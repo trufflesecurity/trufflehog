@@ -1,6 +1,10 @@
 # Truffle Hog
 Searches through git repositories for high entropy strings, digging deep into commit history and branches. This is effective at finding secrets accidentally committed that contain high entropy.
 
+```
+python truffleHog.py https://github.com/dxa4481/truffleHog.git
+```
+
 ![Example](https://i.imgur.com/aGSIEd9.png)
 
 ## Setup
