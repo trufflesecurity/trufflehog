@@ -1,4 +1,4 @@
-import os, math, string, datetime, argparse
+import shutil, os, math, string, datetime, argparse
 from uuid import uuid4
 from git import Repo
 
@@ -93,6 +93,7 @@ def find_strings(git_url):
 
                     
             prev_commit = curr_commit
+    shutil.rmtree(project_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
