@@ -85,9 +85,10 @@ def find_strings(git_url):
                                     foundSomething = True
                                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     if foundSomething:
-                        commit_time =  datetime.datetime.fromtimestamp(curr_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                        print bcolors.OKGREEN + "Commit: " + curr_commit.message + "Date: " + commit_time + bcolors.ENDC
+                        commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                        print bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC
                         print bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC
+                        print bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC
                         print printableDiff
 
                     
