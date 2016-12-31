@@ -1,5 +1,4 @@
-import os, math, string
-import argparse
+import os, math, string, datetime, argparse
 from uuid import uuid4
 from git import Repo
 
@@ -53,10 +52,10 @@ def find_strings(git_url):
     repo = Repo(project_path)
 
 
-    for i in repo.remotes.origin.fetch():
-        branch_name = str(i).split('/')[1]
+    for remote_branch in repo.remotes.origin.fetch():
+        branch_name = str(remote_branch).split('/')[1]
         try:
-            repo.git.checkout(i, b=branch_name)
+            repo.git.checkout(remote_branch, b=branch_name)
         except:
             pass
      
@@ -66,11 +65,11 @@ def find_strings(git_url):
                 pass
             else:
                 diff = prev_commit.diff(curr_commit, create_patch=True)
-                for i in diff:
+                for blob in diff:
                     #print i.a_blob.data_stream.read()
-                    printableDiff = i.diff
+                    printableDiff = blob.diff
                     foundSomething = False
-                    lines = i.diff.split("\n")
+                    lines = blob.diff.split("\n")
                     for line in lines:
                         for word in line.split():
                             base64_strings = get_strings_of_set(word, BASE64_CHARS)
@@ -86,6 +85,9 @@ def find_strings(git_url):
                                     foundSomething = True
                                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     if foundSomething:
+                        commit_time =  datetime.datetime.fromtimestamp(curr_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                        print bcolors.OKGREEN + "Commit: " + curr_commit.message + "Date: " + commit_time + bcolors.ENDC
+                        print bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC
                         print printableDiff
 
                     
