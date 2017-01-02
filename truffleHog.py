@@ -1,4 +1,4 @@
-import shutil, sys, os, math, string, datetime, argparse
+import shutil, sys, os, math, string, datetime, argparse, tempfile
 from uuid import uuid4
 from git import Repo
 
@@ -48,7 +48,7 @@ class bcolors:
 
 def find_strings(git_url):
     new_project = str(uuid4())
-    project_path = os.path.join("temp", new_project)
+    project_path = os.path.join(tempfile.gettempdir(), new_project)
 
     Repo.clone_from(git_url, project_path)
 
