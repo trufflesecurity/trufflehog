@@ -5,7 +5,7 @@ Searches through git repositories for high entropy strings, digging deep into co
 python truffleHog.py https://github.com/dxa4481/truffleHog.git
 ```
 
-![Example](https://i.imgur.com/aGSIEd9.png)
+![Example](https://i.imgur.com/U52GPGm.png)
 
 ## Setup
 The only requirement is GitPython, which can be installed with the following
