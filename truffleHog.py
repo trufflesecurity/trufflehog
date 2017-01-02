@@ -8,6 +8,9 @@ BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 HEX_CHARS = "1234567890abcdefABCDEF"
 
 def shannon_entropy(data, iterator):
+    """
+    Borrowed from http://blog.dkbza.org/2007/05/scanning-data-for-entropy-anomalies.html
+    """
     if not data:
         return 0
     entropy = 0
