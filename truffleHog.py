@@ -72,7 +72,11 @@ def find_strings(git_url):
                 diff = prev_commit.diff(curr_commit, create_patch=True)
                 for blob in diff:
                     #print i.a_blob.data_stream.read()
-                    printableDiff = blob.diff.decode() 
+                    printableDiff = blob.diff.decode()
+                    if printableDiff.startswith("Binary files"):
+                        # print("[DEBUG] DETECTED BINARY FILE DIFF")
+                        continue
+                    # print("[DEBUG] Normal diff")
                     foundSomething = False
                     lines = blob.diff.decode().split("\n")
                     for line in lines:
