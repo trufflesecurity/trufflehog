@@ -1,6 +1,9 @@
-import shutil, os, math, string, datetime, argparse
+import shutil, sys, os, math, string, datetime, argparse
 from uuid import uuid4
 from git import Repo
+
+reload(sys)  
+sys.setdefaultencoding('utf8')
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
@@ -90,7 +93,6 @@ def find_strings(git_url):
                         print bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC
                         print bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC
                         print printableDiff
-
                     
             prev_commit = curr_commit
     shutil.rmtree(project_path)
