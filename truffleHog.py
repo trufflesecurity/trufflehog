@@ -1,5 +1,4 @@
-import shutil, sys, os, math, string, datetime, argparse, tempfile
-from uuid import uuid4
+import shutil, sys, math, string, datetime, argparse, tempfile
 from git import Repo
 
 reload(sys)  
@@ -47,8 +46,7 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 def find_strings(git_url):
-    new_project = str(uuid4())
-    project_path = os.path.join(tempfile.gettempdir(), new_project)
+    project_path = tempfile.mkdtemp()
 
     Repo.clone_from(git_url, project_path)
 
