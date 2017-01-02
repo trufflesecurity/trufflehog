@@ -1,8 +1,9 @@
 import shutil, sys, math, string, datetime, argparse, tempfile
 from git import Repo
 
-reload(sys)  
-sys.setdefaultencoding('utf8')
+if sys.version_info[0] == 2:
+    reload(sys)  
+    sys.setdefaultencoding('utf8')
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
@@ -71,9 +72,9 @@ def find_strings(git_url):
                 diff = prev_commit.diff(curr_commit, create_patch=True)
                 for blob in diff:
                     #print i.a_blob.data_stream.read()
-                    printableDiff = blob.diff
+                    printableDiff = blob.diff.decode() 
                     foundSomething = False
-                    lines = blob.diff.split("\n")
+                    lines = blob.diff.decode().split("\n")
                     for line in lines:
                         for word in line.split():
                             base64_strings = get_strings_of_set(word, BASE64_CHARS)
@@ -90,10 +91,10 @@ def find_strings(git_url):
                                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     if foundSomething:
                         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                        print bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC
-                        print bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC
-                        print bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC
-                        print printableDiff
+                        print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
+                        print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
+                        print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
+                        print(printableDiff)
                     
             prev_commit = curr_commit
     shutil.rmtree(project_path)
