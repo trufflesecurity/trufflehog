@@ -18,5 +18,5 @@ This module will go through the entire commit history of each branch, and check 
 
 ## Wishlist
 
-- A way to detect and not scan binary diffs
+- ~~A way to detect and not scan binary diffs~~
 - ~~Don't rescan diffs if already looked at in another branch~~
