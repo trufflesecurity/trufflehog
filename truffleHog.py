@@ -91,7 +91,11 @@ def find_strings(git_url):
                 for blob in diff:
                     #print i.a_blob.data_stream.read()
                     if blob.a_path:
-                        if not pathfilter(blob.a_path):
+                        path = blob.a_path
+                    else:
+                        path = blob.b_path
+                    if path:
+                        if not pathfilter(path):
                             continue
                     printableDiff = blob.diff.decode()
                     if printableDiff.startswith("Binary files"):
@@ -114,7 +118,7 @@ def find_strings(git_url):
                                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     if foundSomething:
                         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                        print(bcolors.OKGREEN + "File: " + str(blob.a_path) + bcolors.ENDC)
+                        print(bcolors.OKGREEN + "File: " + str(path) + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
