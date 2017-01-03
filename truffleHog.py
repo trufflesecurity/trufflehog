@@ -1,5 +1,7 @@
 import shutil, sys, math, string, datetime, argparse, tempfile
 from git import Repo
+import os
+import stat
 
 if sys.version_info[0] == 2:
     reload(sys)  
@@ -7,6 +9,10 @@ if sys.version_info[0] == 2:
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
+
+def del_rw(action, name, exc):
+    os.chmod(name, stat.S_IWRITE)
+    os.remove(name)
 
 def shannon_entropy(data, iterator):
     """
@@ -97,7 +103,7 @@ def find_strings(git_url):
                         print(printableDiff)
                     
             prev_commit = curr_commit
-    shutil.rmtree(project_path)
+    return project_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
@@ -105,5 +111,6 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    find_strings(args.git_url)
+    project_path = find_strings(args.git_url)
+    shutil.rmtree(project_path, onerror=del_rw)
 
