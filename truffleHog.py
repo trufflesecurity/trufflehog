@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import shutil, sys, math, string, datetime, argparse, tempfile
 from git import Repo
 
