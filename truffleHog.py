@@ -226,6 +226,8 @@ if __name__ == "__main__":
                     totalrepos = countrepos - countforks
                     print "Total: %d" % totalrepos
                     ignoringforks = " being ignored"
+                else:
+                    totalrepos = countrepos
 
                 procrepos = 0
 
