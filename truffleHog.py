@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import shutil, sys, math, string, datetime, argparse, tempfile
+import shutil, sys, math, string, datetime, argparse, tempfile, os, fnmatch
 from git import Repo
 
 if sys.version_info[0] == 2:
@@ -8,6 +8,16 @@ if sys.version_info[0] == 2:
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
+
+file_filter_patterns = []
+
+def pathfilter(path):
+    for pat in file_filter_patterns:
+        if ("/" in pat) or ("\\" in pat):
+            if fnmatch.fnmatch(path, pat): return None
+        else:
+            if fnmatch.fnmatch(os.path.basename(path), pat): return None
+    return path
 
 def shannon_entropy(data, iterator):
     """
@@ -77,10 +87,12 @@ def find_strings(git_url):
                     prev_commit = curr_commit
                     continue
                 already_searched.add(hashes)
-
                 diff = prev_commit.diff(curr_commit, create_patch=True)
                 for blob in diff:
                     #print i.a_blob.data_stream.read()
+                    if blob.a_path:
+                        if not pathfilter(blob.a_path):
+                            continue
                     printableDiff = blob.diff.decode()
                     if printableDiff.startswith("Binary files"):
                         continue
@@ -102,6 +114,7 @@ def find_strings(git_url):
                                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     if foundSomething:
                         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                        print(bcolors.OKGREEN + "File: " + str(blob.a_path) + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
@@ -114,6 +127,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('git_url', type=str, help='URL for secret searching')
 
+    # if the .fileignore file exists, attempt to import file patterns
+    try:
+        with open('.fileignore', 'r') as f:
+            for line in f:
+                if not (line[0] == "#"):
+                    file_filter_patterns.append(line.rstrip())
+    except:
+        pass
 
     args = parser.parse_args()
     find_strings(args.git_url)
