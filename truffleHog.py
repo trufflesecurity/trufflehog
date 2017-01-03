@@ -117,7 +117,7 @@ if __name__ == "__main__":
     org_parser = subparsers.add_parser('org', help='Search inside all repositories for an organization (github.com/uber, github.com/google, etc)')
     org_parser.add_argument('orgname', type=str, action='store', help='Github Organization name (uber, yubico, etc)')
     # Parse git repo command
-    git_parser = subparsers.add_parser('git', help='Search inside a singpe repository')
+    git_parser = subparsers.add_parser('git', help='Search inside a single repository')
     git_parser.add_argument('git_url', type=str, action='store', help='URL for secret searching')
     args = parser.parse_args()
     if hasattr(args, 'orgname'):
