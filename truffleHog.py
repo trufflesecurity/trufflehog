@@ -83,9 +83,7 @@ def find_strings(git_url):
                     #print i.a_blob.data_stream.read()
                     printableDiff = blob.diff.decode()
                     if printableDiff.startswith("Binary files"):
-                        # print("[DEBUG] DETECTED BINARY FILE DIFF")
                         continue
-                    # print("[DEBUG] Normal diff")
                     foundSomething = False
                     lines = blob.diff.decode().split("\n")
                     for line in lines:
