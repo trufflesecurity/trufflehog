@@ -1,0 +1,5 @@
+# Use UNIX style pattern matching to select files for truffleHog to ignore. Use slashes for directory matching.
+# Examples:
+# *.md
+# LICENSE
+# temp/*
