@@ -51,15 +51,16 @@ def get_strings_of_set(word, char_set, threshold=20):
         strings.append(letters)
     return strings
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+bcolors = {
+    'HEADER' : '\033[95m',
+    'OKBLUE' : '\033[94m',
+    'OKGREEN' : '\033[92m',
+    'WARNING' : '\033[93m',
+    'FAIL' : '\033[91m',
+    'ENDC' : '\033[0m',
+    'BOLD' : '\033[1m',
+    'UNDERLINE' : '\033[4m'
+    }
 
 def find_strings(git_url):
     project_path = tempfile.mkdtemp()
@@ -105,17 +106,19 @@ def find_strings(git_url):
                                 b64Entropy = shannon_entropy(string, BASE64_CHARS)
                                 if b64Entropy > 4.5:
                                     foundSomething = True
-                                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
+                                    printableDiff = printableDiff.replace(string,
+                                                                          bcolors['WARNING'] + string + bcolors['ENDC'])
                             for string in hex_strings:
                                 hexEntropy = shannon_entropy(string, HEX_CHARS)
                                 if hexEntropy > 3:
                                     foundSomething = True
-                                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
+                                    printableDiff = printableDiff.replace(string,
+                                                                          bcolors['WARNING'] + string + bcolors['ENDC'])
                     if foundSomething:
                         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                        print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
-                        print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
-                        print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
+                        print(bcolors['OKGREEN'] + "Date: " + commit_time + bcolors['ENDC'])
+                        print(bcolors['OKGREEN'] + "Branch: " + branch_name + bcolors['ENDC'])
+                        print(bcolors['OKGREEN'] + "Commit: " + prev_commit.message + bcolors['ENDC'])
                         print(printableDiff)
                     
             prev_commit = curr_commit
