@@ -37,7 +37,7 @@ def get_strings_of_set(word, char_set, threshold=20):
             letters += char
             count += 1
         else:
-            if count > 20:
+            if count > threshold:
                 strings.append(letters)
             letters = ""
             count = 0
