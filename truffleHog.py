@@ -7,6 +7,9 @@ import argparse
 import tempfile
 from git import Repo
 
+# needed to get list of orgs using github api
+import requests
+
 if sys.version_info[0] == 2:
     reload(sys)  
     sys.setdefaultencoding('utf8')
@@ -115,11 +118,26 @@ def find_strings(git_url):
             prev_commit = curr_commit
     shutil.rmtree(project_path)
 
+def get_org_repos(orgname):
+    response = requests.get(url='https://api.github.com/users/' + orgname + '/repos')
+    json = response.json()
+    for item in json:
+        if item['private'] == False:
+            print('searching ' + item["html_url"])
+            find_strings(item["html_url"])
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
-    parser.add_argument('git_url', type=str, help='URL for secret searching')
-
-
+    subparsers = parser.add_subparsers(help='commands')
+    # Parse org repo search command
+    org_parser = subparsers.add_parser('org', help='Search inside all repositories for an organization (github.com/uber, github.com/google, etc)')
+    org_parser.add_argument('orgname', type=str, action='store', help='Github Organization name (uber, yubico, etc)')
+    # Parse git repo command
+    git_parser = subparsers.add_parser('git', help='Search inside a single repository')
+    git_parser.add_argument('git_url', type=str, action='store', help='URL for secret searching')
     args = parser.parse_args()
-    find_strings(args.git_url)
-
+    if hasattr(args, 'orgname'):
+        print('searching for repos in the github organization: ' + args.orgname)
+        get_org_repos(args.orgname)
+    if hasattr(args, 'git_url'):
+        find_strings(args.git_url)
