@@ -5,9 +5,9 @@ import math
 import datetime
 import argparse
 import tempfile
-from git import Repo
 import os
 import stat
+from git import Repo
 
 if sys.version_info[0] == 2:
     reload(sys)  
