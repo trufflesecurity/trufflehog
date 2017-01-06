@@ -27,8 +27,8 @@ def shannon_entropy(data, iterator):
     if not data:
         return 0
     entropy = 0
-    for x in (ord(c) for c in iterator):
-        p_x = float(data.count(chr(x)))/len(data)
+    for x in iterator:
+        p_x = float(data.count(x))/len(data)
         if p_x > 0:
             entropy += - p_x*math.log(p_x, 2)
     return entropy
