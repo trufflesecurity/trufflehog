@@ -63,7 +63,7 @@ def find_strings(git_url):
                             for string in base64_strings:
                                 printableDiff.replace(string, thlib.Utility.examine_string(string, "b64"))
                             for string in hex_strings:
-                                printableDiff.replace(string, thlib.Utility.examine_string(string, "b64"))
+                                printableDiff.replace(string, thlib.Utility.examine_string(string, "hex"))
                     if thlib.BColors.WARNING in printableDiff:
                         thlib.Utility.print_alert(prev_commit, branch_name, printableDiff)
             prev_commit = curr_commit

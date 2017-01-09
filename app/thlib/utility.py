@@ -46,8 +46,8 @@ class Utility(object):
                                  "hex": 3}
         entropy = Utility.shannon_entropy(in_string, str_type_ref[str_type])
         if entropy > entropy_threshold_ref[str_type]:
-            print in_string
-            alert_string = bc.WARNING + in_string + bc.ENDC
+            alert_string = str(bc.WARNING + in_string + bc.ENDC)
+            print alert_string
             return alert_string
         else:
             return in_string
