@@ -1,5 +1,12 @@
 #!/usr/bin/env python
-import shutil, sys, math, string, datetime, argparse, tempfile
+import shutil
+import sys
+import math
+import datetime
+import argparse
+import tempfile
+import os
+import stat
 from git import Repo
 import json
 
@@ -9,6 +16,10 @@ if sys.version_info[0] == 2:
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
+
+def del_rw(action, name, exc):
+    os.chmod(name, stat.S_IWRITE)
+    os.remove(name)
 
 def shannon_entropy(data, iterator):
     """
@@ -33,7 +44,7 @@ def get_strings_of_set(word, char_set, threshold=20):
             letters += char
             count += 1
         else:
-            if count > 20:
+            if count > threshold:
                 strings.append(letters)
             letters = ""
             count = 0
@@ -125,7 +136,7 @@ def find_strings(git_url, output):
                             print(printableDiff)
 
             prev_commit = curr_commit
-    shutil.rmtree(project_path)
+    return project_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
@@ -133,4 +144,5 @@ if __name__ == "__main__":
     parser.add_argument('git_url', type=str, help='URL for secret searching')
 
     args = parser.parse_args()
-    find_strings(args.git_url, args.output_json)
+    project_path = find_strings(args.git_url, args.output_json)
+    shutil.rmtree(project_path, onerror=del_rw)
