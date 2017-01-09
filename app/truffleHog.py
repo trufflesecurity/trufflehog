@@ -5,6 +5,7 @@ import argparse
 import tempfile
 import os
 import stat
+import sys
 from git import Repo
 
 import thlib
@@ -24,6 +25,7 @@ def del_rw(action, name, exc):
 
 
 def find_strings(git_url):
+    clean_exit = True
     project_path = tempfile.mkdtemp()
 
     Repo.clone_from(git_url, project_path)
@@ -56,23 +58,33 @@ def find_strings(git_url):
                     if printableDiff.startswith("Binary files"):
                         continue
                     lines = blob.diff.decode().split("\n")
+                    issues_found = False
                     for line in lines:
                         for word in line.split():
                             base64_strings = thlib.Utility.get_strings_of_set(word, BASE64_CHARS)
                             hex_strings = thlib.Utility.get_strings_of_set(word, HEX_CHARS)
-                            for string in base64_strings:
-                                printableDiff.replace(string, thlib.Utility.examine_string(string, "b64"))
-                            for string in hex_strings:
-                                printableDiff.replace(string, thlib.Utility.examine_string(string, "hex"))
-                    if thlib.BColors.WARNING in printableDiff:
+                            for in_string in base64_strings:
+                                out_string = thlib.Utility.examine_string(in_string, "b64")
+                                if in_string != out_string:
+                                    issues_found = True
+                                    printableDiff = printableDiff.replace(in_string, out_string)
+                            for in_string in hex_strings:
+                                out_string = thlib.Utility.examine_string(in_string, "hex")
+                                if in_string != out_string:
+                                    issues_found = True
+                                    printableDiff = printableDiff.replace(in_string, out_string)
+                    if issues_found is True:
+                        clean_exit = False
                         thlib.Utility.print_alert(prev_commit, branch_name, printableDiff)
             prev_commit = curr_commit
-    return project_path
+    return(project_path, clean_exit)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     args = parser.parse_args()
     print args
-    project_path = find_strings(args.git_url)
+    project_path, clean_exit = find_strings(args.git_url)
     shutil.rmtree(project_path, onerror=del_rw)
+    if clean_exit is False:
+        sys.exit(1)

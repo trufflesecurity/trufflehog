@@ -47,7 +47,6 @@ class Utility(object):
         entropy = Utility.shannon_entropy(in_string, str_type_ref[str_type])
         if entropy > entropy_threshold_ref[str_type]:
             alert_string = str(bc.WARNING + in_string + bc.ENDC)
-            print alert_string
             return alert_string
         else:
             return in_string
@@ -56,9 +55,9 @@ class Utility(object):
     def print_alert(cls, prev_commit, branch_name, printableDiff):
         prev_commit_date = dt.fromtimestamp(prev_commit.committed_date)
         commit_time = Utility.format_time(prev_commit_date)
-        print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
-        print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
-        print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
+        print(bc.OKGREEN + "Date: " + commit_time + bc.ENDC)
+        print(bc.OKGREEN + "Branch: " + branch_name + bc.ENDC)
+        print(bc.OKGREEN + "Commit: " + prev_commit.message + bc.ENDC)
         print(printableDiff)
 
     @classmethod
