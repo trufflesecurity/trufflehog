@@ -9,8 +9,17 @@ import os
 import stat
 from git import Repo
 
+def main():
+    parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
+    parser.add_argument('git_url', type=str, help='URL for secret searching')
+
+
+    args = parser.parse_args()
+    project_path = find_strings(args.git_url)
+    shutil.rmtree(project_path, onerror=del_rw)
+
 if sys.version_info[0] == 2:
-    reload(sys)  
+    reload(sys)
     sys.setdefaultencoding('utf8')
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
@@ -76,7 +85,7 @@ def find_strings(git_url):
             repo.git.checkout(remote_branch, b=branch_name)
         except:
             pass
-     
+
         prev_commit = None
         for curr_commit in repo.iter_commits():
             if not prev_commit:
@@ -117,16 +126,9 @@ def find_strings(git_url):
                         print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
                         print(printableDiff)
-                    
+
             prev_commit = curr_commit
     return project_path
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
-    parser.add_argument('git_url', type=str, help='URL for secret searching')
-
-
-    args = parser.parse_args()
-    project_path = find_strings(args.git_url)
-    shutil.rmtree(project_path, onerror=del_rw)
-
+    main()
