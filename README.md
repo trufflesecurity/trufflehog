@@ -12,12 +12,6 @@ python truffleHog.py https://github.com/dxa4481/truffleHog.git
 pip install truffleHog
 ```
 
-## Setup
-The only requirement is GitPython, which can be installed with the following
-```
-pip install -r requirements.txt
-```
-
 ## How it works
 This module will go through the entire commit history of each branch, and check each diff from each commit, and evaluate the shannon entropy for both the base64 char set and hexidecimal char set for every blob of text greater than 20 characters comprised of those character sets in each diff. If at any point a high entropy string >20 characters is detected, it will print to the screen.
 
