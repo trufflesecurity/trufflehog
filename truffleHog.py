@@ -115,7 +115,7 @@ def find_strings(git_url):
                         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                         print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
-                        print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
+                        print(bcolors.OKGREEN + "Commit: " + prev_commit.message.strip() + " / " + prev_commit.hexsha + bcolors.ENDC)
                         print(printableDiff)
                     
             prev_commit = curr_commit
