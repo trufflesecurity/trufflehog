@@ -116,7 +116,7 @@ def find_strings(git_url):
                         print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
-                        print(printableDiff)
+                        print(printableDiff.encode('utf-8').strip())
                     
             prev_commit = curr_commit
     return project_path
