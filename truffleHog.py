@@ -70,6 +70,7 @@ def find_strings(project_path, outfile=None):
 
     repo = Repo(project_path)
 
+    already_found = []
     already_searched = set()
     for remote_branch in repo.remotes.origin.fetch():
         branch_name = str(remote_branch).split('/')[1]
@@ -119,7 +120,9 @@ def find_strings(project_path, outfile=None):
                         print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
                         print(printableDiff)
 
-                        if outfile is not None:
+                        if outfile is not None and string not in already_found:
+
+                            already_found.append(string)
                             outfile.write(string+'\n')
 
             prev_commit = curr_commit
@@ -133,7 +136,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if("http" in args.path):
+    if "http" in args.path:
         path = clone_repo(args.path)
     else:
         path = args.path
