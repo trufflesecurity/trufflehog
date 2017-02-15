@@ -44,4 +44,4 @@ This file will contain all unique strings found. One per line.
 
 - ~~A way to detect and not scan binary diffs~~
 - ~~Don't rescan diffs if already looked at in another branch~~
-- ~~Output a file with all found keys
+- ~~Output a file with all found keys~~
