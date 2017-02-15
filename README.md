@@ -22,7 +22,7 @@ This module will go through the entire commit history of each branch, and check 
 It is possible to run it in a remote git repository or with a local git repository:
 
 `
-python truffleHog.py django_app
+python truffleHog.py source_folder
 `
 
 or
