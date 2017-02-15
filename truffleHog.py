@@ -10,7 +10,7 @@ import stat
 from git import Repo
 
 if sys.version_info[0] == 2:
-    reload(sys)  
+    reload(sys)
     sys.setdefaultencoding('utf8')
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
@@ -61,13 +61,14 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def find_strings(git_url):
+def clone_repo(repo_path):
     project_path = tempfile.mkdtemp()
+    Repo.clone_from(path, project_path)
+    return project_path
 
-    Repo.clone_from(git_url, project_path)
+def find_strings(project_path):
 
     repo = Repo(project_path)
-
 
     already_searched = set()
     for remote_branch in repo.remotes.origin.fetch():
@@ -76,7 +77,7 @@ def find_strings(git_url):
             repo.git.checkout(remote_branch, b=branch_name)
         except:
             pass
-     
+
         prev_commit = None
         for curr_commit in repo.iter_commits():
             if not prev_commit:
@@ -117,16 +118,22 @@ def find_strings(git_url):
                         print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
                         print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
                         print(printableDiff)
-                    
+
             prev_commit = curr_commit
     return project_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
-    parser.add_argument('git_url', type=str, help='URL for secret searching')
+    parser.add_argument('path', type=str, help='URL or PATH where to search for secrets')
 
 
     args = parser.parse_args()
-    project_path = find_strings(args.git_url)
+
+    if("http" in args.path):
+        path = clone_repo(args.path)
+    else:
+        path = args.path
+
+    project_path = find_strings(path)
     shutil.rmtree(project_path, onerror=del_rw)
 
