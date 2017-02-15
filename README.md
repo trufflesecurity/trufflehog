@@ -14,6 +14,7 @@ pip install -r requirements.txt
 ```
 
 ## How it works
+
 This module will go through the entire commit history of each branch, and check each diff from each commit, and evaluate the shannon entropy for both the base64 char set and hexidecimal char set for every blob of text greater than 20 characters comprised of those character sets in each diff. If at any point a high entropy string >20 characters is detected, it will print to the screen. 
 
 ## Run
@@ -30,7 +31,17 @@ or
 python truffleHog.py http://...
 `
 
+## Output
+
+This module will output print in the diffs where the key is found highlighting the found string.
+It is possible to make it ouput a file with the argument:
+
+	`-o` or `-outfile`
+
+This file will contain all unique strings found. One per line.
+
 ## Wishlist
 
 - ~~A way to detect and not scan binary diffs~~
 - ~~Don't rescan diffs if already looked at in another branch~~
+- ~~Output a file with all found keys
