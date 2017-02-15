@@ -66,7 +66,7 @@ def clone_repo(repo_path):
     Repo.clone_from(path, project_path)
     return project_path
 
-def find_strings(project_path):
+def find_strings(project_path, outfile=None):
 
     repo = Repo(project_path)
 
@@ -119,13 +119,17 @@ def find_strings(project_path):
                         print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
                         print(printableDiff)
 
+                        if outfile is not None:
+                            outfile.write(string+'\n')
+
             prev_commit = curr_commit
     return project_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
-    parser.add_argument('path', type=str, help='URL or PATH where to search for secrets')
 
+    parser.add_argument('path', type=str, help='URL or PATH where to search for secrets')
+    parser.add_argument('-o', '--outfile', nargs='?', type=argparse.FileType('w'), help='output file')
 
     args = parser.parse_args()
 
@@ -134,6 +138,6 @@ if __name__ == "__main__":
     else:
         path = args.path
 
-    project_path = find_strings(path)
+    project_path = find_strings(path, outfile=args.outfile)
     shutil.rmtree(project_path, onerror=del_rw)
 
