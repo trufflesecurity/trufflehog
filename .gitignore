@@ -1,0 +1,4 @@
+/build/
+/dist/
+/truffleHog.egg-info/
+*/__pycache__/

@@ -6,9 +6,18 @@ import datetime
 import argparse
 import tempfile
 import os
+import json
 import stat
 from git import Repo
-import json
+
+def main():
+    parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
+    parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
+    parser.add_argument('git_url', type=str, help='URL for secret searching')
+    args = parser.parse_args()
+    output = find_strings(args.git_url, args.output_json)
+    project_path = output["project_path"]
+    shutil.rmtree(project_path, onerror=del_rw)
 
 if sys.version_info[0] == 2:
     reload(sys)
@@ -131,10 +140,4 @@ def find_strings(git_url, printJson=False):
     return output
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
-    parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
-    parser.add_argument('git_url', type=str, help='URL for secret searching')
-    args = parser.parse_args()
-    output = find_strings(args.git_url, args.output_json)
-    project_path = output["project_path"]
-    shutil.rmtree(project_path, onerror=del_rw)
+    main()
