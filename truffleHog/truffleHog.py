@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import shutil
 import sys
 import math
@@ -19,9 +21,6 @@ def main():
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
-if sys.version_info[0] == 2:
-    reload(sys)
-    sys.setdefaultencoding('utf8')
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
@@ -77,6 +76,7 @@ def find_strings(git_url, printJson=False):
     output = {"entropicDiffs": []}
     repo = Repo(project_path)
     already_searched = set()
+
     for remote_branch in repo.remotes.origin.fetch():
         branch_name = str(remote_branch).split('/')[1]
         try:
@@ -99,11 +99,11 @@ def find_strings(git_url, printJson=False):
                 diff = prev_commit.diff(curr_commit, create_patch=True)
                 for blob in diff:
                     #print i.a_blob.data_stream.read()
-                    printableDiff = blob.diff.decode()
+                    printableDiff = blob.diff.decode('utf-8', errors='replace')
                     if printableDiff.startswith("Binary files"):
                         continue
                     stringsFound = []
-                    lines = blob.diff.decode().split("\n")
+                    lines = blob.diff.decode('utf-8', errors='replace').split("\n")
                     for line in lines:
                         for word in line.split():
                             base64_strings = get_strings_of_set(word, BASE64_CHARS)
@@ -124,7 +124,7 @@ def find_strings(git_url, printJson=False):
                         entropicDiff['date'] = commit_time
                         entropicDiff['branch'] = branch_name
                         entropicDiff['commit'] = prev_commit.message
-                        entropicDiff['diff'] = blob.diff.decode() 
+                        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace') 
                         entropicDiff['stringsFound'] = stringsFound
                         output["entropicDiffs"].append(entropicDiff)
                         if printJson:
