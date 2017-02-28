@@ -8,7 +8,7 @@ truffleHog https://github.com/dxa4481/truffleHog.git
 or
 
 ```
-python truffleHog.py file:///user/dxa4481/codeprojects/truffleHog/
+truffleHog file:///user/dxa4481/codeprojects/truffleHog/
 ```
 
 ![Example](https://i.imgur.com/YAXndLD.png)
