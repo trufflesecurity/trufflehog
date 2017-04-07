@@ -15,9 +15,10 @@ from git import Repo
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
+    parser.add_argument('--threshold', type=int, default=20, help="Set character limit threshold for searches. Defaults to 20")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     args = parser.parse_args()
-    output = find_strings(args.git_url, args.output_json)
+    output = find_strings(args.git_url, args.output_json, args.threshold)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
@@ -43,7 +44,7 @@ def shannon_entropy(data, iterator):
     return entropy
 
 
-def get_strings_of_set(word, char_set, threshold=20):
+def get_strings_of_set(word, char_set, threshold):
     count = 0
     letters = ""
     strings = []
@@ -70,7 +71,7 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def find_strings(git_url, printJson=False):
+def find_strings(git_url, printJson=False, threshold=20):
     project_path = tempfile.mkdtemp()
     Repo.clone_from(git_url, project_path)
     output = {"entropicDiffs": []}
@@ -106,8 +107,8 @@ def find_strings(git_url, printJson=False):
                     lines = blob.diff.decode('utf-8', errors='replace').split("\n")
                     for line in lines:
                         for word in line.split():
-                            base64_strings = get_strings_of_set(word, BASE64_CHARS)
-                            hex_strings = get_strings_of_set(word, HEX_CHARS)
+                            base64_strings = get_strings_of_set(word, BASE64_CHARS, threshold)
+                            hex_strings = get_strings_of_set(word, HEX_CHARS, threshold)
                             for string in base64_strings:
                                 b64Entropy = shannon_entropy(string, BASE64_CHARS)
                                 if b64Entropy > 4.5:
