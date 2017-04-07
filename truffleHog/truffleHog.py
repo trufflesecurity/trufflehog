@@ -16,12 +16,13 @@ def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument('--threshold', type=int, default=20, help="Set character limit threshold for searches. Defaults to 20")
+    parser.add_argument('--b64entropy', type=float, default=4.5, help="Set minimum entropy level for b64 encoding of strings. Defaults to 4.5")
+    parser.add_argument('--hexentropy', type=float, default=3.0, help="Set minimum entropy level for hex encoding of strings. Defaults to 3")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     args = parser.parse_args()
-    output = find_strings(args.git_url, args.output_json, args.threshold)
+    output = find_strings(args.git_url, args.output_json, args.threshold, args.b64entropy, args.hexentropy)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
-
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
@@ -71,7 +72,7 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def find_strings(git_url, printJson=False, threshold=20):
+def find_strings(git_url, printJson=False, threshold=20, b64_min=4.5, hex_min=3.0):
     project_path = tempfile.mkdtemp()
     Repo.clone_from(git_url, project_path)
     output = {"entropicDiffs": []}
@@ -111,12 +112,12 @@ def find_strings(git_url, printJson=False, threshold=20):
                             hex_strings = get_strings_of_set(word, HEX_CHARS, threshold)
                             for string in base64_strings:
                                 b64Entropy = shannon_entropy(string, BASE64_CHARS)
-                                if b64Entropy > 4.5:
+                                if b64Entropy > b64_min:
                                     stringsFound.append(string)
                                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                             for string in hex_strings:
                                 hexEntropy = shannon_entropy(string, HEX_CHARS)
-                                if hexEntropy > 3:
+                                if hexEntropy > hex_min:
                                     stringsFound.append(string)
                                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     if len(stringsFound) > 0:
