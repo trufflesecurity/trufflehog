@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
+
 import shutil
 import sys
 import math
@@ -15,9 +17,16 @@ from git import Repo
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
+    parser.add_argument('-o', '--output-file', dest="output_file", help="Filename to write output to (defaults to stdout)")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     args = parser.parse_args()
-    output = find_strings(args.git_url, args.output_json)
+    if args.output_file is not None:
+        with open(args.output_file, "w") as f:
+            utf8_output = codecs.getwriter('utf8')
+            utf8_file = utf8_output(f)
+            output = find_strings(args.git_url, args.output_json, output_file=utf8_file)
+    else:
+        output = find_strings(args.git_url, args.output_json)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
@@ -70,7 +79,7 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def find_strings(git_url, printJson=False):
+def find_strings(git_url, printJson=False, output_file=sys.stdout):
     project_path = tempfile.mkdtemp()
     Repo.clone_from(git_url, project_path)
     output = {"entropicDiffs": []}
@@ -124,16 +133,16 @@ def find_strings(git_url, printJson=False):
                         entropicDiff['date'] = commit_time
                         entropicDiff['branch'] = branch_name
                         entropicDiff['commit'] = prev_commit.message
-                        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace') 
+                        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
                         entropicDiff['stringsFound'] = stringsFound
                         output["entropicDiffs"].append(entropicDiff)
                         if printJson:
-                            print(json.dumps(output, sort_keys=True, indent=4))
+                            print(json.dumps(output, sort_keys=True, indent=4), file=output_file)
                         else:
-                            print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
-                            print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
-                            print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
-                            print(printableDiff)
+                            print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC, file=output_file)
+                            print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC, file=output_file)
+                            print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC, file=output_file)
+                            print(printableDiff, file=output_file)
 
             prev_commit = curr_commit
     output["project_path"] = project_path
