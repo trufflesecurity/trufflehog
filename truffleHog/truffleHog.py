@@ -104,7 +104,7 @@ def find_strings(git_url, printJson=False):
                         continue
                     stringsFound = []
                     lines = blob.diff.decode('utf-8', errors='replace').split("\n")
-                    for line in lines:
+                    for line in [l for l in lines if l.startswith("+")]:
                         for word in line.split():
                             base64_strings = get_strings_of_set(word, BASE64_CHARS)
                             hex_strings = get_strings_of_set(word, HEX_CHARS)
