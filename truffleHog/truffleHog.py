@@ -16,18 +16,41 @@ def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
+
+    # if the .fileignore file exists, attempt to import file patterns
+    try:
+        with open('.fileignore', 'r') as f:
+            for line in f:
+                if not (line[0] == "#"):
+                    file_filter_patterns.append(line.rstrip())
+    except:
+        pass
+
     args = parser.parse_args()
     output = find_strings(args.git_url, args.output_json)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
+if sys.version_info[0] == 2:
+    reload(sys)
+    sys.setdefaultencoding('utf8')
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
 
+file_filter_patterns = []
+
 def del_rw(action, name, exc):
     os.chmod(name, stat.S_IWRITE)
     os.remove(name)
+
+def pathfilter(path):
+    for pat in file_filter_patterns:
+        if ("/" in pat) or ("\\" in pat):
+            if fnmatch.fnmatch(path, pat): return None
+        else:
+            if fnmatch.fnmatch(os.path.basename(path), pat): return None
+    return path
 
 def shannon_entropy(data, iterator):
     """
@@ -76,7 +99,6 @@ def find_strings(git_url, printJson=False):
     output = {"entropicDiffs": []}
     repo = Repo(project_path)
     already_searched = set()
-
     for remote_branch in repo.remotes.origin.fetch():
         branch_name = str(remote_branch).split('/')[1]
         try:
@@ -95,10 +117,16 @@ def find_strings(git_url, printJson=False):
                     prev_commit = curr_commit
                     continue
                 already_searched.add(hashes)
-
                 diff = prev_commit.diff(curr_commit, create_patch=True)
                 for blob in diff:
                     #print i.a_blob.data_stream.read()
+                    if blob.a_path:
+                        path = blob.a_path
+                    else:
+                        path = blob.b_path
+                    if path:
+                        if not pathfilter(path):
+                            continue
                     printableDiff = blob.diff.decode('utf-8', errors='replace')
                     if printableDiff.startswith("Binary files"):
                         continue
@@ -121,6 +149,7 @@ def find_strings(git_url, printJson=False):
                     if len(stringsFound) > 0:
                         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                         entropicDiff = {}
+                        entropicDiff['file'] = str(path)
                         entropicDiff['date'] = commit_time
                         entropicDiff['branch'] = branch_name
                         entropicDiff['commit'] = prev_commit.message
@@ -130,6 +159,7 @@ def find_strings(git_url, printJson=False):
                         if printJson:
                             print(json.dumps(output, sort_keys=True, indent=4))
                         else:
+                            print(bcolors.OKGREEN + "File: " + str(path) + bcolors.ENDC)
                             print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
                             print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
                             print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
@@ -137,6 +167,7 @@ def find_strings(git_url, printJson=False):
 
             prev_commit = curr_commit
     output["project_path"] = project_path
+    shutil.rmtree(project_path)
     return output
 
 if __name__ == "__main__":
