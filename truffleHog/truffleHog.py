@@ -10,6 +10,7 @@ import tempfile
 import os
 import json
 import stat
+import fnmatch
 from git import Repo
 
 def main():
@@ -155,7 +156,7 @@ def find_strings(git_url, printJson=False):
                         entropicDiff['date'] = commit_time
                         entropicDiff['branch'] = branch_name
                         entropicDiff['commit'] = prev_commit.message
-                        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace') 
+                        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
                         entropicDiff['stringsFound'] = stringsFound
                         output["entropicDiffs"].append(entropicDiff)
                         if printJson:
