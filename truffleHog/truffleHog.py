@@ -99,6 +99,7 @@ def find_strings(git_url, printJson=False):
     output = {"entropicDiffs": []}
     repo = Repo(project_path)
     already_searched = set()
+
     for remote_branch in repo.remotes.origin.fetch():
         branch_name = str(remote_branch).split('/')[1]
         try:
@@ -117,6 +118,7 @@ def find_strings(git_url, printJson=False):
                     prev_commit = curr_commit
                     continue
                 already_searched.add(hashes)
+
                 diff = prev_commit.diff(curr_commit, create_patch=True)
                 for blob in diff:
                     #print i.a_blob.data_stream.read()
