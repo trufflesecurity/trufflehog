@@ -32,18 +32,14 @@ def main():
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
-if sys.version_info[0] == 2:
-    reload(sys)
-    sys.setdefaultencoding('utf8')
-
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
-
-file_filter_patterns = []
 
 def del_rw(action, name, exc):
     os.chmod(name, stat.S_IWRITE)
     os.remove(name)
+
+file_filter_patterns = []
 
 def pathfilter(path):
     for pat in file_filter_patterns:
@@ -170,7 +166,6 @@ def find_strings(git_url, printJson=False):
 
             prev_commit = curr_commit
     output["project_path"] = project_path
-    shutil.rmtree(project_path)
     return output
 
 if __name__ == "__main__":
