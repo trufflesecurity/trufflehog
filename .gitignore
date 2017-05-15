@@ -2,3 +2,4 @@
 /dist/
 /truffleHog.egg-info/
 */__pycache__/
+files.txt

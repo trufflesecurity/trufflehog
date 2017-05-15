@@ -14,8 +14,27 @@ truffleHog file:///user/dxa4481/codeprojects/truffleHog/
 ![Example](https://i.imgur.com/YAXndLD.png)
 
 ## Install
+Automatically install via the [Python Package Indexer, PIP](https://pypi.python.org/pypi/pip)
 ```
 pip install truffleHog
+```
+
+or manually install by via clone/download the repository and install with setup.py
+
+```
+git clone https://github.com/dxa4481/truffleHog.git
+cd truffleHog.git
+python setup.py install --record files.txt
+```
+
+## Uninstall
+```
+pip uninstall truffleHog
+```
+
+or manually uninstall if installed locally via repo
+```
+cat files.txt | xargs rm -rf
 ```
 
 ## How it works
