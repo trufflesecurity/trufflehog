@@ -34,7 +34,7 @@ def is_abs_url(url=None):
     """
     if url is None or url.strip() == '':
         return False
-    if url.strip().lower()[:4] == 'http' is False:
+    if not url.strip().lower()[:4] == 'http': 
         return False
     try:
         rc = urllib.urlopen(url).getcode()
@@ -60,7 +60,7 @@ def is_git_dir(filepath=None):
         filepath += '/.git'
 
     # verify actual git directory
-    if os.path.isdir(filepath) and os.path.exists(filepath):
+    if not os.path.isdir(filepath) and os.path.exists(filepath):
         try:
             rc = subprocess.call(['git', 'rev-parse'], cwd=filepath)
             return (rc == 0)
@@ -68,6 +68,7 @@ def is_git_dir(filepath=None):
             sys.stderr.write("Unable to invoke cmd 'git rev-parse' due to following: " + e.message)
             return False  
     else:
+        sys.stderr.write("Invalid filepath - directory does not exist " + filepath)
         return False
 
 def del_rw(action, name, exc):
