@@ -8,22 +8,62 @@ import datetime
 import argparse
 import tempfile
 import os
+import subprocess
 import json
 import stat
 from git import Repo
+from urlparse import urlparse
+
+# Global Vars
+BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+HEX_CHARS = "1234567890abcdefABCDEF"
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
-    parser.add_argument('git_url', type=str, help='URL for secret searching')
+    parser.add_argument('git_repo', type=str, help='Git Repository: Remote URL or local filesystem for secret searching')
     args = parser.parse_args()
-    output = find_strings(args.git_url, args.output_json)
+    output = find_strings(args.git_repo, args.output_json)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
+def is_abs_url(url=None):
+    """Checks if string is absolute URL or not and returns boolean denoting True or False if valid URL.  
 
-BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
-HEX_CHARS = "1234567890abcdefABCDEF"
+    :param url: A string, absolute URL.
+    """
+    if url is None or url.strip() == '':
+        return False
+    if url.strip().lower()[:4] == 'http' is False:
+        return False
+    try:
+        result = urlparse(url)
+        return True if [result.scheme, result.netloc, result.path] else False
+    except:
+        return False
+
+def is_git_dir(filepath=None):
+    """Checks if filepath is directory and if directory itself is a git repository.
+    Returns boolean denoting True or False if valid directory and git repository.  
+
+    :param filepath: A string, filepath of the directory.
+    """
+    if filepath is None or filepath.strip() == '':
+        return False
+
+    if filepath[-4:] != '.git':
+        filepath += '/.git'
+
+    # verify actual git directory
+    if os.path.isdir(filepath) and os.path.exists(filepath):
+        try:
+            rc = subprocess.call(['git', 'rev-parse'], cwd=filepath)
+            return (rc == 0)
+        except OSError as e:
+            sys.stderr.write("Unable to invoke cmd 'git rev-parse' due to following: " + e.message)
+            return False  
+    else:
+        return False
 
 def del_rw(action, name, exc):
     os.chmod(name, stat.S_IWRITE)
@@ -41,7 +81,6 @@ def shannon_entropy(data, iterator):
         if p_x > 0:
             entropy += - p_x*math.log(p_x, 2)
     return entropy
-
 
 def get_strings_of_set(word, char_set, threshold=20):
     count = 0
@@ -70,9 +109,15 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def find_strings(git_url, printJson=False):
-    project_path = tempfile.mkdtemp()
-    Repo.clone_from(git_url, project_path)
+def find_strings(git_repo, printJson=False):
+    if is_abs_url(git_repo):
+        project_path = tempfile.mkdtemp()
+        Repo.clone_from(git_repo, project_path)
+    elif is_git_dir(git_repo):
+        project_path = git_repo
+    else:
+        sys.exit("Unable to scan for secrets due to invalid Git repository " + git_repo)
+
     output = {"entropicDiffs": []}
     repo = Repo(project_path)
     already_searched = set()
