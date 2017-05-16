@@ -11,8 +11,8 @@ import os
 import subprocess
 import json
 import stat
+import urllib
 from git import Repo
-from urlparse import urlparse
 
 # Global Vars
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
@@ -37,9 +37,14 @@ def is_abs_url(url=None):
     if url.strip().lower()[:4] == 'http' is False:
         return False
     try:
-        result = urlparse(url)
-        return True if [result.scheme, result.netloc, result.path] else False
-    except:
+        rc = urllib.urlopen(url).getcode()
+        if rc == 200:
+            return True
+        else:
+            sys.stderr.write("Unable to reach remote Git repo over HTTP due to response code : " + str(rc))
+            return False
+    except Exception as e:
+        sys.stderr.write("Invalid URL " + e.message)
         return False
 
 def is_git_dir(filepath=None):
@@ -110,13 +115,11 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 def find_strings(git_repo, printJson=False):
-    if is_abs_url(git_repo):
+    if is_abs_url(git_repo) or is_git_dir(git_repo):
         project_path = tempfile.mkdtemp()
         Repo.clone_from(git_repo, project_path)
-    elif is_git_dir(git_repo):
-        project_path = git_repo
     else:
-        sys.exit("Unable to scan for secrets due to invalid Git repository " + git_repo)
+        sys.exit("\nUnable to scan for secrets due to invalid Git repository " + git_repo)
 
     output = {"entropicDiffs": []}
     repo = Repo(project_path)
