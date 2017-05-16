@@ -13,6 +13,20 @@ truffleHog file:///user/dxa4481/codeprojects/truffleHog/
 
 ![Example](https://i.imgur.com/YAXndLD.png)
 
+## Usage Details
+```
+usage: truffleHog [-h] [--json] git_repo
+
+Find secrets hidden in the depths of git.
+
+positional arguments:
+  git_repo    Git Repository: Remote URL or local filesystem for secret searching
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --json      Output in JSON
+```
+
 ## Install
 Automatically install via the [Python Package Indexer, PIP](https://pypi.python.org/pypi/pip)
 ```
