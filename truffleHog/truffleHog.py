@@ -78,7 +78,7 @@ def find_strings(git_url, printJson=False):
     already_searched = set()
 
     for remote_branch in repo.remotes.origin.fetch():
-        branch_name = remote_branch.name.split('/')[1]
+        branch_name = remote_branch.name
         try:
             repo.git.checkout(remote_branch, b=branch_name)
         except:
