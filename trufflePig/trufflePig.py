@@ -10,7 +10,7 @@ import tempfile
 import os
 import json
 import stat
-from git import Repo
+from test import Repo
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
@@ -75,17 +75,17 @@ def find_strings(git_url, printJson=False):
     repo = Repo(git_url)
     already_searched = set()
 
-    print "active branch name", repo.active_branch.name
-    print "commit", repo.active_branch.commit
+    print("active branch name", repo.active_branch.name)
+    print("commit", repo.active_branch.commit)
 
     diffs = repo.head.commit.diff(create_patch=True)
 
     for blob in diffs:
-        print "meep"
+        print("meep")
         lines = blob.diff.decode('utf-8').split("\n")
         for line in lines:
             for word in line.split():
-                print "word", word
+                print("word", word)
 
     # for remote_branch in repo.remotes.origin.fetch():
     #     branch_name = str(remote_branch).split('/')[1]
