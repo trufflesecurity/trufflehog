@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import shutil
-import sys
 import math
 import datetime
 import argparse
@@ -97,47 +96,55 @@ def find_strings(git_url, printJson=False):
                 already_searched.add(hashes)
 
                 diff = prev_commit.diff(curr_commit, create_patch=True)
-                for blob in diff:
-                    #print i.a_blob.data_stream.read()
-                    printableDiff = blob.diff.decode('utf-8', errors='replace')
-                    if printableDiff.startswith("Binary files"):
-                        continue
-                    stringsFound = []
-                    lines = blob.diff.decode('utf-8', errors='replace').split("\n")
-                    for line in lines:
-                        for word in line.split():
-                            base64_strings = get_strings_of_set(word, BASE64_CHARS)
-                            hex_strings = get_strings_of_set(word, HEX_CHARS)
-                            for string in base64_strings:
-                                b64Entropy = shannon_entropy(string, BASE64_CHARS)
-                                if b64Entropy > 4.5:
-                                    stringsFound.append(string)
-                                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
-                            for string in hex_strings:
-                                hexEntropy = shannon_entropy(string, HEX_CHARS)
-                                if hexEntropy > 3:
-                                    stringsFound.append(string)
-                                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
-                    if len(stringsFound) > 0:
-                        commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                        entropicDiff = {}
-                        entropicDiff['date'] = commit_time
-                        entropicDiff['branch'] = branch_name
-                        entropicDiff['commit'] = prev_commit.message
-                        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace') 
-                        entropicDiff['stringsFound'] = stringsFound
-                        output["entropicDiffs"].append(entropicDiff)
-                        if printJson:
-                            print(json.dumps(output, sort_keys=True, indent=4))
-                        else:
-                            print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
-                            print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
-                            print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
-                            print(printableDiff)
+                printEntropyForDiff(diff, branch_name, prev_commit, output, printJson)
 
             prev_commit = curr_commit
     output["project_path"] = project_path
     return output
+
+def printEntropyForDiff(diff, branch_name, prev_commit, output, printJson):
+    for blob in diff:
+        # print i.a_blob.data_stream.read()
+        printable_diff = blob.diff.decode('utf-8', errors='replace')
+        if printable_diff.startswith("Binary files"):
+            continue
+        lines = blob.diff.decode('utf-8', errors='replace').split("\n")
+        [stringsFound, printable_diff] = entropy_in_strings(lines, printable_diff)
+
+        if len(stringsFound) > 0:
+            commit_time = datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+            entropicDiff = {}
+            entropicDiff['date'] = commit_time
+            entropicDiff['branch'] = branch_name
+            entropicDiff['commit'] = prev_commit.message
+            entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
+            entropicDiff['stringsFound'] = stringsFound
+            output["entropicDiffs"].append(entropicDiff)
+            if printJson:
+                print(json.dumps(output, sort_keys=True, indent=4))
+            else:
+                print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
+                print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
+                print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
+                print(printable_diff)
+
+def entropy_in_strings(lines, printable_diff):
+    stringsFound = []
+    for line in lines:
+        for word in line.split():
+            base64_strings = get_strings_of_set(word, BASE64_CHARS)
+            hex_strings = get_strings_of_set(word, HEX_CHARS)
+            for string in base64_strings:
+                b64Entropy = shannon_entropy(string, BASE64_CHARS)
+                if b64Entropy > 4.5:
+                    stringsFound.append(string)
+                    printable_diff = printable_diff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
+            for string in hex_strings:
+                hexEntropy = shannon_entropy(string, HEX_CHARS)
+                if hexEntropy > 3:
+                    stringsFound.append(string)
+                    printable_diff = printable_diff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
+    return [stringsFound, printable_diff]
 
 if __name__ == "__main__":
     main()
