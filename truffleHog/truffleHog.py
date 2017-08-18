@@ -10,7 +10,7 @@ import tempfile
 import os
 import json
 import stat
-from test import Repo
+from git import Repo
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
