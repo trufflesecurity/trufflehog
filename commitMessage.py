@@ -12,7 +12,7 @@ def main():
 
     [found, output] = truffleHog.entropy_in_strings(data, "\n".join(data))
     if len(found) > 0:
-        print output
+        print(output)
         print(truffleHog.bcolors.FAIL + 'At least one word in the commit message contains too much entropy. '
                                         'Are there secrets that shouldn\'t be included?' + truffleHog.bcolors.ENDC)
     return found

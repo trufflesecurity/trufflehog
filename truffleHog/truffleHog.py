@@ -128,6 +128,7 @@ def printEntropyForDiff(diff, branch_name, prev_commit, output, printJson):
                 print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
                 print(printable_diff)
 
+
 def entropy_in_strings(lines, printable_diff):
     stringsFound = []
     for line in lines:
