@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if [ ! -f "/tmp/truffleHog/commitMessage.py" ]; then
+  rm -rf /tmp/truffleHog
+  git clone https://github.com/clydet/truffleHog.git /tmp/truffleHog
+else
+  sh -c "cd /tmp/truffleHog && git pull > /dev/null"
+fi
+
+python /tmp/truffleHog/commitMessage.py $1
