@@ -1,6 +1,7 @@
 #!/bin/sh
 
-if [ ! -d "/tmp/truffleHog" ]; then
+if [ ! -f "/tmp/truffleHog/stagedForCommit.py" ]; then
+  rm -rf /tmp/truffleHog
   git clone https://github.com/clydet/truffleHog.git /tmp/truffleHog
 else
   sh -c "cd /tmp/truffleHog && git pull > /dev/null"
