@@ -70,15 +70,40 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def find_strings(git_url, printJson=False):
+def clone_git_repo(git_url):
     project_path = tempfile.mkdtemp()
     Repo.clone_from(git_url, project_path)
+    return project_path
+
+def print_results(printJson, commit_time, branch_name, prev_commit, printableDiff):
+    if printJson:
+        print(json.dumps(output, sort_keys=True, indent=4))
+    else:
+        if sys.version_info >= (3, 0):
+            dateStr = "{}Date: {}{}".format(bcolors.OKGREEN, commit_time, bcolors.ENDC)
+            print(dateStr)
+            branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name, bcolors.ENDC)
+            print(branchStr)
+            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.message, bcolors.ENDC)
+            print(commitStr)
+            print(printableDiff)
+        else:
+            dateStr = "{}Date: {}{}".format(bcolors.OKGREEN, commit_time, bcolors.ENDC)
+            print(dateStr)
+            branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name.encode('utf-8'), bcolors.ENDC)
+            print(branchStr)
+            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.message.encode('utf-8'), bcolors.ENDC)
+            print(commitStr)
+            print(printableDiff.encode('utf-8'))
+
+def find_strings(git_url, printJson=False):
     output = {"entropicDiffs": []}
+    project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
 
     for remote_branch in repo.remotes.origin.fetch():
-        branch_name = str(remote_branch).split('/')[1]
+        branch_name = remote_branch.name.split('/')[1]
         try:
             repo.git.checkout(remote_branch, b=branch_name)
         except:
@@ -127,14 +152,8 @@ def find_strings(git_url, printJson=False):
                         entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace') 
                         entropicDiff['stringsFound'] = stringsFound
                         output["entropicDiffs"].append(entropicDiff)
-                        if printJson:
-                            print(json.dumps(output, sort_keys=True, indent=4))
-                        else:
-                            print(bcolors.OKGREEN + "Date: " + commit_time + bcolors.ENDC)
-                            print(bcolors.OKGREEN + "Branch: " + branch_name + bcolors.ENDC)
-                            print(bcolors.OKGREEN + "Commit: " + prev_commit.message + bcolors.ENDC)
-                            print(printableDiff)
 
+                        print_results(printJson, commit_time, branch_name, prev_commit, printableDiff)
             prev_commit = curr_commit
     output["project_path"] = project_path
     return output
