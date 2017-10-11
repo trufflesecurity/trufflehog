@@ -94,15 +94,19 @@ def print_results(printJson, issue):
     branch_name = issue['branch']
     prev_commit = issue['commit']
     printableDiff = issue['printDiff']
+    commitHash = issue['commitHash']
     reason = issue['reason']
 
     if printJson:
         print(json.dumps(output, sort_keys=True, indent=4))
     else:
+        print("~~~~~~~~~~~~~~~~~~~~~")
         reason = "{}Reason: {}{}".format(bcolors.OKGREEN, reason, bcolors.ENDC)
         print(reason)
         dateStr = "{}Date: {}{}".format(bcolors.OKGREEN, commit_time, bcolors.ENDC)
         print(dateStr)
+        hashStr = "{}Hash: {}{}".format(bcolors.OKGREEN, commitHash, bcolors.ENDC)
+        print(hashStr)
 
         if sys.version_info >= (3, 0):
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name, bcolors.ENDC)
@@ -116,8 +120,9 @@ def print_results(printJson, issue):
             commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.encode('utf-8'), bcolors.ENDC)
             print(commitStr)
             print(printableDiff.encode('utf-8'))
+        print("~~~~~~~~~~~~~~~~~~~~~")
 
-def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob):
+def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
     stringsFound = []
     lines = printableDiff.split("\n")
     for line in lines:
@@ -143,10 +148,11 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob):
         entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
         entropicDiff['stringsFound'] = stringsFound
         entropicDiff['printDiff'] = printableDiff
+        entropicDiff['commitHash'] = commitHash
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
-def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob):
+def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
     regex_matches = []
     for key in regexes:
         found_strings = regexes[key].findall(printableDiff)
@@ -161,6 +167,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob):
             foundRegex['stringsFound'] = found_strings
             foundRegex['printDiff'] = printableDiff
             foundRegex['reason'] = key
+            foundRegex['commitHash'] = commitHash
             regex_matches.append(foundRegex)
     return regex_matches
 
@@ -182,6 +189,7 @@ def find_strings(git_url, printJson=False, do_regex=False, do_entropy=True):
 
         prev_commit = None
         for curr_commit in repo.iter_commits():
+            commitHash = curr_commit.hexsha
             if not prev_commit:
                 pass
             else:
@@ -200,11 +208,11 @@ def find_strings(git_url, printJson=False, do_regex=False, do_entropy=True):
                     commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     foundIssues = []
                     if do_entropy:
-                        entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob)
+                        entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
                         if entropicDiff:
                             foundIssues.append(entropicDiff)
                     if do_regex:
-                        found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob)
+                        found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
                         foundIssues += found_regexes
                     for foundIssue in foundIssues:
                         print_results(printJson, foundIssue)
