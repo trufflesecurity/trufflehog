@@ -14,8 +14,16 @@ truffleHog file:///user/dxa4481/codeprojects/truffleHog/
 ![Example](https://i.imgur.com/YAXndLD.png)
 
 ## Install
+Using pip:
 ```
 pip install truffleHog
+```
+
+or from source:
+```
+git clone https://github.com/Brodan/truffleHog.git
+cd trufflehog
+python setup.py install
 ```
 
 ## How it works
