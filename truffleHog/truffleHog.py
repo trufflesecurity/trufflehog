@@ -28,6 +28,8 @@ def main():
     shutil.rmtree(project_path, onerror=del_rw)
 
 def str2bool(v):
+    if v == None:
+        return True
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
@@ -98,7 +100,7 @@ def print_results(printJson, issue):
     reason = issue['reason']
 
     if printJson:
-        print(json.dumps(output, sort_keys=True, indent=4))
+        print(json.dumps(issue, sort_keys=True, indent=4))
     else:
         print("~~~~~~~~~~~~~~~~~~~~~")
         reason = "{}Reason: {}{}".format(bcolors.OKGREEN, reason, bcolors.ENDC)
