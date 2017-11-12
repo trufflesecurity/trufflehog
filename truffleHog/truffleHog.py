@@ -10,16 +10,32 @@ import tempfile
 import os
 import json
 import stat
+from regexChecks import regexes
 from git import Repo
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
+    parser.add_argument("--regex", dest="do_regex", action="store_true")
+    parser.add_argument("--entropy", dest="do_entropy")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
+    parser.set_defaults(regex=False)
+    parser.set_defaults(entropy=True)
     args = parser.parse_args()
-    output = find_strings(args.git_url, args.output_json)
+    do_entropy = str2bool(args.do_entropy)
+    output = find_strings(args.git_url, args.output_json, args.do_regex, do_entropy)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
+
+def str2bool(v):
+    if v == None:
+        return True
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
@@ -75,28 +91,92 @@ def clone_git_repo(git_url):
     Repo.clone_from(git_url, project_path)
     return project_path
 
-def print_results(printJson, commit_time, branch_name, prev_commit, printableDiff):
+def print_results(printJson, issue):
+    commit_time = issue['date']
+    branch_name = issue['branch']
+    prev_commit = issue['commit']
+    printableDiff = issue['printDiff']
+    commitHash = issue['commitHash']
+    reason = issue['reason']
+
     if printJson:
-        print(json.dumps(output, sort_keys=True, indent=4))
+        print(json.dumps(issue, sort_keys=True, indent=4))
     else:
+        print("~~~~~~~~~~~~~~~~~~~~~")
+        reason = "{}Reason: {}{}".format(bcolors.OKGREEN, reason, bcolors.ENDC)
+        print(reason)
+        dateStr = "{}Date: {}{}".format(bcolors.OKGREEN, commit_time, bcolors.ENDC)
+        print(dateStr)
+        hashStr = "{}Hash: {}{}".format(bcolors.OKGREEN, commitHash, bcolors.ENDC)
+        print(hashStr)
+
         if sys.version_info >= (3, 0):
-            dateStr = "{}Date: {}{}".format(bcolors.OKGREEN, commit_time, bcolors.ENDC)
-            print(dateStr)
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name, bcolors.ENDC)
             print(branchStr)
-            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.message, bcolors.ENDC)
+            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit, bcolors.ENDC)
             print(commitStr)
             print(printableDiff)
         else:
-            dateStr = "{}Date: {}{}".format(bcolors.OKGREEN, commit_time, bcolors.ENDC)
-            print(dateStr)
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name.encode('utf-8'), bcolors.ENDC)
             print(branchStr)
-            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.message.encode('utf-8'), bcolors.ENDC)
+            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.encode('utf-8'), bcolors.ENDC)
             print(commitStr)
             print(printableDiff.encode('utf-8'))
+        print("~~~~~~~~~~~~~~~~~~~~~")
 
-def find_strings(git_url, printJson=False):
+def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
+    stringsFound = []
+    lines = printableDiff.split("\n")
+    for line in lines:
+        for word in line.split():
+            base64_strings = get_strings_of_set(word, BASE64_CHARS)
+            hex_strings = get_strings_of_set(word, HEX_CHARS)
+            for string in base64_strings:
+                b64Entropy = shannon_entropy(string, BASE64_CHARS)
+                if b64Entropy > 4.5:
+                    stringsFound.append(string)
+                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
+            for string in hex_strings:
+                hexEntropy = shannon_entropy(string, HEX_CHARS)
+                if hexEntropy > 3:
+                    stringsFound.append(string)
+                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
+    entropicDiff = None
+    if len(stringsFound) > 0:
+        entropicDiff = {}
+        entropicDiff['date'] = commit_time
+        entropicDiff['branch'] = branch_name
+        entropicDiff['commit'] = prev_commit.message
+        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
+        entropicDiff['stringsFound'] = stringsFound
+        entropicDiff['printDiff'] = printableDiff
+        entropicDiff['commitHash'] = commitHash
+        entropicDiff['reason'] = "High Entropy"
+    return entropicDiff
+
+def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
+    regex_matches = []
+    for key in regexes:
+        found_strings = regexes[key].findall(printableDiff)
+        for found_string in found_strings:
+            printableDiff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
+        if found_strings:
+            foundRegex = {}
+            foundRegex['date'] = commit_time
+            foundRegex['branch'] = branch_name
+            foundRegex['commit'] = prev_commit.message
+            foundRegex['diff'] = blob.diff.decode('utf-8', errors='replace')
+            foundRegex['stringsFound'] = found_strings
+            foundRegex['printDiff'] = printableDiff
+            foundRegex['reason'] = key
+            foundRegex['commitHash'] = commitHash
+            regex_matches.append(foundRegex)
+    return regex_matches
+
+
+
+
+def find_strings(git_url, printJson=False, do_regex=False, do_entropy=True):
     output = {"entropicDiffs": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
@@ -111,6 +191,7 @@ def find_strings(git_url, printJson=False):
 
         prev_commit = None
         for curr_commit in repo.iter_commits():
+            commitHash = curr_commit.hexsha
             if not prev_commit:
                 pass
             else:
@@ -123,37 +204,21 @@ def find_strings(git_url, printJson=False):
 
                 diff = prev_commit.diff(curr_commit, create_patch=True)
                 for blob in diff:
-                    #print i.a_blob.data_stream.read()
                     printableDiff = blob.diff.decode('utf-8', errors='replace')
                     if printableDiff.startswith("Binary files"):
                         continue
-                    stringsFound = []
-                    lines = blob.diff.decode('utf-8', errors='replace').split("\n")
-                    for line in lines:
-                        for word in line.split():
-                            base64_strings = get_strings_of_set(word, BASE64_CHARS)
-                            hex_strings = get_strings_of_set(word, HEX_CHARS)
-                            for string in base64_strings:
-                                b64Entropy = shannon_entropy(string, BASE64_CHARS)
-                                if b64Entropy > 4.5:
-                                    stringsFound.append(string)
-                                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
-                            for string in hex_strings:
-                                hexEntropy = shannon_entropy(string, HEX_CHARS)
-                                if hexEntropy > 3:
-                                    stringsFound.append(string)
-                                    printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
-                    if len(stringsFound) > 0:
-                        commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                        entropicDiff = {}
-                        entropicDiff['date'] = commit_time
-                        entropicDiff['branch'] = branch_name
-                        entropicDiff['commit'] = prev_commit.message
-                        entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace') 
-                        entropicDiff['stringsFound'] = stringsFound
-                        output["entropicDiffs"].append(entropicDiff)
+                    commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                    foundIssues = []
+                    if do_entropy:
+                        entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+                        if entropicDiff:
+                            foundIssues.append(entropicDiff)
+                    if do_regex:
+                        found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+                        foundIssues += found_regexes
+                    for foundIssue in foundIssues:
+                        print_results(printJson, foundIssue)
 
-                        print_results(printJson, commit_time, branch_name, prev_commit, printableDiff)
             prev_commit = curr_commit
     output["project_path"] = project_path
     return output
