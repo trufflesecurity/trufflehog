@@ -16,16 +16,26 @@ from git import Repo
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
-    parser.add_argument("--regex", dest="do_regex", action="store_true")
-    parser.add_argument("--entropy", dest="do_entropy")
+    parser.add_argument("--regex", dest="do_regex", action="store_true", help="Scan for predefined regular expressions")
+    parser.add_argument("--entropy", dest="do_entropy", help="Search for high entropy strings")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
+    parser.add_argument("--fail", dest="do_fail", help='Fail when issues found')
     parser.set_defaults(regex=False)
     parser.set_defaults(entropy=True)
     args = parser.parse_args()
     do_entropy = str2bool(args.do_entropy)
     output = find_strings(args.git_url, args.output_json, args.do_regex, do_entropy)
     project_path = output["project_path"]
+    issues_found = output["issues_found"]
     shutil.rmtree(project_path, onerror=del_rw)
+
+    if args.do_fail == None:
+        do_fail = False
+    else:
+        do_fail = str2bool(args.do_fail)
+
+    if do_fail and issues_found:
+        exit(1)
 
 def str2bool(v):
     if v == None:
@@ -178,6 +188,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
 
 def find_strings(git_url, printJson=False, do_regex=False, do_entropy=True):
     output = {"entropicDiffs": []}
+    issues_found = False
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
@@ -218,9 +229,13 @@ def find_strings(git_url, printJson=False, do_regex=False, do_entropy=True):
                         foundIssues += found_regexes
                     for foundIssue in foundIssues:
                         print_results(printJson, foundIssue)
+                        issues_found = True
 
             prev_commit = curr_commit
+
     output["project_path"] = project_path
+    output["issues_found"] = issues_found
+
     return output
 
 if __name__ == "__main__":
