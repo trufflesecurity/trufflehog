@@ -157,20 +157,30 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
 def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
     regex_matches = []
     for key in regexes:
-        found_strings = regexes[key].findall(printableDiff)
-        for found_string in found_strings:
-            printableDiff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
-        if found_strings:
-            foundRegex = {}
-            foundRegex['date'] = commit_time
-            foundRegex['branch'] = branch_name
-            foundRegex['commit'] = prev_commit.message
-            foundRegex['diff'] = blob.diff.decode('utf-8', errors='replace')
-            foundRegex['stringsFound'] = found_strings
-            foundRegex['printDiff'] = printableDiff
-            foundRegex['reason'] = key
-            foundRegex['commitHash'] = commitHash
-            regex_matches.append(foundRegex)
+        findings = []
+        highlighted_diff = ''
+        last_index = 0
+        for match in regexes[key].finditer(printableDiff):
+            findings.append(match.group())
+            highlighted_diff += ''.join((
+                printableDiff[last_index:match.start()],
+                bcolors.WARNING,
+                printableDiff[match.start():match.end()],
+                bcolors.ENDC,
+            ))
+            last_index = match.end()
+        if findings:
+            finding = {
+                'date': commit_time,
+                'branch': branch_name,
+                'commit': prev_commit.message,
+                'diff': blob.diff.decode('utf-8', errors='replace'),
+                'stringsFound': findings,
+                'printDiff': highlighted_diff + printableDiff[last_index:],
+                'reason': key,
+                'commitHash': commitHash,
+            }
+            regex_matches.append(finding)
     return regex_matches
 
 
