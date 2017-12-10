@@ -1,4 +1,4 @@
 language: python
 python:
   - "2.7"
-script: pytest
+script: pytest --cov=./ && codecov
