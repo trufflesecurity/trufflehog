@@ -16,14 +16,18 @@ from git import Repo
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
-    parser.add_argument("--regex", dest="do_regex", action="store_true")
-    parser.add_argument("--entropy", dest="do_entropy")
+    parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
+    parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
+    parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
+    parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
+    parser.set_defaults(max_depth=None)
+    parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
     args = parser.parse_args()
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.output_json, args.do_regex, do_entropy)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
@@ -98,6 +102,7 @@ def print_results(printJson, issue):
     printableDiff = issue['printDiff']
     commitHash = issue['commitHash']
     reason = issue['reason']
+    path = issue['path']
 
     if printJson:
         print(json.dumps(issue, sort_keys=True, indent=4))
@@ -109,6 +114,8 @@ def print_results(printJson, issue):
         print(dateStr)
         hashStr = "{}Hash: {}{}".format(bcolors.OKGREEN, commitHash, bcolors.ENDC)
         print(hashStr)
+        filePath = "{}Filepath: {}{}".format(bcolors.OKGREEN, path, bcolors.ENDC)
+        print(filePath)
 
         if sys.version_info >= (3, 0):
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name, bcolors.ENDC)
@@ -145,6 +152,7 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
     if len(stringsFound) > 0:
         entropicDiff = {}
         entropicDiff['date'] = commit_time
+        entropicDiff['path'] = blob.b_path if blob.b_path else blob.a_path
         entropicDiff['branch'] = branch_name
         entropicDiff['commit'] = prev_commit.message
         entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
@@ -163,6 +171,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
         if found_strings:
             foundRegex = {}
             foundRegex['date'] = commit_time
+            foundRegex['path'] = blob.b_path if blob.b_path else blob.a_path
             foundRegex['branch'] = branch_name
             foundRegex['commit'] = prev_commit.message
             foundRegex['diff'] = blob.diff.decode('utf-8', errors='replace')
@@ -176,13 +185,14 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
 
 
 
-def find_strings(git_url, printJson=False, do_regex=False, do_entropy=True):
+def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True):
     output = {"entropicDiffs": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
 
     for remote_branch in repo.remotes.origin.fetch():
+        since_commit_reached = False
         branch_name = remote_branch.name.split('/')[1]
         try:
             repo.git.checkout(remote_branch, b=branch_name)
@@ -190,8 +200,13 @@ def find_strings(git_url, printJson=False, do_regex=False, do_entropy=True):
             pass
 
         prev_commit = None
-        for curr_commit in repo.iter_commits():
+        for curr_commit in repo.iter_commits(max_count=max_depth):
             commitHash = curr_commit.hexsha
+            if commitHash == since_commit:
+                since_commit_reached = True
+            if since_commit and since_commit_reached:
+                prev_commit = curr_commit
+                continue
             if not prev_commit:
                 pass
             else:
