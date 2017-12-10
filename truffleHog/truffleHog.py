@@ -159,7 +159,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
     for key in regexes:
         found_strings = regexes[key].findall(printableDiff)
         for found_string in found_strings:
-            printableDiff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
+            found_diff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
         if found_strings:
             foundRegex = {}
             foundRegex['date'] = commit_time
@@ -167,7 +167,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             foundRegex['commit'] = prev_commit.message
             foundRegex['diff'] = blob.diff.decode('utf-8', errors='replace')
             foundRegex['stringsFound'] = found_strings
-            foundRegex['printDiff'] = printableDiff
+            foundRegex['printDiff'] = found_diff
             foundRegex['reason'] = key
             foundRegex['commitHash'] = commitHash
             regex_matches.append(foundRegex)
