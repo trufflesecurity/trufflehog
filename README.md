@@ -37,9 +37,29 @@ Feel free to also contribute high signal regexes upstream that you think will be
 ## How it works
 This module will go through the entire commit history of each branch, and check each diff from each commit, and check for secrets. This is both by regex and by entropy. For entropy checks, trufflehog will evaluate the shannon entropy for both the base64 char set and hexidecimal char set for every blob of text greater than 20 characters comprised of those character sets in each diff. If at any point a high entropy string >20 characters is detected, it will print to the screen.
 
+## Help
+
+```
+Find secrets hidden in the depths of git.
+
+positional arguments:
+  git_url               URL for secret searching
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --json                Output in JSON
+  --regex               Enable high signal regex checks
+  --entropy DO_ENTROPY  Enable entropy checks
+  --since_commit SINCE_COMMIT
+                        Only scan from a given commit hash
+  --max_depth MAX_DEPTH
+                        The max commit depth to go back when searching for
+                        secrets
+```
+
 ## Wishlist
 
 - ~~A way to detect and not scan binary diffs~~
 - ~~Don't rescan diffs if already looked at in another branch~~
-- A since commit X feature
-- Print the file affected
+- ~~A since commit X feature~~
+- ~~Print the file affected~~
