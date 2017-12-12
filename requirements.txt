@@ -1,0 +1,4 @@
+GitPython
+unittest2
+pytest-cov
+codecov
