@@ -15,7 +15,7 @@ or
 truffleHog file:///user/dxa4481/codeprojects/truffleHog/
 ```
 
-With the `--include` and `--exclude` options, it is also possible to limit scanning to a subset of objects in the Git history by defining regular expressions (one per line) in a file to match the targeted object paths. To illustrate, see the example include and exclude files below:
+With the `--include_paths` and `--exclude_paths` options, it is also possible to limit scanning to a subset of objects in the Git history by defining regular expressions (one per line) in a file to match the targeted object paths. To illustrate, see the example include and exclude files below:
 
 _include-patterns.txt:_
 ```ini
@@ -37,7 +37,7 @@ _exclude-patterns.txt:_
 
 These filter files could then be applied by:
 ```bash
-trufflehog --include include-patterns.txt --exclude exclude-patterns.txt file://path/to/my/repo.git
+trufflehog --include_paths include-patterns.txt --exclude_paths exclude-patterns.txt file://path/to/my/repo.git
 ```
 With these filters, issues found in files in the root-level `src` directory would be reported, unless they had the `.classpath` or `.jmx` extension, or if they were found in the `src/test/dev/resources/` directory, for example. Additional usage information is provided when calling `trufflehog` with the `-h` or `--help` options.
 
@@ -81,6 +81,20 @@ optional arguments:
   --max_depth MAX_DEPTH
                         The max commit depth to go back when searching for
                         secrets
+  -i INCLUDE_PATHS_FILE, --include_paths INCLUDE_PATHS_FILE
+                        File with regular expressions (one per line), at least
+                        one of which must match a Git object path in order for
+                        it to be scanned; lines starting with "#" are treated
+                        as comments and are ignored. If empty or not provided
+                        (default), all Git object paths are included unless
+                        otherwise excluded via the --exclude_paths option.
+  -x EXCLUDE_PATHS_FILE, --exclude_paths EXCLUDE_PATHS_FILE
+                        File with regular expressions (one per line), none of
+                        which may match a Git object path in order for it to
+                        be scanned; lines starting with "#" are treated as
+                        comments and are ignored. If empty or not provided
+                        (default), no Git object paths are excluded unless
+                        effectively excluded via the --include_paths option.
 ```
 
 ## Wishlist
