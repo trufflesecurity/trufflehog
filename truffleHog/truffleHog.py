@@ -133,8 +133,7 @@ def print_results(printJson, issue):
 
 
 def merge_ranges(ranges):
-    """
-    Return a generator over the non-overlapping/non-adjacent ranges, in order.
+    """Return a generator over the non-overlapping/non-adjacent ranges, in order.
 
     >>> ranges = [(-10, -4), (0, 0), (1, 5), (1, 5), (-5, 0), (1, 6), (-10, -5), (9, 10), (2, 6), (6, 8)]
     >>> sorted(ranges)
@@ -161,6 +160,21 @@ def merge_ranges(ranges):
 
 
 def highlight_diff(printableDiff, ranges):
+    """Return `printableDiff` with each highlight position in `ranges` surrounded by bash color control characters.
+
+    The `ranges` parameter should be an iterable of `(<start_index>, <end_index>)` tuples designating where highlighted
+    index ranges should occur. These ranges are first consolidated such that overlapping and adjacent ranges are
+    combined before `printableDiff` is highlighted by inserting the bash color control character into those ranges.
+
+    >>> highlight_diff('foobar foo!', [(0, 3), (3, 6)])
+    '\\x1b[93mfoobar\\x1b[0m foo!'
+    >>> highlight_diff('foobar foo!', [(0, 3), (3, 6), (3, 10)])
+    '\\x1b[93mfoobar foo\\x1b[0m!'
+
+    :param printableDiff: string to highlight by inserting bash color control characters at the given index ranges
+    :param ranges: iterable of `(<start_index>, <end_index>)` tuples indicating where to highlight `printableDiff`
+    :return: string resulting from insertion of bash color highlights into `printableDiff` at the given index ranges
+    """
     ranges = list(merge_ranges(r for r in ranges if r[0] != r[1]))
     prev_end = 0
     highlighted_diff = ''
@@ -175,19 +189,36 @@ def highlight_diff(printableDiff, ranges):
     return highlighted_diff
 
 
-def get_ranges(string, match):
-    match_len = len(match)
-    start = string.find(match)
+def get_ranges(string, substring):
+    """Return generator over the ranges, as tuples of `(<start_index>, <end_index>)`, where `substring` occurs in `string`.
+
+    Note that `substring` must be a non-empty string.
+
+    >>> list(get_ranges('foobar foo', ''))
+    []
+    >>> list(get_ranges('foobar foo', 'bar'))
+    [(3, 6)]
+    >>> list(get_ranges('foobar foo', 'foo'))
+    [(0, 3), (7, 10)]
+
+    :param string: the string to search for occurrences of `substring`
+    :param substring: the (non-empty) substring for which to search for occurrences of within `string`
+    :return: a generator yielding tuples of `(<start_index>, <end_index>)` where `substring` occurs within `string`
+    """
+    match_len = len(substring)
+    if match_len == 0:
+        return
+    start = string.find(substring)
     while start != -1:
         end = start + match_len
         yield start, end
-        start = string.find(match, end)
+        start = string.find(substring, end)
 
 
 def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
     stringsFound = []
     lines = printableDiff.split("\n")
-    index = 0
+    index = 0  # track the index offset for already scanned lines in printableDiff
     finding_ranges = []
     for line in lines:
         for word in line.split():
