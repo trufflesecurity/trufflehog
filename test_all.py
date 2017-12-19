@@ -1,6 +1,12 @@
 import unittest
+import doctest
 import os
 from truffleHog import truffleHog
+
+
+def load_tests(loader, tests, ignore):
+    tests.addTests(doctest.DocTestSuite(truffleHog))
+    return tests
 
 
 class TestStringMethods(unittest.TestCase):
