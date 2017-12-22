@@ -1,3 +1,9 @@
+Improvements:
+support for private orgs -- done
+support for reporting pubclic repos in private orgs  -- wip
+more custom patterns -- wip
+support for gitrob filenames -- wip
+
 # Truffle Hog
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
 

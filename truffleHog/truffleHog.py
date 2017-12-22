@@ -13,6 +13,7 @@ import os
 import re
 import json
 import stat
+from regexChecks import regexes
 from git import Repo
 from git import NULL_TREE
 from truffleHogRegexes.regexChecks import regexes
@@ -125,7 +126,7 @@ def print_results(printJson, issue):
     path = issue['path']
 
     if printJson:
-        print(json.dumps(issue, sort_keys=True))
+        print(json.dumps(issue, sort_keys=True, indent=4))
     else:
         print("~~~~~~~~~~~~~~~~~~~~~")
         reason = "{}Reason: {}{}".format(bcolors.OKGREEN, reason, bcolors.ENDC)
@@ -264,6 +265,13 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 prev_commit = curr_commit
                 continue
             else:
+                #avoid searching the same diffs
+                hashes = str(prev_commit) + str(curr_commit)
+                if hashes in already_searched:
+                    prev_commit = curr_commit
+                    continue
+                already_searched.add(hashes)
+
                 diff = prev_commit.diff(curr_commit, create_patch=True)
             foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson)
             output = handle_results(output, output_dir, foundIssues)
