@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Python Flask Bucket List App</title>
+
+
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+    <link href="./lib/style.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+<div class="container">
+    <div class="header">
+        <h3 class="text-muted">Trufflehog Web Interface</h3>
+    </div>
+
+    <div class="jumbotron">
+        <h1>Bucket List App</h1>
+        <form class="form-signin" action="/scan" method="POST">
+            <label for="inputName" class="sr-only">Token for account without private org access</label>
+            <input type="name" name="public_token" id="inputName" class="form-control" placeholder="public github token"
+                   autofocus>
+            <label for="inputName" class="sr-only">Username of account with private org access</label>
+            <input type="name" name="username" id="inputEmail" class="form-control" placeholder="private username"
+                   required autofocus>
+            <label for="inputName" class="sr-only">Password</label>
+            <input type="password" name="password" id="inputPassword" class="form-control" placeholder="Password"
+                   required>
+            <label for="inputName" class="sr-only">Token for account above</label>
+            <input type="name" name="token" id="inputToken" class="form-control" placeholder="Private Token"
+                   required>
+            <label for="inputName" class="sr-only">Org Name</label>
+            <input type="name" name="orgname" id="inputOrg" class="form-control" placeholder="Private Organization Name"
+                   required>
+            <label for="inputName" class="sr-only">Repo Name</label>
+            <input type="name" name="orgname" id="inputRepo" class="form-control" placeholder="Repo Name(optional)">
+            <input type="submit" id="scan" class="btn btn-lg btn-primary btn-block">Scan</input>
+        </form>
+    </div>
+
+
+    <footer class="footer">
+        <p>&copy; Company 2015</p>
+    </footer>
+
+</div>
+</body>
+</html>
