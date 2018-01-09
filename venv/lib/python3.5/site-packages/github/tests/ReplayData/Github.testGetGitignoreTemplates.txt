@@ -1,0 +1,11 @@
+https
+GET
+api.github.com
+None
+/gitignore/templates
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('content-length', '757'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('x-ratelimit-limit', '5000'), ('x-ratelimit-remaining', '4993'), ('server', 'nginx'), ('connection', 'keep-alive'), ('etag', '"cc8e8df5d003cd489fd90931fa7f751a"'), ('cache-control', 'max-age=0, private, must-revalidate'), ('date', 'Fri, 21 Dec 2012 19:54:21 GMT'), ('content-type', 'application/json; charset=utf-8')]
+["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","CFWheels","CMake","CSharp","CakePHP","Clojure","CodeIgniter","Compass","Concrete5","Coq","Delphi","Django","Drupal","Erlang","ExpressionEngine","Finale","ForceDotCom","FuelPHP","GWT","Go","Grails","Haskell","Java","Jboss","Jekyll","Joomla","Jython","Kohana","LaTeX","Leiningen","LemonStand","Lilypond","Lithium","Magento","Maven","Node","OCaml","Objective-C","Opa","OracleForms","Perl","PlayFramework","Python","Qooxdoo","Qt","R","Rails","RhodesRhomobile","Ruby","Scala","Sdcc","SeamGen","SketchUp","SugarCRM","Symfony","Symfony2","SymphonyCMS","Target3001","Tasm","Textpattern","TurboGears2","Unity","VB.Net","Waf","Wordpress","Yii","ZendFramework","gcov","nanoc","opencart"]
+

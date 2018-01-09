@@ -1,0 +1,11 @@
+https
+GET
+api.github.com
+None
+/repos/jacquev6/PyGithub/issues/28/labels
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4996'), ('content-length', '335'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"c9f9beccb03030beaf7b80927da6fef6"'), ('date', 'Sun, 27 May 2012 08:56:31 GMT'), ('content-type', 'application/json; charset=utf-8')]
+[{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Bug","name":"Bug","color":"e10c02"},{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Project+management","name":"Project management","color":"444444"},{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Question","name":"Question","color":"02e10c"}]
+

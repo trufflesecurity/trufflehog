@@ -1,0 +1,11 @@
+https
+POST
+api.github.com
+None
+/hub
+{'Content-Type': 'multipart/form-data; boundary=----------------------------3c3ba8b523b2', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+------------------------------3c3ba8b523b2Content-Disposition: form-data; name="hub.callback"http://requestb.in/1bc1sc61------------------------------3c3ba8b523b2Content-Disposition: form-data; name="hub.topic"https://github.com/jacquev6/PyGithub/events/non-existing-event------------------------------3c3ba8b523b2Content-Disposition: form-data; name="hub.mode"subscribe------------------------------3c3ba8b523b2--
+422
+[('status', '422 Unprocessable Entity'), ('content-length', '51'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('x-ratelimit-remaining', '4994'), ('server', 'GitHub.com'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('cache-control', ''), ('date', 'Tue, 05 Feb 2013 18:58:01 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"message":"Invalid event: \"non-existing-event\""}
+

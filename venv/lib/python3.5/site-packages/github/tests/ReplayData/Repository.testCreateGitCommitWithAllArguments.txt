@@ -1,0 +1,22 @@
+https
+GET
+api.github.com
+None
+/repos/jacquev6/PyGithub/git/trees/107139a922f33bab6fbeb9f9eb8787e7f19e0528
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4994'), ('content-length', '381'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"f33782d7031ff19c5301bb52068533cf"'), ('date', 'Fri, 01 Jun 2012 20:02:40 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"url":"https://api.github.com/repos/jacquev6/PyGithub/git/trees/107139a922f33bab6fbeb9f9eb8787e7f19e0528","sha":"107139a922f33bab6fbeb9f9eb8787e7f19e0528","tree":[{"type":"blob","url":"https://api.github.com/repos/jacquev6/PyGithub/git/blobs/5dd930f591cd5188e9ea7200e308ad355182a1d8","sha":"5dd930f591cd5188e9ea7200e308ad355182a1d8","size":0,"path":"Barbaz.txt","mode":"100644"}]}
+
+https
+POST
+api.github.com
+None
+/repos/jacquev6/PyGithub/git/commits
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+{"parents": [], "message": "Commit created by PyGithub", "tree": "107139a922f33bab6fbeb9f9eb8787e7f19e0528", "committer": {"date": "2008-07-09T16:13:30+12:00", "name": "John Doe", "email": "j.doe@vincent-jacques.net"}, "author": {"date": "2008-07-09T16:13:30+12:00", "name": "John Doe", "email": "j.doe@vincent-jacques.net"}}
+201
+[('status', '201 Created'), ('x-ratelimit-remaining', '4928'), ('content-length', '577'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"660cc851cdd42a2caa7241cd96db0d01"'), ('date', 'Sun, 27 May 2012 05:53:47 GMT'), ('content-type', 'application/json; charset=utf-8'), ('location', 'https://api.github.com/repos/jacquev6/PyGithub/git/commits/526946197ae9da59c6507cacd13ad6f1cfb686ea')]
+{"author":{"email":"j.doe@vincent-jacques.net","name":"John Doe","date":"2008-07-08T21:13:30-07:00"},"url":"https://api.github.com/repos/jacquev6/PyGithub/git/commits/526946197ae9da59c6507cacd13ad6f1cfb686ea","message":"Commit created by PyGithub","committer":{"email":"j.doe@vincent-jacques.net","name":"John Doe","date":"2008-07-08T21:13:30-07:00"},"sha":"526946197ae9da59c6507cacd13ad6f1cfb686ea","parents":[],"tree":{"url":"https://api.github.com/repos/jacquev6/PyGithub/git/trees/107139a922f33bab6fbeb9f9eb8787e7f19e0528","sha":"107139a922f33bab6fbeb9f9eb8787e7f19e0528"}}
+

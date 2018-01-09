@@ -1,0 +1,22 @@
+https
+GET
+api.github.com
+None
+/users/nvie
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4996'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('access-control-expose-headers', 'ETag, Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes'), ('access-control-allow-credentials', 'true'), ('vary', 'Accept, Authorization, Cookie, Accept-Encoding'), ('content-length', '1218'), ('server', 'GitHub.com'), ('last-modified', 'Wed, 21 Aug 2013 16:26:40 GMT'), ('x-ratelimit-limit', '5000'), ('etag', '"8e2b307f8fb4186bfb512febd7215fc8"'), ('cache-control', 'private, max-age=60, s-maxage=60'), ('date', 'Wed, 21 Aug 2013 17:20:44 GMT'), ('access-control-allow-origin', '*'), ('content-type', 'application/json; charset=utf-8'), ('x-ratelimit-reset', '1377108637')]
+{"login":"nvie","id":83844,"avatar_url":"https://2.gravatar.com/avatar/466ef7561a0b100dc5a1021959962d28?d=https%3A%2F%2Fidenticons.github.com%2Fe6d0513ce49cc06cb956251623cb8fd9.png","gravatar_id":"466ef7561a0b100dc5a1021959962d28","url":"https://api.github.com/users/nvie","html_url":"https://github.com/nvie","followers_url":"https://api.github.com/users/nvie/followers","following_url":"https://api.github.com/users/nvie/following{/other_user}","gists_url":"https://api.github.com/users/nvie/gists{/gist_id}","starred_url":"https://api.github.com/users/nvie/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/nvie/subscriptions","organizations_url":"https://api.github.com/users/nvie/orgs","repos_url":"https://api.github.com/users/nvie/repos","events_url":"https://api.github.com/users/nvie/events{/privacy}","received_events_url":"https://api.github.com/users/nvie/received_events","type":"User","name":"Vincent Driessen","company":"3rd Cloud","blog":"http://nvie.com","location":"Netherlands","email":"vincent@3rdcloud.com","hireable":true,"bio":null,"public_repos":86,"followers":530,"following":45,"created_at":"2009-05-12T21:19:38Z","updated_at":"2013-08-21T16:26:40Z","public_gists":38}
+
+https
+GET
+api.github.com
+None
+/users/jacquev6/following/nvie
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+204
+[('status', '204 No Content'), ('x-ratelimit-remaining', '4995'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('access-control-expose-headers', 'ETag, Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes'), ('vary', 'Accept-Encoding'), ('server', 'GitHub.com'), ('x-ratelimit-limit', '5000'), ('access-control-allow-credentials', 'true'), ('date', 'Wed, 21 Aug 2013 17:20:48 GMT'), ('access-control-allow-origin', '*'), ('x-ratelimit-reset', '1377108637')]
+
+

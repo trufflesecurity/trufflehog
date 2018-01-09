@@ -13,7 +13,6 @@ jarjar==2.0
 Jinja2==2.10
 linecache2==1.0.0
 MarkupSafe==1.0
-pkg-resources==0.0.0
 pluggy==0.6.0
 py==1.5.2
 PyGithub==1.35

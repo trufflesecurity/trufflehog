@@ -1,0 +1,2 @@
+501bf602abea7d21c3dbb409b435976e92033145 82b8902e033430000481eb355733cd7065342037 Sebastian Thiel <byronimo@gmail.com> 1270634931 +0200	commit: Used this release for a first beta of the 0.2 branch of development
+82b8902e033430000481eb355733cd7065342037 69361d96a59381fde0ac34d19df2d4aff05fb9a9 Sebastian Thiel <byronimo@gmail.com> 1271229940 +0200 commit: conf.py: Adjusted version to match with the actual version

@@ -1,0 +1,11 @@
+https
+GET
+api.github.com
+None
+/users/klmitch
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4966'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('access-control-expose-headers', 'ETag, Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes'), ('x-github-request-id', 'b66ca3c7-84f9-455a-9db8-3df385fc7b32'), ('access-control-allow-credentials', 'true'), ('vary', 'Accept, Authorization, Cookie, Accept-Encoding'), ('content-length', '1254'), ('server', 'GitHub.com'), ('last-modified', 'Wed, 11 Sep 2013 19:26:25 GMT'), ('x-ratelimit-limit', '5000'), ('etag', '"6c1c41cdc34b6a47b3ee2a765cc51310"'), ('cache-control', 'private, max-age=60, s-maxage=60'), ('date', 'Thu, 12 Sep 2013 08:45:34 GMT'), ('access-control-allow-origin', '*'), ('content-type', 'application/json; charset=utf-8'), ('x-ratelimit-reset', '1378976739')]
+{"login":"klmitch","id":686398,"avatar_url":"https://1.gravatar.com/avatar/3c505225c6f28a7702b318a991141495?d=https%3A%2F%2Fidenticons.github.com%2Ffffa0f2e30bad5753edbb60f250b7cbe.png","gravatar_id":"3c505225c6f28a7702b318a991141495","url":"https://api.github.com/users/klmitch","html_url":"https://github.com/klmitch","followers_url":"https://api.github.com/users/klmitch/followers","following_url":"https://api.github.com/users/klmitch/following{/other_user}","gists_url":"https://api.github.com/users/klmitch/gists{/gist_id}","starred_url":"https://api.github.com/users/klmitch/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/klmitch/subscriptions","organizations_url":"https://api.github.com/users/klmitch/orgs","repos_url":"https://api.github.com/users/klmitch/repos","events_url":"https://api.github.com/users/klmitch/events{/privacy}","received_events_url":"https://api.github.com/users/klmitch/received_events","type":"User","name":"Kevin L. Mitchell","company":"Rackspace","blog":null,"location":"San Antonio, TX","email":"kevin.mitchell@rackspace.com","hireable":false,"bio":null,"public_repos":29,"followers":15,"following":18,"created_at":"foobar","updated_at":42,"public_gists":0}
+

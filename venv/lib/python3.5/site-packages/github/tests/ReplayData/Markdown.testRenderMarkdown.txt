@@ -1,0 +1,11 @@
+https
+POST
+api.github.com
+None
+/markdown
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+{"text": "MyTitle\n=======\n\nIssue #1"}
+200
+[('status', '200 OK'), ('content-length', '133'), ('x-ratelimit-remaining', '4985'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"4cb17c0ebe3cc45c1a7f27d4d0850c54"'), ('cache-control', 'max-age=0, private, must-revalidate'), ('date', 'Fri, 13 Jul 2012 11:59:59 GMT'), ('content-type', 'text/html;charset=utf-8')]
+<h1><a name="mytitle" class="anchor" href="#mytitle"><span class="mini-icon mini-icon-link"></span></a>MyTitle</h1><p>Issue #1</p>
+

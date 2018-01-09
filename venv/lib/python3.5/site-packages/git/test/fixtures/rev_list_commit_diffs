@@ -1,0 +1,8 @@
+commit 91169e1f5fa4de2eaea3f176461f5dc784796769
+tree 802ed53edbf6f02ad664af3f7e5900f514024b2f
+parent 038af8c329ef7c1bae4568b98bd5c58510465493
+author Tom Preston-Werner <tom@mojombo.com> 1193200199 -0700
+committer Tom Preston-Werner <tom@mojombo.com> 1193200199 -0700
+
+    fix some initialization warnings
+

@@ -1,0 +1,22 @@
+https
+GET
+api.github.com
+None
+/user
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('content-length', '806'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('vary', 'Accept, Authorization, Cookie'), ('x-ratelimit-remaining', '4703'), ('server', 'nginx'), ('last-modified', 'Tue, 25 Sep 2012 07:42:42 GMT'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"e199a6b2e012ed6ffb1e6a935f4ba856"'), ('cache-control', 'private, s-maxage=60, max-age=60'), ('date', 'Tue, 25 Sep 2012 19:50:45 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"type":"User","blog":"http://vincent-jacques.net","public_gists":3,"html_url":"https://github.com/jacquev6","login":"jacquev6","followers":14,"company":"Criteo","hireable":false,"private_gists":5,"plan":{"space":614400,"private_repos":5,"name":"micro","collaborators":1},"created_at":"2010-07-09T06:10:06Z","avatar_url":"https://secure.gravatar.com/avatar/b68de5ae38616c296fa345d2b9df2225?d=https://a248.e.akamai.net/assets.github.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png","email":"vincent@vincent-jacques.net","bio":"","disk_usage":18788,"public_repos":13,"total_private_repos":4,"following":29,"name":"Vincent Jacques","gravatar_id":"b68de5ae38616c296fa345d2b9df2225","owned_private_repos":4,"collaborators":1,"id":327146,"location":"Paris, France","url":"https://api.github.com/users/jacquev6"}
+
+https
+GET
+api.github.com
+None
+/repos/jacquev6/PyGithub
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('content-length', '1238'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('vary', 'Accept, Authorization, Cookie'), ('x-ratelimit-remaining', '4702'), ('server', 'nginx'), ('last-modified', 'Mon, 24 Sep 2012 18:51:20 GMT'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"d0aaa41da0d7452a0dad489a3a4fcd35"'), ('cache-control', 'private, s-maxage=60, max-age=60'), ('date', 'Tue, 25 Sep 2012 19:50:46 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"open_issues":16,"mirror_url":null,"has_issues":true,"language":"Python","homepage":"http://vincent-jacques.net/PyGithub","owner":{"login":"jacquev6","avatar_url":"https://secure.gravatar.com/avatar/b68de5ae38616c296fa345d2b9df2225?d=https://a248.e.akamai.net/assets.github.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png","gravatar_id":"b68de5ae38616c296fa345d2b9df2225","id":327146,"url":"https://api.github.com/users/jacquev6"},"html_url":"https://github.com/jacquev6/PyGithub","master_branch":"master","description":"Python library implementing the full Github API v3","forks_count":20,"has_downloads":true,"created_at":"2012-02-25T12:53:47Z","svn_url":"https://github.com/jacquev6/PyGithub","git_url":"git://github.com/jacquev6/PyGithub.git","network_count":20,"watchers_count":79,"size":408,"fork":false,"ssh_url":"git@github.com:jacquev6/PyGithub.git","pushed_at":"2012-09-17T19:28:28Z","forks":20,"has_wiki":true,"name":"PyGithub","permissions":{"pull":true,"admin":true,"push":true},"watchers":79,"open_issues_count":16,"clone_url":"https://github.com/jacquev6/PyGithub.git","private":false,"updated_at":"2012-09-24T18:51:20Z","full_name":"jacquev6/PyGithub","id":3544490,"url":"https://api.github.com/repos/jacquev6/PyGithub"}
+

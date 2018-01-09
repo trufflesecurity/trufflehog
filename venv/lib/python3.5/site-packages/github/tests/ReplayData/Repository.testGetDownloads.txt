@@ -1,0 +1,11 @@
+https
+GET
+api.github.com
+None
+/repos/jacquev6/PyGithub/downloads
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4968'), ('content-length', '277'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"209ba3e85bfec4914fb88bb2d12b55e9"'), ('date', 'Sun, 27 May 2012 06:55:04 GMT'), ('content-type', 'application/json; charset=utf-8')]
+[{"content_type":".py","download_count":0,"url":"https://api.github.com/repos/jacquev6/PyGithub/downloads/245143","size":1024,"name":"Hook.py","created_at":"2012-05-27T06:54:54Z","description":"","id":245143,"html_url":"https://github.com/downloads/jacquev6/PyGithub/Hook.py"}]
+

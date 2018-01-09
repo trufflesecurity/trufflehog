@@ -1,0 +1,11 @@
+https
+POST
+api.github.com
+None
+/orgs/BeaverSoftware/teams
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+{"name": "Team created by PyGithub"}
+201
+[('status', '201 Created'), ('x-ratelimit-remaining', '4988'), ('content-length', '145'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"189a318993cde3e040f2efb4f634f8a8"'), ('date', 'Sat, 26 May 2012 20:58:53 GMT'), ('content-type', 'application/json; charset=utf-8'), ('location', 'https://api.github.com/teams/189850')]
+{"url":"https://api.github.com/teams/189850","members_count":0,"repos_count":0,"name":"Team created by PyGithub","permission":"pull","id":189850}
+

@@ -1,0 +1,11 @@
+https
+GET
+api.github.com
+None
+/repos/jacquev6/PyGithub/labels
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4944'), ('content-length', '695'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"a35ac34bf5089a20b90cd0bb34001fa3"'), ('date', 'Sun, 27 May 2012 07:05:48 GMT'), ('content-type', 'application/json; charset=utf-8')]
+[{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Refactoring","name":"Refactoring","color":"0b02e1"},{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Public+interface","name":"Public interface","color":"d7e102"},{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Functionalities","name":"Functionalities","color":"e102d8"},{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Project+management","name":"Project management","color":"444444"},{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Bug","name":"Bug","color":"e10c02"},{"url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Question","name":"Question","color":"02e10c"}]
+

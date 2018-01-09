@@ -1,0 +1,11 @@
+https
+GET
+api.github.com
+None
+/hooks/activecollab
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4999'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('access-control-expose-headers', 'ETag, Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes'), ('x-github-request-id', 'b3cd8329-7f33-4611-84d1-4e2ecfd91812'), ('access-control-allow-credentials', 'true'), ('vary', 'Accept, Authorization, Cookie, Accept-Encoding'), ('content-length', '191'), ('server', 'GitHub.com'), ('last-modified', 'Wed, 04 Sep 2013 18:03:57 GMT'), ('x-ratelimit-limit', '5000'), ('etag', '"678dd8e392d70d3a284c3d47221ec6f0"'), ('cache-control', 'private, max-age=60, s-maxage=60'), ('date', 'Wed, 11 Sep 2013 21:10:37 GMT'), ('access-control-allow-origin', '*'), ('content-type', 'application/json; charset=utf-8'), ('x-ratelimit-reset', '1378937437')]
+{"name":"activecollab","events":["push"],"supported_events":["push"],"schema":[["string","url"],["string","token"],["string","project_id"],["string","milestone_id"],["string","category_id"]]}
+

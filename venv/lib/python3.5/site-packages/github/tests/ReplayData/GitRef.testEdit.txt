@@ -1,0 +1,11 @@
+https
+PATCH
+api.github.com
+None
+/repos/jacquev6/PyGithub/git/refs/heads/BranchCreatedByPyGithub
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+{"sha": "04cde900a0775b51f762735637bd30de392a2793"}
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4986'), ('content-length', '322'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"ced480ad69948233f6520f7cd945eb34"'), ('date', 'Thu, 10 May 2012 18:49:20 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"url":"https://api.github.com/repos/jacquev6/PyGithub/git/refs/heads/BranchCreatedByPyGithub","object":{"url":"https://api.github.com/repos/jacquev6/PyGithub/git/commits/04cde900a0775b51f762735637bd30de392a2793","type":"commit","sha":"04cde900a0775b51f762735637bd30de392a2793"},"ref":"refs/heads/BranchCreatedByPyGithub"}
+

@@ -1,0 +1,11 @@
+http
+GET
+my.enterprise.com
+None
+/my/prefix/users/jacquev6
+{'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('content-length', '628'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('x-ratelimit-limit', '5000'), ('vary', 'Accept'), ('x-ratelimit-remaining', '4989'), ('server', 'nginx'), ('last-modified', 'Tue, 25 Sep 2012 07:42:42 GMT'), ('connection', 'keep-alive'), ('etag', '"9bd085221a16b6d2ea95e72634c3c1ac"'), ('cache-control', 'public, max-age=60, s-maxage=60'), ('date', 'Tue, 25 Sep 2012 20:38:56 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"type":"User","html_url":"https://github.com/jacquev6","login":"jacquev6","followers":14,"company":"Criteo","created_at":"2010-07-09T06:10:06Z","email":"vincent@vincent-jacques.net","hireable":false,"avatar_url":"https://secure.gravatar.com/avatar/b68de5ae38616c296fa345d2b9df2225?d=https://a248.e.akamai.net/assets.github.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png","public_gists":3,"bio":"","following":29,"name":"Vincent Jacques","blog":"http://vincent-jacques.net","gravatar_id":"b68de5ae38616c296fa345d2b9df2225","id":327146,"public_repos":13,"location":"Paris, France","url":"https://api.github.com/users/jacquev6"}
+

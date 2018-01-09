@@ -1,0 +1,22 @@
+https
+GET
+api.github.com
+None
+/repos/jacquev6/PyGithub/labels/Label%20with%20spaces%20and%20strange%20characters%20%28%26%2A%23%24%29
+{'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+null
+200
+[('status', '200 OK'), ('content-length', '197'), ('x-ratelimit-limit', '5000'), ('vary', 'Accept, Authorization, Cookie'), ('x-ratelimit-remaining', '4918'), ('server', 'nginx/1.0.13'), ('last-modified', 'Thu, 28 Jun 2012 19:29:52 GMT'), ('connection', 'keep-alive'), ('etag', '"c536d81e7479c8c9acfa7deeddeb6e72"'), ('cache-control', 'private, max-age=60'), ('date', 'Thu, 28 Jun 2012 19:54:44 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"color":"ffff00","name":"Label with spaces and strange characters (&*#$)","url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Label+with+spaces+and+strange+characters+%28%26%2A%23%24%29"}
+
+https
+POST
+api.github.com
+None
+/repos/jacquev6/PyGithub/issues/50/labels
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+["Label with spaces and strange characters (&*#$)"]
+200
+[('status', '200 OK'), ('content-length', '419'), ('x-ratelimit-limit', '5000'), ('x-ratelimit-remaining', '4917'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('etag', '"e1d0a1c54608a676af0cdc1f63e04da7"'), ('cache-control', 'max-age=0, private, must-revalidate'), ('date', 'Thu, 28 Jun 2012 19:54:44 GMT'), ('content-type', 'application/json; charset=utf-8')]
+[{"color":"e10c02","name":"Bug","url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Bug"},{"color":"ffff00","name":"Label with spaces and strange characters (&*#$)","url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Label+with+spaces+and+strange+characters+%28%26%2A%23%24%29"},{"color":"e10c02","name":"RequestedByUser","url":"https://api.github.com/repos/jacquev6/PyGithub/labels/RequestedByUser"}]
+

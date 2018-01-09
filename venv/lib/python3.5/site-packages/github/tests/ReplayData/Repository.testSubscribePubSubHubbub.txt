@@ -1,0 +1,11 @@
+https
+POST
+api.github.com
+None
+/hub
+{'Content-Type': 'multipart/form-data; boundary=----------------------------3c3ba8b523b2', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+------------------------------3c3ba8b523b2Content-Disposition: form-data; name="hub.callback"http://requestb.in/1bc1sc61------------------------------3c3ba8b523b2Content-Disposition: form-data; name="hub.topic"https://github.com/jacquev6/PyGithub/events/push------------------------------3c3ba8b523b2Content-Disposition: form-data; name="hub.mode"subscribe------------------------------3c3ba8b523b2Content-Disposition: form-data; name="hub.secret"my_secret------------------------------3c3ba8b523b2--
+204
+[('status', '204 No Content'), ('x-ratelimit-remaining', '4997'), ('x-github-media-type', 'github.beta; format=json'), ('x-content-type-options', 'nosniff'), ('server', 'GitHub.com'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('cache-control', ''), ('date', 'Tue, 05 Feb 2013 18:57:27 GMT')]
+
+

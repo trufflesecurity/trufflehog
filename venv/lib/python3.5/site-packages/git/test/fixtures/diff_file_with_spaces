@@ -1,0 +1,7 @@
+diff --git a/file with spaces b/file with spaces
+new file mode 100644
+index 0000000000000000000000000000000000000000..75c620d7b0d3b0100415421a97f553c979d75174
+--- /dev/null
++++ b/file with spaces
+@@ -0,0 +1 @@
++ohai

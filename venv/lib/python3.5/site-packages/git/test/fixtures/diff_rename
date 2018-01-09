@@ -1,0 +1,12 @@
+commit 2524c44334a8ba6b2ab8f3f0a478f04c5b073cc8
+tree e126e7b4203dadf083f5eb8e2f34c255b51d8bee
+parent d789e23b9ea8d90221d13c46f7c228d729385f92
+author Michael Trier <mtrier@gmail.com> 1229389391 -0500
+committer Michael Trier <mtrier@gmail.com> 1229389391 -0500
+
+    Renamed AUTHORS to CONTRIBUTORS because it's cooler.
+
+diff --git a/AUTHORS b/CONTRIBUTORS
+similarity index 100%
+rename from Jérôme
+rename to müller

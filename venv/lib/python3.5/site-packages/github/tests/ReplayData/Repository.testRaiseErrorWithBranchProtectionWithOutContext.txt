@@ -1,0 +1,11 @@
+https
+PATCH
+api.github.com
+None
+/repos/jacquev6/PyGithub/branches/master
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'Accept': 'application/vnd.github.loki-preview+json', 'User-Agent': 'PyGithub/Python'}
+{"protection": {"enabled": true, "required_status_checks": {"enforcement_level": "everyone"}}}
+422
+[('status', '422 Unprocessable Entity'), ('content-length', '117'), ('x-github-media-type', 'github.loki-preview; format=json'), ('x-content-type-options', 'nosniff'), ('content-security-policy', "default-src 'none'"), ('access-control-expose-headers', 'ETag, Link, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval'), ('x-github-request-id', 'AE1E5031:1D259:685F04B:568E6DC2'), ('strict-transport-security', 'max-age=31536000; includeSubdomains; preload'), ('x-ratelimit-remaining', '4969'), ('server', 'GitHub.com'), ('x-ratelimit-limit', '5000'), ('x-xss-protection', '1; mode=block'), ('access-control-allow-credentials', 'true'), ('date', 'Thu, 07 Jan 2016 13:53:06 GMT'), ('access-control-allow-origin', '*'), ('content-type', 'application/json; charset=utf-8'), ('x-frame-options', 'deny'), ('x-ratelimit-reset', '1452177625')]
+{"message":"Invalid request.\n\n\"contexts\" wasn't supplied.","documentation_url":"https://developer.github.com/v3"}
+

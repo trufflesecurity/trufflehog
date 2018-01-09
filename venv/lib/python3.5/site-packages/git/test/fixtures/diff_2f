@@ -1,0 +1,19 @@
+diff --git a/lib/grit/commit.rb b/lib/grit/commit.rb
+index a093bb1db8e884cccf396b297259181d1caebed4..80fd3d527f269ecbd570b65b8e21fd85baedb6e9 100644
+--- a/lib/grit/commit.rb
++++ b/lib/grit/commit.rb
+@@ -156,12 +156,8 @@ module Grit
+ 
+     def diffs
+       if parents.empty?
+-        diff = @repo.git.show({:full_index => true, :pretty => 'raw'}, @id)
+-        if diff =~ /diff --git a/
+-          diff = diff.sub(/.+?(diff --git a)/m, '\1')
+-        else
+-          diff = ''
+-        end
++        diff = @repo.git.show({:full_index => true, :pretty => 'raw'}, @id) 
++        diff = diff.sub(/.+?(diff --git a)/m, '\1')
+         Diff.list_from_string(@repo, diff)
+       else
+         self.class.diff(@repo, parents.first.id, @id) 

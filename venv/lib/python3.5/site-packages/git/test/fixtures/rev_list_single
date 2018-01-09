@@ -1,0 +1,7 @@
+commit 4c8124ffcf4039d292442eeccabdeca5af5c5017
+tree 672eca9b7f9e09c22dcb128c283e8c3c8d7697a4
+parent 634396b2f541a9f2d58b00be1a07f0c358b999b3
+author Tom Preston-Werner <tom@mojombo.com> 1191999972 -0700
+committer Tom Preston-Werner <tom@mojombo.com> 1191999972 -0700
+
+    implement Grit#heads

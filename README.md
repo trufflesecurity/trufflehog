@@ -1,12 +1,13 @@
 Improvements:
 support for private orgs -- done
-support for reporting public repos in private orgs  -- wip
+add web interface which allows it to be run as a service -- done
+add dockerfile so it can be run as a web service -- done
+slack support -- done
+
+add unit tests for all functionality --wip
 more custom patterns -- wip
 support for gitrob filenames -- wip
-add web interface which allows it to be run as a service -- done
-add unit tests for all functionality --wip
-add dockerfile so it can be run as a web service -- wip https://hub.docker.com/r/jazzdd/alpine-flask/
-slack support -- done
+support for reporting public repos in private orgs  -- wip
 
 # Truffle Hog
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.

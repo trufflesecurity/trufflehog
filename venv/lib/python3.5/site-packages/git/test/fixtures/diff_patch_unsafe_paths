@@ -1,0 +1,89 @@
+diff --git a/path/ starting with a space b/path/ starting with a space
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ b/path/ starting with a space
+@@ -0,0 +1 @@
++dummy content
+diff --git "a/path/\"with-quotes\"" "b/path/\"with-quotes\""
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ "b/path/\"with-quotes\""
+@@ -0,0 +1 @@
++dummy content
+diff --git a/path/'with-single-quotes' b/path/'with-single-quotes'
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ b/path/'with-single-quotes'
+@@ -0,0 +1 @@
++dummy content
+diff --git a/path/ending in a space  b/path/ending in a space 
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ b/path/ending in a space 
+@@ -0,0 +1 @@
++dummy content
+diff --git "a/path/with\ttab" "b/path/with\ttab"
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ "b/path/with\ttab"
+@@ -0,0 +1 @@
++dummy content
+diff --git "a/path/with\nnewline" "b/path/with\nnewline"
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ "b/path/with\nnewline"
+@@ -0,0 +1 @@
++dummy content
+diff --git a/path/with spaces b/path/with spaces
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ b/path/with spaces
+@@ -0,0 +1 @@
++dummy content
+diff --git a/path/with-question-mark? b/path/with-question-mark?
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ b/path/with-question-mark?
+@@ -0,0 +1 @@
++dummy content
+diff --git "a/path/¯\\_(ツ)_|¯" "b/path/¯\\_(ツ)_|¯"
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ "b/path/¯\\_(ツ)_|¯"
+@@ -0,0 +1 @@
++dummy content
+diff --git "a/path/\360\237\222\251.txt" "b/path/\360\237\222\251.txt"
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ "b/path/\360\237\222\251.txt"
+@@ -0,0 +1 @@
++dummy content
+diff --git "a/path/\200-invalid-unicode-path.txt" "b/path/\200-invalid-unicode-path.txt"
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf5f7510320b6a327fb308379de2f94d8859a54
+--- /dev/null
++++ "b/path/\200-invalid-unicode-path.txt"
+@@ -0,0 +1 @@
++dummy content
+diff --git a/a/with spaces b/b/with some spaces
+similarity index 100%
+rename from a/with spaces
+rename to b/with some spaces
+diff --git a/a/ending in a space  b/b/ending with space 
+similarity index 100%
+rename from a/ending in a space 
+rename to b/ending with space 
+diff --git "a/a/\"with-quotes\"" "b/b/\"with even more quotes\""
+similarity index 100%
+rename from "a/\"with-quotes\""
+rename to "b/\"with even more quotes\""

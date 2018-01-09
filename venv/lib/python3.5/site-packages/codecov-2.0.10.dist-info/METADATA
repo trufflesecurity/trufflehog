@@ -1,0 +1,26 @@
+Metadata-Version: 2.0
+Name: codecov
+Version: 2.0.10
+Summary: Hosted coverage reports for Github, Bitbucket and Gitlab
+Home-page: http://github.com/codecov/codecov-python
+Author: @codecov
+Author-email: hello@codecov.io
+License: http://www.apache.org/licenses/LICENSE-2.0
+Keywords: coverage codecov code python java scala php
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Plugins
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Topic :: Software Development :: Testing
+Requires-Dist: coverage
+Requires-Dist: requests (>=2.7.9)
+
+UNKNOWN
+
+

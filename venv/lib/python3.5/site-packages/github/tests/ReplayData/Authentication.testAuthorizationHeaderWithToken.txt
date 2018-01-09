@@ -1,0 +1,11 @@
+https
+GET
+api.github.com
+None
+/user
+{'Authorization': 'token ZmFrZV9sb2dpbjpmYWtlX3Bhc3N3b3Jk', 'User-Agent': 'PyGithub/Python'}
+null
+403
+[('status', '403 Forbidden'), ('content-length', '50'), ('x-github-media-type', 'github.beta; format=json'), ('server', 'GitHub.com'), ('connection', 'keep-alive'), ('date', 'Thu, 28 Mar 2013 20:15:00 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"message":"Max number of login attempt exceeded"}
+

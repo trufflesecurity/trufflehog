@@ -1,0 +1,11 @@
+https
+POST
+api.github.com
+None
+/repos/jacquev6/PyGithub/git/trees
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+{"tree": [{"content": "File created by PyGithub", "path": "Foobar.txt", "type": "blob", "mode": "100644"}]}
+201
+[('status', '201 Created'), ('x-ratelimit-remaining', '4937'), ('content-length', '382'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"0446b5f676814b5801ab6744ef9b59f7"'), ('date', 'Sun, 27 May 2012 05:48:14 GMT'), ('content-type', 'application/json; charset=utf-8'), ('location', 'https://api.github.com/repos/jacquev6/PyGithub/git/trees/41cf8c178c636a018d537cb20daae09391efd70b')]
+{"url":"https://api.github.com/repos/jacquev6/PyGithub/git/trees/41cf8c178c636a018d537cb20daae09391efd70b","sha":"41cf8c178c636a018d537cb20daae09391efd70b","tree":[{"type":"blob","url":"https://api.github.com/repos/jacquev6/PyGithub/git/blobs/73a1c7f17aa0ad5d7cbb5a8ca033ce47d3d23197","size":24,"path":"Foobar.txt","sha":"73a1c7f17aa0ad5d7cbb5a8ca033ce47d3d23197","mode":"100644"}]}
+

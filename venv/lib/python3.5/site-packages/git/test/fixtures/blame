@@ -1,0 +1,131 @@
+634396b2f541a9f2d58b00be1a07f0c358b999b3 1 1 7
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1191997100
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1191997100
+committer-tz -0700
+filename lib/grit.rb
+summary initial grit setup
+boundary
+	$:.unshift File.dirname(__FILE__)     # For use/testing when no gem is installed
+634396b2f541a9f2d58b00be1a07f0c358b999b3 2 2
+	
+634396b2f541a9f2d58b00be1a07f0c358b999b3 3 3
+	# core
+634396b2f541a9f2d58b00be1a07f0c358b999b3 4 4
+	
+634396b2f541a9f2d58b00be1a07f0c358b999b3 5 5
+	# stdlib
+634396b2f541a9f2d58b00be1a07f0c358b999b3 6 6
+	
+634396b2f541a9f2d58b00be1a07f0c358b999b3 7 7
+	# internal requires
+3b1930208a82457747d76729ae088e90edca4673 8 8 1
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1192267241
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1192267241
+committer-tz -0700
+filename lib/grit.rb
+summary big refactor to do lazy loading
+	require 'grit/lazy'
+4c8124ffcf4039d292442eeccabdeca5af5c5017 8 9 1
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1191999972
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1191999972
+committer-tz -0700
+filename lib/grit.rb
+summary implement Grit#heads
+	require 'grit/errors'
+d01a4cfad6ea50285c4710243e3cbe019d381eba 9 10 1
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1192032303
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1192032303
+committer-tz -0700
+filename lib/grit.rb
+summary convert to Grit module, refactor to be more OO
+	require 'grit/git'
+4c8124ffcf4039d292442eeccabdeca5af5c5017 9 11 1
+	require 'grit/head'
+a47fd41f3aa4610ea527dcc1669dfdb9c15c5425 10 12 1
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1192002639
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1192002639
+committer-tz -0700
+filename lib/grit.rb
+summary add more comments throughout
+	require 'grit/commit'
+b17b974691f0a26f26908495d24d9c4c718920f8 13 13 1
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1192271832
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1192271832
+committer-tz -0700
+filename lib/grit.rb
+summary started implementing Tree
+	require 'grit/tree'
+74fd66519e983a0f29e16a342a6059dbffe36020 14 14 1
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1192317005
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1192317005
+committer-tz -0700
+filename lib/grit.rb
+summary add Blob
+	require 'grit/blob'
+d01a4cfad6ea50285c4710243e3cbe019d381eba 12 15 1
+	require 'grit/repo'
+634396b2f541a9f2d58b00be1a07f0c358b999b3 9 16 1
+	
+d01a4cfad6ea50285c4710243e3cbe019d381eba 14 17 1
+	module Grit
+b6e1b765e0c15586a2c5b9832854f95defd71e1f 18 18 6
+author Tom Preston-Werner
+author-mail <tom@mojombo.com>
+author-time 1192860483
+author-tz -0700
+committer Tom Preston-Werner
+committer-mail <tom@mojombo.com>
+committer-time 1192860483
+committer-tz -0700
+filename lib/grit.rb
+summary implement Repo.init_bare
+	  class << self
+b6e1b765e0c15586a2c5b9832854f95defd71e1f 19 19
+	    attr_accessor :debug
+b6e1b765e0c15586a2c5b9832854f95defd71e1f 20 20
+	  end
+b6e1b765e0c15586a2c5b9832854f95defd71e1f 21 21
+	  
+b6e1b765e0c15586a2c5b9832854f95defd71e1f 22 22
+	  self.debug = false
+b6e1b765e0c15586a2c5b9832854f95defd71e1f 23 23
+	  
+634396b2f541a9f2d58b00be1a07f0c358b999b3 11 24 2
+	  VERSION = '1.0.0'
+634396b2f541a9f2d58b00be1a07f0c358b999b3 12 25
+	end

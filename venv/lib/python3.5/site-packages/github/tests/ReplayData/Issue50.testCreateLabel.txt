@@ -1,0 +1,11 @@
+https
+POST
+api.github.com
+None
+/repos/jacquev6/PyGithub/labels
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+{"color": "ffff00", "name": "Label with spaces and strange characters (&*#$)"}
+201
+[('status', '201 Created'), ('content-length', '197'), ('etag', '"99cbb3bf0f7ee7d6278c2ddd3ef42577"'), ('x-ratelimit-remaining', '4968'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('location', 'https://api.github.com/repos/jacquev6/PyGithub/labels/Label+with+spaces+and+strange+characters+%28%26%2A%23%24%29'), ('cache-control', 'max-age=0, private, must-revalidate'), ('date', 'Thu, 28 Jun 2012 19:29:52 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"color":"ffff00","name":"Label with spaces and strange characters (&*#$)","url":"https://api.github.com/repos/jacquev6/PyGithub/labels/Label+with+spaces+and+strange+characters+%28%26%2A%23%24%29"}
+

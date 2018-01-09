@@ -1,0 +1,51 @@
+commit cf37099ea8d1d8c7fbf9b6d12d7ec0249d3acb8b (dist=2)
+tree 01fb5ddba393df486d850c37f40c9a87f4a28a14
+parent bfdc8e26d36833b3a7106c306fdbe6d38dec817e
+author Florian Apolloner <florian@apolloner.eu> 1218480521 +0200
+committer Florian Apolloner <florian@apolloner.eu> 1218480521 +0200
+
+    use shell=True in windows (git.exe needs to be on %PATH%)
+    One bug remaining: git on windows is returning status 0 for `git this-does-not-exist`, so no GitCommandError is raised.
+
+commit 33ebe7acec14b25c5f84f35a664803fcab2f7781 (dist=1)
+tree 960b40fe368a9882221bcdd8635b9080dec01ec6
+author Michael Trier <mtrier@gmail.com> 1210193388 -0400
+committer Michael Trier <mtrier@gmail.com> 1210193388 -0400
+
+    initial project
+
+commit a6604a00a652e754cb8b6b0b9f194f839fc38d7c (dist=1)
+tree 547e8af2f10ffa77c4ed4d0a8381e64141f986b4
+parent cf37099ea8d1d8c7fbf9b6d12d7ec0249d3acb8b
+author Florian Apolloner <florian@apolloner.eu> 1219330141 +0200
+committer Florian Apolloner <florian@apolloner.eu> 1219330141 +0200
+
+    fixed unneeded list unpacking
+
+commit 8df638c22c75ddc9a43ecdde90c0c9939f5009e7 (dist=0)
+tree 43a63b045e538a38161c8da5e154ff1c9436ea4e
+parent a6604a00a652e754cb8b6b0b9f194f839fc38d7c
+parent 127e511ea2e22f3bd9a0279e747e9cfa9509986d
+author Florian Apolloner <florian@apolloner.eu> 1219330182 +0200
+committer Florian Apolloner <florian@apolloner.eu> 1219330182 +0200
+
+    Merge branch 'master' of git@gitorious.org:git-python/mainline
+
+commit c231551328faa864848bde6ff8127f59c9566e90 (dist=-1)
+tree 991ed402b4f6562209ea56550a3c5050d1aa0118
+parent 8df638c22c75ddc9a43ecdde90c0c9939f5009e7
+author David Aguilar <davvid@gmail.com> 1220418344 -0700
+committer David Aguilar <davvid@gmail.com> 1220418344 -0700
+
+    commit: handle --bisect-all output in Commit.list_from_string
+    
+    Rui Abreu Ferrerira pointed out that "git rev-list --bisect-all"
+    returns a slightly different format which we can easily accomodate
+    by changing the way we parse rev-list output.
+    
+    http://groups.google.com/group/git-python/browse_thread/thread/aed1d5c4b31d5027
+    
+    This resolves the issue mentioned in that thread.
+    
+    Signed-off-by: David Aguilar <davvid@gmail.com>
+

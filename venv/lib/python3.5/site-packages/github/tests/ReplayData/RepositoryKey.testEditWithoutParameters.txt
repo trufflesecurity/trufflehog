@@ -1,0 +1,11 @@
+https
+PATCH
+api.github.com
+None
+/repos/jacquev6/PyGithub/keys/2626761
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'User-Agent': 'PyGithub/Python'}
+{}
+200
+[('status', '200 OK'), ('x-ratelimit-remaining', '4985'), ('content-length', '503'), ('server', 'nginx/1.0.13'), ('connection', 'keep-alive'), ('x-ratelimit-limit', '5000'), ('etag', '"ee6bf384c86aa3147ffa7fcde628072e"'), ('date', 'Sun, 27 May 2012 11:07:43 GMT'), ('content-type', 'application/json; charset=utf-8')]
+{"url":"https://api.github.com/user/keys/2626761","key":"ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA5Q58YmzZjU64prR5Pk91MfeHezOTgLqDYmepYbv3qjguiHtPai1vSai5WvUv3hgf9DArXsXE5CV6yoBIhAdGtpJKExHuQ2m4XTFCdbrgfQ3ypcSdgzEiQemyTA6TWwhbuwjJ1IqJMYOVLH+FBCkD8pyIpUDO7v3vaR2TCEuNwOS7lbsRsW3OkGYnUKjaPaCTe/inrqb7I3OE8cPhWJ3dM/zzzBj22J4LCNKhjKua8TFS74xGm3lNDZ6/twQl4n4xmrH/3tG+WOJicNO3JohNHqK9T0pILnr3epEyfdkBjcG0qXApqWvH2WipJhaH6of8Gdr0Z/K/7p8QFddmwNgdPQ==","verified":true,"title":"Title edited by PyGithub","id":2626761}
+

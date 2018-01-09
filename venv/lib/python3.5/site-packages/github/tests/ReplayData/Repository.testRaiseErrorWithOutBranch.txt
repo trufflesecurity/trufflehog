@@ -1,0 +1,11 @@
+https
+PATCH
+api.github.com
+None
+/repos/jacquev6/PyGithub/branches/
+{'Content-Type': 'application/json', 'Authorization': 'Basic login_and_password_removed', 'Accept': 'application/vnd.github.loki-preview+json', 'User-Agent': 'PyGithub/Python'}
+{"protection": {"enabled": true, "required_status_checks": {"enforcement_level": "everyone", "contexts": ["test"]}}}
+404
+[('status', '404 Not Found'), ('content-length', '102'), ('x-github-media-type', 'github.loki-preview; format=json'), ('x-content-type-options', 'nosniff'), ('content-security-policy', "default-src 'none'"), ('access-control-expose-headers', 'ETag, Link, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval'), ('x-github-request-id', 'AE1E5031:A39B:2D392574:568E6BC1'), ('strict-transport-security', 'max-age=31536000; includeSubdomains; preload'), ('x-ratelimit-remaining', '4991'), ('server', 'GitHub.com'), ('x-ratelimit-limit', '5000'), ('x-xss-protection', '1; mode=block'), ('access-control-allow-credentials', 'true'), ('date', 'Thu, 07 Jan 2016 13:44:34 GMT'), ('access-control-allow-origin', '*'), ('content-type', 'application/json; charset=utf-8'), ('x-frame-options', 'deny'), ('x-ratelimit-reset', '1452177625')]
+{"message":"Branch not found","documentation_url":"https://developer.github.com/v3/repos/#get-branch"}
+
