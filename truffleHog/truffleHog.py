@@ -11,7 +11,7 @@ import os
 import re
 import json
 import stat
-from regexChecks import regexes
+from defaultRegexes.regexChecks import regexes
 from git import Repo
 
 def main():
