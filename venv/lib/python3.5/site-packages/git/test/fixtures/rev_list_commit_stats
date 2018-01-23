@@ -1,7 +1,0 @@
-commit 634396b2f541a9f2d58b00be1a07f0c358b999b3
-tree b35b4bf642d667fdd613eebcfe4e17efd420fb8a
-author Tom Preston-Werner <tom@mojombo.com> 1191997100 -0700
-committer Tom Preston-Werner <tom@mojombo.com> 1191997100 -0700
-
-    initial grit setup
-

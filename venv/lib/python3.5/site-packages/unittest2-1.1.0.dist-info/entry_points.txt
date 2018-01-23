@@ -1,3 +1,0 @@
-[console_scripts]
-unit2 = unittest2.__main__:main_
-

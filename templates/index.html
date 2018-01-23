@@ -21,27 +21,35 @@
     <div class="jumbotron">
         <h1>Trufflehog Submit Form</h1>
         <form class="form-signin" action="/scan" method="POST">
+
             <label for="inputName" class="sr-only">Token for account without private org access</label>
             <input type="name" name="public_token" id="inputName" class="form-control" placeholder="public github token"
                    autofocus>
+
             <label for="inputName" class="sr-only">Username of account with private org access</label>
             <input type="name" name="username" id="inputEmail" class="form-control" placeholder="private username"
-                   required autofocus>
+                   >
+
             <label for="inputName" class="sr-only">Password</label>
             <input type="password" name="password" id="inputPassword" class="form-control" placeholder="Password"
-                   required>
+                   >
+
             <label for="inputName" class="sr-only">Token for account above</label>
             <input type="name" name="token" id="inputToken" class="form-control" placeholder="Private Token"
-                   required>
+                   >
+
             <label for="inputName" class="sr-only">Org Name</label>
             <input type="name" name="orgname" id="inputOrg" class="form-control" placeholder="Private Organization Name"
                    required>
+
             <label for="inputName" class="sr-only">Repo Name</label>
-            <input type="name" name="orgname" id="inputRepo" class="form-control" placeholder="Repo Name(optional)">
+            <input type="name" name="repoName" id="inputRepo" class="form-control" placeholder="Repo Name(optional)">
+
             <label for="inputName" class="sr-only">Slack Webhook URL</label>
-            <input type="name" name="orgname" id="webhook" class="form-control" placeholder="webhook"><label for="inputName" class="sr-only">webhook url</label>
+            <input type="name" name="webhook" id="webhook" class="form-control" placeholder="webhook">
+
             <label for="inputName" class="sr-only">Slack Channel</label>
-            <input type="name" name="orgname" id="channel" class="form-control" placeholder="#channel or @user"><label for="inputName" class="sr-only">slack #channel or @user</label>
+            <input type="name" name="channel" id="channel" class="form-control" placeholder="#channel or @user"><label for="inputName" class="sr-only">slack #channel or @user</label>
 
             <input type="submit" id="scan" class="btn btn-lg btn-primary btn-block" value="scan">Scan</input>
         </form>

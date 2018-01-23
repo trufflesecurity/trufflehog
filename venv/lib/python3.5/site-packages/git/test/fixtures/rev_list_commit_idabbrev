@@ -1,8 +1,0 @@
-commit 80f136f500dfdb8c3e8abf4ae716f875f0a1b57f
-tree 3fffd0fce0655433c945e6bdc5e9f338b087b211
-parent 44f82e5ac93ba322161019dce44b78c5bd1fdce2
-author tom <tom@taco.(none)> 1195608462 -0800
-committer tom <tom@taco.(none)> 1195608462 -0800
-
-    fix tests on other machines
-

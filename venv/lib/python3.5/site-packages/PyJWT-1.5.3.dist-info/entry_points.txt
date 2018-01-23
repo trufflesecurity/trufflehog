@@ -1,3 +1,0 @@
-[console_scripts]
-pyjwt = jwt.__main__:main
-

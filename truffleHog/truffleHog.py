@@ -13,6 +13,9 @@ import os
 import re
 import json
 import stat
+from pprint import pprint
+
+from git import Repo, RemoteProgress
 from regexChecks import regexes
 from git import Repo
 from git import NULL_TREE
@@ -26,7 +29,8 @@ def main():
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
-    parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
+    parser.add_argument("--max_depth", dest="max_depth",
+                        help="The max commit depth to go back when searching for secrets")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
@@ -78,9 +82,9 @@ def shannon_entropy(data, iterator):
         return 0
     entropy = 0
     for x in iterator:
-        p_x = float(data.count(x))/len(data)
+        p_x = float(data.count(x)) / len(data)
         if p_x > 0:
-            entropy += - p_x*math.log(p_x, 2)
+            entropy += - p_x * math.log(p_x, 2)
     return entropy
 
 
@@ -111,9 +115,10 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def clone_git_repo(git_url):
+
+def clone_git_repo(git_url, progress=None):
     project_path = tempfile.mkdtemp()
-    Repo.clone_from(git_url, project_path)
+    Repo.clone_from(git_url, project_path, progress=progress)
     return project_path
 
 def print_results(printJson, issue):
@@ -171,6 +176,7 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
     entropicDiff = None
     if len(stringsFound) > 0:
+        # print("found ",len(stringsFound)," entropic issues")
         entropicDiff = {}
         entropicDiff['date'] = commit_time
         entropicDiff['path'] = blob.b_path if blob.b_path else blob.a_path
@@ -194,6 +200,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
         for found_string in found_strings:
             found_diff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
         if found_strings:
+            # print("found ", len(found_strings), " regex issues")
             foundRegex = {}
             foundRegex['date'] = commit_time
             foundRegex['path'] = blob.b_path if blob.b_path else blob.a_path
@@ -227,6 +234,10 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
         issues += foundIssues
     return issues
 
+class MyProgressPrinter(RemoteProgress):
+    def update(self, op_code, cur_count, max_count=None, message=''):
+        print(op_code, cur_count, max_count, cur_count / (max_count or 100.0), message or "NO MESSAGE")
+
 def handle_results(output, output_dir, foundIssues):
     for foundIssue in foundIssues:
         result_path = os.path.join(output_dir, str(uuid.uuid4()))
@@ -235,23 +246,32 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, custom_regexes={}):
-    output = {"foundIssues": []}
+def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True):
+    output = {"entropicDiffs": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
-    output_dir = tempfile.mkdtemp()
 
-    for remote_branch in repo.remotes.origin.fetch():
+    branches = repo.remotes.origin.fetch()
+    for remote_branch in branches:
         since_commit_reached = False
         branch_name = remote_branch.name.split('/')[1]
+        if specific_branch is not None and branch_name != specific_branch:
+            pprint("Specific branch is %s, current branch is %s continuing" % (specific_branch, branch_name))
+            continue
         try:
-            repo.git.checkout(remote_branch, b=branch_name)
-        except:
+            print("checking out ", branch_name)
+            repo.git.checkout(remote_branch)
+        except Exception as e:
+            print("Checkout failed because of %s" % e)
             pass
 
         prev_commit = None
-        for curr_commit in repo.iter_commits(max_count=max_depth):
+        commits = repo.iter_commits(max_count=max_depth)
+        if print_str >=3:
+            print("checking ", git_url, " with ", str(len(list(commits))), " commits")
+
+        for curr_commit in commits:
             commitHash = curr_commit.hexsha
             if commitHash == since_commit:
                 since_commit_reached = True

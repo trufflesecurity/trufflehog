@@ -1,13 +1,28 @@
 Improvements:
 support for private orgs -- done
+
 add web interface which allows it to be run as a service -- done
+
 add dockerfile so it can be run as a web service -- done
+
 slack support -- done
 
+support for private repo in private org -- done
+
+
+Trufflehog web is a long running task, HTTP times out before it returns, so it's better to run the jobs on celery
 add unit tests for all functionality --wip
+
 more custom patterns -- wip
+
 support for gitrob filenames -- wip
+
 support for reporting public repos in private orgs  -- wip
+
+Integrate scruadub to remove PII as well -- wip
+https://scrubadub.readthedocs.io/en/stable/
+
+
 
 # Truffle Hog
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.

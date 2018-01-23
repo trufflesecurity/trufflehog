@@ -5,6 +5,9 @@ click==6.7
 codecov==2.0.10
 coverage==4.4.2
 Flask==0.12.2
+funcsigs==1.0.2
+futures==3.1.1
+futures-actors==0.0.5
 gitdb2==2.0.3
 GitPython==2.1.8
 idna==2.6
@@ -16,6 +19,7 @@ MarkupSafe==1.0
 pluggy==0.6.0
 py==1.5.2
 PyGithub==1.35
+Pygments==2.2.0
 PyJWT==1.5.3
 pytest==3.3.1
 pytest-cov==2.5.1
@@ -24,7 +28,9 @@ truffleHogRegexes==0.0.4
 requests==2.18.4
 six==1.11.0
 smmap2==2.0.3
+str==0.1
 traceback2==1.4.0
+ubelt==0.1.0
 unittest2==1.1.0
 urllib3==1.22
 Werkzeug==0.14.1
