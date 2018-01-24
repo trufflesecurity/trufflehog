@@ -13,6 +13,7 @@ import json
 import stat
 from defaultRegexes.regexChecks import regexes
 from git import Repo
+from git import NULL_TREE
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
@@ -223,33 +224,39 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do
             if since_commit and since_commit_reached:
                 prev_commit = curr_commit
                 continue
-            if not prev_commit:
-                pass
-            else:
-                #avoid searching the same diffs
-                hashes = str(prev_commit) + str(curr_commit)
-                if hashes in already_searched:
-                    prev_commit = curr_commit
-                    continue
-                already_searched.add(hashes)
 
+            # if not prev_commit, then curr_commit is the newest commit. And we have nothing to diff with.
+            # But we will diff the first commit with NULL_TREE here to check the oldest code.
+            # In this way, no commit will be missed.
+            if not prev_commit:
+                prev_commit = list(repo.iter_commits(max_count=max_depth))[-1]
+                diff = prev_commit.diff(NULL_TREE, create_patch=True)
+            else:
                 diff = prev_commit.diff(curr_commit, create_patch=True)
-                for blob in diff:
-                    printableDiff = blob.diff.decode('utf-8', errors='replace')
-                    if printableDiff.startswith("Binary files"):
-                        continue
-                    commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                    foundIssues = []
-                    if do_entropy:
-                        entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
-                        if entropicDiff:
-                            foundIssues.append(entropicDiff)
-                    if do_regex:
-                        found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
-                        foundIssues += found_regexes
-                    for foundIssue in foundIssues:
-                        print_results(printJson, foundIssue)
-                    output["foundIssues"] += foundIssues
+
+            # avoid searching the same diffs
+            hashes = str(prev_commit) + str(curr_commit)
+            if hashes in already_searched:
+                prev_commit = curr_commit
+                continue
+            already_searched.add(hashes)
+
+            for blob in diff:
+                printableDiff = blob.diff.decode('utf-8', errors='replace')
+                if printableDiff.startswith("Binary files"):
+                    continue
+                commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                foundIssues = []
+                if do_entropy:
+                    entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+                    if entropicDiff:
+                        foundIssues.append(entropicDiff)
+                if do_regex:
+                    found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+                    foundIssues += found_regexes
+                for foundIssue in foundIssues:
+                    print_results(printJson, foundIssue)
+                output["foundIssues"] += foundIssues
 
             prev_commit = curr_commit
     output["project_path"] = project_path 
