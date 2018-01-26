@@ -8,10 +8,10 @@ import datetime
 import argparse
 import tempfile
 import os
+import re
 import json
 import stat
-import re
-from regexChecks import regexes
+from defaultRegexes.regexChecks import regexes
 from git import Repo
 
 
@@ -19,6 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
+    parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
@@ -34,10 +35,24 @@ def main():
                              'effectively excluded via the --include_paths option.')
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
+    parser.set_defaults(rules={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
     args = parser.parse_args()
+    rules = {}
+    if args.rules:
+        try:
+            with open(args.rules, "r") as ruleFile:
+                rules = json.loads(ruleFile.read())
+                for rule in rules:
+                    rules[rule] = re.compile(rules[rule])
+        except (IOError, ValueError) as e:
+            raise("Error reading rules file")
+        for regex in dict(regexes):
+            del regexes[regex]
+        for regex in rules:
+            regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
 
     # read & compile path inclusion/exclusion patterns
@@ -237,7 +252,7 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
 
 def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True,
                  path_inclusions=None, path_exclusions=None):
-    output = {"entropicDiffs": []}
+    output = {"foundIssues": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
@@ -286,9 +301,11 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do
                         foundIssues += found_regexes
                     for foundIssue in foundIssues:
                         print_results(printJson, foundIssue)
+                    output["foundIssues"] += foundIssues
 
             prev_commit = curr_commit
-    output["project_path"] = project_path
+    output["project_path"] = project_path 
+    output["clone_uri"] = git_url 
     return output
 
 if __name__ == "__main__":
