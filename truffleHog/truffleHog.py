@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
 import shutil
 import sys
 import math
@@ -11,9 +12,12 @@ import os
 import re
 import json
 import stat
-from defaultRegexes.regexChecks import regexes
 from git import Repo
 from git import NULL_TREE
+try:
+    from defaultRegexes.regexChecks import regexes
+except ImportError:
+    from truffleHog.defaultRegexes.regexChecks import regexes
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
@@ -179,10 +183,14 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
-def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
+def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes={}):
+    if custom_regexes:
+        secret_regexes = custom_regexes
+    else:
+        secret_regexes = regexes
     regex_matches = []
-    for key in regexes:
-        found_strings = regexes[key].findall(printableDiff)
+    for key in secret_regexes:
+        found_strings = secret_regexes[key].findall(printableDiff)
         for found_string in found_strings:
             found_diff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
         if found_strings:
@@ -202,7 +210,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
 
 
 
-def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True):
+def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True, custom_regexes={}):
     output = {"foundIssues": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
@@ -229,18 +237,10 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do
             # But we will diff the first commit with NULL_TREE here to check the oldest code.
             # In this way, no commit will be missed.
             if not prev_commit:
-                prev_commit = list(repo.iter_commits(max_count=max_depth))[-1]
-                diff = prev_commit.diff(NULL_TREE, create_patch=True)
+                diff = curr_commit.diff(NULL_TREE, create_patch=True)
+                prev_commit = curr_commit
             else:
                 diff = prev_commit.diff(curr_commit, create_patch=True)
-
-            # avoid searching the same diffs
-            hashes = str(prev_commit) + str(curr_commit)
-            if hashes in already_searched:
-                prev_commit = curr_commit
-                continue
-            already_searched.add(hashes)
-
             for blob in diff:
                 printableDiff = blob.diff.decode('utf-8', errors='replace')
                 if printableDiff.startswith("Binary files"):
@@ -252,15 +252,15 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do
                     if entropicDiff:
                         foundIssues.append(entropicDiff)
                 if do_regex:
-                    found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+                    found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes)
                     foundIssues += found_regexes
                 for foundIssue in foundIssues:
                     print_results(printJson, foundIssue)
                 output["foundIssues"] += foundIssues
 
             prev_commit = curr_commit
-    output["project_path"] = project_path 
-    output["clone_uri"] = git_url 
+    output["project_path"] = project_path
+    output["clone_uri"] = git_url
     return output
 
 if __name__ == "__main__":
