@@ -12,8 +12,11 @@ import os
 import re
 import json
 import stat
-from defaultRegexes.regexChecks import regexes
 from git import Repo
+try:
+    from defaultRegexes.regexChecks import regexes
+except ImportError:
+    from truffleHog.defaultRegexes.regexChecks import regexes
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
