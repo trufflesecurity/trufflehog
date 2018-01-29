@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
 import shutil
 import sys
 import math
@@ -178,10 +179,14 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
-def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
+def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes={}):
+    if custom_regexes:
+        secret_regexes = custom_regexes
+    else:
+        secret_regexes = regexes
     regex_matches = []
-    for key in regexes:
-        found_strings = regexes[key].findall(printableDiff)
+    for key in secret_regexes:
+        found_strings = secret_regexes[key].findall(printableDiff)
         for found_string in found_strings:
             found_diff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
         if found_strings:
@@ -201,7 +206,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
 
 
 
-def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True):
+def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True, custom_regexes={}):
     output = {"foundIssues": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
@@ -245,7 +250,7 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do
                         if entropicDiff:
                             foundIssues.append(entropicDiff)
                     if do_regex:
-                        found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+                        found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes)
                         foundIssues += found_regexes
                     for foundIssue in foundIssues:
                         print_results(printJson, foundIssue)
