@@ -50,6 +50,9 @@ optional arguments:
   --json                Output in JSON
   --regex               Enable high signal regex checks
   --entropy DO_ENTROPY  Enable entropy checks
+  --status_on_failures STATUS_ON_FAILURES
+                        Status code to return when secrets are founds.
+                        Defaults to 0
   --since_commit SINCE_COMMIT
                         Only scan from a given commit hash
   --max_depth MAX_DEPTH

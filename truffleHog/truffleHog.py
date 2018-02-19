@@ -24,6 +24,8 @@ def main():
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
+    parser.add_argument("--status_on_failures", help="Status code to return when secrets are founds. Defaults to 0",
+                        default=0, type=int)
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
@@ -50,6 +52,8 @@ def main():
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
+    return args.status_on_failures if output["foundIssues"] else 0
+
 
 def str2bool(v):
     if v == None:
@@ -265,4 +269,5 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do
     return output
 
 if __name__ == "__main__":
-    main()
+    status = main()
+    sys.exit(status)
