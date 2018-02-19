@@ -1,4 +1,8 @@
 language: python
 python:
   - "2.7"
-script: pytest --cov=./ && codecov
+before_install:
+    - pip install flake8
+script:
+  - flake8
+  - pytest --cov=./ && codecov
