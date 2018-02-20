@@ -13,6 +13,7 @@ import re
 import json
 import stat
 from git import Repo
+from git.exc import GitCommandError
 try:
     from defaultRegexes.regexChecks import regexes
 except ImportError:
@@ -229,7 +230,7 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False,
         branch_name = remote_branch.name.split('/')[1]
         try:
             repo.git.checkout(remote_branch, b=branch_name)
-        except:
+        except GitCommandError:
             pass
 
         prev_commit = None
