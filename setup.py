@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name='truffleHog',
@@ -8,11 +8,11 @@ setup(
     author='Dylan Ayrey',
     author_email='dxa4481@rit.edu',
     license='GNU',
-    packages = ['truffleHog', 'truffleHog.defaultRegexes'],
+    packages=['truffleHog', 'truffleHog.defaultRegexes'],
     install_requires=[
         'GitPython == 2.1.1'
     ],
-    entry_points = {
+    entry_points={
       'console_scripts': ['trufflehog = truffleHog.truffleHog:main'],
     },
 )

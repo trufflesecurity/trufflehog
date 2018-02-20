@@ -22,5 +22,6 @@ class TestStringMethods(unittest.TestCase):
         except UnicodeEncodeError:
             self.fail("Unicode print error")
 
+
 if __name__ == '__main__':
     unittest.main()

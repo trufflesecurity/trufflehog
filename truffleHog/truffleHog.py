@@ -42,7 +42,7 @@ def main():
                 rules = json.loads(ruleFile.read())
                 for rule in rules:
                     rules[rule] = re.compile(rules[rule])
-        except (IOError, ValueError) as e:
+        except (IOError, ValueError):
             raise("Error reading rules file")
         for regex in dict(regexes):
             del regexes[regex]
@@ -255,7 +255,8 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False,
                     printableDiff = blob.diff.decode('utf-8', errors='replace')
                     if printableDiff.startswith("Binary files"):
                         continue
-                    commit_time = datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                    commit_time = datetime.datetime.fromtimestamp(
+                        prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     foundIssues = []
                     if do_entropy:
                         entropicDiff = find_entropy(printableDiff, commit_time,
