@@ -230,7 +230,8 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False,
         branch_name = remote_branch.name.split('/')[1]
         try:
             repo.git.checkout(remote_branch, b=branch_name)
-        except GitCommandError:
+        except (GitCommandError, UnicodeEncodeError):
+            # dont know what to do with utf8 chars in branch names
             pass
 
         prev_commit = None
