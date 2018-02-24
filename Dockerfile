@@ -3,4 +3,3 @@ RUN apk add --no-cache git && pip install trufflehog
 WORKDIR /proj
 ENTRYPOINT [ "trufflehog" ]
 CMD [ "-h" ]
-# CMD [ "file:///proj" ]
