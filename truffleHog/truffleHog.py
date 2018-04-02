@@ -7,6 +7,7 @@ import sys
 import math
 import datetime
 import argparse
+import uuid
 import tempfile
 import os
 import re
@@ -207,14 +208,40 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             regex_matches.append(foundRegex)
     return regex_matches
 
+def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson):
+    issues = []
+    for blob in diff:
+        printableDiff = blob.diff.decode('utf-8', errors='replace')
+        if printableDiff.startswith("Binary files"):
+            continue
+        commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+        foundIssues = []
+        if do_entropy:
+            entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+            if entropicDiff:
+                foundIssues.append(entropicDiff)
+        if do_regex:
+            found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes)
+            foundIssues += found_regexes
+        for foundIssue in foundIssues:
+            print_results(printJson, foundIssue)
+        issues += foundIssues
+    return issues
 
+def handle_results(output, output_dir, foundIssues):
+    for foundIssue in foundIssues:
+        result_path = os.path.join(output_dir, str(uuid.uuid4()))
+        with open(result_path, "w+") as result_file:
+            result_file.write(json.dumps(foundIssue))
+        output["foundIssues"].append(result_path)
+    return output
 
-
-def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do_regex=False, do_entropy=True, custom_regexes={}):
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, custom_regexes={}):
     output = {"foundIssues": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
+    output_dir = tempfile.mkdtemp()
 
     for remote_branch in repo.remotes.origin.fetch():
         since_commit_reached = False
@@ -232,33 +259,21 @@ def find_strings(git_url, since_commit=None, max_depth=None, printJson=False, do
             if since_commit and since_commit_reached:
                 prev_commit = curr_commit
                 continue
-
             # if not prev_commit, then curr_commit is the newest commit. And we have nothing to diff with.
             # But we will diff the first commit with NULL_TREE here to check the oldest code.
             # In this way, no commit will be missed.
             if not prev_commit:
-                diff = curr_commit.diff(NULL_TREE, create_patch=True)
                 prev_commit = curr_commit
+                continue
             else:
                 diff = prev_commit.diff(curr_commit, create_patch=True)
-            for blob in diff:
-                printableDiff = blob.diff.decode('utf-8', errors='replace')
-                if printableDiff.startswith("Binary files"):
-                    continue
-                commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                foundIssues = []
-                if do_entropy:
-                    entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
-                    if entropicDiff:
-                        foundIssues.append(entropicDiff)
-                if do_regex:
-                    found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes)
-                    foundIssues += found_regexes
-                for foundIssue in foundIssues:
-                    print_results(printJson, foundIssue)
-                output["foundIssues"] += foundIssues
-
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson)
+            output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
+        # Handling the first commit
+        diff = curr_commit.diff(NULL_TREE, create_patch=True)
+        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson)
+        output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
     return output
