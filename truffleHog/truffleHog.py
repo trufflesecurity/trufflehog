@@ -126,7 +126,7 @@ def print_results(printJson, issue):
     path = issue['path']
 
     if printJson:
-        print(json.dumps(issue, sort_keys=True, indent=4))
+        print(json.dumps(issue, sort_keys=True))
     else:
         print("~~~~~~~~~~~~~~~~~~~~~")
         reason = "{}Reason: {}{}".format(bcolors.OKGREEN, reason, bcolors.ENDC)
