@@ -1,11 +1,12 @@
 # Truffle Hog
+
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
 
 ## NEW
-Trufflehog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to surpress entropy checking has also been added.
 
-These features help cut down on noise, and makes the tool easier to shove into a devops pipeline.
+TruffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to surpress entropy checking has also been added.
 
+These features help cut down on noise, and makes the tool easier to integrate into a devops pipeline.
 
 ```
 trufflehog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
@@ -18,6 +19,12 @@ trufflehog file:///user/dxa4481/codeprojects/truffleHog/
 ```
 
 ![Example](https://i.imgur.com/YAXndLD.png)
+
+The tool can also be used with a Personal Access Token (PAT) directly integrated in the URL, if you are scanning private repositories:
+
+```
+trufflehog --regex https://USERNAME:PAT@github.com/YOUR_ORG/YOUR_REPO.git
+```
 
 ## Install
 ```
