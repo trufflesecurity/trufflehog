@@ -28,13 +28,13 @@ def main():
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
-    parser.add_argument("--exit-code", dest="throw_exit_1", help="Throw exit 1 code when issues are found")
+    parser.add_argument("--fail_code", dest="fail_code", help="Throw exit 1 code when issues are found")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
-    parser.set_defaults(throw_exit_1=False)
+    parser.set_defaults(fail_code="no")
     parser.set_defaults(entropy=True)
     args = parser.parse_args()
     rules = {}
@@ -53,10 +53,10 @@ def main():
     do_entropy = str2bool(args.do_entropy)
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy)
 
-    throw_exit_1 = str2bool(args.throw_exit_1)
+    fail_code = str2bool(args.fail_code)
     exit_code = 0
 
-    if throw_exit_1 and len(output["foundIssues"]) > 0:
+    if fail_code and len(output["foundIssues"]) > 0:
        exit_code = 1
 
     project_path = output["project_path"]
