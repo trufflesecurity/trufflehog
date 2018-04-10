@@ -2,7 +2,7 @@ import re
 
 regexes = {
     #"Internal subdomain": re.compile('([a-z0-9]+[.]*supersecretinternal[.]com)'),
-    "Slack Token": re.compile('(xox[p|b|o|a]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})'),
+    "Slack Token": re.compile('(xox[pboa]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})'),
     "RSA private key": re.compile('-----BEGIN RSA PRIVATE KEY-----'),
     "SSH (OPENSSH) private key": re.compile('-----BEGIN OPENSSH PRIVATE KEY-----'),
     "SSH (DSA) private key": re.compile('-----BEGIN DSA PRIVATE KEY-----'),
