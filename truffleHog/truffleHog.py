@@ -267,6 +267,14 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 continue
             else:
                 diff = prev_commit.diff(curr_commit, create_patch=True)
+
+            # avoid searching the same diffs
+            hashes = str(prev_commit) + str(curr_commit)
+            if hashes in already_searched:
+                prev_commit = curr_commit
+                continue
+            already_searched.add(hashes)
+
             foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
