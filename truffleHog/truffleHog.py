@@ -15,10 +15,8 @@ import json
 import stat
 from git import Repo
 from git import NULL_TREE
-try:
-    from defaultRegexes.regexChecks import regexes
-except ImportError:
-    from truffleHog.defaultRegexes.regexChecks import regexes
+from truffleHogRegexes.regexChecks import regexes
+
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
