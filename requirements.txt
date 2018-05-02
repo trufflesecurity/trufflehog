@@ -23,7 +23,6 @@ Pygments==2.2.0
 PyJWT==1.5.3
 pytest==3.3.1
 pytest-cov==2.5.1
-codecov==2.0.15
 truffleHogRegexes==0.0.4
 requests==2.18.4
 six==1.11.0

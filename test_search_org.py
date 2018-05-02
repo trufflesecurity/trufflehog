@@ -6,7 +6,7 @@ import unittest
 import os
 from pprint import pprint
 from unittest import skip, TestCase
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 import github
 from github import UnknownObjectException, Github, BadCredentialsException

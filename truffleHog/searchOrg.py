@@ -243,7 +243,7 @@ def analyze(args):
     if delay > 0:
         time.sleep(delay)
 
-    strings = find_strings(url, print_json=True, do_entropy=entropy, do_regex=regex,
+    strings = find_strings(url, printJson=True, do_entropy=entropy, do_regex=regex,
                            max_depth=999999999999999999999999, print_str=verbosity, specific_branch=args.options.branch)
     result = {"entropicDiffs": list(filter(lambda x: x is not None, strings["entropicDiffs"])),
               "found_regexes": list(filter(lambda x: x is not None, strings["found_regexes"])),
