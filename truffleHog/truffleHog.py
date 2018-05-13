@@ -249,14 +249,9 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
 
     for remote_branch in repo.remotes.origin.fetch():
         since_commit_reached = False
-        _, _, branch_name = remote_branch.name.partition('/')
-        try:
-            repo.git.checkout(remote_branch, b=branch_name)
-        except:
-            pass
-
+        branch_name = remote_branch.name
         prev_commit = None
-        for curr_commit in repo.iter_commits(max_count=max_depth):
+        for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
             commitHash = curr_commit.hexsha
             if commitHash == since_commit:
                 since_commit_reached = True
