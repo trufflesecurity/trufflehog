@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='truffleHog',
-    version='2.0.91',
+    version='2.0.92',
     description='Searches through git repositories for high entropy strings, digging deep into commit history.',
     url='https://github.com/dxa4481/truffleHog',
     author='Dylan Ayrey',
