@@ -8,6 +8,7 @@ import math
 import datetime
 import argparse
 import uuid
+import hashlib
 import tempfile
 import os
 import re
@@ -261,11 +262,17 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
             # if not prev_commit, then curr_commit is the newest commit. And we have nothing to diff with.
             # But we will diff the first commit with NULL_TREE here to check the oldest code.
             # In this way, no commit will be missed.
+            diff_hash = hashlib.md5((str(prev_commit) + str(curr_commit)).encode('utf-8')).digest()
             if not prev_commit:
+                prev_commit = curr_commit
+                continue
+            elif diff_hash in already_searched:
                 prev_commit = curr_commit
                 continue
             else:
                 diff = prev_commit.diff(curr_commit, create_patch=True)
+            # avoid searching the same diffs
+            already_searched.add(diff_hash)
             foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
