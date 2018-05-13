@@ -245,7 +245,7 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
 
     for remote_branch in repo.remotes.origin.fetch():
         since_commit_reached = False
-        branch_name = remote_branch.name.split('/')[1]
+        _, _, branch_name = remote_branch.name.partition('/')
         try:
             repo.git.checkout(remote_branch, b=branch_name)
         except:
