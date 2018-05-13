@@ -47,7 +47,7 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
@@ -206,7 +206,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             regex_matches.append(foundRegex)
     return regex_matches
 
-def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson):
+def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output):
     issues = []
     for blob in diff:
         printableDiff = blob.diff.decode('utf-8', errors='replace')
@@ -221,8 +221,9 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
         if do_regex:
             found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes)
             foundIssues += found_regexes
-        for foundIssue in foundIssues:
-            print_results(printJson, foundIssue)
+        if not surpress_output:
+            for foundIssue in foundIssues:
+                print_results(printJson, foundIssue)
         issues += foundIssues
     return issues
 
@@ -234,7 +235,7 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, custom_regexes={}):
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}):
     output = {"foundIssues": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
@@ -265,12 +266,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 continue
             else:
                 diff = prev_commit.diff(curr_commit, create_patch=True)
-            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson)
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
         # Handling the first commit
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
-        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson)
+        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
