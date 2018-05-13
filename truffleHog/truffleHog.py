@@ -51,6 +51,10 @@ def main():
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
+    if output["foundIssues"]:
+        sys.exit(1)
+    else:
+        sys.exit(0)
 
 def str2bool(v):
     if v == None:
