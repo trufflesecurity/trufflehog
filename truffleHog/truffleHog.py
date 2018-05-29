@@ -197,18 +197,18 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
         found_strings = secret_regexes[key].findall(printableDiff)
         for found_string in found_strings:
             found_diff = printableDiff.replace(printableDiff, bcolors.WARNING + found_string + bcolors.ENDC)
-        if found_strings:
-            foundRegex = {}
-            foundRegex['date'] = commit_time
-            foundRegex['path'] = blob.b_path if blob.b_path else blob.a_path
-            foundRegex['branch'] = branch_name
-            foundRegex['commit'] = prev_commit.message
-            foundRegex['diff'] = blob.diff.decode('utf-8', errors='replace')
-            foundRegex['stringsFound'] = found_strings
-            foundRegex['printDiff'] = found_diff
-            foundRegex['reason'] = key
-            foundRegex['commitHash'] = commitHash
-            regex_matches.append(foundRegex)
+            if found_diff:
+                foundRegex = {}
+                foundRegex['date'] = commit_time
+                foundRegex['path'] = blob.b_path if blob.b_path else blob.a_path
+                foundRegex['branch'] = branch_name
+                foundRegex['commit'] = prev_commit.message
+                foundRegex['diff'] = blob.diff.decode('utf-8', errors='replace')
+                foundRegex['stringsFound'] = found_strings
+                foundRegex['printDiff'] = found_diff
+                foundRegex['reason'] = key
+                foundRegex['commitHash'] = commitHash
+                regex_matches.append(foundRegex)
     return regex_matches
 
 def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output):
