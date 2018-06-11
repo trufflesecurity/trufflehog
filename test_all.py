@@ -1,5 +1,8 @@
 import unittest
 import os
+import sys
+import json
+import io
 from truffleHog import truffleHog
 
 
@@ -21,6 +24,35 @@ class TestStringMethods(unittest.TestCase):
             truffleHog.find_strings("https://github.com/dxa4481/tst.git")
         except UnicodeEncodeError:
             self.fail("Unicode print error")
+
+    def test_return_correct_commit_hash(self):
+        # Start at commit d15627104d07846ac2914a976e8e347a663bbd9b, which 
+        # is immediately followed by a secret inserting commit:
+        # https://github.com/dxa4481/truffleHog/commit/9ed54617547cfca783e0f81f8dc5c927e3d1e345
+        since_commit = 'd15627104d07846ac2914a976e8e347a663bbd9b'
+        commit_w_secret = '9ed54617547cfca783e0f81f8dc5c927e3d1e345'
+        cross_valdiating_commit_w_secret_comment = 'OH no a secret'
+
+        json_result = ''
+        tmp_stdout = io.StringIO()
+        bak_stdout = sys.stdout
+
+        # Redirect STDOUT, run scan and re-establish STDOUT
+        sys.stdout = tmp_stdout
+        try:
+            truffleHog.find_strings("https://github.com/dxa4481/truffleHog.git", 
+                since_commit=since_commit, printJson=True, surpress_output=False)
+        finally:
+            sys.stdout = bak_stdout
+
+        json_result_list = tmp_stdout.getvalue().split('\n')
+        results = [json.loads(r) for r in json_result_list if bool(r.strip())]
+        filtered_results = list(filter(lambda r: r['commitHash'] == commit_w_secret, results))
+        self.assertEqual(1, len(filtered_results))
+        self.assertEqual(commit_w_secret, filtered_results[0]['commitHash'])
+        # Additionally, we cross-validate the commit comment matches the expected comment
+        self.assertEqual(cross_valdiating_commit_w_secret_comment, filtered_results[0]['commit'].strip())
+
 
 if __name__ == '__main__':
     unittest.main()
