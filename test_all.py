@@ -34,7 +34,10 @@ class TestStringMethods(unittest.TestCase):
         cross_valdiating_commit_w_secret_comment = 'OH no a secret'
 
         json_result = ''
-        tmp_stdout = io.StringIO()
+        if sys.version_info >= (3,):
+            tmp_stdout = io.StringIO()
+        else:
+            tmp_stdout = io.BytesIO()
         bak_stdout = sys.stdout
 
         # Redirect STDOUT, run scan and re-establish STDOUT
