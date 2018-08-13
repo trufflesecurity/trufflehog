@@ -183,7 +183,7 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
         entropicDiff['stringsFound'] = stringsFound
         entropicDiff['printDiff'] = printableDiff
-        entropicDiff['commitHash'] = commitHash
+        entropicDiff['commitHash'] = prev_commit.hexsha
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
@@ -207,7 +207,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             foundRegex['stringsFound'] = found_strings
             foundRegex['printDiff'] = found_diff
             foundRegex['reason'] = key
-            foundRegex['commitHash'] = commitHash
+            foundRegex['commitHash'] = prev_commit.hexsha
             regex_matches.append(foundRegex)
     return regex_matches
 
