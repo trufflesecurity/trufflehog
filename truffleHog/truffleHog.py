@@ -281,7 +281,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
+    output["issues_directory"] = output_dir
     return output
+
+def clean_up(output):
+    shutil.rmtree(output["project_path"])
+    shutil.rmtree(output["issues_directory"])
 
 if __name__ == "__main__":
     main()
