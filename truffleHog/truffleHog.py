@@ -27,12 +27,14 @@ def main():
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
+    parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
+    parser.set_defaults(branch=None)
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -48,7 +50,7 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
     if output["foundIssues"]:
@@ -240,14 +242,19 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}):
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}, branch=None):
     output = {"foundIssues": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
     output_dir = tempfile.mkdtemp()
 
-    for remote_branch in repo.remotes.origin.fetch():
+    if branch:
+        branches = repo.remotes.origin.fetch(branch)
+    else:
+        branches = repo.remotes.origin.fetch()
+
+    for remote_branch in branches:
         since_commit_reached = False
         branch_name = remote_branch.name
         prev_commit = None
