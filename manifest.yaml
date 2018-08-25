@@ -24,11 +24,6 @@ python:
     python_versions:
       - '3.6'
 
-py3k:
-  linters:
-    - modernize
-    - pylint
-
 deploy:
   - name: staging
     legacy: true
