@@ -1,4 +1,4 @@
-name: pythonlyfttrufflehog
+name: trufflehog
 description: Used to look for secrets in source code
 repository: git@github.com:lyft/truffleHog.git
 image_type: library
@@ -13,7 +13,7 @@ builder:
 tests:
   - name: unit
     type: jailed
-    command: make test
+    command: python test_all.py
   - name: lint
     type: jailed
     command: flake8 .
