@@ -1,75 +1,101 @@
-# Truffle Hog
-Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
+# Lyft trufflehog
+###### A Lyft Python library
 
-## NEW
-Trufflehog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to surpress entropy checking has also been added.
+This is compatible with Python 2.7 and Python 3.4+.
 
-These features help cut down on noise, and makes the tool easier to shove into a devops pipeline.
+## Features
+This package is Used to look for secrets in source code .
 
+It does X, Y and Z.
 
-```
-truffleHog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
-```
+## Installing
 
-or
+### Install from command line
 
-```
-truffleHog file:///user/dxa4481/codeprojects/truffleHog/
-```
-
-![Example](https://i.imgur.com/YAXndLD.png)
-
-## Install
-```
-pip install truffleHog
+```bash
+pip install --extra-index-url https://pypi.lyft.net/pypi/ lyft-trufflehog
 ```
 
-## Customizing
+### Install to a Python service
 
-Custom regexes can be added with the following flag `--rules /path/to/rules`. This should be a json file of the following format:
+##### 1. add to requirements.in
 ```
-{
-    "RSA private key": "-----BEGIN EC PRIVATE KEY-----"
-}
-```
-Things like subdomain enumeration, s3 bucket detection, and other useful regexes highly custom to the situation can be added.
-
-Feel free to also contribute high signal regexes upstream that you think will benifit the community. Things like Azure keys, Twilio keys, Google Compute keys, are welcome, provided a high signal regex can be constructed.
-
-Trufflehog's base rule set sources from https://github.com/dxa4481/truffleHogRegexes/blob/master/truffleHogRegexes/regexes.json
-
-## How it works
-This module will go through the entire commit history of each branch, and check each diff from each commit, and check for secrets. This is both by regex and by entropy. For entropy checks, trufflehog will evaluate the shannon entropy for both the base64 char set and hexidecimal char set for every blob of text greater than 20 characters comprised of those character sets in each diff. If at any point a high entropy string >20 characters is detected, it will print to the screen.
-
-## Help
-
-```
-usage: trufflehog [-h] [--json] [--regex] [--rules RULES]
-                  [--entropy DO_ENTROPY] [--since_commit SINCE_COMMIT]
-                  [--max_depth MAX_DEPTH]
-                  git_url
-
-Find secrets hidden in the depths of git.
-
-positional arguments:
-  git_url               URL for secret searching
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --json                Output in JSON
-  --regex               Enable high signal regex checks
-  --rules RULES         Ignore default regexes and source from json list file
-  --entropy DO_ENTROPY  Enable entropy checks
-  --since_commit SINCE_COMMIT
-                        Only scan from a given commit hash
-  --max_depth MAX_DEPTH
-                        The max commit depth to go back when searching for
-                        secrets
+lyft-trufflehog==X.Y.Z
 ```
 
-## Wishlist
+##### 2. pip compile
 
-- ~~A way to detect and not scan binary diffs~~
-- ~~Don't rescan diffs if already looked at in another branch~~
-- ~~A since commit X feature~~
-- ~~Print the file affected~~
+```bash
+# on your laptop
+control run piptools.compile <directory-name>
+```
+
+Commit the changes to requirements.txt and requirements.in to the repo.
+
+##### 3. Install in container
+
+```bash
+# in container
+service_venv pip install -r requirements.txt
+```
+
+## Developing lyft-trufflehog
+
+### Environment
+
+Create a virtual environment. This is easiest with
+[virtualenvwrapper](http://virtualenvwrapper.readthedocs.org/en/latest/index.html).
+
+```bash
+mkvirtualenv lyft-trufflehog
+```
+
+If you run into errors while trying to install virtualenvwrapper with pip six-1.4.1 on Mac OSX 10.11, use the following before creating your virtual environment:
+
+```bash
+install virtualenvwrapper --ignore-installed
+```
+
+Then, install the development requirements:
+
+```bash
+pip install -r requirements.txt
+pip3 install -r requirements.txt  # python 3
+```
+
+#### Developing with another service
+
+To install a local copy of this package into consuming projects run the following command in that services' container:
+
+```bash
+# in container
+pip install -e /code/python-lyft-trufflehog
+```
+
+This will allow any changes you make in python-lyft-trufflehog to be picked up automatically in other projects without having to re-install.
+
+### Testing
+
+Unit tests are run with `py.test`. They are located in `tests/unit`. 100% code coverage is required. Make sure to test both python 2 & 3. Type checks are run with `mypy`. Linting is `flake8`. There are friendly `make` targets for each of these tests.
+
+```bash
+# after setting up environment
+make test  # unit tests in Python 2 & 3
+make lint  # flake8
+make mypy  # type checks
+```
+
+## Distributing lyft-trufflehog
+Follow these three easy steps to update the lyft-trufflehog package:
+
+1. Increment the version number in `setup.py` so that the package index picks up the change. This should be done as part of your commit.
+
+   The version is a dot-separated string of the format, `M.m.b`, where `M` is
+   a major release, `m` is a minor release, and `b` is a bugfix release.
+   See [Semantic Versioning](http://semver.org/).
+
+2. Use Submit Queue to merge your branch :rocket:
+
+3. Create a [release](https://github.com/lyft/python-lyft-trufflehog/releases/new) in github for the new version. Prefix the tag version with `v`, e.g. `v1.2.3`.
+
+This will trigger a deploy in Jenkins (https://deploy.lyft.net/view/yourlibraryname-deploy-view). When the deploy finishes, your code will be released automatically to Lyft's pypi.
