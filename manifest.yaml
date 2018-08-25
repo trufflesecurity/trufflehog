@@ -1,0 +1,50 @@
+name: pythonlyfttrufflehog
+description: Used to look for secrets in source code
+repository: git@github.com:lyft/truffleHog.git
+image_type: library
+languages:
+  - python
+builder:
+  name: s2i
+  params:
+    builder: lyft/s2ipythonlibrary:c421d769bbd8479005c5a72d3c46b1eac64cc89d
+
+
+tests:
+  - name: unit
+    type: jailed
+    command: make test
+  - name: lint
+    type: jailed
+    command: flake8 .
+
+
+python:
+  mypy:
+    python_versions:
+      - '3.6'
+
+py3k:
+  linters:
+    - modernize
+    - pylint
+
+deploy:
+  - name: staging
+    legacy: true
+    role: lyftpypi-staging-iad-deploy
+    orca:
+      - region: iad
+  - name: production
+    legacy: true
+    role: lyftpypi-production-iad-deploy
+    automatic: true
+    orca:
+      - region: iad
+slack: '#security'
+notification_overrides:
+  deploy:
+    slack: '#security-deploys'
+  pr_merge:
+    slack: '#security-deploys'
+team_email: security-engineering@lyft.com
