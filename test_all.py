@@ -1,6 +1,8 @@
 import unittest
 import os
 from truffleHog import truffleHog
+from mock import patch 
+from mock import MagicMock
 
 
 class TestStringMethods(unittest.TestCase):
@@ -21,6 +23,14 @@ class TestStringMethods(unittest.TestCase):
             truffleHog.find_strings("https://github.com/dxa4481/tst.git")
         except UnicodeEncodeError:
             self.fail("Unicode print error")
+
+    @patch('truffleHog.truffleHog.clone_git_repo')
+    @patch('truffleHog.truffleHog.Repo')
+    def test_branch(self, repo_const_mock, clone_git_repo): 
+        repo = MagicMock()
+        repo_const_mock.return_value = repo
+        truffleHog.find_strings("test_repo", branch="testbranch")
+        repo.remotes.origin.fetch.assert_called_once_with("testbranch")
 
 if __name__ == '__main__':
     unittest.main()
