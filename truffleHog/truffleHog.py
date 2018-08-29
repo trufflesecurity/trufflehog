@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
+    parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
@@ -37,6 +38,7 @@ def main():
     parser.set_defaults(entropy=True)
     parser.set_defaults(branch=None)
     parser.set_defaults(cleanup=False)
+    parser.set_defaults(repo_path=None)
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -52,9 +54,7 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch)
-    project_path = output["project_path"]
-    shutil.rmtree(project_path, onerror=del_rw)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
     if args.cleanup:
         clean_up(output)
     if output["foundIssues"]:
@@ -246,9 +246,12 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}, branch=None):
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}, branch=None, repo_path=None):
     output = {"foundIssues": []}
-    project_path = clone_git_repo(git_url)
+    if repo_path:
+        project_path = repo_path
+    else:
+        project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
     output_dir = tempfile.mkdtemp()
@@ -293,6 +296,8 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
     output["project_path"] = project_path
     output["clone_uri"] = git_url
     output["issues_path"] = output_dir
+    if not repo_path:
+        shutil.rmtree(project_path, onerror=del_rw)
     return output
 
 def clean_up(output):
