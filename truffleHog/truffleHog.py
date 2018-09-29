@@ -135,6 +135,8 @@ def print_results(printJson, issue):
     prev_commit = issue['commit']
     printableDiff = issue['printDiff']
     commitHash = issue['commitHash']
+    authorName = issue['commitAuthorName']
+    authorEmail = issue['commitAuthorEmail']
     reason = issue['reason']
     path = issue['path']
 
@@ -148,6 +150,10 @@ def print_results(printJson, issue):
         print(dateStr)
         hashStr = "{}Hash: {}{}".format(bcolors.OKGREEN, commitHash, bcolors.ENDC)
         print(hashStr)
+        authorNameStr = "{}Author Name: {}{}".format(bcolors.OKGREEN, authorName, bcolors.ENDC)
+        print(authorNameStr)
+        authorEmailStr = "{}Author Email: {}{}".format(bcolors.OKGREEN, authorEmail, bcolors.ENDC)
+        print(authorEmailStr)
         filePath = "{}Filepath: {}{}".format(bcolors.OKGREEN, path, bcolors.ENDC)
         print(filePath)
 
@@ -165,7 +171,7 @@ def print_results(printJson, issue):
             print(printableDiff.encode('utf-8'))
         print("~~~~~~~~~~~~~~~~~~~~~")
 
-def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
+def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, commitAuthor):
     stringsFound = []
     linesFound = set()
     lines = printableDiff.split("\n")
@@ -197,10 +203,12 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['linesFound'] = list(linesFound)
         entropicDiff['printDiff'] = printableDiff
         entropicDiff['commitHash'] = commitHash
+        entropicDiff['commitAuthorName'] = commitAuthor.name
+        entropicDiff['commitAuthorEmail'] = commitAuthor.email
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
-def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes={}):
+def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, commitAuthor, custom_regexes={}):
     if custom_regexes:
         secret_regexes = custom_regexes
     else:
@@ -221,10 +229,12 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             foundRegex['printDiff'] = found_diff
             foundRegex['reason'] = key
             foundRegex['commitHash'] = commitHash
+            foundRegex['commitAuthorName'] = commitAuthor.name
+            foundRegex['commitAuthorEmail'] = commitAuthor.email
             regex_matches.append(foundRegex)
     return regex_matches
 
-def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output):
+def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, commitAuthor, custom_regexes, do_entropy, do_regex, printJson, surpress_output):
     issues = []
     for blob in diff:
         printableDiff = blob.diff.decode('utf-8', errors='replace')
@@ -233,11 +243,11 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
         foundIssues = []
         if do_entropy:
-            entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+            entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, commitAuthor)
             if entropicDiff:
                 foundIssues.append(entropicDiff)
         if do_regex:
-            found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes)
+            found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, commitAuthor, custom_regexes)
             foundIssues += found_regexes
         if not surpress_output:
             for foundIssue in foundIssues:
@@ -267,6 +277,7 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         prev_commit = None
         for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
             commitHash = curr_commit.hexsha
+            commitAuthor = curr_commit.author
             if commitHash == since_commit:
                 since_commit_reached = True
             if since_commit and since_commit_reached:
@@ -286,7 +297,7 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 diff = prev_commit.diff(curr_commit, create_patch=True)
             # avoid searching the same diffs
             already_searched.add(diff_hash)
-            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, commitAuthor, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
             if do_report:
                 addIssuesToReport(foundIssues, report_issues)
 
@@ -294,7 +305,7 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
             prev_commit = curr_commit
         # Handling the first commit
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
-        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, commitAuthor, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
         if do_report:
             addIssuesToReport(foundIssues, report_issues)
 
@@ -322,6 +333,8 @@ def addIssuesToReport(issues, report_issues):
                 commit = {
                     "date": issue["date"],
                     "hash": issue["commitHash"],
+                    "authorName": issue["commitAuthorName"],
+                    "authorEmail": issue["commitAuthorEmail"],
                     "file": issue["path"],
                     "branch": issue["branch"],
                     "commitMsg": issue["commit"]
