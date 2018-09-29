@@ -27,12 +27,14 @@ def main():
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
+    parser.add_argument("--report", dest="report_path", help="Path where the report file will be written")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
+    parser.set_defaults(report_path='')
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -47,14 +49,21 @@ def main():
             del regexes[regex]
         for regex in rules:
             regexes[regex] = rules[regex]
+
+    do_report = args.report_path != ''
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, do_report=do_report)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
+
+    if do_report:
+        saveReport(args.report_path, output['report_issues'])
+
     if output["foundIssues"]:
         sys.exit(1)
     else:
         sys.exit(0)
+
 
 def str2bool(v):
     if v == None:
@@ -158,6 +167,7 @@ def print_results(printJson, issue):
 
 def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
     stringsFound = []
+    linesFound = set()
     lines = printableDiff.split("\n")
     for line in lines:
         for word in line.split():
@@ -167,11 +177,13 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
                 b64Entropy = shannon_entropy(string, BASE64_CHARS)
                 if b64Entropy > 4.5:
                     stringsFound.append(string)
+                    linesFound.add(line)
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
             for string in hex_strings:
                 hexEntropy = shannon_entropy(string, HEX_CHARS)
                 if hexEntropy > 3:
                     stringsFound.append(string)
+                    linesFound.add(line)
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
     entropicDiff = None
     if len(stringsFound) > 0:
@@ -182,6 +194,7 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['commit'] = prev_commit.message
         entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
         entropicDiff['stringsFound'] = stringsFound
+        entropicDiff['linesFound'] = list(linesFound)
         entropicDiff['printDiff'] = printableDiff
         entropicDiff['commitHash'] = commitHash
         entropicDiff['reason'] = "High Entropy"
@@ -240,12 +253,13 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}):
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, do_report=False, custom_regexes={}):
     output = {"foundIssues": []}
     project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
     output_dir = tempfile.mkdtemp()
+    report_issues = []
 
     for remote_branch in repo.remotes.origin.fetch():
         since_commit_reached = False
@@ -273,15 +287,60 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
             # avoid searching the same diffs
             already_searched.add(diff_hash)
             foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+            if do_report:
+                addIssuesToReport(foundIssues, report_issues)
+
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
         # Handling the first commit
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
         foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+        if do_report:
+            addIssuesToReport(foundIssues, report_issues)
+
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
+    output["report_issues"] = report_issues
     return output
+
+
+def addIssuesToReport(issues, report_issues):
+    for issue in issues:
+        for finding in issue["stringsFound"]:
+            reported_issue = next((i for i in report_issues if i["finding"] == finding), None)
+            if reported_issue is None:
+                reported_issue = {
+                    "finding": finding,
+                    "reason": issue["reason"],
+                    "commits": []
+                }
+                report_issues.append(reported_issue)
+
+            commit_added = any(c["hash"] == issue["commitHash"] for c in reported_issue["commits"])
+            if not commit_added:
+                commit = {
+                    "date": issue["date"],
+                    "hash": issue["commitHash"],
+                    "file": issue["path"],
+                    "branch": issue["branch"],
+                    "commitMsg": issue["commit"]
+                }
+
+                if 'linesFound' in issue:
+                    commit['relevantLines'] = issue['linesFound']
+
+                reported_issue["commits"].append(commit)
+
+
+
+def saveReport(report_path, report_issues):
+    if not report_issues:
+        return
+
+    with open(report_path, 'w') as f:
+        f.write(json.dumps(report_issues, indent=4, separators=(',', ': ')))
+
 
 if __name__ == "__main__":
     main()
