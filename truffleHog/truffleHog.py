@@ -27,7 +27,7 @@ def main():
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
-    parser.add_argument("--report", dest="report_path", help="Path where the report file will be written")
+    parser.add_argument("--report", dest="report_path", type=is_file_path, help="Path where the report file will be written", metavar="FILE_PATH")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
@@ -63,6 +63,12 @@ def main():
         sys.exit(1)
     else:
         sys.exit(0)
+
+
+def is_file_path(path):
+    if os.path.isdir(path):
+        raise argparse.ArgumentTypeError("{0} is a directory path. It should be a file path instead.".format(path))
+    return path
 
 
 def str2bool(v):
@@ -344,7 +350,6 @@ def addIssuesToReport(issues, report_issues):
                     commit['relevantLines'] = issue['linesFound']
 
                 reported_issue["commits"].append(commit)
-
 
 
 def saveReport(report_path, report_issues):
