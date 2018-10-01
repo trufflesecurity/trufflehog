@@ -28,13 +28,19 @@ def main():
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument("--report", dest="report_path", type=is_file_path, help="Path where the report file will be written", metavar="FILE_PATH")
+    parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
+    parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
+    parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
-    parser.set_defaults(report_path='')
+    parser.set_defaults(report_path=None)
+    parser.set_defaults(branch=None)
+    parser.set_defaults(repo_path=None)
+    parser.set_defaults(cleanup=False)
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -50,15 +56,17 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
 
-    do_report = args.report_path != ''
+    do_report = args.report_path != None
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, do_report=do_report)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, do_report, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
 
     if do_report:
         saveReport(args.report_path, output['report_issues'])
 
+    if args.cleanup:
+        clean_up(output)
     if output["foundIssues"]:
         sys.exit(1)
     else:
@@ -208,9 +216,9 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['stringsFound'] = stringsFound
         entropicDiff['linesFound'] = list(linesFound)
         entropicDiff['printDiff'] = printableDiff
-        entropicDiff['commitHash'] = commitHash
         entropicDiff['commitAuthorName'] = commitAuthor.name
         entropicDiff['commitAuthorEmail'] = commitAuthor.email
+        entropicDiff['commitHash'] = prev_commit.hexsha
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
@@ -234,9 +242,9 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             foundRegex['stringsFound'] = found_strings
             foundRegex['printDiff'] = found_diff
             foundRegex['reason'] = key
-            foundRegex['commitHash'] = commitHash
             foundRegex['commitAuthorName'] = commitAuthor.name
             foundRegex['commitAuthorEmail'] = commitAuthor.email
+            foundRegex['commitHash'] = prev_commit.hexsha
             regex_matches.append(foundRegex)
     return regex_matches
 
@@ -269,15 +277,23 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, do_report=False, custom_regexes={}):
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, do_report=False, surpress_output=True, custom_regexes={}, branch=None, repo_path=None):
     output = {"foundIssues": []}
-    project_path = clone_git_repo(git_url)
+    if repo_path:
+        project_path = repo_path
+    else:
+        project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
     output_dir = tempfile.mkdtemp()
     report_issues = []
 
-    for remote_branch in repo.remotes.origin.fetch():
+    if branch:
+        branches = repo.remotes.origin.fetch(branch)
+    else:
+        branches = repo.remotes.origin.fetch()
+
+    for remote_branch in branches:
         since_commit_reached = False
         branch_name = remote_branch.name
         prev_commit = None
@@ -318,8 +334,16 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
-    output["report_issues"] = report_issues
+    output["issues_path"] = output_dir
+    if not repo_path:
+        shutil.rmtree(project_path, onerror=del_rw)
     return output
+
+
+def clean_up(output):
+    issues_path = output.get("issues_path", None)
+    if issues_path and os.path.isdir(issues_path):
+        shutil.rmtree(output["issues_path"])
 
 
 def addIssuesToReport(issues, report_issues):
