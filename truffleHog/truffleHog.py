@@ -60,7 +60,9 @@ def main():
     do_entropy = str2bool(args.do_entropy)
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, do_report, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
     project_path = output["project_path"]
-    shutil.rmtree(project_path, onerror=del_rw)
+
+    if not args.repo_path:
+        shutil.rmtree(project_path, onerror=del_rw)
 
     if do_report:
         saveReport(args.report_path, output['report_issues'])
