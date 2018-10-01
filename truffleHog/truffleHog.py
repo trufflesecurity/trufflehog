@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument("--report", dest="report_path", type=is_file_path, help="Path where the report file will be written", metavar="FILE_PATH")
+    parser.add_argument("--no-output", dest="no_output", help="Disable standard output", action="store_true")
     parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
@@ -38,6 +39,7 @@ def main():
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
     parser.set_defaults(report_path=None)
+    parser.set_defaults(no_output=False)
     parser.set_defaults(branch=None)
     parser.set_defaults(repo_path=None)
     parser.set_defaults(cleanup=False)
@@ -58,7 +60,7 @@ def main():
 
     do_report = args.report_path != None
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, do_report, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, do_report, surpress_output=args.no_output, branch=args.branch, repo_path=args.repo_path)
     project_path = output["project_path"]
 
     if not args.repo_path:
