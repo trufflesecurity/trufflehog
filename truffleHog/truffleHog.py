@@ -384,7 +384,7 @@ def saveReport(report_path, report_issues):
         return
 
     with open(report_path, 'w') as f:
-        f.write(json.dumps(report_issues, indent=4, separators=(',', ': ')))
+        json.dump(report_issues, f, indent=4, separators=(',', ': '))
 
 
 if __name__ == "__main__":
