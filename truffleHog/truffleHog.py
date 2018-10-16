@@ -25,7 +25,9 @@ def main():
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
-    parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
+    since_group = parser.add_mutually_exclusive_group()
+    since_group.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
+    since_group.add_argument("--since_branch", dest="since_branch", help="Only scan from a given branch's head")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
@@ -35,6 +37,7 @@ def main():
     parser.set_defaults(rules={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
+    parser.set_defaults(since_branch=None)
     parser.set_defaults(entropy=True)
     parser.set_defaults(branch=None)
     parser.set_defaults(repo_path=None)
@@ -54,7 +57,7 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch, repo_path=args.repo_path, since_branch=args.since_branch)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
     if args.cleanup:
@@ -248,7 +251,7 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}, branch=None, repo_path=None):
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}, branch=None, repo_path=None, since_branch=None):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
@@ -262,6 +265,9 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         branches = repo.remotes.origin.fetch(branch)
     else:
         branches = repo.remotes.origin.fetch()
+
+    if since_branch:
+        since_commit = repo.remotes.origin.refs[since_branch].commit.hexsha
 
     for remote_branch in branches:
         since_commit_reached = False
