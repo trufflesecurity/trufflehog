@@ -44,10 +44,12 @@ This module will go through the entire commit history of each branch, and check 
 ## Help
 
 ```
-usage: trufflehog [-h] [--json] [--regex] [--rules RULES]
-                  [--entropy DO_ENTROPY] [--since_commit SINCE_COMMIT]
-                  [--max_depth MAX_DEPTH]
-                  git_url
+usage: truffleHog.py [-h] [--json] [--regex] [--rules RULES]
+                     [--entropy DO_ENTROPY]
+                     [--since_commit SINCE_COMMIT | --since_branch SINCE_BRANCH]
+                     [--max_depth MAX_DEPTH] [--branch BRANCH]
+                     [--repo_path REPO_PATH] [--cleanup]
+                     git_url
 
 Find secrets hidden in the depths of git.
 
@@ -62,9 +64,16 @@ optional arguments:
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
                         Only scan from a given commit hash
+  --since_branch SINCE_BRANCH
+                        Only scan from a given branch's head
   --max_depth MAX_DEPTH
                         The max commit depth to go back when searching for
                         secrets
+  --branch BRANCH       Name of the branch to be scanned
+  --repo_path REPO_PATH
+                        Path to the cloned repo. If provided, git_url will not
+                        be used
+  --cleanup             Clean up all temporary result files
 ```
 
 ## Wishlist
