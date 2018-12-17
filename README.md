@@ -34,7 +34,7 @@ Custom regexes can be added with the following flag `--rules /path/to/rules`. Th
 ```
 Things like subdomain enumeration, s3 bucket detection, and other useful regexes highly custom to the situation can be added.
 
-Feel free to also contribute high signal regexes upstream that you think will benifit the community. Things like Azure keys, Twilio keys, Google Compute keys, are welcome, provided a high signal regex can be constructed.
+Feel free to also contribute high signal regexes upstream that you think will benefit the community. Things like Azure keys, Twilio keys, Google Compute keys, are welcome, provided a high signal regex can be constructed.
 
 trufflehog's base rule set sources from https://github.com/dxa4481/truffleHogRegexes/blob/master/truffleHogRegexes/regexes.json
 
