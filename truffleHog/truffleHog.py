@@ -56,7 +56,8 @@ def main():
     do_entropy = str2bool(args.do_entropy)
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
     project_path = output["project_path"]
-    shutil.rmtree(project_path, onerror=del_rw)
+    if os.path.exists(dirpath) and os.path.isdir(dirpath):
+        shutil.rmtree(project_path, onerror=del_rw)
     if args.cleanup:
         clean_up(output)
     if output["foundIssues"]:
@@ -299,7 +300,8 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
     output["clone_uri"] = git_url
     output["issues_path"] = output_dir
     if not repo_path:
-        shutil.rmtree(project_path, onerror=del_rw)
+        if os.path.exists(dirpath) and os.path.isdir(dirpath):
+            shutil.rmtree(project_path, onerror=del_rw)
     return output
 
 def clean_up(output):
