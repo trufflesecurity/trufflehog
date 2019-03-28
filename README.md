@@ -58,6 +58,9 @@ optional arguments:
   -h, --help            show this help message and exit
   --json                Output in JSON
   --regex               Enable high signal regex checks
+  --contextify          Trim the output down to essential information
+                        For the entropy checker shows the line of occurance as well as surrounding words
+                        For the regex checker only outputs the actually found string for now (to be worked on)
   --rules RULES         Ignore default regexes and source from json list file
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
