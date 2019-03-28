@@ -183,11 +183,12 @@ def print_results(printJson, issue, contextify):
 
 
 def render_with_context(lines_with_context):
-    # the middle term holds the found entity
-    return "\n\n".join(["Line {}: \n".format(line_with_context[0])
-                        + line_with_context[1][0] + "\n"
+    return "\n\n".join(["Line {}: \n".format(line_with_context[0])  # line number
+                        + line_with_context[1][0] + "\n"  # pre context
+                        # the middle term holds the found entity
                         + bcolors.WARNING + line_with_context[1][1] + bcolors.ENDC + "\n"
-                        + line_with_context[1][2] for line_with_context in lines_with_context])
+                        + line_with_context[1][2]  # post context
+                        for line_with_context in lines_with_context])
 
 
 def process_found_word_with_context(string, line_number, word_number, all_words):
