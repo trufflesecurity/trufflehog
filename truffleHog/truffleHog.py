@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
+    parser.add_argument("--contextify", dest="contextify", action="store_true", help="Don't display full diffs, only essential context")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
@@ -39,6 +40,7 @@ def main():
     parser.set_defaults(branch=None)
     parser.set_defaults(repo_path=None)
     parser.set_defaults(cleanup=False)
+    parser.set_defaults(contextify=False)
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -54,7 +56,11 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth,
+                          args.output_json, args.do_regex,
+                          do_entropy, surpress_output=False,
+                          branch=args.branch, repo_path=args.repo_path,
+                          contextify=args.contextify)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
     if args.cleanup:
@@ -64,8 +70,9 @@ def main():
     else:
         sys.exit(0)
 
+
 def str2bool(v):
-    if v == None:
+    if v is None:
         return True
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -78,9 +85,11 @@ def str2bool(v):
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
 
+
 def del_rw(action, name, exc):
     os.chmod(name, stat.S_IWRITE)
     os.remove(name)
+
 
 def shannon_entropy(data, iterator):
     """
@@ -113,6 +122,7 @@ def get_strings_of_set(word, char_set, threshold=20):
         strings.append(letters)
     return strings
 
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -123,16 +133,23 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
 def clone_git_repo(git_url):
     project_path = tempfile.mkdtemp()
     Repo.clone_from(git_url, project_path)
     return project_path
 
-def print_results(printJson, issue):
+
+def print_results(printJson, issue, contextify):
     commit_time = issue['date']
     branch_name = issue['branch']
     prev_commit = issue['commit']
-    printableDiff = issue['printDiff']
+
+    if contextify:
+        printableDiff = issue['printContext']
+    else:
+        printableDiff = issue['printDiff']
+
     commitHash = issue['commitHash']
     reason = issue['reason']
     path = issue['path']
@@ -164,36 +181,62 @@ def print_results(printJson, issue):
             print(printableDiff.encode('utf-8'))
         print("~~~~~~~~~~~~~~~~~~~~~")
 
+
+def render_with_context(lines_with_context):
+    # the middle term holds the found entity
+    return "\n\n".join(["Line {}: \n".format(line_with_context[0])
+                        + line_with_context[1][0] + "\n"
+                        + bcolors.WARNING + line_with_context[1][1] + bcolors.ENDC + "\n"
+                        + line_with_context[1][2] for line_with_context in lines_with_context])
+
+
+def process_found_word_with_context(string, line_number, word_number, all_words):
+    result = (line_number, [  # a tuple
+        all_words[max(0, word_number - 1)],
+        string,
+        all_words[min(len(all_words) - 1, word_number + 1)],
+    ])
+    return result
+
+
 def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
-    stringsFound = []
+    lines_with_context_found = []
     lines = printableDiff.split("\n")
-    for line in lines:
-        for word in line.split():
+    for line, line_number in zip(lines, range(len(lines))):
+        words = line.split()
+        for word_number in range(len(words)):
+            word = words[word_number]
             base64_strings = get_strings_of_set(word, BASE64_CHARS)
             hex_strings = get_strings_of_set(word, HEX_CHARS)
             for string in base64_strings:
                 b64Entropy = shannon_entropy(string, BASE64_CHARS)
                 if b64Entropy > 4.5:
-                    stringsFound.append(string)
+                    lines_with_context_found.append(
+                        process_found_word_with_context(string, line_number,
+                                                        word_number, words))
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
             for string in hex_strings:
                 hexEntropy = shannon_entropy(string, HEX_CHARS)
                 if hexEntropy > 3:
-                    stringsFound.append(string)
+                    lines_with_context_found.append(
+                        process_found_word_with_context(string, line_number,
+                                                        word_number, words))
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
     entropicDiff = None
-    if len(stringsFound) > 0:
+    if len(lines_with_context_found) > 0:
         entropicDiff = {}
         entropicDiff['date'] = commit_time
         entropicDiff['path'] = blob.b_path if blob.b_path else blob.a_path
         entropicDiff['branch'] = branch_name
         entropicDiff['commit'] = prev_commit.message
         entropicDiff['diff'] = blob.diff.decode('utf-8', errors='replace')
-        entropicDiff['stringsFound'] = stringsFound
+        entropicDiff['stringsFound'] = lines_with_context_found
+        entropicDiff['printContext'] = render_with_context(lines_with_context_found)
         entropicDiff['printDiff'] = printableDiff
         entropicDiff['commitHash'] = prev_commit.hexsha
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
+
 
 def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes={}):
     if custom_regexes:
@@ -214,12 +257,15 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             foundRegex['diff'] = blob.diff.decode('utf-8', errors='replace')
             foundRegex['stringsFound'] = found_strings
             foundRegex['printDiff'] = found_diff
+            foundRegex['printContext'] = "\n\n".implode(found_strings)
             foundRegex['reason'] = key
             foundRegex['commitHash'] = prev_commit.hexsha
             regex_matches.append(foundRegex)
     return regex_matches
 
-def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output):
+
+def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy,
+                do_regex, printJson, surpress_output, contextify):
     issues = []
     for blob in diff:
         printableDiff = blob.diff.decode('utf-8', errors='replace')
@@ -236,9 +282,10 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
             foundIssues += found_regexes
         if not surpress_output:
             for foundIssue in foundIssues:
-                print_results(printJson, foundIssue)
+                print_results(printJson, foundIssue, contextify)
         issues += foundIssues
     return issues
+
 
 def handle_results(output, output_dir, foundIssues):
     for foundIssue in foundIssues:
@@ -248,7 +295,10 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}, branch=None, repo_path=None):
+
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False,
+                 do_entropy=True, surpress_output=True, custom_regexes={},
+                 branch=None, repo_path=None, contextify=False):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
@@ -288,12 +338,14 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 diff = prev_commit.diff(curr_commit, create_patch=True)
             # avoid searching the same diffs
             already_searched.add(diff_hash)
-            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes,
+                                      do_entropy, do_regex, printJson, surpress_output, contextify)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
         # Handling the first commit
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
-        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes,
+                                  do_entropy, do_regex, printJson, surpress_output, contextify)
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
@@ -302,10 +354,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         shutil.rmtree(project_path, onerror=del_rw)
     return output
 
+
 def clean_up(output):
     issues_path = output.get("issues_path", None)
     if issues_path and os.path.isdir(issues_path):
         shutil.rmtree(output["issues_path"])
+
 
 if __name__ == "__main__":
     main()
