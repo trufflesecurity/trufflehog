@@ -14,9 +14,16 @@ import os
 import re
 import json
 import stat
+from enum import Enum
 from git import Repo
 from git import NULL_TREE
 from truffleHogRegexes.regexChecks import regexes
+
+
+class Suppress(Enum):
+    yes = "yes"
+    no = "no"
+    secret = "secret"
 
 
 def main():
@@ -26,13 +33,16 @@ def main():
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
-    parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
+    parser.add_argument("--max_depth", dest="max_depth",
+                        help="The max commit depth to go back when searching for secrets")
     parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
-    parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
+    parser.add_argument("--repo_path", type=str, dest="repo_path",
+                        help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
+    parser.add_argument("--suppress_output", type=Suppress, dest="do_suppress_output", help="suppresses secret output")
     parser.set_defaults(regex=False)
-    parser.set_defaults(rules={})
+    parser.set_defaults(do_suppress_output=Suppress.no)
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
@@ -48,13 +58,16 @@ def main():
                 for rule in rules:
                     rules[rule] = re.compile(rules[rule])
         except (IOError, ValueError) as e:
-            raise("Error reading rules file")
+            raise ("Error reading rules file")
         for regex in dict(regexes):
             del regexes[regex]
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
+    print(args.do_suppress_output)
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
+                          args.do_suppress_output, branch=args.branch, repo_path=args.repo_path)
+    print(args.do_suppress_output)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
     if args.cleanup:
@@ -78,9 +91,11 @@ def str2bool(v):
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
 
+
 def del_rw(action, name, exc):
     os.chmod(name, stat.S_IWRITE)
     os.remove(name)
+
 
 def shannon_entropy(data, iterator):
     """
@@ -90,9 +105,9 @@ def shannon_entropy(data, iterator):
         return 0
     entropy = 0
     for x in iterator:
-        p_x = float(data.count(x))/len(data)
+        p_x = float(data.count(x)) / len(data)
         if p_x > 0:
-            entropy += - p_x*math.log(p_x, 2)
+            entropy += - p_x * math.log(p_x, 2)
     return entropy
 
 
@@ -113,6 +128,7 @@ def get_strings_of_set(word, char_set, threshold=20):
         strings.append(letters)
     return strings
 
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -123,12 +139,14 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
 def clone_git_repo(git_url):
     project_path = tempfile.mkdtemp()
     Repo.clone_from(git_url, project_path)
     return project_path
 
-def print_results(printJson, issue):
+
+def print_results(printJson, issue, do_suppress_output):
     commit_time = issue['date']
     branch_name = issue['branch']
     prev_commit = issue['commit']
@@ -155,7 +173,8 @@ def print_results(printJson, issue):
             print(branchStr)
             commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit, bcolors.ENDC)
             print(commitStr)
-            print(printableDiff)
+            if do_suppress_output == Suppress.no:
+                print(printableDiff)
         else:
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name.encode('utf-8'), bcolors.ENDC)
             print(branchStr)
@@ -163,6 +182,7 @@ def print_results(printJson, issue):
             print(commitStr)
             print(printableDiff.encode('utf-8'))
         print("~~~~~~~~~~~~~~~~~~~~~")
+
 
 def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
     stringsFound = []
@@ -195,6 +215,7 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
+
 def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes={}):
     if custom_regexes:
         secret_regexes = custom_regexes
@@ -219,26 +240,31 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             regex_matches.append(foundRegex)
     return regex_matches
 
-def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output):
+
+def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex,
+                printJson, do_suppress_output):
     issues = []
     for blob in diff:
         printableDiff = blob.diff.decode('utf-8', errors='replace')
         if printableDiff.startswith("Binary files"):
             continue
-        commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+        commit_time = datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
         foundIssues = []
         if do_entropy:
             entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
             if entropicDiff:
                 foundIssues.append(entropicDiff)
         if do_regex:
-            found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes)
+            found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash,
+                                        custom_regexes)
             foundIssues += found_regexes
-        if not surpress_output:
+
+        if (do_suppress_output == Suppress.no) or (do_suppress_output == Suppress.secret):
             for foundIssue in foundIssues:
-                print_results(printJson, foundIssue)
+                print_results(printJson, foundIssue, do_suppress_output)
         issues += foundIssues
     return issues
+
 
 def handle_results(output, output_dir, foundIssues):
     for foundIssue in foundIssues:
@@ -248,7 +274,9 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True, custom_regexes={}, branch=None, repo_path=None):
+
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True,
+                 do_suppress_output=Suppress.no, custom_regexes={}, branch=None, repo_path=None):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
@@ -288,12 +316,14 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 diff = prev_commit.diff(curr_commit, create_patch=True)
             # avoid searching the same diffs
             already_searched.add(diff_hash)
-            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes,
+                                      do_entropy, do_regex, printJson, do_suppress_output)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
         # Handling the first commit
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
-        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output)
+        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy,
+                                  do_regex, printJson, do_suppress_output)
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
@@ -302,10 +332,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         shutil.rmtree(project_path, onerror=del_rw)
     return output
 
+
 def clean_up(output):
     issues_path = output.get("issues_path", None)
     if issues_path and os.path.isdir(issues_path):
         shutil.rmtree(output["issues_path"])
+
 
 if __name__ == "__main__":
     main()
