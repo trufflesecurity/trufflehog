@@ -67,7 +67,6 @@ def main():
     print(args.do_suppress_output)
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
                           args.do_suppress_output, branch=args.branch, repo_path=args.repo_path)
-    print(args.do_suppress_output)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
     if args.cleanup:
@@ -76,6 +75,7 @@ def main():
         sys.exit(1)
     else:
         sys.exit(0)
+
 
 def str2bool(v):
     if v == None:

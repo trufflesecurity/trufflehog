@@ -44,7 +44,7 @@ This module will go through the entire commit history of each branch, and check 
 ## Help
 
 ```
-usage: trufflehog [-h] [--json] [--regex] [--rules RULES]
+usage: trufflehog [-h] [--json] [--regex] [--rules RULES] [--suppress_output SUPRESS_OUTPUT]
                   [--entropy DO_ENTROPY] [--since_commit SINCE_COMMIT]
                   [--max_depth MAX_DEPTH]
                   git_url
@@ -59,6 +59,8 @@ optional arguments:
   --json                Output in JSON
   --regex               Enable high signal regex checks
   --rules RULES         Ignore default regexes and source from json list file
+  --suppress_output     yes, no or secret. default is no, yes returns no output,
+                        secret returns everything apart from the found secret value    
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
                         Only scan from a given commit hash
