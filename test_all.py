@@ -4,8 +4,8 @@ import sys
 import json
 import io
 from truffleHog import truffleHog
-from unittest.mock import patch
-from unittest.mock import MagicMock
+from mock import patch
+from mock import MagicMock
 
 
 class TestStringMethods(unittest.TestCase):

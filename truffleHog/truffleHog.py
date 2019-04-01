@@ -14,7 +14,7 @@ import os
 import re
 import json
 import stat
-from enum import Enum
+from aenum import Enum
 from git import Repo
 from git import NULL_TREE
 from truffleHogRegexes.regexChecks import regexes
@@ -64,7 +64,6 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
-    print(args.do_suppress_output)
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
                           args.do_suppress_output, branch=args.branch, repo_path=args.repo_path)
     project_path = output["project_path"]
