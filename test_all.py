@@ -35,7 +35,6 @@ class TestStringMethods(unittest.TestCase):
         commit_w_secret = '9ed54617547cfca783e0f81f8dc5c927e3d1e345'
         cross_valdiating_commit_w_secret_comment = 'OH no a secret'
 
-        json_result = ''
         if sys.version_info >= (3,):
             tmp_stdout = io.StringIO()
         else:
@@ -46,7 +45,10 @@ class TestStringMethods(unittest.TestCase):
         sys.stdout = tmp_stdout
         try:
             truffleHog.find_strings("https://github.com/dxa4481/truffleHog.git", 
-                since_commit=since_commit, printJson=True, surpress_output=False)
+                since_commit=since_commit, entropy_options={
+                    'do_entropy': True, 'entropy_wc': 20,
+                    'entropy_b64_thresh': 4.5, 'entropy_hex_thresh': 3.0},
+                printJson=True, surpress_output=False)
         finally:
             sys.stdout = bak_stdout
 
