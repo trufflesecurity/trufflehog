@@ -11,7 +11,7 @@ setup(
     packages = ['truffleHog'],
     install_requires=[
         'GitPython == 2.1.1',
-        'truffleHogRegexes == 0.0.4'
+        'truffleHogRegexes == 0.0.7'
     ],
     entry_points = {
       'console_scripts': ['trufflehog = truffleHog.truffleHog:main'],
