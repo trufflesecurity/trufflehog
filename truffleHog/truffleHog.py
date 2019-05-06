@@ -39,6 +39,8 @@ def main():
                              'in order for it to be scanned; lines starting with "#" are treated as comments and are '
                              'ignored. If empty or not provided (default), no Git object paths are excluded unless '
                              'effectively excluded via the --include_paths option.')
+    parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
+    parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
@@ -46,6 +48,8 @@ def main():
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
     parser.set_defaults(branch=None)
+    parser.set_defaults(repo_path=None)
+    parser.set_defaults(cleanup=False)
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -75,9 +79,10 @@ def main():
                 path_exclusions.append(re.compile(pattern))
 
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
-            surpress_output=False, branch=args.branch, path_inclusions=path_inclusions, path_exclusions=path_exclusions)
+            surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions)
     project_path = output["project_path"]
-    shutil.rmtree(project_path, onerror=del_rw)
+    if args.cleanup:
+        clean_up(output)
     if output["foundIssues"]:
         sys.exit(1)
     else:
@@ -296,9 +301,12 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
 
 
 def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
-                custom_regexes={}, branch=None, path_inclusions=None, path_exclusions=None):
+                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None):
     output = {"foundIssues": []}
-    project_path = clone_git_repo(git_url)
+    if repo_path:
+        project_path = repo_path
+    else:
+        project_path = clone_git_repo(git_url)
     repo = Repo(project_path)
     already_searched = set()
     output_dir = tempfile.mkdtemp()
@@ -343,12 +351,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
     output["project_path"] = project_path
     output["clone_uri"] = git_url
     output["issues_path"] = output_dir
+    if not repo_path:
+        shutil.rmtree(project_path, onerror=del_rw)
     return output
 
 def clean_up(output):
-    project_path = output.get("project_path", None)
-    if project_path and os.path.isdir(project_path):
-        shutil.rmtree(output["project_path"])
+    print("Whhaat")
     issues_path = output.get("issues_path", None)
     if issues_path and os.path.isdir(issues_path):
         shutil.rmtree(output["issues_path"])
