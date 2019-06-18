@@ -344,7 +344,9 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
             foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
-        # Handling the first commit
+        # Handling the first commit only when since_commit wasn't specified or reached
+        if since_commit_reached:
+            continue
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
         foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
         output = handle_results(output, output_dir, foundIssues)
