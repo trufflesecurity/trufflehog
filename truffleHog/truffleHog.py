@@ -179,18 +179,18 @@ def print_results(printJson, issue):
         if sys.version_info >= (3, 0):
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name, bcolors.ENDC)
             print(branchStr)
-            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit, bcolors.ENDC)
-            print(commitStr)
             authorStr = "{}Author: {}{}".format(bcolors.OKGREEN, author, bcolors.ENDC)
             print(authorStr)
+            commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit, bcolors.ENDC)
+            print(commitStr)
             print(printableDiff)
         else:
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name.encode('utf-8'), bcolors.ENDC)
             print(branchStr)
+            authorStr = "{}Author: {}{}".format(bcolors.OKGREEN, author.encode('utf-8'), bcolors.ENDC)
+            print(authorStr)
             commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.encode('utf-8'), bcolors.ENDC)
             print(commitStr)
-            authorStr = "{}Author: {}{}".format(bcolors.OKGREEN, author, bcolors.ENDC)
-            print(authorStr)
             print(printableDiff.encode('utf-8'))
         print("~~~~~~~~~~~~~~~~~~~~~")
 
@@ -268,6 +268,8 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
             foundIssues += found_regexes
         if not surpress_output:
             for foundIssue in foundIssues:
+                foundIssue["author"] = "{} ({})".format(curr_commit.author.name, curr_commit.author.email)
+                print(foundIssue["author"])
                 print_results(printJson, foundIssue)
         issues += foundIssues
     return issues
