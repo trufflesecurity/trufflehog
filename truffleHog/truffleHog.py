@@ -86,6 +86,7 @@ def main():
     if output["foundIssues"]:
         sys.exit(1)
     else:
+        print("No secrets found")
         sys.exit(0)
 
 def str2bool(v):
@@ -160,6 +161,7 @@ def print_results(printJson, issue):
     commitHash = issue['commitHash']
     reason = issue['reason']
     path = issue['path']
+    author = issue['author']
 
     if printJson:
         print(json.dumps(issue, sort_keys=True))
@@ -179,12 +181,16 @@ def print_results(printJson, issue):
             print(branchStr)
             commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit, bcolors.ENDC)
             print(commitStr)
+            authorStr = "{}Author: {}{}".format(bcolors.OKGREEN, author, bcolors.ENDC)
+            print(authorStr)
             print(printableDiff)
         else:
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name.encode('utf-8'), bcolors.ENDC)
             print(branchStr)
             commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.encode('utf-8'), bcolors.ENDC)
             print(commitStr)
+            authorStr = "{}Author: {}{}".format(bcolors.OKGREEN, author, bcolors.ENDC)
+            print(authorStr)
             print(printableDiff.encode('utf-8'))
         print("~~~~~~~~~~~~~~~~~~~~~")
 
