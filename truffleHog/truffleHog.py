@@ -42,7 +42,7 @@ def main():
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.add_argument("--suppress_output", type=Suppress, dest="do_suppress_output", help="suppresses secret output")
     parser.set_defaults(regex=False)
-    parser.set_defaults(do_suppress_output=Suppress.no)
+    parser.set_defaults(do_suppress_output=Suppress.secret)
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
@@ -66,8 +66,6 @@ def main():
     do_entropy = str2bool(args.do_entropy)
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
                           args.do_suppress_output, branch=args.branch, repo_path=args.repo_path)
-    project_path = output["project_path"]
-    shutil.rmtree(project_path, onerror=del_rw)
     if args.cleanup:
         clean_up(output)
     if output["foundIssues"]:
@@ -172,14 +170,13 @@ def print_results(printJson, issue, do_suppress_output):
             print(branchStr)
             commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit, bcolors.ENDC)
             print(commitStr)
-            if do_suppress_output == Suppress.no:
-                print(printableDiff)
         else:
             branchStr = "{}Branch: {}{}".format(bcolors.OKGREEN, branch_name.encode('utf-8'), bcolors.ENDC)
             print(branchStr)
             commitStr = "{}Commit: {}{}".format(bcolors.OKGREEN, prev_commit.encode('utf-8'), bcolors.ENDC)
             print(commitStr)
-            print(printableDiff.encode('utf-8'))
+            if do_suppress_output == Suppress.no:
+                print(printableDiff.encode('utf-8'))
         print("~~~~~~~~~~~~~~~~~~~~~")
 
 

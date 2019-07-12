@@ -59,7 +59,7 @@ optional arguments:
   --json                Output in JSON
   --regex               Enable high signal regex checks
   --rules RULES         Ignore default regexes and source from json list file
-  --suppress_output     yes, no or secret. default is no, yes returns no output,
+  --suppress_output     yes, no or secret. default is secret, yes returns no output,
                         secret returns everything apart from the found secret value    
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
