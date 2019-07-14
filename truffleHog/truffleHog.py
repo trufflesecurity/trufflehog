@@ -112,7 +112,7 @@ def shannon_entropy(data, char_set):
     entropy = 0
     pd_table = {c: data.count(c) / len(data) for c in data if c in char_set}
     for x in data:
-        entropy += -pd_table[x] * math.log2(pd_table[x])
+        entropy += -pd_table[x] * math.log(pd_table[x], 2)
     return entropy
 
 def get_strings_of_set(word, char_set, threshold=20):
