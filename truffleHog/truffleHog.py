@@ -99,26 +99,21 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
-HEX_CHARS = "1234567890abcdefABCDEF"
+BASE64_CHARS = set(list("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="))
+HEX_CHARS = set(list("1234567890abcdefABCDEF"))
 
 def del_rw(action, name, exc):
     os.chmod(name, stat.S_IWRITE)
     os.remove(name)
 
-def shannon_entropy(data, iterator):
-    """
-    Borrowed from http://blog.dkbza.org/2007/05/scanning-data-for-entropy-anomalies.html
-    """
+def shannon_entropy(data, char_set):
     if not data:
         return 0
     entropy = 0
-    for x in iterator:
-        p_x = float(data.count(x))/len(data)
-        if p_x > 0:
-            entropy += - p_x*math.log(p_x, 2)
+    pd_table = {c: data.count(c) / len(data) for c in data if c in char_set}
+    for x in data:
+        entropy += -pd_table[x] * math.log2(pd_table[x])
     return entropy
-
 
 def get_strings_of_set(word, char_set, threshold=20):
     count = 0
@@ -197,12 +192,12 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
             hex_strings = get_strings_of_set(word, HEX_CHARS)
             for string in base64_strings:
                 b64Entropy = shannon_entropy(string, BASE64_CHARS)
-                if b64Entropy > 4.5:
+                if b64Entropy > 6:
                     stringsFound.append(string)
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
             for string in hex_strings:
                 hexEntropy = shannon_entropy(string, HEX_CHARS)
-                if hexEntropy > 3:
+                if hexEntropy > 4:
                     stringsFound.append(string)
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
     entropicDiff = None
