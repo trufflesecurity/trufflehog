@@ -3,3 +3,6 @@
 /truffleHog.egg-info/
 **/__pycache__/
 **/*.pyc
+.DS_Store
+.idea/
+
