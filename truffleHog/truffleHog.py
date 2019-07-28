@@ -39,6 +39,9 @@ def main():
                              'in order for it to be scanned; lines starting with "#" are treated as comments and are '
                              'ignored. If empty or not provided (default), no Git object paths are excluded unless '
                              'effectively excluded via the --include_paths option.')
+    parser.add_argument('-e', '--entropy-exclude-regex', type=argparse.FileType('r'), metavar='ENTROPY_EXCLUDE_RE_FILE',
+                        help='File with regular expressions (one perline).'
+                             ' The line matching one of these regex will be excluded from high entropy testing.')
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
@@ -66,9 +69,10 @@ def main():
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
 
-    # read & compile path inclusion/exclusion patterns
+    # read & compile inclusion/exclusion patterns
     path_inclusions = []
     path_exclusions = []
+    entropy_regex_exclusions = []
     if args.include_paths:
         for pattern in set(l[:-1].lstrip() for l in args.include_paths):
             if pattern and not pattern.startswith('#'):
@@ -77,9 +81,13 @@ def main():
         for pattern in set(l[:-1].lstrip() for l in args.exclude_paths):
             if pattern and not pattern.startswith('#'):
                 path_exclusions.append(re.compile(pattern))
+    if args.entropy_exclude_regex:
+        for pattern in set(l[:-1].lstrip() for l in args.entropy_exclude_regex):
+            if pattern and not pattern.startswith('#'):
+                entropy_regex_exclusions.append(re.compile(pattern))
 
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
-            surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions)
+            surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, entropy_regex_exclusions=entropy_regex_exclusions)
     project_path = output["project_path"]
     if args.cleanup:
         clean_up(output)
@@ -188,10 +196,18 @@ def print_results(printJson, issue):
             print(printableDiff.encode('utf-8'))
         print("~~~~~~~~~~~~~~~~~~~~~")
 
-def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
+def is_exclude_line(line,entropy_regex_exclusions):
+    for rege in entropy_regex_exclusions:
+        if rege.search(line):
+            return True
+    return False
+
+def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, entropy_regex_exclusions):
     stringsFound = []
     lines = printableDiff.split("\n")
     for line in lines:
+        if is_exclude_line(line, entropy_regex_exclusions):
+            continue
         for word in line.split():
             base64_strings = get_strings_of_set(word, BASE64_CHARS)
             hex_strings = get_strings_of_set(word, HEX_CHARS)
@@ -243,7 +259,8 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             regex_matches.append(foundRegex)
     return regex_matches
 
-def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions):
+
+def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, entropy_regex_exclusions):
     issues = []
     for blob in diff:
         printableDiff = blob.diff.decode('utf-8', errors='replace')
@@ -254,7 +271,7 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
         foundIssues = []
         if do_entropy:
-            entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash)
+            entropicDiff = find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, entropy_regex_exclusions)
             if entropicDiff:
                 foundIssues.append(entropicDiff)
         if do_regex:
@@ -301,7 +318,7 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
 
 
 def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
-                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None):
+                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, entropy_regex_exclusions=None):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
@@ -341,12 +358,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 diff = prev_commit.diff(curr_commit, create_patch=True)
             # avoid searching the same diffs
             already_searched.add(diff_hash)
-            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, entropy_regex_exclusions)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
         # Handling the first commit
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
-        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
+        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, entropy_regex_exclusions)
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url

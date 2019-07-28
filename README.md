@@ -72,7 +72,10 @@ This module will go through the entire commit history of each branch, and check 
 ```
 usage: trufflehog [-h] [--json] [--regex] [--rules RULES]
                   [--entropy DO_ENTROPY] [--since_commit SINCE_COMMIT]
-                  [--max_depth MAX_DEPTH]
+                  [--max_depth MAX_DEPTH] [--branch BRANCH]
+                  [-i INCLUDE_PATHS_FILE] [-x EXCLUDE_PATHS_FILE]
+                  [-e ENTROPY_EXCLUDE_RE_FILE] [--repo_path REPO_PATH]
+                  [--cleanup]
                   git_url
 
 Find secrets hidden in the depths of git.
@@ -105,11 +108,9 @@ optional arguments:
                         comments and are ignored. If empty or not provided
                         (default), no Git object paths are excluded unless
                         effectively excluded via the --include_paths option.
+  -e ENTROPY_EXCLUDE_RE_FILE, --entropy-exclude-regex ENTROPY_EXCLUDE_RE_FILE
+			File with regular expressions (one perline), none of
+			wihch may match a diff line in order for it to be 
+			scanned by entropy checks. If empty or not provided
+			(default), all diff lines are included.
 ```
-
-## Wishlist
-
-- ~~A way to detect and not scan binary diffs~~
-- ~~Don't rescan diffs if already looked at in another branch~~
-- ~~A since commit X feature~~
-- ~~Print the file affected~~
