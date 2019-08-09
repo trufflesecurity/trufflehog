@@ -11,6 +11,8 @@ These features help cut down on noise, and makes the tool easier to shove into a
 truffleHog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
 ```
 
+DkoMGNOwkdz;2:DKa2@
+
 or
 
 ```
