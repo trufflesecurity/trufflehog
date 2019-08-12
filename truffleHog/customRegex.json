@@ -1,5 +1,5 @@
 {
-    "password": "[A-Za-z0-9]+[A-Za-z0-9]+[@%]",
+    "password": "[:][\\s]['][0-9a-zA-Z@:;<%@~!+~?{}\\[\\]]{21,45}[']",
     "RSA private key": "-----BEGIN RSA PRIVATE KEY-----",
     "SSH (DSA) private key": "-----BEGIN DSA PRIVATE KEY-----",
     "SSH (EC) private key": "-----BEGIN EC PRIVATE KEY-----",
