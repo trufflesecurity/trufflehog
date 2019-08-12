@@ -1,0 +1,14 @@
+{
+    "password": "[A-Za-z0-9]+[A-Za-z0-9]+[@%]",
+    "RSA private key": "-----BEGIN RSA PRIVATE KEY-----",
+    "SSH (DSA) private key": "-----BEGIN DSA PRIVATE KEY-----",
+    "SSH (EC) private key": "-----BEGIN EC PRIVATE KEY-----",
+    "PGP private key block": "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "Amazon AWS Access Key ID": "AKIA[0-9A-Z]{16}",
+    "Amazon MWS Auth Token": "amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    "AWS API Key": "AKIA[0-9A-Z]{16}",
+    "GitHub": "[g|G][i|I][t|T][h|H][u|U][b|B].*['|\"][0-9a-zA-Z]{35,40}['|\"]",
+    "Generic API Key": "[a|A][p|P][i|I][_]?[k|K][e|E][y|Y].*['|\"][0-9a-zA-Z]{32,45}['|\"]",
+    "Generic Secret": "[s|S][e|E][c|C][r|R][e|E][t|T].*['|\"][0-9a-zA-Z]{32,45}['|\"]",
+    "Password in URL": "[a-zA-Z]{3,10}://[^/\\s:@]{3,20}:[^/\\s:@]{3,20}@.{1,100}[\"'\\s]"
+}

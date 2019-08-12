@@ -65,7 +65,8 @@ def main():
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
-                          args.do_suppress_output, branch=args.branch, repo_path=args.repo_path)
+                          args.do_suppress_output, custom_regexes=args.rules, branch=args.branch,
+                          repo_path=args.repo_path)
     if args.cleanup:
         clean_up(output)
     if output["foundIssues"]:
@@ -212,9 +213,16 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
     return entropicDiff
 
 
-def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes={}):
+def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash, custom_regexes):
     if custom_regexes:
-        secret_regexes = custom_regexes
+        try:
+            with open(custom_regexes, "r") as ruleFile:
+                rules = json.loads(ruleFile.read())
+                for rule in rules:
+                    rules[rule] = re.compile(rules[rule])
+        except (IOError, ValueError) as e:
+            raise ("Error reading rules file")
+        secret_regexes = rules
     else:
         secret_regexes = regexes
     regex_matches = []
@@ -251,6 +259,10 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
             if entropicDiff:
                 foundIssues.append(entropicDiff)
         if do_regex:
+            found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash,
+                                        custom_regexes)
+            foundIssues += found_regexes
+        if custom_regexes:
             found_regexes = regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash,
                                         custom_regexes)
             foundIssues += found_regexes
