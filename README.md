@@ -1,4 +1,7 @@
 # truffleHog
+[![Build Status](https://travis-ci.org/dxa4481/truffleHog.svg?branch=master)](https://travis-ci.org/dxa4481/truffleHog)
+[![codecov](https://codecov.io/gh/dxa4481/truffleHog/branch/master/graph/badge.svg)](https://codecov.io/gh/dxa4481/truffleHog)
+
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
 
 ## NEW
