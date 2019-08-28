@@ -16,6 +16,7 @@ import json
 import stat
 from git import Repo
 from git import NULL_TREE
+from git.exc import GitCommandError
 from truffleHogRegexes.regexChecks import regexes
 
 
@@ -27,6 +28,7 @@ def main():
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
+    parser.add_argument("--since_date", dest="since_date", help="Only scan from a given epoc date", default=0, type=int)
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
     parser.add_argument('-i', '--include_paths', type=argparse.FileType('r'), metavar='INCLUDE_PATHS_FILE',
@@ -78,7 +80,7 @@ def main():
             if pattern and not pattern.startswith('#'):
                 path_exclusions.append(re.compile(pattern))
 
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
+    output = find_strings(args.git_url, args.since_commit, args.since_date, args.max_depth, args.output_json, args.do_regex, do_entropy,
             surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions)
     project_path = output["project_path"]
     if args.cleanup:
@@ -147,9 +149,13 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def clone_git_repo(git_url):
+def clone_git_repo(git_url, **kwargs):
     project_path = tempfile.mkdtemp()
-    Repo.clone_from(git_url, project_path)
+    try:
+        Repo.clone_from(git_url, project_path, **kwargs)
+    except GitCommandError:
+        print("There was an error during cloning.")
+        sys.exit(2)
     return project_path
 
 def print_results(printJson, issue):
@@ -300,13 +306,13 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
     return True
 
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
+def find_strings(git_url, since_commit=None, since_date=0, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
                 custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
     else:
-        project_path = clone_git_repo(git_url)
+        project_path = clone_git_repo(git_url, shallow_since=since_date)
     repo = Repo(project_path)
     already_searched = set()
     output_dir = tempfile.mkdtemp()
@@ -318,13 +324,20 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
 
     for remote_branch in branches:
         since_commit_reached = False
+        since_date_reached = False
         branch_name = remote_branch.name
         prev_commit = None
-        for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
+        for curr_commit in repo.iter_commits(branch_name, max_count=max_depth, max_age=since_date):
             commitHash = curr_commit.hexsha
+            commitDate = curr_commit.committed_date
+            if commitDate < since_date:
+                since_date_reached = True
             if commitHash == since_commit:
                 since_commit_reached = True
             if since_commit and since_commit_reached:
+                prev_commit = curr_commit
+                continue
+            if since_date and since_date_reached:
                 prev_commit = curr_commit
                 continue
             # if not prev_commit, then curr_commit is the newest commit. And we have nothing to diff with.
@@ -345,9 +358,10 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
         # Handling the first commit
-        diff = curr_commit.diff(NULL_TREE, create_patch=True)
-        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
-        output = handle_results(output, output_dir, foundIssues)
+        if not (since_commit or since_date):
+            diff = curr_commit.diff(NULL_TREE, create_patch=True)
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
+            output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
     output["issues_path"] = output_dir
