@@ -15,8 +15,8 @@ if [ -z $REF ]; then
     REF="${BUILDKITE_BRANCH}"
 fi
 
-echo "\e[34mrunning trufflehug on Pull Request $REF from $GIT_UPSTREAM_REPO repo on commits $COMMITS
-Build fail if secrets are found in these commits. 
+echo "\e[34mrunning trufflehug on $REF from $GIT_UPSTREAM_REPO repo on commits $COMMITS \e[0m"
+echo "\e[32mBuild fail if secrets are found in these commits. To remove secrets please see https://github.com/uber-atg/truffleHog?organization=uber-atg&organization=uber-atg#trufflehog-found-secrets-so-my-build-failed-what-should-i-do
 Secrets type we scan for can be found at https://github.com/uber-atg/truffleHog/blob/dev/testRules.json.
 If there exist a trufflehog/exclude-patterns.txt under repo $GIT_UPSTREAM_REPO then these files will be excluded from the scan. \e[0m"
 
