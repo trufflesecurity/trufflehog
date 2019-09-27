@@ -41,6 +41,7 @@ def main():
                              'effectively excluded via the --include_paths option.')
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
+    parser.add_argument("--commits", dest="commits", help="commits to be scanned")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
@@ -50,6 +51,7 @@ def main():
     parser.set_defaults(branch=None)
     parser.set_defaults(repo_path=None)
     parser.set_defaults(cleanup=False)
+    parser.set_defaults(commits="")
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -78,7 +80,7 @@ def main():
             if pattern and not pattern.startswith('#'):
                 path_exclusions.append(re.compile(pattern))
 
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
+    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy, args.commits,
             surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions)
     project_path = output["project_path"]
     if args.cleanup:
@@ -300,7 +302,7 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
     return True
 
 
-def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
+def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, commits="", surpress_output=True,
                 custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None):
     output = {"foundIssues": []}
     if repo_path:
@@ -315,13 +317,27 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         branches = repo.remotes.origin.fetch(branch)
     else:
         branches = repo.remotes.origin.fetch()
-
+    only_commits = False
+    commits_to_be_searched = []
+    if commits != "":
+        only_commits = True
+        commits_to_be_searched = commits.split(",")
     for remote_branch in branches:
         since_commit_reached = False
         branch_name = remote_branch.name
         prev_commit = None
         for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
             commitHash = curr_commit.hexsha
+            if only_commits:
+                if len(commits_to_be_searched) == 0:
+                    curr_commit = prev_commit
+                    break
+
+                if commitHash not in commits_to_be_searched:
+                    continue
+                else:
+                    commits_to_be_searched.remove(commitHash)
+
             if commitHash == since_commit:
                 since_commit_reached = True
             if since_commit and since_commit_reached:
@@ -341,6 +357,8 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 diff = prev_commit.diff(curr_commit, create_patch=True)
             # avoid searching the same diffs
             already_searched.add(diff_hash)
+            if branch_name == "FETCH_HEAD":
+                branch_name = remote_branch.remote_ref_path
             foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
