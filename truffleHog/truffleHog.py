@@ -316,13 +316,30 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
     else:
         branches = repo.remotes.origin.fetch()
 
+    listCommits_hash = []
+    listCommits_date = []
+
     for remote_branch in branches:
         since_commit_reached = False
         branch_name = remote_branch.name
         prev_commit = None
         for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
             commitHash = curr_commit.hexsha
-            if commitHash == since_commit:
+            commitDate = curr_commit.committed_date
+            listCommits_hash.append(commitHash)
+            listCommits_date.append(commitDate)
+
+    if since_commit:
+        indexOfsince_commit     =   listCommits_hash.index(since_commit)
+        commitDatesince_commit  =   listCommits_date[indexOfsince_commit]
+
+    for remote_branch in branches:
+        since_commit_reached = False
+        branch_name = remote_branch.name
+        prev_commit = None
+        for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
+            commitHash = curr_commit.hexsha
+            if since_commit and listCommits_date[listCommits_hash.index(commitHash)]<commitDatesince_commit:
                 since_commit_reached = True
             if since_commit and since_commit_reached:
                 prev_commit = curr_commit
