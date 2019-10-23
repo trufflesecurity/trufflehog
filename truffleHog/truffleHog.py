@@ -25,6 +25,7 @@ def main():
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
+    parser.add_argument("-ri", "--rules-ignore-case", dest="do_rules_ignore_case", action="store_true", help="Ignore case in rules regex checks")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
@@ -43,6 +44,7 @@ def main():
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
+    parser.set_defaults(regex_ignore_case=False)
     parser.set_defaults(rules={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
@@ -54,10 +56,13 @@ def main():
     rules = {}
     if args.rules:
         try:
+            regex_flags = 0
+            if args.do_rules_ignore_case:
+                regex_flags |= re.IGNORECASE
             with open(args.rules, "r") as ruleFile:
                 rules = json.loads(ruleFile.read())
                 for rule in rules:
-                    rules[rule] = re.compile(rules[rule])
+                    rules[rule] = re.compile(rules[rule], flags=regex_flags)
         except (IOError, ValueError) as e:
             raise("Error reading rules file")
         for regex in dict(regexes):
