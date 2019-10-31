@@ -154,8 +154,8 @@ def clone_git_repo(git_url, **kwargs):
     try:
         Repo.clone_from(git_url, project_path, **kwargs)
     except GitCommandError:
-        print("There was an error during cloning.")
-        sys.exit(2)
+        print("There was an error during cloning...")
+        raise
     return project_path
 
 def print_results(printJson, issue):
