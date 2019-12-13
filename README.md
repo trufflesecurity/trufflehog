@@ -1,11 +1,12 @@
 # Truffle Hog
+
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
 
 ## NEW
+
 Trufflehog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to surpress entropy checking has also been added.
 
 These features help cut down on noise, and makes the tool easier to shove into a devops pipeline.
-
 
 ```
 truffleHog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
@@ -20,6 +21,7 @@ truffleHog file:///user/dxa4481/codeprojects/truffleHog/
 ![Example](https://i.imgur.com/YAXndLD.png)
 
 ## Install
+
 ```
 pip install truffleHog
 ```
@@ -27,11 +29,13 @@ pip install truffleHog
 ## Customizing
 
 Custom regexes can be added with the following flag `--rules /path/to/rules`. This should be a json file of the following format:
+
 ```
 {
     "RSA private key": "-----BEGIN EC PRIVATE KEY-----"
 }
 ```
+
 Things like subdomain enumeration, s3 bucket detection, and other useful regexes highly custom to the situation can be added.
 
 Feel free to also contribute high signal regexes upstream that you think will benifit the community. Things like Azure keys, Twilio keys, Google Compute keys, are welcome, provided a high signal regex can be constructed.
@@ -39,6 +43,7 @@ Feel free to also contribute high signal regexes upstream that you think will be
 Trufflehog's base rule set sources from https://github.com/dxa4481/truffleHogRegexes/blob/master/truffleHogRegexes/regexes.json
 
 ## How it works
+
 This module will go through the entire commit history of each branch, and check each diff from each commit, and check for secrets. This is both by regex and by entropy. For entropy checks, trufflehog will evaluate the shannon entropy for both the base64 char set and hexidecimal char set for every blob of text greater than 20 characters comprised of those character sets in each diff. If at any point a high entropy string >20 characters is detected, it will print to the screen.
 
 ## Help
@@ -67,9 +72,14 @@ optional arguments:
                         secrets
 ```
 
-## Wishlist
+# To Do - in order of priority
 
-- ~~A way to detect and not scan binary diffs~~
-- ~~Don't rescan diffs if already looked at in another branch~~
-- ~~A since commit X feature~~
-- ~~Print the file affected~~
+- [x] A way to detect and not scan binary diffs
+- [x] Don't rescan diffs if already looked at in another branch -> remove duplicate entries with same diff hash
+- [x] Print the file affected
+- [x] CLI interface
+- [x] output as json
+- [ ] Able to scan a plain file or directory to use as a stand alone tool in CIs and pre-commit
+- [ ] able to ignore secific lines in files
+- [ ] able to include or exclude specific files
+- [ ] A since commit X feature

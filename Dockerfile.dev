@@ -1,0 +1,15 @@
+FROM python:3-alpine
+
+LABEL maintainer="sortigoza@gmail.com"
+
+USER root
+WORKDIR /app
+
+RUN apk add -q --no-cache \
+  git \
+  bash \
+  libffi-dev \
+  python3-dev
+
+COPY requirements.txt  requirements-dev.txt /tmp/
+RUN pip install -q -r /tmp/requirements-dev.txt

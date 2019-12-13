@@ -1,4 +1,21 @@
 language: python
+
 python:
-  - "2.7"
-script: pytest --cov=./ && codecov
+  - "3.7"
+
+services:
+  - docker
+
+jobs:
+  include:
+    - stage: Test
+      name: test
+      script: bin/do.sh test
+    - name: lint
+      script: bin/do.sh lint
+    - name: validate-build-install
+      script: bin/do.sh validate-build-install
+
+    - stage: "Build Image"
+      name: build-image
+      script: bin/do.sh build-image

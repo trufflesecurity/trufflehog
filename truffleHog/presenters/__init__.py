@@ -1,0 +1,2 @@
+from truffleHog.presenters.json_presenter import json_presenter
+from truffleHog.presenters.simple_presenter import simple_presenter

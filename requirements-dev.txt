@@ -1,0 +1,7 @@
+-r requirements.txt
+
+pycodestyle==2.3.1
+pylint==1.7.4
+s3pypi==0.5.0
+nose2==0.9.1
+black==19.3b0
