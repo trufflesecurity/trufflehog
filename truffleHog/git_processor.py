@@ -1,4 +1,7 @@
 import hashlib
+import os
+import json
+import re
 from collections import namedtuple
 from functools import partial, reduce
 from datetime import datetime
@@ -16,6 +19,9 @@ from truffleHog.shannon import ShannonEntropy
 from truffleHog.presenters import simple_presenter, json_presenter
 
 
+THIS_FILE_PATH = os.path.dirname(__file__)
+
+
 class IO:
     def __init__(self, io):
         self.unsafePerformIO = io
@@ -29,7 +35,9 @@ class RepoProcessor:
         "Commit", "blob_diffs branch commit commit_time diff_hash next_commit"
     )
 
-    DiffBlob = namedtuple("DiffBlob", "file_a file_b text high_entropy_words")
+    DiffBlob = namedtuple(
+        "DiffBlob", "file_a file_b text high_entropy_words regexp_matches"
+    )
 
     # process_repo :: repoURL -> [RepoProcessor.Commit]
     @staticmethod
@@ -40,7 +48,7 @@ class RepoProcessor:
                 shutil.rmtree(repo_path, ignore_errors=True)
                 return git.Repo.clone_from(repo_url, repo_path)
 
-            return fn
+            return IO(fn)
 
         def get_remote_branches(repo):
             return repo.remotes.origin.fetch()
@@ -108,7 +116,9 @@ class RepoProcessor:
             return RepoProcessor.Commit(**commit_dict)
 
         def to_diff_blob_struct(blob_dict):
-            return RepoProcessor.DiffBlob(**blob_dict, high_entropy_words=[])
+            return RepoProcessor.DiffBlob(
+                **blob_dict, high_entropy_words=[], regexp_matches=[]
+            )
 
         # -- main --
 
@@ -129,9 +139,17 @@ class RepoProcessor:
                 get_remote_branches,
             )
 
-        return IO(get_repo_from_url(repo_url)).map(
-            lambda repo: fn(repo, max_depth)(repo)
-        )
+        return get_repo_from_url(repo_url).map(lambda repo: fn(repo, max_depth)(repo))
+
+
+def update_blob_field(commits, field, update_fn):
+    def get_new_blob_diffs(update_fn, commit):
+        return [blob._replace(**{field: update_fn(blob)}) for blob in commit.blob_diffs]
+
+    def update_commit_blobs(update_fn, commit):
+        return commit._replace(blob_diffs=get_new_blob_diffs(update_fn, commit))
+
+    return [update_commit_blobs(update_fn, commit) for commit in commits]
 
 
 def find_high_entropy_strings(commits):
@@ -151,31 +169,55 @@ def find_high_entropy_strings(commits):
     def filter_words_with_entropy(words_results):
         return [x for x in words_results if x["b64_entropy"] or x["hex_entropy"]]
 
-    def get_new_blob_diffs(commit):
+    update_fn = compose(filter_words_with_entropy, get_words_entropy)
+
+    return update_blob_field(commits, "high_entropy_words", update_fn)
+
+
+def get_regexes_from_file():
+    def to_regexes_objects(raw_regexs_dict):
+        return [{"name": x, "regex": y} for x, y in raw_regexs_dict.items()]
+
+    def fn():
+        with open(os.path.join(THIS_FILE_PATH, "regexes.json"), "r") as f:
+            return to_regexes_objects(json.loads(f.read()))
+
+    return IO(fn)
+
+
+def find_matching_regexps(regexes_objects, commits):
+    def get_matching_regexes(text):
         return [
-            blob._replace(
-                high_entropy_words=compose(
-                    filter_words_with_entropy, get_words_entropy
-                )(blob)
-            )
-            for blob in commit.blob_diffs
+            {
+                "found_strings": re.findall(regex["regex"], str(text)),
+                "regex": regex["name"],
+            }
+            for regex in regexes_objects
         ]
 
-    def update_commit_blobs(commit):
-        return commit._replace(blob_diffs=get_new_blob_diffs(commit))
+    def filter_words_with_regexp_matches(regexp_results):
+        return [x for x in regexp_results if x["found_strings"]]
 
-    return [update_commit_blobs(commit) for commit in commits]
+    update_fn = compose(filter_words_with_regexp_matches, get_matching_regexes)
+
+    return update_blob_field(commits, "regexp_matches", update_fn)
 
 
-def scan_repo(repo_url):
+def scan_repo(repo_url, use_entropy=True, use_regexps=True):
     # impure
-    return find_high_entropy_strings(
-        RepoProcessor.process_repo(repo_url).unsafePerformIO()
-    )
+    commits = RepoProcessor.process_repo(repo_url).unsafePerformIO()
+    if use_entropy:
+        commits = find_high_entropy_strings(commits)
+    if use_regexps:
+        regexes_objects = get_regexes_from_file().unsafePerformIO()
+        commits = find_matching_regexps(regexes_objects, commits)
+
+    return commits
 
 
 # run with:
 #   python -m truffleHog.git_processor
 
 if __name__ == "__main__":
-    scan_repo("https://github.com/sortigoza/truffleHog.git")
+    result = scan_repo("https://github.com/sortigoza/truffleHog.git")
+    print(result)

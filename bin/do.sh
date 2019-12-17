@@ -9,6 +9,17 @@ test_no_docker() {
     bin/test.sh
 }
 
+function helptext() {
+    echo "Usage: ./bin/do.sh <command>"
+    echo ""
+    echo "Available commands are:"
+    echo "    lint                    "
+    echo "    test-no-docker          "
+    echo "    test                    "
+    echo "    validate-build-install  "
+    echo "    build-image             "
+}
+
 case $1 in
 lint)
     build_dev_container
@@ -29,6 +40,7 @@ build-image)
     docker build -t sortigoza/trufflehog .
     ;;
 *)
+    helptext
     echo "error no task selected"
     exit 1
     ;;

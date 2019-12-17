@@ -79,6 +79,7 @@ optional arguments:
 - [x] Print the file affected
 - [x] CLI interface
 - [x] output as json
+- [x] find by regexp
 - [ ] Able to scan a plain file or directory to use as a stand alone tool in CIs and pre-commit
 - [ ] able to ignore secific lines in files
 - [ ] able to include or exclude specific files
