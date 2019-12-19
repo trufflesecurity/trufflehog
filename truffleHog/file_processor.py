@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from toolz.functoolz import compose
 
 from truffleHog.utils import IO, replace, get_regexes_from_file
-from truffleHog.shannon import ShannonEntropy
+from truffleHog.shannon import HighEntropyStringsFinder
 
 
 THIS_FILE_PATH = os.path.dirname(__file__)
@@ -59,9 +59,7 @@ def find_high_entropy_strings(file_obj) -> File:
         return [x for x in words_results if x["b64_entropy"] or x["hex_entropy"]]
 
     return replace(
-        file_obj,
-        "high_entropy_words",
-        compose(filter_words_with_entropy, get_words_entropy)(file_obj),
+        file_obj, "high_entropy_words", HighEntropyStringsFinder.apply(file_obj)
     )
 
 

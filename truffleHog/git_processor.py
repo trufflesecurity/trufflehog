@@ -1,6 +1,6 @@
 import hashlib
 import re
-from functools import partial, reduce
+from functools import partial
 from datetime import datetime
 import shutil
 from typing import List, Any, Optional
@@ -15,7 +15,7 @@ from toolz.functoolz import compose
 import git
 
 from truffleHog.utils import IO, replace, get_regexes_from_file
-from truffleHog.shannon import ShannonEntropy
+from truffleHog.shannon import HighEntropyStringsFinder
 
 
 class DiffBlob(BaseModel):
@@ -147,25 +147,9 @@ def update_blob_field(commits, field, update_fn) -> List[Commit]:
 
 
 def find_high_entropy_strings(commits) -> List[Commit]:
-    def get_words_entropy(blob):
-        return [
-            {
-                "b64_entropy": ShannonEntropy.find_base64_shannon_entropy(word),
-                "hex_entropy": ShannonEntropy.find_hex_shannon_entropy(word),
-                "word": word,
-            }
-            for word in get_blob_words(blob)
-        ]
-
-    def get_blob_words(blob):
-        return reduce(lambda x, y: x + y.split(), blob.text, [])
-
-    def filter_words_with_entropy(words_results):
-        return [x for x in words_results if x["b64_entropy"] or x["hex_entropy"]]
-
-    update_fn = compose(filter_words_with_entropy, get_words_entropy)
-
-    return update_blob_field(commits, "high_entropy_words", update_fn)
+    return update_blob_field(
+        commits, "high_entropy_words", HighEntropyStringsFinder.apply
+    )
 
 
 def find_matching_regexps(regexes_objects, commits) -> List[Commit]:
