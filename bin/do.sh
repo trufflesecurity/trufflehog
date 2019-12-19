@@ -18,6 +18,7 @@ function helptext() {
     echo "    test                    "
     echo "    validate-build-install  "
     echo "    build-image             "
+    echo "    type-check              "
 }
 
 case $1 in
@@ -38,6 +39,9 @@ validate-build-install)
     ;;
 build-image)
     docker build -t sortigoza/trufflehog .
+    ;;
+type-check)
+    mypy --ignore-missing-imports truffleHog
     ;;
 *)
     helptext

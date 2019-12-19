@@ -2,3 +2,4 @@ GitPython==2.1.1
 toolz==0.10.0
 termcolor==1.1.0
 simplejson==3.17.0
+pydantic==1.2

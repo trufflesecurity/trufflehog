@@ -6,3 +6,4 @@
 aws_credentials
 .env
 .coverage
+.mypy_cache

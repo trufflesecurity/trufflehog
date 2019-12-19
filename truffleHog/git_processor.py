@@ -54,9 +54,8 @@ def replace(thing, attribute, value):
 
 
 class RepoProcessor:
-    # process_repo :: repoURL -> [RepoProcessor.Commit]
     @staticmethod
-    def process_repo(repo_url: str, max_depth=10):
+    def process_repo(repo_url: str, max_depth=10) -> List[Commit]:
         def get_repo_from_url(repo_url):
             def fn():
                 repo_path = "/tmp/repo-in-analisys"
@@ -155,7 +154,7 @@ class RepoProcessor:
         return get_repo_from_url(repo_url).map(lambda repo: fn(repo, max_depth)(repo))
 
 
-def update_blob_field(commits, field, update_fn):
+def update_blob_field(commits, field, update_fn) -> List[Commit]:
     def get_new_blob_diffs(update_fn, commit):
         return [replace(blob, field, update_fn(blob)) for blob in commit.blob_diffs]
 
@@ -165,7 +164,7 @@ def update_blob_field(commits, field, update_fn):
     return [update_commit_blobs(update_fn, commit) for commit in commits]
 
 
-def find_high_entropy_strings(commits):
+def find_high_entropy_strings(commits) -> List[Commit]:
     def get_words_entropy(blob):
         return [
             {
@@ -198,7 +197,7 @@ def get_regexes_from_file():
     return IO(fn)
 
 
-def find_matching_regexps(regexes_objects, commits):
+def find_matching_regexps(regexes_objects, commits) -> List[Commit]:
     def get_matching_regexes(text):
         return [
             {
