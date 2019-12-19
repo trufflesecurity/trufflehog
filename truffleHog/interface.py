@@ -59,7 +59,6 @@ def get_args():
         "and are ignored. If empty or not provided (default), no Git object paths are "
         "excluded unless  effectively excluded via the --include_paths option.",
     )
-    # TODO: finish this
     parser.add_argument(
         "files_or_git_url",
         nargs="+",

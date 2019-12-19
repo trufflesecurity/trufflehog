@@ -2,11 +2,12 @@ import hashlib
 import os
 import json
 import re
-from collections import namedtuple
 from functools import partial, reduce
 from datetime import datetime
 import shutil
+from typing import List, Any, Optional
 
+from pydantic import BaseModel
 
 # ref: https://toolz.readthedocs.io/en/latest/index.html
 from toolz.itertoolz import concat, unique
@@ -16,7 +17,6 @@ from toolz.functoolz import compose
 import git
 
 from truffleHog.shannon import ShannonEntropy
-from truffleHog.presenters import simple_presenter, json_presenter
 
 
 THIS_FILE_PATH = os.path.dirname(__file__)
@@ -30,15 +30,30 @@ class IO:
         return IO(compose(fn, self.unsafePerformIO))
 
 
+class DiffBlob(BaseModel):
+    file_a: Optional[str]
+    file_b: Optional[str]
+    text: List[str]
+    high_entropy_words: List[dict]
+    regexp_matches: List[dict]
+
+
+class Commit(BaseModel):
+    branch: str
+    commit: Any
+    commit_time: datetime
+    blob_diffs: List[DiffBlob]
+    diff_hash: str
+    next_commit: Any
+
+
+def replace(thing, attribute, value):
+    """a simple replace method that will set an attribute and return the object"""
+    setattr(thing, attribute, value)
+    return thing
+
+
 class RepoProcessor:
-    Commit = namedtuple(
-        "Commit", "blob_diffs branch commit commit_time diff_hash next_commit"
-    )
-
-    DiffBlob = namedtuple(
-        "DiffBlob", "file_a file_b text high_entropy_words regexp_matches"
-    )
-
     # process_repo :: repoURL -> [RepoProcessor.Commit]
     @staticmethod
     def process_repo(repo_url: str, max_depth=10):
@@ -113,12 +128,10 @@ class RepoProcessor:
             ]
 
         def to_commit_struct(commit_dict):
-            return RepoProcessor.Commit(**commit_dict)
+            return Commit(**commit_dict)
 
         def to_diff_blob_struct(blob_dict):
-            return RepoProcessor.DiffBlob(
-                **blob_dict, high_entropy_words=[], regexp_matches=[]
-            )
+            return DiffBlob(**blob_dict, high_entropy_words=[], regexp_matches=[])
 
         # -- main --
 
@@ -144,10 +157,10 @@ class RepoProcessor:
 
 def update_blob_field(commits, field, update_fn):
     def get_new_blob_diffs(update_fn, commit):
-        return [blob._replace(**{field: update_fn(blob)}) for blob in commit.blob_diffs]
+        return [replace(blob, field, update_fn(blob)) for blob in commit.blob_diffs]
 
     def update_commit_blobs(update_fn, commit):
-        return commit._replace(blob_diffs=get_new_blob_diffs(update_fn, commit))
+        return replace(commit, "blob_diffs", get_new_blob_diffs(update_fn, commit))
 
     return [update_commit_blobs(update_fn, commit) for commit in commits]
 
