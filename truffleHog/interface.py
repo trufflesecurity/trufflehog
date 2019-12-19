@@ -59,19 +59,46 @@ def get_args():
         "and are ignored. If empty or not provided (default), no Git object paths are "
         "excluded unless  effectively excluded via the --include_paths option.",
     )
-    parser.add_argument("git_url", type=str, help="URL for secret searching")
+    # TODO: finish this
+    parser.add_argument(
+        "files_or_git_url",
+        nargs="+",
+        type=str,
+        help="URL or list of files for secret searching",
+    )
 
     return parser.parse_args()
 
 
-def main():
-    args = get_args()
-    commits = scan_repo(args.git_url)
+def is_remote_repo(item):
+    return True
+
+
+def is_local_file(item):
+    return False
+
+
+def proces_local_file(args, file_path):
+    pass
+
+
+def proces_remote_repo(args, repo_url):
+    commits = scan_repo(repo_url)
 
     if args.output_json:
         json_presenter(commits)
     else:
         simple_presenter(commits)
+
+
+def main():
+    args = get_args()
+    for item in args.files_or_git_url:
+        print(f"processing: {item}")
+        if is_remote_repo(item):
+            proces_remote_repo(args, item)
+        if is_local_file(item):
+            proces_local_file(args, item)
 
 
 if __name__ == "__main__":
