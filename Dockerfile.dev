@@ -9,7 +9,9 @@ RUN apk add -q --no-cache \
   git \
   bash \
   libffi-dev \
-  python3-dev
+  python3-dev \
+  musl-dev \
+  gcc
 
 COPY requirements.txt  requirements-dev.txt /tmp/
 RUN pip install -q -r /tmp/requirements-dev.txt

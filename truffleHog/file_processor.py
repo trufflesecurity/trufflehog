@@ -1,13 +1,11 @@
 import os
-import re
 from functools import partial, reduce
 from typing import List
 
 from pydantic import BaseModel
-from toolz.functoolz import compose
 
 from truffleHog.utils import IO, replace, get_regexes_from_file
-from truffleHog.shannon import HighEntropyStringsFinder
+from truffleHog.finders import HighEntropyStringsFinder, RegexpMatchFinder
 
 
 THIS_FILE_PATH = os.path.dirname(__file__)
@@ -42,44 +40,16 @@ class FileProcessor:
 
 
 def find_high_entropy_strings(file_obj) -> File:
-    def get_words_entropy(blob):
-        return [
-            {
-                "b64_entropy": ShannonEntropy.find_base64_shannon_entropy(word),
-                "hex_entropy": ShannonEntropy.find_hex_shannon_entropy(word),
-                "word": word,
-            }
-            for word in get_blob_words(blob)
-        ]
-
-    def get_blob_words(blob):
-        return reduce(lambda x, y: x + y.split(), blob.text, [])
-
-    def filter_words_with_entropy(words_results):
-        return [x for x in words_results if x["b64_entropy"] or x["hex_entropy"]]
-
     return replace(
         file_obj, "high_entropy_words", HighEntropyStringsFinder.apply(file_obj)
     )
 
 
 def find_matching_regexps(regexes_objects, file_obj) -> File:
-    def get_matching_regexes(text):
-        return [
-            {
-                "found_strings": re.findall(regex["regex"], str(text)),
-                "regex": regex["name"],
-            }
-            for regex in regexes_objects
-        ]
-
-    def filter_words_with_regexp_matches(regexp_results):
-        return [x for x in regexp_results if x["found_strings"]]
-
     return replace(
         file_obj,
         "regexp_matches",
-        compose(filter_words_with_regexp_matches, get_matching_regexes)(file_obj.text),
+        RegexpMatchFinder.apply(regexes_objects, file_obj.text),
     )
 
 

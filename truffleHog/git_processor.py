@@ -1,5 +1,4 @@
 import hashlib
-import re
 from functools import partial
 from datetime import datetime
 import shutil
@@ -15,7 +14,7 @@ from toolz.functoolz import compose
 import git
 
 from truffleHog.utils import IO, replace, get_regexes_from_file
-from truffleHog.shannon import HighEntropyStringsFinder
+from truffleHog.finders import HighEntropyStringsFinder, RegexpMatchFinder
 
 
 class DiffBlob(BaseModel):
@@ -153,21 +152,9 @@ def find_high_entropy_strings(commits) -> List[Commit]:
 
 
 def find_matching_regexps(regexes_objects, commits) -> List[Commit]:
-    def get_matching_regexes(text):
-        return [
-            {
-                "found_strings": re.findall(regex["regex"], str(text)),
-                "regex": regex["name"],
-            }
-            for regex in regexes_objects
-        ]
-
-    def filter_words_with_regexp_matches(regexp_results):
-        return [x for x in regexp_results if x["found_strings"]]
-
-    update_fn = compose(filter_words_with_regexp_matches, get_matching_regexes)
-
-    return update_blob_field(commits, "regexp_matches", update_fn)
+    return update_blob_field(
+        commits, "regexp_matches", partial(RegexpMatchFinder.apply, regexes_objects)
+    )
 
 
 def scan_repo(repo_url: str, use_entropy=True, use_regexps=True):
