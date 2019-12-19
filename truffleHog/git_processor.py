@@ -1,6 +1,4 @@
 import hashlib
-import os
-import json
 import re
 from functools import partial, reduce
 from datetime import datetime
@@ -16,18 +14,8 @@ from toolz.functoolz import compose
 # ref: https://gitpython.readthedocs.io/en/stable/index.html
 import git
 
+from truffleHog.utils import IO, replace, get_regexes_from_file
 from truffleHog.shannon import ShannonEntropy
-
-
-THIS_FILE_PATH = os.path.dirname(__file__)
-
-
-class IO:
-    def __init__(self, io):
-        self.unsafePerformIO = io
-
-    def map(self, fn):
-        return IO(compose(fn, self.unsafePerformIO))
 
 
 class DiffBlob(BaseModel):
@@ -47,15 +35,9 @@ class Commit(BaseModel):
     next_commit: Any
 
 
-def replace(thing, attribute, value):
-    """a simple replace method that will set an attribute and return the object"""
-    setattr(thing, attribute, value)
-    return thing
-
-
 class RepoProcessor:
     @staticmethod
-    def process_repo(repo_url: str, max_depth=10) -> List[Commit]:
+    def process_repo(repo_url: str, max_depth=10) -> IO:
         def get_repo_from_url(repo_url):
             def fn():
                 repo_path = "/tmp/repo-in-analisys"
@@ -186,17 +168,6 @@ def find_high_entropy_strings(commits) -> List[Commit]:
     return update_blob_field(commits, "high_entropy_words", update_fn)
 
 
-def get_regexes_from_file():
-    def to_regexes_objects(raw_regexs_dict):
-        return [{"name": x, "regex": y} for x, y in raw_regexs_dict.items()]
-
-    def fn():
-        with open(os.path.join(THIS_FILE_PATH, "regexes.json"), "r") as f:
-            return to_regexes_objects(json.loads(f.read()))
-
-    return IO(fn)
-
-
 def find_matching_regexps(regexes_objects, commits) -> List[Commit]:
     def get_matching_regexes(text):
         return [
@@ -215,7 +186,7 @@ def find_matching_regexps(regexes_objects, commits) -> List[Commit]:
     return update_blob_field(commits, "regexp_matches", update_fn)
 
 
-def scan_repo(repo_url, use_entropy=True, use_regexps=True):
+def scan_repo(repo_url: str, use_entropy=True, use_regexps=True):
     # impure
     commits = RepoProcessor.process_repo(repo_url).unsafePerformIO()
     if use_entropy:
