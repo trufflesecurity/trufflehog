@@ -1,5 +1,4 @@
 GitPython==3.0.6
-gitdb2==3.0.0
 unittest2==1.1.0
 pytest-cov==2.5.1
 codecov==2.0.15
