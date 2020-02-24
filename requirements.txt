@@ -4,3 +4,4 @@ pytest-cov==2.5.1
 codecov==2.0.15
 truffleHogRegexes==0.0.7
 aenum==2.1.2
+gitdb2==3.0.1
