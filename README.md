@@ -9,7 +9,7 @@ Right now a breaking change in GitPython is causing an error in pip installation
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
 
 ## NEW
-truffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to surpress entropy checking has also been added.
+truffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to suppress entropy checking has also been added.
 
 
 ```
