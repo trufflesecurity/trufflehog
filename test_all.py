@@ -8,6 +8,11 @@ from collections import namedtuple
 from truffleHog import truffleHog
 from mock import patch 
 from mock import MagicMock
+from tempfile import mkdtemp
+from subprocess import run, STDOUT
+from truffleHog import truffleHog
+
+FNULL = open(os.devnull, 'w')
 
 
 class TestStringMethods(unittest.TestCase):
@@ -138,6 +143,52 @@ class TestStringMethods(unittest.TestCase):
         truffleHog.find_strings("test_repo", repo_path="test/path/")
         rmtree_mock.assert_not_called()
         clone_git_repo.assert_not_called()
+
+
+class TestDiff(unittest.TestCase):
+
+    def setUp(self):
+        # Create repo
+        self.repo_dir = mkdtemp()
+        self.file_path = os.path.join(self.repo_dir, "file.txt")
+        run(['git', 'init', self.repo_dir], stdout=FNULL, stderr=STDOUT)
+
+    def test_diff_one_commit(self):
+        self.commit_new_line('commit 1', 'commit 1 with secret m5nR7k7AmZ88Ge0IP9wZ8OQDT6zCYEiWjRVZxaMAGapTKvr9pRkDF')
+
+        # Fire
+        output = truffleHog.find_strings(self.repo_dir + '/.git')
+
+        diff = self.get_first_diff(output)
+        self.assert_diff_appends(diff)
+
+    def test_diff_multiple_commits(self):
+        self.commit_new_line('commit 1', 'commit 1')
+        self.commit_new_line('commit 2', 'commit 2 with secret m5nR7k7AmZ88Ge0IP9wZ8OQDT6zCYEiWjRVZxaMAGapTKvr9pRkDF')
+
+        # Fire
+        output = truffleHog.find_strings(self.repo_dir + '/.git')
+
+        diff = self.get_first_diff(output)
+        self.assert_diff_appends(diff)
+
+    def commit_new_line(self, msg, content):
+        with open(self.file_path, 'a') as f:
+            f.write(content + "\n")
+        run(['git', 'add', self.file_path], cwd=self.repo_dir, stdout=FNULL, stderr=STDOUT)
+        run(['git', 'commit', '-m', msg], cwd=self.repo_dir, stdout=FNULL, stderr=STDOUT)
+
+    def assert_diff_appends(self, diff):
+        last_line = diff.splitlines()[-1]
+        self.assertEqual('+', last_line[:1])
+
+    def get_first_diff(self, output):
+        if not output['foundIssues']:
+            self.fail('no issues found')
+        with open(output['foundIssues'][0], 'r') as f:
+            issue = json.loads(f.read())
+            return issue['diff']
+
 
 if __name__ == '__main__':
     unittest.main()
