@@ -40,6 +40,7 @@ def main():
                              'ignored. If empty or not provided (default), no Git object paths are excluded unless '
                              'effectively excluded via the --include_paths option.')
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
+    parser.add_argument("--proxy", type=str, dest="proxy", help="URL of your proxy server to allow traffic to be routed to the internet if blocked in a company etc.")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
@@ -50,6 +51,7 @@ def main():
     parser.set_defaults(branch=None)
     parser.set_defaults(repo_path=None)
     parser.set_defaults(cleanup=False)
+    parser.set_defaults(proxy=None)
     args = parser.parse_args()
     rules = {}
     if args.rules:
@@ -79,7 +81,8 @@ def main():
                 path_exclusions.append(re.compile(pattern))
 
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
-            surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions)
+            surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions,
+            path_exclusions=path_exclusions, proxy=args.proxy)
     project_path = output["project_path"]
     if args.cleanup:
         clean_up(output)
@@ -147,9 +150,10 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def clone_git_repo(git_url):
+def clone_git_repo(git_url, proxy):
+    proxy_config ="http.proxy='{}'".format(proxy) if proxy else None
     project_path = tempfile.mkdtemp()
-    Repo.clone_from(git_url, project_path)
+    Repo.clone_from(git_url, project_path, config=proxy_config)
     return project_path
 
 def print_results(printJson, issue):
@@ -301,12 +305,12 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
 
 
 def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
-                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None):
+                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, proxy=None):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
     else:
-        project_path = clone_git_repo(git_url)
+        project_path = clone_git_repo(git_url, proxy)
     repo = Repo(project_path)
     already_searched = set()
     output_dir = tempfile.mkdtemp()
