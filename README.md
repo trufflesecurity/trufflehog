@@ -134,6 +134,9 @@ On Windows, using powershell, run the following instead:
 docker run --rm -v $(pwd):/proj dxa4481/trufflehog file:///proj
 ```
 
+`-v` mounts the current working dir (`pwd`) to the `/proj` dir in the Docker container
+`file:///proj` references that very same `/proj` dir in the container (which is also set as the default working dir in the Dockerfile)
+
 ## Wishlist
 
 - ~~A way to detect and not scan binary diffs~~
