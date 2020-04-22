@@ -114,6 +114,26 @@ optional arguments:
                         effectively excluded via the --include_paths option.
 ```
 
+## Running with Docker
+
+First, enter the directory containing the git repository
+
+```
+cd /path/to/git
+```
+
+On Linux or MacOS, run the following:
+
+```
+docker run --rm -v `pwd`:/proj dxa4481/trufflehog file:///proj
+```
+
+On Windows, using powershell, run the following instead:
+
+```
+docker run --rm -v $(pwd):/proj dxa4481/trufflehog file:///proj
+```
+
 ## Wishlist
 
 - ~~A way to detect and not scan binary diffs~~
