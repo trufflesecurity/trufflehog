@@ -95,6 +95,7 @@ optional arguments:
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
                         Only scan from a given commit hash
+  --branch BRANCH       Scans only the selected branch
   --max_depth MAX_DEPTH
                         The max commit depth to go back when searching for
                         secrets
