@@ -30,9 +30,9 @@ class TestStringMethods(unittest.TestCase):
             self.fail("Unicode print error")
 
     def test_return_correct_commit_hash(self):
-        # Start at commit d15627104d07846ac2914a976e8e347a663bbd9b, which 
+        # Start at commit 202564cf776b402800a4aab8bb14fa4624888475, which 
         # is immediately followed by a secret inserting commit:
-        # https://github.com/dxa4481/truffleHog/commit/9ed54617547cfca783e0f81f8dc5c927e3d1e345
+        # https://github.com/dxa4481/truffleHog/commit/d15627104d07846ac2914a976e8e347a663bbd9b
         since_commit = '202564cf776b402800a4aab8bb14fa4624888475'
         commit_w_secret = 'd15627104d07846ac2914a976e8e347a663bbd9b'
         cross_valdiating_commit_w_secret_comment = 'Oh no a secret file'
