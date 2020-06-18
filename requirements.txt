@@ -3,3 +3,4 @@ unittest2==1.1.0
 pytest-cov==2.5.1
 codecov==2.0.15
 truffleHogRegexes==0.0.7
+gitdb2==3.0.1
