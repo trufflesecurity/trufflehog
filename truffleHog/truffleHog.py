@@ -72,7 +72,7 @@ def main():
             with open(args.allow, "r") as allowFile:
                 allow = json.loads(allowFile.read())
                 for rule in allow:
-                    allow[rule] = re.compile(make_flexible(allow[rule]))
+                    allow[rule] = read_pattern(allow[rule])
         except (IOError, ValueError) as e:
             raise("Error reading allow file")
     do_entropy = str2bool(args.do_entropy)
@@ -99,8 +99,12 @@ def main():
     else:
         sys.exit(0)
 
-def make_flexible(r):
-    return re.sub(r"(\r?\n|(\\+r)?\\+n)+", "([ \t]*(\r?\n|(\\+r)?\\+n)[ \t]*)*", r)
+def read_pattern(r):
+    if r.startswith("regex:"):
+        return re.compile(r[6:])
+    converted = re.escape(r)
+    converted = re.sub(r"(\r?\n|(\\+r)?\\+n)+", "([ \t]*(\r?\n|(\\+r)?\\+n)[ \t]*)*", converted)
+    return re.compile(converted)
 
 def str2bool(v):
     if v == None:
