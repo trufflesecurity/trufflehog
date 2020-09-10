@@ -28,14 +28,12 @@ deploy:
   - name: staging
     legacy: true
     role: lyftpypi-staging-iad-deploy
-    orca:
-      - region: iad
+    orca: []
   - name: production
     legacy: true
     role: lyftpypi-production-iad-deploy
     automatic: true
-    orca:
-      - region: iad
+    orca: []
 slack: '#security'
 notification_overrides:
   deploy:
