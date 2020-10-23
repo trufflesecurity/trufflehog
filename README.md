@@ -122,16 +122,10 @@ First, enter the directory containing the git repository
 cd /path/to/git
 ```
 
-On Linux or MacOS, run the following:
+To launch the trufflehog with the docker image, run the following"
 
 ```
-docker run --rm -v `pwd`:/proj dxa4481/trufflehog file:///proj
-```
-
-On Windows, using powershell, run the following instead:
-
-```
-docker run --rm -v $(pwd):/proj dxa4481/trufflehog file:///proj
+docker run --rm -v "$(pwd):/proj" dxa4481/trufflehog file:///proj
 ```
 
 `-v` mounts the current working dir (`pwd`) to the `/proj` dir in the Docker container
