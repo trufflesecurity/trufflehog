@@ -103,7 +103,7 @@ def read_pattern(r):
     if r.startswith("regex:"):
         return re.compile(r[6:])
     converted = re.escape(r)
-    converted = re.sub(r"(\r?\n|(\\+r)?\\+n)+", r"([ \t]*(\r?\n|(\\\\+r)?\\\\+n)[ \t]*)*", converted)
+    converted = re.sub(r"((\\*\r)?\\*\n|(\\+r)?\\+n)+", r"( |\\t|(\\r|\\n|\\\\+[rn])[-+]?)*", converted)
     return re.compile(converted)
 
 def str2bool(v):
