@@ -30,12 +30,12 @@ class TestStringMethods(unittest.TestCase):
             self.fail("Unicode print error")
 
     def test_return_correct_commit_hash(self):
-        # Start at commit d15627104d07846ac2914a976e8e347a663bbd9b, which 
+        # Start at commit 202564cf776b402800a4aab8bb14fa4624888475, which 
         # is immediately followed by a secret inserting commit:
-        # https://github.com/dxa4481/truffleHog/commit/9ed54617547cfca783e0f81f8dc5c927e3d1e345
-        since_commit = 'd15627104d07846ac2914a976e8e347a663bbd9b'
-        commit_w_secret = '9ed54617547cfca783e0f81f8dc5c927e3d1e345'
-        cross_valdiating_commit_w_secret_comment = 'OH no a secret'
+        # https://github.com/dxa4481/truffleHog/commit/d15627104d07846ac2914a976e8e347a663bbd9b
+        since_commit = '202564cf776b402800a4aab8bb14fa4624888475'
+        commit_w_secret = 'd15627104d07846ac2914a976e8e347a663bbd9b'
+        cross_valdiating_commit_w_secret_comment = 'Oh no a secret file'
 
         json_result = ''
         if sys.version_info >= (3,):
@@ -54,7 +54,8 @@ class TestStringMethods(unittest.TestCase):
 
         json_result_list = tmp_stdout.getvalue().split('\n')
         results = [json.loads(r) for r in json_result_list if bool(r.strip())]
-        filtered_results = list(filter(lambda r: r['commitHash'] == commit_w_secret, results))
+        filtered_results = list(filter(lambda r: r['commitHash'] == commit_w_secret and r['branch'] == 'origin/master', results))
+
         self.assertEqual(1, len(filtered_results))
         self.assertEqual(commit_w_secret, filtered_results[0]['commitHash'])
         # Additionally, we cross-validate the commit comment matches the expected comment

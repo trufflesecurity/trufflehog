@@ -344,9 +344,7 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
             commitHash = curr_commit.hexsha
             if commitHash == since_commit:
                 since_commit_reached = True
-            if since_commit and since_commit_reached:
-                prev_commit = curr_commit
-                continue
+                break
             # if not prev_commit, then curr_commit is the newest commit. And we have nothing to diff with.
             # But we will diff the first commit with NULL_TREE here to check the oldest code.
             # In this way, no commit will be missed.
@@ -364,8 +362,16 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
             foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, allow)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
-        # Handling the first commit
-        diff = curr_commit.diff(NULL_TREE, create_patch=True)
+
+        # Check if since_commit was used to check which diff should be grabbed
+        if since_commit_reached:
+            # Handle when there's no prev_commit (used since_commit on the most recent commit)
+            if prev_commit is None:
+                continue
+            diff = prev_commit.diff(curr_commit, create_patch=True)
+        else:
+            diff = curr_commit.diff(NULL_TREE, create_patch=True)
+
         foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, allow)
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
