@@ -1,0 +1,9 @@
+name: Run tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: python
+    steps:
+    - run: pytest --cov=./ && codecov
