@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
-    parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
+    parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json file")
     parser.add_argument("--allow", dest="allow", help="Explicitly allow regexes from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
@@ -59,7 +59,7 @@ def main():
             with open(args.rules, "r") as ruleFile:
                 rules = json.loads(ruleFile.read())
                 for rule in rules:
-                    rules[rule] = re.compile(rules[rule])
+                    rules[rule] = re.compile(rule)
         except (IOError, ValueError) as e:
             raise("Error reading rules file")
         for regex in dict(regexes):
