@@ -26,6 +26,7 @@ rules = {
     "Google (GCP) Service-account": "\"type\": \"service_account\"",
     "Twilio API Key": "SK[a-z0-9]{32}",
     "Password in URL": "[a-zA-Z]{3,10}://[^/\\s:@]{3,20}:[^/\\s:@]{3,20}@.{1,100}[\"'\\s]",
+    "SlackInternal": "slack-corp",
 }
 
 for key in rules:
@@ -38,7 +39,7 @@ def get_org_repos(orgname, page):
         return None
     for item in json:
 
-        if item['fork'] == False and reached:
+        if item['fork'] == False:
             print('searching ' + item["html_url"])
             results = truffleHog.find_strings(item["html_url"], do_regex=True, custom_regexes=rules, do_entropy=False, max_depth=100000)
             for issue in results["foundIssues"]:
@@ -49,4 +50,4 @@ def get_org_repos(orgname, page):
                 d['printDiff'] = d['printDiff'][0:200]
                 print(dumps(d, indent=4))
     get_org_repos(orgname, page + 1)
-get_org_repos("square", 1)
+get_org_repos("Twitter", 1)
