@@ -71,13 +71,23 @@ Feel free to also contribute high signal regexes upstream that you think will be
 
 trufflehog's base rule set sources from https://github.com/dxa4481/truffleHogRegexes/blob/master/truffleHogRegexes/regexes.json
 
+To explicitly allow particular secrets (e.g. self-signed keys used only for local testing) you can provide an allow list `--allow /path/to/allow` in the following format:
+```
+{
+    "local self signed test key": "-----BEGIN EC PRIVATE KEY-----\nfoobar123\n-----END EC PRIVATE KEY-----",
+    "git cherry pick SHAs": "regex:Cherry picked from .*",
+}
+```
+
+Note that values beginning with `regex:` will be used as regular expressions. Values without this will be literal, with some automatic conversions (e.g. flexible newlines).
+
 ## How it works
 This module will go through the entire commit history of each branch, and check each diff from each commit, and check for secrets. This is both by regex and by entropy. For entropy checks, truffleHog will evaluate the shannon entropy for both the base64 char set and hexidecimal char set for every blob of text greater than 20 characters comprised of those character sets in each diff. If at any point a high entropy string >20 characters is detected, it will print to the screen.
 
 ## Help
 
 ```
-usage: trufflehog [-h] [--json] [--regex] [--rules RULES]
+usage: trufflehog [-h] [--json] [--regex] [--rules RULES] [--allow ALLOW]
                   [--entropy DO_ENTROPY] [--since_commit SINCE_COMMIT]
                   [--max_depth MAX_DEPTH]
                   git_url
@@ -92,6 +102,7 @@ optional arguments:
   --json                Output in JSON
   --regex               Enable high signal regex checks
   --rules RULES         Ignore default regexes and source from json list file
+  --allow ALLOW         Explicitly allow regexes from json list file
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
                         Only scan from a given commit hash

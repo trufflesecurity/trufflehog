@@ -25,6 +25,7 @@ def main():
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
+    parser.add_argument("--allow", dest="allow", help="Explicitly allow regexes from json list file")
     parser.add_argument("--entropy", dest="do_entropy", help="Enable entropy checks")
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
@@ -44,6 +45,7 @@ def main():
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
+    parser.set_defaults(allow={})
     parser.set_defaults(max_depth=1000000)
     parser.set_defaults(since_commit=None)
     parser.set_defaults(entropy=True)
@@ -64,6 +66,15 @@ def main():
             del regexes[regex]
         for regex in rules:
             regexes[regex] = rules[regex]
+    allow = {}
+    if args.allow:
+        try:
+            with open(args.allow, "r") as allowFile:
+                allow = json.loads(allowFile.read())
+                for rule in allow:
+                    allow[rule] = read_pattern(allow[rule])
+        except (IOError, ValueError) as e:
+            raise("Error reading allow file")
     do_entropy = str2bool(args.do_entropy)
 
     # read & compile path inclusion/exclusion patterns
@@ -79,7 +90,7 @@ def main():
                 path_exclusions.append(re.compile(pattern))
 
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
-            surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions)
+            surpress_output=False, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, allow=allow)
     project_path = output["project_path"]
     if args.cleanup:
         clean_up(output)
@@ -87,6 +98,13 @@ def main():
         sys.exit(1)
     else:
         sys.exit(0)
+
+def read_pattern(r):
+    if r.startswith("regex:"):
+        return re.compile(r[6:])
+    converted = re.escape(r)
+    converted = re.sub(r"((\\*\r)?\\*\n|(\\+r)?\\+n)+", r"( |\\t|(\\r|\\n|\\\\+[rn])[-+]?)*", converted)
+    return re.compile(converted)
 
 def str2bool(v):
     if v == None:
@@ -243,7 +261,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             regex_matches.append(foundRegex)
     return regex_matches
 
-def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions):
+def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, allow):
     issues = []
     for blob in diff:
         printableDiff = blob.diff.decode('utf-8', errors='replace')
@@ -251,6 +269,8 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
             continue
         if not path_included(blob, path_inclusions, path_exclusions):
             continue
+        for key in allow:
+            printableDiff = allow[key].sub('', printableDiff)
         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
         foundIssues = []
         if do_entropy:
@@ -301,7 +321,7 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
 
 
 def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
-                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None):
+                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, allow={}):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
@@ -341,12 +361,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
                 diff = prev_commit.diff(curr_commit, create_patch=True)
             # avoid searching the same diffs
             already_searched.add(diff_hash)
-            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
+            foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, allow)
             output = handle_results(output, output_dir, foundIssues)
             prev_commit = curr_commit
         # Handling the first commit
         diff = curr_commit.diff(NULL_TREE, create_patch=True)
-        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions)
+        foundIssues = diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, allow)
         output = handle_results(output, output_dir, foundIssues)
     output["project_path"] = project_path
     output["clone_uri"] = git_url
