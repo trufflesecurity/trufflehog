@@ -6,9 +6,13 @@ import io
 import re
 from collections import namedtuple
 from truffleHog import truffleHog
-from mock import patch 
-from mock import MagicMock
 
+try:
+    from mock import patch 
+    from mock import MagicMock
+except:
+    from unittest.mock import patch
+    from unittest.mock import MagicMock
 
 class TestStringMethods(unittest.TestCase):
 
