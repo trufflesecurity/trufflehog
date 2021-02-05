@@ -1,6 +1,4 @@
-HEADS UP
 
-Right now a breaking change in GitPython is causing an error in pip installations. I will get this working asap, but in the mean time, the docker image has a temperary fix and you can find it here https://hub.docker.com/r/dxa4481/trufflehog
 
 # truffleHog
 [![Build Status](https://travis-ci.org/dxa4481/truffleHog.svg?branch=master)](https://travis-ci.org/dxa4481/truffleHog)

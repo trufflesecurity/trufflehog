@@ -59,7 +59,7 @@ def main():
             with open(args.rules, "r") as ruleFile:
                 rules = json.loads(ruleFile.read())
                 for rule in rules:
-                    rules[rule] = re.compile(rule)
+                    rules[rule] = re.compile(rules[rule])
         except (IOError, ValueError) as e:
             raise("Error reading rules file")
         for regex in dict(regexes):
