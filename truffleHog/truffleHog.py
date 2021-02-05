@@ -382,7 +382,6 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
     return output
 
 def clean_up(output):
-    print("Whhaat")
     issues_path = output.get("issues_path", None)
     if issues_path and os.path.isdir(issues_path):
         shutil.rmtree(output["issues_path"])

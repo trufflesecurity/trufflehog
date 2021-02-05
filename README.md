@@ -1,6 +1,4 @@
-HEADS UP
 
-Right now a breaking change in GitPython is causing an error in pip installations. I will get this working asap, but in the mean time, the docker image has a temperary fix and you can find it here https://hub.docker.com/r/dxa4481/trufflehog
 
 # truffleHog
 [![Build Status](https://travis-ci.org/dxa4481/truffleHog.svg?branch=master)](https://travis-ci.org/dxa4481/truffleHog)
@@ -9,7 +7,7 @@ Right now a breaking change in GitPython is causing an error in pip installation
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
 
 ## NEW
-truffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to surpress entropy checking has also been added.
+truffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to suppress entropy checking has also been added.
 
 
 ```
@@ -106,6 +104,7 @@ optional arguments:
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
                         Only scan from a given commit hash
+  --branch BRANCH       Scans only the selected branch
   --max_depth MAX_DEPTH
                         The max commit depth to go back when searching for
                         secrets
@@ -124,6 +123,24 @@ optional arguments:
                         (default), no Git object paths are excluded unless
                         effectively excluded via the --include_paths option.
 ```
+
+## Running with Docker
+
+First, enter the directory containing the git repository
+
+```
+cd /path/to/git
+```
+
+To launch the trufflehog with the docker image, run the following"
+
+```
+docker run --rm -v "$(pwd):/proj" dxa4481/trufflehog file:///proj
+```
+
+`-v` mounts the current working dir (`pwd`) to the `/proj` dir in the Docker container
+
+`file:///proj` references that very same `/proj` dir in the container (which is also set as the default working dir in the Dockerfile)
 
 ## Wishlist
 
