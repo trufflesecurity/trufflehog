@@ -30,6 +30,12 @@ def main():
     parser.add_argument("--since_commit", dest="since_commit", help="Only scan from a given commit hash")
     parser.add_argument("--max_depth", dest="max_depth", help="The max commit depth to go back when searching for secrets")
     parser.add_argument("--branch", dest="branch", help="Name of the branch to be scanned")
+    parser.add_argument("--rev_list", action="update",
+                        help="Options to be passed in git-rev-list for commits iteration. "
+                             "For multiple options repeat the argument and keep in mind that git-rev-parse option `-` should"
+                             "be replaced with `_`. For values with spaces inside use quotes. "
+                             "Example: --rev_list max_age='2021-01-01 11:15:59' --rev_list skip=10 "
+                             "WARNING: If you want to limit amount of commits by count use --max_depth instead")
     parser.add_argument('-i', '--include_paths', type=argparse.FileType('r'), metavar='INCLUDE_PATHS_FILE',
                         help='File with regular expressions (one per line), at least one of which must match a Git '
                              'object path in order for it to be scanned; lines starting with "#" are treated as '
@@ -89,8 +95,13 @@ def main():
             if pattern and not pattern.startswith('#'):
                 path_exclusions.append(re.compile(pattern))
 
+    rev_list = dict((key.strip(), value.strip())
+                    for key, value in (pair.split("=")
+                                       for pair in args.rev_list or dict()))
+
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
-            surpress_output=False, custom_regexes=regexes, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, allow=allow)
+                          surpress_output=False, custom_regexes=regexes, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, allow=allow,
+                          rev_list=rev_list)
     project_path = output["project_path"]
     if args.cleanup:
         clean_up(output)
@@ -321,7 +332,7 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
 
 
 def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False, do_regex=False, do_entropy=True, surpress_output=True,
-                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, allow={}):
+                 custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, allow={}, rev_list={}):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
@@ -340,7 +351,7 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         since_commit_reached = False
         branch_name = remote_branch.name
         prev_commit = None
-        for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
+        for curr_commit in repo.iter_commits(branch_name, max_count=max_depth, **rev_list):
             commitHash = curr_commit.hexsha
             if commitHash == since_commit:
                 since_commit_reached = True
