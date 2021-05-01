@@ -9,6 +9,7 @@ import datetime
 import argparse
 import uuid
 import hashlib
+import logging
 import tempfile
 import os
 import re
@@ -42,6 +43,8 @@ def main():
                              'effectively excluded via the --include_paths option.')
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
+    parser.add_argument("--log", type=str, dest="log_level", help="Set logging level")
+    parser.add_argument("--log_file", type=str, dest="log_file", help="Write log to file")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
@@ -52,7 +55,13 @@ def main():
     parser.set_defaults(branch=None)
     parser.set_defaults(repo_path=None)
     parser.set_defaults(cleanup=False)
+    parser.set_defaults(log_level=None)
+    parser.set_defaults(log_file=None)
     args = parser.parse_args()
+    if args.log_level or args.log_file:
+        if not args.log_level:
+            args.log_level = "WARNING"
+        logging.basicConfig(filename=args.log_file, format="%(asctime)s %(levelname)s: %(message)s", level=args.log_level.upper())
     rules = {}
     if args.rules:
         try:
@@ -91,6 +100,7 @@ def main():
 
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, do_entropy,
             surpress_output=False, custom_regexes=regexes, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, allow=allow)
+    logging.info("Finished")
     project_path = output["project_path"]
     if args.cleanup:
         clean_up(output)
@@ -209,6 +219,7 @@ def print_results(printJson, issue):
 def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, commitHash):
     stringsFound = []
     lines = printableDiff.split("\n")
+    logging.debug("      Finding Entropy over %d LOC", len(lines))
     for line in lines:
         for word in line.split():
             base64_strings = get_strings_of_set(word, BASE64_CHARS)
@@ -243,6 +254,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
     else:
         secret_regexes = regexes
     regex_matches = []
+    logging.debug("      Checking %d regexes", len(secret_regexes))
     for key in secret_regexes:
         found_strings = secret_regexes[key].findall(printableDiff)
         for found_string in found_strings:
@@ -265,11 +277,18 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
     issues = []
     for blob in diff:
         printableDiff = blob.diff.decode('utf-8', errors='replace')
+        blob_path = blob.b_path if blob.b_path else blob.a_path
         if printableDiff.startswith("Binary files"):
+            logging.info("    %s: Binary files", blob_path)
             continue
-        if not path_included(blob, path_inclusions, path_exclusions):
+        if not path_included(blob_path, path_inclusions, path_exclusions):
+            logging.info("    %s: Not included", blob_path)
             continue
+        logging.info("    %s (%d bytes)", blob_path, len(printableDiff))
         for key in allow:
+            # For very large blobs look for slow regexes.
+            if len(printableDiff) > 256000:
+                logging.info("      Allow: \"%s\"", key)
             printableDiff = allow[key].sub('', printableDiff)
         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
         foundIssues = []
@@ -294,7 +313,10 @@ def handle_results(output, output_dir, foundIssues):
         output["foundIssues"].append(result_path)
     return output
 
-def path_included(blob, include_patterns=None, exclude_patterns=None):
+def blob_path(blob):
+    return blob.b_path if blob.b_path else blob.a_path
+
+def path_included(blob_path, include_patterns=None, exclude_patterns=None):
     """Check if the diff blob object should included in analysis.
 
     If defined and non-empty, `include_patterns` has precedence over `exclude_patterns`, such that a blob that is not
@@ -302,20 +324,19 @@ def path_included(blob, include_patterns=None, exclude_patterns=None):
     `exclude_patterns`. If either `include_patterns` or `exclude_patterns` are undefined or empty, they will have no
     effect, respectively. All blobs are included by this function when called with default arguments.
 
-    :param blob: a Git diff blob object
+    :param blob_path: a blob path
     :param include_patterns: iterable of compiled regular expression objects; when non-empty, at least one pattern must
-     match the blob object for it to be included; if empty or None, all blobs are included, unless excluded via
+     match the blob_path for it to be included; if empty or None, all blobs are included, unless excluded via
      `exclude_patterns`
     :param exclude_patterns: iterable of compiled regular expression objects; when non-empty, _none_ of the patterns may
-     match the blob object for it to be included; if empty or None, no blobs are excluded if not otherwise
+     match the blob_path for it to be included; if empty or None, no blobs are excluded if not otherwise
      excluded via `include_patterns`
     :return: False if the blob is _not_ matched by `include_patterns` (when provided) or if it is matched by
     `exclude_patterns` (when provided), otherwise returns True
     """
-    path = blob.b_path if blob.b_path else blob.a_path
-    if include_patterns and not any(p.match(path) for p in include_patterns):
+    if include_patterns and not any(p.match(blob_path) for p in include_patterns):
         return False
-    if exclude_patterns and any(p.match(path) for p in exclude_patterns):
+    if exclude_patterns and any(p.match(blob_path) for p in exclude_patterns):
         return False
     return True
 
@@ -337,10 +358,12 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
         branches = repo.remotes.origin.fetch()
 
     for remote_branch in branches:
+        logging.info("Branch: %s", remote_branch.name)
         since_commit_reached = False
         branch_name = remote_branch.name
         prev_commit = None
         for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
+            logging.info("  %s:%s \"%s\"", remote_branch.name, curr_commit.hexsha, curr_commit.message.split('\n', 1)[0])
             commitHash = curr_commit.hexsha
             if commitHash == since_commit:
                 since_commit_reached = True
