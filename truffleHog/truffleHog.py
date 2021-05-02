@@ -336,7 +336,7 @@ def diff_worker(diff, curr_commit, prev_commit, branch_name, commitHash, custom_
             # For very large blobs look for slow regexes.
             if len(printableDiff) > 256000:
                 logging.info("      Allow: \"%s\"", key)
-            printableDiff = allow[key].sub('', printableDiff)
+            printableDiff = allow[key].sub(' [Allowed by: \"%s\"] ' % key, printableDiff)
         commit_time =  datetime.datetime.fromtimestamp(prev_commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
         foundIssues = []
         if do_entropy:
