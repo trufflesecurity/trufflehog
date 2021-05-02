@@ -75,6 +75,7 @@ def main():
     if args.log_level or args.log_file:
         if not args.log_level:
             args.log_level = "WARNING"
+        os.remove(args.log_file)
         logging.basicConfig(filename=args.log_file, format="%(asctime)s %(levelname)s: %(message)s", level=args.log_level.upper())
     logging.info("Started")
 
