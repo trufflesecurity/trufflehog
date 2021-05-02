@@ -76,6 +76,8 @@ def main():
         if not args.log_level:
             args.log_level = "WARNING"
         logging.basicConfig(filename=args.log_file, format="%(asctime)s %(levelname)s: %(message)s", level=args.log_level.upper())
+    logging.info("Started")
+
     rules = {}
     if args.rules:
         try:
@@ -191,6 +193,7 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 def clone_git_repo(git_url):
+    logging.info("Cloning repo: %s", git_url)
     project_path = tempfile.mkdtemp()
     Repo.clone_from(git_url, project_path)
     return project_path
@@ -252,14 +255,14 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
             for string in base64_strings:
                 b64Entropy = shannon_entropy(string, BASE64_CHARS)
                 if b64Entropy > 4.5:
-                    logging.warn("Found base64 string \"%s\": \"%s\"", string, line)
+                    logging.warning("Found base64 string \"%s\": \"%s\"", string, line)
                     stringsFound.append(string)
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     summaryDiff += line.replace(string, bcolors.WARNING + string + bcolors.ENDC)
             for string in hex_strings:
                 hexEntropy = shannon_entropy(string, HEX_CHARS)
                 if hexEntropy > 3:
-                    logging.warn("Found hex string \"%s\": \"%s\"", string, line)
+                    logging.warning("Found hex string \"%s\": \"%s\"", string, line)
                     stringsFound.append(string)
                     printableDiff = printableDiff.replace(string, bcolors.WARNING + string + bcolors.ENDC)
                     summaryDiff += line.replace(string, bcolors.WARNING + string + bcolors.ENDC) + "\n"
@@ -301,7 +304,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
         diff = printableDiff
         for m in secret_regexes[key].finditer(diff):
             line = get_line(diff, m)
-            logging.warn("Found regex %s: %s", key, line)
+            logging.warning("Found regex %s: %s", key, line)
             found_strings.append(m.group())
             printableDiff = printableDiff.replace(m.group(), bcolors.WARNING + str(m.group()) + bcolors.ENDC)
             summaryDiff += line.replace(m.group(), bcolors.WARNING + str(m.group()) + bcolors.ENDC) + "\n"
