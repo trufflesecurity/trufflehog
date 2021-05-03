@@ -54,6 +54,9 @@ def main():
                              'in order for it to be scanned; lines starting with "#" are treated as comments and are '
                              'ignored. If empty or not provided (default), no Git object paths are excluded unless '
                              'effectively excluded via the --include_paths option.')
+    parser.add_argument('--exclude_commits',type=argparse.FileType('r'), metavar='EXCLUDE_COMMITS_FILE',
+                        help='File with commit hashes (one per line). lines starting with "#" are treated as comments '
+                             'and are ignored.')
     parser.add_argument("--repo_path", type=str, dest="repo_path", help="Path to the cloned repo. If provided, git_url will not be used")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument("--log", type=str, dest="log_level", choices=list(logging._nameToLevel.keys()), help="Set logging level")
@@ -125,9 +128,17 @@ def main():
             if pattern and not pattern.startswith('#'):
                 path_exclusions.append(re.compile(pattern))
 
+    # read commit exclusions
+    commit_exclusions = []
+    if args.exclude_commits:
+        for commit in set(l[:-1].strip() for l in args.exclude_commits):
+            if commit and not commit.startswith('#'):
+                commit_exclusions.append(commit)
+
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.do_regex, do_entropy,
             output_format=OutputFormat[args.format.upper()], custom_regexes=regexes, branch=args.branch, 
-            repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, allow=allow)
+            repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, 
+            commit_exclusions=commit_exclusions, allow=allow)
     logging.info("Finished")
     project_path = output["project_path"]
     if args.cleanup:
@@ -429,7 +440,7 @@ def path_included(blob_path, include_patterns=None, exclude_patterns=None):
 
 
 def find_strings(git_url, since_commit=None, max_depth=1000000, do_regex=False, do_entropy=True, output_format=OutputFormat.FULL,
-                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, allow={}):
+                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, commit_exclusions=None, allow={}):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
@@ -450,8 +461,11 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, do_regex=False, 
         branch_name = remote_branch.name
         prev_commit = None
         for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
-            logging.info("  %s:%s \"%s\"", remote_branch.name, curr_commit.hexsha, curr_commit.message.split('\n', 1)[0])
             commitHash = curr_commit.hexsha
+            if commitHash in commit_exclusions:
+                logging.info("  %s:%s Excluded", remote_branch.name, commitHash)
+                continue
+            logging.info("  %s:%s \"%s\"", remote_branch.name, commitHash, curr_commit.message.split('\n', 1)[0])
             if commitHash == since_commit:
                 since_commit_reached = True
                 break
