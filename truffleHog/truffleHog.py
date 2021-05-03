@@ -58,7 +58,9 @@ def main():
     parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
     parser.add_argument("--log", type=str, dest="log_level", choices=list(logging._nameToLevel.keys()), help="Set logging level")
     parser.add_argument("--log_file", type=str, dest="log_file", help="Write log to file")
+    parser.add_argument("--check", type=str, dest="check_rules", help="Check rules")
     parser.add_argument('git_url', type=str, help='URL for secret searching')
+    parser.set_defaults(format="FULL")
     parser.set_defaults(regex=False)
     parser.set_defaults(rules={})
     parser.set_defaults(allow={})
@@ -70,16 +72,16 @@ def main():
     parser.set_defaults(cleanup=False)
     parser.set_defaults(log_level=None)
     parser.set_defaults(log_file=None)
-    parser.set_defaults(format="FULL")
+    parser.set_defaults(validate=None)
     args = parser.parse_args()
-    if args.log_level or args.log_file:
-        if not args.log_level:
-            args.log_level = "WARNING"
-        if os.path.exists(args.log_file):
-            try:
-                os.remove(args.log_file)
-            except OSError:
-                pass
+    if not args.log_level and args.log_file:
+        args.log_level = "WARNING"
+    if args.log_file and os.path.exists(args.log_file):
+        try:
+            os.remove(args.log_file)
+        except OSError:
+            pass
+    if args.log_level:
         logging.basicConfig(filename=args.log_file, format="%(asctime)s %(levelname)s: %(message)s", level=args.log_level.upper())
     logging.info("Started")
 
@@ -107,6 +109,10 @@ def main():
             raise("Error reading allow file")
     do_entropy = str2bool(args.do_entropy)
 
+    if args.check_rules:
+        if not check_rules(allow, args.check_rules):
+            exit(1)
+
     # read & compile path inclusion/exclusion patterns
     path_inclusions = []
     path_exclusions = []
@@ -130,6 +136,32 @@ def main():
         sys.exit(1)
     else:
         sys.exit(0)
+
+def check_rules(allow, check_rules):
+    passed = True
+    logging.info("Checking rules with: %s", check_rules)
+    f = open(check_rules, 'r')
+    lines = f.readlines()
+    for l in lines:
+        l = l.strip()
+        if l == "" or l.startswith("#"):
+            continue
+        if l.startswith("==="):
+            rule = l.split(" ",1)[1]
+            logging.info("  Rule: %s", rule)
+            if rule not in allow:
+                logging.error("    FAILED! Rule %s not found", rule)
+                passed = False
+            continue
+        if rule not in allow:
+            continue
+        test = f"BEGIN {l} MIDDLE {l} END"
+        test = allow[rule].sub(' [Allowed by: \"%s\"] ' % rule, test)
+        r = re.match("BEGIN.*\[Allowed by: \"%s\"\].*MIDDLE.*\[Allowed by: \"%s\"\].*END" % (rule, rule), test)
+        if not r:
+            logging.error("    FAILED! %s", test)
+            passed = False
+    return passed
 
 def read_pattern(r):
     if r.startswith("regex:"):
