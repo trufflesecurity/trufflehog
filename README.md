@@ -14,13 +14,13 @@ https://join.slack.com/t/trufflehog-community/shared_invite/zt-nzznzf8w-y1Lg4Pnn
 truffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to suppress entropy checking has also been added.
 
 
-```
+```bash
 truffleHog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
 ```
 
 or
 
-```
+```bash
 truffleHog file:///user/dxa4481/codeprojects/truffleHog/
 ```
 
@@ -55,14 +55,14 @@ These features help cut down on noise, and makes the tool easier to shove into a
 ![Example](https://i.imgur.com/YAXndLD.png)
 
 ## Install
-```
+```bash
 pip install truffleHog
 ```
 
 ## Customizing
 
 Custom regexes can be added with the following flag `--rules /path/to/rules`. This should be a json file of the following format:
-```
+```json
 {
     "RSA private key": "-----BEGIN EC PRIVATE KEY-----"
 }
@@ -74,7 +74,7 @@ Feel free to also contribute high signal regexes upstream that you think will be
 trufflehog's base rule set sources from https://github.com/dxa4481/truffleHogRegexes/blob/master/truffleHogRegexes/regexes.json
 
 To explicitly allow particular secrets (e.g. self-signed keys used only for local testing) you can provide an allow list `--allow /path/to/allow` in the following format:
-```
+```json
 {
     "local self signed test key": "-----BEGIN EC PRIVATE KEY-----\nfoobar123\n-----END EC PRIVATE KEY-----",
     "git cherry pick SHAs": "regex:Cherry picked from .*",
@@ -89,10 +89,15 @@ This module will go through the entire commit history of each branch, and check 
 ## Help
 
 ```
-usage: trufflehog [-h] [--json] [--regex] [--rules RULES] [--allow ALLOW]
-                  [--entropy DO_ENTROPY] [--since_commit SINCE_COMMIT]
-                  [--max_depth MAX_DEPTH]
-                  git_url
+usage: truffleHog.py [-h] [--json] [--format {NONE,TERSE,FULL,JSON}] [--regex]
+                     [--rules RULES] [--allow ALLOW] [--entropy DO_ENTROPY]
+                     [--since_commit SINCE_COMMIT] [--max_depth MAX_DEPTH]
+                     [--branch BRANCH] [-i INCLUDE_PATHS_FILE]
+                     [-x EXCLUDE_PATHS_FILE] [--repo_path REPO_PATH]
+                     [--cleanup]
+                     [--log {CRITICAL,FATAL,ERROR,WARN,WARNING,INFO,DEBUG,NOTSET}]
+                     [--log_file LOG_FILE]
+                     git_url
 
 Find secrets hidden in the depths of git.
 
@@ -101,17 +106,23 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --json                Output in JSON
+  --json                Output in JSON format, equivalent to --format=JSON
+  --format {NONE,TERSE,FULL,JSON}
+                        Format for result output; NONE No output, TERSE First
+                        line of commit message and only matching lines from
+                        the diff, FULL Entire commit message and entire diff,
+                        JSON Entire commit message and entire diff in JSON
+                        format
   --regex               Enable high signal regex checks
-  --rules RULES         Ignore default regexes and source from json list file
+  --rules RULES         Ignore default regexes and source from json file
   --allow ALLOW         Explicitly allow regexes from json list file
   --entropy DO_ENTROPY  Enable entropy checks
   --since_commit SINCE_COMMIT
                         Only scan from a given commit hash
-  --branch BRANCH       Scans only the selected branch
   --max_depth MAX_DEPTH
                         The max commit depth to go back when searching for
                         secrets
+  --branch BRANCH       Name of the branch to be scanned
   -i INCLUDE_PATHS_FILE, --include_paths INCLUDE_PATHS_FILE
                         File with regular expressions (one per line), at least
                         one of which must match a Git object path in order for
@@ -126,19 +137,26 @@ optional arguments:
                         comments and are ignored. If empty or not provided
                         (default), no Git object paths are excluded unless
                         effectively excluded via the --include_paths option.
+  --repo_path REPO_PATH
+                        Path to the cloned repo. If provided, git_url will not
+                        be used
+  --cleanup             Clean up all temporary result files
+  --log {CRITICAL,FATAL,ERROR,WARN,WARNING,INFO,DEBUG,NOTSET}
+                        Set logging level
+  --log_file LOG_FILE   Write log to file
 ```
 
 ## Running with Docker
 
 First, enter the directory containing the git repository
 
-```
+```bash
 cd /path/to/git
 ```
 
 To launch the trufflehog with the docker image, run the following"
 
-```
+```bash
 docker run --rm -v "$(pwd):/proj" dxa4481/trufflehog file:///proj
 ```
 
