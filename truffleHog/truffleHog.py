@@ -465,8 +465,10 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, do_regex=False, 
         prev_commit = None
         for curr_commit in repo.iter_commits(branch_name, max_count=max_depth):
             commitHash = curr_commit.hexsha
-            if commitHash in commit_exclusions:
+            prevCommitHash = prev_commit.hexsha if prev_commit else ""
+            if commitHash in commit_exclusions or prevCommitHash in commit_exclusions:
                 logging.info("  %s:%s Excluded", remote_branch.name, commitHash)
+                prev_commit = curr_commit
                 continue
             logging.info("  %s:%s \"%s\"", remote_branch.name, commitHash, curr_commit.message.split('\n', 1)[0])
             if commitHash == since_commit:
