@@ -257,7 +257,7 @@ def print_results(output_format, issue):
         prev_commit = prev_commit.split('\n', 1)[0]
     printableDiff = issue['printDiff']
     summaryDiff = issue['summaryDiff']
-    commitHash = issue['commitHash']
+    commitHash = "{}..{}".format(issue['nextCommitHash'], issue['commitHash'])
     reason = issue['reason']
     path = issue['path']
 
@@ -269,7 +269,7 @@ def print_results(output_format, issue):
         print(reason)
         dateStr = "{}Date: {}{}".format(bcolors.OKGREEN, commit_time, bcolors.ENDC)
         print(dateStr)
-        hashStr = "{}Hash: {}{}".format(bcolors.OKGREEN, commitHash, bcolors.ENDC)
+        hashStr = "{}Hashes: {}{}".format(bcolors.OKGREEN, commitHash, bcolors.ENDC)
         print(hashStr)
         filePath = "{}Filepath: {}{}".format(bcolors.OKGREEN, path, bcolors.ENDC)
         print(filePath)
@@ -329,6 +329,7 @@ def find_entropy(printableDiff, commit_time, branch_name, prev_commit, blob, com
         entropicDiff['printDiff'] = printableDiff
         entropicDiff['summaryDiff'] = summaryDiff
         entropicDiff['commitHash'] = prev_commit.hexsha
+        entropicDiff['nextCommitHash'] = commitHash
         entropicDiff['reason'] = "High Entropy"
     return entropicDiff
 
@@ -371,6 +372,7 @@ def regex_check(printableDiff, commit_time, branch_name, prev_commit, blob, comm
             foundRegex['summaryDiff'] = summaryDiff.strip()
             foundRegex['reason'] = key
             foundRegex['commitHash'] = prev_commit.hexsha
+            foundRegex['nextCommitHash'] = commitHash
             regex_matches.append(foundRegex)
     return regex_matches
 
@@ -467,10 +469,10 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, do_regex=False, 
             commitHash = curr_commit.hexsha
             prevCommitHash = prev_commit.hexsha if prev_commit else ""
             if commitHash in commit_exclusions or prevCommitHash in commit_exclusions:
-                logging.info("  %s:%s Excluded", remote_branch.name, commitHash)
+                logging.info("  %s:%s-%s Excluded", remote_branch.name, commitHash, prevCommitHash, )
                 prev_commit = curr_commit
                 continue
-            logging.info("  %s:%s \"%s\"", remote_branch.name, commitHash, curr_commit.message.split('\n', 1)[0])
+            logging.info("  %s:%s-%s \"%s\"", remote_branch.name, commitHash, prevCommitHash, curr_commit.message.split('\n', 1)[0])
             if commitHash == since_commit:
                 since_commit_reached = True
                 break
