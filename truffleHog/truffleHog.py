@@ -15,6 +15,7 @@ import os
 import re
 import json
 import stat
+import time
 from enum import Enum
 from git import Repo
 from git import NULL_TREE
@@ -135,11 +136,13 @@ def main():
             if commit and not commit.startswith('#'):
                 commit_exclusions.append(commit)
 
+    start_time = time.perf_counter()
     output = find_strings(args.git_url, args.since_commit, args.max_depth, args.do_regex, do_entropy,
             output_format=OutputFormat[args.format.upper()], custom_regexes=regexes, branch=args.branch, 
             repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, 
             commit_exclusions=commit_exclusions, allow=allow)
-    logging.info("Finished")
+    end_time = time.perf_counter()
+    logging.info("Finished in %.5fs", end_time - start_time)
     project_path = output["project_path"]
     if args.cleanup:
         clean_up(output)
