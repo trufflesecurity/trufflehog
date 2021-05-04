@@ -8,7 +8,7 @@ Searches through git repositories for secrets, digging deep into commit history 
 ## Join The Slack
 Have questions? Feedback? Jump in slack and hang out with me 
 
-https://join.slack.com/t/trufflehog-community/shared_invite/zt-8al1k31h-JlTasbSx4O4mHUxRQ2UgAg
+https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ
 
 ## NEW
 truffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to suppress entropy checking has also been added.
