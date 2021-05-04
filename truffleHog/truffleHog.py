@@ -440,7 +440,7 @@ def path_included(blob_path, include_patterns=None, exclude_patterns=None):
 
 
 def find_strings(git_url, since_commit=None, max_depth=1000000, do_regex=False, do_entropy=True, output_format=OutputFormat.FULL,
-                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, commit_exclusions=None, allow={}):
+                custom_regexes={}, branch=None, repo_path=None, path_inclusions=None, path_exclusions=None, commit_exclusions=[], allow={}):
     output = {"foundIssues": []}
     if repo_path:
         project_path = repo_path
