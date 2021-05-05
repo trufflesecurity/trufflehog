@@ -22,6 +22,12 @@ class TestStringMethods(unittest.TestCase):
         self.assertGreater(truffleHog.shannon_entropy(random_stringB64, truffleHog.BASE64_CHARS), 4.5)
         self.assertGreater(truffleHog.shannon_entropy(random_stringHex, truffleHog.HEX_CHARS), 3)
 
+    def test_get_strings_of_set(self):
+        self.assertEqual(["123456"], truffleHog.get_strings_of_set("1234_123456", truffleHog.BASE64_CHARS, 5))
+        self.assertEqual(["123456"], truffleHog.get_strings_of_set("123456_1234", truffleHog.BASE64_CHARS, 5))
+        self.assertEqual(["123456"], truffleHog.get_strings_of_set("1234_123456_1234", truffleHog.BASE64_CHARS, 5))
+        self.assertEqual(["123456", "1234567", "12345678"], truffleHog.get_strings_of_set("12345_123456_1234567_12345678", truffleHog.BASE64_CHARS, 5))
+
     def test_cloning(self):
         project_path = truffleHog.clone_git_repo("https://github.com/dxa4481/truffleHog.git")
         license_file = os.path.join(project_path, "LICENSE")
