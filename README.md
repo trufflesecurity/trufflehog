@@ -15,13 +15,13 @@ truffleHog previously functioned by running entropy checks on git diffs. This fu
 
 
 ```
-truffleHog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
+trufflehog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
 ```
 
 or
 
 ```
-truffleHog file:///user/dxa4481/codeprojects/truffleHog/
+trufflehog file:///user/dxa4481/codeprojects/truffleHog/
 ```
 
 With the `--include_paths` and `--exclude_paths` options, it is also possible to limit scanning to a subset of objects in the Git history by defining regular expressions (one per line) in a file to match the targeted object paths. To illustrate, see the example include and exclude files below:
