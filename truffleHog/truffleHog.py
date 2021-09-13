@@ -91,6 +91,9 @@ def main():
             if pattern and not pattern.startswith('#'):
                 path_exclusions.append(re.compile(pattern))
 
+    if args.repo_path and args.staged_files:
+        raise("You cannot use repo_path when staged_files is set")
+
     if args.staged_files:
         output = find_strings_staged(args.git_url, args.output_json, args.do_regex, do_entropy,
                 surpress_output=False, custom_regexes=regexes, branch=args.branch, repo_path=args.repo_path, path_inclusions=path_inclusions, path_exclusions=path_exclusions, allow=allow)
