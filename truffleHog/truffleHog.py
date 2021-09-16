@@ -422,7 +422,7 @@ def find_strings_staged(git_url, printJson=False, do_regex=False, do_entropy=Tru
 
         for blob in blobs:
             if "blob" == blob[1].type:
-                staged_files.append((blob[1], blob[1].path))
+                staged_files.append((blob[1], f"{project_path}/{blob[1].path}"))
 
         foundIssues = file_worker(staged_files, branch_name, None, custom_regexes, do_entropy, do_regex, printJson, surpress_output, path_inclusions, path_exclusions, allow)
 
