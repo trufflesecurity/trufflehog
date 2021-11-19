@@ -14,6 +14,7 @@ import os
 import re
 import json
 import stat
+import platform
 from git import Repo
 from git import NULL_TREE
 from truffleHogRegexes.regexChecks import regexes
@@ -120,9 +121,16 @@ def str2bool(v):
 BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 HEX_CHARS = "1234567890abcdefABCDEF"
 
-def del_rw(action, name, exc):
-    os.chmod(name, stat.S_IWRITE)
-    os.remove(name)
+def del_rw(func, path, exc):
+    """
+    Handles permissions error when trying to remove file
+    Add write permissions, try to remove file again
+    """
+    if platform.system() == "Windows":
+        os.chmod(path, stat.S_IWUSR)
+    else:
+        os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 def shannon_entropy(data, iterator):
     """
