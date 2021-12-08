@@ -10,6 +10,7 @@ import argparse
 import uuid
 import hashlib
 import tempfile
+import textwrap
 import os
 import re
 import json
@@ -21,7 +22,21 @@ from truffleHogRegexes.regexChecks import regexes
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
+    parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent(
+            '''\
+            ADDITIONAL INFORMATION:\n
+
+                Exit Status Code:\n
+
+                 We return non-zero exit code when a secret is found.\n
+
+                 0  No Secrets Found\n
+
+                 1  Secrets Found\n
+            \n
+            '''))
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json file")
