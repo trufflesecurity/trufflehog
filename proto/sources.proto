@@ -1,0 +1,195 @@
+syntax = "proto3";
+
+package sources;
+
+option go_package = "github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb";
+
+import "validate/validate.proto";
+import "credentials.proto";
+import "google/protobuf/duration.proto";
+
+
+enum SourceType {
+  SOURCE_TYPE_AZURE_STORAGE = 0;
+  SOURCE_TYPE_BITBUCKET = 1;
+  SOURCE_TYPE_CIRCLECI = 2;
+  SOURCE_TYPE_CONFLUENCE = 3;
+  SOURCE_TYPE_DOCKERHUB_IMAGES = 4;
+  SOURCE_TYPE_ECR = 5;
+  SOURCE_TYPE_GCS = 6;
+  SOURCE_TYPE_GITHUB = 7;
+  SOURCE_TYPE_PUBLIC_GIT = 8;
+  SOURCE_TYPE_GITLAB = 9;
+  SOURCE_TYPE_JIRA = 10;
+  SOURCE_TYPE_NPM_UNAUTHD_PACKAGES = 11;
+  SOURCE_TYPE_PYPI_UNAUTHD_PACKAGES = 12;
+  SOURCE_TYPE_S3 = 13;
+  SOURCE_TYPE_SLACK = 14;
+  SOURCE_TYPE_FILESYSTEM = 15;
+  SOURCE_TYPE_GIT = 16;
+  SOURCE_TYPE_TEST = 17;
+  SOURCE_TYPE_S3_UNAUTHED = 18;
+  SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG = 19;
+  SOURCE_TYPE_BUILDKITE = 20;
+  SOURCE_TYPE_GERRIT = 21;
+  SOURCE_TYPE_JENKINS = 22;
+}
+
+message AzureStorage {
+  oneof credential {
+    string connection_string = 1;
+    credentials.BasicAuth basic_auth = 2;
+    string client_certificate = 3;
+    credentials.Unauthenticated unauthenticated = 4;
+  }
+  repeated string storage_containers = 5;
+}
+
+message Bitbucket {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+    credentials.Oauth2 oauth = 3;
+    credentials.BasicAuth basic_auth = 4;
+
+  }
+  repeated string repositories = 5;
+}
+
+message CircleCI {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+  }
+}
+
+message Confluence {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 2;
+    credentials.BasicAuth basic_auth = 3;
+    string token = 4;
+  }
+}
+
+message DockerHub {
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 1;
+  }
+  repeated string repositories = 2;
+}
+
+message ECR {
+  oneof credential {
+    credentials.KeySecret access_key = 1;
+  }
+  repeated string registries = 2;
+}
+
+message Filesystem{
+  repeated string directories = 1;
+}
+
+message GCS {
+  oneof credential {
+    string json_sa = 1;
+  }
+  repeated string buckets = 2;
+}
+
+message Git {
+  oneof credential {
+    credentials.BasicAuth basic_auth = 1;
+    credentials.Unauthenticated unauthenticated = 2;
+  }
+  repeated string directories = 3;
+  repeated string repositories = 4;
+}
+
+message GitLab {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+    credentials.Oauth2 oauth = 3;
+    credentials.BasicAuth basic_auth = 4;
+  }
+  repeated string repositories = 5;
+}
+
+message GitHub {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.GitHubApp github_app = 2;
+    string token = 3;
+    credentials.Unauthenticated unauthenticated = 4;
+  }
+  repeated string repositories = 5;
+  repeated string organizations = 6;
+  bool scanUsers = 7;
+}
+
+message JIRA {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.BasicAuth basic_auth = 2;
+    credentials.Unauthenticated unauthenticated = 3;
+    credentials.Oauth2 oauth = 4;
+
+  }
+  repeated string projects = 5;
+}
+
+message NPMUnauthenticatedPackage {
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 1;
+  }
+}
+
+message PyPIUnauthenticatedPackage {
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 1;
+  }
+}
+
+message S3 {
+  oneof credential {
+    credentials.KeySecret access_key = 1;
+    credentials.Unauthenticated unauthenticated = 2;
+    credentials.CloudEnvironment cloud_environment = 4;
+  }
+  repeated string buckets = 3;
+}
+
+message Slack {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+  }
+  repeated string channels = 3;
+
+
+}
+
+message Test{}
+
+message Buildkite {
+  oneof credential {
+    string token = 1;
+  }
+}
+
+message Gerrit {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.BasicAuth basic_auth = 2;
+    credentials.Unauthenticated unauthenticated = 3;
+  }
+  repeated string projects = 4;
+}
+
+message Jenkins {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.BasicAuth basic_auth = 2;
+  }
+}

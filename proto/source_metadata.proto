@@ -1,0 +1,189 @@
+syntax = "proto3";
+
+package source_metadata;
+
+option go_package = "github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb";
+
+message Azure {
+  string container = 1;
+  string file = 2;
+  string uploaded = 3;
+  string link = 4;
+  string email = 5;
+}
+
+message Bitbucket {
+  string file = 1;
+  string repository = 2;
+  string workspace = 3;
+  string snippet_id = 4;
+  string title = 5;
+  string commit = 6;
+  string email = 7;
+  string link = 8;
+}
+
+message Buildkite {
+  string org = 1;
+  string pipeline = 2;
+  string link = 3;
+  string email = 4;
+  int64 build_number = 5;
+}
+
+message CircleCI {
+  string vcs_type = 1;
+  string username = 2;
+  string repository = 3;
+  int64 build_number = 4;
+  string build_step  = 5;
+  string link = 6;
+  string email = 7;
+}
+
+message Confluence {
+  string page = 1;
+  string space = 2;
+  string version = 3;
+  string link = 4;
+  string email = 5;
+}
+
+message Dockerhub {
+  string file = 1;
+  string image = 2;
+  string layer = 3;
+  string tag = 4;
+  string link = 5;
+  string email = 6;
+}
+
+message ECR {
+  string file = 1;
+  string layer = 2;
+  string image = 3;
+  string registry = 4;
+  string region = 5;
+  string link = 6;
+  string email = 7;
+}
+
+message Filesystem {
+  string file = 1;
+  string link = 2;
+  string email = 3;
+}
+
+message Git {
+  string commit = 1;
+  string file = 2;
+  string email = 3;
+  string repository = 4;
+}
+
+message Github {
+  string link = 1;
+  string username = 2;
+  string repository = 3;
+  string commit = 4;
+  string email = 5;
+  string file = 6;
+}
+
+message Gitlab {
+  string commit = 1;
+  string file = 2;
+  string link = 3;
+  string email = 4;
+  string repository = 5;
+}
+
+message GCS {
+  string bucket = 1;
+  string file = 2;
+  string link = 3;
+  string email = 4;
+}
+
+message Jira {
+  string issue = 1;
+  string author = 2;
+  string link = 3;
+  string location = 4;
+  string email = 5;
+}
+
+message NPM {
+  string file = 1;
+  string package = 2;
+  string release = 3;
+  string link = 4;
+  string email = 5;
+}
+
+message PyPi {
+  string file = 1;
+  string package = 2;
+  string release = 3;
+  string link = 4;
+  string email = 5;
+}
+
+message S3 {
+  string bucket = 1;
+  string file = 2;
+  string link = 3;
+  string email = 5;
+}
+
+message Slack {
+  string channel_id = 1;
+  string channel_name = 2;
+  string timestamp = 3;
+  string user_id = 4;
+  string link = 5;
+  string file = 6;
+  string email = 7;
+}
+
+message Gerrit {
+  string commit = 1;
+  string file = 2;
+  string email = 3;
+  string project = 4; // projects are what Gerrit calls repositories
+}
+
+message Test {
+  string file = 1;
+}
+
+message Jenkins {
+  string project_name = 1;
+  int64 build_number = 2;
+  string link = 3;
+}
+
+message MetaData {
+  oneof data {
+    Azure azure = 1;
+    Bitbucket bitbucket = 2;
+    CircleCI circleci = 3;
+    Confluence confluence = 4;
+    Dockerhub dockerhub = 5;
+    ECR ecr = 6;
+    GCS gcs = 7;
+    Github github = 8;
+    Gitlab gitlab = 9;
+    Jira jira = 10;
+    NPM npm = 11;
+    PyPi pypi = 12;
+    S3 s3 = 13;
+    Slack slack = 14;
+    Filesystem filesystem = 15;
+    Git git = 16;
+    Test test = 17;
+    Buildkite buildkite = 18;
+    Gerrit gerrit = 19;
+    Jenkins jenkins = 20;
+  }
+}
