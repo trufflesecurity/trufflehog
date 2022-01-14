@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -136,7 +137,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, chunksChan)
+			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
 			if err != nil {
 				return err
 			}
@@ -152,7 +153,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, chunksChan)
+			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
 			if err != nil {
 				return err
 			}
@@ -177,7 +178,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				defer os.RemoveAll(u)
 			}
 
-			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, chunksChan)
+			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
 			if err != nil {
 				return err
 
@@ -247,7 +248,7 @@ func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repo
 	return
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogOptions, untilCommit *object.Commit, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogOptions, untilCommit *object.Commit, filter *common.Filter, chunksChan chan *sources.Chunk) error {
 	wg := &sync.WaitGroup{}
 
 	remote, err := repo.Remote("origin")
@@ -291,7 +292,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogO
 		// go func(wg *sync.WaitGroup) {
 		// defer wg.Done()
 		// defer s.sem.Release(1)
-		err = s.scanCommitPatches(ctx, repo, commit, chunksChan)
+		err = s.scanCommitPatches(ctx, repo, commit, chunksChan, filter)
 		if err != nil {
 			switch e := err.Error(); {
 			case strings.Contains(e, "operation canceled"):
@@ -335,6 +336,9 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogO
 			return err
 		}
 		for fh := range status {
+			if !filter.Pass(fh) {
+				continue
+			}
 			metadata := s.sourceMetadataFunc(
 				fh, "unstaged", "unstaged", safeRepo,
 			)
@@ -378,7 +382,7 @@ func GenerateLink(repo, commit, file string) string {
 	return link
 }
 
-func (s *Git) scanCommitPatches(ctx context.Context, repo *git.Repository, commit *object.Commit, chunksChan chan *sources.Chunk) error {
+func (s *Git) scanCommitPatches(ctx context.Context, repo *git.Repository, commit *object.Commit, chunksChan chan *sources.Chunk, filter *common.Filter) error {
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -427,6 +431,9 @@ func (s *Git) scanCommitPatches(ctx context.Context, repo *git.Repository, commi
 	for _, file := range patch.FilePatches() {
 		bf, f := file.Files()
 		filename := f.Path()
+		if !filter.Pass(filename) {
+			continue
+		}
 		if filename == "" {
 			filename = bf.Path()
 		}

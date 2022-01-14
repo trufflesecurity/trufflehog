@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"runtime"
 	"strings"
 
@@ -16,7 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 )
 
-func (e *Engine) ScanGit(ctx context.Context, gitScanURI, gitScanBranch, headRef string) error {
+func (e *Engine) ScanGit(ctx context.Context, gitScanURI, gitScanBranch, headRef string, filter *common.Filter) error {
 	var path string
 	switch {
 	case strings.HasPrefix(gitScanURI, "file://"):
@@ -34,8 +35,9 @@ func (e *Engine) ScanGit(ctx context.Context, gitScanURI, gitScanBranch, headRef
 	}
 
 	scanOptions := &gogit.LogOptions{
-		All:   true,
-		Order: gogit.LogOrderCommitterTime,
+		All:        true,
+		Order:      gogit.LogOrderCommitterTime,
+		PathFilter: func(s string) bool { return filter.Pass(s) },
 	}
 
 	if gitScanBranch != "" {
@@ -81,8 +83,9 @@ func (e *Engine) ScanGit(ctx context.Context, gitScanURI, gitScanBranch, headRef
 		}).Debug("resolved common merge base between references")
 
 		scanOptions = &gogit.LogOptions{
-			From:  *headHash,
-			Order: gogit.LogOrderCommitterTime,
+			From:       *headHash,
+			Order:      gogit.LogOrderCommitterTime,
+			PathFilter: func(s string) bool { return filter.Pass(s) },
 		}
 	}
 
@@ -101,7 +104,7 @@ func (e *Engine) ScanGit(ctx context.Context, gitScanURI, gitScanBranch, headRef
 		})
 
 	go func() {
-		err := gitSource.ScanRepo(ctx, repo, scanOptions, &object.Commit{}, e.ChunksChan())
+		err := gitSource.ScanRepo(ctx, repo, scanOptions, &object.Commit{}, filter, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Fatal("could not scan repo")
 		}

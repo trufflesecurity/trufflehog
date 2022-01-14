@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"log"
 	"os"
 	"runtime"
@@ -26,8 +27,8 @@ func main() {
 
 	gitScan := cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI := gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
-	// gitScanIncludePaths := gitScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	// gitScanExcludePaths := gitScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitScanIncludePaths := gitScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	gitScanExcludePaths := gitScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	// gitScanSinceCommit := gitScan.Flag("since_commit", "Commit to start scan from.").String()
 	gitScanBranch := gitScan.Flag("branch", "Branch to scan.").String()
 	// gitScanMaxDepth := gitScan.Flag("max_depth", "Maximum depth of commits to scan.").Int()
@@ -71,9 +72,14 @@ func main() {
 		engine.WithDetectors(*verification, engine.DefaultDetectors()...),
 	)
 
+	filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
+	if err != nil {
+		logrus.WithError(err)
+	}
+
 	switch cmd {
 	case gitScan.FullCommand():
-		err := e.ScanGit(ctx, *gitScanURI, *gitScanBranch, "HEAD")
+		err := e.ScanGit(ctx, *gitScanURI, *gitScanBranch, "HEAD", filter)
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
