@@ -2,36 +2,22 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"runtime"
-	"strings"
-
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sirupsen/logrus"
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
+	"runtime"
 )
 
-func (e *Engine) ScanGit(ctx context.Context, gitScanURI, gitScanBranch, headRef string, filter *common.Filter) error {
-	var path string
-	switch {
-	case strings.HasPrefix(gitScanURI, "file://"):
-		path = strings.TrimPrefix(gitScanURI, "file://")
-	case strings.HasPrefix(gitScanURI, "https://"):
-		// TODO: clone repo and get path
-		return errors.New("TODO: clone repo and get path")
-	default:
-		logrus.Fatalf("Unsupported Git URI: %s", gitScanURI)
-	}
-
-	repo, err := gogit.PlainOpenWithOptions(path, &gogit.PlainOpenOptions{DetectDotGit: true})
+func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef string, filter *common.Filter) error {
+	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		return fmt.Errorf("could open repo: %s: %w", path, err)
+		return fmt.Errorf("could open repo: %s: %w", repoPath, err)
 	}
 
 	scanOptions := &gogit.LogOptions{

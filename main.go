@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/trufflesecurity/trufflehog/pkg/common"
+	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 	"log"
 	"os"
 	"runtime"
@@ -79,7 +80,14 @@ func main() {
 
 	switch cmd {
 	case gitScan.FullCommand():
-		err := e.ScanGit(ctx, *gitScanURI, *gitScanBranch, "HEAD", filter)
+		repoPath, remote, err := git.PrepareRepo(*gitScanURI)
+		if err != nil || repoPath == "" {
+			logrus.WithError(err).Fatal("error preparing git repo for scanning")
+		}
+		if remote {
+			defer os.RemoveAll(repoPath)
+		}
+		err = e.ScanGit(ctx, repoPath, *gitScanBranch, "HEAD", filter)
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}

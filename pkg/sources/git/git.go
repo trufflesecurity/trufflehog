@@ -211,6 +211,9 @@ func CloneRepoUsingToken(token, url, user string) (clonePath string, repo *git.R
 		return
 	}
 	repo, err = git.PlainClone(clonePath, false, cloneOptions)
+	if err != nil {
+		return
+	}
 	safeRepo, err := stripPassword(url)
 	if err != nil {
 		err = errors.New(err)
@@ -234,6 +237,9 @@ func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repo
 		return
 	}
 	repo, err = git.PlainClone(clonePath, false, cloneOptions)
+	if err != nil {
+		return
+	}
 	safeRepo, err := stripPassword(url)
 	if err != nil {
 		err = errors.New(err)
@@ -545,4 +551,42 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 	}
 
 	return nil, fmt.Errorf("no base refs succeeded for base: %q", base)
+}
+func PrepareRepo(uriString string) (string, bool, error) {
+	var path string
+	uri, err := url.Parse(uriString)
+	if err != nil {
+		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
+	}
+
+	remote := false
+	switch uri.Scheme {
+	case "file":
+		path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
+	case "https":
+		remotePath := fmt.Sprintf("%s://%s%s", uri.Scheme, uri.Host, uri.Path)
+		remote = true
+		switch {
+		case uri.User != nil:
+			log.Debugf("Cloning remote Git repo with authentication")
+			password, ok := uri.User.Password()
+			if !ok {
+				return "", remote, fmt.Errorf("password must be included in Git repo URL when username is provided")
+			}
+			path, _, err = CloneRepoUsingToken(password, remotePath, uri.User.Username())
+			if err != nil {
+				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
+			}
+		default:
+			log.Debugf("Cloning remote Git repo without authentication")
+			path, _, err = CloneRepoUsingUnauthenticated(remotePath)
+			if err != nil {
+				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+			}
+		}
+	default:
+		return "", remote, fmt.Errorf("unsupported Git URI: %s", uriString)
+	}
+	log.Debugf("Git repo local path: %s", path)
+	return path, remote, nil
 }
