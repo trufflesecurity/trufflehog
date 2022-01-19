@@ -16,11 +16,14 @@ check:
 	go fmt $(shell go list ./... | grep -v /vendor/)
 	go vet $(shell go list ./... | grep -v /vendor/)
 
+test-failing:
+	CGO_ENABLED=0 go test -timeout=30s $(shell go list ./... | grep -v /vendor/) | grep FAIL
+
 test:
-	CGO_ENABLED=0 go test $(shell go list ./... | grep -v /vendor/)
+	CGO_ENABLED=0 go test -timeout=30s $(shell go list ./... | grep -v /vendor/)
 
 test-race:
-	CGO_ENABLED=1 go test -race $(shell go list ./... | grep -v /vendor/)
+	CGO_ENABLED=1 go test -timeout=30s -race $(shell go list ./... | grep -v /vendor/)
 
 bench:
 	CGO_ENABLED=0 go test $(shell go list ./pkg/secrets/... | grep -v /vendor/) -benchmem -run=xxx -bench .

@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -15,11 +16,12 @@ import (
 )
 
 type Engine struct {
-	concurrency int
-	chunks      chan *sources.Chunk
-	results     chan detectors.ResultWithMetadata
-	decoders    []decoders.Decoder
-	detectors   map[bool][]detectors.Detector
+	concurrency   int
+	chunks        chan *sources.Chunk
+	results       chan detectors.ResultWithMetadata
+	decoders      []decoders.Decoder
+	detectors     map[bool][]detectors.Detector
+	chunksScanned uint64
 }
 
 type EngineOption func(*Engine)
@@ -36,7 +38,8 @@ func WithDetectors(verify bool, d ...detectors.Detector) EngineOption {
 			e.detectors = make(map[bool][]detectors.Detector)
 		}
 		if e.detectors[verify] == nil {
-			e.detectors[verify] = []detectors.Detector{}
+			e.detectors[true] = []detectors.Detector{}
+			e.detectors[false] = []detectors.Detector{}
 		}
 		e.detectors[verify] = append(e.detectors[verify], d...)
 	}
@@ -67,7 +70,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	var workerWg sync.WaitGroup
-
 	for i := 0; i < e.concurrency; i++ {
 		workerWg.Add(1)
 		go func() {
@@ -76,6 +78,23 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}()
 	}
 
+	if len(e.decoders) == 0 {
+		e.decoders = decoders.DefaultDecoders()
+	}
+
+	if len(e.detectors) == 0 {
+		e.detectors = map[bool][]detectors.Detector{}
+		e.detectors[true] = DefaultDetectors()
+		e.detectors[false] = []detectors.Detector{}
+	}
+
+	logrus.Debugf("loaded %d decoders", len(e.decoders))
+	logrus.Debugf("loaded %d detectors total, %d with verification enabled. %d with verification disabled",
+		len(e.detectors[true])+len(e.detectors[false]),
+		len(e.detectors[true]),
+		len(e.detectors[false]))
+
+	// start the workers
 	go func() {
 		// close results chan when all workers are done
 		workerWg.Wait()
@@ -84,15 +103,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		time.Sleep(time.Second)
 		close(e.ResultsChan())
 	}()
-
-	if len(e.decoders) == 0 {
-		e.decoders = decoders.DefaultDecoders()
-	}
-
-	if len(e.detectors) == 0 {
-		e.detectors = map[bool][]detectors.Detector{}
-		e.detectors[true] = DefaultDetectors()
-	}
 
 	return e
 }
@@ -103,6 +113,10 @@ func (e *Engine) ChunksChan() chan *sources.Chunk {
 
 func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 	return e.results
+}
+
+func (e *Engine) ChunksScanned() uint64 {
+	return e.chunksScanned
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {
@@ -136,5 +150,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 			}
 		}
+		atomic.AddUint64(&e.chunksScanned, 1)
 	}
 }

@@ -24,7 +24,7 @@ func main() {
 	debug := cli.Flag("debug", "Run in debug mode").Bool()
 	jsonOut := cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	concurrency := cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	verification := cli.Flag("verification", "Verify the results.").Bool()
+	noVerification := cli.Flag("no-verification", "Don't verify the results.").Bool()
 	// rules := cli.Flag("rules", "Path to file with custom rules.").String()
 
 	gitScan := cli.Command("git", "Find credentials in git repositories.")
@@ -71,7 +71,7 @@ func main() {
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(*verification, engine.DefaultDetectors()...),
+		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
 	)
 
 	filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
@@ -112,5 +112,5 @@ func main() {
 			fmt.Printf("%+v\n", r)
 		}
 	}
-
+	logrus.Infof("scanned %d chunks", e.ChunksScanned())
 }
