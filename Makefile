@@ -20,10 +20,13 @@ test-failing:
 	CGO_ENABLED=0 go test -timeout=30s $(shell go list ./... | grep -v /vendor/) | grep FAIL
 
 test:
-	CGO_ENABLED=0 go test -timeout=30s $(shell go list ./... | grep -v /vendor/)
+	CGO_ENABLED=0 go test -timeout=30s $(shell go list ./... | grep -v /vendor/ | grep -v /pkg/detectors)
 
 test-race:
-	CGO_ENABLED=1 go test -timeout=30s -race $(shell go list ./... | grep -v /vendor/)
+	CGO_ENABLED=1 go test -timeout=30s -race $(shell go list ./... | grep -v /vendor/ | grep -v /pkg/detectors)
+
+test-detectors:
+	CGO_ENABLED=0 go test -timeout=30s $(shell go list ./... | grep /pkg/detectors)
 
 bench:
 	CGO_ENABLED=0 go test $(shell go list ./pkg/secrets/... | grep -v /vendor/) -benchmem -run=xxx -bench .
