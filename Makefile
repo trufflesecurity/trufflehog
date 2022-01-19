@@ -26,7 +26,10 @@ bench:
 	CGO_ENABLED=0 go test $(shell go list ./pkg/secrets/... | grep -v /vendor/) -benchmem -run=xxx -bench .
 
 run:
-	CGO_ENABLED=0 go run . git file://.
+	CGO_ENABLED=0 go run . git file://. --json
+
+run-debug:
+	CGO_ENABLED=0 go run . git file://. --json --debug
 
 protos:
 	docker run -u "$(shell id -u)" -v "$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; /pwd/scripts/gen_proto.sh"

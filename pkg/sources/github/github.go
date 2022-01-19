@@ -313,7 +313,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			log.WithError(err).Warnf("unable to clone repo, continuing")
 			continue
 		}
-		err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, chunksChan)
+		err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
 		if err != nil {
 			log.WithError(err).Warnf("unable to scan repo")
 		}
@@ -407,7 +407,7 @@ func (s *Source) paginateGists(ctx context.Context, user string, chunksChan chan
 		s.log.WithField("repo", *gist.HTMLURL).Debugf("attempting to clone gist from user %s", user)
 
 		scanCtx := context.Background()
-		err = s.git.ScanRepo(scanCtx, repo, &gogit.LogOptions{All: true}, nil, chunksChan)
+		err = s.git.ScanRepo(scanCtx, repo, &gogit.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
 		if err != nil {
 			log.WithError(err).Warnf("Could not scan after clone: %s", *gist.HTMLURL)
 			continue

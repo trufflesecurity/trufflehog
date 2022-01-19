@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
 
@@ -215,7 +216,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				errors = append(errors, err)
 				continue
 			}
-			err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, chunksChan)
+			err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
 			if err != nil {
 				errors = append(errors, err)
 				continue
@@ -236,7 +237,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				errors = append(errors, err)
 				continue
 			}
-			err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, chunksChan)
+			err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
 			if err != nil {
 				errors = append(errors, err)
 				continue

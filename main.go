@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 	"log"
 	"os"
 	"runtime"
 	"strconv"
+
+	"github.com/trufflesecurity/trufflehog/pkg/common"
+	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 
 	"github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/pkg/decoders"
@@ -21,7 +22,7 @@ func main() {
 
 	cli := kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
 	debug := cli.Flag("debug", "Run in debug mode").Bool()
-	jsonOut := cli.Flag("json", "Output in JSON format.").Bool()
+	jsonOut := cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	concurrency := cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	verification := cli.Flag("verification", "Verify the results.").Bool()
 	// rules := cli.Flag("rules", "Path to file with custom rules.").String()

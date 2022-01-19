@@ -3,9 +3,10 @@ package common
 import (
 	"bufio"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"regexp"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Filter struct {
@@ -82,7 +83,7 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 func (filter *Filter) Pass(object string) bool {
 	excluded := filter.exclude.Matches(object)
 	included := filter.include.Matches(object)
-	log.Debugf("test PathFilter: file: %s, included: %t, excluded: %t, pass: %t", object, included, excluded, !excluded && included)
+	// log.Debugf("test PathFilter: file: %s, included: %t, excluded: %t, pass: %t", object, included, excluded, !excluded && included)
 	return !excluded && included
 }
 

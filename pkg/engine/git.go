@@ -3,15 +3,16 @@ package engine
 import (
 	"context"
 	"fmt"
+	"runtime"
+
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sirupsen/logrus"
+
 	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
-	"runtime"
 )
 
 func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef string, filter *common.Filter) error {
@@ -90,7 +91,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 		})
 
 	go func() {
-		err := gitSource.ScanRepo(ctx, repo, scanOptions, &object.Commit{}, filter, e.ChunksChan())
+		err := gitSource.ScanRepo(ctx, repo, scanOptions, nil, filter, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Fatal("could not scan repo")
 		}

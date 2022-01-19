@@ -34,7 +34,7 @@ func TestSource_Scan(t *testing.T) {
 			init: init{
 				name: "this repo",
 				connection: &sourcespb.Git{
-					Directories: []string{"../../../../"},
+					Directories: []string{"../../../"},
 					Credential: &sourcespb.Git_Unauthenticated{
 						Unauthenticated: &credentialspb.Unauthenticated{},
 					},
