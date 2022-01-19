@@ -1,0 +1,82 @@
+package gitlab
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"regexp"
+
+	"github.com/trufflesecurity/trufflehog/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/pkg/pb/detectorspb"
+
+	"github.com/trufflesecurity/trufflehog/pkg/common"
+)
+
+type Scanner struct{}
+
+// Ensure the Scanner satisfies the interface at compile time
+var _ detectors.Detector = (*Scanner)(nil)
+
+var (
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
+)
+
+// Keywords are used for efficiently pre-filtering chunks.
+// Use identifiers in the secret preferably, or the provider name.
+func (s Scanner) Keywords() []string {
+	return []string{"gitlab"}
+}
+
+// FromData will find and optionally verify Gitlab secrets in a given set of bytes.
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	dataStr := string(data)
+
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+
+	for _, match := range matches {
+		if len(match) != 2 {
+			continue
+		}
+
+		secret := detectors.Result{
+			DetectorType: detectorspb.DetectorType_Gitlab,
+			Raw:          []byte(match[1]),
+		}
+
+		if verify {
+			// there are 4 read 'scopes' for a gitlab token: api, read_user, read_repo, and read_registry
+			// they all grant access to different parts of the API. I couldn't find an endpoint that every
+			// one of these scopes has access to, so we just check an example endpoint for each scope. If any
+			// of them contain data, we know we have a valid key, but if they all fail, we don't
+			baseURL := "https://gitlab.com/api/v4"
+
+			client := common.RetryableHttpClient()
+
+			// test `read_user` scope
+			req, _ := http.NewRequest("GET", baseURL+"/user", nil)
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
+			res, err := client.Do(req)
+			if err != nil {
+				return results, err
+			}
+			defer res.Body.Close()
+
+			// 200 means good key and has `read_user` scope
+			// 403 means good key but not the right scope
+			// 401 is bad key
+			if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
+				secret.Verified = true
+			}
+		}
+
+		if !secret.Verified {
+			if detectors.IsKnownFalsePositive(string(secret.Raw), detectors.DefaultFalsePositives, true) {
+				continue
+			}
+		}
+
+		results = append(results, secret)
+	}
+
+	return
+}

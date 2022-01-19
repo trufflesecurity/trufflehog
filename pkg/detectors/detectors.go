@@ -2,6 +2,11 @@ package detectors
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"unicode"
 
 	"github.com/trufflesecurity/trufflehog/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
@@ -61,11 +66,11 @@ func CleanResults(results []Result) []Result {
 		return results
 	}
 
-	var cleaned = make([]Result, 0)
+	var cleaned = make(map[string]Result, 0)
 
 	for _, s := range results {
 		if s.Verified {
-			cleaned = append(cleaned, s)
+			cleaned[s.Redacted] = s
 		}
 	}
 
@@ -73,5 +78,53 @@ func CleanResults(results []Result) []Result {
 		return results[:1]
 	}
 
-	return cleaned
+	results = results[:0]
+	for _, r := range cleaned {
+		results = append(results, r)
+	}
+
+	return results
+}
+
+// Prefix regex ensures that at least one of the given keywords is within
+// 20 characters of the capturing group that follows.
+// This can help prevent false positives.
+func PrefixRegex(keywords []string) string {
+	pre := `(?i)(?:`
+	middle := strings.Join(keywords, "|")
+	post := `).{0,40}`
+	return pre + middle + post
+}
+
+//KeyIsRandom is a Low cost check to make sure that 'keys' include a number to reduce FPs.
+//Golang doesnt support regex lookaheads, so must be done in seperate calls.
+//TODO improve checks. Shannon entropy did not work well.
+func KeyIsRandom(key string) bool {
+	for _, ch := range key {
+		if unicode.IsDigit(ch) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func MustGetBenchmarkData() map[string][]byte {
+	_, filename, _, _ := runtime.Caller(0)
+	dir := filepath.Dir(filename)
+	small := make([]byte, 0)
+	medium, err := os.ReadFile(filepath.Join(dir, "detectors.go"))
+	if err != nil {
+		panic(err)
+	}
+	big := make([]byte, 0)
+	for i := 0; i < 25; i++ {
+		big = append(big, medium...)
+	}
+
+	return map[string][]byte{
+		"small":  small,
+		"medium": medium,
+		"big":    big,
+	}
 }
