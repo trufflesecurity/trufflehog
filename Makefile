@@ -8,6 +8,10 @@ PROTOS_IMAGE=us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
 .PHONY: protos
 .PHONY: protos-windows
 .PHONY: vendor
+.PHONY: dogfood
+
+dogfood:
+	CGO_ENABLED=0 go run . git file://. --json --debug
 
 install:
 	CGO_ENABLED=0 go install .
