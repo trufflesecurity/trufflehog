@@ -8,7 +8,9 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
+	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
@@ -115,20 +117,21 @@ func main() {
 		log.Fatal("s3 not implemented")
 	}
 
-	stdoutLogger := logrus.New()
-	stdoutLogger.SetOutput(os.Stdout)
-	stdoutLogger.SetFormatter(&logrus.TextFormatter{})
+	yellowPrinter := color.New(color.FgYellow)
+	greenPrinter := color.New(color.FgHiGreen)
+	redPrinter := color.New(color.FgRed)
+	whitePrinter := color.New(color.FgWhite)
+
+	fmt.Printf("🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 
 	for r := range e.ResultsChan() {
 		type outputFormat struct {
 			DetectorType string
-			SourceType   string
 			Verified     bool
 			*source_metadatapb.MetaData
 		}
 		output := outputFormat{
 			DetectorType: r.Result.DetectorType.String(),
-			SourceType:   r.SourceType.String(),
 			Verified:     r.Result.Verified,
 			MetaData:     r.SourceMetadata,
 		}
@@ -142,23 +145,34 @@ func main() {
 			}
 			fmt.Println(string(out))
 		} else {
-			out, err := structToFields(output)
+			meta, err := structToMap(output.MetaData.Data)
 			if err != nil {
 				logrus.WithError(err).Fatal("could not marshal result")
 			}
-			stdoutLogger.WithFields(out).Info("found secret")
+
+			yellowPrinter.Print("Found result 🐷🔑\n")
+			greenPrinter.Printf("Detector Type: %s\n", output.DetectorType)
+			if output.Verified {
+				redPrinter.Print("Verified: true\n")
+			} else {
+				whitePrinter.Print("Verified: false\n")
+			}
+			for _, data := range meta {
+				for k, v := range data {
+					greenPrinter.Printf("%s: %s\n", strings.Title(k), v)
+				}
+			}
+			fmt.Println("")
 		}
 	}
 	logrus.Infof("scanned %d chunks", e.ChunksScanned())
 }
 
-func structToFields(obj interface{}) (fields logrus.Fields, err error) {
+func structToMap(obj interface{}) (m map[string]map[string]interface{}, err error) {
 	data, err := json.Marshal(obj)
-
 	if err != nil {
 		return
 	}
-
-	err = json.Unmarshal(data, &fields)
+	err = json.Unmarshal(data, &m)
 	return
 }
