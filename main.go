@@ -17,15 +17,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/pkg/output"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 )
 
 func main() {
-
 	cli := kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
 	debug := cli.Flag("debug", "Run in debug mode").Bool()
 	jsonOut := cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy := cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	concurrency := cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification := cli.Flag("no-verification", "Don't verify the results.").Bool()
 	// rules := cli.Flag("rules", "Path to file with custom rules.").String()
@@ -86,9 +87,11 @@ func main() {
 		logrus.WithError(err)
 	}
 
+	var repoPath string
 	switch cmd {
 	case gitScan.FullCommand():
-		repoPath, remote, err := git.PrepareRepo(*gitScanURI)
+		var remote bool
+		repoPath, remote, err = git.PrepareRepo(*gitScanURI)
 		if err != nil || repoPath == "" {
 			logrus.WithError(err).Fatal("error preparing git repo for scanning")
 		}
@@ -122,37 +125,40 @@ func main() {
 	redPrinter := color.New(color.FgRed)
 	whitePrinter := color.New(color.FgWhite)
 
-	fmt.Printf("🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
+	if !*jsonLegacy && !*jsonOut {
+		fmt.Printf("🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
+	}
 
 	for r := range e.ResultsChan() {
-		type outputFormat struct {
-			DetectorType string
-			Verified     bool
-			*source_metadatapb.MetaData
-		}
-		output := outputFormat{
+		out := outputFormat{
 			DetectorType: r.Result.DetectorType.String(),
 			Verified:     r.Result.Verified,
 			MetaData:     r.SourceMetadata,
 		}
 
-		if *jsonOut {
-			// todo - add parity to trufflehog's existing output for git
-			// source
-			out, err := json.Marshal(output)
+		switch {
+		case *jsonLegacy:
+			legacy := output.ConvertToLegacyJSON(&r, repoPath)
+			out, err := json.Marshal(legacy)
 			if err != nil {
 				logrus.WithError(err).Fatal("could not marshal result")
 			}
 			fmt.Println(string(out))
-		} else {
-			meta, err := structToMap(output.MetaData.Data)
+		case *jsonOut:
+			out, err := json.Marshal(r)
+			if err != nil {
+				logrus.WithError(err).Fatal("could not marshal result")
+			}
+			fmt.Println(string(out))
+		default:
+			meta, err := structToMap(out.MetaData.Data)
 			if err != nil {
 				logrus.WithError(err).Fatal("could not marshal result")
 			}
 
 			yellowPrinter.Print("Found result 🐷🔑\n")
-			greenPrinter.Printf("Detector Type: %s\n", output.DetectorType)
-			if output.Verified {
+			greenPrinter.Printf("Detector Type: %s\n", out.DetectorType)
+			if out.Verified {
 				redPrinter.Print("Verified: true\n")
 			} else {
 				whitePrinter.Print("Verified: false\n")
@@ -175,4 +181,10 @@ func structToMap(obj interface{}) (m map[string]map[string]interface{}, err erro
 	}
 	err = json.Unmarshal(data, &m)
 	return
+}
+
+type outputFormat struct {
+	DetectorType string
+	Verified     bool
+	*source_metadatapb.MetaData
 }

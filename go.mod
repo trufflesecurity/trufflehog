@@ -23,6 +23,7 @@ require (
 	github.com/mattn/go-colorable v0.1.12
 	github.com/pkg/errors v0.9.1
 	github.com/razorpay/razorpay-go v0.0.0-20210728161131-0341409a6ab2
+	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/xanzy/go-gitlab v0.54.3
@@ -75,7 +76,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/pkg/diff v0.0.0-20200914180035-5b29258ca4f7 // indirect
-	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/mod v0.5.0 // indirect
