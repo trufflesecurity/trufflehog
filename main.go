@@ -15,6 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 )
 
@@ -114,19 +115,50 @@ func main() {
 		log.Fatal("s3 not implemented")
 	}
 
-	// deal with the results from e.ResultsChan()
+	stdoutLogger := logrus.New()
+	stdoutLogger.SetOutput(os.Stdout)
+	stdoutLogger.SetFormatter(&logrus.TextFormatter{})
+
 	for r := range e.ResultsChan() {
+		type outputFormat struct {
+			DetectorType string
+			SourceType   string
+			Verified     bool
+			*source_metadatapb.MetaData
+		}
+		output := outputFormat{
+			DetectorType: r.Result.DetectorType.String(),
+			SourceType:   r.SourceType.String(),
+			Verified:     r.Result.Verified,
+			MetaData:     r.SourceMetadata,
+		}
+
 		if *jsonOut {
 			// todo - add parity to trufflehog's existing output for git
 			// source
-			out, err := json.Marshal(r)
+			out, err := json.Marshal(output)
 			if err != nil {
 				logrus.WithError(err).Fatal("could not marshal result")
 			}
 			fmt.Println(string(out))
 		} else {
-			fmt.Printf("%+v\n", r)
+			out, err := structToFields(output)
+			if err != nil {
+				logrus.WithError(err).Fatal("could not marshal result")
+			}
+			stdoutLogger.WithFields(out).Info("found secret")
 		}
 	}
 	logrus.Infof("scanned %d chunks", e.ChunksScanned())
+}
+
+func structToFields(obj interface{}) (fields logrus.Fields, err error) {
+	data, err := json.Marshal(obj)
+
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(data, &fields)
+	return
 }
