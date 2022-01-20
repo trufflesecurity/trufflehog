@@ -140,11 +140,25 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	case *sourcespb.GitHub_Unauthenticated:
 		apiClient := github.NewClient(s.httpClient)
 		if len(s.orgs) > 30 {
-			log.Warn("You may experience rate limiting due with the unauthenticated GitHub api. Consider using the authenticated org user scan feature instead")
+			log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 		}
-		for _, org := range s.orgs {
-			org = strings.TrimSpace(org)
-			if !strings.HasSuffix(org, ".git") {
+
+		if len(s.repos) > 0 {
+			for i, repo := range s.repos {
+				if !strings.HasSuffix(repo, ".git") {
+					if repo, err := giturl.NormalizeGithubRepo(repo); err != nil {
+						// This wasn't formatted as expected, let the user know why that might be.
+						log.WithError(err).Warnf("Repo not in expected format, attempting to paginate repos instead.")
+					} else {
+						s.repos[i] = repo
+					}
+					s.paginateRepos(ctx, apiClient, repo)
+				}
+			}
+		}
+
+		if len(s.orgs) > 0 {
+			for _, org := range s.orgs {
 				s.paginateRepos(ctx, apiClient, org)
 			}
 		}
@@ -203,6 +217,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		if err != nil {
 			return errors.New(err)
 		}
+		// TODO: this should enumerate an organizations gists too...
 		s.paginateGists(ctx, user.GetLogin(), chunksChan)
 
 		if !specificScope {

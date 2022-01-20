@@ -11,12 +11,13 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/mattn/go-colorable"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/pkg/sources"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Scan(t *testing.T) {
@@ -176,6 +177,29 @@ func TestSource_Scan(t *testing.T) {
 				connection: &sourcespb.GitHub{
 					Organizations: []string{"trufflesecurity"},
 					Credential:    &sourcespb.GitHub_Unauthenticated{},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/driftwood.git",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "get an unauthenticated repo chunk with no enumeration",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
+					Credential:   &sourcespb.GitHub_Unauthenticated{},
 				},
 			},
 			wantChunk: &sources.Chunk{

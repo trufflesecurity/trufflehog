@@ -9,13 +9,13 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
-
 	"github.com/sirupsen/logrus"
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
+
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/pkg/engine"
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 )
 
 func main() {
@@ -39,22 +39,26 @@ func main() {
 	gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
 	githubScan := cli.Command("github", "Find credentials in GitHub repositories.")
-	// githubScanTarget := githubScan.Arg("target", "GitHub target. Can be a repository, user or organization.").Required().String()
-	// githubScanToken := githubScan.Flag("token", "GitHub token.").String()
+	githubScanEndpoint := githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos := githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs := githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken := githubScan.Flag("token", "GitHub token.").String()
 
 	gitlabScan := cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// gitlabScanTarget := gitlabScan.Arg("target", "GitLab target. Can be a repository, user or organization.").Required().String()
 	// gitlabScanToken := gitlabScan.Flag("token", "GitLab token.").String()
 
-	// bitbucketScan := cli.Command("bitbucket", "Find credentials in Bitbucket repositories.")
+	bitbucketScan := cli.Command("bitbucket", "Find credentials in Bitbucket repositories.")
 	// bitbucketScanTarget := bitbucketScan.Arg("target", "Bitbucket target. Can be a repository, user or organization.").Required().String()
 	// bitbucketScanToken := bitbucketScan.Flag("token", "Bitbucket token.").String()
 
-	// filesystemScan := cli.Command("filesystem", "Find credentials in filesystem.")
+	filesystemScan := cli.Command("filesystem", "Find credentials in a filesystem.")
 	// filesystemScanPath := filesystemScan.Arg("path", "Path to scan.").Required().String()
 	// filesystemScanRecursive := filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
 	// filesystemScanIncludePaths := filesystemScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	// filesystemScanExcludePaths := filesystemScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+
+	s3Scan := cli.Command("s3", "Find credentials in an S3 bucket.")
 
 	cmd := kingpin.MustParse(cli.Parse(os.Args[1:]))
 
@@ -93,9 +97,21 @@ func main() {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
 	case githubScan.FullCommand():
-		log.Fatal("github not implemented")
+		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
+			log.Fatal("You must specify at least one organization or repository.")
+		}
+		err = e.ScanGitHub(ctx, *githubScanEndpoint, *githubScanRepos, *githubScanOrgs, *githubScanToken, filter, *concurrency)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to scan git.")
+		}
 	case gitlabScan.FullCommand():
 		log.Fatal("gitlab not implemented")
+	case bitbucketScan.FullCommand():
+		log.Fatal("bitbucket not implemented")
+	case filesystemScan.FullCommand():
+		log.Fatal("filesystem not implemented")
+	case s3Scan.FullCommand():
+		log.Fatal("s3 not implemented")
 	}
 
 	// deal with the results from e.ResultsChan()
