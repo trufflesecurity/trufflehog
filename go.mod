@@ -5,7 +5,7 @@ go 1.17
 require (
 	cloud.google.com/go/secretmanager v1.0.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1443
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1453
 	github.com/aws/aws-sdk-go-v2/credentials v1.7.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.13.0
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
@@ -17,7 +17,6 @@ require (
 	github.com/google/go-github/v41 v41.0.0
 	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-retryablehttp v0.7.0
-	github.com/jeremywohl/flatten v1.0.1
 	github.com/joho/godotenv v1.4.0
 	github.com/kylelemons/godebug v1.1.0
 	github.com/mattn/go-colorable v0.1.12
