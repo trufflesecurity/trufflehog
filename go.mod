@@ -6,8 +6,8 @@ require (
 	cloud.google.com/go/secretmanager v1.0.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1453
-	github.com/aws/aws-sdk-go-v2/credentials v1.7.0
-	github.com/aws/aws-sdk-go-v2/service/sts v1.13.0
+	github.com/aws/aws-sdk-go-v2/credentials v1.8.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.14.0
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -47,11 +47,11 @@ require (
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.12.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.1.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.6.0 // indirect
-	github.com/aws/smithy-go v1.9.1 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.13.0 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.4 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.2.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.7.0 // indirect
+	github.com/aws/smithy-go v1.10.0 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
