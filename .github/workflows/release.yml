@@ -1,29 +1,46 @@
 name: release
 
+# on:
+#   push:
+#     tags:
+#       - 'v*'
+
 on:
   push:
     tags:
-      - 'v*'
+      - v*
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: write
 
 jobs:
-  goreleaser:
+  Release:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      -
-        name: Set up Go
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Docker Login
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.17
-      -
-        name: Run GoReleaser
+      - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
-          distribution: goreleaser
           version: latest
           args: release --rm-dist
         env:

@@ -1,0 +1,6 @@
+FROM golang:bullseye as builder
+
+FROM scratch
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY trufflehog /usr/bin/trufflehog
+ENTRYPOINT ["/usr/bin/trufflehog"]

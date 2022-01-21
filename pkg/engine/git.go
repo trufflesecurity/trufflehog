@@ -3,8 +3,9 @@ package engine
 import (
 	"context"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"runtime"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"

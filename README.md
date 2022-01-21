@@ -1,6 +1,11 @@
 # TruffleHog
 
-# Join The Slack
+[![CI Status](https://github.com/trufflesecurity/trufflehog2/workflows/release/badge.svg)](https://github.com/trufflesecurity/trufflehog2/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog2)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog2)
+[![Docker Hub Build Status](https://img.shields.io/docker/cloud/build/trufflesecurity/trufflehog2.svg)](https://hub.docker.com/r/trufflesecurity/trufflehog2/)
+![GitHub](https://img.shields.io/github/license/trufflesecurity/trufflehog2)
+
+## Join The Slack
 Have questions? Feedback? Jump in slack and hang out with us
 
 https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ
@@ -14,8 +19,28 @@ Several options:
 
 ### 2. [Release binaries](https://github.com/trufflesecurity/trufflehog2/releases)
 
-### 3. Docker (TODO)
-`docker run ...`
+### 3. Docker
+```bash
+$ docker run -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog2:latest github --repo https://github.com/dustin-decker/secretsandstuff.git     
+🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
+
+Found verified result 🐷🔑
+Detector Type: AWS
+File: aws
+Link: https://github.com/dustin-decker/secretsandstuff/blob/90c75f884c65dc3638ca1610bd9844e668f213c2/aws
+Repository: https://github.com/dustin-decker/secretsandstuff.git
+Commit: 90c75f884c65dc3638ca1610bd9844e668f213c2
+Email: dustindecker@protonmail.com
+
+Found unverified result 🐷🔑❓
+Detector Type: Github
+File: slack
+Link: https://github.com/dustin-decker/secretsandstuff/blob/8afb0ecd4998b1179e428db5ebbcdc8221214432/slack
+Repository: https://github.com/dustin-decker/secretsandstuff.git
+Commit: 8afb0ecd4998b1179e428db5ebbcdc8221214432
+Email: dustindecker@protonmail.com
+...
+```
 
 ### 4. Pip (TODO)
 pip install trufflehog
