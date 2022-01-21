@@ -70,6 +70,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 		}).Debug("resolved common merge base between references")
 
 		scanOptions = &gogit.LogOptions{
+			All:        true,
 			From:       *headHash,
 			Order:      gogit.LogOrderCommitterTime,
 			PathFilter: func(s string) bool { return filter.Pass(s) },

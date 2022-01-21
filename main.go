@@ -8,9 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"strings"
 
-	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/pkg/output"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 )
 
@@ -120,21 +117,11 @@ func main() {
 		log.Fatal("s3 not implemented")
 	}
 
-	yellowPrinter := color.New(color.FgYellow)
-	greenPrinter := color.New(color.FgHiGreen)
-	redPrinter := color.New(color.FgRed)
-	whitePrinter := color.New(color.FgWhite)
-
 	if !*jsonLegacy && !*jsonOut {
 		fmt.Printf("🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
 	for r := range e.ResultsChan() {
-		out := outputFormat{
-			DetectorType: r.Result.DetectorType.String(),
-			Verified:     r.Result.Verified,
-			MetaData:     r.SourceMetadata,
-		}
 
 		switch {
 		case *jsonLegacy:
@@ -151,40 +138,8 @@ func main() {
 			}
 			fmt.Println(string(out))
 		default:
-			meta, err := structToMap(out.MetaData.Data)
-			if err != nil {
-				logrus.WithError(err).Fatal("could not marshal result")
-			}
-
-			yellowPrinter.Print("Found result 🐷🔑\n")
-			greenPrinter.Printf("Detector Type: %s\n", out.DetectorType)
-			if out.Verified {
-				redPrinter.Print("Verified: true\n")
-			} else {
-				whitePrinter.Print("Verified: false\n")
-			}
-			for _, data := range meta {
-				for k, v := range data {
-					greenPrinter.Printf("%s: %s\n", strings.Title(k), v)
-				}
-			}
-			fmt.Println("")
+			output.PrintPlainOutput(&r)
 		}
 	}
-	logrus.Infof("scanned %d chunks", e.ChunksScanned())
-}
-
-func structToMap(obj interface{}) (m map[string]map[string]interface{}, err error) {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return
-	}
-	err = json.Unmarshal(data, &m)
-	return
-}
-
-type outputFormat struct {
-	DetectorType string
-	Verified     bool
-	*source_metadatapb.MetaData
+	logrus.Debugf("scanned %d chunks", e.ChunksScanned())
 }
