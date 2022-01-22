@@ -137,7 +137,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, NewScanOptions(), chunksChan)
 			if err != nil {
 				return err
 			}
@@ -153,7 +153,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, NewScanOptions(), chunksChan)
 			if err != nil {
 				return err
 			}
@@ -178,7 +178,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				defer os.RemoveAll(u)
 			}
 
-			err = s.git.ScanRepo(ctx, repo, &git.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, NewScanOptions(), chunksChan)
 			if err != nil {
 				return err
 
@@ -254,7 +254,7 @@ func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repo
 	return
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogOptions, untilCommit *object.Commit, filter *common.Filter, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	wg := &sync.WaitGroup{}
 
 	remote, err := repo.Remote("origin")
@@ -266,18 +266,19 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogO
 		return errors.New(err)
 	}
 
-	commitIter, err := repo.Log(opts)
+	commitIter, err := repo.Log(scanOptions.LogOptions)
 	if err != nil {
 		return errors.New(err)
 	}
 
 	scanOneCommit := false
-	if untilCommit != nil && opts.From.String() == untilCommit.Hash.String() {
+	if scanOptions.SinceCommit != nil && scanOptions.LogOptions.From.String() == scanOptions.SinceCommit.Hash.String() {
 		// Our head and base commits are the same, so scan the one commit
 		scanOneCommit = true
 	}
 	breakIteration := false
 
+	depth := int64(0)
 	err = commitIter.ForEach(func(commit *object.Commit) error {
 		if breakIteration {
 			return storer.ErrStop
@@ -286,19 +287,14 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogO
 			breakIteration = true
 		}
 
-		if untilCommit != nil && commit.Hash == untilCommit.Hash && !scanOneCommit {
+		// TODO: Clean up this conditional mess.
+		if (scanOptions.SinceCommit != nil && commit.Hash == scanOptions.SinceCommit.Hash && !scanOneCommit) ||
+			(scanOptions.MaxDepth >= 0 && depth >= scanOptions.MaxDepth) {
 			return storer.ErrStop
 		}
+		depth++
 
-		// err := s.sem.Acquire(ctx, 1)
-		// if err != nil {
-		// 	return err
-		// }
-		// wg.Add(1)
-		// go func(wg *sync.WaitGroup) {
-		// defer wg.Done()
-		// defer s.sem.Release(1)
-		err = s.scanCommitPatches(ctx, repo, commit, chunksChan, filter)
+		err = s.scanCommitPatches(ctx, repo, commit, chunksChan, scanOptions.Filter)
 		if err != nil {
 			switch e := err.Error(); {
 			case strings.Contains(e, "operation canceled"):
@@ -315,7 +311,6 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogO
 				return err
 			}
 		}
-		// }(wg)
 		return nil
 	})
 	if err != nil {
@@ -342,7 +337,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, opts *git.LogO
 			return err
 		}
 		for fh := range status {
-			if !filter.Pass(fh) {
+			if !scanOptions.Filter.Pass(fh) {
 				continue
 			}
 			metadata := s.sourceMetadataFunc(

@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"runtime"
 
 	gogit "github.com/go-git/go-git/v5"
@@ -15,39 +16,33 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 )
 
-func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef string, filter *common.Filter) error {
+func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef string, sinceHash *plumbing.Hash, maxDepth int, filter *common.Filter) error {
 	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return fmt.Errorf("could open repo: %s: %w", repoPath, err)
 	}
 
-	scanOptions := &gogit.LogOptions{
+	logOptions := &gogit.LogOptions{
 		All:        true,
 		Order:      gogit.LogOrderCommitterTime,
 		PathFilter: func(s string) bool { return filter.Pass(s) },
 	}
 
-	if gitScanBranch != "" {
-		baseHash, err := git.TryAdditionalBaseRefs(repo, gitScanBranch)
+	var sinceCommit, headCommit *object.Commit
+	if !sinceHash.IsZero() {
+		sinceCommit, err = repo.CommitObject(*sinceHash)
 		if err != nil {
-			return fmt.Errorf("could not parse base revision: %q: %w", gitScanBranch, err)
+			return fmt.Errorf("unable to resolve commit %s: %s", sinceHash.String(), err)
 		}
+	}
 
-		headHash, err := repo.ResolveRevision(plumbing.Revision(headRef))
+	if gitScanBranch != "" {
+		headHash, err := git.TryAdditionalBaseRefs(repo, gitScanBranch)
 		if err != nil {
 			return fmt.Errorf("could not parse revision: %q: %w", headRef, err)
 		}
 
-		baseCommit, err := repo.CommitObject(*baseHash)
-		if err != nil {
-			return fmt.Errorf("could not find commit: %q: %w", headRef, err)
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"commit": baseCommit.Hash.String(),
-		}).Debug("resolved base reference")
-
-		headCommit, err := repo.CommitObject(*headHash)
+		headCommit, err = repo.CommitObject(*headHash)
 		if err != nil {
 			return fmt.Errorf("could not find commit: %q: %w", headRef, err)
 		}
@@ -56,24 +51,13 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 			"commit": headCommit.Hash.String(),
 		}).Debug("resolved head reference")
 
-		mergeBase, err := baseCommit.MergeBase(headCommit)
-		if err != nil {
-			return fmt.Errorf("could not find common base between the given references: %q: %w", headRef, err)
-		}
+		logOptions.From = headCommit.Hash
+		logOptions.All = false
+	}
 
-		if len(mergeBase) == 0 {
-			return fmt.Errorf("no common mergeable base between the given references: %q: %w", headRef, err)
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"commit": mergeBase[0].Hash.String(),
-		}).Debug("resolved common merge base between references")
-
-		scanOptions = &gogit.LogOptions{
-			All:        true,
-			From:       *headHash,
-			Order:      gogit.LogOrderCommitterTime,
-			PathFilter: func(s string) bool { return filter.Pass(s) },
+	if sinceCommit != nil && headCommit != nil {
+		if ok, _ := sinceCommit.IsAncestor(headCommit); !ok {
+			return fmt.Errorf("unable to scan from requested head to end commit. %s is not an ancestor of %s", sinceCommit.Hash.String(), headCommit.Hash.String())
 		}
 	}
 
@@ -91,8 +75,21 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 			}
 		})
 
+	opts := []git.ScanOption{
+		git.ScanOptionFilter(filter),
+		git.ScanOptionLogOptions(logOptions),
+	}
+	// TODO: Add kingpin type that can differentiate between `not set` and `0` for int.
+	if maxDepth != 0 {
+		opts = append(opts, git.ScanOptionMaxDepth(int64(maxDepth)))
+	}
+	if sinceCommit != nil {
+		opts = append(opts, git.ScanOptionSinceCommit(sinceCommit))
+	}
+	scanOptions := git.NewScanOptions(opts...)
+
 	go func() {
-		err := gitSource.ScanRepo(ctx, repo, scanOptions, nil, filter, e.ChunksChan())
+		err := gitSource.ScanRepo(ctx, repo, scanOptions, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Fatal("could not scan repo")
 		}

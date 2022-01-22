@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing"
 	"log"
 	"os"
 	"runtime"
@@ -32,9 +33,9 @@ func main() {
 	gitScanURI := gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
 	gitScanIncludePaths := gitScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitScanExcludePaths := gitScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	// gitScanSinceCommit := gitScan.Flag("since_commit", "Commit to start scan from.").String()
+	gitScanSinceCommit := gitScan.Flag("since_commit", "Commit to start scan from.").String()
 	gitScanBranch := gitScan.Flag("branch", "Branch to scan.").String()
-	// gitScanMaxDepth := gitScan.Flag("max_depth", "Maximum depth of commits to scan.").Int()
+	gitScanMaxDepth := gitScan.Flag("max_depth", "Maximum depth of commits to scan.").Int()
 	gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
 	gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
@@ -95,7 +96,8 @@ func main() {
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
-		err = e.ScanGit(ctx, repoPath, *gitScanBranch, "HEAD", filter)
+		sinceHash := plumbing.NewHash(*gitScanSinceCommit)
+		err = e.ScanGit(ctx, repoPath, *gitScanBranch, "HEAD", &sinceHash, *gitScanMaxDepth, filter)
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}

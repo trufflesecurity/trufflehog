@@ -8,20 +8,16 @@ import (
 	"runtime"
 
 	"github.com/go-errors/errors"
-	gogit "github.com/go-git/go-git/v5"
 	log "github.com/sirupsen/logrus"
-	"github.com/xanzy/go-gitlab"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/trufflesecurity/trufflehog/pkg/common"
+	"github.com/trufflesecurity/trufflehog/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
-
-	"github.com/trufflesecurity/trufflehog/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
+	"github.com/xanzy/go-gitlab"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Source struct {
@@ -216,7 +212,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				errors = append(errors, err)
 				continue
 			}
-			err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
 			if err != nil {
 				errors = append(errors, err)
 				continue
@@ -237,7 +233,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				errors = append(errors, err)
 				continue
 			}
-			err = s.git.ScanRepo(ctx, repo, &gogit.LogOptions{All: true}, nil, common.FilterEmpty(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
 			if err != nil {
 				errors = append(errors, err)
 				continue
