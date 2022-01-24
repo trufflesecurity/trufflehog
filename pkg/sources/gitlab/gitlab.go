@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
@@ -146,33 +147,65 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	if err != nil {
 		return nil, errors.Errorf("unable to authenticate using: %s", s.authMethod)
 	}
-	//when bool pointers are req'd
-	//yes := true
-	no := false
-	projectQuery := &gitlab.ListProjectsOptions{}
-	projects, _, err := apiClient.Projects.ListUserProjects(user.ID, projectQuery)
-	if err != nil {
-		return nil, errors.Errorf("received error on listing projects: %s\n", err)
+
+	var projects []*gitlab.Project
+
+	// TODO: enumerate all usewr projects
+	projectQueryOptions := &gitlab.ListProjectsOptions{
+		OrderBy: gitlab.String("last_activity_at"),
 	}
-	groups, _, err := apiClient.Groups.ListGroups(&gitlab.ListGroupsOptions{AllAvailable: &no})
-	if err != nil {
-		return nil, errors.Errorf("received error on listing projects: %s\n", err)
-	}
-	for _, group := range groups {
-		grpPrjs, _, err := apiClient.Groups.ListGroupProjects(group.ID, &gitlab.ListGroupProjectsOptions{})
+	for {
+		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions)
 		if err != nil {
 			return nil, errors.Errorf("received error on listing projects: %s\n", err)
 		}
-		projects = append(projects, grpPrjs...)
-		subgroups, _, err := apiClient.Groups.ListSubgroups(group.ID, &gitlab.ListSubgroupsOptions{AllAvailable: &no})
-		if err != nil {
-			log.Debugf("could not retrieve subgroups from %s", group.Name)
-			continue
-		}
-		for _, subgroup := range subgroups {
-			projects = append(projects, subgroup.Projects...)
+		projects = append(projects, userProjects...)
+		projectQueryOptions.Page = res.NextPage
+		if res.NextPage == 0 {
+			break
 		}
 	}
+
+	var groups []*gitlab.Group
+
+	listGroupsOptions := gitlab.ListGroupsOptions{
+		AllAvailable: gitlab.Bool(false), // This actually grabs outside groups on public GitLab
+		TopLevelOnly: gitlab.Bool(false),
+		Owned:        gitlab.Bool(false),
+	}
+	if s.url != "https://gitlab.com/" {
+		listGroupsOptions.AllAvailable = gitlab.Bool(true)
+	}
+	for {
+		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
+		if err != nil {
+			return nil, errors.Errorf("received error on listing projects: %s\n", err)
+		}
+		groups = append(groups, groupList...)
+		listGroupsOptions.Page = res.NextPage
+		if res.NextPage == 0 {
+			break
+		}
+	}
+
+	for _, group := range groups {
+		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
+			OrderBy:          gitlab.String("last_activity_at"),
+			IncludeSubgroups: gitlab.Bool(true),
+		}
+		for {
+			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
+			if err != nil {
+				return nil, errors.Errorf("received error on listing projects: %s\n", err)
+			}
+			projects = append(projects, grpPrjs...)
+			listGroupProjectOptions.Page = res.NextPage
+			if res.NextPage == 0 {
+				break
+			}
+		}
+	}
+	log.WithField("projects", projects).Debugf("Enumerated %d GitLab projects", len(projects))
 	return projects, nil
 }
 
@@ -201,6 +234,11 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 	var errors []error
 	if s.authMethod == "UNAUTHENTICATED" {
 		for i, u := range repos {
+			if common.IsDone(ctx) {
+				// We are returning nil instead of the errors slice here because
+				// we don't want to mark this scan as errored if we cancelled it.
+				return nil
+			}
 			s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", u))
 
 			if len(u.String()) == 0 {
@@ -222,6 +260,11 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	} else {
 		for i, u := range repos {
+			if common.IsDone(ctx) {
+				// We are returning nil instead of the errors slice here because
+				// we don't want to mark this scan as errored if we cancelled it.
+				return nil
+			}
 			s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", u))
 
 			if len(u.String()) == 0 {
