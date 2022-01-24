@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -27,9 +26,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
-
 	"github.com/trufflesecurity/trufflehog/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/pkg/sources"
 )
@@ -298,10 +297,6 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *S
 		if err != nil {
 			switch e := err.Error(); {
 			case strings.Contains(e, "operation canceled"):
-				log.WithError(err).
-					WithField("repo", safeRepo).
-					WithField("commit", commit.Hash.String()).
-					Warn("commit took too long to compute")
 				return nil
 			case strings.Contains(e, "packfile not found"):
 				log.WithError(err).WithField("repo", safeRepo).Warn("invalid commit reference while scanning commit")
