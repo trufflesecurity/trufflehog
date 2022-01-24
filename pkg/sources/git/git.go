@@ -286,6 +286,10 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *S
 			breakIteration = true
 		}
 
+		if FilterCommitByFiles(commit, scanOptions.Filter) {
+			return nil
+		}
+
 		// TODO: Clean up this conditional mess.
 		if (scanOptions.SinceCommit != nil && commit.Hash == scanOptions.SinceCommit.Hash && !scanOneCommit) ||
 			(scanOptions.MaxDepth >= 0 && depth >= scanOptions.MaxDepth) {
@@ -579,4 +583,23 @@ func PrepareRepo(uriString string) (string, bool, error) {
 	}
 	log.Debugf("Git repo local path: %s", path)
 	return path, remote, nil
+}
+
+func FilterCommitByFiles(commit *object.Commit, filter *common.Filter) bool {
+	fileCount := 0
+	fileIter, err := commit.Files()
+	foundErr := errors.New("file found")
+	err = fileIter.ForEach(func(file *object.File) error {
+		fileCount++
+		if filter.Pass(file.Name) {
+			return foundErr
+		}
+		return nil
+	})
+	// fileIter will return a "file found" "error" if any files match the filter. If there are no files, there will
+	// not be a match, but the commit should pass anyway in case we want to do something with the commit message.
+	if !errors.Is(err, foundErr) && fileCount > 0 {
+		return true
+	}
+	return false
 }

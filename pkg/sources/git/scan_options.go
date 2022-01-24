@@ -45,8 +45,7 @@ func NewScanOptions(options ...ScanOption) *ScanOptions {
 		SinceCommit: nil,
 		MaxDepth:    -1,
 		LogOptions: &git.LogOptions{
-			All:   true,
-			Order: git.LogOrderCommitterTime,
+			All: true,
 		},
 	}
 	for _, option := range options {

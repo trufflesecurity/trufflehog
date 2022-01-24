@@ -23,9 +23,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 	}
 
 	logOptions := &gogit.LogOptions{
-		All:        true,
-		Order:      gogit.LogOrderCommitterTime,
-		PathFilter: func(s string) bool { return filter.Pass(s) },
+		All: true,
 	}
 
 	var sinceCommit, headCommit *object.Commit
