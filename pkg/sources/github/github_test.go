@@ -185,7 +185,7 @@ func TestSource_Scan(t *testing.T) {
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Repository: "https://github.com/trufflesecurity/driftwood.git",
+							Repository: "https://github.com/trufflesecurity/TruffleHog-Enterprise-Github-Action.git",
 						},
 					},
 				},

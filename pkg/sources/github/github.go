@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation"
@@ -18,6 +19,7 @@ import (
 	"github.com/google/go-github/v41/github"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -43,9 +45,10 @@ type Source struct {
 	httpClient *http.Client
 	aCtx       context.Context
 	sources.Progress
-	log   *log.Entry
-	token string
-	conn  *sourcespb.GitHub
+	log    *log.Entry
+	token  string
+	conn   *sourcespb.GitHub
+	jobSem *semaphore.Weighted
 }
 
 // Ensure the Source satisfies the interface at compile time
@@ -97,6 +100,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
+	s.jobSem = semaphore.NewWeighted(int64(concurrency))
 
 	s.httpClient = common.SaneHttpClient()
 
@@ -296,43 +300,60 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		rand.Shuffle(len(s.repos), func(i, j int) { s.repos[i], s.repos[j] = s.repos[j], s.repos[i] })
 	}
 
-	log.Infof("Found %v total repos to scan", len(s.repos))
+	log.Debugf("Found %v total repos to scan", len(s.repos))
+	wg := sync.WaitGroup{}
+	errChan := make(chan error)
 	for i, repoURL := range s.repos {
-		s.SetProgressComplete(i, len(s.repos), fmt.Sprintf("Repo: %s", repoURL))
+		s.jobSem.Acquire(ctx, 1)
+		wg.Add(1)
+		go func(ctx context.Context, errCh chan error, repoURL string, i int) {
+			defer s.jobSem.Release(1)
+			defer wg.Done()
+			s.SetProgressComplete(i, len(s.repos), fmt.Sprintf("Repo: %s", repoURL))
 
-		if !strings.HasSuffix(repoURL, ".git") {
-			continue
-		}
-		if strings.Contains(repoURL, "DefinitelyTyped") {
-			continue
-		}
-		s.log.WithField("repo", repoURL).Debug("attempting to clone repo")
-		var path string
-		var repo *gogit.Repository
-		var err error
-
-		switch s.conn.GetCredential().(type) {
-		case *sourcespb.GitHub_Unauthenticated:
-			path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
-		default:
-			var token string
-			token, err = s.Token(ctx, installationClient)
-			if err != nil {
-				return err
+			if !strings.HasSuffix(repoURL, ".git") {
+				return
 			}
-			path, repo, err = git.CloneRepoUsingToken(token, repoURL, "clone")
-		}
+			if strings.Contains(repoURL, "DefinitelyTyped") {
+				return
+			}
+			s.log.WithField("repo", repoURL).Debug("attempting to clone repo")
+			var path string
+			var repo *gogit.Repository
+			var err error
 
-		defer os.RemoveAll(path)
-		if err != nil {
-			log.WithError(err).Warnf("unable to clone repo, continuing")
-			continue
-		}
-		err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
-		if err != nil {
-			log.WithError(err).Warnf("unable to scan repo")
-		}
+			switch s.conn.GetCredential().(type) {
+			case *sourcespb.GitHub_Unauthenticated:
+				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
+			default:
+				var token string
+				token, err = s.Token(ctx, installationClient)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				path, repo, err = git.CloneRepoUsingToken(token, repoURL, "clone")
+			}
 
+			defer os.RemoveAll(path)
+			if err != nil {
+				log.WithError(err).Errorf("unable to clone repo, continuing")
+				return
+			}
+			err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
+			if err != nil {
+				log.WithError(err).Errorf("unable to scan repo, continuing")
+			}
+		}(ctx, errChan, repoURL, i)
+	}
+
+	wg.Wait()
+	close(errChan)
+	// This only returns first error which is what we did prior to concurrency
+	for err := range errChan {
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

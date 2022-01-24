@@ -22,6 +22,7 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) {
 		DetectorType: r.Result.DetectorType.String(),
 		Verified:     r.Result.Verified,
 		MetaData:     r.SourceMetadata,
+		Raw:          strings.TrimSpace(string(r.Result.Raw)),
 	}
 
 	meta, err := structToMap(out.MetaData.Data)
@@ -38,6 +39,7 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) {
 		whitePrinter.Print("Found unverified result 🐷🔑❓\n")
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
+	printer.Printf("Raw result: %s\n", whitePrinter.Sprint(out.Raw))
 	for _, data := range meta {
 		for k, v := range data {
 			printer.Printf("%s: %s\n", strings.Title(k), v)
@@ -58,5 +60,6 @@ func structToMap(obj interface{}) (m map[string]map[string]interface{}, err erro
 type outputFormat struct {
 	DetectorType string
 	Verified     bool
+	Raw          string
 	*source_metadatapb.MetaData
 }
