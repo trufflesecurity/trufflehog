@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sync"
 
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
@@ -17,6 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
 	"github.com/xanzy/go-gitlab"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -35,6 +37,7 @@ type Source struct {
 	git        *git.Git
 	aCtx       context.Context
 	sources.Progress
+	jobSem *semaphore.Weighted
 }
 
 // Ensure the Source satisfies the interface at compile time
@@ -62,6 +65,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
+	s.jobSem = semaphore.NewWeighted(int64(concurrency))
 
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -231,7 +235,8 @@ func (s *Source) getRepos(apiClient *gitlab.Client) ([]*url.URL, []error) {
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, repos []*url.URL) []error {
-	var errors []error
+	errChan := make(chan error)
+	wg := sync.WaitGroup{}
 	if s.authMethod == "UNAUTHENTICATED" {
 		for i, u := range repos {
 			if common.IsDone(ctx) {
@@ -239,23 +244,28 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				// we don't want to mark this scan as errored if we cancelled it.
 				return nil
 			}
-			s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", u))
+			s.jobSem.Acquire(ctx, 1)
+			wg.Add(1)
+			go func(ctx context.Context, errCh chan error, repoURL *url.URL, i int) {
+				defer s.jobSem.Release(1)
+				defer wg.Done()
+				if len(repoURL.String()) == 0 {
+					return
+				}
+				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL))
 
-			if len(u.String()) == 0 {
-				continue
-			}
-			path, repo, err := git.CloneRepoUsingUnauthenticated(u.String())
-			defer os.RemoveAll(path)
-			if err != nil {
-				errors = append(errors, err)
-				continue
-			}
-			err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
-			if err != nil {
-				errors = append(errors, err)
-				continue
-			}
-
+				path, repo, err := git.CloneRepoUsingUnauthenticated(repoURL.String())
+				defer os.RemoveAll(path)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
+				if err != nil {
+					errCh <- err
+					return
+				}
+			}(ctx, errChan, u, i)
 		}
 
 	} else {
@@ -265,27 +275,40 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				// we don't want to mark this scan as errored if we cancelled it.
 				return nil
 			}
-			s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", u))
+			s.jobSem.Acquire(ctx, 1)
+			wg.Add(1)
+			go func(ctx context.Context, errCh chan error, repoURL *url.URL, i int) {
+				defer s.jobSem.Release(1)
+				defer wg.Done()
+				if len(repoURL.String()) == 0 {
+					return
+				}
+				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL))
 
-			if len(u.String()) == 0 {
-				continue
-			}
-			path, repo, err := git.CloneRepoUsingToken(s.token, u.String(), s.user)
-			defer os.RemoveAll(path)
-			if err != nil {
-				errors = append(errors, err)
-				continue
-			}
-			err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
-			if err != nil {
-				errors = append(errors, err)
-				continue
-			}
-
+				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), s.user)
+				defer os.RemoveAll(path)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
+				if err != nil {
+					errCh <- err
+					return
+				}
+			}(ctx, errChan, u, i)
 		}
 	}
-	return errors
 
+	wg.Wait()
+	close(errChan)
+
+	var errors []error
+	for err := range errChan {
+		errors = append(errors, err)
+	}
+
+	return errors
 }
 
 // Chunks emits chunks of bytes over a channel.

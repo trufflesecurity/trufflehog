@@ -207,10 +207,12 @@ func CloneRepoUsingToken(token, url, user string) (clonePath string, repo *git.R
 	}
 	clonePath, err = ioutil.TempDir(os.TempDir(), "trufflehog")
 	if err != nil {
+		err = errors.New(err)
 		return
 	}
 	repo, err = git.PlainClone(clonePath, false, cloneOptions)
 	if err != nil {
+		err = errors.New(err)
 		return
 	}
 	safeRepo, err := stripPassword(url)
@@ -237,6 +239,7 @@ func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repo
 	}
 	repo, err = git.PlainClone(clonePath, false, cloneOptions)
 	if err != nil {
+		err = errors.New(err)
 		return
 	}
 	safeRepo, err := stripPassword(url)
@@ -588,6 +591,9 @@ func PrepareRepo(uriString string) (string, bool, error) {
 func FilterCommitByFiles(commit *object.Commit, filter *common.Filter) bool {
 	fileCount := 0
 	fileIter, err := commit.Files()
+	if err != nil {
+		return true
+	}
 	foundErr := errors.New("file found")
 	err = fileIter.ForEach(func(file *object.File) error {
 		fileCount++
