@@ -68,6 +68,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		logrus.Warn("No concurrency specified, defaulting to ", numCPU)
 		e.concurrency = numCPU
 	}
+	logrus.Debugf("running with  up to %d workers", e.concurrency)
 
 	var workerWg sync.WaitGroup
 	for i := 0; i < e.concurrency; i++ {

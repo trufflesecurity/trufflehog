@@ -17,6 +17,7 @@ import (
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v41/github"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
@@ -300,6 +301,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		rand.Shuffle(len(s.repos), func(i, j int) { s.repos[i], s.repos[j] = s.repos[j], s.repos[i] })
 	}
 
+	scanned := 0
+
 	log.Debugf("Found %v total repos to scan", len(s.repos))
 	wg := sync.WaitGroup{}
 	errChan := make(chan error)
@@ -309,6 +312,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		go func(ctx context.Context, errCh chan error, repoURL string, i int) {
 			defer s.jobSem.Release(1)
 			defer wg.Done()
+
 			s.SetProgressComplete(i, len(s.repos), fmt.Sprintf("Repo: %s", repoURL))
 
 			if !strings.HasSuffix(repoURL, ".git") {
@@ -317,7 +321,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if strings.Contains(repoURL, "DefinitelyTyped") {
 				return
 			}
-			s.log.WithField("repo", repoURL).Debug("attempting to clone repo")
+			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo %d/%d", i+1, len(s.repos))
 			var path string
 			var repo *gogit.Repository
 			var err error
@@ -344,6 +348,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 			}
+			scanned += 1
+			logrus.Debugf("scanned %d/%d repos", scanned, len(s.repos))
 		}(ctx, errChan, repoURL, i)
 	}
 
