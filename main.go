@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing"
 	"log"
 	"os"
 	"runtime"
 	"strconv"
 
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
@@ -27,6 +27,7 @@ func main() {
 	jsonLegacy := cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	concurrency := cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification := cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified := cli.Flag("only-verified", "Only output verified results.").Bool()
 	// rules := cli.Flag("rules", "Path to file with custom rules.").String()
 
 	gitScan := cli.Command("git", "Find credentials in git repositories.")
@@ -124,6 +125,9 @@ func main() {
 	}
 
 	for r := range e.ResultsChan() {
+		if *onlyVerified && !r.Verified {
+			continue
+		}
 
 		switch {
 		case *jsonLegacy:
