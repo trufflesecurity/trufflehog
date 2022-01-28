@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -19,6 +20,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/pkg/sources"
 )
+
+type chunkFunc func(chunk *sources.Chunk) error
+
+var MatchError error = errors.New("chunk doesn't match")
 
 func TestSource_Scan(t *testing.T) {
 
@@ -65,9 +70,11 @@ func TestSource_Scan(t *testing.T) {
 		init      init
 		wantChunk *sources.Chunk
 		wantErr   bool
+		minRepo   int
+		minOrg    int
 	}{
 		{
-			name: "get an authenticated (token) chunk",
+			name: "token authenticated, single repo",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
@@ -83,7 +90,7 @@ func TestSource_Scan(t *testing.T) {
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Repository: "https://gist.github.com/be45ad1ebabe98482d9c0bb80c07c619.git",
+							Repository: "https://github.com/dustin-decker/secretsandstuff.git",
 						},
 					},
 				},
@@ -91,34 +98,74 @@ func TestSource_Scan(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		// {
-		// 	name: "get an authenticated (token) chunk with specific 'org' enum",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Repositories: []string{"https://github.com/dustin-decker/"},
-		// 			Credential: &sourcespb.GitHub_Token{
-		// 				Token: githubToken,
-		// 			},
-		// 		},
-		// 	},
-		// 	wantChunk: &sources.Chunk{
-		// 		SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
-		// 		SourceName: "test source",
-		// 		SourceMetadata: &source_metadatapb.MetaData{
-		// 			Data: &source_metadatapb.MetaData_Github{
-		// 				Github: &source_metadatapb.Github{
-		// 					Repository: "https://github.com/dustin-decker/secretsandstuff.git",
-		// 				},
-		// 			},
-		// 		},
-		// 		Verify: false,
-		// 	},
-		// 	wantErr: false,
-		// },
 		{
-			name: "get an authenticated (token) chunk with enumeration",
-			//Enum cannot be restricted w/ token
+			name: "token authenticated, single org",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Organizations: []string{"trufflesecurity"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   3,
+			minOrg:    0,
+		},
+		{
+			name: "token authenticated, username in org",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Organizations: []string{"dustin-decker"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   3,
+			minOrg:    0,
+		},
+		{
+			name: "token authenticated, username in repo",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"dustin-decker"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   3,
+			minOrg:    0,
+		},
+		{
+			name: "token authenticated, org in repo",
+			// I do not think that this is a supported case, but adding the test to specify there is no requirement.
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"trufflesecurity"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   0,
+			minOrg:    0,
+		},
+		{
+			name: "token authenticated, no org or user (enum)",
+			// This configuration currently will only find gists from the user. No repos or orgs will be scanned.
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
@@ -127,22 +174,13 @@ func TestSource_Scan(t *testing.T) {
 					},
 				},
 			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
-				SourceName: "test source",
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Github{
-						Github: &source_metadatapb.Github{
-							Repository: "https://gist.github.com/be45ad1ebabe98482d9c0bb80c07c619.git",
-						},
-					},
-				},
-				Verify: false,
-			},
-			wantErr: false,
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   0,
+			minOrg:    0,
 		},
 		{
-			name: "get an authenticated (old app) chunk w/ enum",
+			name: "app authenticated (old), no repo or org (enum)",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
@@ -156,22 +194,13 @@ func TestSource_Scan(t *testing.T) {
 					},
 				},
 			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
-				SourceName: "test source",
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Github{
-						Github: &source_metadatapb.Github{
-							Repository: "https://github.com/dustin-decker/dockerfiles.git",
-						},
-					},
-				},
-				Verify: false,
-			},
-			wantErr: false,
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   3,
+			minOrg:    0,
 		},
 		{
-			name: "get an unauthenticated org chunk with enumeration",
+			name: "unauthenticated, single org",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
@@ -179,22 +208,13 @@ func TestSource_Scan(t *testing.T) {
 					Credential:    &sourcespb.GitHub_Unauthenticated{},
 				},
 			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
-				SourceName: "test source",
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Github{
-						Github: &source_metadatapb.Github{
-							Repository: "https://github.com/trufflesecurity/TruffleHog-Enterprise-Github-Action.git",
-						},
-					},
-				},
-				Verify: false,
-			},
-			wantErr: false,
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   3,
+			minOrg:    1,
 		},
 		{
-			name: "get an unauthenticated repo chunk with no enumeration",
+			name: "unauthenticated, single repo",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
@@ -217,11 +237,31 @@ func TestSource_Scan(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "installed app on org w/ enum",
+			name: "app authenticated, no repo or org",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
 					ScanUsers: true,
+					Credential: &sourcespb.GitHub_GithubApp{
+						GithubApp: &credentialspb.GitHubApp{
+							PrivateKey:     githubPrivateKeyNew,
+							InstallationId: githubInstallationIDNew,
+							AppId:          githubAppIDNew,
+						},
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   3,
+			minOrg:    0,
+		},
+		{
+			name: "app authenticated, single repo",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
 					Credential: &sourcespb.GitHub_GithubApp{
 						GithubApp: &credentialspb.GitHubApp{
 							PrivateKey:     githubPrivateKeyNew,
@@ -237,41 +277,41 @@ func TestSource_Scan(t *testing.T) {
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Repository: "https://gist.github.com/be45ad1ebabe98482d9c0bb80c07c619.git",
+							Repository: "https://github.com/trufflesecurity/driftwood.git",
 						},
 					},
 				},
 				Verify: false,
 			},
 			wantErr: false,
+			minRepo: 3,
+			minOrg:  0,
 		},
-		// {
-		// 	name: "early termination of org/users",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Repositories: strings.Split(testAccts, "\n"),
-		// 			Credential:   &sourcespb.GitHub_Unauthenticated{},
-		// 		},
-		// 	},
-		// 	wantChunk: &sources.Chunk{
-		// 		SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
-		// 		SourceName: "test source",
-		// 		SourceMetadata: &source_metadatapb.MetaData{
-		// 			Data: &source_metadatapb.MetaData_Github{
-		// 				Github: &source_metadatapb.Github{
-		// 					Repository: "https://gist.github.com/be45ad1ebabe98482d9c0bb80c07c619.git",
-		// 				},
-		// 			},
-		// 		},
-		// 		Verify: false,
-		// 	},
-		// 	wantErr: false,
-		// },
+		{
+			name: "app authenticated, single org",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Organizations: []string{"trufflesecurity"},
+					Credential: &sourcespb.GitHub_GithubApp{
+						GithubApp: &credentialspb.GitHubApp{
+							PrivateKey:     githubPrivateKeyNew,
+							InstallationId: githubInstallationIDNew,
+							AppId:          githubAppIDNew,
+						},
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   3,
+			minOrg:    1,
+		},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			log.Debugf("Beginning test %d: %s", i, tt.name)
 			s := Source{}
 
 			log.SetLevel(log.DebugLevel)
@@ -300,9 +340,8 @@ func TestSource_Scan(t *testing.T) {
 					return
 				}
 			}()
-			gotChunk := <-chunksCh
-			if diff := pretty.Compare(gotChunk.SourceMetadata.GetGithub().Repository, tt.wantChunk.SourceMetadata.GetGithub().Repository); diff != "" {
-				t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+			if err = handleChannel(chunksCh, basicCheckFunc(tt.minOrg, tt.minRepo, tt.wantChunk, &s)); err != nil {
+				t.Error(err)
 			}
 		})
 	}
@@ -338,6 +377,7 @@ func TestSource_paginateGists(t *testing.T) {
 		init      init
 		wantChunk *sources.Chunk
 		wantErr   bool
+		user      string
 	}{
 		{
 			name: "get gist secret",
@@ -354,7 +394,6 @@ func TestSource_paginateGists(t *testing.T) {
 				},
 			},
 			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
 				SourceName: "test source",
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
@@ -366,7 +405,37 @@ func TestSource_paginateGists(t *testing.T) {
 				Verify: false,
 			},
 			wantErr: false,
+			user:    "dustin-decker",
 		},
+		/*		{
+					name: "get multiple pages of gists",
+					init: init{
+						name: "test source",
+						connection: &sourcespb.GitHub{
+							Credential: &sourcespb.GitHub_GithubApp{
+								GithubApp: &credentialspb.GitHubApp{
+									PrivateKey:     githubPrivateKeyNew,
+									InstallationId: githubInstallationIDNew,
+									AppId:          githubAppIDNew,
+								},
+							},
+						},
+					},
+					wantChunk: &sources.Chunk{
+						SourceName: "test source",
+						SourceMetadata: &source_metadatapb.MetaData{
+							Data: &source_metadatapb.MetaData_Github{
+								Github: &source_metadatapb.Github{
+									Repository: "https://gist.github.com/872df3b78b9ec3e7dbe597fb5a202121.git",
+								},
+							},
+						},
+						Verify: false,
+					},
+					wantErr: false,
+					user:    "andrew",
+				},
+		*/
 	}
 
 	for _, tt := range tests {
@@ -390,13 +459,48 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.paginateGists(ctx, "dustin-decker", chunksCh)
+				s.paginateGists(ctx, tt.user, chunksCh)
 			}()
-			gotChunk := <-chunksCh
-			if diff := pretty.Compare(gotChunk.SourceMetadata.GetGithub().Repository, tt.wantChunk.SourceMetadata.GetGithub().Repository); diff != "" {
-				t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+			if err = handleChannel(chunksCh, basicCheckFunc(0, 0, tt.wantChunk, &s)); err != nil {
+				t.Error(err)
 			}
 		})
+	}
+}
+
+func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) chunkFunc {
+	return func(chunk *sources.Chunk) error {
+		if minOrg != 0 && minOrg > len(s.orgs) {
+			return fmt.Errorf("incorrect number of orgs. expected at least: %d, got %d", minOrg, len(s.orgs))
+		}
+		if minRepo != 0 && minRepo > len(s.repos) {
+			return fmt.Errorf("incorrect number of repos. expected at least: %d, got %d", minRepo, len(s.repos))
+		}
+		if wantChunk != nil {
+			if diff := pretty.Compare(chunk.SourceMetadata.GetGithub().Repository, wantChunk.SourceMetadata.GetGithub().Repository); diff == "" {
+				return nil
+			}
+			return MatchError
+		}
+		return nil
+	}
+}
+
+func handleChannel(chunksCh chan *sources.Chunk, cf chunkFunc) error {
+	for {
+		select {
+		case gotChunk := <-chunksCh:
+			err := cf(gotChunk)
+			if err != nil {
+				if errors.Is(err, MatchError) {
+					continue
+				}
+				return err
+			}
+			return nil
+		case <-time.After(10 * time.Second):
+			return fmt.Errorf("no new chunks recieved after 10 seconds")
+		}
 	}
 }
 
