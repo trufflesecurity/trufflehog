@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/google/go-github/v41/github"
 	"os"
 	"testing"
 	"time"
@@ -378,6 +379,7 @@ func TestSource_paginateGists(t *testing.T) {
 		wantChunk *sources.Chunk
 		wantErr   bool
 		user      string
+		minRepos  int
 	}{
 		{
 			name: "get gist secret",
@@ -404,8 +406,28 @@ func TestSource_paginateGists(t *testing.T) {
 				},
 				Verify: false,
 			},
-			wantErr: false,
-			user:    "dustin-decker",
+			wantErr:  false,
+			user:     "dustin-decker",
+			minRepos: 1,
+		},
+		{
+			name: "get multiple pages of gists",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Credential: &sourcespb.GitHub_GithubApp{
+						GithubApp: &credentialspb.GitHubApp{
+							PrivateKey:     githubPrivateKeyNew,
+							InstallationId: githubInstallationIDNew,
+							AppId:          githubAppIDNew,
+						},
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			user:      "andrew",
+			minRepos:  101,
 		},
 		/*		{
 					name: "get multiple pages of gists",
@@ -459,12 +481,34 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.paginateGists(ctx, tt.user, chunksCh)
+				s.addGistsByUser(ctx, github.NewClient(s.httpClient), tt.user)
+				chunksCh <- &sources.Chunk{}
 			}()
-			if err = handleChannel(chunksCh, basicCheckFunc(0, 0, tt.wantChunk, &s)); err != nil {
+			var wantedRepo string
+			if tt.wantChunk != nil {
+				wantedRepo = tt.wantChunk.SourceMetadata.GetGithub().Repository
+			}
+			if err = handleChannel(chunksCh, gistsCheckFunc(wantedRepo, tt.minRepos, &s)); err != nil {
 				t.Error(err)
 			}
 		})
+	}
+}
+
+func gistsCheckFunc(expected string, minRepos int, s *Source) chunkFunc {
+	return func(chunk *sources.Chunk) error {
+		if minRepos != 0 && minRepos > len(s.repos) {
+			return fmt.Errorf("didn't find enough repos. expected: %d, got :%d", minRepos, len(s.repos))
+		}
+		if expected != "" {
+			for _, repo := range s.repos {
+				if repo == expected {
+					return nil
+				}
+			}
+			return fmt.Errorf("expected repo not included: %s", expected)
+		}
+		return nil
 	}
 }
 

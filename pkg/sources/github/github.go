@@ -141,30 +141,18 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	s.repos = s.conn.Repositories
 	s.orgs = s.conn.Organizations
 
+	var apiClient *github.Client
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
-		apiClient := github.NewClient(s.httpClient)
+		apiClient = github.NewClient(s.httpClient)
 		if len(s.orgs) > 30 {
 			log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 		}
 
-		if len(s.repos) > 0 {
-			for i, repo := range s.repos {
-				if !strings.HasSuffix(repo, ".git") {
-					if repo, err := giturl.NormalizeGithubRepo(repo); err != nil {
-						// This wasn't formatted as expected, let the user know why that might be.
-						log.WithError(err).Warnf("Repo not in expected format, attempting to paginate repos instead.")
-					} else {
-						s.repos[i] = repo
-					}
-					s.paginateRepos(ctx, apiClient, repo)
-				}
-			}
-		}
-
 		if len(s.orgs) > 0 {
 			for _, org := range s.orgs {
-				s.paginateRepos(ctx, apiClient, org)
+				s.addReposByOrg(ctx, apiClient, org)
+				s.addReposByUser(ctx, apiClient, org)
 			}
 		}
 	case *sourcespb.GitHub_Token:
@@ -177,7 +165,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		)
 		tc := oauth2.NewClient(context.TODO(), ts)
 
-		var apiClient *github.Client
 		var err error
 		// If we're using public github, make a regular client.
 		// Otherwise make an enterprise client
@@ -196,24 +183,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 		if len(s.repos) > 0 {
 			specificScope = true
-			for i, repo := range s.repos {
-				if !strings.HasSuffix(repo, ".git") {
-					if repo, err := giturl.NormalizeGithubRepo(repo); err != nil {
-						// This wasn't formatted as expected, let the user know why that might be.
-						log.WithError(err).Warnf("Repo not in expected format, attempting to paginate repos instead.")
-					} else {
-						s.repos[i] = repo
-					}
-					s.paginateRepos(ctx, apiClient, repo)
-				}
-			}
 		}
 
 		if len(s.orgs) > 0 {
 			specificScope = true
 			for _, org := range s.orgs {
 				if !strings.HasSuffix(org, ".git") {
-					s.paginateRepos(ctx, apiClient, org)
+					s.addReposByOrg(ctx, apiClient, org)
+					s.addReposByUser(ctx, apiClient, org)
 				}
 			}
 		}
@@ -222,14 +199,21 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		if err != nil {
 			return errors.New(err)
 		}
-		// TODO: this should enumerate an organizations gists too...
-		s.paginateGists(ctx, user.GetLogin(), chunksChan)
 
 		if !specificScope {
-			s.paginateRepos(ctx, apiClient, user.GetLogin())
+			s.addReposByUser(ctx, apiClient, user.GetLogin())
 			// Scan for orgs is default with a token. GitHub App enumerates the repositories
 			// that were assigned to it in GitHub App settings.
-			s.paginateOrgs(ctx, apiClient, *user.Name)
+			s.addOrgsByUser(ctx, apiClient, user.GetLogin())
+			for _, org := range s.orgs {
+				s.addReposByOrg(ctx, apiClient, org)
+			}
+		}
+
+		s.addGistsByUser(ctx, apiClient, user.GetLogin())
+		for _, org := range s.orgs {
+			// TODO: Test it actually works to list org gists like this.
+			s.addGistsByUser(ctx, apiClient, org)
 		}
 	case *sourcespb.GitHub_GithubApp:
 		installationID, err := strconv.ParseInt(cred.GithubApp.InstallationId, 10, 64)
@@ -252,7 +236,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			return errors.New(err)
 		}
 		itr.BaseURL = apiEndpoint
-		apiClient, err := github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: itr})
+		apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: itr})
 		if err != nil {
 			return errors.New(err)
 		}
@@ -272,28 +256,29 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			return errors.New(err)
 		}
 
-		err = s.paginateApp(ctx, apiClient)
+		err = s.addReposByApp(ctx, apiClient)
 		if err != nil {
 			return err
 		}
 
 		//check if we need to find user repos
 		if s.conn.ScanUsers {
-			err := s.paginateMembers(ctx, installationClient, apiClient)
+			err := s.addMembersByApp(ctx, installationClient, apiClient)
 			if err != nil {
 				return err
 			}
 			log.Infof("Scanning repos from %v organization members.", len(s.members))
 			for _, member := range s.members {
-				//all org member's gists
-				s.paginateGists(ctx, member, chunksChan)
-				s.paginateRepos(ctx, apiClient, member)
+				s.addGistsByUser(ctx, apiClient, member)
+				s.addReposByUser(ctx, apiClient, member)
 			}
 
 		}
 	default:
 		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
+
+	s.normalizeRepos(ctx, apiClient)
 
 	if _, ok := os.LookupEnv("DO_NOT_RANDOMIZE"); !ok {
 		//Randomize channel scan order on each scan
@@ -341,7 +326,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 			defer os.RemoveAll(path)
 			if err != nil {
-				log.WithError(err).Errorf("unable to clone repo, continuing")
+				log.WithError(err).Errorf("unable to clone repo (%s), continuing", repoURL)
 				return
 			}
 			err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
@@ -377,7 +362,7 @@ func handleRateLimit(err error) bool {
 	return true
 }
 
-func (s *Source) paginateReposByOrg(ctx context.Context, apiClient *github.Client, org string) {
+func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, org string) {
 	opts := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 100,
@@ -395,7 +380,7 @@ func (s *Source) paginateReposByOrg(ctx context.Context, apiClient *github.Clien
 			break
 		}
 		for _, r := range someRepos {
-			s.repos = append(s.repos, r.GetCloneURL())
+			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
 		}
 		if res.NextPage == 0 {
 			break
@@ -404,9 +389,8 @@ func (s *Source) paginateReposByOrg(ctx context.Context, apiClient *github.Clien
 	}
 }
 
-func (s *Source) paginateRepos(ctx context.Context, apiClient *github.Client, user string) {
+func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, user string) {
 	opts := &github.RepositoryListOptions{
-		// Visibility: "all",
 		ListOptions: github.ListOptions{
 			PerPage: 50,
 		},
@@ -423,7 +407,7 @@ func (s *Source) paginateRepos(ctx context.Context, apiClient *github.Client, us
 			break
 		}
 		for _, r := range someRepos {
-			s.repos = append(s.repos, r.GetCloneURL())
+			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
 		}
 		if res.NextPage == 0 {
 			break
@@ -432,34 +416,31 @@ func (s *Source) paginateRepos(ctx context.Context, apiClient *github.Client, us
 	}
 }
 
-func (s *Source) paginateGists(ctx context.Context, user string, chunksChan chan *sources.Chunk) {
-	apiClient := github.NewClient(s.httpClient)
-	gists, _, err := apiClient.Gists.List(ctx, user, &github.GistListOptions{})
-	if err != nil {
-		log.WithError(err).Warnf("Could not get gists for user %s", user)
-		return
-	}
-	for _, gist := range gists {
-		path, repo, err := git.CloneRepoUsingUnauthenticated(*gist.GitPullURL)
-		defer os.RemoveAll(path)
-		if err != nil {
-			log.WithError(err).Warnf("Could not get gist %s from user %s", *gist.HTMLURL, user)
+func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, user string) {
+	gistOpts := &github.GistListOptions{}
+	for {
+		gists, resp, err := apiClient.Gists.List(ctx, user, gistOpts)
+		if err == nil {
+			defer resp.Body.Close()
+		}
+		if handled := handleRateLimit(err); handled {
 			continue
 		}
-		s.log.WithField("repo", *gist.HTMLURL).Debugf("attempting to clone gist from user %s", user)
-
-		scanCtx := context.Background()
-		err = s.git.ScanRepo(scanCtx, repo, git.NewScanOptions(), chunksChan)
 		if err != nil {
-			log.WithError(err).Warnf("Could not scan after clone: %s", *gist.HTMLURL)
-			continue
+			log.WithError(err).Warnf("Could not get gists for user %s", user)
 		}
-
+		for _, gist := range gists {
+			common.AddStringSliceItem(gist.GetGitPullURL(), &s.repos)
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		gistOpts.Page = resp.NextPage
 	}
-
+	return
 }
 
-func (s *Source) paginateMembers(ctx context.Context, installationClient *github.Client, apiClient *github.Client) error {
+func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, apiClient *github.Client) error {
 
 	opts := &github.ListOptions{
 		PerPage: 500,
@@ -493,20 +474,19 @@ func (s *Source) paginateMembers(ctx context.Context, installationClient *github
 				if usr == nil || *usr == "" {
 					continue
 				}
-				s.members = append(s.members, *usr)
+				common.AddStringSliceItem(*usr, &s.members)
 			}
 			if res.NextPage == 0 {
 				break
 			}
 			opts.Page = res.NextPage
 		}
-
 	}
 
 	return nil
 }
 
-func (s *Source) paginateApp(ctx context.Context, apiClient *github.Client) error {
+func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) error {
 	// Authenticated enumeration of repos
 	opts := &github.ListOptions{
 		PerPage: 100,
@@ -523,7 +503,7 @@ func (s *Source) paginateApp(ctx context.Context, apiClient *github.Client) erro
 			return errors.WrapPrefix(err, "unable to list repositories", 0)
 		}
 		for _, r := range someRepos.Repositories {
-			s.repos = append(s.repos, r.GetCloneURL())
+			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
 		}
 		if res.NextPage == 0 {
 			break
@@ -533,23 +513,57 @@ func (s *Source) paginateApp(ctx context.Context, apiClient *github.Client) erro
 	return nil
 }
 
-func (s *Source) paginateOrgs(ctx context.Context, apiClient *github.Client, user string) {
-	orgOpts := &github.ListOptions{}
-	orgs, _, err := apiClient.Organizations.List(ctx, "", orgOpts)
-	if err != nil {
-		log.WithError(err).Errorf("Could not list organizations for %s", user)
-		return
+func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, user string) {
+	orgOpts := &github.ListOptions{
+		PerPage: 100,
 	}
-	for _, org := range orgs {
-		var name string
-		if org.Name != nil {
-			name = *org.Name
-		} else if org.Login != nil {
-			name = *org.Login
-		} else {
+	for {
+		orgs, resp, err := apiClient.Organizations.List(ctx, "", orgOpts)
+		if err == nil {
+			defer resp.Body.Close()
+		}
+		if handled := handleRateLimit(err); handled {
 			continue
 		}
-		s.paginateReposByOrg(ctx, apiClient, name)
+		if err != nil {
+			log.WithError(err).Errorf("Could not list organizations for %s", user)
+			return
+		}
+		for _, org := range orgs {
+			var name string
+			if org.Name != nil {
+				name = *org.Name
+			} else if org.Login != nil {
+				name = *org.Login
+			} else {
+				continue
+			}
+			common.AddStringSliceItem(name, &s.orgs)
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		orgOpts.Page = resp.NextPage
 	}
+}
 
+func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
+	// TODO: Add check/fix for repos that are missing scheme
+	var newRepoList []string
+	for _, repo := range s.repos {
+		if parts := strings.Split(repo, "/"); len(parts) == 1 {
+			origSources := len(s.repos)
+			s.addGistsByUser(ctx, apiClient, repo)
+			s.addReposByUser(ctx, apiClient, repo)
+			if origSources != len(s.repos) {
+				common.RemoveStringSliceItem(repo, &s.repos)
+				continue
+			}
+		}
+		repoNormalized, err := giturl.NormalizeGithubRepo(repo)
+		if err != nil {
+			log.WithError(err).Warnf("Repo not in expected format: %s", repo)
+		}
+		newRepoList = append(newRepoList, repoNormalized)
+	}
 }
