@@ -6,8 +6,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/pkg/common"
 	"github.com/trufflesecurity/trufflehog/pkg/detectors"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/trufflesecurity/trufflehog/pkg/pb/detectorspb"
@@ -22,6 +24,7 @@ var (
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"key", "secret"}) + `\b([A-Za-z0-9]{32})\b`)
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"id"}) + `\b([A-Za-z0-9]{32})\b`)
+	ctx       = context.WithValue(context.Background(), oauth2.HTTPClient, common.SaneHttpClient())
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -58,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					ClientSecret: resMatch,
 					TokenURL:     "https://accounts.spotify.com/api/token",
 				}
-				token, err := config.Token(context.Background())
+				token, err := config.Token(ctx)
 				if err == nil {
 					if token.Type() == "Bearer" {
 						s1.Verified = true
