@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/sources/github"
 )
 
-func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []string, token string, filter *common.Filter, concurrency int) error {
+func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []string, token string, includeForks bool, filter *common.Filter, concurrency int) error {
 	source := github.Source{}
 	connection := sourcespb.GitHub{
 		Endpoint:      endpoint,
@@ -26,6 +26,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []
 	} else {
 		connection.Credential = &sourcespb.GitHub_Unauthenticated{}
 	}
+	connection.IncludeForks = includeForks
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {

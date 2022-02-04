@@ -126,6 +126,7 @@ message GitHub {
   repeated string repositories = 5;
   repeated string organizations = 6;
   bool scanUsers = 7;
+  bool includeForks = 8;
 }
 
 message JIRA {

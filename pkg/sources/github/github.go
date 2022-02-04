@@ -378,6 +378,9 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 			break
 		}
 		for _, r := range someRepos {
+			if r.GetFork() && !s.conn.IncludeForks {
+				continue
+			}
 			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
 		}
 		if res.NextPage == 0 {
@@ -405,6 +408,9 @@ func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, u
 			break
 		}
 		for _, r := range someRepos {
+			if r.GetFork() && !s.conn.IncludeForks {
+				continue
+			}
 			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
 		}
 		if res.NextPage == 0 {
@@ -501,6 +507,9 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 			return errors.WrapPrefix(err, "unable to list repositories", 0)
 		}
 		for _, r := range someRepos.Repositories {
+			if r.GetFork() && !s.conn.IncludeForks {
+				continue
+			}
 			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
 		}
 		if res.NextPage == 0 {
