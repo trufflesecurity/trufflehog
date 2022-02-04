@@ -3,7 +3,6 @@ package github
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"github.com/google/go-github/v42/github"
 	"os"
@@ -22,12 +21,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/pkg/sources"
 )
 
-type chunkFunc func(chunk *sources.Chunk) error
-
-var MatchError error = errors.New("chunk doesn't match")
-
 func TestSource_Scan(t *testing.T) {
-
 	os.Setenv("DO_NOT_RANDOMIZE", "true")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
@@ -341,7 +335,7 @@ func TestSource_Scan(t *testing.T) {
 					return
 				}
 			}()
-			if err = handleChannel(chunksCh, basicCheckFunc(tt.minOrg, tt.minRepo, tt.wantChunk, &s)); err != nil {
+			if err = common.HandleTestChannel(chunksCh, basicCheckFunc(tt.minOrg, tt.minRepo, tt.wantChunk, &s)); err != nil {
 				t.Error(err)
 			}
 		})
@@ -488,14 +482,14 @@ func TestSource_paginateGists(t *testing.T) {
 			if tt.wantChunk != nil {
 				wantedRepo = tt.wantChunk.SourceMetadata.GetGithub().Repository
 			}
-			if err = handleChannel(chunksCh, gistsCheckFunc(wantedRepo, tt.minRepos, &s)); err != nil {
+			if err = common.HandleTestChannel(chunksCh, gistsCheckFunc(wantedRepo, tt.minRepos, &s)); err != nil {
 				t.Error(err)
 			}
 		})
 	}
 }
 
-func gistsCheckFunc(expected string, minRepos int, s *Source) chunkFunc {
+func gistsCheckFunc(expected string, minRepos int, s *Source) common.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
 		if minRepos != 0 && minRepos > len(s.repos) {
 			return fmt.Errorf("didn't find enough repos. expected: %d, got :%d", minRepos, len(s.repos))
@@ -512,7 +506,7 @@ func gistsCheckFunc(expected string, minRepos int, s *Source) chunkFunc {
 	}
 }
 
-func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) chunkFunc {
+func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) common.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
 		if minOrg != 0 && minOrg > len(s.orgs) {
 			return fmt.Errorf("incorrect number of orgs. expected at least: %d, got %d", minOrg, len(s.orgs))
@@ -524,27 +518,9 @@ func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) ch
 			if diff := pretty.Compare(chunk.SourceMetadata.GetGithub().Repository, wantChunk.SourceMetadata.GetGithub().Repository); diff == "" {
 				return nil
 			}
-			return MatchError
+			return common.MatchError
 		}
 		return nil
-	}
-}
-
-func handleChannel(chunksCh chan *sources.Chunk, cf chunkFunc) error {
-	for {
-		select {
-		case gotChunk := <-chunksCh:
-			err := cf(gotChunk)
-			if err != nil {
-				if errors.Is(err, MatchError) {
-					continue
-				}
-				return err
-			}
-			return nil
-		case <-time.After(10 * time.Second):
-			return fmt.Errorf("no new chunks recieved after 10 seconds")
-		}
 	}
 }
 

@@ -172,7 +172,6 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				"a6f8aa55736d4a85be31a0048a4607396898647a-bump":  {B: []byte(" s \noops \nf\n")},
 				"73ab4713057944753f1bdeb80e757380e64c6b5b-bump":  {B: []byte(" s \noops \n")},
 				"2f251b8c1e72135a375b659951097ec7749d4af9-bump":  {B: []byte(" \noops \n")},
-				"90c75f884c65dc3638ca1610bd9844e668f213c2-aws":   {B: []byte("blah blaj\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")},
 				"e6c8bbabd8796ea3cd85bfc2e55b27e0a491747f-bump":  {B: []byte("\noops \n")},
 				"735b52b0eb40610002bb1088e902bd61824eb305-bump":  {B: []byte("\noops\n")},
 				"ce62d79908803153ef6e145e042d3e80488ef747-bump":  {B: []byte("\n")},

@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -19,7 +19,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/diff"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
@@ -256,8 +255,34 @@ func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repo
 	return
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	wg := &sync.WaitGroup{}
+func (s *Git) ScanCommits(repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	blobsSeen := map[string]bool{}
+	commits := map[int64][]*object.Commit{}
+
+	logIter, err := repo.Log(scanOptions.LogOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	keys := []int64{}
+
+	sinceTime := int64(0)
+
+	logIter.ForEach(func(commit *object.Commit) error {
+		key := commit.Committer.When.Unix()
+		if scanOptions.SinceCommit != nil && scanOptions.SinceCommit.Hash.String() == commit.Hash.String() {
+			sinceTime = key
+		}
+		if existing, ok := commits[key]; ok {
+			commits[key] = append(existing, commit)
+		} else {
+			commits[key] = []*object.Commit{commit}
+			keys = append(keys, key)
+		}
+		return nil
+	})
+
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 	remote, err := repo.Remote("origin")
 	if err != nil {
@@ -268,60 +293,64 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *S
 		return errors.New(err)
 	}
 
-	commitIter, err := repo.Log(scanOptions.LogOptions)
-	if err != nil {
-		return errors.New(err)
+	start := int64(0)
+	if scanOptions.MaxDepth > 0 && scanOptions.MaxDepth < int64(len(keys)) {
+		start = int64(len(keys)) - scanOptions.MaxDepth
 	}
 
-	scanOneCommit := false
-	if scanOptions.SinceCommit != nil && scanOptions.LogOptions.From.String() == scanOptions.SinceCommit.Hash.String() {
-		// Our head and base commits are the same, so scan the one commit
-		scanOneCommit = true
-	}
-	breakIteration := false
-
-	depth := int64(0)
-	err = commitIter.ForEach(func(commit *object.Commit) error {
-		if breakIteration {
-			return storer.ErrStop
+	scannedCommits := []string{}
+	for _, key := range keys[start:] {
+		if sinceTime > key {
+			continue
 		}
-		if scanOneCommit {
-			breakIteration = true
-		}
-
-		if FilterCommitByFiles(commit, scanOptions.Filter) {
-			return nil
-		}
-
-		// TODO: Clean up this conditional mess.
-		if (scanOptions.SinceCommit != nil && commit.Hash == scanOptions.SinceCommit.Hash && !scanOneCommit) ||
-			(scanOptions.MaxDepth >= 0 && depth >= scanOptions.MaxDepth) {
-			return storer.ErrStop
-		}
-		depth++
-
-		err = s.scanCommitPatches(ctx, repo, commit, chunksChan, scanOptions.Filter)
-		if err != nil {
-			switch e := err.Error(); {
-			case strings.Contains(e, "operation canceled"):
+		for _, commit := range commits[key] {
+			scannedCommits = append(scannedCommits, commit.Hash.String())
+			fileIter, err := commit.Files()
+			if err != nil {
+				return err
+			}
+			err = fileIter.ForEach(func(file *object.File) error {
+				if _, scanned := blobsSeen[file.Hash.String()]; scanned || !scanOptions.Filter.Pass(file.Name) {
+					return nil
+				}
+				blobsSeen[file.Hash.String()] = true
+				metadata := s.sourceMetadataFunc(file.Name, commit.Author.Email, commit.Hash.String(), safeRepo)
+				reader, err := file.Reader()
+				if err != nil {
+					return nil
+				}
+				defer reader.Close()
+				buffer := new(bytes.Buffer)
+				buffer.ReadFrom(reader)
+				chunksChan <- &sources.Chunk{
+					SourceType:     s.sourceType,
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					Data:           buffer.Bytes(),
+					SourceMetadata: metadata,
+					Verify:         s.verify,
+				}
 				return nil
-			case strings.Contains(e, "packfile not found"):
-				log.WithError(err).WithField("repo", safeRepo).Warn("invalid commit reference while scanning commit")
-				return nil
-			default:
-				log.WithError(err).WithField("repo", safeRepo).Error("unhandled error scanning commit")
+			})
+			if err != nil {
 				return err
 			}
 		}
-		return nil
-	})
+	}
+	if err != nil && !strings.Contains(err.Error(), "max_depth exceeded") && !strings.Contains(err.Error(), "reached since_commit") {
+		return err
+	}
+	return nil
+}
+
+func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	remote, err := repo.Remote("origin")
 	if err != nil {
-		// https://github.com/src-d/go-git/issues/879
-		if strings.Contains(err.Error(), "object not found") {
-			log.WithError(err).Error("known issue: probably caused by a dangling reference in the repo")
-		} else {
-			return errors.New(err)
-		}
+		return errors.New(err)
+	}
+	safeRepo, err := stripPassword(remote.Config().URLs[0])
+	if err != nil {
+		return errors.New(err)
 	}
 
 	// Also scan any unstaged changes in the working tree of the repo
@@ -366,8 +395,22 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *S
 			}
 		}
 	}
+	return nil
+}
 
-	wg.Wait()
+func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	if err := s.ScanCommits(repo, scanOptions, chunksChan); err != nil {
+		return err
+	}
+	if err := s.ScanUnstaged(repo, scanOptions, chunksChan); err != nil {
+		// https://github.com/src-d/go-git/issues/879
+		if strings.Contains(err.Error(), "object not found") {
+			log.WithError(err).Error("known issue: probably caused by a dangling reference in the repo")
+		} else {
+			return errors.New(err)
+		}
+		return err
+	}
 	return nil
 }
 
