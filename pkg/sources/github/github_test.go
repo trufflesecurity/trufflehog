@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/google/go-github/v41/github"
+	"github.com/google/go-github/v42/github"
 	"os"
 	"testing"
 	"time"

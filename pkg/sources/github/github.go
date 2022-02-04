@@ -16,7 +16,7 @@ import (
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v41/github"
+	"github.com/google/go-github/v42/github"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
@@ -303,9 +303,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if !strings.HasSuffix(repoURL, ".git") {
 				return
 			}
-			if strings.Contains(repoURL, "DefinitelyTyped") {
-				return
-			}
+
 			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo %d/%d", i+1, len(s.repos))
 			var path string
 			var repo *gogit.Repository

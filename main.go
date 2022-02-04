@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/go-echarts/statsview"
+	"github.com/go-echarts/statsview/viewer"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
@@ -72,6 +74,16 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	} else {
 		logrus.SetLevel(logrus.InfoLevel)
+	}
+
+	if *debug {
+		go func() {
+			viewer.SetConfiguration(viewer.WithAddr(":18066"))
+			viewer.SetConfiguration(viewer.WithLinkAddr("localhost:18066"))
+			mgr := statsview.New()
+			logrus.Info("starting pprof and metrics server on http://localhost:18066/debug/pprof and http://localhost:18066/debug/statsview")
+			mgr.Start()
+		}()
 	}
 
 	ctx := context.TODO()
