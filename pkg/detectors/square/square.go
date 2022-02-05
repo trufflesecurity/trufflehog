@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// 403 will be issued if the scope is wrong but the key is correct
 			baseURL := "https://connect.squareupsandbox.com/v2/merchants"
 
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 
 			// test `merchants` scope - its commonly allowed and low sensitivity
 			req, _ := http.NewRequestWithContext(ctx, "GET", baseURL, nil)

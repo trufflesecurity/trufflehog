@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				baseURL := "https://connect.squareupsandbox.com/oauth2/revoke"
 
-				client := common.RetryableHttpClient()
+				client := common.SaneHttpClient()
 				reqData, err := json.Marshal(map[string]string{
 					"client_id":    match,
 					"access_token": "fakeTruffleHogAccessTokenForVerification",

@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.RetryableHttpClient()
+	client = common.SaneHttpClient()
 
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sendgrid"}) + `(SG\.[\w\-_]{20,24}\.[\w\-_]{39,50})\b`)
 )

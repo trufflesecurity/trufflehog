@@ -42,7 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 			// https://circleci.com/docs/api/#authentication
 			req, _ := http.NewRequestWithContext(ctx, "GET", "https://circleci.com/api/v2/me", nil)
 			req.Header.Add("Accept", "application/json;")

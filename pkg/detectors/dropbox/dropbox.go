@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			baseURL := "https://api.dropboxapi.com/2/users/get_current_account"
 
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 
 			req, _ := http.NewRequest("POST", baseURL, nil)
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))

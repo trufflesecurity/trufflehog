@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 			// https://www.pivotaltracker.com/help/api/rest/v5#top
 			req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.pivotaltracker.com/services/v5/me", nil)
 			req.Header.Add("Content-Type", "application/json; charset=utf-8")

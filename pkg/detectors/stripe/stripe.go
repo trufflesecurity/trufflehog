@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			baseURL := "https://api.stripe.com/v1/charges"
 
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 
 			// test `read_user` scope
 			req, _ := http.NewRequestWithContext(ctx, "GET", baseURL, nil)

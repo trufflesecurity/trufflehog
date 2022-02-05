@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// of them contain data, we know we have a valid key, but if they all fail, we don't
 			baseURL := "https://gitlab.com/api/v4"
 
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 
 			// test `read_user` scope
 			req, _ := http.NewRequest("GET", baseURL+"/user", nil)

@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			datacenter := strings.Split(match, "-")[1]
 
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 			// https://mailchimp.com/developer/guides/marketing-api-conventions/
 			req, _ := http.NewRequest("GET", fmt.Sprintf("https://%s.api.mailchimp.com/3.0/", datacenter), nil)
 			req.SetBasicAuth("anystring", match)

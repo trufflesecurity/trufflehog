@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := common.RetryableHttpClient()
+			client := common.SaneHttpClient()
 			// https://developer.github.com/v3/users/#get-the-authenticated-user
 			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
 			req.Header.Add("Content-Type", "application/json; charset=utf-8")

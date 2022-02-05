@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", fmt.Sprintf("SSWS %s", token))
 
-				resp, err := common.RetryableHttpClient().Do(req)
+				resp, err := common.SaneHttpClient().Do(req)
 				if err != nil {
 					return results, err
 				}
