@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("https://api.opencagedata.com/geocode/v1/json?q=12.8797,121.7740&key=%s", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.opencagedata.com/geocode/v1/json?q=12.8797,121.7740&key=%s", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

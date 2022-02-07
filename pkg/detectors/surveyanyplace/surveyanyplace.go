@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					"code2"
 					]
 					}`)
-				req, _ := http.NewRequest("POST", "https://api.surveyanyplace.com/v1/surveys/"+resIdMatch+"/accesscodes", payload)
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.surveyanyplace.com/v1/surveys/"+resIdMatch+"/accesscodes", payload)
 				req.Header.Add("Authorization", fmt.Sprintf("API %s", resMatch))
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)

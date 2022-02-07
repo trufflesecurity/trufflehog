@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.glassnode.com/v1/metrics/indicators/sopr?a=btc&api_key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.glassnode.com/v1/metrics/indicators/sopr?a=btc&api_key="+resMatch, nil)
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

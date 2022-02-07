@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader(fmt.Sprintf(`grant_type=client_credentials&client_id=%s&client_secret=%s`, resMatch, resSecret))
-				req, _ := http.NewRequest("POST", "https://developer.api.autodesk.com/authentication/v1/authenticate", payload)
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://developer.api.autodesk.com/authentication/v1/authenticate", payload)
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				res, err := client.Do(req)
 				if err == nil {

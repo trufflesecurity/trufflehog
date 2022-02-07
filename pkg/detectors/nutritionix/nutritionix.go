@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader(`{"query":"for breakfast i ate 2 eggs, bacon, and french toast","timezone":"US/Eastern"}`)
-				req, _ := http.NewRequest("POST", "https://trackapi.nutritionix.com/v2/natural/nutrients", payload)
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://trackapi.nutritionix.com/v2/natural/nutrients", payload)
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("x-app-id", resIdMatch)
 				req.Header.Add("x-app-key", resMatch)

@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				data := fmt.Sprintf("%s:X", resMatch)
 				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://%s/api/v2/tickets", resURL), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v2/tickets", resURL), nil)
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 				res, err := client.Do(req)

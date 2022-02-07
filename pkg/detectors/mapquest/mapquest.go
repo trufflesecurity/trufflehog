@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "http://www.mapquestapi.com/datamanager/v2/get-column-types?key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "http://www.mapquestapi.com/datamanager/v2/get-column-types?key="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.juro.com/v3/templates", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.juro.com/v3/templates", nil)
 			req.Header.Add("x-api-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

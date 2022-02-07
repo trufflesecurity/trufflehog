@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"token": "sample"}`)
-			req, _ := http.NewRequest("POST", "https://api.unify.id/v1/humandetect/verify", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.unify.id/v1/humandetect/verify", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("X-API-Key", resMatch)
 			res, err := client.Do(req)

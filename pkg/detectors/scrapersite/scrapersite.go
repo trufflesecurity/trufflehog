@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequest("GET", fmt.Sprintf("https://scrapersite.com/api-v1?api_key=%s&url=https://google.com", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://scrapersite.com/api-v1?api_key=%s&url=https://google.com", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)

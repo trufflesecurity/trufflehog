@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.textanywhere.com/API/v1.0/REST/status", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.textanywhere.com/API/v1.0/REST/status", nil)
 				req.Header.Add("user_key", resMatch)
 				req.Header.Add("access_token", tokenRes)
 				res, err := client.Do(req)

@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"to": [ "639668957581" ],
 				"body": "This is a test message from your Sinch account"
 				}`)
-				req, _ := http.NewRequest("POST", "https://sms.api.sinch.com/xms/v1/"+resIdMatch+"/batches", payload)
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://sms.api.sinch.com/xms/v1/"+resIdMatch+"/batches", payload)
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 				res, err := client.Do(req)

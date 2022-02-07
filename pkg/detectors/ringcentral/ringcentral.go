@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://platform.devtest.ringcentral.com/restapi/oauth/authorize?response_type=code&redirect_uri=%s&client_id=%s", resURI, resMatch), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://platform.devtest.ringcentral.com/restapi/oauth/authorize?response_type=code&redirect_uri=%s&client_id=%s", resURI, resMatch), nil)
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)
 				if err == nil {

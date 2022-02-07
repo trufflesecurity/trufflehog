@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.hunter.io/v2/leads_lists?api_key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.hunter.io/v2/leads_lists?api_key="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			client.Timeout = 5 * time.Second
-			req, _ := http.NewRequest("GET", "https://commodities-api.com/api/latest?access_key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://commodities-api.com/api/latest?access_key="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)

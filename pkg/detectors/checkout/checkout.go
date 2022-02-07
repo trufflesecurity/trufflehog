@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				//Used the app's sandbox environment for this case since I can't create a live account.
-				req, _ := http.NewRequest("GET", "https://api.sandbox.checkout.com/customers/"+resIdMatch, nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.sandbox.checkout.com/customers/"+resIdMatch, nil)
 				req.Header.Add("Authorization", resMatch)
 				res, err := client.Do(req)
 				if err == nil {

@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("https://api.weatherbit.io/v2.0/history/airquality?lat=38.0&lon=-78.0&key=%s", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.weatherbit.io/v2.0/history/airquality?lat=38.0&lon=-78.0&key=%s", resMatch), nil)
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://nitro.alconost.com/api/v1/account", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://nitro.alconost.com/api/v1/account", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.SetBasicAuth(resMatch, "")
 			res, err := client.Do(req)

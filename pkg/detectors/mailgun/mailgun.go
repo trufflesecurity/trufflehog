@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.mailgun.net/v3/domains", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.mailgun.net/v3/domains", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

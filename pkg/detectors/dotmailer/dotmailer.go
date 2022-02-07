@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				timeout := 10 * time.Second
 				client.Timeout = timeout
-				req, _ := http.NewRequest("GET", "https://r3-api.dotmailer.com/v2/account-info", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://r3-api.dotmailer.com/v2/account-info", nil)
 				req.SetBasicAuth(resMatch, resPassMatch)
 				res, err := client.Do(req)
 				if err == nil {

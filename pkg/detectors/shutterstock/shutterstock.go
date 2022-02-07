@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.shutterstock.com/v2/images/search", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.shutterstock.com/v2/images/search", nil)
 				req.Header.Add("Accept", "application/json")
 				req.SetBasicAuth(resMatch, resSecretMatch)
 				res, err := client.Do(req)

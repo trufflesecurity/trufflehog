@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			payload := strings.NewReader(`{
 				"domain": "www.example.com"
 				}`)
-			req, _ := http.NewRequest("POST", "https://api.brandfetch.io/v1/color", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.brandfetch.io/v1/color", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("x-api-key", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)

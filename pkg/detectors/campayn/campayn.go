@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://campayn.com/api/v1/lists", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://campayn.com/api/v1/lists", nil)
 			req.Header.Add("Authorization", "TRUEREST apikey="+resMatch)
 			res, err := client.Do(req)
 			if err == nil {

@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://api.foursquare.com/v2/venues/trending?client_id=%s&client_secret=%s&v=20211019&near=LA", resMatch, resSecret), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.foursquare.com/v2/venues/trending?client_id=%s&client_secret=%s&v=20211019&near=LA", resMatch, resSecret), nil)
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)
 				if err == nil {

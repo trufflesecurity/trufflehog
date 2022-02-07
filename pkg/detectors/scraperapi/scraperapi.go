@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 15 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequest("GET", fmt.Sprintf("http://api.scraperapi.com?api_key=%s&url=google.com", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://api.scraperapi.com?api_key=%s&url=google.com", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

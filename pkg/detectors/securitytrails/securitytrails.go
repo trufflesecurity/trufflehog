@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.securitytrails.com/v1/ping", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.securitytrails.com/v1/ping", nil)
 			req.Header.Add("APIKEY", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

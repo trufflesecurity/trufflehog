@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resMatch),
 			}
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://verifier.meetchopra.com/verify/%s?token=%s", userPatMatch, resMatch), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://verifier.meetchopra.com/verify/%s?token=%s", userPatMatch, resMatch), nil)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

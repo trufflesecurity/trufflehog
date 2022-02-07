@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.agora.io/dev/v1/projects", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.agora.io/dev/v1/projects", nil)
 				req.SetBasicAuth(resSecret, resMatch)
 				res, err := client.Do(req)
 

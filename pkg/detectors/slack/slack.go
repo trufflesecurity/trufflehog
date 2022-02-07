@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			if verify {
 				client := common.SaneHttpClient()
-				req, _ := http.NewRequest("POST", verifyURL, nil)
+				req, _ := http.NewRequestWithContext(ctx, "POST", verifyURL, nil)
 				req.Header.Add("Content-Type", "application/json; charset=utf-8")
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 				res, err := client.Do(req)

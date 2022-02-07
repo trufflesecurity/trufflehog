@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://"+resURLMatch+"/artifactory/api/storageinfo", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://"+resURLMatch+"/artifactory/api/storageinfo", nil)
 
 			req.Header.Add("X-JFrog-Art-Api", resMatch)
 			res, err := client.Do(req)

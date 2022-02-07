@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				payload := strings.NewReader(`{"environment":"production","username":"john","email":"john@smith.com","repository":"https://github.com/airbrake/airbrake","revision":"38748467ea579e7ae64f7815452307c9d05e05c5","version":"v2.0"}`)
 
-				req, _ := http.NewRequest("POST", "https://api.airbrake.io/api/v4/projects/"+resIdMatch+"/deploys?key="+resMatch, payload)
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.airbrake.io/api/v4/projects/"+resIdMatch+"/deploys?key="+resMatch, payload)
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)
 				if err == nil {

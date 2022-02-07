@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.ambeedata.com/latest/by-lat-lng?lat=12&lng=77", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.ambeedata.com/latest/by-lat-lng?lat=12&lng=77", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("x-api-key", resMatch)
 			res, err := client.Do(req)

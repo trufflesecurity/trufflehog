@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://rest.nexmo.com/account/get-balance?api_key="+resMatch+"&api_secret="+resSecret+"", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://rest.nexmo.com/account/get-balance?api_key="+resMatch+"&api_secret="+resSecret+"", nil)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

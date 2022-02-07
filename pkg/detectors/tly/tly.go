@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://t.ly/api/v1/link/stats?api_token="+resMatch+"&short_url=https://t.ly/h9YS", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://t.ly/api/v1/link/stats?api_token="+resMatch+"&short_url=https://t.ly/h9YS", nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

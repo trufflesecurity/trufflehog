@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		if verify {
 			payload := strings.NewReader(`{'text':'This is a verification message from TruffleHog. It means that there has been a live webhook credential found.'}`)
-			req, _ := http.NewRequest("POST", resMatch, payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err != nil {

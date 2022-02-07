@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				data := fmt.Sprintf("%s:%s", unameMatch, keyMatch)
 				encoded := b64.StdEncoding.EncodeToString([]byte(data))
 
-				req, _ := http.NewRequest("GET", "https://api.getguru.com/api/v1/teams/teamId/stats", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.getguru.com/api/v1/teams/teamId/stats", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
 				res, err := client.Do(req)
 				if err == nil {

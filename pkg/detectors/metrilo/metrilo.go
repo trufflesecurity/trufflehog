@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"time":1518004715732,"token": "` + resMatch + `" ,"platform":"Wordpress 4.2.7 / Woocommerce 3.5","pluginVersion":"1.1.0","params":{"id":"12","name":"Clothing","url":"https://dummysite.com"}}`)
-			req, _ := http.NewRequest("POST", "https://trk.mtrl.me/category", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://trk.mtrl.me/category", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Content-Length", `0`)
 			res, err := client.Do(req)

@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader("apiKey=" + resMatch)
-			req, _ := http.NewRequest("POST", "https://canny.io/api/v1/boards/list", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://canny.io/api/v1/boards/list", payload)
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			res, err := client.Do(req)
 			if err == nil {

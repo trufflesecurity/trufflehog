@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://stock.adobe.io/Rest/Media/1/Search/Files?locale=en_US%2526search_parameters%255Bwords%255D=kittens", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://stock.adobe.io/Rest/Media/1/Search/Files?locale=en_US%2526search_parameters%255Bwords%255D=kittens", nil)
 				req.Header.Add("x-api-key", resMatch)
 				req.Header.Add("x-product", resIdMatch)
 				res, err := client.Do(req)

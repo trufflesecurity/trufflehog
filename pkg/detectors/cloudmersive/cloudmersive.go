@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"AddressString":"string","CapitalizationMode":"string"}`)
-			req, _ := http.NewRequest("POST", "https://api.cloudmersive.com/validate/address/parse", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.cloudmersive.com/validate/address/parse", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Apikey", resMatch)
 			res, err := client.Do(req)

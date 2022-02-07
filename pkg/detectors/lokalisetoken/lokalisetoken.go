@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.lokalise.com/api2/system/languages", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.lokalise.com/api2/system/languages", nil)
 			req.Header.Add("x-api-token", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

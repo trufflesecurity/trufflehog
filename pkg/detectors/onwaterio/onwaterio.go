@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("https://api.onwater.io/api/v1/results/23.92323,-66.3?access_token=%s", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.onwater.io/api/v1/results/23.92323,-66.3?access_token=%s", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("POST", "https://notify-api.line.me/api/notify?message=Notification Successful", nil)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://notify-api.line.me/api/notify?message=Notification Successful", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

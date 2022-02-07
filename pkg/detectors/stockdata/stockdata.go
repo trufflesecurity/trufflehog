@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.stockdata.org/v1/data/quote?symbols=AAPL,TSLA,MSFT&api_token="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.stockdata.org/v1/data/quote?symbols=AAPL,TSLA,MSFT&api_token="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

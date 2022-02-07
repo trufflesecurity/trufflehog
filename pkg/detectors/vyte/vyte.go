@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.vyte.in/v2/events", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.vyte.in/v2/events", nil)
 			req.Header.Add("Accept", "application/vnd.vyte+json; version=3")
 			req.Header.Add("Authorization", resMatch)
 			res, err := client.Do(req)

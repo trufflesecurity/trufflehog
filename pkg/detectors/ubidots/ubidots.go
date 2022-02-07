@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://industrial.api.ubidots.com/api/v1.6/variables/", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://industrial.api.ubidots.com/api/v1.6/variables/", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("X-Auth-Token", resMatch)
 			res, err := client.Do(req)

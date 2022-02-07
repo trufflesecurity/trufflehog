@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("http://api.airvisual.com/v2/countries?key=%s", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://api.airvisual.com/v2/countries?key=%s", resMatch), nil)
 			req.Header.Add("Accept", "application/vnd.airvisual+json; version=3")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

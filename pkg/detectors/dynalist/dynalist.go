@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(fmt.Sprintf(`{"token": "%s"}`, resMatch))
-			req, _ := http.NewRequest("POST", "https://dynalist.io/api/v1/file/list", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://dynalist.io/api/v1/file/list", payload)
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

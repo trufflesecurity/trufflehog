@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				data := fmt.Sprintf("%s:%s", resMatch, resSecret)
 				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-				req, _ := http.NewRequest("GET", "https://api.smooch.io/v2/apps", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.smooch.io/v2/apps", nil)
 				req.Header.Add("Accept", "application/vnd.smooch+json; version=3")
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 				res, err := client.Do(req)

@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"text": ""}`)
-			req, _ := http.NewRequest("POST", resMatch, payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

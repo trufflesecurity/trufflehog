@@ -80,7 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"output":{"format":"mp4", "resolution":"sd"
 				}
 			}`)
-			req, _ := http.NewRequest("POST", "https://api.shotstack.io/stage/render", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.shotstack.io/stage/render", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("x-api-key", resMatch)

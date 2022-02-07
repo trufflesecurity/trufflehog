@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://rest-api.d7networks.com/secure/balance", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://rest-api.d7networks.com/secure/balance", nil)
 			req.Header.Add("Authorization", "Basic "+resMatch)
 			res, err := http.DefaultClient.Do(req)
 			if err == nil {

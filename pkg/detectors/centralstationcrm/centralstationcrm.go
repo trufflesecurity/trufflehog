@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.centralstationcrm.net/api/users.json", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.centralstationcrm.net/api/users.json", nil)
 			req.Header.Add("X-apikey", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

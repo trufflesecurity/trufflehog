@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.openuv.io/api/v1/uv?lat=-33.34&lng=115.342", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.openuv.io/api/v1/uv?lat=-33.34&lng=115.342", nil)
 			req.Header.Add("x-access-token", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

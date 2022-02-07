@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://%s/api/v1/me", resURL), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v1/me", resURL), nil)
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("Authorization", fmt.Sprintf("OAuth %s", resMatch))
 				res, err := client.Do(req)

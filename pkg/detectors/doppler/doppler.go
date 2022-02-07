@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.doppler.com/v3/workplace", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.doppler.com/v3/workplace", nil)
 			req.Header.Add("Accept", "application/json")
 			req.SetBasicAuth(resMatch, "")
 			res, err := client.Do(req)

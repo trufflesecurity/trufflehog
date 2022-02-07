@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			// test for api key
-			req, _ := http.NewRequest("GET", "https://api.clarifai.com/v2/inputs", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.clarifai.com/v2/inputs", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("Key %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if !s1.Verified {
 				// test for pat
-				req, _ := http.NewRequest("GET", "https://api.clarifai.com/v2/users/me", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.clarifai.com/v2/users/me", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Key %s", resMatch))
 				res, err := client.Do(req)
 				if err == nil {

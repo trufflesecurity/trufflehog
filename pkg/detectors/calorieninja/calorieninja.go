@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.calorieninjas.com/v1/nutrition?query", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.calorieninjas.com/v1/nutrition?query", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("X-Api-Key", resMatch)
 			res, err := client.Do(req)

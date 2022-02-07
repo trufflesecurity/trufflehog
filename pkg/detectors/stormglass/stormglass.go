@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.stormglass.io/v2/weather/point?lat=58.7984&lng=17.8081&params=windSpeed", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.stormglass.io/v2/weather/point?lat=58.7984&lng=17.8081&params=windSpeed", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://us.qubole.com/api/v1.2/account", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://us.qubole.com/api/v1.2/account", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("X-AUTH-TOKEN", fmt.Sprintf("%s", resMatch))

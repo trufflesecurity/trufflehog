@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.keen.io/3.0/organizations/"+resIdMatch+"/projects", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.keen.io/3.0/organizations/"+resIdMatch+"/projects", nil)
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("Authorization", fmt.Sprintf("%s", resMatch))
 				res, err := client.Do(req)

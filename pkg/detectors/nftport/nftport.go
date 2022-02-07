@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.nftport.xyz/me/contracts", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.nftport.xyz/me/contracts", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)

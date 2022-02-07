@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://app.zenserp.com/api/v2/search?apikey="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.zenserp.com/api/v2/search?apikey="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

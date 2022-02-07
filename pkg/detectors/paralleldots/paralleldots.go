@@ -73,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, _ := http.NewRequest("POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader(payload.Bytes()))
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader(payload.Bytes()))
 			req.Header.Add("Content-Type", writer.FormDataContentType())
 			res, err := client.Do(req)
 			if err == nil {

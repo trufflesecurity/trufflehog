@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequest("GET", fmt.Sprintf("https://geo.ipify.org/api/v2/country?apiKey=%s&ipAddress=8.8.8.8", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://geo.ipify.org/api/v2/country?apiKey=%s&ipAddress=8.8.8.8", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

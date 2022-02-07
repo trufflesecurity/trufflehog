@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.mailmodo.com/api/v1/campaigns?type=CONTACT_LIST", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.mailmodo.com/api/v1/campaigns?type=CONTACT_LIST", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("mmApiKey", resMatch)
 			res, err := client.Do(req)

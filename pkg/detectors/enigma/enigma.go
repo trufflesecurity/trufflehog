@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"name":"Enigma Technologies, Inc.","person":{"first_name":"","last_name":""},"address":{"street_address1":"245 5th Ave","street_address2":"","city":"New York","state":"NY","postal_code":"10016"}}`)
-			req, _ := http.NewRequest("POST", "https://api.enigma.com/businesses/match", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.enigma.com/businesses/match", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("x-api-key", resMatch)
 			res, err := client.Do(req)

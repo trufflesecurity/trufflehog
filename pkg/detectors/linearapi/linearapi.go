@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			reqDataQuery := strings.NewReader(`{ "query": "{ viewer { id name } }" }`)
-			req, _ := http.NewRequest("POST", "https://api.linear.app/graphql", reqDataQuery)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.linear.app/graphql", reqDataQuery)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", resMatch)
 

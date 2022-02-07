@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.sendinblue.com/v3/account", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.sendinblue.com/v3/account", nil)
 			req.Header.Add("api-key", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

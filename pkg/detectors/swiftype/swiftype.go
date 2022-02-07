@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"auth_token":"` + resMatch + `","q": "gatsby"}`)
-			req, _ := http.NewRequest("GET", "https://search-api.swiftype.com/api/v1/engines/bookstore/document_types/books/search.json", payload)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://search-api.swiftype.com/api/v1/engines/bookstore/document_types/books/search.json", payload)
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

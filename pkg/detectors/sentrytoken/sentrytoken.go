@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequest("GET", "https://sentry.io/api/0/projects/", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://sentry.io/api/0/projects/", nil)
 			if err != nil {
 				continue
 			}

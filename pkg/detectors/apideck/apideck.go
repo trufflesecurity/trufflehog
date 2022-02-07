@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://unify.apideck.com/vault/consumers", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://unify.apideck.com/vault/consumers", nil)
 				req.Header.Add("x-apideck-app-id", resIdMatch)
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 				res, err := client.Do(req)

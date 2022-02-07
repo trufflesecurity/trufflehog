@@ -51,7 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://openapi.etsy.com/v2/listings/active?api_key="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://openapi.etsy.com/v2/listings/active?api_key="+resMatch, nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

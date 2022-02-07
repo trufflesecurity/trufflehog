@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			req, _ := http.NewRequest("GET", "https://apiv2.bitcoinaverage.com/websocket/get_ticket", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://apiv2.bitcoinaverage.com/websocket/get_ticket", nil)
 			req.Header.Add("x-ba-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

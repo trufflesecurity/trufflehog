@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.travis-ci.com/user", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.travis-ci.com/user", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("token %s", resMatch))
 			req.Header.Add("User-Agent", "API Explorer")
 			req.Header.Add("Travis-API-Version", "3")

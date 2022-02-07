@@ -73,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				signature := getPoloniexSignature(resSecretMatch, payload.Encode())
 
-				req, _ := http.NewRequest("POST", "https://poloniex.com/tradingApi", strings.NewReader(payload.Encode()))
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://poloniex.com/tradingApi", strings.NewReader(payload.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				req.Header.Add("Key", resMatch)
 				req.Header.Add("Sign", signature)

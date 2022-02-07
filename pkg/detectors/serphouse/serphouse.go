@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.serphouse.com/account/info", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.serphouse.com/account/info", nil)
 			req.Header.Add("Accept", "application/vnd.serphouse+json; version=3")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

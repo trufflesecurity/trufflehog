@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://stage-api.wepay.com/payments?type=credit_card&credit_card=4003830171874018", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://stage-api.wepay.com/payments?type=credit_card&credit_card=4003830171874018", nil)
 			req.Header.Add("App-Token", resMatch)
 			req.Header.Add("App-Id", resAppIDMatch)
 			req.Header.Add("Api-Version", "3.0")

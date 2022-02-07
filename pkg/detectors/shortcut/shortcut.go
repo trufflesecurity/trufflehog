@@ -51,13 +51,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.app.shortcut.com/api/v3/categories", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.app.shortcut.com/api/v3/categories", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Shortcut-Token", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, _ := ioutil.ReadAll(res.Body)
+				bodyBytes, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
 				body := string(bodyBytes)
 
 				if !strings.Contains(body, "Unauthorized") {

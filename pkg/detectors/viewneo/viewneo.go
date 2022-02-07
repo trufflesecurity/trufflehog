@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://cloud.viewneo.com/api/v1.0/playlist", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://cloud.viewneo.com/api/v1.0/playlist", nil)
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

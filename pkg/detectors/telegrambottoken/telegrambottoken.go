@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			// https://core.telegram.org/bots/api#getme
-			req, _ := http.NewRequest("GET", "https://api.telegram.org/bot"+key+"/getMe", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.telegram.org/bot"+key+"/getMe", nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

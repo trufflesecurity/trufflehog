@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				data := fmt.Sprintf("%s:%s", resIdMatch, resMatch)
 				encoded := b64.StdEncoding.EncodeToString([]byte(data))
-				req, _ := http.NewRequest("GET", "https://api.us2.sumologic.com/api/v1/users", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.us2.sumologic.com/api/v1/users", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
 				res, err := client.Do(req)
 				if err == nil {

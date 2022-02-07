@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://v3.api.hypertrack.com/trips/", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://v3.api.hypertrack.com/trips/", nil)
 				req.SetBasicAuth(resAccMatch, resMatch)
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)

@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://app.surveybot.io/api/v1/surveys?page=1&per_page=20&offset=0", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.surveybot.io/api/v1/surveys?page=1&per_page=20&offset=0", nil)
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("X-Api-Key", resMatch)
 			res, err := client.Do(req)

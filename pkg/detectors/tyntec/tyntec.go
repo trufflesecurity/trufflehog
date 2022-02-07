@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.tyntec.com/2fa/v1/application", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.tyntec.com/2fa/v1/application", nil)
 			req.Header.Add("apiKey", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

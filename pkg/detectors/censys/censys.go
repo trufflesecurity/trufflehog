@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://search.censys.io/api/v1/account", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://search.censys.io/api/v1/account", nil)
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

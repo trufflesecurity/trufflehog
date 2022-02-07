@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://discord.com/api/v8/users/"+resId, nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://discord.com/api/v8/users/"+resId, nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Bot %s", resMatch))
 				res, err := client.Do(req)
 				if err == nil {

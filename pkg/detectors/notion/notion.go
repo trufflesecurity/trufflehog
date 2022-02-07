@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.notion.com/v1/users", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.notion.com/v1/users", nil)
 			req.Header.Add("Notion-Version", "2021-05-11")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

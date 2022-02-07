@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.imagekit.io/v1/files", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.imagekit.io/v1/files", nil)
 			req.SetBasicAuth(resMatch, "")
 			res, err := client.Do(req)
 

@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"data":{"attributes":{"type":"paymaya"}}}`)
-			req, _ := http.NewRequest("POST", "https://api.paymongo.com/v1/payment_methods", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.paymongo.com/v1/payment_methods", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.SetBasicAuth(resMatch, "")
 			res, err := client.Do(req)

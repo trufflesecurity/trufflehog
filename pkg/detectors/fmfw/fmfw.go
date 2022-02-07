@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				timeout := 10 * time.Second
 				client.Timeout = timeout
-				req, _ := http.NewRequest("GET", "https://api.fmfw.io/api/3/spot/balance", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.fmfw.io/api/3/spot/balance", nil)
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

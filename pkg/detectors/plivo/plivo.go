@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			stringResMatch := fmt.Sprintf("%s:%s", id, resMatch)
 			decodeSecret := b64.StdEncoding.EncodeToString([]byte(stringResMatch))
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.plivo.com/v1/Account/"+id+"/Number/", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.plivo.com/v1/Account/"+id+"/Number/", nil)
 				req.Header.Add("Accept", "application/json")
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", decodeSecret))
 				res, err := client.Do(req)

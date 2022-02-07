@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				payload := strings.NewReader("grant_type=client_credentials&client_id=" + resMatch + "&client_secret=" + resSecret)
 
-				req, _ := http.NewRequest("POST", "https://test.api.amadeus.com/v1/security/oauth2/token", payload)
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://test.api.amadeus.com/v1/security/oauth2/token", payload)
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				res, err := client.Do(req)
 				if err == nil {

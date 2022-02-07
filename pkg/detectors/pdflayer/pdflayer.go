@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("http://api.pdflayer.com/api/convert?access_key=%s&document_url=https://pdflayer.com/downloads/invoice.html", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://api.pdflayer.com/api/convert?access_key=%s&document_url=https://pdflayer.com/downloads/invoice.html", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)

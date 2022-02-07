@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://runrun.it/api/v1.0/users", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://runrun.it/api/v1.0/users", nil)
 				req.Header.Add("App-Key", resMatch)
 				req.Header.Add("User-Token", resUserTokenMatch)
 				res, err := client.Do(req)

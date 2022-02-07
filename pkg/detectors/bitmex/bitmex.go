@@ -72,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				signature := getBitmexSignature(timestamp, resSecretMatch, action, path, payload.Encode())
 
-				req, _ := http.NewRequest(action, "https://www.bitmex.com"+path, strings.NewReader(payload.Encode()))
+				req, _ := http.NewRequestWithContext(ctx, action, "https://www.bitmex.com"+path, strings.NewReader(payload.Encode()))
 				req.Header.Add("api-expires", timestamp)
 				req.Header.Add("api-key", resMatch)
 				req.Header.Add("api-signature", signature)

@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, _ := http.NewRequest("POST", "https://www.virustotal.com/api/v3/urls", bytes.NewReader(body.Bytes()))
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://www.virustotal.com/api/v3/urls", bytes.NewReader(body.Bytes()))
 			req.Header.Add("Content-Type", writer.FormDataContentType())
 			req.Header.Add("x-apikey", resMatch)
 			res, err := client.Do(req)

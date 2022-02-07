@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://rubygems.org/api/v1/gems", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://rubygems.org/api/v1/gems", nil)
 			req.Header.Add("Accept", "*/*")
 			req.Header.Add("Authorization", resMatch)
 			res, err := client.Do(req)

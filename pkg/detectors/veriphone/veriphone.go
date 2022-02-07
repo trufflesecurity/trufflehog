@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.veriphone.io/v2/verify?phone=%252B49-15123577723&key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.veriphone.io/v2/verify?phone=%252B49-15123577723&key="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

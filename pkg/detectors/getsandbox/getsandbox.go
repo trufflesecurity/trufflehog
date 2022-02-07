@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://getsandbox.com/api/1/sandboxes/%s", resIdMatch), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://getsandbox.com/api/1/sandboxes/%s", resIdMatch), nil)
 				req.Header.Add("API-Key", resMatch)
 				res, err := client.Do(req)
 				if err == nil {

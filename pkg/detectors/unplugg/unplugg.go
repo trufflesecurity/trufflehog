@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"data":[{"timestamp":1466640000,"value":0.27589941523037853},{"timestamp":1466640900,"value":0.4059699097648263}],"forecast_to":1458136800,"callback":"http://yourdomain.com/samplecallback"}`)
-			req, _ := http.NewRequest("POST", "https://api.unplu.gg/forecast", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.unplu.gg/forecast", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("x-access-token", resMatch)
 			res, err := client.Do(req)

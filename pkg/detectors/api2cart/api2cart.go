@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("https://api.api2cart.com/v1.1/account.cart.list.json?api_key=%s", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.api2cart.com/v1.1/account.cart.list.json?api_key=%s", resMatch), nil)
 			req.Header.Add("Accept", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

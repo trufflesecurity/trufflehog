@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			payload := &bytes.Buffer{}
 			writer := multipart.NewWriter(payload)
 			_ = writer.WriteField("name", "\"My Form\"")
-			req, _ := http.NewRequest("POST", "https://api.base-api.io/v1/forms", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.base-api.io/v1/forms", payload)
 			req.Header.Set("Content-Type", writer.FormDataContentType())
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

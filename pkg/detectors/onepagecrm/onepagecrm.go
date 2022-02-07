@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(tokenPatMatch),
 			}
 			if verify {
-				req, _ := http.NewRequest("GET", "https://app.onepagecrm.com/api/v3/contacts.json?per_page=20&page=1", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.onepagecrm.com/api/v3/contacts.json?per_page=20&page=1", nil)
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://min-api.cryptocompare.com/data/blockchain/list?api_key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://min-api.cryptocompare.com/data/blockchain/list?api_key="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)

@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			data := fmt.Sprintf("%s:", resMatch)
 			encoded := b64.StdEncoding.EncodeToString([]byte(data))
-			req, _ := http.NewRequest("GET", "https://mltb8350.hiveage.com/api/network", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://mltb8350.hiveage.com/api/network", nil)
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
 			res, err := client.Do(req)

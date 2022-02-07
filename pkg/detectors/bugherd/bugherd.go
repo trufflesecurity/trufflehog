@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			data := fmt.Sprintf("%s:x", resMatch)
 			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-			req, _ := http.NewRequest("GET", "https://www.bugherd.com/api_v2/projects.json", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.bugherd.com/api_v2/projects.json", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 			res, err := client.Do(req)

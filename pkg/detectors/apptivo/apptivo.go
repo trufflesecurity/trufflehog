@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://api.apptivo.com/app/dao/v6/leads?a=getConfigData&apiKey=%s&accessKey=%s", resMatch, resIdMatch), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.apptivo.com/app/dao/v6/leads?a=getConfigData&apiKey=%s&accessKey=%s", resMatch, resIdMatch), nil)
 				res, err := client.Do(req)
 				if err == nil {
 					bodyBytes, err := ioutil.ReadAll(res.Body)

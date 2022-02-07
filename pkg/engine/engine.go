@@ -147,6 +147,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					if !foundKeyword {
 						continue
 					}
+					ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+					defer cancel()
 					results, err := detector.FromData(ctx, verify, decoded.Data)
 					if err != nil {
 						logrus.WithError(err).Error("could not scan chunk")

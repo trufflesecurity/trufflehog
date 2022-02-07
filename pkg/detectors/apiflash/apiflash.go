@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://api.apiflash.com/v1/urltoimage?url=%s&access_key=%s", resUrlMatch, resMatch), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.apiflash.com/v1/urltoimage?url=%s&access_key=%s", resUrlMatch, resMatch), nil)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

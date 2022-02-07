@@ -72,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, _ := http.NewRequest("POST", "https://api.meaningcloud.com/lang-4.0/identification", bytes.NewReader(body.Bytes()))
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.meaningcloud.com/lang-4.0/identification", bytes.NewReader(body.Bytes()))
 			req.Header.Add("Content-Type", writer.FormDataContentType())
 			res, err := client.Do(req)
 			if err == nil {

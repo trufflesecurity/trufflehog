@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.mixmax.com/v1/users/me", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.mixmax.com/v1/users/me", nil)
 
 			req.Header.Add("X-API-Token", resMatch)
 			res, err := client.Do(req)

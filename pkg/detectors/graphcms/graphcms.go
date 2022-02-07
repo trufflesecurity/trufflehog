@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader(`{users {id name}}`)
-				req, _ := http.NewRequest("POST", "https://api-ap-northeast-1.graphcms.com/v2/"+resIdMatch+"/master", payload)
+				req, _ := http.NewRequestWithContext(ctx, "POST", "https://api-ap-northeast-1.graphcms.com/v2/"+resIdMatch+"/master", payload)
 				req.Header.Add("Content-Type", "application/graphql")
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 

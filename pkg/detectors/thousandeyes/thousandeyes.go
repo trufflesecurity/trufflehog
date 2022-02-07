@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.thousandeyes.com/v6/endpoint-data/user-sessions/web.json", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.thousandeyes.com/v6/endpoint-data/user-sessions/web.json", nil)
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

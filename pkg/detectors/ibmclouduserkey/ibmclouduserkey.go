@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`apikey=` + resMatch + `&grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey`)
-			req, _ := http.NewRequest("POST", "https://iam.ng.bluemix.net/identity/token", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://iam.ng.bluemix.net/identity/token", payload)
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			req.Header.Add("Authorization", "Basic Yng6Yng=")
 			res, err := client.Do(req)

@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"query": "YOUR_GRAPHQL_PAYLOAD"}`)
-			req, _ := http.NewRequest("POST", "https://api.noticeable.io/graphql", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.noticeable.io/graphql", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Apikey %s", resMatch))
 			res, err := client.Do(req)

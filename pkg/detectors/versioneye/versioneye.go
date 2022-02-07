@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://www.versioneye.com/api/v1/scans", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.versioneye.com/api/v1/scans", nil)
 			req.Header.Add("apiKey", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://besttime.app/api/v1/keys/"+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://besttime.app/api/v1/keys/"+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

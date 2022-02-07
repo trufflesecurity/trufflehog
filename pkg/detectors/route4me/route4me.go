@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.route4me.com/api.v4/address_book.php?api_key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.route4me.com/api.v4/address_book.php?api_key="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://www.rev.com/api/v1/orders", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.rev.com/api/v1/orders", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Rev %s:%s", resClientMatch, resUserMatch))
 				res, err := client.Do(req)
 				if err == nil {

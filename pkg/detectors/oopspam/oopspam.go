@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"checkForLength":true,"content":"Dear Agent, We are a manufacturing company which specializes in supplying Aluminum Rod with Zinc Alloy Rod to customers worldwide, based in Japan, Asia. We have been unable to follow up payments effectively for transactions with debtor customers in your country due to our distant locations, thus our reason for requesting for your services representation.","senderIP":"185.234.219.246","allowedCountries":["it","us"],"allowedLanguages":["en"]}`)
-			req, _ := http.NewRequest("POST", "https://api.oopspam.com/v1/spamdetection", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.oopspam.com/v1/spamdetection", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("X-Api-Key", resMatch)
 			res, err := client.Do(req)

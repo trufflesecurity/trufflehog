@@ -82,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				//end get token
 
-				req, _ := http.NewRequest("GET", "https://api.github.com/app", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/app", nil)
 				req.Header.Add("Accept", "application/vnd.github.v3+json")
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenString))
 				res, err := client.Do(req)

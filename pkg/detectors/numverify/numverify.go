@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("http://apilayer.net/api/validate?access_key=%s&number=14158586273", resMatch), nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://apilayer.net/api/validate?access_key=%s&number=14158586273", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)

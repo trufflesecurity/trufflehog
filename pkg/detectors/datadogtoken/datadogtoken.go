@@ -59,7 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 
-				req, _ := http.NewRequest("GET", "https://api.datadoghq.com/api/v2/users", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.datadoghq.com/api/v2/users", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("DD-API-KEY", resApiMatch)
 				req.Header.Add("DD-APPLICATION-KEY", resMatch)

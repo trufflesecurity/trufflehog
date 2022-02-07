@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://powrbot.com/api/v1/search/single/?company=Apple", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://powrbot.com/api/v1/search/single/?company=Apple", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("secret-key %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

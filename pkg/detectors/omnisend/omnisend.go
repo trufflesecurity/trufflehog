@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.omnisend.com/v3/contacts?limit=100&offset=0", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.omnisend.com/v3/contacts?limit=100&offset=0", nil)
 			req.Header.Add("X-API-KEY", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

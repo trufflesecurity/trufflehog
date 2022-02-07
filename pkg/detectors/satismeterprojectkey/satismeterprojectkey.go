@@ -72,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					data := fmt.Sprintf("%s:%s", resEmailMatch, resPassMatch)
 					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 
-					req, _ := http.NewRequest("GET", "https://app.satismeter.com/api/users?project="+resMatch, nil)
+					req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.satismeter.com/api/users?project="+resMatch, nil)
 					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 					res, err := client.Do(req)
 					if err == nil {

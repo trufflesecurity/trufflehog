@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.airtable.com/v0/"+appRes+"/Projects", nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.airtable.com/v0/"+appRes+"/Projects", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", keyRes))
 				res, err := client.Do(req)
 				if err == nil {

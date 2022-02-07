@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			data := fmt.Sprintf("api-key:%s", resMatch)
 			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-			req, _ := http.NewRequest("GET", "https://www.clinchpad.com/api/v1/pipelines", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.clinchpad.com/api/v1/pipelines", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 			res, err := client.Do(req)
 			if err == nil {

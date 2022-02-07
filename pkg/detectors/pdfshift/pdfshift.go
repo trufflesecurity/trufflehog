@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.pdfshift.io/v3/credits/usage", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.pdfshift.io/v3/credits/usage", nil)
 			req.Header.Add("Content-Type", "application/json")
 			req.SetBasicAuth("api", resMatch)
 			res, err := client.Do(req)

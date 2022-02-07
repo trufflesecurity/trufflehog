@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://app.workstack.io/api/team?api_token="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.workstack.io/api/team?api_token="+resMatch, nil)
 			req.Header.Add("Accept", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

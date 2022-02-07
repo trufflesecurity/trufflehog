@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://dictionary.yandex.net/api/v1/dicservice.json/getLangs?key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://dictionary.yandex.net/api/v1/dicservice.json/getLangs?key="+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

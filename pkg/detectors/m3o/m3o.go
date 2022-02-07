@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"days": 2,
 				"location": "London"
 				}`)
-			req, _ := http.NewRequest("POST", "https://api.m3o.com/v1/weather/Forecast", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.m3o.com/v1/weather/Forecast", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

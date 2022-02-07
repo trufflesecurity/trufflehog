@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`[{"name":"api.response.time","dimension":null,"values":[[1568319841,12.4],[1568319856,9.3],[1568319860,234],[1568319863,3.2]]},{"name":"click.color","dimension":"green","values":[[1568319841,1],[1568319856,1],[1568319860,1],[1568319863,1]]}]`)
-			req, _ := http.NewRequest("POST", "https://qckm.io/list", payload)
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://qckm.io/list", payload)
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("x-qm-key", resMatch)
 			res, err := client.Do(req)

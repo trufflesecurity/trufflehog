@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://secretscanner.ladesk.com/api/v3/agents", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://secretscanner.ladesk.com/api/v3/agents", nil)
 			req.Header.Add("apikey", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

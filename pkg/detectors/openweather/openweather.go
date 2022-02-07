@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "http://api.openweathermap.org/data/2.5/weather?id=524901&lang=fr&appid="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "http://api.openweathermap.org/data/2.5/weather?id=524901&lang=fr&appid="+resMatch, nil)
 
 			res, err := client.Do(req)
 			if err == nil {

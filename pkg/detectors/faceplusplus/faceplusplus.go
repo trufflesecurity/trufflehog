@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("POST", fmt.Sprintf("https://api-us.faceplusplus.com/facepp/v3/faceset/getfacesets?api_key=%s&api_secret=%s", resMatch, resSecret), nil)
+				req, _ := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://api-us.faceplusplus.com/facepp/v3/faceset/getfacesets?api_key=%s&api_secret=%s", resMatch, resSecret), nil)
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)
 				if err == nil {
