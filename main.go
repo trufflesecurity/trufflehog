@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strconv"
+	"time"
 
-	"github.com/go-echarts/statsview"
-	"github.com/go-echarts/statsview/viewer"
+	"github.com/felixge/fgprof"
+
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
@@ -31,6 +35,7 @@ func main() {
 	noVerification := cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified := cli.Flag("only-verified", "Only output verified results.").Bool()
 	// rules := cli.Flag("rules", "Path to file with custom rules.").String()
+	printAvgDetectorTime := cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 
 	gitScan := cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI := gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
@@ -79,11 +84,13 @@ func main() {
 
 	if *debug {
 		go func() {
-			viewer.SetConfiguration(viewer.WithAddr(":18066"))
-			viewer.SetConfiguration(viewer.WithLinkAddr("localhost:18066"))
-			mgr := statsview.New()
-			logrus.Info("starting pprof and metrics server on http://localhost:18066/debug/pprof and http://localhost:18066/debug/statsview")
-			mgr.Start()
+			router := mux.NewRouter()
+			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
+			router.PathPrefix("/debug/fgprof").Handler(fgprof.Handler())
+			if err := http.ListenAndServe(":18066", router); err != nil {
+				panic(err)
+			}
+			logrus.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
 		}()
 	}
 
@@ -161,4 +168,20 @@ func main() {
 		}
 	}
 	logrus.Debugf("scanned %d chunks", e.ChunksScanned())
+
+	if *printAvgDetectorTime {
+		printAverageDetectorTime(e)
+	}
+}
+
+func printAverageDetectorTime(e *engine.Engine) {
+	fmt.Fprintln(os.Stderr, "Average detector time is the measurement of average time spent on each detector when results are returned.")
+	for detectorName, durations := range e.DetectorAvgTime() {
+		var total time.Duration
+		for _, d := range durations {
+			total += d
+		}
+		avgDuration := total / time.Duration(len(durations))
+		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
+	}
 }

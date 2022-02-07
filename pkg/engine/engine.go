@@ -16,12 +16,13 @@ import (
 )
 
 type Engine struct {
-	concurrency   int
-	chunks        chan *sources.Chunk
-	results       chan detectors.ResultWithMetadata
-	decoders      []decoders.Decoder
-	detectors     map[bool][]detectors.Detector
-	chunksScanned uint64
+	concurrency     int
+	chunks          chan *sources.Chunk
+	results         chan detectors.ResultWithMetadata
+	decoders        []decoders.Decoder
+	detectors       map[bool][]detectors.Detector
+	chunksScanned   uint64
+	detectorAvgTime map[string][]time.Duration
 }
 
 type EngineOption func(*Engine)
@@ -53,8 +54,9 @@ func WithDecoders(decoders ...decoders.Decoder) EngineOption {
 
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
-		chunks:  make(chan *sources.Chunk),
-		results: make(chan detectors.ResultWithMetadata),
+		chunks:          make(chan *sources.Chunk),
+		results:         make(chan detectors.ResultWithMetadata),
+		detectorAvgTime: map[string][]time.Duration{},
 	}
 
 	for _, option := range options {
@@ -120,6 +122,10 @@ func (e *Engine) ChunksScanned() uint64 {
 	return e.chunksScanned
 }
 
+func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
+	return e.detectorAvgTime
+}
+
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for chunk := range e.chunks {
 		for _, decoder := range e.decoders {
@@ -130,6 +136,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 			dataLower := strings.ToLower(string(decoded.Data))
 			for verify, detectorsSet := range e.detectors {
 				for _, detector := range detectorsSet {
+					start := time.Now()
 					foundKeyword := false
 					for _, kw := range detector.Keywords() {
 						if strings.Contains(dataLower, strings.ToLower(kw)) {
@@ -147,6 +154,11 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					}
 					for _, result := range results {
 						e.results <- detectors.CopyMetadata(chunk, result)
+					}
+					if len(results) > 0 {
+						elasped := time.Since(start)
+						detectorName := results[0].DetectorType.String()
+						e.detectorAvgTime[detectorName] = append(e.detectorAvgTime[detectorName], elasped)
 					}
 				}
 			}

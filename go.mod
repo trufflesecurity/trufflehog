@@ -13,10 +13,11 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/envoyproxy/protoc-gen-validate v0.6.3
 	github.com/fatih/color v1.13.0
-	github.com/go-echarts/statsview v0.3.4
+	github.com/felixge/fgprof v0.9.2
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/google/go-github/v42 v42.0.0
+	github.com/gorilla/mux v1.8.0
 	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-retryablehttp v0.7.0
 	github.com/joho/godotenv v1.4.0
@@ -59,7 +60,6 @@ require (
 	github.com/aws/smithy-go v1.10.0 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
-	github.com/go-echarts/go-echarts/v2 v2.2.3 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.3.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
@@ -68,6 +68,7 @@ require (
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/go-github/v29 v29.0.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
@@ -80,7 +81,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/pkg/diff v0.0.0-20200914180035-5b29258ca4f7 // indirect
-	github.com/rs/cors v1.7.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/mod v0.5.0 // indirect
