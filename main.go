@@ -141,7 +141,7 @@ func main() {
 	}
 
 	if !*jsonLegacy && !*jsonOut {
-		fmt.Printf("🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
+		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
 	for r := range e.ResultsChan() {
