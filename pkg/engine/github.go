@@ -7,9 +7,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/pkg/sources/github"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
 func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []string, token string, includeForks bool, filter *common.Filter, concurrency int) error {

@@ -11,10 +11,10 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef string, sinceHash *plumbing.Hash, maxDepth int, filter *common.Filter) error {

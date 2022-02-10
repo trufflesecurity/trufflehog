@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 func TestGeneric_FromChunk(t *testing.T) {

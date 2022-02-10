@@ -8,12 +8,12 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"github.com/trufflesecurity/trufflehog/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func TestSource_Scan(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestJdbc_FromChunk(t *testing.T) {

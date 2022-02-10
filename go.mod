@@ -1,4 +1,4 @@
-module github.com/trufflesecurity/trufflehog
+module github.com/trufflesecurity/trufflehog/v3
 
 go 1.17
 

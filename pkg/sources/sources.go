@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

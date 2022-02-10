@@ -3,7 +3,7 @@ package git
 import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/trufflesecurity/trufflehog/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type ScanOptions struct {

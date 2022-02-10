@@ -2,16 +2,17 @@ package output
 
 import (
 	"fmt"
+	"log"
+	"net/url"
+	"strings"
+
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
-	"log"
-	"net/url"
-	"strings"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
 func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) *LegacyJSONOutput {

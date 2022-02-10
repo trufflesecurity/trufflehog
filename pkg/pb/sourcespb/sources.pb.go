@@ -8,7 +8,7 @@ package sourcespb
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
-	credentialspb "github.com/trufflesecurity/trufflehog/pkg/pb/credentialspb"
+	credentialspb "github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	_ "google.golang.org/protobuf/types/known/durationpb"

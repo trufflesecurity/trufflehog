@@ -7,8 +7,8 @@ import (
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	log "github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{}

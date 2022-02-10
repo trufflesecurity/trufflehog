@@ -10,9 +10,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/trufflesecurity/trufflehog/pkg/decoders"
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type Engine struct {
@@ -151,7 +151,10 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					defer cancel()
 					results, err := detector.FromData(ctx, verify, decoded.Data)
 					if err != nil {
-						logrus.WithError(err).Error("could not scan chunk")
+						logrus.WithFields(logrus.Fields{
+							"source_type": decoded.SourceType.String(),
+							"metadata":    decoded.SourceMetadata,
+						}).WithError(err).Error("could not scan chunk")
 						continue
 					}
 					for _, result := range results {

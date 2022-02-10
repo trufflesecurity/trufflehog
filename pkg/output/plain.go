@@ -7,8 +7,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
 
 var (

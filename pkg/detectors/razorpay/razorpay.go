@@ -5,8 +5,8 @@ import (
 	"regexp"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	razorpay "github.com/razorpay/razorpay-go"
 )

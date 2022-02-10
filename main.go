@@ -19,11 +19,11 @@ import (
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"github.com/trufflesecurity/trufflehog/pkg/decoders"
-	"github.com/trufflesecurity/trufflehog/pkg/engine"
-	"github.com/trufflesecurity/trufflehog/pkg/output"
-	"github.com/trufflesecurity/trufflehog/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 func main() {
@@ -87,10 +87,10 @@ func main() {
 			router := mux.NewRouter()
 			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
 			router.PathPrefix("/debug/fgprof").Handler(fgprof.Handler())
-			if err := http.ListenAndServe(":18066", router); err != nil {
-				panic(err)
-			}
 			logrus.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
+			if err := http.ListenAndServe(":18066", router); err != nil {
+				logrus.Error(err)
+			}
 		}()
 	}
 

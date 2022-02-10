@@ -3,8 +3,9 @@ package common
 import (
 	"errors"
 	"fmt"
-	"github.com/trufflesecurity/trufflehog/pkg/sources"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type ChunkFunc func(chunk *sources.Chunk) error

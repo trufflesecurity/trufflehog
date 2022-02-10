@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
-	"github.com/trufflesecurity/trufflehog/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/pkg/common"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{}

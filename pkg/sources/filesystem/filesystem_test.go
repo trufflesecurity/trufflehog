@@ -10,9 +10,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb"
-	"github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func TestSource_Scan(t *testing.T) {

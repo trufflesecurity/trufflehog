@@ -1,7 +1,7 @@
 package decoders
 
 import (
-	"github.com/trufflesecurity/trufflehog/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func DefaultDecoders() []Decoder {
