@@ -103,7 +103,7 @@ func main() {
 
 	filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
 	if err != nil {
-		logrus.WithError(err)
+		logrus.WithError(err).Fatal("could not create filter")
 	}
 
 	var repoPath string
