@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "http://dataservice.accuweather.com/locations/v1/cities/autocomplete?apikey="+resMatch+"&q=----&language=en-us", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://dataservice.accuweather.com/locations/v1/cities/autocomplete?apikey="+resMatch+"&q=----&language=en-us", nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

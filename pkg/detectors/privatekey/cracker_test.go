@@ -10,7 +10,7 @@ import (
 var (
 	testEncryptedKeyCorrectPassword   = []byte("123456")
 	testEncryptedKeyIncorrectPassword = []byte("incorrect")
-	testEncryptedKey                  = []byte(normalize(string(`-----BEGIN OPENSSH PRIVATE KEY-----
+	testEncryptedKey                  = []byte(normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABAjNIZuun
 xgLkM8KuzfmQuRAAAAEAAAAAEAAAGXAAAAB3NzaC1yc2EAAAADAQABAAABgQDe3Al0EMPz
 utVNk5DixaYrGMK56RqUoqGBinke6SWVWmqom1lBcJWzor6HlnMRPPr7YCEsJKL4IpuVwu
@@ -48,7 +48,7 @@ muIjvl6G7Hoj1hObM2t/ZheN1EShS11z868hhS6Mx7GvIdtkXuvdiBYMiBLOshJQxB8Mzx
 iug9W+Di3upLf0UMC1TqADGphsIHRU7RbmHQ8Rwp7dogswmDfpRSapPt9p0D+6Ad5VBzi3
 f3BPXj76UBLMEJCrZR1P28vnAA7AyNHaLvMPlWDMG5v3V/UV+ugyFcoBAOyjiQgYST8F3e
 Hx7UPVlTK8dyvk1Z+Yw0nrfNClI=
------END OPENSSH PRIVATE KEY-----`)))
+-----END OPENSSH PRIVATE KEY-----`))
 )
 
 func Test_crack(t *testing.T) {

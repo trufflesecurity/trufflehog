@@ -23,13 +23,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"terra"}) + `\b([A-Za-z0-9]{14}.atlasv1.[A-Za-z0-9]{60,70})\b`)
+	keyPat = regexp.MustCompile(`\b([A-Za-z0-9]{14}.atlasv1.[A-Za-z0-9]{67})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"terraform"}
+	return []string{".atlasv1."}
 }
 
 // FromData will find and optionally verify TerraformCloudPersonalToken secrets in a given set of bytes.

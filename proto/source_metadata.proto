@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package source_metadata;
 
-option go_package = "github.com/trufflesecurity/trufflehog/pkg/pb/source_metadatapb";
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb";
 
 message Azure {
   string container = 1;

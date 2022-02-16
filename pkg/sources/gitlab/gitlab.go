@@ -6,10 +6,16 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/xanzy/go-gitlab"
+	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -17,10 +23,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
-	"github.com/xanzy/go-gitlab"
-	"golang.org/x/sync/semaphore"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Source struct {
@@ -70,7 +72,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
-		errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
 	s.repos = conn.Repositories
@@ -152,9 +154,8 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 		return nil, errors.Errorf("unable to authenticate using: %s", s.authMethod)
 	}
 
-	var projects []*gitlab.Project
+	projects := map[int]*gitlab.Project{}
 
-	// TODO: enumerate all usewr projects
 	projectQueryOptions := &gitlab.ListProjectsOptions{
 		OrderBy: gitlab.String("last_activity_at"),
 	}
@@ -163,7 +164,9 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 		if err != nil {
 			return nil, errors.Errorf("received error on listing projects: %s\n", err)
 		}
-		projects = append(projects, userProjects...)
+		for _, prj := range userProjects {
+			projects[prj.ID] = prj
+		}
 		projectQueryOptions.Page = res.NextPage
 		if res.NextPage == 0 {
 			break
@@ -173,7 +176,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	var groups []*gitlab.Group
 
 	listGroupsOptions := gitlab.ListGroupsOptions{
-		AllAvailable: gitlab.Bool(false), // This actually grabs outside groups on public GitLab
+		AllAvailable: gitlab.Bool(false), // This actually grabs public groups on public GitLab if set to true
 		TopLevelOnly: gitlab.Bool(false),
 		Owned:        gitlab.Bool(false),
 	}
@@ -202,19 +205,29 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 			if err != nil {
 				return nil, errors.Errorf("received error on listing projects: %s\n", err)
 			}
-			projects = append(projects, grpPrjs...)
+			for _, prj := range grpPrjs {
+				projects[prj.ID] = prj
+			}
 			listGroupProjectOptions.Page = res.NextPage
 			if res.NextPage == 0 {
 				break
 			}
 		}
 	}
-	log.WithField("projects", projects).Debugf("Enumerated %d GitLab projects", len(projects))
-	return projects, nil
+	var projectNamesWithNamespace []string
+	for _, project := range projects {
+		projectNamesWithNamespace = append(projectNamesWithNamespace, project.NameWithNamespace)
+	}
+	log.WithField("projects", strings.Join(projectNamesWithNamespace, ", ")).Debugf("Enumerated %d GitLab projects", len(projects))
+
+	var projectList []*gitlab.Project
+	for _, project := range projects {
+		projectList = append(projectList, project)
+	}
+	return projectList, nil
 }
 
-func (s *Source) getRepos(apiClient *gitlab.Client) ([]*url.URL, []error) {
-	//is repo defined?
+func (s *Source) getRepos() ([]*url.URL, []error) {
 	var validRepos []*url.URL
 	var errs []error
 	if len(s.repos) > 0 {
@@ -222,6 +235,7 @@ func (s *Source) getRepos(apiClient *gitlab.Client) ([]*url.URL, []error) {
 			repo, err := giturl.NormalizeGitlabRepo(prj)
 			if err != nil {
 				errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+				continue
 			}
 
 			// The repo normalization has already successfully parsed the URL at this point, so we can ignore the error.
@@ -235,18 +249,19 @@ func (s *Source) getRepos(apiClient *gitlab.Client) ([]*url.URL, []error) {
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, repos []*url.URL) []error {
-	errChan := make(chan error)
 	wg := sync.WaitGroup{}
+	errs := []error{}
+	var errsMut sync.Mutex
 	if s.authMethod == "UNAUTHENTICATED" {
 		for i, u := range repos {
 			if common.IsDone(ctx) {
-				// We are returning nil instead of the errors slice here because
+				// We are returning nil instead of the scanErrors slice here because
 				// we don't want to mark this scan as errored if we cancelled it.
 				return nil
 			}
 			s.jobSem.Acquire(ctx, 1)
 			wg.Add(1)
-			go func(ctx context.Context, errCh chan error, repoURL *url.URL, i int) {
+			go func(ctx context.Context, repoURL *url.URL, i int) {
 				defer s.jobSem.Release(1)
 				defer wg.Done()
 				if len(repoURL.String()) == 0 {
@@ -257,27 +272,33 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				path, repo, err := git.CloneRepoUsingUnauthenticated(repoURL.String())
 				defer os.RemoveAll(path)
 				if err != nil {
-					errCh <- err
+					errsMut.Lock()
+					errs = append(errs, err)
+					errsMut.Unlock()
 					return
 				}
+				log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(repos), repoURL.String())
 				err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
 				if err != nil {
-					errCh <- err
+					errsMut.Lock()
+					errs = append(errs, err)
+					errsMut.Unlock()
 					return
 				}
-			}(ctx, errChan, u, i)
+				log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(repos), repoURL.String())
+			}(ctx, u, i)
 		}
 
 	} else {
 		for i, u := range repos {
 			if common.IsDone(ctx) {
-				// We are returning nil instead of the errors slice here because
+				// We are returning nil instead of the scanErrors slice here because
 				// we don't want to mark this scan as errored if we cancelled it.
 				return nil
 			}
 			s.jobSem.Acquire(ctx, 1)
 			wg.Add(1)
-			go func(ctx context.Context, errCh chan error, repoURL *url.URL, i int) {
+			go func(ctx context.Context, repoURL *url.URL, i int) {
 				defer s.jobSem.Release(1)
 				defer wg.Done()
 				if len(repoURL.String()) == 0 {
@@ -288,27 +309,27 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), s.user)
 				defer os.RemoveAll(path)
 				if err != nil {
-					errCh <- err
+					errsMut.Lock()
+					errs = append(errs, err)
+					errsMut.Unlock()
 					return
 				}
+				log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(repos), repoURL.String())
 				err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
 				if err != nil {
-					errCh <- err
+					errsMut.Lock()
+					errs = append(errs, err)
+					errsMut.Unlock()
 					return
 				}
-			}(ctx, errChan, u, i)
+				log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(repos), repoURL.String())
+			}(ctx, u, i)
 		}
 	}
 
 	wg.Wait()
-	close(errChan)
 
-	var errors []error
-	for err := range errChan {
-		errors = append(errors, err)
-	}
-
-	return errors
+	return errs
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -319,10 +340,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return errors.New(err)
 	}
 	// get repo within target
-	repos, errs := s.getRepos(apiClient)
+	repos, errs := s.getRepos()
 	for _, repoErr := range errs {
 		log.WithError(repoErr).Warn("error getting repo")
 	}
+
+	// End early if we had errors getting specified repos but none were validated
+	if len(errs) > 0 && len(repos) == 0 {
+		return errors.New("All specified repos had validation issues, ending scan")
+	}
+
 	// get all repos if not specified
 	if repos == nil {
 		projects, err := s.getAllProjects(apiClient)

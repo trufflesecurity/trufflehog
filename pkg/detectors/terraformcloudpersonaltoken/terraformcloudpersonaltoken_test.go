@@ -51,6 +51,29 @@ func TestTerraformCloudPersonalToken_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
+
+		{
+			name: "found, unverified in json",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`{
+			  "credentials": {
+			    "app.terraform.io": {
+			      "token": "%s"
+			    }
+			  }
+			}`, inactiveSecret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_TerraformCloudPersonalToken,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
 		{
 			name: "found, unverified",
 			s:    Scanner{},

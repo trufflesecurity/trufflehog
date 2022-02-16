@@ -2,6 +2,7 @@ package spotifykey
 
 import (
 	"context"
+	"golang.org/x/oauth2"
 
 	"regexp"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -24,7 +24,6 @@ var (
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"key", "secret"}) + `\b([A-Za-z0-9]{32})\b`)
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"id"}) + `\b([A-Za-z0-9]{32})\b`)
-	ctx       = context.WithValue(context.Background(), oauth2.HTTPClient, common.SaneHttpClient())
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,6 +34,8 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, common.SaneHttpClient())
+
 	dataStr := string(data)
 
 	matches := secretPat.FindAllStringSubmatch(dataStr, -1)

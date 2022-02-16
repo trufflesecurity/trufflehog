@@ -2,10 +2,11 @@ syntax = "proto3";
 
 package sources;
 
-option go_package = "github.com/trufflesecurity/trufflehog/pkg/pb/sourcespb";
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb";
 
 import "validate/validate.proto";
 import "credentials.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
 
@@ -33,6 +34,14 @@ enum SourceType {
   SOURCE_TYPE_BUILDKITE = 20;
   SOURCE_TYPE_GERRIT = 21;
   SOURCE_TYPE_JENKINS = 22;
+}
+
+message LocalSource {
+  string type = 1 ;
+  string name = 2 ;
+  google.protobuf.Duration scan_interval = 3;
+  bool verify = 4;
+  google.protobuf.Any connection = 5;
 }
 
 message AzureStorage {

@@ -21,8 +21,8 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secretTLS := testSecrets.MustGetField(("PRIVATEKEY_TLS"))
-	secretGitHub := testSecrets.MustGetField(("PRIVATEKEY_GITHUB"))
+	secretTLS := testSecrets.MustGetField("PRIVATEKEY_TLS")
+	secretGitHub := testSecrets.MustGetField("PRIVATEKEY_GITHUB")
 	secretInactive := testSecrets.MustGetField("PRIVATEKEY_UNVERIFIED")
 	type args struct {
 		ctx    context.Context

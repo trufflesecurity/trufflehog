@@ -55,9 +55,7 @@ type Progress struct {
 func (p *Progress) SetProgressComplete(i, scope int, message string) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
-	if p == nil {
-		p = &Progress{}
-	}
+
 	p.Message = message
 	p.SectionsCompleted = int32(i)
 	p.SectionsRemaining = int32(scope)

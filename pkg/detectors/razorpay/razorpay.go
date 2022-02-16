@@ -8,7 +8,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
-	razorpay "github.com/razorpay/razorpay-go"
+	"github.com/razorpay/razorpay-go"
 )
 
 type Scanner struct{}

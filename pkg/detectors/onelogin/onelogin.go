@@ -23,8 +23,6 @@ var (
 
 	// TODO: Legacy API tokens
 
-	falsePositives = []string{"example"}
-
 	apiDomains = []string{"api.us.onelogin.com", "api.eu.onelogin.com"}
 
 	client = http.Client{Timeout: time.Second * 5}

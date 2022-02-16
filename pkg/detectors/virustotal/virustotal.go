@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			_, err = io.Copy(fw, strings.NewReader("http://www.amazon.com"))
+			_, err = io.Copy(fw, strings.NewReader("https://www.amazon.com"))
 			if err != nil {
 				continue
 			}

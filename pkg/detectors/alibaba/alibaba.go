@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				// Create an API request and set parameters
 				request := ecs.CreateDescribeInstancesRequest()
-				request.ConnectTimeout = (time.Duration(5) * time.Second)
+				request.ConnectTimeout = time.Duration(5) * time.Second
 				request.Scheme = "https"
 				request.Domain = "ecs.aliyuncs.com"
 				// Initiate the request and handle exceptions

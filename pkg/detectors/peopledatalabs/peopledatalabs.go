@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.peopledatalabs.com/v5/person/enrich?min_likelihood=6&profile=http://linkedin.com/in/williamhgates", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.peopledatalabs.com/v5/person/enrich?min_likelihood=6&profile=https://linkedin.com/in/williamhgates", nil)
 			req.Header.Add("X-Api-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

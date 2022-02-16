@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 				signature := getGengoSignature(timestamp, resSecretMatch)
 
-				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://api.gengo.com/v2/account/me?ts=%s&api_key=%s&api_sig=%s", timestamp, resMatch, signature), nil)
+				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.gengo.com/v2/account/me?ts=%s&api_key=%s&api_sig=%s", timestamp, resMatch, signature), nil)
 				req.Header.Add("Accept", "application/json")
 				res, err := client.Do(req)
 				if err == nil {

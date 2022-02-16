@@ -10,7 +10,7 @@ import (
 
 type ChunkFunc func(chunk *sources.Chunk) error
 
-var MatchError error = errors.New("chunk doesn't match")
+var MatchError = errors.New("chunk doesn't match")
 
 func HandleTestChannel(chunksCh chan *sources.Chunk, cf ChunkFunc) error {
 	for {

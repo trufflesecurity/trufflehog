@@ -108,7 +108,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
-		errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 	s.conn = &conn
 
@@ -290,11 +290,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	log.Debugf("Found %v total repos to scan", len(s.repos))
 	wg := sync.WaitGroup{}
-	errChan := make(chan error)
+	errs := []error{}
+	var errsMut sync.Mutex
 	for i, repoURL := range s.repos {
 		s.jobSem.Acquire(ctx, 1)
 		wg.Add(1)
-		go func(ctx context.Context, errCh chan error, repoURL string, i int) {
+		go func(ctx context.Context, repoURL string, i int) {
 			defer s.jobSem.Release(1)
 			defer wg.Done()
 
@@ -316,7 +317,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				var token string
 				token, err = s.Token(ctx, installationClient)
 				if err != nil {
-					errCh <- err
+					errsMut.Lock()
+					errs = append(errs, err)
+					errsMut.Unlock()
 					return
 				}
 				path, repo, err = git.CloneRepoUsingToken(token, repoURL, "clone")
@@ -333,16 +336,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			scanned += 1
 			logrus.Debugf("scanned %d/%d repos", scanned, len(s.repos))
-		}(ctx, errChan, repoURL, i)
+		}(ctx, repoURL, i)
 	}
 
 	wg.Wait()
-	close(errChan)
+
 	// This only returns first error which is what we did prior to concurrency
-	for err := range errChan {
-		if err != nil {
-			return err
-		}
+	if len(errs) > 0 {
+		return errs[0]
 	}
 
 	return nil

@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -17,7 +16,6 @@ type Detector struct{}
 var _ detectors.Detector = (*Detector)(nil)
 
 var (
-	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(`\b(test)\b`)
