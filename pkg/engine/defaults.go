@@ -189,7 +189,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geocodify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geocodio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geoipifi"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getemail"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getemails"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getgeoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getgist"
@@ -776,7 +775,7 @@ func DefaultDetectors() []detectors.Detector {
 		pusherchannelkey.Scanner{},
 		imagekit.Scanner{},
 		asanaoauth.Scanner{},
-		getemail.Scanner{},
+		// getemail.Scanner{},
 		rocketreach.Scanner{},
 		// raven.Scanner{},
 		kontent.Scanner{},
