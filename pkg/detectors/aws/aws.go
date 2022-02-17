@@ -20,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
-	keyPat    = regexp.MustCompile(`\b((AKIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA|ASCA|ASIA)[0-9A-Z]{16})\b`)
+	keyPat    = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
 	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})\b`)
 )
 
@@ -31,14 +31,6 @@ func (s Scanner) Keywords() []string {
 		"AKIA",
 		"ABIA",
 		"ACCA",
-		"AGPA",
-		"AIDA",
-		"AIPA",
-		"ANPA",
-		"ANVA",
-		"APKA",
-		"AROA",
-		"ASCA",
 		"ASIA",
 	}
 }
