@@ -293,7 +293,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	errs := []error{}
 	var errsMut sync.Mutex
 	for i, repoURL := range s.repos {
-		s.jobSem.Acquire(ctx, 1)
+		if err := s.jobSem.Acquire(ctx, 1); err != nil {
+			log.WithError(err).Debug("could not acquire semaphore")
+			continue
+		}
 		wg.Add(1)
 		go func(ctx context.Context, repoURL string, i int) {
 			defer s.jobSem.Release(1)
