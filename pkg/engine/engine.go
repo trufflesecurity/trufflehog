@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"runtime"
 	"strings"
@@ -172,16 +173,43 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					}
 					for _, result := range results {
 						if isGitSource(chunk.SourceType) {
-							data := bytes.Join([][]byte{result.Raw, []byte(chunk.SourceMetadata.GetGit().Repository), []byte(chunk.SourceMetadata.GetGit().File)}, []byte{})
-							sid := sha256.Sum256(data)
-							_, exists := e.detectedSecret.secret[sid]
-							if exists {
-								logrus.Debugf("skipping duplicate result for %s in commit %s", result.Raw, chunk.SourceMetadata.GetGit().Commit)
-								continue
+							repo := ""
+							file := ""
+							commit := ""
+							switch metadata := chunk.SourceMetadata.GetData().(type) {
+							case *source_metadatapb.MetaData_Git:
+								repo = metadata.Git.Repository
+								file = metadata.Git.File
+								commit = metadata.Git.Commit
+							case *source_metadatapb.MetaData_Github:
+								repo = metadata.Github.Repository
+								file = metadata.Github.File
+								commit = metadata.Github.Commit
+							case *source_metadatapb.MetaData_Gitlab:
+								repo = metadata.Gitlab.Repository
+								file = metadata.Gitlab.File
+								commit = metadata.Gitlab.Commit
+							case *source_metadatapb.MetaData_Bitbucket:
+								repo = metadata.Bitbucket.Repository
+								file = metadata.Bitbucket.File
+								commit = metadata.Bitbucket.Commit
+							case *source_metadatapb.MetaData_Gerrit:
+								repo = metadata.Gerrit.Project
+								file = metadata.Gerrit.File
+								commit = metadata.Gerrit.Commit
 							}
-							e.detectedSecret.sync.Lock()
-							e.detectedSecret.secret[sid] = true
-							e.detectedSecret.sync.Unlock()
+							if repo != "" && file != "" {
+								data := bytes.Join([][]byte{result.Raw, []byte(repo), []byte(file)}, []byte{})
+								sid := sha256.Sum256(data)
+								_, exists := e.detectedSecret.secret[sid]
+								if exists {
+									logrus.Debugf("skipping duplicate result for %s in commit %s", result.Raw, commit)
+									continue
+								}
+								e.detectedSecret.sync.Lock()
+								e.detectedSecret.secret[sid] = true
+								e.detectedSecret.sync.Unlock()
+							}
 						}
 						e.results <- detectors.CopyMetadata(chunk, result)
 					}
