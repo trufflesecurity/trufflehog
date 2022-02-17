@@ -1,7 +1,10 @@
 package engine
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"runtime"
 	"strings"
 	"sync"
@@ -23,9 +26,15 @@ type Engine struct {
 	detectors       map[bool][]detectors.Detector
 	chunksScanned   uint64
 	detectorAvgTime map[string][]time.Duration
+	detectedSecret  secretTracker
 }
 
 type EngineOption func(*Engine)
+
+type secretTracker struct {
+	secret map[[32]byte]bool
+	sync   sync.Mutex
+}
 
 func WithConcurrency(concurrency int) EngineOption {
 	return func(e *Engine) {
@@ -57,6 +66,10 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		chunks:          make(chan *sources.Chunk),
 		results:         make(chan detectors.ResultWithMetadata),
 		detectorAvgTime: map[string][]time.Duration{},
+		detectedSecret: secretTracker{
+			secret: map[[32]byte]bool{},
+			sync:   sync.Mutex{},
+		},
 	}
 
 	for _, option := range options {
@@ -158,6 +171,18 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						continue
 					}
 					for _, result := range results {
+						if isGitSource(chunk.SourceType) {
+							data := bytes.Join([][]byte{result.Raw, []byte(chunk.SourceMetadata.GetGit().Repository), []byte(chunk.SourceMetadata.GetGit().File)}, []byte{})
+							sid := sha256.Sum256(data)
+							_, exists := e.detectedSecret.secret[sid]
+							if exists {
+								logrus.Debugf("skipping duplicate result for %s in commit %s", result.Raw, chunk.SourceMetadata.GetGit().Commit)
+								continue
+							}
+							e.detectedSecret.sync.Lock()
+							e.detectedSecret.secret[sid] = true
+							e.detectedSecret.sync.Unlock()
+						}
 						e.results <- detectors.CopyMetadata(chunk, result)
 					}
 					if len(results) > 0 {
@@ -170,4 +195,27 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 		}
 		atomic.AddUint64(&e.chunksScanned, 1)
 	}
+}
+
+// gitSources is a list of sources that utilize the Git source. It is stored this way because slice consts are not
+// supported.
+func gitSources() []sourcespb.SourceType {
+	return []sourcespb.SourceType{
+		sourcespb.SourceType_SOURCE_TYPE_GIT,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+		sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+		sourcespb.SourceType_SOURCE_TYPE_BITBUCKET,
+		sourcespb.SourceType_SOURCE_TYPE_GERRIT,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG,
+		sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT,
+	}
+}
+
+func isGitSource(sourceType sourcespb.SourceType) bool {
+	for _, i := range gitSources() {
+		if i == sourceType {
+			return true
+		}
+	}
+	return false
 }

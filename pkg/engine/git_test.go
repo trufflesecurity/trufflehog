@@ -1,0 +1,65 @@
+package engine
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+)
+
+func TestGitEngine(t *testing.T) {
+	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
+	path, _, err := git.PrepareRepo(repoUrl)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(path)
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	type testProfile struct {
+		expected map[string]string
+		branch   string
+		base     string
+		maxDepth int
+		filter   *common.Filter
+	}
+	for tName, tTest := range map[string]testProfile{
+		"all_secrets": {
+			expected: map[string]string{
+				"70001020fab32b1fcf2f1f0e5c66424eae649826": "AKIAXYZDQCEN4B6JSJQI",
+				"84e9c75e388ae3e866e121087ea2dd45a71068f2": "AKIAILE3JG6KMS3HZGCA",
+				"8afb0ecd4998b1179e428db5ebbcdc8221214432": "369963c1434c377428ca8531fbc46c0c43d037a0",
+				"27fbead3bf883cdb7de9d7825ed401f28f9398f1": "ffc7e0f9400fb6300167009e42d2f842cd7956e2",
+			},
+			filter: common.FilterEmpty(),
+		},
+	} {
+		e := Start(ctx,
+			WithConcurrency(1),
+			WithDecoders(decoders.DefaultDecoders()...),
+			WithDetectors(false, DefaultDetectors()...),
+		)
+		base := plumbing.NewHash(tTest.base)
+		e.ScanGit(ctx, path, tTest.branch, "HEAD", &base, tTest.maxDepth, tTest.filter)
+		resultCount := 0
+		for result := range e.ResultsChan() {
+			switch meta := result.SourceMetadata.GetData().(type) {
+			case *source_metadatapb.MetaData_Git:
+				if tTest.expected[meta.Git.Commit] != string(result.Raw) {
+					t.Errorf("%s: unexpected result. Got: %s, Expected: %s", tName, string(result.Raw), tTest.expected[meta.Git.Commit])
+				}
+			}
+			resultCount++
+
+		}
+		if resultCount != len(tTest.expected) {
+			t.Errorf("%s: unexpected number of results. Got: %d, Expected: %d", tName, resultCount, len(tTest.expected))
+		}
+	}
+}

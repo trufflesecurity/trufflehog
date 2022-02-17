@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/go-git/go-git/v5/plumbing/object"
-
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sirupsen/logrus"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -38,12 +36,12 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 	if gitScanBranch != "" {
 		headHash, err := git.TryAdditionalBaseRefs(repo, gitScanBranch)
 		if err != nil {
-			return fmt.Errorf("could not parse revision: %q: %w", headRef, err)
+			return fmt.Errorf("could not parse revision: %q: %w", gitScanBranch, err)
 		}
 
 		headCommit, err = repo.CommitObject(*headHash)
 		if err != nil {
-			return fmt.Errorf("could not find commit: %q: %w", headRef, err)
+			return fmt.Errorf("could not find commit: %q: %w", gitScanBranch, err)
 		}
 
 		logrus.WithFields(logrus.Fields{
@@ -52,12 +50,6 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 
 		logOptions.From = headCommit.Hash
 		logOptions.All = false
-	}
-
-	if sinceCommit != nil && headCommit != nil {
-		if ok, _ := sinceCommit.IsAncestor(headCommit); !ok {
-			return fmt.Errorf("unable to scan from requested head to end commit. %s is not an ancestor of %s", sinceCommit.Hash.String(), headCommit.Hash.String())
-		}
 	}
 
 	gitSource := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "local", true, runtime.NumCPU(),
@@ -83,7 +75,10 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 		opts = append(opts, git.ScanOptionMaxDepth(int64(maxDepth)))
 	}
 	if sinceCommit != nil {
-		opts = append(opts, git.ScanOptionSinceCommit(sinceCommit))
+		opts = append(opts, git.ScanOptionBaseCommit(sinceCommit))
+	}
+	if headCommit != nil {
+		opts = append(opts, git.ScanOptionHeadCommit(headCommit))
 	}
 	scanOptions := git.NewScanOptions(opts...)
 

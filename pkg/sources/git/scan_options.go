@@ -7,10 +7,11 @@ import (
 )
 
 type ScanOptions struct {
-	Filter      *common.Filter
-	SinceCommit *object.Commit // When scanning a git.Log, this is the oldest/first commit.
-	MaxDepth    int64
-	LogOptions  *git.LogOptions
+	Filter     *common.Filter
+	BaseCommit *object.Commit // When scanning a git.Log, this is the oldest/first commit.
+	HeadCommit *object.Commit
+	MaxDepth   int64
+	LogOptions *git.LogOptions
 }
 
 type ScanOption func(*ScanOptions)
@@ -21,9 +22,15 @@ func ScanOptionFilter(filter *common.Filter) ScanOption {
 	}
 }
 
-func ScanOptionSinceCommit(commit *object.Commit) ScanOption {
+func ScanOptionBaseCommit(commit *object.Commit) ScanOption {
 	return func(scanOptions *ScanOptions) {
-		scanOptions.SinceCommit = commit
+		scanOptions.BaseCommit = commit
+	}
+}
+
+func ScanOptionHeadCommit(commit *object.Commit) ScanOption {
+	return func(scanOptions *ScanOptions) {
+		scanOptions.HeadCommit = commit
 	}
 }
 
@@ -41,9 +48,9 @@ func ScanOptionLogOptions(logOptions *git.LogOptions) ScanOption {
 
 func NewScanOptions(options ...ScanOption) *ScanOptions {
 	scanOptions := &ScanOptions{
-		Filter:      common.FilterEmpty(),
-		SinceCommit: nil,
-		MaxDepth:    -1,
+		Filter:     common.FilterEmpty(),
+		BaseCommit: nil,
+		MaxDepth:   -1,
 		LogOptions: &git.LogOptions{
 			All: true,
 		},
