@@ -201,5 +201,6 @@ message Jenkins {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
+    credentials.BasicAuthWithHeader basic_auth_with_header = 3;
   }
 }

@@ -3063,6 +3063,37 @@ func (m *Jenkins) validate(all bool) error {
 			}
 		}
 
+	case *Jenkins_BasicAuthWithHeader:
+
+		if all {
+			switch v := interface{}(m.GetBasicAuthWithHeader()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, JenkinsValidationError{
+						field:  "BasicAuthWithHeader",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, JenkinsValidationError{
+						field:  "BasicAuthWithHeader",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetBasicAuthWithHeader()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return JenkinsValidationError{
+					field:  "BasicAuthWithHeader",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	}
 
 	if len(errors) > 0 {
