@@ -39,6 +39,13 @@ func TestGitEngine(t *testing.T) {
 			},
 			filter: common.FilterEmpty(),
 		},
+		"base_commit": {
+			expected: map[string]string{
+				"70001020fab32b1fcf2f1f0e5c66424eae649826": "AKIAXYZDQCEN4B6JSJQI",
+			},
+			filter: common.FilterEmpty(),
+			base:   "2f251b8c1e72135a375b659951097ec7749d4af9",
+		},
 	} {
 		e := Start(ctx,
 			WithConcurrency(1),

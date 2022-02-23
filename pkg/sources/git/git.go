@@ -262,15 +262,23 @@ func (s *Git) ScanCommits(repo *git.Repository, scanOptions *ScanOptions, chunks
 	commits := map[int64][]*object.Commit{}
 
 	depth := int64(0)
-	reachedBase := false
+
+	if scanOptions.BaseCommit != nil {
+		parentHashes := scanOptions.BaseCommit.ParentHashes
+		for _, parentHash := range parentHashes {
+			parentCommit, err := repo.CommitObject(parentHash)
+			if err != nil {
+				log.WithError(err).WithField("parentHash", parentHash.String()).WithField("commit", scanOptions.BaseCommit.Hash.String()).Debug("could not find parent commit")
+			}
+			dummyMap := map[plumbing.Hash]bool{}
+			s.scanCommit(repo, parentCommit, &dummyMap, scanOptions, true, chunksChan)
+		}
+	}
+
 	// Create a map of timestamps to commits.
 	commitIter.ForEach(func(commit *object.Commit) error {
-		if scanOptions.BaseCommit != nil && !reachedBase {
-			if commit.Hash == scanOptions.BaseCommit.Hash {
-				reachedBase = true
-			} else {
-				return nil
-			}
+		if scanOptions.BaseCommit != nil && commit.Hash.String() == scanOptions.BaseCommit.Hash.String() {
+			return errors.New("reached base commit")
 		}
 		time := commit.Committer.When.Unix()
 		if _, ok := commits[time]; !ok {
@@ -323,13 +331,13 @@ func (s *Git) ScanCommits(repo *git.Repository, scanOptions *ScanOptions, chunks
 				commits[laterParent] = append(commits[laterParent], commit)
 			}
 
-			s.scanCommit(repo, commit, &seenMap, scanOptions, chunksChan)
+			s.scanCommit(repo, commit, &seenMap, scanOptions, false, chunksChan)
 		}
 	}
 	return nil
 }
 
-func (s *Git) scanCommit(repo *git.Repository, commit *object.Commit, seenMap *map[plumbing.Hash]bool, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) {
+func (s *Git) scanCommit(repo *git.Repository, commit *object.Commit, seenMap *map[plumbing.Hash]bool, scanOptions *ScanOptions, ignoreResult bool, chunksChan chan *sources.Chunk) {
 	remote, err := repo.Remote("origin")
 	if err != nil {
 		log.Errorf("error getting repo name: %s", err)
@@ -374,6 +382,7 @@ func (s *Git) scanCommit(repo *git.Repository, commit *object.Commit, seenMap *m
 			SourceMetadata: metadata,
 			Data:           bytes,
 			Verify:         s.verify,
+			IgnoreResult:   ignoreResult,
 		}
 		(*seenMap)[file.Hash] = true
 		return nil

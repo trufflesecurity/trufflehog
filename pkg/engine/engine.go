@@ -211,7 +211,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 								e.detectedSecret.sync.Unlock()
 							}
 						}
-						e.results <- detectors.CopyMetadata(chunk, result)
+						if !chunk.IgnoreResult {
+							e.results <- detectors.CopyMetadata(chunk, result)
+						}
 					}
 					if len(results) > 0 {
 						elasped := time.Since(start)

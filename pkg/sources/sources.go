@@ -24,6 +24,8 @@ type Chunk struct {
 	Data []byte
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
+	// Do not report any results that came from this chunk.
+	IgnoreResult bool
 }
 
 // Source defines the interface required to implement a source chunker.

@@ -73,6 +73,11 @@ func main() {
 
 	cmd := kingpin.MustParse(cli.Parse(os.Args[1:]))
 
+	// When setting a base commit, chunks must be scanned in order.
+	if *gitScanSinceCommit != "" {
+		*concurrency = 1
+	}
+
 	if *jsonOut {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
