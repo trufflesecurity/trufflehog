@@ -95,6 +95,31 @@ func TestSource_Scan(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "token authenticated, single repo, no .git",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"https://github.com/dustin-decker/secretsandstuff"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/dustin-decker/secretsandstuff.git",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
+		{
 			name: "token authenticated, single org",
 			init: init{
 				name: "test source",

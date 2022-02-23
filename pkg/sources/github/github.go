@@ -560,8 +560,9 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 
 func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
 	// TODO: Add check/fix for repos that are missing scheme
-	var newRepoList []string
-	for _, repo := range s.repos {
+	repoIter := make([]string, len(s.repos))
+	copy(repoIter, s.repos)
+	for _, repo := range repoIter {
 		if parts := strings.Split(repo, "/"); len(parts) == 1 {
 			origSources := len(s.repos)
 			s.addGistsByUser(ctx, apiClient, repo)
@@ -575,6 +576,6 @@ func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
 		if err != nil {
 			log.WithError(err).Warnf("Repo not in expected format: %s", repo)
 		}
-		newRepoList = append(newRepoList, repoNormalized)
+		common.AddStringSliceItem(repoNormalized, &s.repos)
 	}
 }
