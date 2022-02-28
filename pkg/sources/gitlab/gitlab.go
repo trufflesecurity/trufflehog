@@ -89,6 +89,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 		s.authMethod = "BASIC_AUTH"
 		s.user = cred.BasicAuth.Username
 		s.password = cred.BasicAuth.Password
+		// We may need the password as a token if the user is using an access_token with basic auth.
+		s.token = cred.BasicAuth.Password
 	default:
 		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", name, s.Type())
 	}
@@ -117,33 +119,38 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 }
 
 func (s *Source) newClient() (*gitlab.Client, error) {
-
 	// initialize a new api instance
 	switch s.authMethod {
 	case "OAUTH":
 		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
 		if err != nil {
-			return nil, fmt.Errorf("could not authenticate to Gitlab instance %s via OAUTH. Error: %v", s.url, err)
-		}
-		return apiClient, nil
-	case "BASIC_AUTH":
-		apiClient, err := gitlab.NewBasicAuthClient(s.user, s.password, gitlab.WithBaseURL(s.url))
-		if err != nil {
-			return nil, fmt.Errorf("could not authenticate to Gitlab instance %s via BASICAUTH. Error: %v", s.url, err)
+			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %s. Error: %v", s.url, err)
 		}
 		return apiClient, nil
 
+	case "BASIC_AUTH":
+		apiClient, err := gitlab.NewBasicAuthClient(s.user, s.password, gitlab.WithBaseURL(s.url))
+		if err != nil {
+			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %s. Error: %v", s.url, err)
+		}
+		// If the user is using an access_token rather than a username/password, then basic auth
+		// will not work. In this case, we test to see if basic auth would work, and if it does not,
+		// we proceed with an OAuth client using the access_token (s.password) as the token.
+		// At this point, s.token is already set to s.password
+		if s.basicAuthSuccessful(apiClient) {
+			return apiClient, nil
+		}
+		fallthrough
 	case "TOKEN":
 		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
 		if err != nil {
-			return nil, fmt.Errorf("could not authenticate to Gitlab instance %s via TOKEN Auth. Error: %v", s.url, err)
+			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %s. Error: %v", s.url, err)
 		}
 		return apiClient, nil
 
 	default:
 		return nil, errors.New("Could not determine authMethod specified for GitLab")
 	}
-
 }
 
 func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, error) {
@@ -380,4 +387,18 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	return nil
+}
+
+func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
+	user, resp, err := apiClient.Users.CurrentUser()
+	if err != nil {
+		return false
+	}
+	if resp.StatusCode <= 400 {
+		return false
+	}
+	if user != nil {
+		return true
+	}
+	return false
 }
