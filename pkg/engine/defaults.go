@@ -189,7 +189,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geocodify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geocodio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geoipifi"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getemails"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getgeoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getgist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github"
@@ -782,7 +781,7 @@ func DefaultDetectors() []detectors.Detector {
 		cloudplan.Scanner{},
 		autoklose.Scanner{},
 		appcues.Scanner{},
-		getemails.Scanner{},
+		// getemails.Scanner{},
 		leadfeeder.Scanner{},
 		uplead.Scanner{},
 		audd.Scanner{},
