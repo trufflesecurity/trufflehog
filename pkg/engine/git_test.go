@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -52,8 +51,7 @@ func TestGitEngine(t *testing.T) {
 			WithDecoders(decoders.DefaultDecoders()...),
 			WithDetectors(false, DefaultDetectors()...),
 		)
-		base := plumbing.NewHash(tTest.base)
-		e.ScanGit(ctx, path, tTest.branch, "HEAD", &base, tTest.maxDepth, tTest.filter)
+		e.ScanGit(ctx, path, tTest.branch, tTest.base, tTest.maxDepth, tTest.filter)
 		resultCount := 0
 		for result := range e.ResultsChan() {
 			switch meta := result.SourceMetadata.GetData().(type) {

@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef string, sinceHash *plumbing.Hash, maxDepth int, filter *common.Filter) error {
+func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string, maxDepth int, filter *common.Filter) error {
 	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return fmt.Errorf("could open repo: %s: %w", repoPath, err)
@@ -26,22 +26,29 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, gitScanBranch, headRef s
 	}
 
 	var sinceCommit, headCommit *object.Commit
-	if !sinceHash.IsZero() {
-		sinceCommit, err = repo.CommitObject(*sinceHash)
+	if len(baseRef) > 0 {
+		baseHash := plumbing.NewHash(baseRef)
+		if baseHash.IsZero() {
+			base, err := git.TryAdditionalBaseRefs(repo, baseRef)
+			if err == nil && !base.IsZero() {
+				baseHash = *base
+			}
+		}
+		sinceCommit, err = repo.CommitObject(baseHash)
 		if err != nil {
-			return fmt.Errorf("unable to resolve commit %s: %s", sinceHash.String(), err)
+			return fmt.Errorf("unable to resolve commit %s: %s", baseRef, err)
 		}
 	}
 
-	if gitScanBranch != "" {
-		headHash, err := git.TryAdditionalBaseRefs(repo, gitScanBranch)
+	if headRef != "" {
+		headHash, err := git.TryAdditionalBaseRefs(repo, headRef)
 		if err != nil {
-			return fmt.Errorf("could not parse revision: %q: %w", gitScanBranch, err)
+			return fmt.Errorf("could not parse revision: %q: %w", headRef, err)
 		}
 
 		headCommit, err = repo.CommitObject(*headHash)
 		if err != nil {
-			return fmt.Errorf("could not find commit: %q: %w", gitScanBranch, err)
+			return fmt.Errorf("could not find commit: %q: %w", headRef, err)
 		}
 
 		logrus.WithFields(logrus.Fields{

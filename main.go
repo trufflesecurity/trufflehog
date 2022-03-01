@@ -14,7 +14,6 @@ import (
 
 	"github.com/felixge/fgprof"
 
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -122,8 +121,7 @@ func main() {
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
-		sinceHash := plumbing.NewHash(*gitScanSinceCommit)
-		err = e.ScanGit(ctx, repoPath, *gitScanBranch, "HEAD", &sinceHash, *gitScanMaxDepth, filter)
+		err = e.ScanGit(ctx, repoPath, *gitScanBranch, *gitScanSinceCommit, *gitScanMaxDepth, filter)
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
