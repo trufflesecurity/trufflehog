@@ -147,10 +147,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
+	foundResults := false
 	for r := range e.ResultsChan() {
 		if *onlyVerified && !r.Verified {
 			continue
 		}
+		foundResults = true
 
 		switch {
 		case *jsonLegacy:
@@ -174,6 +176,10 @@ func main() {
 
 	if *printAvgDetectorTime {
 		printAverageDetectorTime(e)
+	}
+
+	if foundResults {
+		os.Exit(1)
 	}
 }
 

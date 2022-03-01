@@ -266,7 +266,10 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				// we don't want to mark this scan as errored if we cancelled it.
 				return nil
 			}
-			s.jobSem.Acquire(ctx, 1)
+			if err := s.jobSem.Acquire(ctx, 1); err != nil {
+				log.WithError(err).Debug("could not acquire semaphore")
+				continue
+			}
 			wg.Add(1)
 			go func(ctx context.Context, repoURL *url.URL, i int) {
 				defer s.jobSem.Release(1)
@@ -303,7 +306,10 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				// we don't want to mark this scan as errored if we cancelled it.
 				return nil
 			}
-			s.jobSem.Acquire(ctx, 1)
+			if err := s.jobSem.Acquire(ctx, 1); err != nil {
+				log.WithError(err).Debug("could not acquire semaphore")
+				continue
+			}
 			wg.Add(1)
 			go func(ctx context.Context, repoURL *url.URL, i int) {
 				defer s.jobSem.Release(1)
