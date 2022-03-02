@@ -25,7 +25,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - id: 'auth'
       uses: 'google-github-actions/auth@v0'
       with:
@@ -48,7 +48,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - id: 'auth'
       uses: 'google-github-actions/auth@v0'
       with:
