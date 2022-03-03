@@ -201,6 +201,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							if repo != "" && file != "" {
 								data := bytes.Join([][]byte{result.Raw, []byte(repo), []byte(file)}, []byte{})
 								sid := sha256.Sum256(data)
+								logrus.WithField("raw", string(result.Raw)).WithField("repo", repo).WithField("file", file).Debugf("result: %s", result.Raw)
 								_, exists := e.detectedSecret.secret[sid]
 								if exists {
 									logrus.Debugf("skipping duplicate result for %s in commit %s", result.Raw, commit)

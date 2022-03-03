@@ -180,6 +180,8 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for Link
 
+	// no validation rules for Timestamp
+
 	if len(errors) > 0 {
 		return BitbucketMultiError(errors)
 	}
@@ -287,6 +289,8 @@ func (m *Buildkite) validate(all bool) error {
 	// no validation rules for Email
 
 	// no validation rules for BuildNumber
+
+	// no validation rules for Timestamp
 
 	if len(errors) > 0 {
 		return BuildkiteMultiError(errors)
@@ -507,6 +511,8 @@ func (m *Confluence) validate(all bool) error {
 	// no validation rules for Link
 
 	// no validation rules for Email
+
+	// no validation rules for Timestamp
 
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
@@ -938,6 +944,8 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for Repository
 
+	// no validation rules for Timestamp
+
 	if len(errors) > 0 {
 		return GitMultiError(errors)
 	}
@@ -1047,6 +1055,8 @@ func (m *Github) validate(all bool) error {
 
 	// no validation rules for File
 
+	// no validation rules for Timestamp
+
 	if len(errors) > 0 {
 		return GithubMultiError(errors)
 	}
@@ -1153,6 +1163,8 @@ func (m *Gitlab) validate(all bool) error {
 	// no validation rules for Email
 
 	// no validation rules for Repository
+
+	// no validation rules for Timestamp
 
 	if len(errors) > 0 {
 		return GitlabMultiError(errors)
@@ -1365,6 +1377,8 @@ func (m *Jira) validate(all bool) error {
 	// no validation rules for Location
 
 	// no validation rules for Email
+
+	// no validation rules for Timestamp
 
 	if len(errors) > 0 {
 		return JiraMultiError(errors)
@@ -1685,6 +1699,8 @@ func (m *S3) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Timestamp
+
 	if len(errors) > 0 {
 		return S3MultiError(errors)
 	}
@@ -1901,6 +1917,8 @@ func (m *Gerrit) validate(all bool) error {
 
 	// no validation rules for Project
 
+	// no validation rules for Timestamp
+
 	if len(errors) > 0 {
 		return GerritMultiError(errors)
 	}
@@ -2102,6 +2120,8 @@ func (m *Jenkins) validate(all bool) error {
 	// no validation rules for BuildNumber
 
 	// no validation rules for Link
+
+	// no validation rules for Timestamp
 
 	if len(errors) > 0 {
 		return JenkinsMultiError(errors)

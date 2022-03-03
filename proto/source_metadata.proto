@@ -21,6 +21,7 @@ message Bitbucket {
   string commit = 6;
   string email = 7;
   string link = 8;
+  string timestamp = 9;
 }
 
 message Buildkite {
@@ -29,6 +30,7 @@ message Buildkite {
   string link = 3;
   string email = 4;
   int64 build_number = 5;
+  string timestamp = 6;
 }
 
 message CircleCI {
@@ -47,6 +49,7 @@ message Confluence {
   string version = 3;
   string link = 4;
   string email = 5;
+  string timestamp = 6;
 }
 
 message Dockerhub {
@@ -79,6 +82,7 @@ message Git {
   string file = 2;
   string email = 3;
   string repository = 4;
+  string timestamp = 5;
 }
 
 message Github {
@@ -88,6 +92,7 @@ message Github {
   string commit = 4;
   string email = 5;
   string file = 6;
+  string timestamp = 7;
 }
 
 message Gitlab {
@@ -96,6 +101,7 @@ message Gitlab {
   string link = 3;
   string email = 4;
   string repository = 5;
+  string timestamp = 6;
 }
 
 message GCS {
@@ -111,6 +117,7 @@ message Jira {
   string link = 3;
   string location = 4;
   string email = 5;
+  string timestamp = 6;
 }
 
 message NPM {
@@ -134,6 +141,7 @@ message S3 {
   string file = 2;
   string link = 3;
   string email = 5;
+  string timestamp = 6;
 }
 
 message Slack {
@@ -151,6 +159,7 @@ message Gerrit {
   string file = 2;
   string email = 3;
   string project = 4; // projects are what Gerrit calls repositories
+  string timestamp = 5;
 }
 
 message Test {
@@ -161,6 +170,7 @@ message Jenkins {
   string project_name = 1;
   int64 build_number = 2;
   string link = 3;
+  string timestamp = 4;
 }
 
 message MetaData {

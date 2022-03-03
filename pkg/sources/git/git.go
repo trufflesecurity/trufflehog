@@ -47,14 +47,14 @@ type Git struct {
 	sourceName         string
 	sourceID           int64
 	jobID              int64
-	sourceMetadataFunc func(file, email, commit, repository string) *source_metadatapb.MetaData
+	sourceMetadataFunc func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData
 	verify             bool
 	// sem is used to limit concurrency
 	sem *semaphore.Weighted
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
-	sourceMetadataFunc func(file, email, commit, repository string) *source_metadatapb.MetaData,
+	sourceMetadataFunc func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData,
 ) *Git {
 	return &Git{
 		sourceType:         sourceType,
@@ -102,7 +102,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.conn = &conn
 
 	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, runtime.NumCPU(),
-		func(file, email, commit, repository string) *source_metadatapb.MetaData {
+		func(file, email, commit, repository, timestamp string) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
@@ -110,6 +110,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 						File:       sanitizer.UTF8(file),
 						Email:      sanitizer.UTF8(email),
 						Repository: sanitizer.UTF8(repository),
+						Timestamp:  sanitizer.UTF8(timestamp),
 					},
 				},
 			}
@@ -374,7 +375,7 @@ func (s *Git) scanCommit(repo *git.Repository, commit *object.Commit, seenMap *m
 			return nil
 		}
 
-		metadata := s.sourceMetadataFunc(file.Name, commit.Committer.Email, commit.Hash.String(), safeRepo)
+		metadata := s.sourceMetadataFunc(file.Name, commit.Committer.Email, commit.Hash.String(), commit.Committer.When.String(), safeRepo)
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.sourceName,
 			SourceID:       s.sourceID,
@@ -418,7 +419,7 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 				continue
 			}
 			metadata := s.sourceMetadataFunc(
-				fh, "unstaged", "unstaged", safeRepo,
+				fh, "unstaged", "unstaged", time.Now().String(), safeRepo,
 			)
 
 			fileBuf := bytes.NewBuffer(nil)
@@ -549,7 +550,7 @@ func (s *Git) scanCommitPatches(ctx context.Context, repo *git.Repository, commi
 		}
 
 		metadata := s.sourceMetadataFunc(
-			filename, email, commitHash, safeRepo,
+			filename, email, commitHash, commit.Committer.When.String(), safeRepo,
 		)
 
 		chunk := bytes.NewBuffer(nil)
@@ -610,7 +611,7 @@ func (s *Git) scanFilesForCommit(ctx context.Context, repo *git.Repository, comm
 			SourceID:   s.sourceID,
 			Data:       []byte(chunkStr),
 			SourceMetadata: s.sourceMetadataFunc(
-				f.Name, commit.Author.Email, commit.Hash.String(), safeRepo,
+				f.Name, commit.Author.Email, commit.Hash.String(), commit.Committer.When.String(), safeRepo,
 			),
 			Verify: s.verify,
 		}
