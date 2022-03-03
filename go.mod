@@ -28,7 +28,7 @@ require (
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/xanzy/go-gitlab v0.55.1
+	github.com/xanzy/go-gitlab v0.56.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
