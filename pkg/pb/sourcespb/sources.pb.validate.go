@@ -697,6 +697,8 @@ func (m *Confluence) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for SpacesScope
+
 	switch m.Credential.(type) {
 
 	case *Confluence_Unauthenticated:

@@ -79,6 +79,14 @@ message Confluence {
     credentials.BasicAuth basic_auth = 3;
     string token = 4;
   }
+
+  enum GetAllSpacesScope {
+    ALL = 0;
+    GLOBAL = 1;
+    PERSONAL = 2;
+  }
+
+  GetAllSpacesScope spaces_scope = 5;
 }
 
 message DockerHub {
