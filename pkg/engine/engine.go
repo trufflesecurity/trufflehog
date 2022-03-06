@@ -26,7 +26,7 @@ type Engine struct {
 	decoders        []decoders.Decoder
 	detectors       map[bool][]detectors.Detector
 	chunksScanned   uint64
-	detectorAvgTime map[string][]time.Duration
+	detectorAvgTime sync.Map
 	detectedSecret  secretTracker
 }
 
@@ -66,7 +66,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
 		chunks:          make(chan *sources.Chunk),
 		results:         make(chan detectors.ResultWithMetadata),
-		detectorAvgTime: map[string][]time.Duration{},
+		detectorAvgTime: sync.Map{},
 		detectedSecret: secretTracker{
 			secret: map[[32]byte]bool{},
 			sync:   sync.Mutex{},
@@ -137,7 +137,23 @@ func (e *Engine) ChunksScanned() uint64 {
 }
 
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
-	return e.detectorAvgTime
+	avgTime := map[string][]time.Duration{}
+	e.detectorAvgTime.Range(func(k, v interface{}) bool {
+		key, ok := k.(string)
+		if !ok {
+			logrus.Warnf("expected DetectorAvgTime key to be a string")
+			return true
+		}
+
+		value, ok := v.([]time.Duration)
+		if !ok {
+			logrus.Warnf("expected DetectorAvgTime value to be []time.Duration")
+			return true
+		}
+		avgTime[key] = value
+		return true
+	})
+	return avgTime
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {
@@ -219,7 +235,16 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					if len(results) > 0 {
 						elasped := time.Since(start)
 						detectorName := results[0].DetectorType.String()
-						e.detectorAvgTime[detectorName] = append(e.detectorAvgTime[detectorName], elasped)
+						avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
+						avgTime := []time.Duration{}
+						if ok {
+							avgTime, ok = avgTimeI.([]time.Duration)
+							if !ok {
+								continue
+							}
+						}
+						avgTime = append(avgTime, elasped)
+						e.detectorAvgTime.Store(detectorName, avgTime)
 					}
 				}
 			}
