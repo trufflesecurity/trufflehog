@@ -399,7 +399,11 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
-		if len(someRepos) == 0 || err != nil {
+		if err != nil {
+			log.WithError(err).WithField("org", org).Errorf("could not load list repos for org")
+			break
+		}
+		if len(someRepos) == 0 {
 			break
 		}
 		for _, r := range someRepos {

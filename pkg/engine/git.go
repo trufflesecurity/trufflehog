@@ -40,24 +40,28 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 		}
 	}
 
-	if headRef != "" {
-		headHash, err := git.TryAdditionalBaseRefs(repo, headRef)
+	if headRef == "" {
+		head, err := repo.Head()
 		if err != nil {
-			return fmt.Errorf("could not parse revision: %q: %w", headRef, err)
+			return err
 		}
-
-		headCommit, err = repo.CommitObject(*headHash)
-		if err != nil {
-			return fmt.Errorf("could not find commit: %q: %w", headRef, err)
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"commit": headCommit.Hash.String(),
-		}).Debug("resolved head reference")
-
-		logOptions.From = headCommit.Hash
-		logOptions.All = false
+		headRef = head.Hash().String()
 	}
+	headHash, err := git.TryAdditionalBaseRefs(repo, headRef)
+	if err != nil {
+		return fmt.Errorf("could not parse revision: %q: %w", headRef, err)
+	}
+
+	headCommit, err = repo.CommitObject(*headHash)
+	if err != nil {
+		return fmt.Errorf("could not find commit: %q: %w", headRef, err)
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"commit": headCommit.Hash.String(),
+	}).Debug("resolved head reference")
+
+	logOptions.From = headCommit.Hash
 
 	gitSource := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "local", true, runtime.NumCPU(),
 		func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData {

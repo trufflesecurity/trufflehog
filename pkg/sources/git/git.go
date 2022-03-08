@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -261,18 +262,44 @@ func (s *Git) ScanCommits(repo *git.Repository, scanOptions *ScanOptions, chunks
 		return err
 	}
 	commits := map[int64][]*object.Commit{}
+	seenMap := map[plumbing.Hash]bool{}
 
 	depth := int64(0)
 
 	if scanOptions.BaseCommit != nil {
+		var head *object.Commit
+		if scanOptions.HeadCommit != nil {
+			head = scanOptions.HeadCommit
+		}
+		headMap := sync.Map{}
+		headIter, err := head.Files()
+		if err == nil {
+			_ = headIter.ForEach(func(file *object.File) error {
+				headMap.Store(file.Hash, struct{}{})
+				return nil
+			})
+		}
+		parentCommits := []*object.Commit{}
 		parentHashes := scanOptions.BaseCommit.ParentHashes
 		for _, parentHash := range parentHashes {
 			parentCommit, err := repo.CommitObject(parentHash)
 			if err != nil {
 				log.WithError(err).WithField("parentHash", parentHash.String()).WithField("commit", scanOptions.BaseCommit.Hash.String()).Debug("could not find parent commit")
 			}
-			dummyMap := map[plumbing.Hash]bool{}
-			s.scanCommit(repo, parentCommit, &dummyMap, scanOptions, true, chunksChan)
+			parentCommits = append(parentCommits, parentCommit)
+			parentIter, err := parentCommit.Files()
+			if err == nil {
+				_ = parentIter.ForEach(func(file *object.File) error {
+					_, ok := headMap.Load(file.Hash)
+					if ok {
+						seenMap[file.Hash] = true
+					}
+					return nil
+				})
+			}
+		}
+		for _, parentCommit := range parentCommits {
+			s.scanCommit(repo, parentCommit, &seenMap, scanOptions, true, chunksChan)
 		}
 	}
 
@@ -300,8 +327,6 @@ func (s *Git) ScanCommits(repo *git.Repository, scanOptions *ScanOptions, chunks
 		keys[i] = key
 		i++
 	}
-
-	seenMap := map[plumbing.Hash]bool{}
 
 	// Sort the timestamps
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
@@ -473,7 +498,7 @@ func verifyOptions(scanOptions *ScanOptions) error {
 	head := scanOptions.HeadCommit
 	if base != nil && head != nil {
 		if ok, _ := base.IsAncestor(head); !ok {
-			return fmt.Errorf("unable to scan from requested head to end commit. %s is not an ancestor of %s", base, head)
+			return fmt.Errorf("unable to scan from requested head to end commit. %s is not an ancestor of %s", base.Hash.String(), head.Hash.String())
 		}
 	}
 	return nil
