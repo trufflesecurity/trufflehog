@@ -355,8 +355,28 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 // handleRateLimit returns true if a rate limit was handled
 //unauthed github has a rate limit of 60 requests per hour. This will likely only be exhausted if many users/orgs are scanned without auth
-func handleRateLimit(err error) bool {
-	limit, ok := err.(*github.RateLimitError)
+func handleRateLimit(errIn error, res *github.Response) bool {
+	knownWait := true
+	remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
+	if err != nil {
+		knownWait = false
+	}
+	resetTime, err := strconv.Atoi(res.Header.Get("x-ratelimit-reset"))
+	if err != nil || resetTime == 0 {
+		knownWait = false
+	}
+
+	if knownWait && remaining == 0 {
+		waitTime := int64(resetTime) - time.Now().Unix()
+		if waitTime > 0 {
+			duration := time.Duration(waitTime+1) * time.Second
+			log.WithField("resumeTime", time.Now().Add(duration).String()).Debugf("rate limited")
+			time.Sleep(duration)
+			return true
+		}
+	}
+
+	limit, ok := errIn.(*github.RateLimitError)
 	if !ok {
 		return false
 	}
@@ -376,7 +396,7 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 		if err == nil {
 			defer res.Body.Close()
 		}
-		if handled := handleRateLimit(err); handled {
+		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
 		if len(someRepos) == 0 || err != nil {
@@ -406,7 +426,7 @@ func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, u
 		if err == nil {
 			defer res.Body.Close()
 		}
-		if handled := handleRateLimit(err); handled {
+		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -432,7 +452,7 @@ func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, u
 		if err == nil {
 			defer resp.Body.Close()
 		}
-		if handled := handleRateLimit(err); handled {
+		if handled := handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil {
@@ -470,7 +490,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 			if err == nil {
 				defer res.Body.Close()
 			}
-			if handled := handleRateLimit(err); handled {
+			if handled := handleRateLimit(err, res); handled {
 				continue
 			}
 			if err != nil || len(members) == 0 {
@@ -505,7 +525,7 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 		if err == nil {
 			defer res.Body.Close()
 		}
-		if handled := handleRateLimit(err); handled {
+		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -534,7 +554,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 		if err == nil {
 			defer resp.Body.Close()
 		}
-		if handled := handleRateLimit(err); handled {
+		if handled := handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil {
