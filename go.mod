@@ -9,13 +9,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.10.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.0
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
-	github.com/bradleyfalzon/ghinstallation v1.1.1
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
 	github.com/fatih/color v1.13.0
 	github.com/felixge/fgprof v0.9.2
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.4.2
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-github/v42 v42.0.0
 	github.com/gorilla/mux v1.8.0
 	github.com/h2non/filetype v1.1.3
@@ -66,7 +66,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.7 // indirect
-	github.com/google/go-github/v29 v29.0.2 // indirect
+	github.com/google/go-github/v41 v41.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect

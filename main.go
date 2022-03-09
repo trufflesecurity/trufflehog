@@ -58,10 +58,6 @@ func main() {
 	// gitlabScanTarget := gitlabScan.Arg("target", "GitLab target. Can be a repository, user or organization.").Required().String()
 	// gitlabScanToken := gitlabScan.Flag("token", "GitLab token.").String()
 
-	bitbucketScan := cli.Command("bitbucket", "Coming soon. Find credentials in Bitbucket repositories.")
-	// bitbucketScanTarget := bitbucketScan.Arg("target", "Bitbucket target. Can be a repository, user or organization.").Required().String()
-	// bitbucketScanToken := bitbucketScan.Flag("token", "Bitbucket token.").String()
-
 	filesystemScan := cli.Command("filesystem", "Coming soon. Find credentials in a filesystem.")
 	// filesystemScanPath := filesystemScan.Arg("path", "Path to scan.").Required().String()
 	// filesystemScanRecursive := filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
@@ -135,8 +131,6 @@ func main() {
 		}
 	case gitlabScan.FullCommand():
 		log.Fatal("GitLab not implemented. Coming soon.")
-	case bitbucketScan.FullCommand():
-		log.Fatal("Bitbucket not implemented. Coming soon.")
 	case filesystemScan.FullCommand():
 		log.Fatal("Filesystem not implemented. Coming soon.")
 	case s3Scan.FullCommand():

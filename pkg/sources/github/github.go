@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bradleyfalzon/ghinstallation"
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v42/github"
