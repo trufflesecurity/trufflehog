@@ -6,15 +6,12 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
-	"strconv"
-	"time"
-
-	// "log"
-	"regexp"
-	"strings"
-
 	"net/http"
 	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
