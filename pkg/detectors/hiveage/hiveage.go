@@ -2,14 +2,11 @@ package hiveage
 
 import (
 	"context"
-	"fmt"
-
-	// "log"
 	b64 "encoding/base64"
+	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
-
-	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
