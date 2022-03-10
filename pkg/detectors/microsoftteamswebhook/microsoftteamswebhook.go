@@ -2,9 +2,6 @@ package microsoftteamswebhook
 
 import (
 	"context"
-	// "fmt"
-
-	// "log"
 	"io/ioutil"
 	"net/http"
 	"regexp"
