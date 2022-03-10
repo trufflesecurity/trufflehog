@@ -1,11 +1,9 @@
 package baseapiio
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-
-	// "log"
-	"bytes"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
