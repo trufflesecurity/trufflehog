@@ -3,15 +3,12 @@ package kraken
 import (
 	"context"
 	"io"
-	"time"
-
-	// "log"
+	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"net/http"
-	"net/url"
+	"time"
 
 	"crypto/hmac"
 	"crypto/sha256"
