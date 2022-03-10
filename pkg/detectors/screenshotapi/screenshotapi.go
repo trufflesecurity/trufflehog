@@ -2,13 +2,10 @@ package screenshotapi
 
 import (
 	"context"
-	"time"
-
-	// "log"
+	"net/http"
 	"regexp"
 	"strings"
-
-	"net/http"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
