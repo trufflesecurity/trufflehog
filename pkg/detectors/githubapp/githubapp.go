@@ -5,13 +5,10 @@ import (
 
 	// b64 "encoding/base64"
 	"fmt"
-	"time"
-
-	// "log"
+	"net/http"
 	"regexp"
 	"strings"
-
-	"net/http"
+	"time"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
