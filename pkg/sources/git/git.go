@@ -323,7 +323,7 @@ func (s *Git) ScanCommits(repo *git.Repository, scanOptions *ScanOptions, chunks
 	// Make a slice of all the timestamp keys so it can be sorted.
 	keys := make([]int64, len(commits))
 	i := 0
-	for key, _ := range commits {
+	for key := range commits {
 		keys[i] = key
 		i++
 	}

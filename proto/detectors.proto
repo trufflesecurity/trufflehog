@@ -750,6 +750,9 @@ enum DetectorType {
   FlagsmithEnvironmentKey = 746;
   FlagsmithToken = 747;
   Mux = 748;
+  Column = 749;
+  Sendbird = 750;
+  SendbirdOrganizationAPI = 751;
 }
 
 message Result {

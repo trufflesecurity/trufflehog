@@ -1,8 +1,7 @@
-package gocardless
+package cliengo
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,17 +20,16 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	//Removed bounds at the end of the regex since there are some cases that the token ends with an underscore (_) or a dash (-)
-	keyPat = regexp.MustCompile(`\b(live_[0-9A-Za-z\_\-]{40}[ "'\r\n]{1})`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cliengo"}) + `\b([0-9a-f]{8}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"gocardless"}
+	return []string{"cliengo"}
 }
 
-// FromData will find and optionally verify GoCardless secrets in a given set of bytes.
+// FromData will find and optionally verify Cliengo secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -44,15 +42,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_GoCardless,
+			DetectorType: detectorspb.DetectorType_Cliengo,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.gocardless.com/customers/", nil)
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			req.Header.Add("GoCardless-Version", "2015-07-06")
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cliengo.com/1.0/account?api_key="+resMatch, nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
