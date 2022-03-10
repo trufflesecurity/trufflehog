@@ -3,8 +3,6 @@ package airtableapikey
 import (
 	"context"
 	"fmt"
-
-	// "log"
 	"net/http"
 	"regexp"
 	"strings"
