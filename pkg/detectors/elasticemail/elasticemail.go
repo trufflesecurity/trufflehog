@@ -9,7 +9,6 @@ import (
 	// "fmt"
 	"encoding/json"
 	"io/ioutil"
-
 	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
