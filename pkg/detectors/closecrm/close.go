@@ -2,10 +2,8 @@ package closecrm
 
 import (
 	"context"
-	"fmt"
-
-	// "log"
 	b64 "encoding/base64"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
