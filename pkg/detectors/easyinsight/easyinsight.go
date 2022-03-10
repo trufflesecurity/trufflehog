@@ -3,8 +3,6 @@ package easyinsight
 import (
 	"context"
 	"fmt"
-
-	// "log"
 	"regexp"
 	"strings"
 
