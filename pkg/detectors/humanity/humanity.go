@@ -3,12 +3,9 @@ package humanity
 import (
 	"context"
 	"io/ioutil"
-
-	// "log"
+	"net/http"
 	"regexp"
 	"strings"
-
-	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
