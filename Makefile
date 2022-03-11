@@ -46,3 +46,6 @@ protos:
 
 protos-windows:
 	docker run -v "$(shell cygpath -w $(shell pwd))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; ./scripts/gen_proto.sh"
+
+snifftest:
+	./hack/snifftest/snifftest.sh

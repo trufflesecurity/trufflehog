@@ -6,7 +6,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adafruitio"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adobeio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adzuna"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/agora"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeprojectkey"
@@ -33,7 +32,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apimatic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apiscience"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apollo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appcues"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appfollow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
@@ -145,7 +143,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/customerguru"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/customerio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/d7network"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dailyco"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dandelion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datafire"
@@ -320,7 +317,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailmodo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailsac"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mandrill"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/manifest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mapbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mapquest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/marketstack"
@@ -337,7 +333,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mixmax"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mixpanel"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moderation"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerck"
@@ -495,7 +490,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smooch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snipcart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snykkey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sparkpost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/splunkobservabilitytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spoonacular"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportsmonk"
@@ -713,7 +707,7 @@ func DefaultDetectors() []detectors.Detector {
 		&notion.Scanner{},
 		&droneci.Scanner{},
 		&ipstack.Scanner{},
-		&adobeio.Scanner{},
+		// &adobeio.Scanner{},
 		&sslmate.Scanner{},
 		&buildkite.Scanner{},
 		&shodankey.Scanner{},
@@ -819,7 +813,7 @@ func DefaultDetectors() []detectors.Detector {
 		&clockify.Scanner{},
 		&karmacrm.Scanner{},
 		&revampcrm.Scanner{},
-		&apollo.Scanner{},
+		// &apollo.Scanner{},
 		&artsy.Scanner{},
 		&vpnapi.Scanner{},
 		&dnscheck.Scanner{},
@@ -910,7 +904,7 @@ func DefaultDetectors() []detectors.Detector {
 		spoonacular.Scanner{},
 		finnhub.Scanner{},
 		checkout.Scanner{},
-		mixpanel.Scanner{},
+		// mixpanel.Scanner{},
 		ipgeolocation.Scanner{},
 		tmetric.Scanner{},
 		fullstory.Scanner{},
@@ -949,7 +943,7 @@ func DefaultDetectors() []detectors.Detector {
 		zipcodeapi.Scanner{},
 		gyazo.Scanner{},
 		fakejson.Scanner{},
-		sparkpost.Scanner{},
+		// sparkpost.Scanner{},
 		locationiq.Scanner{},
 		saucelabs.Scanner{},
 		enigma.Scanner{},
@@ -1079,7 +1073,7 @@ func DefaultDetectors() []detectors.Detector {
 		edenai.Scanner{},
 		urlscan.Scanner{},
 		zenscrape.Scanner{},
-		dailyco.Scanner{},
+		// dailyco.Scanner{},
 		nicereply.Scanner{},
 		hive.Scanner{},
 		clustdoc.Scanner{},
@@ -1178,7 +1172,7 @@ func DefaultDetectors() []detectors.Detector {
 		gocanvas.Scanner{},
 		formio.Scanner{},
 		livestorm.Scanner{},
-		manifest.Scanner{},
+		// manifest.Scanner{},
 		formbucket.Scanner{},
 		apiscience.Scanner{},
 		dronahq.Scanner{},

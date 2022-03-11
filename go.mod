@@ -23,6 +23,7 @@ require (
 	github.com/joho/godotenv v1.4.0
 	github.com/kylelemons/godebug v1.1.0
 	github.com/mattn/go-colorable v0.1.12
+	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/razorpay/razorpay-go v0.0.0-20210728161131-0341409a6ab2
 	github.com/sergi/go-diff v1.2.0
