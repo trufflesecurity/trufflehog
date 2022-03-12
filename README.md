@@ -21,7 +21,7 @@ Several options:
 
 ### 3. Docker
 ```bash
-$ docker run -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog2:latest github --repo https://github.com/dustin-decker/secretsandstuff.git     
+$ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog2:latest github --repo https://github.com/dustin-decker/secretsandstuff --debug 
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
 
 Found verified result 🐷🔑

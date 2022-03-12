@@ -354,32 +354,36 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 // handleRateLimit returns true if a rate limit was handled
-//unauthed github has a rate limit of 60 requests per hour. This will likely only be exhausted if many users/orgs are scanned without auth
+// Unauthenticated access to most github endpoints has a rate limit of 60 requests per hour.
+// This will likely only be exhausted if many users/orgs are scanned without auth
 func handleRateLimit(errIn error, res *github.Response) bool {
-	knownWait := true
-	remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
-	if err != nil {
-		knownWait = false
-	}
-	resetTime, err := strconv.Atoi(res.Header.Get("x-ratelimit-reset"))
-	if err != nil || resetTime == 0 {
-		knownWait = false
-	}
-
-	if knownWait && remaining == 0 {
-		waitTime := int64(resetTime) - time.Now().Unix()
-		if waitTime > 0 {
-			duration := time.Duration(waitTime+1) * time.Second
-			log.WithField("resumeTime", time.Now().Add(duration).String()).Debugf("rate limited")
-			time.Sleep(duration)
-			return true
-		}
-	}
-
 	limit, ok := errIn.(*github.RateLimitError)
 	if !ok {
 		return false
 	}
+
+	if res != nil {
+		knownWait := true
+		remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
+		if err != nil {
+			knownWait = false
+		}
+		resetTime, err := strconv.Atoi(res.Header.Get("x-ratelimit-reset"))
+		if err != nil || resetTime == 0 {
+			knownWait = false
+		}
+
+		if knownWait && remaining == 0 {
+			waitTime := int64(resetTime) - time.Now().Unix()
+			if waitTime > 0 {
+				duration := time.Duration(waitTime+1) * time.Second
+				log.WithField("resumeTime", time.Now().Add(duration).String()).Debugf("rate limited")
+				time.Sleep(duration)
+				return true
+			}
+		}
+	}
+
 	log.WithField("retry-after", limit.Message).Debug("handling rate limit (5 minutes retry)")
 	time.Sleep(time.Minute * 5)
 	return true
