@@ -20,6 +20,9 @@ Several options:
 ### 2. [Release binaries](https://github.com/trufflesecurity/trufflehog2/releases)
 
 ### 3. Docker
+
+> Note: Apple M1 hardware users should run with `docker run --platform linux/arm64` for better performance.
+
 ```bash
 $ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog2:latest github --repo https://github.com/dustin-decker/secretsandstuff --debug 
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
