@@ -7,6 +7,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adafruitio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adzuna"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aeroworkflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/agora"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeprojectkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeuserkey"
@@ -92,7 +93,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/caspio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/censys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/centralstationcrm"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cexio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chatbot"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chatfule"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checklyhq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checkout"
@@ -123,12 +126,14 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/column"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commodities"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/companyhub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/contentfulpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convertkit"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/copper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/countrylayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/courier"
@@ -200,6 +205,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fleetbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flickr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightstats"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/float"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowflu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flutterwave"
@@ -283,6 +289,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/karmacrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/keenio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kickbox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/klipfolio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kontent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kraken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
@@ -304,7 +311,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lokalisetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/luno"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/m3o"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/macaddress"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/madkudu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magnetic"
@@ -328,6 +334,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mesibo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/messagebird"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metrilo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
@@ -423,6 +430,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/reallysimplesystems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rebrandly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
@@ -457,6 +465,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/segmentapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/selectpdf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/semaphore"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbird"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbirdorganizationapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendgrid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendinbluev2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentiment"
@@ -509,6 +519,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/streak"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stytch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sugester"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sumologickey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supernotesapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/surveyanyplace"
@@ -1002,7 +1013,7 @@ func DefaultDetectors() []detectors.Detector {
 		pdflayer.Scanner{},
 		geocode.Scanner{},
 		iconfinder.Scanner{},
-		m3o.Scanner{},
+		// m3o.Scanner{},
 		mesibo.Scanner{},
 		impala.Scanner{},
 		besttime.Scanner{},
@@ -1224,5 +1235,17 @@ func DefaultDetectors() []detectors.Detector {
 		uploadcare.Scanner{},
 		moderation.Scanner{},
 		myintervals.Scanner{},
+		klipfolio.Scanner{},
+		flightstats.Scanner{},
+		sendbird.Scanner{},
+		cexio.Scanner{},
+		repairshopr.Scanner{},
+		metaapi.Scanner{},
+		aeroworkflow.Scanner{},
+		column.Scanner{},
+		sugester.Scanner{},
+		sendbirdorganizationapi.Scanner{},
+		chatfule.Scanner{},
+		convier.Scanner{},
 	}
 }

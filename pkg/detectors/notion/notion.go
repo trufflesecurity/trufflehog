@@ -3,7 +3,6 @@ package notion
 import (
 	"context"
 	"fmt"
-
 	"net/http"
 	"regexp"
 	"strings"

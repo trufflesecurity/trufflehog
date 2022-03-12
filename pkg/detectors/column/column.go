@@ -5,15 +5,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-
-	// "log"
+	"net/http"
 	"regexp"
 	"strings"
 
-	"net/http"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{}

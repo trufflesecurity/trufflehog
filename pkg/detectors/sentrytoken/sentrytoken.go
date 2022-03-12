@@ -3,7 +3,6 @@ package sentrytoken
 import (
 	"context"
 	"fmt"
-
 	"net/http"
 	"regexp"
 	"strings"

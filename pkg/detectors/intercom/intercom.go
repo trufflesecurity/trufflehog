@@ -3,7 +3,6 @@ package intercom
 import (
 	"context"
 	"encoding/base64"
-
 	"net/http"
 	"regexp"
 	"strings"
