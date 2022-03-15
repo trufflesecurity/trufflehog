@@ -220,7 +220,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 								logrus.WithField("raw", string(result.Raw)).WithField("repo", repo).WithField("file", file).Debugf("result: %s", result.Raw)
 								_, exists := e.detectedSecret.secret[sid]
 								if exists {
-									logrus.Debugf("skipping duplicate result for %s in commit %s", result.Raw, commit)
+									commit = commit
+									// logrus.Debugf("skipping duplicate result for %s in commit %s", result.Raw, commit)
 									continue
 								}
 								e.detectedSecret.sync.Lock()

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/gitleaks/go-gitdiff/gitdiff"
-	"github.com/rs/zerolog"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -15,19 +13,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gitleaks/go-gitdiff/gitdiff"
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/rs/zerolog"
 	log "github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	glgo "github.com/zricethezav/gitleaks/v8/git"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type Source struct {

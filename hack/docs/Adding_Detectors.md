@@ -46,9 +46,9 @@ If you think that something should be included outside of these guidelines, plea
 
 ### Creating a new Secret Scanner
 
-1. Identify the Secret Scanner name from the [proto/secrets.proto](proto/secrets.proto) `DetectorType` enum.
+1. Identify the Secret Detector name from the [/proto/detectors.proto](/proto/detectors.proto) `DetectorType` enum.
 
-2. Generate the SecretScanner
+2. Generate the Secret Detector
 
    ```bash
    go run hack/generate/generate.go detector <DetectorType enum name>
@@ -56,7 +56,7 @@ If you think that something should be included outside of these guidelines, plea
 
 3. Complete the secret detector.
 
-   The previous step templated a boilerplate + some example code as a package in the `pkg/secrets` folder for you to work on.
+   The previous step templated a boilerplate + some example code as a package in the `pkg/detectors` folder for you to work on.
    The secret detector can be completed with these general steps:
 
    1. Add the test secret to GCP Secrets. See [managing test secrets](#managing-test-secrets)
@@ -80,7 +80,7 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
    Note: `/tmp/s` is a valid path on Linux. You will need to change that for Windows or OSX, otherwise you will see an error. On Windows you will also need to install [WSL](https://docs.microsoft.com/en-us/windows/wsl/install).
 
    ```bash
-   gcloud secrets versions access --project thog-contractor-tests --secret detectors3 latest > /tmp/s
+   gcloud secrets versions access --project trufflehog-testing --secret detectors3 latest > /tmp/s
    ```
 
 2. Add the secret that you need for testing.
@@ -97,7 +97,7 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
 3. Update the secret version with your modification.
 
    ```bash
-   gcloud secrets versions add --project thog-contractor-tests detectors3 --data-file /tmp/s
+   gcloud secrets versions add --project trufflehog-testing detectors3 --data-file /tmp/s
    ```
 
 4. Access the secret value as shown in the [example code](pkg/secrets/heroku/heroku_test.go).
@@ -119,7 +119,7 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
    ```bash
    dos2unix ./scripts/gen_proto.sh
    ```
-5. Open [proto/secrets.proto](proto/secrets.proto) file and add new detectors then save it. Make sure Docker is running and run this in Ubuntu command line.
+5. Open [/proto/detectors.proto](/proto/detectors.proto) file and add new detectors then save it. Make sure Docker is running and run this in Ubuntu command line.
    ```bash
    make protos
    ```

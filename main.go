@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/felixge/fgprof"
@@ -38,11 +39,11 @@ func main() {
 
 	gitScan := cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI := gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
-	gitScanIncludePaths := gitScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	gitScanExcludePaths := gitScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	gitScanSinceCommit := gitScan.Flag("since_commit", "Commit to start scan from.").String()
+	gitScanIncludePaths := gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	gitScanExcludePaths := gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitScanSinceCommit := gitScan.Flag("since-commit", "Commit to start scan from.").String()
 	gitScanBranch := gitScan.Flag("branch", "Branch to scan.").String()
-	gitScanMaxDepth := gitScan.Flag("max_depth", "Maximum depth of commits to scan.").Int()
+	gitScanMaxDepth := gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
 	gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
@@ -52,7 +53,7 @@ func main() {
 	githubScanRepos := githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
 	githubScanOrgs := githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
 	githubScanToken := githubScan.Flag("token", "GitHub token.").String()
-	githubIncludeForks := githubScan.Flag("include_forks", "Include forks in scan.").Bool()
+	githubIncludeForks := githubScan.Flag("include-forks", "Include forks in scan.").Bool()
 
 	gitlabScan := cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -64,14 +65,21 @@ func main() {
 	filesystemDirectories := filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
 	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive := filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
-	// filesystemScanIncludePaths := filesystemScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	// filesystemScanExcludePaths := filesystemScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	// filesystemScanIncludePaths := filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	// filesystemScanExcludePaths := filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
 	s3Scan := cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey := s3Scan.Flag("key", "S3 key used to authenticate.").String()
 	s3ScanSecret := s3Scan.Flag("secret", "S3 secret used to authenticate.").String()
 	s3ScanCloudEnv := s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
 	s3ScanBuckets := s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
+
+	for i, arg := range os.Args {
+		if strings.HasPrefix(arg, "--") {
+			os.Args[i] = strings.ReplaceAll(arg, "_", "-")
+		}
+	}
+
 	cmd := kingpin.MustParse(cli.Parse(os.Args[1:]))
 
 	// When setting a base commit, chunks must be scanned in order.
