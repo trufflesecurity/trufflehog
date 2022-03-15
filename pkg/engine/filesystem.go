@@ -23,7 +23,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, directories []string) error
 	}
 
 	fileSystemSource := filesystem.Source{}
-	err = fileSystemSource.Init(ctx, "local", 0, int64(sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM), true, &conn, runtime.NumCPU())
+	err = fileSystemSource.Init(ctx, "trufflehog - filesystem", 0, int64(sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM), true, &conn, runtime.NumCPU())
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init filesystem source", 0)
 	}

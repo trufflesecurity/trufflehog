@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -256,6 +257,9 @@ func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repo
 }
 
 func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
+		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
+	}
 	zerolog.SetGlobalLevel(zerolog.Disabled)
 	fileChan, err := glgo.GitLog(path, scanOptions.HeadHash)
 	if err != nil {
