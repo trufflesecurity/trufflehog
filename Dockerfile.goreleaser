@@ -1,8 +1,5 @@
-FROM golang:bullseye as builder
-RUN mkdir /empty
-
-FROM scratch
-COPY --from=builder /empty /tmp
+FROM alpine
+RUN apk add git
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY trufflehog /usr/bin/trufflehog
+COPY --from=builder /build/trufflehog /usr/bin/trufflehog
 ENTRYPOINT ["/usr/bin/trufflehog"]

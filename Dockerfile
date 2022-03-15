@@ -5,8 +5,8 @@ WORKDIR /build
 RUN CGO_ENABLED=0 go build -a -o trufflehog main.go
 RUN mkdir /empty
 
-FROM scratch
-COPY --from=builder /empty /tmp
+FROM alpine
+RUN apk add git
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /build/trufflehog /usr/bin/trufflehog
 ENTRYPOINT ["/usr/bin/trufflehog"]
