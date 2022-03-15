@@ -14,7 +14,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
 	github.com/fatih/color v1.13.0
 	github.com/felixge/fgprof v0.9.2
-	github.com/gitleaks/go-gitdiff v0.7.4
+	github.com/gitleaks/go-gitdiff v0.7.5
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/golang-jwt/jwt v3.2.2+incompatible
@@ -35,6 +35,7 @@ require (
 	github.com/xanzy/go-gitlab v0.59.0
 	github.com/zricethezav/gitleaks/v8 v8.3.0
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf
@@ -89,7 +90,6 @@ require (
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/mod v0.5.0 // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect

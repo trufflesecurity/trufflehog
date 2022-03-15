@@ -167,8 +167,9 @@ github.com/felixge/fgprof v0.9.2/go.mod h1:+VNi+ZXtHIQ6wIw6bUT8nXQRefQflWECoFyRe
 github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568/go.mod h1:xEzjJPgXI435gkrCt3MPfRiAkVrwSbHsst4LCFVfpJc=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
-github.com/gitleaks/go-gitdiff v0.7.4 h1:8vICc4moyRR2poklblThdQ0ckMet22mEvFJSxPsiDlk=
 github.com/gitleaks/go-gitdiff v0.7.4/go.mod h1:pKz0X4YzCKZs30BL+weqBIG7mx0jl4tF1uXV9ZyNvrA=
+github.com/gitleaks/go-gitdiff v0.7.5 h1:nWw94ajiA/lBiJb4rHoh9icuW/P8ljpYSAv1mT0m2mY=
+github.com/gitleaks/go-gitdiff v0.7.5/go.mod h1:pKz0X4YzCKZs30BL+weqBIG7mx0jl4tF1uXV9ZyNvrA=
 github.com/gliderlabs/ssh v0.2.2 h1:6zsha5zo/TWhRhwqCD3+EarCAgZ2yN28ipRnGPnwkI0=
 github.com/gliderlabs/ssh v0.2.2/go.mod h1:U7qILu1NlMHj9FlMhZLlkCdDnU1DBEAqr0aevW3Awn0=
 github.com/go-errors/errors v1.4.2 h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=
