@@ -67,8 +67,11 @@ func main() {
 	// filesystemScanIncludePaths := filesystemScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	// filesystemScanExcludePaths := filesystemScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
-	s3Scan := cli.Command("s3", "Coming soon. Find credentials in an S3 bucket.")
-
+	s3Scan := cli.Command("s3", "Find credentials in S3 buckets.")
+	s3ScanKey := s3Scan.Flag("key", "S3 key used to authenticate.").String()
+	s3ScanSecret := s3Scan.Flag("secret", "S3 secret used to authenticate.").String()
+	s3ScanCloudEnv := s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
+	s3ScanBuckets := s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 	cmd := kingpin.MustParse(cli.Parse(os.Args[1:]))
 
 	// When setting a base commit, chunks must be scanned in order.
@@ -143,7 +146,10 @@ func main() {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
-		log.Fatal("S3 not implemented. Coming soon.")
+		err := e.ScanS3(ctx, *s3ScanKey, *s3ScanSecret, *s3ScanCloudEnv, *s3ScanBuckets)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to scan S3.")
+		}
 	}
 
 	if !*jsonLegacy && !*jsonOut {
