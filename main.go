@@ -58,8 +58,9 @@ func main() {
 	// gitlabScanTarget := gitlabScan.Arg("target", "GitLab target. Can be a repository, user or organization.").Required().String()
 	// gitlabScanToken := gitlabScan.Flag("token", "GitLab token.").String()
 
-	filesystemScan := cli.Command("filesystem", "Coming soon. Find credentials in a filesystem.")
-	// filesystemScanPath := filesystemScan.Arg("path", "Path to scan.").Required().String()
+	filesystemScan := cli.Command("filesystem", "Find credentials in a filesystem.")
+	filesystemDirectories := filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
+	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive := filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
 	// filesystemScanIncludePaths := filesystemScan.Flag("include_paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	// filesystemScanExcludePaths := filesystemScan.Flag("exclude_paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
@@ -132,7 +133,10 @@ func main() {
 	case gitlabScan.FullCommand():
 		log.Fatal("GitLab not implemented. Coming soon.")
 	case filesystemScan.FullCommand():
-		log.Fatal("Filesystem not implemented. Coming soon.")
+		err := e.ScanFileSystem(ctx, *filesystemDirectories)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to scan filesystem")
+		}
 	case s3Scan.FullCommand():
 		log.Fatal("S3 not implemented. Coming soon.")
 	}
