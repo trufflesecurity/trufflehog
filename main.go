@@ -54,9 +54,11 @@ func main() {
 	githubScanToken := githubScan.Flag("token", "GitHub token.").String()
 	githubIncludeForks := githubScan.Flag("include_forks", "Include forks in scan.").Bool()
 
-	gitlabScan := cli.Command("gitlab", "Coming soon. Find credentials in GitLab repositories.")
-	// gitlabScanTarget := gitlabScan.Arg("target", "GitLab target. Can be a repository, user or organization.").Required().String()
-	// gitlabScanToken := gitlabScan.Flag("token", "GitLab token.").String()
+	gitlabScan := cli.Command("gitlab", "Find credentials in GitLab repositories.")
+	// TODO: Add more GitLab options
+	gitlabScanEndpoint := gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
+	gitlabScanRepos := gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
+	gitlabScanToken := gitlabScan.Flag("token", "GitLab token.").Required().String()
 
 	filesystemScan := cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemDirectories := filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
@@ -131,7 +133,10 @@ func main() {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
 	case gitlabScan.FullCommand():
-		log.Fatal("GitLab not implemented. Coming soon.")
+		err := e.ScanGitLab(ctx, *gitlabScanEndpoint, *gitlabScanToken, *gitlabScanRepos)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to scan GitLab.")
+		}
 	case filesystemScan.FullCommand():
 		err := e.ScanFileSystem(ctx, *filesystemDirectories)
 		if err != nil {
