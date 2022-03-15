@@ -334,7 +334,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				log.WithError(err).Errorf("unable to clone repo (%s), continuing", repoURL)
 				return
 			}
-			err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 			if err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 			}

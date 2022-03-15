@@ -2,14 +2,13 @@ package git
 
 import (
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type ScanOptions struct {
 	Filter     *common.Filter
-	BaseCommit *object.Commit // When scanning a git.Log, this is the oldest/first commit.
-	HeadCommit *object.Commit
+	BaseHash   string // When scanning a git.Log, this is the oldest/first commit.
+	HeadHash   string
 	MaxDepth   int64
 	LogOptions *git.LogOptions
 }
@@ -22,15 +21,15 @@ func ScanOptionFilter(filter *common.Filter) ScanOption {
 	}
 }
 
-func ScanOptionBaseCommit(commit *object.Commit) ScanOption {
+func ScanOptionBaseHash(hash string) ScanOption {
 	return func(scanOptions *ScanOptions) {
-		scanOptions.BaseCommit = commit
+		scanOptions.BaseHash = hash
 	}
 }
 
-func ScanOptionHeadCommit(commit *object.Commit) ScanOption {
+func ScanOptionHeadCommit(hash string) ScanOption {
 	return func(scanOptions *ScanOptions) {
-		scanOptions.HeadCommit = commit
+		scanOptions.HeadHash = hash
 	}
 }
 
@@ -48,9 +47,10 @@ func ScanOptionLogOptions(logOptions *git.LogOptions) ScanOption {
 
 func NewScanOptions(options ...ScanOption) *ScanOptions {
 	scanOptions := &ScanOptions{
-		Filter:     common.FilterEmpty(),
-		BaseCommit: nil,
-		MaxDepth:   -1,
+		Filter:   common.FilterEmpty(),
+		BaseHash: "",
+		HeadHash: "",
+		MaxDepth: -1,
 		LogOptions: &git.LogOptions{
 			All: true,
 		},

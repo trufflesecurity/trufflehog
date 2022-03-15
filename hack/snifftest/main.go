@@ -185,7 +185,7 @@ func main() {
 					})
 
 				log.Infof("scanning %s", r)
-				err = s.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
+				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 				if err != nil {
 					log.Fatal(err)
 				}

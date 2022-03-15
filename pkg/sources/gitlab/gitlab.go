@@ -289,7 +289,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 					return
 				}
 				log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(repos), repoURL.String())
-				err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
+				err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 				if err != nil {
 					errsMut.Lock()
 					errs = append(errs, err)
@@ -329,7 +329,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 					return
 				}
 				log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(repos), repoURL.String())
-				err = s.git.ScanRepo(ctx, repo, git.NewScanOptions(), chunksChan)
+				err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 				if err != nil {
 					errsMut.Lock()
 					errs = append(errs, err)

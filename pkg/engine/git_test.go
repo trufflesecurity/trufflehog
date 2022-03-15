@@ -32,7 +32,7 @@ func TestGitEngine(t *testing.T) {
 		"all_secrets": {
 			expected: map[string]string{
 				"70001020fab32b1fcf2f1f0e5c66424eae649826": "AKIAXYZDQCEN4B6JSJQI",
-				"84e9c75e388ae3e866e121087ea2dd45a71068f2": "AKIAILE3JG6KMS3HZGCA",
+				"90c75f884c65dc3638ca1610bd9844e668f213c2": "AKIAILE3JG6KMS3HZGCA",
 				"8afb0ecd4998b1179e428db5ebbcdc8221214432": "369963c1434c377428ca8531fbc46c0c43d037a0",
 				"27fbead3bf883cdb7de9d7825ed401f28f9398f1": "ffc7e0f9400fb6300167009e42d2f842cd7956e2",
 			},

@@ -4,29 +4,27 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/gitleaks/go-gitdiff/gitdiff"
+	"github.com/rs/zerolog"
 	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/format/diff"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	log "github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	glgo "github.com/zricethezav/gitleaks/v8/git"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -136,7 +134,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			err = s.git.ScanRepo(ctx, repo, NewScanOptions(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
 			if err != nil {
 				return err
 			}
@@ -152,7 +150,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			err = s.git.ScanRepo(ctx, repo, NewScanOptions(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
 			if err != nil {
 				return err
 			}
@@ -177,7 +175,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				defer os.RemoveAll(u)
 			}
 
-			err = s.git.ScanRepo(ctx, repo, NewScanOptions(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, u, NewScanOptions(), chunksChan)
 			if err != nil {
 				return err
 
@@ -256,163 +254,69 @@ func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repo
 	return
 }
 
-func (s *Git) ScanCommits(repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	commitIter, err := repo.Log(scanOptions.LogOptions)
+func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+	fileChan, err := glgo.GitLog(path, scanOptions.HeadHash)
 	if err != nil {
-		return err
+		return errors.WrapPrefix(err, "could not open repo path", 0)
 	}
-	commits := map[int64][]*object.Commit{}
-	seenMap := map[plumbing.Hash]bool{}
-
-	depth := int64(0)
-
-	if scanOptions.BaseCommit != nil {
-		var head *object.Commit
-		if scanOptions.HeadCommit != nil {
-			head = scanOptions.HeadCommit
+	var depth int64
+	for file := range fileChan {
+		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+			log.Debugf("reached max depth")
+			break
 		}
-		headMap := sync.Map{}
-		headIter, err := head.Files()
-		if err == nil {
-			_ = headIter.ForEach(func(file *object.File) error {
-				headMap.Store(file.Hash, struct{}{})
-				return nil
-			})
-		}
-		parentCommits := []*object.Commit{}
-		parentHashes := scanOptions.BaseCommit.ParentHashes
-		for _, parentHash := range parentHashes {
-			parentCommit, err := repo.CommitObject(parentHash)
-			if err != nil {
-				log.WithError(err).WithField("parentHash", parentHash.String()).WithField("commit", scanOptions.BaseCommit.Hash.String()).Debug("could not find parent commit")
-			}
-			parentCommits = append(parentCommits, parentCommit)
-			parentIter, err := parentCommit.Files()
-			if err == nil {
-				_ = parentIter.ForEach(func(file *object.File) error {
-					_, ok := headMap.Load(file.Hash)
-					if ok {
-						seenMap[file.Hash] = true
-					}
-					return nil
-				})
-			}
-		}
-		for _, parentCommit := range parentCommits {
-			s.scanCommit(repo, parentCommit, &seenMap, scanOptions, true, chunksChan)
-		}
-	}
-
-	// Create a map of timestamps to commits.
-	commitIter.ForEach(func(commit *object.Commit) error {
-		if scanOptions.BaseCommit != nil && commit.Hash.String() == scanOptions.BaseCommit.Hash.String() {
-			return errors.New("reached base commit")
-		}
-		time := commit.Committer.When.Unix()
-		if _, ok := commits[time]; !ok {
-			commits[time] = []*object.Commit{}
-		}
-		commits[time] = append(commits[time], commit)
 		depth++
-		if scanOptions.MaxDepth > int64(0) && depth >= scanOptions.MaxDepth {
-			return errors.New("reached max depth")
+		if len(scanOptions.BaseHash) > 0 {
+			if file.PatchHeader.SHA == scanOptions.BaseHash {
+				log.Debugf("reached base commit")
+				break
+			}
 		}
-		return nil
-	})
-
-	// Make a slice of all the timestamp keys so it can be sorted.
-	keys := make([]int64, len(commits))
-	i := 0
-	for key := range commits {
-		keys[i] = key
-		i++
-	}
-
-	// Sort the timestamps
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-	for _, commitTime := range keys {
-		commitSlice := commits[commitTime]
-		for _, commit := range commitSlice {
-			// Check to make sure a commit's parents are scanned before the commit. This is done by checking each
-			// commit's timestamp to the later of it's two parents.
-			laterParent := int64(0)
-			for _, parentHash := range commit.ParentHashes {
-				parent, err := repo.CommitObject(parentHash)
-				if err != nil {
-					continue
-				}
-				parentTime := parent.Committer.When.Unix()
-				if commitTime > parentTime {
-					continue
-				}
-				log.WithField("parentTime", parentTime).WithField("commitTime", commitTime).Debugf("commit %s is out of order", commit.Hash)
-				if parentTime > laterParent {
-					laterParent = parentTime
+		if !scanOptions.Filter.Pass(file.NewName) {
+			continue
+		}
+		newLines := bytes.Buffer{}
+		for _, frag := range file.TextFragments {
+			for _, line := range frag.Lines {
+				if line.Op == gitdiff.OpAdd {
+					newLines.WriteString(line.String())
 				}
 			}
-			// If the commit has an earlier timestamp than it's parents, something has gone wrong. Moving the commit
-			// to the end of the timestamp the parent is in will ensure the parents are scanned first.
-			if laterParent > 0 {
-				log.Debugf("commit (%s) is out of order moving after its parent", commit.Hash)
-				commits[laterParent] = append(commits[laterParent], commit)
+		}
+		fileName := file.NewName
+		if fileName == "" {
+			continue
+		}
+		var email, hash, when string
+		if file.PatchHeader != nil {
+			if file.PatchHeader.Committer != nil {
+				email = file.PatchHeader.Committer.Email
 			}
-
-			s.scanCommit(repo, commit, &seenMap, scanOptions, false, chunksChan)
-		}
-	}
-	return nil
-}
-
-func (s *Git) scanCommit(repo *git.Repository, commit *object.Commit, seenMap *map[plumbing.Hash]bool, scanOptions *ScanOptions, ignoreResult bool, chunksChan chan *sources.Chunk) {
-	remote, err := repo.Remote("origin")
-	if err != nil {
-		log.Errorf("error getting repo name: %s", err)
-		return
-	}
-	safeRepo, err := stripPassword(remote.Config().URLs[0])
-	if err != nil {
-		log.WithError(err).Errorf("couldn't get repo name")
-		return
-	}
-	fileIter, err := commit.Files()
-	if err != nil {
-		log.WithError(err).WithField("commit", commit.Hash.String()).Errorf("unable to read files")
-		return
-	}
-	fileIter.ForEach(func(file *object.File) error {
-		if _, ok := (*seenMap)[file.Hash]; ok {
-			return nil
+			hash = file.PatchHeader.SHA
+			when = file.PatchHeader.AuthorDate.String()
 		}
 
-		if !scanOptions.Filter.Pass(file.Name) {
-			return nil
-		}
-
-		reader, err := file.Reader()
+		remote, err := repo.Remote("origin")
 		if err != nil {
-			log.WithError(err).WithField("file", file.Name).Debugf("failed to get reader from file")
-			return nil
+			return errors.WrapPrefix(err, "error getting repo remote origin", 0)
 		}
-		defer reader.Close()
-		bytes, err := ioutil.ReadAll(reader)
+		safeRepo, err := stripPassword(remote.Config().URLs[0])
 		if err != nil {
-			log.WithError(err).WithField("file", file.Name).Debugf("failed to read from file")
-			return nil
+			return errors.WrapPrefix(err, "couldn't get repo name", 0)
 		}
 
-		metadata := s.sourceMetadataFunc(file.Name, commit.Committer.Email, commit.Hash.String(), commit.Committer.When.String(), safeRepo)
+		metadata := s.sourceMetadataFunc(fileName, email, hash, when, safeRepo)
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.sourceName,
 			SourceID:       s.sourceID,
 			SourceType:     s.sourceType,
 			SourceMetadata: metadata,
-			Data:           bytes,
+			Data:           newLines.Bytes(),
 			Verify:         s.verify,
-			IgnoreResult:   ignoreResult,
 		}
-		(*seenMap)[file.Hash] = true
-		return nil
-	})
+	}
+	return nil
 }
 
 func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
@@ -470,13 +374,9 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 	return nil
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	if err := verifyOptions(scanOptions); err != nil {
-		return err
-	}
-
+func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	start := time.Now().UnixNano()
-	if err := s.ScanCommits(repo, scanOptions, chunksChan); err != nil {
+	if err := s.ScanCommits(repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
 	if err := s.ScanUnstaged(repo, scanOptions, chunksChan); err != nil {
@@ -493,17 +393,6 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, scanOptions *S
 	return nil
 }
 
-func verifyOptions(scanOptions *ScanOptions) error {
-	base := scanOptions.BaseCommit
-	head := scanOptions.HeadCommit
-	if base != nil && head != nil {
-		if ok, _ := base.IsAncestor(head); !ok {
-			return fmt.Errorf("unable to scan from requested head to end commit. %s is not an ancestor of %s", base.Hash.String(), head.Hash.String())
-		}
-	}
-	return nil
-}
-
 //GenerateLink crafts a link to the specific file from a commit. This works in most major git providers (Github/Gitlab)
 func GenerateLink(repo, commit, file string) string {
 	//bitbucket links are commits not commit...
@@ -516,134 +405,6 @@ func GenerateLink(repo, commit, file string) string {
 		link = repo[:len(repo)-4] + "/commit/" + commit
 	}
 	return link
-}
-
-func (s *Git) scanCommitPatches(ctx context.Context, repo *git.Repository, commit *object.Commit, chunksChan chan *sources.Chunk, filter *common.Filter) error {
-
-	defer func() {
-		if err := recover(); err != nil {
-			return
-		}
-	}()
-
-	// If there are no parents, just scan all files present in the commit
-	//log.Debugf("scanning: %v : %s", repo, commit.Hash)
-	if len(commit.ParentHashes) == 0 {
-		err := s.scanFilesForCommit(ctx, repo, commit, chunksChan)
-		if err != nil {
-			return errors.New(err)
-		}
-		return nil
-	}
-
-	parent, err := commit.Parent(0)
-	if err != nil {
-		return errors.New(err)
-	}
-
-	remote, err := repo.Remote("origin")
-	if err != nil {
-		return errors.New(err)
-	}
-
-	safeRepo, err := stripPassword(remote.Config().URLs[0])
-	if err != nil {
-		return errors.New(err)
-	}
-
-	patchCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-	patch, err := parent.PatchContext(patchCtx, commit)
-	if err != nil {
-		if errors.Is(context.DeadlineExceeded, err) {
-			return nil
-		}
-		return errors.New(err)
-	}
-
-	email := commit.Author.Email
-	commitHash := commit.Hash.String()
-
-	for _, file := range patch.FilePatches() {
-		bf, f := file.Files()
-		filename := f.Path()
-		if !filter.Pass(filename) {
-			continue
-		}
-		if filename == "" {
-			filename = bf.Path()
-		}
-
-		metadata := s.sourceMetadataFunc(
-			filename, email, commitHash, commit.Committer.When.String(), safeRepo,
-		)
-
-		chunk := bytes.NewBuffer(nil)
-		// This makes a chunk for every section of the diff, so lots of little changes in a file can produce a lot of chunks.
-		for _, patchChunk := range file.Chunks() {
-			if patchChunk.Type() != diff.Add {
-				continue
-			}
-			// I wonder if we can eliminate this string conversion
-			chunk.Write([]byte(patchChunk.Content()))
-		}
-
-		chunksChan <- &sources.Chunk{
-			SourceType:     s.sourceType,
-			SourceName:     s.sourceName,
-			SourceID:       s.sourceID,
-			Data:           chunk.Bytes(),
-			SourceMetadata: metadata,
-			Verify:         s.verify,
-		}
-	}
-
-	return nil
-}
-
-func (s *Git) scanFilesForCommit(ctx context.Context, repo *git.Repository, commit *object.Commit, chunksChan chan *sources.Chunk) error {
-	fileIter, err := commit.Files()
-	if err != nil {
-		return errors.New(err)
-	}
-
-	remote, err := repo.Remote("origin")
-	if err != nil {
-		return errors.New(err)
-	}
-	safeRepo, err := stripPassword(remote.Config().URLs[0])
-	if err != nil {
-		return errors.New(err)
-	}
-
-	err = fileIter.ForEach(func(f *object.File) error {
-		isBinary, err := f.IsBinary()
-		if isBinary {
-			return nil
-		}
-		if err != nil {
-			return errors.New(err)
-		}
-
-		chunkStr, err := f.Contents()
-		if err != nil {
-			return errors.New(err)
-		}
-
-		chunksChan <- &sources.Chunk{
-			SourceType: s.sourceType,
-			SourceName: s.sourceName,
-			SourceID:   s.sourceID,
-			Data:       []byte(chunkStr),
-			SourceMetadata: s.sourceMetadataFunc(
-				f.Name, commit.Author.Email, commit.Hash.String(), commit.Committer.When.String(), safeRepo,
-			),
-			Verify: s.verify,
-		}
-		return nil
-	})
-
-	return err
 }
 
 func stripPassword(u string) (string, error) {
@@ -719,26 +480,4 @@ func PrepareRepo(uriString string) (string, bool, error) {
 	}
 	log.Debugf("Git repo local path: %s", path)
 	return path, remote, nil
-}
-
-func FilterCommitByFiles(commit *object.Commit, filter *common.Filter) bool {
-	fileCount := 0
-	fileIter, err := commit.Files()
-	if err != nil {
-		return true
-	}
-	foundErr := errors.New("file found")
-	err = fileIter.ForEach(func(file *object.File) error {
-		fileCount++
-		if filter.Pass(file.Name) {
-			return foundErr
-		}
-		return nil
-	})
-	// fileIter will return a "file found" "error" if any files match the filter. If there are no files, there will
-	// not be a match, but the commit should pass anyway in case we want to do something with the commit message.
-	if !errors.Is(err, foundErr) && fileCount > 0 {
-		return true
-	}
-	return false
 }

@@ -22,6 +22,7 @@ message Bitbucket {
   string email = 7;
   string link = 8;
   string timestamp = 9;
+  string line = 10;
 }
 
 message Buildkite {
@@ -83,6 +84,7 @@ message Git {
   string email = 3;
   string repository = 4;
   string timestamp = 5;
+  string line = 6;
 }
 
 message Github {
@@ -93,6 +95,7 @@ message Github {
   string email = 5;
   string file = 6;
   string timestamp = 7;
+  string line = 8;
 }
 
 message Gitlab {
@@ -102,6 +105,7 @@ message Gitlab {
   string email = 4;
   string repository = 5;
   string timestamp = 6;
+  string line = 6;
 }
 
 message GCS {
@@ -160,6 +164,7 @@ message Gerrit {
   string email = 3;
   string project = 4; // projects are what Gerrit calls repositories
   string timestamp = 5;
+  string line = 6;
 }
 
 message Test {
