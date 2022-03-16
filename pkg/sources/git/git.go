@@ -295,8 +295,8 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 		}
 		var email, hash, when string
 		if file.PatchHeader != nil {
-			if file.PatchHeader.Committer != nil {
-				email = file.PatchHeader.Committer.Email
+			if file.PatchHeader.Author != nil {
+				email = file.PatchHeader.Author.Email
 			}
 			hash = file.PatchHeader.SHA
 			when = file.PatchHeader.AuthorDate.String()
