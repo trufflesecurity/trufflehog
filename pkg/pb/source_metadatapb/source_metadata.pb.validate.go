@@ -182,6 +182,8 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for Timestamp
 
+	// no validation rules for Line
+
 	if len(errors) > 0 {
 		return BitbucketMultiError(errors)
 	}
@@ -946,6 +948,8 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for Timestamp
 
+	// no validation rules for Line
+
 	if len(errors) > 0 {
 		return GitMultiError(errors)
 	}
@@ -1057,6 +1061,8 @@ func (m *Github) validate(all bool) error {
 
 	// no validation rules for Timestamp
 
+	// no validation rules for Line
+
 	if len(errors) > 0 {
 		return GithubMultiError(errors)
 	}
@@ -1165,6 +1171,8 @@ func (m *Gitlab) validate(all bool) error {
 	// no validation rules for Repository
 
 	// no validation rules for Timestamp
+
+	// no validation rules for Line
 
 	if len(errors) > 0 {
 		return GitlabMultiError(errors)
@@ -1918,6 +1926,8 @@ func (m *Gerrit) validate(all bool) error {
 	// no validation rules for Project
 
 	// no validation rules for Timestamp
+
+	// no validation rules for Line
 
 	if len(errors) > 0 {
 		return GerritMultiError(errors)
