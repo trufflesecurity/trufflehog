@@ -21,7 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/rs/zerolog"
 	log "github.com/sirupsen/logrus"
-	glgo "github.com/zricethezav/gitleaks/v8/git"
+	glgo "github.com/zricethezav/gitleaks/v8/detect/git"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
