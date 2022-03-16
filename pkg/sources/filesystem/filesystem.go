@@ -77,15 +77,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	return nil
 }
 
-func isDirectory(path string) (bool, error) {
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return false, err
-	}
-
-	return fileInfo.IsDir(), err
-}
-
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	for i, path := range s.paths {
@@ -105,7 +96,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 			path := filepath.Join(cleanPath, relativePath)
 
-			if ok, _ := isDirectory(path); ok {
+			fileStat, _ := os.Stat(path)
+			if !fileStat.Mode().IsRegular() {
 				return nil
 			}
 
