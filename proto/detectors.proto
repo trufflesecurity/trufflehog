@@ -753,6 +753,7 @@ enum DetectorType {
   Column = 749;
   Sendbird = 750;
   SendbirdOrganizationAPI = 751;
+  Midise = 752;
 }
 
 message Result {

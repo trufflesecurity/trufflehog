@@ -337,6 +337,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metrilo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/midise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mixmax"
@@ -1247,5 +1248,6 @@ func DefaultDetectors() []detectors.Detector {
 		sendbirdorganizationapi.Scanner{},
 		chatfule.Scanner{},
 		convier.Scanner{},
+		midise.Scanner{},
 	}
 }
