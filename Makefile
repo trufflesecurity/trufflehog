@@ -1,4 +1,4 @@
-PROTOS_IMAGE=us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
+PROTOS_IMAGE ?= us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
 
 .PHONY: check
 .PHONY: test
