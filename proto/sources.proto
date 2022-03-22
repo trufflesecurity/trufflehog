@@ -184,7 +184,7 @@ message Slack {
     string token = 2;
   }
   repeated string channels = 3;
-  repeated string denyChannels = 4;
+  repeated string ignoreList = 4;
 }
 
 message Test{}
