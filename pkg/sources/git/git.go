@@ -47,14 +47,14 @@ type Git struct {
 	sourceName         string
 	sourceID           int64
 	jobID              int64
-	sourceMetadataFunc func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData
+	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	// sem is used to limit concurrency
 	sem *semaphore.Weighted
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
-	sourceMetadataFunc func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData,
+	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData,
 ) *Git {
 	return &Git{
 		sourceType:         sourceType,
@@ -102,7 +102,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.conn = &conn
 
 	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, runtime.NumCPU(),
-		func(file, email, commit, repository, timestamp string) *source_metadatapb.MetaData {
+		func(file, email, commit, repository, timestamp string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
@@ -111,6 +111,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 						Email:      sanitizer.UTF8(email),
 						Repository: sanitizer.UTF8(repository),
 						Timestamp:  sanitizer.UTF8(timestamp),
+						Line:       line,
 					},
 				},
 			}
@@ -269,14 +270,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 		if !scanOptions.Filter.Pass(file.NewName) {
 			continue
 		}
-		newLines := bytes.Buffer{}
-		for _, frag := range file.TextFragments {
-			for _, line := range frag.Lines {
-				if line.Op == gitdiff.OpAdd {
-					newLines.WriteString(line.String())
-				}
-			}
-		}
+
 		fileName := file.NewName
 		if fileName == "" {
 			continue
@@ -299,14 +293,23 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			return errors.WrapPrefix(err, "couldn't get repo name", 0)
 		}
 
-		metadata := s.sourceMetadataFunc(fileName, email, hash, when, safeRepo)
-		chunksChan <- &sources.Chunk{
-			SourceName:     s.sourceName,
-			SourceID:       s.sourceID,
-			SourceType:     s.sourceType,
-			SourceMetadata: metadata,
-			Data:           newLines.Bytes(),
-			Verify:         s.verify,
+		for _, frag := range file.TextFragments {
+			newLines := bytes.Buffer{}
+			newLineNumber := frag.NewPosition
+			for _, line := range frag.Lines {
+				if line.Op == gitdiff.OpAdd {
+					newLines.WriteString(strings.ReplaceAll(line.String(), "\n", " ") + "\n")
+				}
+			}
+			metadata := s.sourceMetadataFunc(fileName, email, hash, when, safeRepo, newLineNumber)
+			chunksChan <- &sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Data:           newLines.Bytes(),
+				Verify:         s.verify,
+			}
 		}
 	}
 	return nil
@@ -341,7 +344,7 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 				continue
 			}
 			metadata := s.sourceMetadataFunc(
-				fh, "unstaged", "unstaged", time.Now().String(), safeRepo,
+				fh, "unstaged", "unstaged", time.Now().String(), safeRepo, 0,
 			)
 
 			fileBuf := bytes.NewBuffer(nil)

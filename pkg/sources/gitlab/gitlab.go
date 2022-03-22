@@ -101,7 +101,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 
 	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
-		func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData {
+		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{
 					Gitlab: &source_metadatapb.Gitlab{
@@ -111,6 +111,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 						Repository: sanitizer.UTF8(repository),
 						Link:       git.GenerateLink(repository, commit, file),
 						Timestamp:  sanitizer.UTF8(timestamp),
+						Line:       line,
 					},
 				},
 			}

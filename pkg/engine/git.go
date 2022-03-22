@@ -86,8 +86,8 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
-	gitSource := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "local", true, runtime.NumCPU(),
-		func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData {
+	gitSource := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "trufflehog - git", true, runtime.NumCPU(),
+		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
@@ -96,6 +96,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 						Email:      email,
 						Repository: repository,
 						Timestamp:  timestamp,
+						Line:       line,
 					},
 				},
 			}

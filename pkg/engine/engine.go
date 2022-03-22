@@ -1,7 +1,10 @@
 package engine
 
 import (
+	"bytes"
 	"context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"runtime"
 	"strings"
 	"sync"
@@ -174,7 +177,13 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						continue
 					}
 					for _, result := range results {
-						e.results <- detectors.CopyMetadata(chunk, result)
+						targetChunk := chunk
+						if isGitSource(chunk.SourceType) {
+							copyChunk := *chunk
+							targetChunk = &copyChunk
+							SetLineNumber(&copyChunk, &result)
+						}
+						e.results <- detectors.CopyMetadata(targetChunk, result)
 					}
 					if len(results) > 0 {
 						elasped := time.Since(start)
@@ -195,4 +204,52 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 		}
 		atomic.AddUint64(&e.chunksScanned, 1)
 	}
+}
+
+// gitSources is a list of sources that utilize the Git source. It is stored this way because slice consts are not
+// supported.
+func gitSources() []sourcespb.SourceType {
+	return []sourcespb.SourceType{
+		sourcespb.SourceType_SOURCE_TYPE_GIT,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+		sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+		sourcespb.SourceType_SOURCE_TYPE_BITBUCKET,
+		sourcespb.SourceType_SOURCE_TYPE_GERRIT,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG,
+		sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT,
+	}
+}
+
+func isGitSource(sourceType sourcespb.SourceType) bool {
+	for _, i := range gitSources() {
+		if i == sourceType {
+			return true
+		}
+	}
+	return false
+}
+
+func SetLineNumber(chunk *sources.Chunk, result *detectors.Result) {
+	var startingLine *int64
+	switch metadata := chunk.SourceMetadata.GetData().(type) {
+	case *source_metadatapb.MetaData_Git:
+		startingLine = &metadata.Git.Line
+	case *source_metadatapb.MetaData_Github:
+		startingLine = &metadata.Github.Line
+	case *source_metadatapb.MetaData_Gitlab:
+		startingLine = &metadata.Gitlab.Line
+	case *source_metadatapb.MetaData_Bitbucket:
+		startingLine = &metadata.Bitbucket.Line
+	case *source_metadatapb.MetaData_Gerrit:
+		startingLine = &metadata.Gerrit.Line
+	}
+	lines := bytes.Split(chunk.Data, []byte("\n"))
+
+	for i, line := range lines {
+		if bytes.Contains(line, result.Raw) {
+			*startingLine = *startingLine + int64(i)
+			return
+		}
+	}
+	return
 }

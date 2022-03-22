@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -17,8 +18,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/alecthomas/kingpin.v2"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"

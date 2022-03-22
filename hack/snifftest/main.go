@@ -170,7 +170,7 @@ func main() {
 				log.Infof("cloned %s", r)
 
 				s := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "snifftest", false, runtime.NumCPU(),
-					func(file, email, commit, timestamp, repository string) *source_metadatapb.MetaData {
+					func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 						return &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Git{
 								Git: &source_metadatapb.Git{

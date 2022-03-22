@@ -42,7 +42,7 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) {
 	printer.Printf("Raw result: %s\n", whitePrinter.Sprint(out.Raw))
 	for _, data := range meta {
 		for k, v := range data {
-			printer.Printf("%s: %s\n", strings.Title(k), v)
+			printer.Printf("%s: %v\n", strings.Title(k), v)
 		}
 	}
 	fmt.Println("")
