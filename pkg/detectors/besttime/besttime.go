@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				bodyBytes, _ := ioutil.ReadAll(res.Body)
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "Invalid api_key_private") {
+				if strings.Contains(body, `"status": "OK"`) {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

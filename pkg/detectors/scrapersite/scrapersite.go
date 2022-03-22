@@ -55,22 +55,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://scrapersite.com/api-v1?api_key=%s&url=https://google.com", resMatch), nil)
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, err := ioutil.ReadAll(res.Body)
-				if err == nil {
-					bodyString := string(bodyBytes)
-					errCode := strings.Contains(bodyString, `"code":101`)
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						if errCode {
-							s1.Verified = false
-						} else {
-							s1.Verified = true
-						}
+				bodyBytes, _ := ioutil.ReadAll(res.Body)
+				bodyString := string(bodyBytes)
+				validResponse := strings.Contains(bodyString, `"status":true`)
+				defer res.Body.Close()
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					if validResponse {
+						s1.Verified = true
 					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
+						s1.Verified = false
+					}
+				} else {
+					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						continue
 					}
 				}
 			}

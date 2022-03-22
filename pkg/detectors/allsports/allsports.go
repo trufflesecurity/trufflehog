@@ -3,9 +3,12 @@ package allsports
 import (
 	"context"
 	"io/ioutil"
-	"net/http"
+
+	// "log"
 	"regexp"
 	"strings"
+
+	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -55,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				bodyBytes, _ := ioutil.ReadAll(res.Body)
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "Wrong login credentials") {
+				if strings.Contains(body, "success") {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

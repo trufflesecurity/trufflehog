@@ -48,14 +48,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.webscrapingapi.com/v1?api_key="+resMatch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", `https://api.webscrapingapi.com/v1?api_key=`+resMatch, nil)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				bodyBytes, _ := ioutil.ReadAll(res.Body)
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "Invalid API key") {
+				if strings.Contains(body, "key `url` required.") {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

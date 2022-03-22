@@ -1,11 +1,9 @@
 package baseapiio
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
-	"mime/multipart"
 	"net/http"
 	"regexp"
 	"strings"
@@ -51,11 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := &bytes.Buffer{}
-			writer := multipart.NewWriter(payload)
-			_ = writer.WriteField("name", "\"My Form\"")
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.base-api.io/v1/forms", payload)
-			req.Header.Set("Content-Type", writer.FormDataContentType())
+			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.base-api.io/v1/forms?page=1&per_page=10", nil)
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
@@ -63,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				bodyBytes, _ := ioutil.ReadAll(res.Body)
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "UNAUTHENTICATED") {
+				if strings.Contains(body, "items") {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

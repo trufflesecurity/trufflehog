@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					bodyBytes, _ := ioutil.ReadAll(res.Body)
 					body := string(bodyBytes)
-					if res.StatusCode >= 200 && res.StatusCode < 300 && !strings.Contains(body, "Wrong credentials.") {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, `"errors":[]`) {
 						s1.Verified = true
 					} else {
 						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
