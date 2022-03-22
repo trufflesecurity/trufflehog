@@ -18,7 +18,6 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/rs/zerolog"
 	log "github.com/sirupsen/logrus"
 	glgo "github.com/zricethezav/gitleaks/v8/detect/git"
@@ -192,73 +191,62 @@ func RepoFromPath(path string) (*git.Repository, error) {
 	return git.PlainOpen(path)
 }
 
-func CloneRepoUsingToken(token, url, user string) (clonePath string, repo *git.Repository, err error) {
-	log.Debugf("Scanning Repo: %s", url)
-	if user == "" {
-		user = "cloner"
+func CleanOnError(err *error, path string) {
+	if *err != nil {
+		os.RemoveAll(path)
 	}
-	//some git clones require username not just token
-	cloneOptions := &git.CloneOptions{
-		URL: url,
-		Auth: &http.BasicAuth{
-			Username: user,
-			Password: token,
-		},
+}
+
+func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *git.Repository, err error) {
+	if err = GitCmdCheck(); err != nil {
+		return
 	}
 	clonePath, err = ioutil.TempDir(os.TempDir(), "trufflehog")
 	if err != nil {
 		err = errors.New(err)
 		return
 	}
-	repo, err = git.PlainClone(clonePath, false, cloneOptions)
+	defer CleanOnError(&err, clonePath)
+	cloneURL, err := url.Parse(gitUrl)
 	if err != nil {
-		err = errors.New(err)
+		err = errors.WrapPrefix(err, "could not parse url", 0)
 		return
 	}
-	safeRepo, err := stripPassword(url)
+
+	cloneURL.User = userInfo
+
+	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
+	if err := cloneCmd.Run(); err != nil {
+		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
+	}
+
+	repo, err = git.PlainOpen(clonePath)
 	if err != nil {
-		err = errors.New(err)
+		err = errors.WrapPrefix(err, "could not open repo", 0)
 		return
-	}
-	if _, ok := err.(*os.PathError); ok {
-		log.WithField("repo", safeRepo).WithError(err).Error("error cloning repo")
-	}
-	if err != nil && strings.Contains(err.Error(), "cannot read hash, pkt-line too short") {
-		log.WithField("repo", safeRepo).WithError(err).Error("error cloning repo")
 	}
 	return
 }
 
-func CloneRepoUsingUnauthenticated(url string) (clonePath string, repo *git.Repository, err error) {
-	cloneOptions := &git.CloneOptions{
-		URL: url,
+func CloneRepoUsingToken(token, gitUrl, user string) (string, *git.Repository, error) {
+	userInfo := url.UserPassword(user, token)
+	return CloneRepo(userInfo, gitUrl)
+}
+
+func CloneRepoUsingUnauthenticated(url string) (string, *git.Repository, error) {
+	return CloneRepo(nil, url)
+}
+
+func GitCmdCheck() error {
+	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
+		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
 	}
-	clonePath, err = ioutil.TempDir(os.TempDir(), "trufflehog")
-	if err != nil {
-		return
-	}
-	repo, err = git.PlainClone(clonePath, false, cloneOptions)
-	if err != nil {
-		err = errors.New(err)
-		return
-	}
-	safeRepo, err := stripPassword(url)
-	if err != nil {
-		err = errors.New(err)
-		return
-	}
-	if _, ok := err.(*os.PathError); ok {
-		log.WithField("repo", safeRepo).WithError(err).Error("error cloning repo")
-	}
-	if err != nil && strings.Contains(err.Error(), "cannot read hash, pkt-line too short") {
-		log.WithField("repo", safeRepo).WithError(err).Error("error cloning repo")
-	}
-	return
+	return nil
 }
 
 func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
-		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
+	if err := GitCmdCheck(); err != nil {
+		return err
 	}
 	zerolog.SetGlobalLevel(zerolog.Disabled)
 	fileChan, err := glgo.GitLog(path, scanOptions.HeadHash)
@@ -422,10 +410,8 @@ func stripPassword(u string) (string, error) {
 		return "", errors.WrapPrefix(err, "repo remote cannot be sanitized as URI", 0)
 	}
 
-	_, passSet := repoURL.User.Password()
-	if passSet {
-		return strings.Replace(repoURL.String(), repoURL.User.String()+"@", repoURL.User.Username()+":***@", 1), nil
-	}
+	repoURL.User = nil
+
 	return repoURL.String(), nil
 }
 

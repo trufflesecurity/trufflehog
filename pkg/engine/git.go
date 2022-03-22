@@ -31,7 +31,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 	var baseCommit *object.Commit
 	if len(baseRef) > 0 {
 		baseHash := plumbing.NewHash(baseRef)
-		if baseHash.IsZero() {
+		if !plumbing.IsHash(baseRef) {
 			base, err := git.TryAdditionalBaseRefs(repo, baseRef)
 			if err != nil {
 				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
@@ -50,7 +50,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 	var headCommit *object.Commit
 	if len(headRef) > 0 {
 		headHash := plumbing.NewHash(headRef)
-		if headHash.IsZero() {
+		if !plumbing.IsHash(headRef) {
 			head, err := git.TryAdditionalBaseRefs(repo, headRef)
 			if err != nil {
 				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
