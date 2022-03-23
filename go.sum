@@ -447,8 +447,8 @@ github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yuin/goldmark v1.4.0/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
-github.com/zricethezav/gitleaks/v8 v8.5.0 h1:+7+kOptGMlGFx2OPCi5y1oisliojDcBCaE87PI0DJMc=
-github.com/zricethezav/gitleaks/v8 v8.5.0/go.mod h1:kfwn0MTdK7bWJcMIZyQrXPVHoWAZXL0YT+5H4Xr16iY=
+github.com/zricethezav/gitleaks/v8 v8.5.1 h1:vvn9bMwSGTYsq2HPdBAT0Ew9P1si58eSqUC5in0jNLc=
+github.com/zricethezav/gitleaks/v8 v8.5.1/go.mod h1:TxBuxH8eB/1la8Mc7I6j/ZZYNG/mHGpoi09N2oHx5nQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=
 go.etcd.io/etcd/client/pkg/v3 v3.5.0/go.mod h1:IJHfcCEKxYu1Os13ZdwCwIUTUVGYTSAM3YSwc9/Ac1g=
 go.etcd.io/etcd/client/v2 v2.305.0/go.mod h1:h9puh54ZTgAKtEbut2oe9P4L/oqKCVB6xsXlzd7alYQ=
