@@ -304,7 +304,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			defer s.jobSem.Release(1)
 			defer wg.Done()
 
-			s.SetProgressComplete(i, len(s.repos), fmt.Sprintf("Repo: %s", repoURL))
+			s.SetProgressComplete(i, len(s.repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
 			if !strings.HasSuffix(repoURL, ".git") {
 				return

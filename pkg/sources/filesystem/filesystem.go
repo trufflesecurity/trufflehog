@@ -80,7 +80,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	for i, path := range s.paths {
-		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path))
+		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path), "")
 
 		cleanPath := filepath.Clean(path)
 		done := false

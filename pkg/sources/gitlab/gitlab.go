@@ -279,7 +279,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				if len(repoURL.String()) == 0 {
 					return
 				}
-				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL))
+				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
 				path, repo, err := git.CloneRepoUsingUnauthenticated(repoURL.String())
 				defer os.RemoveAll(path)
@@ -319,7 +319,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				if len(repoURL.String()) == 0 {
 					return
 				}
-				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL))
+				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
 				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), s.user)
 				defer os.RemoveAll(path)

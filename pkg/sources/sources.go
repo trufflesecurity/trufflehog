@@ -47,16 +47,22 @@ type Progress struct {
 	mut               sync.Mutex
 	PercentComplete   int64
 	Message           string
+	EncodedResumeInfo string
 	SectionsCompleted int32
 	SectionsRemaining int32
 }
 
-// SetProgressComplete sets job complete percentage based on passed in scope array of highest level objects. i is the current iteration in the loop of target scope, scope should be len(scoped_items)
-func (p *Progress) SetProgressComplete(i, scope int, message string) {
+// SetProgressComplete sets job progress information for a running job based on the highest level objects in the source.
+// i is the current iteration in the loop of target scope
+// scope should be the len(scopedItems)
+// message is the public facing user information about the current progress
+// encodedResumeInfo is an optional string representing any information necessary to resume the job if interrupted
+func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo string) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 
 	p.Message = message
+	p.EncodedResumeInfo = encodedResumeInfo
 	p.SectionsCompleted = int32(i)
 	p.SectionsRemaining = int32(scope)
 	p.PercentComplete = int64((float64(i) / float64(scope)) * 100)
