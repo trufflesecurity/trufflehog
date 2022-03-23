@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.livestorm.co/v1/ping", nil)
+			req, err := http.NewRequest("GET", "https://api.livestorm.co/v1/ping", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

@@ -60,7 +60,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				data := fmt.Sprintf("%s:%s", resClient, resSecret)
 				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 				payload := strings.NewReader("grant_type=client_credentials")
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.roaring.io/token", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.roaring.io/token", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 				res, err := client.Do(req)
 				if err == nil {

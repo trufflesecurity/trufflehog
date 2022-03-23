@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Authorization", fmt.Sprintf("Token token=%s", resMatch))
 				res, err := client.Do(req)
 				if err == nil {

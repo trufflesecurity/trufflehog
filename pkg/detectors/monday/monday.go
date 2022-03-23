@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"query":"{boards(limit:1){id name}}"}`)
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.monday.com/v2", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.monday.com/v2", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", resMatch)
 			res, err := client.Do(req)

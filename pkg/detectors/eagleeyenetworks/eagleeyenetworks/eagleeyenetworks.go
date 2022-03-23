@@ -57,7 +57,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, resEmailPatMatch, resMatch))
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://login.eagleeyenetworks.com/g/aaa/authenticate", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://login.eagleeyenetworks.com/g/aaa/authenticate", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)
 				if err == nil {

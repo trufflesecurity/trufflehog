@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.codacy.com/api/v3/version", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.codacy.com/api/v3/version", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("api-token", resMatch)
 			res, err := client.Do(req)

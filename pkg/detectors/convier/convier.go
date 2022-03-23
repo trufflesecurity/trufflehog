@@ -52,7 +52,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequest("POST", "https://convier.me/api/event", nil)
+			req, err := http.NewRequest("POST", "https://convier.me/api/event", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

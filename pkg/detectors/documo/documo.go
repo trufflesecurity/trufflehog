@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.documo.com/v1/me", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.documo.com/v1/me", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", resMatch))
 			res, err := client.Do(req)

@@ -66,7 +66,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					data := fmt.Sprintf("%s:%s", resEmail, resToken)
 					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-					req, _ := http.NewRequestWithContext(ctx, "GET", "https://"+resDomain+"/rest/api/3/dashboard", nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomain+"/rest/api/3/dashboard", nil)
+					if err != nil {
+						continue
+					}
 					req.Header.Add("Accept", "application/json")
 					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 					res, err := client.Do(req)

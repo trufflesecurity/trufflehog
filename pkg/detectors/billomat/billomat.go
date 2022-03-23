@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.billomat.net/api/v2/clients/myself", resId), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.billomat.net/api/v2/clients/myself", resId), nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("X-BillomatApiKey", resMatch)
 				res, err := client.Do(req)

@@ -54,7 +54,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://"+resDomainMatch+".sugester.com/app/clients.json?api_token="+resMatch, nil)
+				req, err := http.NewRequest("GET", "https://"+resDomainMatch+".sugester.com/app/clients.json?api_token="+resMatch, nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Accept", "application/vnd.sugester+json; version=3")
 				res, err := client.Do(req)
 				if err == nil {

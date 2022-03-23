@@ -51,7 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.lendflow.io/api/v1/deals", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.lendflow.io/api/v1/deals", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			req.Header.Add("Accept", "application/json")

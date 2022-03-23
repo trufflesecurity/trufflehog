@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.audd.io/setCallbackUrl/?api_token=%s&url=https://yourwebsite.com/callbacks_handler/", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.audd.io/setCallbackUrl/?api_token=%s&url=https://yourwebsite.com/callbacks_handler/", resMatch), nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)

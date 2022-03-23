@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.dovico.com/Employees/?version=7", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.dovico.com/Employees/?version=7", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("Authorization", fmt.Sprintf(`WRAP access_token="client=%s&user_token=%s"`, resMatch, resUser))
 				res, err := client.Do(req)

@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.postageapp.com/v.1.0/get_account_info.json?api_key="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.postageapp.com/v.1.0/get_account_info.json?api_key="+resMatch, nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Transfer-Encoding", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

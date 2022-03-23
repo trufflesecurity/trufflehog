@@ -59,7 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				data := fmt.Sprintf("%s:%s", resMatch, resSecret)
 				baseToken := b64.StdEncoding.EncodeToString([]byte(data))
 				payload := strings.NewReader("grant_type=client_credentials")
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://eu.api.tru.id/oauth2/v1/token", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://eu.api.tru.id/oauth2/v1/token", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", baseToken))
 				res, err := client.Do(req)

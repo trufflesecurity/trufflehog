@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader("api_key=" + resMatch + "&identification=%5B%7B%22user_id%22%3A%22datamonster%40gmail.com%22%2C%20%22user_properties%22%3A%7B%22Age%22%3A%2235%22%7D%2C%20%22groups%22%3A%7B%22company_id%22%3A%221234%22%7D%2C%20%22country%22%3A%22United%20States%22%7D%5D")
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.amplitude.com/identify", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.amplitude.com/identify", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			res, err := client.Do(req)
 			if err == nil {

@@ -56,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.getemails.com/api/v1/contacts", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.getemails.com/api/v1/contacts", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("api-key", resMatch)
 				req.Header.Add("api-id", resIdMatch)
 

@@ -51,7 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 15 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequest("GET", "https://api.pipedream.com/v1/users/me", nil)
+			req, err := http.NewRequest("GET", "https://api.pipedream.com/v1/users/me", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

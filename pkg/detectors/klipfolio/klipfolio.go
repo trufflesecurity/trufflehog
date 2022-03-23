@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.klipfolio.com/api/1.0/users", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.klipfolio.com/api/1.0/users", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("kf-api-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

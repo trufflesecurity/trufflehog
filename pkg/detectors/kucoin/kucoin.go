@@ -78,7 +78,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					signature := getKucoinSignature(resSecretMatch, timestamp, method, endpoint, bodyStr)
 					passPhrase := getKucoinPassphrase(resSecretMatch, resPassphraseMatch)
 
-					req, _ := http.NewRequest(method, "https://api.kucoin.com"+endpoint, nil)
+					req, err := http.NewRequest(method, "https://api.kucoin.com"+endpoint, nil)
+					if err != nil {
+						continue
+					}
 					req.Header.Add("KC-API-KEY", resKeyMatch)
 					req.Header.Add("KC-API-SIGN", signature)
 					req.Header.Add("KC-API-TIMESTAMP", timestamp)

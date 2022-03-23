@@ -65,7 +65,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					return results, err
 				}
 
-				req, _ := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewReader(reqData))
+				req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewReader(reqData))
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Authorization", fmt.Sprintf("Client %s", secMatch))
 				req.Header.Add("Content-Type", "application/json")
 

@@ -58,7 +58,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader(fmt.Sprintf(`email=%s&password=%s`, resMatch, resPassword))
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://mrticktock.com/app/api/is_timer_active", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://mrticktock.com/app/api/is_timer_active", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				res, err := client.Do(req)
 				if err == nil {

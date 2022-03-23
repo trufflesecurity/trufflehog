@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.zenscrape.com/api/v1/get?url=http://www.google.com", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.zenscrape.com/api/v1/get?url=http://www.google.com", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("apikey", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

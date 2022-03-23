@@ -82,7 +82,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					payload.Add("signature", signature)
 					payload.Add("nonce", timestamp)
 
-					req, _ := http.NewRequestWithContext(ctx, "POST", "https://cex.io/api/balance/", strings.NewReader(payload.Encode()))
+					req, err := http.NewRequestWithContext(ctx, "POST", "https://cex.io/api/balance/", strings.NewReader(payload.Encode()))
+					if err != nil {
+						continue
+					}
 					req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 					res, err := client.Do(req)
 					if err == nil {

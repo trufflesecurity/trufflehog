@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader("id=Your-User-Id&event=Your%20event%20name")
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.refiner.io/v1/identify-user", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.refiner.io/v1/identify-user", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

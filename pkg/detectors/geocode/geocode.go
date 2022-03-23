@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://geocode.xyz/51.4647,0.0079?json=1&auth=%s", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://geocode.xyz/51.4647,0.0079?json=1&auth=%s", resMatch), nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)

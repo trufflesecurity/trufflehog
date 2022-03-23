@@ -54,7 +54,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resMatch),
 			}
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.aylien.com/news/stories", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.aylien.com/news/stories", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("X-AYLIEN-NewsAPI-Application-ID", resIdMatch)
 				req.Header.Add("X-AYLIEN-NewsAPI-Application-Key", resMatch)
 				res, err := client.Do(req)

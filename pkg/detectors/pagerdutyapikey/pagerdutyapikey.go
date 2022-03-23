@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.pagerduty.com/users", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.pagerduty.com/users", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Accept", "application/vnd.pagerduty+json;version=2")
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Token %s", resMatch))

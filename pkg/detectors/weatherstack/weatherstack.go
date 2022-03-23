@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.weatherstack.com/current?access_key=%s&query=LA", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.weatherstack.com/current?access_key=%s&query=LA", resMatch), nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

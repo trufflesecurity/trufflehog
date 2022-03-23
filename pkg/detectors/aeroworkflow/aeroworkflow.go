@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.aeroworkflow.com/api/"+resIdMatch+"/v1/AeroAppointments", nil)
+				req, err := http.NewRequest("GET", "https://api.aeroworkflow.com/api/"+resIdMatch+"/v1/AeroAppointments", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Accept", "application/json")
 				req.Header.Add("apikey", resMatch)
 				res, err := client.Do(req)

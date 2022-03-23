@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api-eu1.tatum.io/v3/ledger/account?pageSize=10&offset=0&accountCode=AC_1011_B", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api-eu1.tatum.io/v3/ledger/account?pageSize=10&offset=0&accountCode=AC_1011_B", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Accept", "application/vnd.tatumio+json; version=3")
 			req.Header.Add("x-api-key", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)

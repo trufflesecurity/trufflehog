@@ -60,7 +60,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				data := fmt.Sprintf("%s:%s", resIdMatch, resMatch)
 				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://track.customer.io/api/v1/customers/5/events", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://track.customer.io/api/v1/customers/5/events", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 				res, err := client.Do(req)

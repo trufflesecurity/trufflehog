@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://mailsac.com/api/addresses", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://mailsac.com/api/addresses", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Mailsac-Key", resMatch)
 			res, err := client.Do(req)

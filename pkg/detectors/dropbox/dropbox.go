@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			client := common.SaneHttpClient()
 
-			req, _ := http.NewRequestWithContext(ctx, "POST", baseURL, nil)
+			req, err := http.NewRequestWithContext(ctx, "POST", baseURL, nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
 			res, err := client.Do(req)
 			if err != nil {

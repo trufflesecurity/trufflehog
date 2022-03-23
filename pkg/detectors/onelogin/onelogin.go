@@ -56,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				for _, domain := range apiDomains {
 					tokenURL := fmt.Sprintf("https://%s/auth/oauth2/v2/token", domain)
-					req, _ := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(`{"grant_type":"client_credentials"}`))
+					req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(`{"grant_type":"client_credentials"}`))
+					if err != nil {
+						continue
+					}
 					req.Header.Add("Authorization", fmt.Sprintf("client_id:%s, client_secret:%s", clientID[1], clientSecret[1]))
 					req.Header.Add("Content-Type", "application/json; charset=utf-8")
 					res, err := client.Do(req)

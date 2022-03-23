@@ -57,7 +57,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://staging.cloud-elements.com/elements/api-v2/accounts", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://staging.cloud-elements.com/elements/api-v2/accounts", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Authorization", fmt.Sprintf("User %s, Organization %s", resMatch, resOrgMatch))
 				res, err := client.Do(req)
 				if err == nil {

@@ -63,7 +63,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				encoded := b64.StdEncoding.EncodeToString([]byte(data))
 				payload := strings.NewReader("grant_type=client_credentials")
 
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://api-sandbox.dwolla.com/token", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://api-sandbox.dwolla.com/token", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
 

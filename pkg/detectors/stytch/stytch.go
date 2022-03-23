@@ -57,7 +57,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				fmt.Println(userPatMatch)
 				fmt.Println(tokenPatMatch)
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.stytch.com/v1/users/pending", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.stytch.com/v1/users/pending", nil)
+				if err != nil {
+					continue
+				}
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

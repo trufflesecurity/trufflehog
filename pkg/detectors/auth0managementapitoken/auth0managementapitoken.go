@@ -65,7 +65,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				   curl -H "Authorization: Bearer $token" https://domain/api/v2/users
 				*/
 
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/api/v2/users", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/api/v2/users", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", managementApiTokenRes))
 				res, err := client.Do(req)
 				if err == nil {

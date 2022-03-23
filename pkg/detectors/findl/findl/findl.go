@@ -50,7 +50,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 5 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.findl.com/v1.0/query?limit=6", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.findl.com/v1.0/query?limit=6", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("X-API-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

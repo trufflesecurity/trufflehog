@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.whoxy.com/?key=%s&account=balance", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.whoxy.com/?key=%s&account=balance", resMatch), nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

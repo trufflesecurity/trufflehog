@@ -56,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
+				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 				res, err := client.Do(req)
 				if err == nil {

@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader("apiKey=" + resMatch + "&addresses=0xb2930b35844a230f00e51431acae96fe543a0347%2C0xb52d3141ee731fac89927476c6a5207b37cd72ff")
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api-mon.ethplorer.io/createPool", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api-mon.ethplorer.io/createPool", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("accept", "application/json")
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			res, err := client.Do(req)

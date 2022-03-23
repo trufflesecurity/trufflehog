@@ -61,7 +61,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				payload.Add("api_key", resMatch)
 				payload.Add("api_secret", resSecretMatch)
 
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.skybiometry.com/fc/account/authenticate?"+payload.Encode(), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.skybiometry.com/fc/account/authenticate?"+payload.Encode(), nil)
+				if err != nil {
+					continue
+				}
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

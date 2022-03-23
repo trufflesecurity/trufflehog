@@ -53,7 +53,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			baseURL := "https://api.sendgrid.com/v3/templates"
 
 			// test `read_user` scope
-			req, _ := http.NewRequestWithContext(ctx, "GET", baseURL, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", baseURL, nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", res))
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)

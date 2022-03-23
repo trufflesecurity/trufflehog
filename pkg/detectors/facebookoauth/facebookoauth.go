@@ -58,7 +58,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				// thanks https://stackoverflow.com/questions/15621471/validate-a-facebook-app-id-and-app-secret
-				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://graph.facebook.com/%s?fields=roles&access_token=%s|%s", apiIdRes, apiIdRes, apiSecretRes), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://graph.facebook.com/%s?fields=roles&access_token=%s|%s", apiIdRes, apiIdRes, apiSecretRes), nil)
+				if err != nil {
+					continue
+				}
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

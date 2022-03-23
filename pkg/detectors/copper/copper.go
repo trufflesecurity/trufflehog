@@ -59,7 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					"page_size": 25,
 					"sort_by": "name"
 					}`)
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.copper.com/developer_api/v1/tasks/search", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.copper.com/developer_api/v1/tasks/search", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("X-PW-AccessToken", resMatch)
 				req.Header.Add("X-PW-Application", "developer_api")
 				req.Header.Add("X-PW-UserEmail", resIdMatch)

@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.pandascore.co/videogames", nil)
+			req, err := http.NewRequest("GET", "https://api.pandascore.co/videogames", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

@@ -53,7 +53,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := common.SaneHttpClient()
 
 			// test `read_user` scope
-			req, _ := http.NewRequestWithContext(ctx, "GET", baseURL+"/user", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/user", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
 			res, err := client.Do(req)
 			if err != nil {

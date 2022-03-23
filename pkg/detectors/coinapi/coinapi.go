@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://rest.coinapi.io/v1/exchanges", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://rest.coinapi.io/v1/exchanges", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("X-CoinAPI-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

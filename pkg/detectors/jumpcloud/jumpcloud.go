@@ -46,7 +46,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://console.jumpcloud.com/api/v2/systemgroups", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://console.jumpcloud.com/api/v2/systemgroups", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("x-api-key", resMatch)
 
 			res, err := client.Do(req)

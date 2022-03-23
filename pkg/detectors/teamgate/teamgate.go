@@ -54,7 +54,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resMatch),
 			}
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.teamgate.com/v4/users", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.teamgate.com/v4/users", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("X-Auth-Token", resMatch)
 				req.Header.Add("X-App-Key", resKeyMatch)
 

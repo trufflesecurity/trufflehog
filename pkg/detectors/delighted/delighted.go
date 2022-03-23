@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"email": "jony@appleseed.com",
 				"properties": { "Purchase Experience": "Mobile App", "State": "CA" }
 				}`)
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.delighted.com/v1/people.json", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.delighted.com/v1/people.json", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 			res, err := client.Do(req)

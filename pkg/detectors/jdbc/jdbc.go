@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			//TODO can this be verified? Possibly. Could triage verification to other DBMS strings
 			s.Verified = false
 			// client := common.SaneHttpClient()
-			// req, _ := http.NewRequestWithContext(ctx, "GET", "https://jdbcci.com/api/v2/me", nil)
+			// req, err := http.NewRequestWithContext(ctx, "GET", "https://jdbcci.com/api/v2/me", nil)
+			if err != nil {
+				continue
+			}
 			// req.Header.Add("Accept", "application/json;")
 			// req.Header.Add("Jdbc-Token", token)
 			// res, err := client.Do(req)

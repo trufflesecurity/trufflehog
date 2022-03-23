@@ -59,7 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader("grant_type=authorization_code&code=362ad374-735c-4f69-aa8e-bf384f8602de&client_id=" + id + "&client_secret=" + resMatch + "&redirect_uri=http%3A%2F%2Flocalhost.com%2Fb")
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://webexapis.com/v1/access_token", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://webexapis.com/v1/access_token", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				res, err := client.Do(req)
 				if err != nil {

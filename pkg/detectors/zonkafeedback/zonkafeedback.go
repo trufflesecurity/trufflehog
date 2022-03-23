@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://app-us1.zonkafeedback.com/responses?page=1&limit=25&startDate=2020-05-02&endDate=2020-05-09", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app-us1.zonkafeedback.com/responses?page=1&limit=25&startDate=2020-05-02&endDate=2020-05-09", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Z-API-TOKEN", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {

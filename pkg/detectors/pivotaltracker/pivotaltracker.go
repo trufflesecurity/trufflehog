@@ -50,7 +50,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := common.SaneHttpClient()
 			// https://www.pivotaltracker.com/help/api/rest/v5#top
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.pivotaltracker.com/services/v5/me", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://www.pivotaltracker.com/services/v5/me", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json; charset=utf-8")
 			req.Header.Add("X-TrackerToken", token)
 			res, err := client.Do(req)

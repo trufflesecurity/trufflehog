@@ -52,7 +52,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			`)
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequest("POST", "https://api.cloudimage.com/invalidate", payload)
+			req, err := http.NewRequest("POST", "https://api.cloudimage.com/invalidate", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("X-Client-Key", resMatch)
 			res, err := client.Do(req)

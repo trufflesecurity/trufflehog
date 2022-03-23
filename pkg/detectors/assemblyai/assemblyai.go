@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.assemblyai.com/v2/transcript", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.assemblyai.com/v2/transcript", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", resMatch)
 			res, err := client.Do(req)

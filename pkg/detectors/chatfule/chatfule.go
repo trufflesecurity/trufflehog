@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://dashboard.chatfuel.com/api/bots", nil)
+			req, err := http.NewRequest("GET", "https://dashboard.chatfuel.com/api/bots", nil)
+			if err != nil {
+				continue
+			}
 
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

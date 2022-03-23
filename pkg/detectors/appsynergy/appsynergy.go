@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"html":"<html><body><h1>Hello World</h1></body></html>","filename":"HelloWorld.pdf"}`)
-			req, _ := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://www.appsynergy.com/api?action=HTML2PDF&apiKey=%s", resMatch), payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://www.appsynergy.com/api?action=HTML2PDF&apiKey=%s", resMatch), payload)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

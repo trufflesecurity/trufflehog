@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequest("GET", "https://api.the-odds-api.com/v4/sports/?apiKey="+resMatch, nil)
+			req, err := http.NewRequest("GET", "https://api.the-odds-api.com/v4/sports/?apiKey="+resMatch, nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

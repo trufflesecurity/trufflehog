@@ -58,7 +58,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				timeout := 10 * time.Second
 				client.Timeout = timeout
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.apimatic.io/api/code-generations", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.apimatic.io/api/code-generations", nil)
+				if err != nil {
+					continue
+				}
 				req.SetBasicAuth(userPatMatch, passPatMatch)
 				res, err := client.Do(req)
 

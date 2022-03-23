@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.clockify.me/api/v1/user", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.clockify.me/api/v1/user", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("content-type", "application/json")
 			req.Header.Add("X-Api-Key", fmt.Sprintf("%s", resMatch))
 			res, err := client.Do(req)

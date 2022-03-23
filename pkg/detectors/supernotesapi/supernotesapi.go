@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.supernotes.app/v1/user/", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.supernotes.app/v1/user/", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Api-Key", resMatch)
 			res, err := client.Do(req)

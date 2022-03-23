@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.happi.dev/v1/exchange", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.happi.dev/v1/exchange", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("x-happi-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

@@ -53,7 +53,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			timeout := 10 * time.Second
 			client.Timeout = timeout
 			payload := strings.NewReader(`{"query":"{ sshList {id, name}}"}`)
-			req, _ := http.NewRequest("POST", "https://api.borgbase.com/graphql", payload)
+			req, err := http.NewRequest("POST", "https://api.borgbase.com/graphql", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

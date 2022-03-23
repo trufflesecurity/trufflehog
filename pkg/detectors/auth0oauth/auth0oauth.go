@@ -82,7 +82,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					data.Set("code", "AUTHORIZATION_CODE")
 					data.Set("redirect_uri", "undefined")
 
-					req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+domainRes+"/oauth/token", strings.NewReader(data.Encode())) // URL-encoded payload
+					req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+domainRes+"/oauth/token", strings.NewReader(data.Encode())) // URL-encoded payload
+					if err != nil {
+						continue
+					}
 					req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 					res, err := client.Do(req)
 					if err == nil {

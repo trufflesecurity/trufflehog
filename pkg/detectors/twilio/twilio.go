@@ -57,10 +57,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				form := url.Values{}
 				form.Add("FriendlyName", "MyServiceName")
-				req, _ := http.NewRequestWithContext(
+				req, err := http.NewRequestWithContext(
 					ctx, "POST", "https://verify.twilio.com/v2/Services",
+
 					strings.NewReader(form.Encode()),
 				)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				req.Header.Add("Accept", "*/*")
 				req.SetBasicAuth(sid, key)

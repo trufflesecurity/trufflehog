@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://geo.ipify.org/api/v2/country?apiKey="+resMatch+"&ipAddress=8.8.8.8", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://geo.ipify.org/api/v2/country?apiKey="+resMatch+"&ipAddress=8.8.8.8", nil)
+			if err != nil {
+				continue
+			}
 
 			res, err := client.Do(req)
 			if err == nil {

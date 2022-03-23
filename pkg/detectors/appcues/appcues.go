@@ -65,7 +65,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(resMatch),
 				}
 				if verify {
-					req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.appcues.com/v2/accounts/%s/flows", resIdMatch), nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.appcues.com/v2/accounts/%s/flows", resIdMatch), nil)
+					if err != nil {
+						continue
+					}
 					req.SetBasicAuth(resUserMatch, resMatch)
 					res, err := client.Do(req)
 					if err == nil {

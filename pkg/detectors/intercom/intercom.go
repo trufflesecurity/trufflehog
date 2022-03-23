@@ -56,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.intercom.io/contacts?per_page=5", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.intercom.io/contacts?per_page=5", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", "Bearer "+resMatch)
 			req.Header.Add("Accept", "application/json")
 

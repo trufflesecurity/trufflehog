@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.passbase.com/verification/v1/settings", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.passbase.com/verification/v1/settings", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("X-API-KEY", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

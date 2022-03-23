@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://formio.form.io/current", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://formio.form.io/current", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("x-jwt-token", resMatch)
 			res, err := client.Do(req)

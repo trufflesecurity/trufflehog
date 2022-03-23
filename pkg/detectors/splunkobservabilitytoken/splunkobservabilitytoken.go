@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.us1.signalfx.com/v2/dashboard", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.us1.signalfx.com/v2/dashboard", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("X-Sf-Token", resMatch)
 			res, err := client.Do(req)

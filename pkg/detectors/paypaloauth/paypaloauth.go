@@ -59,7 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				data := fmt.Sprintf("%s:%s", residMatch, resMatch)
 				encoded := b64.StdEncoding.EncodeToString([]byte(data))
 				payload := strings.NewReader("grant_type=client_credentials")
-				req, _ := http.NewRequestWithContext(ctx, "POST", "https://api-m.sandbox.paypal.com/v1/oauth2/token", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://api-m.sandbox.paypal.com/v1/oauth2/token", payload)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Accept", "application/json")
 				req.Header.Add("Accept-Language", "en_US")
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")

@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://"+resDomainMatch+".repairshopr.com/api/v1/appointment_types", nil)
+				req, err := http.NewRequest("GET", "https://"+resDomainMatch+".repairshopr.com/api/v1/appointment_types", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Accept", "application/vnd.sugester+json; version=3")
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 

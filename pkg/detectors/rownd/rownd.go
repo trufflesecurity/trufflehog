@@ -65,7 +65,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 
-					req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.rownd.io/applications/"+resId+"/users/data", nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", "https://api.rownd.io/applications/"+resId+"/users/data", nil)
+					if err != nil {
+						continue
+					}
 					req.Header.Add("x-rownd-app-key", keyMatch)
 					req.Header.Add("x-rownd-app-secret", secretMatch)
 					res, err := client.Do(req)

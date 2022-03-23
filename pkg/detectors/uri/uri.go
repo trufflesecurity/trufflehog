@@ -98,7 +98,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// Assume a 200 response is a valid credential
 			postValues := map[string]string{"protocol": parsedURL.Scheme, "credentialed_uri": token}
 			jsonValue, _ := json.Marshal(postValues)
-			req, _ := http.NewRequestWithContext(ctx, "POST", ssrfProtectorURL, bytes.NewBuffer(jsonValue))
+			req, err := http.NewRequestWithContext(ctx, "POST", ssrfProtectorURL, bytes.NewBuffer(jsonValue))
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err != nil {

@@ -65,7 +65,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if verify {
 					payload := strings.NewReader("grant_type=refresh_token&client_id=" + resId + "&client_secret=" + resSecret + "&refresh_token=" + resKey)
 
-					req, _ := http.NewRequestWithContext(ctx, "POST", "https://www.strava.com/oauth/token", payload)
+					req, err := http.NewRequestWithContext(ctx, "POST", "https://www.strava.com/oauth/token", payload)
+					if err != nil {
+						continue
+					}
 					req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 					res, err := client.Do(req)
 					if err == nil {

@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.planyo.com/rest/?method=get_site_info&api_key=%s", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.planyo.com/rest/?method=get_site_info&api_key=%s", resMatch), nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Accept", "application/vnd.planyo+json; version=3")
 			res, err := client.Do(req)
 			if err == nil {

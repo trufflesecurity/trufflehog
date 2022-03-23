@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{"type":"flight","passengers":2,"legs":[{"departure_airport":"sfo","destination_airport":"yyz"},{"departure_airport":"yyz","destination_airport":"sfo"}]}`)
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://www.carboninterface.com/api/v1/estimates", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://www.carboninterface.com/api/v1/estimates", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			req.Header.Add("Content-type", "application/json")
 			res, err := client.Do(req)

@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://dash.readme.com/api/v1", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://dash.readme.com/api/v1", nil)
+			if err != nil {
+				continue
+			}
 			req.SetBasicAuth(resMatch, "")
 			res, err := client.Do(req)
 			if err == nil {

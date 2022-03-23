@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.prospect.io/public/v1/prospects", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.prospect.io/public/v1/prospects", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("%s", resMatch))
 			req.Header.Add("Content-Type", "application/vnd.api+json; charset=utf-8")
 			res, err := client.Do(req)

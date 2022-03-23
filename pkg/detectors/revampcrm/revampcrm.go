@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(tokenPatMatch),
 			}
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://app.revampcrm.com/api/1.0/User/WhoAmI", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://app.revampcrm.com/api/1.0/User/WhoAmI", nil)
+				if err != nil {
+					continue
+				}
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

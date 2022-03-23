@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://calendarific.com/api/v2/holidays?&api_key="+resMatch+"&country=US&year=2019", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://calendarific.com/api/v2/holidays?&api_key="+resMatch+"&country=US&year=2019", nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

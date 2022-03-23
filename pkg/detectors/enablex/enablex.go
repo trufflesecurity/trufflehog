@@ -56,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.enablex.io/voice/v1/call", nil)
+				req, err := http.NewRequest("GET", "https://api.enablex.io/voice/v1/call", nil)
+				if err != nil {
+					continue
+				}
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

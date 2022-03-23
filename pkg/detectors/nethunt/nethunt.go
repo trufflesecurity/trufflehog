@@ -56,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://nethunt.com/api/v1/zapier/triggers/readable-folder", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://nethunt.com/api/v1/zapier/triggers/readable-folder", nil)
+				if err != nil {
+					continue
+				}
 				req.SetBasicAuth(userPatMatch, tokenPatMatch)
 				res, err := client.Do(req)
 				if err == nil {

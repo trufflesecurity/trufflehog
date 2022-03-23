@@ -56,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://us-zipcode.api.smartystreets.com/lookup?auth-id=%s&auth-token=%s&state=CA&zipcode=94035", resIdMatch, resMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://us-zipcode.api.smartystreets.com/lookup?auth-id=%s&auth-token=%s&state=CA&zipcode=94035", resIdMatch, resMatch), nil)
+				if err != nil {
+					continue
+				}
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

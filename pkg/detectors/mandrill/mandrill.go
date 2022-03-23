@@ -49,7 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(fmt.Sprintf(`{"key": "%s"}`, resMatch))
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://mandrillapp.com/api/1.0/users/info", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://mandrillapp.com/api/1.0/users/info", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

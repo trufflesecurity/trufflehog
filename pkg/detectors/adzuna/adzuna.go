@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.adzuna.com/v1/api/jobs/gb/search/1?app_id=%s&app_key=%s", resIdMatch, resMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.adzuna.com/v1/api/jobs/gb/search/1?app_id=%s&app_key=%s", resIdMatch, resMatch), nil)
+				if err != nil {
+					continue
+				}
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

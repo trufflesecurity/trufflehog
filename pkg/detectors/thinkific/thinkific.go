@@ -57,7 +57,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				domainRes := fmt.Sprintf("%s-s-school", resDomainMatch)
-				req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/users", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/users", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("X-Auth-API-Key", resMatch)
 				req.Header.Add("X-Auth-Subdomain", domainRes)
 				req.Header.Add("Content-Type", "application/json")

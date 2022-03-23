@@ -48,7 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://v6.exchangerate-api.com/v6/%s/latest/USD", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://v6.exchangerate-api.com/v6/%s/latest/USD", resMatch), nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Accept", "application/vnd.exchangerateapi+json; version=3")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)

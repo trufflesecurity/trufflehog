@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://axonaut.com/api/v2/companies?type=all&sort=id", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://axonaut.com/api/v2/companies?type=all&sort=id", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("userApiKey", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

@@ -53,7 +53,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"event": "This is the event name",
 				"writeKey": "` + resMatch + `"
 				}`)
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://app.satismeter.com/api/users?type=track", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://app.satismeter.com/api/users?type=track", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {

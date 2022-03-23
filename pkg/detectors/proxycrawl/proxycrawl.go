@@ -51,7 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.proxycrawl.com/leads?token=%s&domain=slack.com", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.proxycrawl.com/leads?token=%s&domain=slack.com", resMatch), nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

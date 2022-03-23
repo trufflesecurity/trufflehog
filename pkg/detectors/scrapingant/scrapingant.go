@@ -50,7 +50,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.scrapingant.com/v1/general?url=google.com", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.scrapingant.com/v1/general?url=google.com", nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("x-api-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {

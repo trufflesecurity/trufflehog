@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://us1.locationiq.com/v1/reverse.php?key="+resMatch+"&lat=-37.870662&lon=144.9803321&format=json", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://us1.locationiq.com/v1/reverse.php?key="+resMatch+"&lat=-37.870662&lon=144.9803321&format=json", nil)
+			if err != nil {
+				continue
+			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

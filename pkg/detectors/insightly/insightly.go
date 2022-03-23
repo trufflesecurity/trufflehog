@@ -47,7 +47,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.na1.insightly.com/v3.1/Contacts?top=2", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.na1.insightly.com/v3.1/Contacts?top=2", nil)
+			if err != nil {
+				continue
+			}
 			req.SetBasicAuth(resMatch, "")
 			res, err := client.Do(req)
 			if err == nil {

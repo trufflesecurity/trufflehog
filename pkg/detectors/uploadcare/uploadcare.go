@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, _ := http.NewRequest("GET", "https://api.uploadcare.com/files/", nil)
+				req, err := http.NewRequest("GET", "https://api.uploadcare.com/files/", nil)
+				if err != nil {
+					continue
+				}
 				req.Header.Add("Accept", "application/vnd.uploadcare-v0.5+json")
 				req.Header.Add("Authorization", fmt.Sprintf("Uploadcare.Simple %s:%s", publicKeyMatch, resMatch))
 				res, err := client.Do(req)

@@ -51,7 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.column.com/entities", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.column.com/entities", nil)
+			if err != nil {
+				continue
+			}
 			//req.SetBasicAuth(resMatch, "")
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(resMatch))))
 			res, err := client.Do(req)

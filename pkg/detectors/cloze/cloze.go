@@ -61,7 +61,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				payload.Add("user", resEmailMatch)
 				payload.Add("api_key", resMatch)
 
-				req, _ := http.NewRequest("GET", "https://api.cloze.com/v1/profile?"+payload.Encode(), nil)
+				req, err := http.NewRequest("GET", "https://api.cloze.com/v1/profile?"+payload.Encode(), nil)
+				if err != nil {
+					continue
+				}
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

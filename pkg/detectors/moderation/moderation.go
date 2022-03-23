@@ -52,7 +52,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			timeout := 5 * time.Second
 			client.Timeout = timeout
 			payload := strings.NewReader(`{"value": "This is an english text"}`)
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://moderationapi.com/api/v1/analyze/language", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://moderationapi.com/api/v1/analyze/language", payload)
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			req.Header.Add("Content-type", "application/json")
 			res, err := client.Do(req)

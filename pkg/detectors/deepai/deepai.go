@@ -61,7 +61,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.deepai.org/api/text-tagging", bytes.NewReader(body.Bytes()))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.deepai.org/api/text-tagging", bytes.NewReader(body.Bytes()))
+			if err != nil {
+				continue
+			}
 			req.Header.Add("Content-Type", writer.FormDataContentType())
 			req.Header.Add("api-key", resMatch)
 			res, err := client.Do(req)
