@@ -11,11 +11,6 @@ import (
 
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/xanzy/go-gitlab"
-	"golang.org/x/sync/semaphore"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -23,6 +18,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"github.com/xanzy/go-gitlab"
+	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Source struct {
@@ -77,6 +76,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 	s.repos = conn.Repositories
 	s.url = conn.Endpoint
+	if !strings.HasSuffix(s.url, "/") {
+		s.url = s.url + "/"
+	}
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.GitLab_Token:
 		s.authMethod = "TOKEN"
