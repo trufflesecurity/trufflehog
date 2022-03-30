@@ -215,15 +215,27 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 	}
 
 	cloneURL.User = userInfo
-
 	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
-	if err := cloneCmd.Run(); err != nil {
+
+	//cloneCmd := exec.Command("date")
+	output, err := cloneCmd.CombinedOutput()
+	if err != nil {
 		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
 	}
-
+	if cloneCmd.ProcessState == nil {
+		return "", nil, errors.New("clone command exited with no output")
+	}
+	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
+		safeUrl, err := stripPassword(gitUrl)
+		if err != nil {
+			log.WithError(err).Errorf("failed to strip credentials from git url")
+		}
+		log.WithField("exit_code", cloneCmd.ProcessState.ExitCode()).WithField("repo", safeUrl).WithField("output", string(output)).Errorf("failed to clone repo")
+		return "", nil, fmt.Errorf("could not clone repo: %s", safeUrl)
+	}
 	repo, err = git.PlainOpen(clonePath)
 	if err != nil {
-		err = errors.WrapPrefix(err, "could not open repo", 0)
+		err = errors.WrapPrefix(err, "could not open cloned repo", 0)
 		return
 	}
 	return
