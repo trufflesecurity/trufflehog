@@ -76,7 +76,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 	s.repos = conn.Repositories
 	s.url = conn.Endpoint
-	if !strings.HasSuffix(s.url, "/") {
+	if conn.Endpoint != "" && !strings.HasSuffix(s.url, "/") {
 		s.url = s.url + "/"
 	}
 	switch cred := conn.GetCredential().(type) {
