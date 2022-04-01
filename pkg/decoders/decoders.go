@@ -20,7 +20,7 @@ func Fuzz(data []byte) int {
 	decoded := false
 	for i, decoder := range DefaultDecoders() {
 		// Skip the first decoder (plain), because it will always decode and give
-		// priority to the input (return 1)
+		// priority to the input (return 1).
 		if i == 0 {
 			continue
 		}
@@ -32,5 +32,5 @@ func Fuzz(data []byte) int {
 	if decoded {
 		return 1 // prioritize the input
 	}
-	return -1 // don't add input to the corpus
+	return -1 // Don't add input to the corpus.
 }

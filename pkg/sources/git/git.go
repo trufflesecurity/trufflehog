@@ -49,8 +49,7 @@ type Git struct {
 	jobID              int64
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
-	// sem is used to limit concurrency
-	sem *semaphore.Weighted
+	concurrency        *semaphore.Weighted
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
@@ -63,11 +62,11 @@ func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName s
 		jobID:              jobID,
 		sourceMetadataFunc: sourceMetadataFunc,
 		verify:             verify,
-		sem:                semaphore.NewWeighted(int64(concurrency)),
+		concurrency:        semaphore.NewWeighted(int64(concurrency)),
 	}
 }
 
-// Ensure the Source satisfies the interface at compile time
+// Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
 // Type returns the type of source.
@@ -241,11 +240,13 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 	return
 }
 
+// CloneRepoUsingToken clones a repo using a provided token.
 func CloneRepoUsingToken(token, gitUrl, user string) (string, *git.Repository, error) {
 	userInfo := url.UserPassword(user, token)
 	return CloneRepo(userInfo, gitUrl)
 }
 
+// CloneRepoUsingUnauthenticated clones a repo with no authentication required.
 func CloneRepoUsingUnauthenticated(url string) (string, *git.Repository, error) {
 	return CloneRepo(nil, url)
 }
@@ -430,6 +431,7 @@ func stripPassword(u string) (string, error) {
 	return repoURL.String(), nil
 }
 
+// TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
 func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, error) {
 	revisionPrefixes := []string{
 		"",
@@ -449,6 +451,8 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 
 	return nil, fmt.Errorf("no base refs succeeded for base: %q", base)
 }
+
+// PrepareRepo clones a repo if possible and returns the cloned repo string.
 func PrepareRepo(uriString string) (string, bool, error) {
 	var path string
 	uri, err := url.Parse(uriString)

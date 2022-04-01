@@ -25,7 +25,7 @@ func FilterEmpty() *Filter {
 	return filter
 }
 
-// FilterFromFiles creates a Filter using from the rules in the provided include and exclude files.
+// FilterFromFiles creates a Filter using the rules in the provided include and exclude files.
 func FilterFromFiles(includeFilterPath, excludeFilterPath string) (*Filter, error) {
 	includeRules, err := FilterRulesFromFile(includeFilterPath)
 	if err != nil {
@@ -62,7 +62,12 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 	if err != nil {
 		log.WithError(err).Fatalf("unable to open filter file: %s", source)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.WithError(err).Fatalf("unable to close filter file: %s", source)
+		}
+	}(file)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -83,7 +88,6 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 func (filter *Filter) Pass(object string) bool {
 	excluded := filter.exclude.Matches(object)
 	included := filter.include.Matches(object)
-	// log.Debugf("test PathFilter: file: %s, included: %t, excluded: %t, pass: %t", object, included, excluded, !excluded && included)
 	return !excluded && included
 }
 

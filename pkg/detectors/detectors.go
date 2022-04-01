@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// Detector defines and interface for scanning for and verifying secrets.
+// Detector defines an interface for scanning for and verifying secrets.
 type Detector interface {
 	// FromData will scan bytes for results, and optionally verify them.
 	FromData(ctx context.Context, verify bool, data []byte) ([]Result, error)
@@ -38,7 +38,7 @@ type Result struct {
 }
 
 type ResultWithMetadata struct {
-	// SourceMetadata contains source-specific contextual information
+	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceID is the ID of the source that the API uses to map secrets to specific sources.
 	SourceID int64
@@ -49,6 +49,7 @@ type ResultWithMetadata struct {
 	Result
 }
 
+// CopyMetadata returns a detector result with included metadata from the source chunk.
 func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 	return ResultWithMetadata{
 		SourceMetadata: chunk.SourceMetadata,
@@ -86,7 +87,7 @@ func CleanResults(results []Result) []Result {
 	return results
 }
 
-// Prefix regex ensures that at least one of the given keywords is within
+// PrefixRegex ensures that at least one of the given keywords is within
 // 20 characters of the capturing group that follows.
 // This can help prevent false positives.
 func PrefixRegex(keywords []string) string {
@@ -97,7 +98,7 @@ func PrefixRegex(keywords []string) string {
 }
 
 //KeyIsRandom is a Low cost check to make sure that 'keys' include a number to reduce FPs.
-//Golang doesnt support regex lookaheads, so must be done in seperate calls.
+//Golang doesnt support regex lookaheads, so must be done in separate calls.
 //TODO improve checks. Shannon entropy did not work well.
 func KeyIsRandom(key string) bool {
 	for _, ch := range key {

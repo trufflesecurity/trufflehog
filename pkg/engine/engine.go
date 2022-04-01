@@ -66,7 +66,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		option(e)
 	}
 
-	// set defaults
+	// Set defaults.
 
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
@@ -186,17 +186,17 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						e.results <- detectors.CopyMetadata(targetChunk, result)
 					}
 					if len(results) > 0 {
-						elasped := time.Since(start)
+						elapsed := time.Since(start)
 						detectorName := results[0].DetectorType.String()
 						avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
-						avgTime := []time.Duration{}
+						var avgTime []time.Duration
 						if ok {
 							avgTime, ok = avgTimeI.([]time.Duration)
 							if !ok {
 								continue
 							}
 						}
-						avgTime = append(avgTime, elasped)
+						avgTime = append(avgTime, elapsed)
 						e.detectorAvgTime.Store(detectorName, avgTime)
 					}
 				}
@@ -229,6 +229,7 @@ func isGitSource(sourceType sourcespb.SourceType) bool {
 	return false
 }
 
+// SetLineNumber sets the line number for a provided source chunk with a given detector result.
 func SetLineNumber(chunk *sources.Chunk, result *detectors.Result) {
 	var startingLine *int64
 	switch metadata := chunk.SourceMetadata.GetData().(type) {
