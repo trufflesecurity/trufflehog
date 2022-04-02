@@ -69,10 +69,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		token := match[0]
+		urlMatch := match[0]
 		password := match[1]
 
-		parsedURL, err := url.Parse(token)
+		// Skip findings where the password starts with a `$` - it's almost certainly a variable.
+		if strings.HasPrefix(password, "$") {
+			continue
+		}
+
+		parsedURL, err := url.Parse(urlMatch)
 		if err != nil {
 			continue
 		}
@@ -83,11 +88,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(token, password, strings.Repeat("*", len(password)), -1))
+		redact := strings.TrimSpace(strings.Replace(urlMatch, password, strings.Repeat("*", len(password)), -1))
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_URI,
-			Raw:          []byte(token),
+			Raw:          []byte(urlMatch),
 			Redacted:     redact,
 		}
 
@@ -96,7 +101,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// whitelist protocols
 
 			// Assume a 200 response is a valid credential
-			postValues := map[string]string{"protocol": parsedURL.Scheme, "credentialed_uri": token}
+			postValues := map[string]string{"protocol": parsedURL.Scheme, "credentialed_uri": urlMatch}
 			jsonValue, _ := json.Marshal(postValues)
 			req, err := http.NewRequestWithContext(ctx, "POST", ssrfProtectorURL, bytes.NewBuffer(jsonValue))
 			if err != nil {

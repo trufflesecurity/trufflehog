@@ -255,7 +255,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpscout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hereapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hiveage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/holidayapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/host"
@@ -504,7 +503,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/splunkobservabilitytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spoonacular"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportsmonk"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spotifykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squarespace"
@@ -709,7 +707,7 @@ func DefaultDetectors() []detectors.Detector {
 		&sentrytoken.Scanner{},
 		&githubapp.Scanner{},
 		&slackwebhook.Scanner{},
-		&spotifykey.Scanner{},
+		// &spotifykey.Scanner{},
 		&discordwebhook.Scanner{},
 		// &zapierwebhook.Scanner{},
 		&pubnubsubscriptionkey.Scanner{},
@@ -1087,7 +1085,7 @@ func DefaultDetectors() []detectors.Detector {
 		zenscrape.Scanner{},
 		// dailyco.Scanner{},
 		nicereply.Scanner{},
-		hive.Scanner{},
+		// hive.Scanner{},
 		clustdoc.Scanner{},
 		scrapingant.Scanner{},
 		kickbox.Scanner{},
