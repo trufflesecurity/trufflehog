@@ -12,12 +12,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
-func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []string, token string, includeForks bool, filter *common.Filter, concurrency int) error {
+func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []string, token string, includeForks bool, filter *common.Filter, concurrency int, includeMembers bool) error {
 	source := github.Source{}
 	connection := sourcespb.GitHub{
 		Endpoint:      endpoint,
 		Organizations: orgs,
 		Repositories:  repos,
+		ScanUsers:     includeMembers,
 	}
 	if len(token) > 0 {
 		connection.Credential = &sourcespb.GitHub_Token{

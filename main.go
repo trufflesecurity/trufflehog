@@ -53,6 +53,7 @@ func main() {
 	githubScanOrgs := githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
 	githubScanToken := githubScan.Flag("token", "GitHub token.").String()
 	githubIncludeForks := githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers := githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
 
 	gitlabScan := cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -138,7 +139,7 @@ func main() {
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			log.Fatal("You must specify at least one organization or repository.")
 		}
-		err = e.ScanGitHub(ctx, *githubScanEndpoint, *githubScanRepos, *githubScanOrgs, *githubScanToken, *githubIncludeForks, filter, *concurrency)
+		err = e.ScanGitHub(ctx, *githubScanEndpoint, *githubScanRepos, *githubScanOrgs, *githubScanToken, *githubIncludeForks, filter, *concurrency, *githubIncludeMembers)
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
