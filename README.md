@@ -22,7 +22,19 @@ https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkii
 
 ## Demo
 
-![Stargazers over time](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
+![GitHub scanning demo](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
+
+
+# What's new in v3?
+
+TruffleHog v3 is a complete rewrite in Go with many new powerful features.
+
+- We've **added over 600 credential detectors that support active verification against their respective APIs**.
+- We've also added native **support for scanning GitHub, GitLab, filesystems, and S3**.
+
+
+## What is credential verification?
+For every potential credential that is detected, we've painstakingly implemented programatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 ## Installation
 
@@ -119,9 +131,11 @@ This project exists thanks to all the people who contribute. [[Contribute](CONTR
 </a>
 
 
-## Stargazers over time
+## Contributing
 
-[![Stargazers over time](https://starchart.cc/trufflesecurity/trufflehog.svg#cache-bust)](https://starchart.cc/trufflesecurity/trufflehog)
+Contributions are very welcome! Please see our [contribution guidelines first](CONTRIBUTING.md).
+
+We no longer accept contributions to TruffleHog v2, but that code is available in the `v2` branch.
 
 ## License Change
 

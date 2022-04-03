@@ -4,4 +4,4 @@ Please create an issue to collect feedback prior to feature additions. If possib
 
 When showing intereste, in a bug, enhancement, PR, or issue, please use the thumbs up/thumbs down emoji on the original message rather than adding comments expressing the same.
 
-Contributors need to sign our CLA before we are able to accept contributions: 
+Contributors need to [sign our CLA](https://cla-assistant.io/trufflesecurity/trufflehog) before we are able to accept contributions.
