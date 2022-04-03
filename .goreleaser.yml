@@ -68,8 +68,8 @@ docker_manifests:
     - trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
   - name_template: ghcr.io/trufflesecurity/{{ .ProjectName }}:latest
     image_templates:
-    - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
-    - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
+    - trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
+    - trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
   - name_template: ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}
     image_templates:
     - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
