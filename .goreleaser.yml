@@ -1,4 +1,6 @@
 builds:
+  ldflags:
+    - -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
 - env: [CGO_ENABLED=0]
   binary: trufflehog
   goos:
