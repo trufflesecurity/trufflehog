@@ -7,10 +7,10 @@
 ---
 
 
-[![CI Status](https://github.com/trufflesecurity/trufflehog2/workflows/release/badge.svg)](https://github.com/trufflesecurity/trufflehog2/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog2)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog2)
-[![Docker Hub Build Status](https://img.shields.io/docker/cloud/build/trufflesecurity/trufflehog2.svg)](https://hub.docker.com/r/trufflesecurity/trufflehog2/)
-![GitHub](https://img.shields.io/github/license/trufflesecurity/trufflehog2)
+[![CI Status](https://github.com/trufflesecurity/trufflehog/workflows/release/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog)
+[![Docker Hub Build Status](https://img.shields.io/docker/cloud/build/trufflesecurity/trufflehog.svg)](https://hub.docker.com/r/trufflesecurity/trufflehog/)
+![GitHub](https://img.shields.io/github/license/trufflesecurity/trufflehog)
 
 ---
 
@@ -41,9 +41,9 @@ For every potential credential that is detected, we've painstakingly implemented
 Several options:
 
 ### 1. Go
-`go install github.com/trufflesecurity/trufflehog2.git@latest`
+`go install github.com/trufflesecurity/trufflehog.git@latest`
 
-### 2. [Release binaries](https://github.com/trufflesecurity/trufflehog2/releases)
+### 2. [Release binaries](https://github.com/trufflesecurity/trufflehog/releases)
 
 ### 3. Docker
 
@@ -53,7 +53,7 @@ Several options:
 #### **Most users**
 
 ```bash
-docker run -it -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog2:latest github --repo https://github.com/trufflesecurity/test_keys --debug 
+docker run -it -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys --debug 
 ```
 
 #### **Apple M1 users**
@@ -62,7 +62,7 @@ The `linux/arm64` image is better to run on the M1 than the amd64 image.
 Even better is running the native darwin binary avilable, but there is not container image for that.
 
 ```bash
-docker run --platform linux/arm64 -it -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog2:latest github --repo https://github.com/trufflesecurity/test_keys 
+docker run --platform linux/arm64 -it -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys 
 ```
 
 ### 4. Pip (help wanted)
@@ -118,7 +118,7 @@ Args:
 For example, to scan a  `git` repository, start with
 
 ```
-$ trufflehog git https://github.com/trufflesecurity/trufflehog2.git
+$ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
 
 ## Contributors
