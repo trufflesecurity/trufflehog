@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClientTimeOut(5)
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"getemail"}) + `\b([a-zA-Z0-9-]{20})\b`)

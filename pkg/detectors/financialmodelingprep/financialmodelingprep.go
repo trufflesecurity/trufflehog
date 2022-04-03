@@ -56,16 +56,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyString := string(bodyBytes)
 				if err == nil {
-					bodyString := string(bodyBytes)
-					errCode := strings.Contains(bodyString, `"Error Message"`)
+					// valid response should be an array of currencies
+					// error response is in json
+					validResponse := strings.Contains(bodyString, `[ "`)
 
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						if errCode {
-							s1.Verified = false
-						} else {
+						if validResponse {
 							s1.Verified = true
+						} else {
+							s1.Verified = false
 						}
 					} else {
 						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key

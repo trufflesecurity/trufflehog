@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClientTimeOut(5)
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(`(https:\/\/[a-zA-Z-0-9]+\.webhook\.office\.com\/webhookb2\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\@[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\/IncomingWebhook\/[a-zA-Z-0-9]{32}\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12})`)
@@ -59,7 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			defer res.Body.Close()
 
-			body, _ := ioutil.ReadAll(res.Body)
+			body, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				continue
+			}
 
 			if res.StatusCode >= 200 && string(body) == "1" {
 				s1.Verified = true

@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				bodyBytes, err := ioutil.ReadAll(res.Body)
 				if err == nil {
 					bodyString := string(bodyBytes)
-					valid := strings.Contains(bodyString, `is_mobile_device`)
+					valid := strings.Contains(bodyString, `is_mobile_device`) || strings.Contains(bodyString, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
 					defer res.Body.Close()
 					if valid {
 						s1.Verified = true

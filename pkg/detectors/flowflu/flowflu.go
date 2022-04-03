@@ -22,7 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flowflu"}) + `\b([a-zA-Z0-9]{51})\b`)
+	keyPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"flowflu"}) + `\b([a-zA-Z0-9]{51})\b`)
+	accountPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flowflu", "account"}) + `\b([a-zA-Z0-9]{4,30})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -36,6 +37,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	accountMatches := accountPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -43,43 +45,51 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_FlowFlu,
-			Raw:          []byte(resMatch),
-		}
-
-		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://secretscanner.flowlu.com/api/v1/module/crm/lead/list?api_key=%s", resMatch), nil)
-			if err != nil {
+		for _, accountMatch := range accountMatches {
+			if len(accountMatch) != 2 {
 				continue
 			}
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := ioutil.ReadAll(res.Body)
-				if err == nil {
+
+			resAccount := strings.TrimSpace(accountMatch[1])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_FlowFlu,
+				Raw:          []byte(resMatch),
+			}
+
+			if verify {
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.flowlu.com/api/v1/module/crm/lead/list?api_key=%s", resAccount, resMatch), nil)
+				if err != nil {
 					continue
 				}
-
-				bodyString := string(bodyBytes)
-				errCode := strings.Contains(bodyString, `error_code":11`)
-
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if errCode {
-						s1.Verified = false
-					} else {
-						s1.Verified = true
-					}
-				} else {
-					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+				res, err := client.Do(req)
+				if err == nil {
+					bodyBytes, err := ioutil.ReadAll(res.Body)
+					if err != nil {
 						continue
+					}
+
+					bodyString := string(bodyBytes)
+					validResponse := strings.Contains(bodyString, `total_result`)
+
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						if validResponse {
+							s1.Verified = true
+						} else {
+							s1.Verified = false
+						}
+					} else {
+						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
 					}
 				}
 			}
-		}
 
-		results = append(results, s1)
+			results = append(results, s1)
+		}
 	}
 
 	return detectors.CleanResults(results), nil

@@ -67,8 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			defer res.Body.Close()
-			data, err := ioutil.ReadAll(res.Body)
-			if err != nil {
+			data, readErr := ioutil.ReadAll(res.Body)
+			if readErr != nil {
 				continue
 			}
 			var ResVar struct {

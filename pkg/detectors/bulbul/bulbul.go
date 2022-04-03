@@ -55,7 +55,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, _ := ioutil.ReadAll(res.Body)
+				bodyBytes, err := ioutil.ReadAll(res.Body)
+
+				if err != nil {
+					continue
+				}
 
 				bodyString := string(bodyBytes)
 				validResponse := strings.Contains(bodyString, `"message":"Successful",`)

@@ -2,7 +2,6 @@ package formbucket
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -23,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formbucket"}) + `\b(eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[0-9A-Za-z]{171}\.[0-9A-Z-a-z\-_]{43}[ \r\n]{1})`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formbucket"}) + `\b([0-9A-Za-z]{1,}.[0-9A-Za-z]{1,}\.[0-9A-Z-a-z\-_]{1,})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,12 +59,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				defer res.Body.Close()
 				body, errBody := ioutil.ReadAll(res.Body)
-
-				var result Response
+				if errBody != nil {
+					continue
+				}
+				bodyString := string(body)
+				validResponse := strings.Contains(bodyString, `created_on`)
+				defer res.Body.Close()
 				if errBody == nil {
-					json.Unmarshal(body, &result)
-
-					if res.StatusCode >= 200 && res.StatusCode < 300 && !result.Anonymous {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 						s1.Verified = true
 					} else {
 						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key

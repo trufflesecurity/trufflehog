@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClientTimeOut(10)
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"screenshotlayer"}) + `\b([a-zA-Z0-9_]{32})\b`)
@@ -50,8 +49,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			timeout := 10 * time.Second
-			client.Timeout = timeout
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.screenshotlayer.com/api/capture?access_key=%s&url=https://google.com", resMatch), nil)
 			if err != nil {
 				continue
@@ -61,13 +58,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				bodyBytes, err := ioutil.ReadAll(res.Body)
 				if err == nil {
 					bodyString := string(bodyBytes)
-					errCode := strings.Contains(bodyString, `"code":101`)
+					validResponse := strings.Contains(bodyString, `PNG`)
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						if errCode {
-							s1.Verified = false
-						} else {
+						if validResponse {
 							s1.Verified = true
+						} else {
+							s1.Verified = false
 						}
 					} else {
 						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key

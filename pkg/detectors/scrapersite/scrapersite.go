@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClientTimeOut(10)
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scrapersite"}) + `\b([a-zA-Z0-9]{45})\b`)
@@ -50,15 +49,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			timeout := 10 * time.Second
-			client.Timeout = timeout
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://scrapersite.com/api-v1?api_key=%s&url=https://google.com", resMatch), nil)
 			if err != nil {
 				continue
 			}
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, _ := ioutil.ReadAll(res.Body)
+				bodyBytes, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
 				bodyString := string(bodyBytes)
 				validResponse := strings.Contains(bodyString, `"status":true`)
 				defer res.Body.Close()

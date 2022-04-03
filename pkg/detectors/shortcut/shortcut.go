@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.app.shortcut.com/api/v3/categories", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.app.shortcut.com/api/v3/projects", nil)
 			if err != nil {
 				continue
 			}
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "Unauthorized") {
+				if strings.Contains(body, "app_url") {
 					s1.Verified = true
 				} else {
 					// if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

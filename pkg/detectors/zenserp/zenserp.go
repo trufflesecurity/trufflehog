@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClientTimeOut(5)
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zenserp"}) + `\b([0-9a-z-]{36})\b`)
@@ -47,16 +47,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.zenserp.com/api/v2/search?apikey="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", `https://app.zenserp.com/api/v2/search?q="test"&apikey=`+resMatch, nil)
 			if err != nil {
 				continue
 			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, _ := ioutil.ReadAll(res.Body)
+				bodyBytes, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
 				body := string(bodyBytes)
-				if !strings.Contains(body, "Not enough requests.") {
+				if strings.Contains(body, "query") {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

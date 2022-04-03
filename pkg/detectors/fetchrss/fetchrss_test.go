@@ -20,7 +20,7 @@ func TestFetchrss_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FETCHRSS")
+	secret := testSecrets.MustGetField("FETCHRSS_TOKEN")
 	inactiveSecret := testSecrets.MustGetField("FETCHRSS_INACTIVE")
 
 	type args struct {

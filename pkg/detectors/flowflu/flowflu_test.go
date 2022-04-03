@@ -20,6 +20,7 @@ func TestFlowFlu_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
+	account := testSecrets.MustGetField("FLOWFLU_ACCOUNT")
 	secret := testSecrets.MustGetField("FLOWFLU_TOKEN")
 	inactiveSecret := testSecrets.MustGetField("FLOWFLU_INACTIVE")
 
@@ -40,7 +41,7 @@ func TestFlowFlu_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a flowflu secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a flowflu secret %s within flowflu account %s", secret, account)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -56,7 +57,7 @@ func TestFlowFlu_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a flowflu secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a flowflu secret %s within flowflu account %s but not valid", inactiveSecret, account)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

@@ -2,7 +2,6 @@ package text2data
 
 import (
 	"context"
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -55,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			data.Add("DocumentText", "Excellent location, opposite a very large mall with wide variety of shops, restaurants and more.")
 			data.Add("PrivateKey", resMatch)
 
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.text2data.com/v3/analyze", strings.NewReader(data.Encode()))
+			req, err := http.NewRequestWithContext(ctx, "POST", "http://api.text2data.com/v3/Analyze", strings.NewReader(data.Encode()))
 			if err != nil {
 				continue
 			}
@@ -67,11 +66,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				body, errBody := ioutil.ReadAll(res.Body)
 
 				if errBody == nil {
+					bodyString := string(body)
+					validResponse := strings.Contains(bodyString, `"DocSentimentResultString":"positive"`)
 
-					var response Response
-					json.Unmarshal(body, &response)
-
-					if res.StatusCode >= 200 && res.StatusCode < 300 && response.Status == 1 && response.ErrorMessage == "" {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 						s1.Verified = true
 					} else {
 						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key

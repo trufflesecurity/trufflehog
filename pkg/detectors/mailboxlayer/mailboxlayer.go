@@ -55,14 +55,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, _ := ioutil.ReadAll(res.Body)
+				bodyBytes, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
 				body := string(bodyBytes)
+				validResponse := strings.Contains(body, `email`) || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
 
 				// if client_id and client_secret is valid -> 403 {"error":"invalid_grant","error_description":"Invalid authorization code"}
 				// if invalid -> 401 {"error":"access_denied","error_description":"Unauthorized"}
 				// ingenious!
 
-				if !strings.Contains(body, "invalid_access_key") {
+				if validResponse {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

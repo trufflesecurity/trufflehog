@@ -70,7 +70,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				defer res.Body.Close()
-				body, _ := ioutil.ReadAll(res.Body)
+				body, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
 
 				var message struct {
 					Message string `json:"message"`

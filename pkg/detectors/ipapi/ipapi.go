@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 
 					bodyString := string(bodyBytes)
-					valid := strings.Contains(bodyString, "continent_code")
+					valid := strings.Contains(bodyString, "continent_code") || strings.Contains(bodyString, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
 
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {

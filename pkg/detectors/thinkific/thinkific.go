@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				domainRes := fmt.Sprintf("%s-s-school", resDomainMatch)
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/users", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/collections", nil)
 				if err != nil {
 					continue
 				}
@@ -67,7 +67,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					bodyBytes, _ := ioutil.ReadAll(res.Body)
+					bodyBytes, err := ioutil.ReadAll(res.Body)
+					if err != nil {
+						continue
+					}
 					body := string(bodyBytes)
 
 					if strings.Contains(body, "API Access is not available") {
