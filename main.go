@@ -112,63 +112,6 @@ func main() {
 }
 
 func run(state overseer.State) {
-	cli := kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	debug := cli.Flag("debug", "Run in debug mode").Bool()
-	versionFlag := cli.Flag("version", "Prints trufflehog version.").Bool()
-	jsonOut := cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy := cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	concurrency := cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification := cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified := cli.Flag("only-verified", "Only output verified results.").Bool()
-	// rules := cli.Flag("rules", "Path to file with custom rules.").String()
-	printAvgDetectorTime := cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
-
-	gitScan := cli.Command("git", "Find credentials in git repositories.")
-	gitScanURI := gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
-	gitScanIncludePaths := gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	gitScanExcludePaths := gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	gitScanSinceCommit := gitScan.Flag("since-commit", "Commit to start scan from.").String()
-	gitScanBranch := gitScan.Flag("branch", "Branch to scan.").String()
-	gitScanMaxDepth := gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
-	gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
-	gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
-	gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
-
-	githubScan := cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint := githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos := githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs := githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken := githubScan.Flag("token", "GitHub token.").String()
-	githubIncludeForks := githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers := githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-
-	gitlabScan := cli.Command("gitlab", "Find credentials in GitLab repositories.")
-	// TODO: Add more GitLab options
-	gitlabScanEndpoint := gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
-	gitlabScanRepos := gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
-	gitlabScanToken := gitlabScan.Flag("token", "GitLab token.").Required().String()
-
-	filesystemScan := cli.Command("filesystem", "Find credentials in a filesystem.")
-	filesystemDirectories := filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
-	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
-	// filesystemScanRecursive := filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
-	// filesystemScanIncludePaths := filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	// filesystemScanExcludePaths := filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-
-	s3Scan := cli.Command("s3", "Find credentials in S3 buckets.")
-	s3ScanKey := s3Scan.Flag("key", "S3 key used to authenticate.").String()
-	s3ScanSecret := s3Scan.Flag("secret", "S3 secret used to authenticate.").String()
-	s3ScanCloudEnv := s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
-	s3ScanBuckets := s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
-
-	for i, arg := range os.Args {
-		if strings.HasPrefix(arg, "--") {
-			os.Args[i] = strings.ReplaceAll(arg, "_", "-")
-		}
-	}
-
-	cmd := kingpin.MustParse(cli.Parse(os.Args[1:]))
-
 	if *versionFlag {
 		fmt.Println("trufflehog " + version.BuildVersion)
 		return

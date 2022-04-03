@@ -153,8 +153,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 		if len(s.orgs) > 0 {
 			for _, org := range s.orgs {
-				s.addReposByOrg(ctx, apiClient, org)
-				s.addReposByUser(ctx, apiClient, org)
+				errOrg := s.addReposByOrg(ctx, apiClient, org)
+				errUser := s.addReposByUser(ctx, apiClient, org)
+				if errOrg != nil && errUser != nil {
+					log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
+				}
 			}
 		}
 	case *sourcespb.GitHub_Token:
@@ -390,7 +393,7 @@ func handleRateLimit(errIn error, res *github.Response) bool {
 	return true
 }
 
-func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, org string) {
+func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, org string) error {
 	opts := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 100,
@@ -405,8 +408,7 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 			continue
 		}
 		if err != nil {
-			log.WithError(err).WithField("org", org).Errorf("could not load list repos for org")
-			break
+			return fmt.Errorf("could not list repos for org %s: %w", org, err)
 		}
 		if len(someRepos) == 0 {
 			break
@@ -422,9 +424,10 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 		}
 		opts.Page = res.NextPage
 	}
+	return nil
 }
 
-func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, user string) {
+func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, user string) error {
 	opts := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 50,
@@ -439,7 +442,7 @@ func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, u
 			continue
 		}
 		if err != nil {
-			break
+			return fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
 		for _, r := range someRepos {
 			if r.GetFork() && !s.conn.IncludeForks {
@@ -452,6 +455,7 @@ func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, u
 		}
 		opts.Page = res.NextPage
 	}
+	return nil
 }
 
 func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, user string) {
