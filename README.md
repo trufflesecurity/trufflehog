@@ -104,19 +104,27 @@ usage: TruffleHog git [<flags>] <uri>
 Find credentials in git repositories.
 
 Flags:
-      --help           Show context-sensitive help (also try --help-long and --help-man).
-      --debug          Run in debug mode
-      --json           Output in JSON format.
-      --concurrency=8  Number of concurrent workers.
-      --verification   Verify the results.
-  -i, --include_paths=INCLUDE_PATHS  
-                       Path to file with newline separated regexes for files to include in scan.
-  -x, --exclude_paths=EXCLUDE_PATHS  
-                       Path to file with newline separated regexes for files to exclude in scan.
-      --branch=BRANCH  Branch to scan.
-      --allow          No-op flag for backwards compat.
-      --entropy        No-op flag for backwards compat.
-      --regex          No-op flag for backwards compat.
+      --help                     Show context-sensitive help (also try --help-long and --help-man).
+      --debug                    Run in debug mode
+      --version                  Prints trufflehog version.
+  -j, --json                     Output in JSON format.
+      --json-legacy              Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
+      --concurrency=1            Number of concurrent workers.
+      --no-verification          Don't verify the results.
+      --only-verified            Only output verified results.
+      --print-avg-detector-time  Print the average time spent on each detector.
+      --no-update                Don't check for updates.
+  -i, --include-paths=INCLUDE-PATHS
+                                 Path to file with newline separated regexes for files to include in scan.
+  -x, --exclude-paths=EXCLUDE-PATHS
+                                 Path to file with newline separated regexes for files to exclude in scan.
+      --since-commit=SINCE-COMMIT
+                                 Commit to start scan from.
+      --branch=BRANCH            Branch to scan.
+      --max-depth=MAX-DEPTH      Maximum depth of commits to scan.
+      --allow                    No-op flag for backwards compat.
+      --entropy                  No-op flag for backwards compat.
+      --regex                    No-op flag for backwards compat.
 
 Args:
   <uri>  Git repository URL. https:// or file:// schema expected.
