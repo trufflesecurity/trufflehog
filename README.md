@@ -24,6 +24,9 @@ https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkii
 
 ![GitHub scanning demo](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
 
+```bash
+docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
+```
 
 # What's new in v3?
 
