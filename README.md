@@ -121,6 +121,16 @@ For example, to scan a  `git` repository, start with
 $ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
 
+
+#### Scanning an orginization
+
+Try scanning an entire GitHub orginization with the following:
+
+```bash
+docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
+```
+
+
 ## Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
