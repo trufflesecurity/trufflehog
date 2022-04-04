@@ -85,7 +85,9 @@ var (
 func init() {
 	for i, arg := range os.Args {
 		if strings.HasPrefix(arg, "--") {
-			os.Args[i] = strings.ReplaceAll(arg, "_", "-")
+			split := strings.SplitN(arg, "=", 2)
+			split[0] = strings.ReplaceAll(split[0], "_", "-")
+			os.Args[i] = strings.Join(split, "=")
 		}
 	}
 
