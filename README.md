@@ -53,7 +53,7 @@ Several options:
 #### **Most users**
 
 ```bash
-docker run -it -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys --debug 
+docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
 #### **Apple M1 users**
@@ -62,7 +62,7 @@ The `linux/arm64` image is better to run on the M1 than the amd64 image.
 Even better is running the native darwin binary avilable, but there is not container image for that.
 
 ```bash
-docker run --platform linux/arm64 -it -v "$PWD:/pwd" ghcr.io/trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys 
+docker run --platform linux/arm64 -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys 
 ```
 
 ### 4. Pip (help wanted)
