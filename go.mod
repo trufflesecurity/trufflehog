@@ -15,7 +15,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.2
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
-	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
 	github.com/fatih/color v1.13.0
 	github.com/felixge/fgprof v0.9.2
@@ -38,7 +37,7 @@ require (
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/xanzy/go-gitlab v0.60.0
+	github.com/xanzy/go-gitlab v0.61.0
 	github.com/zricethezav/gitleaks/v8 v8.5.2
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
