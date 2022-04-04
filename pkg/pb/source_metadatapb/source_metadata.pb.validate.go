@@ -2209,6 +2209,117 @@ var _ interface {
 	ErrorName() string
 } = JenkinsValidationError{}
 
+// Validate checks the field values on Teams with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Teams) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Teams with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in TeamsMultiError, or nil if none found.
+func (m *Teams) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Teams) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for ChannelId
+
+	// no validation rules for ChannelName
+
+	// no validation rules for Timestamp
+
+	// no validation rules for UserId
+
+	// no validation rules for Link
+
+	// no validation rules for File
+
+	// no validation rules for Email
+
+	if len(errors) > 0 {
+		return TeamsMultiError(errors)
+	}
+	return nil
+}
+
+// TeamsMultiError is an error wrapping multiple validation errors returned by
+// Teams.ValidateAll() if the designated constraints aren't met.
+type TeamsMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TeamsMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TeamsMultiError) AllErrors() []error { return m }
+
+// TeamsValidationError is the validation error returned by Teams.Validate if
+// the designated constraints aren't met.
+type TeamsValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TeamsValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TeamsValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TeamsValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TeamsValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TeamsValidationError) ErrorName() string { return "TeamsValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TeamsValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTeams.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TeamsValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TeamsValidationError{}
+
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -2847,6 +2958,37 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "Jenkins",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Teams:
+
+		if all {
+			switch v := interface{}(m.GetTeams()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Teams",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Teams",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTeams()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Teams",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

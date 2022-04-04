@@ -34,6 +34,7 @@ enum SourceType {
   SOURCE_TYPE_BUILDKITE = 20;
   SOURCE_TYPE_GERRIT = 21;
   SOURCE_TYPE_JENKINS = 22;
+  SOURCE_TYPE_TEAMS = 23;
 }
 
 message LocalSource {
@@ -210,4 +211,13 @@ message Jenkins {
     credentials.BasicAuth basic_auth = 2;
     credentials.Header header = 3;
   }
+}
+
+message Teams {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.ClientCredentials authenticated = 2;
+  }
+  repeated string channels = 3;
+  repeated string ignoreList = 4;
 }
