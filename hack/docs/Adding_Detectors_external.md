@@ -10,15 +10,15 @@ The purpose of Secret Detectors is to discover secrets with exceptionally high s
 ## Table of Contents
 
 - [Secret Detectors](#secret-detectors)
-  - [Table of Contents](#table-of-contents)
-  - [Getting Started](#getting-started)
-    - [Sourcing Guidelines](#sourcing-guidelines)
-    - [Development Guidelines](#development-guidelines)
-    - [Development Dependencies](#development-dependencies)
-    - [Creating a new Secret Scanner](#creating-a-new-secret-detector)
-  - [Addendum](#addendum)
-    - [Managing Test Secrets](#managing-test-secrets)
-    - [Setting up Google Cloud SDK](#setting-up-google-cloud-sdk)
+  * [Table of Contents](#table-of-contents)
+  * [Getting Started](#getting-started)
+    + [Sourcing Guidelines](#sourcing-guidelines)
+    + [Development Guidelines](#development-guidelines)
+    + [Development Dependencies](#development-dependencies)
+    + [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
+  * [Addendum](#addendum)
+    + [Using a test secret file](#using-a-test-secret-file)
+    + [Adding Protos in Windows](#adding-protos-in-windows)
 
 ## Getting Started
 
@@ -34,19 +34,15 @@ If you think that something should be included outside of these guidelines, plea
 
 - When reasonable, favor using the `net/http` library to make requests instead of bringing in another library.
 - Use the [`common.SaneHttpClient`](pkg/common/http.go) for the `http.Client` whenever possible.
-- We recommend an editor with gopls integration (such as Vscode with Go plugin) for benefits like easily running tests, autocompletion, linting, type checking, etc.
 
 ### Development Dependencies
 
-- A GitLab account
-- A Google account
-- [Google Cloud SDK installed](#setting-up-google-cloud-sdk)
-- Go 1.16
+- Go 1.17+
 - Make
 
 ### Creating a new Secret Scanner
 
-1. Identify the Secret Detector name from the [/proto/detectors.proto](/proto/detectors.proto) `DetectorType` enum.
+1. Identify the Secret Detector name from the [/proto/detectors.proto](/proto/detectors.proto) `DetectorType` enum. If necessary, run `make protos` when adding new ones.
 
 2. Generate the Secret Detector
 
@@ -59,7 +55,7 @@ If you think that something should be included outside of these guidelines, plea
    The previous step templated a boilerplate + some example code as a package in the `pkg/detectors` folder for you to work on.
    The secret detector can be completed with these general steps:
 
-   1. Add the test secret to GCP Secrets. See [managing test secrets](#managing-test-secrets)
+   1. Create a [test secrets file, and export the variable](#using-a-test-secret-file)
    2. Update the pattern regex and keywords. Try iterating with [regex101.com](http://regex101.com/).
    3. Update the verifier code to use a non-destructive API call that can determine whether the secret is valid or not.
    4. Update the tests with these test cases at minimum:
@@ -67,45 +63,26 @@ If you think that something should be included outside of these guidelines, plea
       2. Found and unverified
       3. Not found
       4. Any false positive cases that you come across
-   5. Create a merge request for review. CI tests must be passing.
+   5. Create a pull request for review.
 
 ## Addendum
 
-### Managing Test Secrets
+### Using a test secret file
 
-Do not embed test credentials in the test code. Instead, use GCP Secrets Manager.
-
-1. Access the latest secret version for modification.
-
-   Note: `/tmp/s` is a valid path on Linux. You will need to change that for Windows or OSX, otherwise you will see an error. On Windows you will also need to install [WSL](https://docs.microsoft.com/en-us/windows/wsl/install).
-
-   ```bash
-   gcloud secrets versions access --project trufflehog-testing --secret detectors3 latest > /tmp/s
-   ```
-
-2. Add the secret that you need for testing.
-
-   The command above saved it to `/tmp/s`.
-
-   The format is standard env file format,
+1. Create a file called `.env` with this env file format:
 
    ```bash
    SECRET_TYPE_ONE=value
    SECRET_TYPE_ONE_INACTIVE=v@lue
    ```
 
-3. Update the secret version with your modification.
+2. Export the `TEST_SECRET_FILE` variable, pointing to the env file:
 
    ```bash
-   gcloud secrets versions add --project trufflehog-testing detectors3 --data-file /tmp/s
+   export TEST_SECRET_FILE=".env"
    ```
 
-4. Access the secret value as shown in the [example code](pkg/secrets/heroku/heroku_test.go).
-
-### Setting up Google Cloud SDK
-
-1. Install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install
-2. Authenticate with `gcloud auth login --update-adc` using your Google account
+Now, the detector test should attempt to load the given env key from that file.
 
 ### Adding Protos in Windows
 

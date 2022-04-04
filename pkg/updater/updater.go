@@ -76,7 +76,7 @@ func (g *OSS) Fetch() (io.Reader, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNoContent {
-		return nil, nil
+		return nil, errors.New("already up to date")
 	}
 
 	log.Debug("fetching trufflehog update")

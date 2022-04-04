@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
@@ -21,13 +22,31 @@ func (s *Secret) MustGetField(name string) string {
 	return val
 }
 
+func GetSecretFromEnv(filename string) (secret *Secret, err error) {
+	data, err := godotenv.Read(filename)
+	if err != nil {
+		return nil, err
+	}
+	return &Secret{kv: data}, nil
+}
+
 func GetTestSecret(ctx context.Context) (secret *Secret, err error) {
+	filename := os.Getenv("TEST_SECRET_FILE")
+	if len(filename) > 0 {
+		return GetSecretFromEnv(filename)
+	}
+
 	return GetSecret(ctx, "trufflehog-testing", "test")
 }
 
 func GetSecret(ctx context.Context, gcpProject, name string) (secret *Secret, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
+
+	filename := os.Getenv("TEST_SECRET_FILE")
+	if len(filename) > 0 {
+		return GetSecretFromEnv(filename)
+	}
 
 	parent := fmt.Sprintf("projects/%s/secrets/%s/versions/latest", gcpProject, name)
 

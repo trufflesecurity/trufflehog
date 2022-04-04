@@ -137,6 +137,10 @@ Contributions are very welcome! Please see our [contribution guidelines first](C
 
 We no longer accept contributions to TruffleHog v2, but that code is available in the `v2` branch.
 
+### Adding new secret detectors
+
+We have published some [documentation and tooling to get started on adding new secret detectors](hack/docs/Adding_Detectors_external.md). Let's improve detection together!
+
 ## License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
