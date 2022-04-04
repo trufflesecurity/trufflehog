@@ -9,13 +9,12 @@ replace github.com/jpillora/overseer => github.com/dustin-decker/overseer v1.1.7
 require (
 	cloud.google.com/go/secretmanager v1.3.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1465
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1545
 	github.com/aws/aws-sdk-go v1.43.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.11.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.2
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
-	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
 	github.com/fatih/color v1.13.0
 	github.com/felixge/fgprof v0.9.2
