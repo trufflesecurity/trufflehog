@@ -29,6 +29,7 @@ func Fetcher(version string) fetcher.Interface {
 type OSS struct {
 	Interval       time.Duration
 	CurrentVersion string
+	Updated        bool
 }
 
 // Init validates the provided config
@@ -49,7 +50,10 @@ type FormData struct {
 
 // Fetch binary from URL via OSS client
 func (g *OSS) Fetch() (io.Reader, error) {
-	log.Debug("fetching trufflehog update")
+	if g.Updated {
+		select {} // block until exit
+	}
+	g.Updated = true
 
 	zone, _ := time.Now().Zone()
 	data := &FormData{
@@ -70,6 +74,12 @@ func (g *OSS) Fetch() (io.Reader, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		return nil, nil
+	}
+
+	log.Debug("fetching trufflehog update")
 
 	newBinBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

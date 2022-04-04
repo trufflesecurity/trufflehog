@@ -3,8 +3,6 @@ package engine
 import (
 	"bytes"
 	"context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"runtime"
 	"strings"
 	"sync"
@@ -15,6 +13,8 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -73,7 +73,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		logrus.Warn("No concurrency specified, defaulting to ", numCPU)
 		e.concurrency = numCPU
 	}
-	logrus.Debugf("running with  up to %d workers", e.concurrency)
+	logrus.Debugf("running with up to %d workers", e.concurrency)
 
 	var workerWg sync.WaitGroup
 	for i := 0; i < e.concurrency; i++ {

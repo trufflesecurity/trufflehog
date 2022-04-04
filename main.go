@@ -14,15 +14,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/felixge/fgprof"
+	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
+	"github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/felixge/fgprof"
-
-	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
@@ -91,6 +90,16 @@ func init() {
 	}
 
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
+
+	if *jsonOut {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+	if *debug {
+		logrus.SetLevel(logrus.DebugLevel)
+		logrus.Debugf("running version %s", version.BuildVersion)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
 }
 
 func main() {
@@ -112,23 +121,16 @@ func main() {
 }
 
 func run(state overseer.State) {
-	if *versionFlag {
+	if *debug || *versionFlag {
 		fmt.Println("trufflehog " + version.BuildVersion)
-		return
+		if *versionFlag {
+			return
+		}
 	}
 
 	// When setting a base commit, chunks must be scanned in order.
 	if *gitScanSinceCommit != "" {
 		*concurrency = 1
-	}
-
-	if *jsonOut {
-		logrus.SetFormatter(&logrus.JSONFormatter{})
-	}
-	if *debug {
-		logrus.SetLevel(logrus.DebugLevel)
-	} else {
-		logrus.SetLevel(logrus.InfoLevel)
 	}
 
 	if *debug {
