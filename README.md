@@ -44,7 +44,11 @@ For every potential credential that is detected, we've painstakingly implemented
 Several options:
 
 ### 1. Go
-`go install github.com/trufflesecurity/trufflehog.git@latest`
+```
+git clone https://github.com/trufflesecurity/trufflehog.git
+
+cd trufflehog; go install
+```
 
 ### 2. [Release binaries](https://github.com/trufflesecurity/trufflehog/releases)
 
