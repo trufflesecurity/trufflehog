@@ -178,6 +178,16 @@ message Jenkins {
   string timestamp = 4;
 }
 
+message Teams {
+  string channel_id = 1;
+  string channel_name = 2;
+  string timestamp = 3;
+  string user_id = 4;
+  string link = 5;
+  string file = 6;
+  string email = 7;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -200,5 +210,6 @@ message MetaData {
     Buildkite buildkite = 18;
     Gerrit gerrit = 19;
     Jenkins jenkins = 20;
+    Teams teams = 21;
   }
 }

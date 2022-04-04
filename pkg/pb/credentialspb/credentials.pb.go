@@ -206,7 +206,7 @@ func (x *Header) GetValue() string {
 	return ""
 }
 
-type ClientCrednetials struct {
+type ClientCredentials struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -216,8 +216,8 @@ type ClientCrednetials struct {
 	ClientSecret string `protobuf:"bytes,3,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
 }
 
-func (x *ClientCrednetials) Reset() {
-	*x = ClientCrednetials{}
+func (x *ClientCredentials) Reset() {
+	*x = ClientCredentials{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_credentials_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -225,13 +225,13 @@ func (x *ClientCrednetials) Reset() {
 	}
 }
 
-func (x *ClientCrednetials) String() string {
+func (x *ClientCredentials) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ClientCrednetials) ProtoMessage() {}
+func (*ClientCredentials) ProtoMessage() {}
 
-func (x *ClientCrednetials) ProtoReflect() protoreflect.Message {
+func (x *ClientCredentials) ProtoReflect() protoreflect.Message {
 	mi := &file_credentials_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -243,26 +243,26 @@ func (x *ClientCrednetials) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ClientCrednetials.ProtoReflect.Descriptor instead.
-func (*ClientCrednetials) Descriptor() ([]byte, []int) {
+// Deprecated: Use ClientCredentials.ProtoReflect.Descriptor instead.
+func (*ClientCredentials) Descriptor() ([]byte, []int) {
 	return file_credentials_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ClientCrednetials) GetTenantId() string {
+func (x *ClientCredentials) GetTenantId() string {
 	if x != nil {
 		return x.TenantId
 	}
 	return ""
 }
 
-func (x *ClientCrednetials) GetClientId() string {
+func (x *ClientCredentials) GetClientId() string {
 	if x != nil {
 		return x.ClientId
 	}
 	return ""
 }
 
-func (x *ClientCrednetials) GetClientSecret() string {
+func (x *ClientCredentials) GetClientSecret() string {
 	if x != nil {
 		return x.ClientSecret
 	}
@@ -662,7 +662,7 @@ var file_credentials_proto_rawDesc = []byte{
 	0x48, 0x65, 0x61, 0x64, 0x65, 0x72, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
 	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x72,
-	0x0a, 0x11, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x43, 0x72, 0x65, 0x64, 0x6e, 0x65, 0x74, 0x69,
+	0x0a, 0x11, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x43, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69,
 	0x61, 0x6c, 0x73, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x65, 0x6e, 0x61, 0x6e, 0x74, 0x5f, 0x69, 0x64,
 	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x74, 0x65, 0x6e, 0x61, 0x6e, 0x74, 0x49, 0x64,
 	0x12, 0x1b, 0x0a, 0x09, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20,
@@ -733,7 +733,7 @@ var file_credentials_proto_goTypes = []interface{}{
 	(*CloudEnvironment)(nil),  // 1: credentials.CloudEnvironment
 	(*BasicAuth)(nil),         // 2: credentials.BasicAuth
 	(*Header)(nil),            // 3: credentials.Header
-	(*ClientCrednetials)(nil), // 4: credentials.ClientCrednetials
+	(*ClientCredentials)(nil), // 4: credentials.ClientCredentials
 	(*ClientCertificate)(nil), // 5: credentials.ClientCertificate
 	(*Oauth2)(nil),            // 6: credentials.Oauth2
 	(*KeySecret)(nil),         // 7: credentials.KeySecret
@@ -805,7 +805,7 @@ func file_credentials_proto_init() {
 			}
 		}
 		file_credentials_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ClientCrednetials); i {
+			switch v := v.(*ClientCredentials); i {
 			case 0:
 				return &v.state
 			case 1:

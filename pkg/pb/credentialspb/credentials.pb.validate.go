@@ -436,22 +436,22 @@ var _ interface {
 	ErrorName() string
 } = HeaderValidationError{}
 
-// Validate checks the field values on ClientCrednetials with the rules defined
+// Validate checks the field values on ClientCredentials with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
-func (m *ClientCrednetials) Validate() error {
+func (m *ClientCredentials) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on ClientCrednetials with the rules
+// ValidateAll checks the field values on ClientCredentials with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// ClientCrednetialsMultiError, or nil if none found.
-func (m *ClientCrednetials) ValidateAll() error {
+// ClientCredentialsMultiError, or nil if none found.
+func (m *ClientCredentials) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *ClientCrednetials) validate(all bool) error {
+func (m *ClientCredentials) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -465,18 +465,18 @@ func (m *ClientCrednetials) validate(all bool) error {
 	// no validation rules for ClientSecret
 
 	if len(errors) > 0 {
-		return ClientCrednetialsMultiError(errors)
+		return ClientCredentialsMultiError(errors)
 	}
 	return nil
 }
 
-// ClientCrednetialsMultiError is an error wrapping multiple validation errors
-// returned by ClientCrednetials.ValidateAll() if the designated constraints
+// ClientCredentialsMultiError is an error wrapping multiple validation errors
+// returned by ClientCredentials.ValidateAll() if the designated constraints
 // aren't met.
-type ClientCrednetialsMultiError []error
+type ClientCredentialsMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m ClientCrednetialsMultiError) Error() string {
+func (m ClientCredentialsMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -485,11 +485,11 @@ func (m ClientCrednetialsMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m ClientCrednetialsMultiError) AllErrors() []error { return m }
+func (m ClientCredentialsMultiError) AllErrors() []error { return m }
 
-// ClientCrednetialsValidationError is the validation error returned by
-// ClientCrednetials.Validate if the designated constraints aren't met.
-type ClientCrednetialsValidationError struct {
+// ClientCredentialsValidationError is the validation error returned by
+// ClientCredentials.Validate if the designated constraints aren't met.
+type ClientCredentialsValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -497,24 +497,24 @@ type ClientCrednetialsValidationError struct {
 }
 
 // Field function returns field value.
-func (e ClientCrednetialsValidationError) Field() string { return e.field }
+func (e ClientCredentialsValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e ClientCrednetialsValidationError) Reason() string { return e.reason }
+func (e ClientCredentialsValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e ClientCrednetialsValidationError) Cause() error { return e.cause }
+func (e ClientCredentialsValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e ClientCrednetialsValidationError) Key() bool { return e.key }
+func (e ClientCredentialsValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e ClientCrednetialsValidationError) ErrorName() string {
-	return "ClientCrednetialsValidationError"
+func (e ClientCredentialsValidationError) ErrorName() string {
+	return "ClientCredentialsValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e ClientCrednetialsValidationError) Error() string {
+func (e ClientCredentialsValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -526,14 +526,14 @@ func (e ClientCrednetialsValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sClientCrednetials.%s: %s%s",
+		"invalid %sClientCredentials.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = ClientCrednetialsValidationError{}
+var _ error = ClientCredentialsValidationError{}
 
 var _ interface {
 	Field() string
@@ -541,7 +541,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = ClientCrednetialsValidationError{}
+} = ClientCredentialsValidationError{}
 
 // Validate checks the field values on ClientCertificate with the rules defined
 // in the proto definition for this message. If any rules are violated, the
