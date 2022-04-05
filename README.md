@@ -137,9 +137,9 @@ $ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
 
 
-#### Scanning an orginization
+#### Scanning an organization
 
-Try scanning an entire GitHub orginization with the following:
+Try scanning an entire GitHub organization with the following:
 
 ```bash
 docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
