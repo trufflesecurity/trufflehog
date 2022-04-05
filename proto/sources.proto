@@ -35,6 +35,7 @@ enum SourceType {
   SOURCE_TYPE_GERRIT = 21;
   SOURCE_TYPE_JENKINS = 22;
   SOURCE_TYPE_TEAMS = 23;
+  SOURCE_TYPE_JFROG_ARTIFACTORY = 24;
 }
 
 message LocalSource {
@@ -220,4 +221,14 @@ message Teams {
   }
   repeated string channels = 3;
   repeated string ignoreList = 4;
+}
+
+// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
+message Artifactory {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.BasicAuth basic_auth = 2;
+    credentials.Header header = 3;
+  }
+  repeated string repositories = 4;
 }
