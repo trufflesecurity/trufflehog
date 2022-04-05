@@ -193,10 +193,9 @@ message Artifactory {
   string repo = 1;
   string path = 2;
   string link = 3;
-  string created_at = 4;
-  string created_by = 5;
-  string modified_at = 6;
-  string modified_by = 7;
+  string timestamp = 4;
+  string username = 5;
+  string email = 6;
 }
 
 message MetaData {
