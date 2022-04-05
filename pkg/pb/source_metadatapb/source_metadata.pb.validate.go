@@ -2348,13 +2348,11 @@ func (m *Artifactory) validate(all bool) error {
 
 	// no validation rules for Link
 
-	// no validation rules for CreatedAt
+	// no validation rules for Timestamp
 
-	// no validation rules for CreatedBy
+	// no validation rules for Username
 
-	// no validation rules for ModifiedAt
-
-	// no validation rules for ModifiedBy
+	// no validation rules for Email
 
 	if len(errors) > 0 {
 		return ArtifactoryMultiError(errors)

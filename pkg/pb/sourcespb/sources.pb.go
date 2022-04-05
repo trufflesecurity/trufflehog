@@ -2098,6 +2098,7 @@ type Teams_Authenticated struct {
 
 func (*Teams_Authenticated) isTeams_Credential() {}
 
+// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
 type Artifactory struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
