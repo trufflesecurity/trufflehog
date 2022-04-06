@@ -116,8 +116,6 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.16.2/go.mod h1:RoMljzynmRe3jyOsRgqIM
 github.com/aws/smithy-go v1.11.2 h1:eG/N+CcUMAvsdffgMvjMKwfyDzIkjM6pfxMJ8Mzc6mE=
 github.com/aws/smithy-go v1.11.2/go.mod h1:3xHYmszWVx2c0kIwQeEVf9uSm4fYZt67FBJnwub1bgM=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
-github.com/bill-rich/go-gitdiff v0.7.6-custom1 h1:Qmga7IT3qNotupbIzWmdhHAcsdDs8E5T9VeVtdDJKK0=
-github.com/bill-rich/go-gitdiff v0.7.6-custom1/go.mod h1:feWLYgyy13awTGuWQ8ZeQ8OTWTbqVEvlqc/8gXCXSTg=
 github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb h1:9v7Bzlg+1EBYi2IYcUmOwHReBEfqBbYIj3ZCi9cIe1Q=
 github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb/go.mod h1:EkOqCuelvo7DY8vCOoZ09p7pHvAK9B1PHI9GeM4Rdxc=
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
@@ -146,12 +144,8 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/denisbrodbeck/machineid v1.0.1 h1:geKr9qtkB876mXguW2X6TU4ZynleN6ezuMSRhl4D7AQ=
-github.com/denisbrodbeck/machineid v1.0.1/go.mod h1:dJUwb7PTidGDeYyUBmXZ2GphQBbjJCrnectwCyxcUSI=
 github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi/U=
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
-github.com/dustin-decker/overseer v1.1.7-custom2 h1:k6lSAUkdxnICmN5/sEsCKFVYchv2wBfogAdwONk39y0=
-github.com/dustin-decker/overseer v1.1.7-custom2/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
 github.com/emirpasic/gods v1.12.0 h1:QAUIPSaCu4G+POclxeqb3F+WPpdKqFGlw36+yOzGlrg=
 github.com/emirpasic/gods v1.12.0/go.mod h1:YfzfFFoVP/catgzJb4IKIqXjX78Ha8FMSDh3ymbK86o=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
@@ -174,6 +168,9 @@ github.com/felixge/fgprof v0.9.2/go.mod h1:+VNi+ZXtHIQ6wIw6bUT8nXQRefQflWECoFyRe
 github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568/go.mod h1:xEzjJPgXI435gkrCt3MPfRiAkVrwSbHsst4LCFVfpJc=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
+github.com/gitleaks/go-gitdiff v0.7.4/go.mod h1:pKz0X4YzCKZs30BL+weqBIG7mx0jl4tF1uXV9ZyNvrA=
+github.com/gitleaks/go-gitdiff v0.7.6 h1:atcfoNPD9erzPs9C89a+i2Y+EUmR2QKB5QHJTfB4n60=
+github.com/gitleaks/go-gitdiff v0.7.6/go.mod h1:pKz0X4YzCKZs30BL+weqBIG7mx0jl4tF1uXV9ZyNvrA=
 github.com/gliderlabs/ssh v0.2.2 h1:6zsha5zo/TWhRhwqCD3+EarCAgZ2yN28ipRnGPnwkI0=
 github.com/gliderlabs/ssh v0.2.2/go.mod h1:U7qILu1NlMHj9FlMhZLlkCdDnU1DBEAqr0aevW3Awn0=
 github.com/go-errors/errors v1.4.2 h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=
@@ -449,6 +446,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502 h1:34icjjmqJ2HPjrSuJYEkdZ+0ItmGQAQ75cRHIiftIyE=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
+github.com/trufflesecurity/overseer v1.1.7-custom3 h1:hpSYY+ca0lug3tbpOoEbUxwrdKSDCtwLasoxruKGXPc=
+github.com/trufflesecurity/overseer v1.1.7-custom3/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
 github.com/xanzy/go-gitlab v0.60.0 h1:HaIlc14k4t9eJjAhY0Gmq2fBHgKd1MthBn3+vzDtsbA=
 github.com/xanzy/go-gitlab v0.60.0/go.mod h1:F0QEXwmqiBUxCgJm8fE9S+1veX4XC9Z4cfaAbqwk4YM=
 github.com/xanzy/ssh-agent v0.3.0 h1:wUMzuKtKilRgBAD1sUb8gOwwRr2FGoBVumcjoOACClI=

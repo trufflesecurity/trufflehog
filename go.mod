@@ -2,9 +2,7 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.17
 
-replace github.com/gitleaks/go-gitdiff => github.com/bill-rich/go-gitdiff v0.7.6-custom1
-
-replace github.com/jpillora/overseer => github.com/dustin-decker/overseer v1.1.7-custom2
+replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom3
 
 require (
 	cloud.google.com/go/secretmanager v1.3.0
@@ -15,11 +13,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.2
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
-	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
 	github.com/fatih/color v1.13.0
 	github.com/felixge/fgprof v0.9.2
-	github.com/gitleaks/go-gitdiff v0.7.5
+	github.com/gitleaks/go-gitdiff v0.7.6
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/golang-jwt/jwt v3.2.2+incompatible
