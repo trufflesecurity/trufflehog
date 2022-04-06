@@ -99,6 +99,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			fileStat, err := os.Stat(path)
 			if err != nil {
 				log.WithError(err).Warnf("unable to stat file: %s", path)
+				return nil
 			}
 			if !fileStat.Mode().IsRegular() {
 				return nil
