@@ -27,4 +27,9 @@ jobs:
         fetch-depth: 0
         ref: ${{ github.head_ref }}
     - name: Dogfood
-      run:  echo $GITHUB_BASE_REF; CGO_ENABLED=0 go run . git file://. --since_commit $GITHUB_BASE_REF
+      uses: ./
+      id: dogfood
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
