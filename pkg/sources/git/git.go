@@ -267,6 +267,10 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	if err != nil {
 		return errors.WrapPrefix(err, "could not open repo path", 0)
 	}
+
+	// get the URL metadata for reporting (may be empty)
+	urlMetadata := getSafeRemoteURL(repo, "origin")
+
 	var depth int64
 	for file := range fileChan {
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
@@ -297,15 +301,6 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			when = file.PatchHeader.AuthorDate.String()
 		}
 
-		remote, err := repo.Remote("origin")
-		if err != nil {
-			return errors.WrapPrefix(err, "error getting repo remote origin", 0)
-		}
-		safeRepo, err := stripPassword(remote.Config().URLs[0])
-		if err != nil {
-			return errors.WrapPrefix(err, "couldn't get repo name", 0)
-		}
-
 		for _, frag := range file.TextFragments {
 			newLines := bytes.Buffer{}
 			newLineNumber := frag.NewPosition
@@ -314,7 +309,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 					newLines.WriteString(strings.ReplaceAll(line.String(), "\n", " ") + "\n")
 				}
 			}
-			metadata := s.sourceMetadataFunc(fileName, email, hash, when, safeRepo, newLineNumber)
+			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, newLineNumber)
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
@@ -329,17 +324,11 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 }
 
 func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	remote, err := repo.Remote("origin")
-	if err != nil {
-		return errors.New(err)
-	}
-	safeRepo, err := stripPassword(remote.Config().URLs[0])
-	if err != nil {
-		return errors.New(err)
-	}
+	// get the URL metadata for reporting (may be empty)
+	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	// Also scan any unstaged changes in the working tree of the repo
-	_, err = repo.Head()
+	_, err := repo.Head()
 	if err == nil || err == plumbing.ErrReferenceNotFound {
 		wt, err := repo.Worktree()
 		if err != nil {
@@ -357,7 +346,7 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 				continue
 			}
 			metadata := s.sourceMetadataFunc(
-				fh, "unstaged", "unstaged", time.Now().String(), safeRepo, 0,
+				fh, "unstaged", "unstaged", time.Now().String(), urlMetadata, 0,
 			)
 
 			fileBuf := bytes.NewBuffer(nil)
@@ -490,4 +479,27 @@ func PrepareRepo(uriString string) (string, bool, error) {
 	}
 	log.Debugf("Git repo local path: %s", path)
 	return path, remote, nil
+}
+
+// getSafeRemoteURL is a helper function that will attempt to get a safe URL first
+// from the preferred remote name, falling back to the first remote name
+// available, or an empty string if there are no remotes.
+func getSafeRemoteURL(repo *git.Repository, preferred string) string {
+	remote, err := repo.Remote(preferred)
+	if err != nil {
+		var remotes []*git.Remote
+		if remotes, err = repo.Remotes(); err != nil {
+			return ""
+		}
+		if len(remotes) == 0 {
+			return ""
+		}
+		remote = remotes[0]
+	}
+	// URLs is guaranteed to be non-empty
+	safeURL, err := stripPassword(remote.Config().URLs[0])
+	if err != nil {
+		return ""
+	}
+	return safeURL
 }
