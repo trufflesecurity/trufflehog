@@ -1689,6 +1689,10 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for IncludeForks
 
+	// no validation rules for Head
+
+	// no validation rules for Base
+
 	switch m.Credential.(type) {
 
 	case *GitHub_GithubApp:
