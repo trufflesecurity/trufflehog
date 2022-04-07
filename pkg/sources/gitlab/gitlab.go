@@ -160,7 +160,7 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, error) {
 	// projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
-	//TODO what happens if the user is anonymous
+
 	if err != nil {
 		return nil, errors.Errorf("unable to authenticate using: %s", s.authMethod)
 	}
@@ -173,7 +173,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	for {
 		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions)
 		if err != nil {
-			return nil, errors.Errorf("received error on listing projects: %s\n", err)
+			return nil, errors.Errorf("received error on listing user projects: %s\n", err)
 		}
 		for _, prj := range userProjects {
 			projects[prj.ID] = prj
@@ -197,7 +197,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	for {
 		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
 		if err != nil {
-			return nil, errors.Errorf("received error on listing projects: %s\n", err)
+			return nil, errors.Errorf("received error on listing groups, you probably don't have permissions to do that: %s\n", err)
 		}
 		groups = append(groups, groupList...)
 		listGroupsOptions.Page = res.NextPage
@@ -214,7 +214,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
 			if err != nil {
-				return nil, errors.Errorf("received error on listing projects: %s\n", err)
+				return nil, errors.Errorf("received error on listing group projects, you probably don't have permissions to do that: %s\n", err)
 			}
 			for _, prj := range grpPrjs {
 				projects[prj.ID] = prj
