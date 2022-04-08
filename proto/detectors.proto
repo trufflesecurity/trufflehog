@@ -782,6 +782,12 @@ enum DetectorType {
   TimeCamp = 778;
   Userflow = 779;
   Wistia = 780;
+  SportRadar = 781;
+  UptimeRobot = 782;
+  Codequiry = 783;
+  ExtractorAPI = 784;
+  Signable = 785;
+  MagicBell = 786;
 }
 
 message Result {
