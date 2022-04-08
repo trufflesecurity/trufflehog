@@ -1,0 +1,23 @@
+# trufflesecurity/protos:1.18-0
+
+FROM golang:1.18-buster
+
+ARG TARGETARCH
+ARG TARGETOS
+ENV PROTOC_VER=3.20.0
+ENV GORELEASER_VER=v1.7.0
+ENV SQLBOILER_VER=v4.9.0
+ENV PROTOC_GEN_GO_VER=v1.5.2
+
+RUN echo "building $TARGETARCH"
+RUN apt-get update; apt-get install -y --no-install-recommends git unzip && rm -rf /var/lib/apt/lists/*
+RUN set -e; \
+	arch=$(echo $TARGETARCH | sed -e s/amd64/x86_64/ -e s/arm64/aarch_64/); \
+	wget -q https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VER}/protoc-${PROTOC_VER}-${TARGETOS}-${arch}.zip && unzip protoc-${PROTOC_VER}-${TARGETOS}-${arch}.zip -d /usr/local
+RUN go install "github.com/golang/protobuf/protoc-gen-go@${PROTOC_GEN_GO_VER}"
+RUN GO111MODULE=off go get -d "github.com/envoyproxy/protoc-gen-validate" && \
+    cd $GOPATH/src/github.com/envoyproxy/protoc-gen-validate && \
+    git checkout v0.6.7 && \
+    ln -s /usr/local/protoc/include/google google && \
+    make build
+CMD ["bash"]

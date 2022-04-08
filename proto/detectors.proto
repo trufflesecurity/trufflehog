@@ -754,6 +754,40 @@ enum DetectorType {
   Sendbird = 750;
   SendbirdOrganizationAPI = 751;
   Midise = 752;
+  Mockaroo = 753;
+  Image4 = 754;
+  Pinata = 755;
+  BrowserStack = 756;
+  CrossBrowserTesting = 757;
+  Loadmill = 758;
+  TestingBot = 759;
+  KnapsackPro = 760;
+  Qase = 761;
+  Dareboost = 762;
+  GTMetrics = 763;
+  Hollistic = 764;
+  Parsers = 765;
+  ScrutinizerCi = 766;
+  SonarCloud = 767;
+  APITemplate = 768;
+  ConversionTools = 769;
+  CraftMyPDF = 770;
+  ExportSDK = 771;
+  GlitterlyAPI = 772;
+  Hybiscus = 773;
+  Miro = 774;
+  Statuspage = 775;
+  Statuspal = 776;
+  Teletype = 777;
+  TimeCamp = 778;
+  Userflow = 779;
+  Wistia = 780;
+  SportRadar = 781;
+  UptimeRobot = 782;
+  Codequiry = 783;
+  ExtractorAPI = 784;
+  Signable = 785;
+  MagicBell = 786;
 }
 
 message Result {

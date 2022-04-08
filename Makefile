@@ -1,4 +1,4 @@
-PROTOS_IMAGE ?= us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
+PROTOS_IMAGE ?= trufflesecurity/protos:1.18-0
 
 .PHONY: check
 .PHONY: test
@@ -47,5 +47,10 @@ protos:
 protos-windows:
 	docker run -v "$(shell cygpath -w $(shell pwd))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; ./scripts/gen_proto.sh"
 
+release-protos-image:
+	docker buildx build --push --platform=linux/amd64,linux/arm64 \
+	-t trufflesecurity/protos:1.18-0 -f hack/Dockerfile.protos .
+
 snifftest:
 	./hack/snifftest/snifftest.sh
+
