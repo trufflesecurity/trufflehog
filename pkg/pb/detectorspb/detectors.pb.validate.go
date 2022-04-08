@@ -98,6 +98,7 @@ func (m *Result) validate(all bool) error {
 	if len(errors) > 0 {
 		return ResultMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -264,6 +265,7 @@ func (m *StructuredData) validate(all bool) error {
 	if len(errors) > 0 {
 		return StructuredDataMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -369,6 +371,7 @@ func (m *TlsPrivateKey) validate(all bool) error {
 	if len(errors) > 0 {
 		return TlsPrivateKeyMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -472,6 +475,7 @@ func (m *GitHubSSHKey) validate(all bool) error {
 	if len(errors) > 0 {
 		return GitHubSSHKeyMultiError(errors)
 	}
+
 	return nil
 }
 

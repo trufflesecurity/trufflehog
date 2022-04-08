@@ -60,6 +60,7 @@ func (m *Unauthenticated) validate(all bool) error {
 	if len(errors) > 0 {
 		return UnauthenticatedMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -159,6 +160,7 @@ func (m *CloudEnvironment) validate(all bool) error {
 	if len(errors) > 0 {
 		return CloudEnvironmentMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -262,6 +264,7 @@ func (m *BasicAuth) validate(all bool) error {
 	if len(errors) > 0 {
 		return BasicAuthMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -363,6 +366,7 @@ func (m *Header) validate(all bool) error {
 	if len(errors) > 0 {
 		return HeaderMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -467,6 +471,7 @@ func (m *ClientCredentials) validate(all bool) error {
 	if len(errors) > 0 {
 		return ClientCredentialsMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -576,6 +581,7 @@ func (m *ClientCertificate) validate(all bool) error {
 	if len(errors) > 0 {
 		return ClientCertificateMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -682,6 +688,7 @@ func (m *Oauth2) validate(all bool) error {
 	if len(errors) > 0 {
 		return Oauth2MultiError(errors)
 	}
+
 	return nil
 }
 
@@ -784,6 +791,7 @@ func (m *KeySecret) validate(all bool) error {
 	if len(errors) > 0 {
 		return KeySecretMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -887,6 +895,7 @@ func (m *AWS) validate(all bool) error {
 	if len(errors) > 0 {
 		return AWSMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1015,6 +1024,7 @@ func (m *SES) validate(all bool) error {
 	if len(errors) > 0 {
 		return SESMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1119,6 +1129,7 @@ func (m *GitHubApp) validate(all bool) error {
 	if len(errors) > 0 {
 		return GitHubAppMultiError(errors)
 	}
+
 	return nil
 }
 
