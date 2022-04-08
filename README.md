@@ -82,7 +82,10 @@ Help with setting up this packaging would be appreciated!
 
 ### 5. Brew (help wanted)
 
-We'd love to distribute via brew and could use your help.
+```bash
+brew tap trufflesecurity/trufflehog
+brew install trufflehog
+```
 
 ## Usage
 
