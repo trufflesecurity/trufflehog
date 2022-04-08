@@ -116,6 +116,10 @@ func main() {
 	if !*noUpdate {
 		updateCfg.Fetcher = updater.Fetcher(version.BuildVersion)
 	}
+	if version.BuildVersion == "dev" {
+		updateCfg.Fetcher = nil
+	}
+
 	err := overseer.RunErr(updateCfg)
 	if err != nil {
 		logrus.WithError(err).Fatal("error occured with trufflehog updater 🐷")
