@@ -214,7 +214,8 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
 			if err != nil {
-				return nil, errors.Errorf("received error on listing group projects, you probably don't have permissions to do that: %s\n", err)
+				log.WithError(err).WithField("group", group.FullPath).Warn("received error on listing group projects, you probably don't have permissions to do that")
+				break
 			}
 			for _, prj := range grpPrjs {
 				projects[prj.ID] = prj
