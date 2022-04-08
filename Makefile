@@ -53,4 +53,3 @@ release-protos-image:
 
 snifftest:
 	./hack/snifftest/snifftest.sh
-
