@@ -40,7 +40,7 @@ func TestTwitter_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twitter secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a twitter  secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
