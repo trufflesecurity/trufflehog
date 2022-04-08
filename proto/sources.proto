@@ -146,6 +146,8 @@ message GitHub {
   repeated string organizations = 6;
   bool scanUsers = 7;
   bool includeForks = 8;
+  string head = 9;
+  string base = 10;
 }
 
 message JIRA {
