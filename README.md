@@ -80,7 +80,7 @@ Here is an example of a [project that does it](https://github.com/Yelp/dumb-init
 
 Help with setting up this packaging would be appreciated!
 
-### 5. Brew (help wanted)
+### 5. Brew
 
 ```bash
 brew tap trufflesecurity/trufflehog
