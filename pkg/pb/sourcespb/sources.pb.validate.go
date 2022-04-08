@@ -124,6 +124,7 @@ func (m *LocalSource) validate(all bool) error {
 	if len(errors) > 0 {
 		return LocalSourceMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -294,6 +295,7 @@ func (m *AzureStorage) validate(all bool) error {
 	if len(errors) > 0 {
 		return AzureStorageMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -473,6 +475,7 @@ func (m *Bitbucket) validate(all bool) error {
 	if len(errors) > 0 {
 		return BitbucketMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -590,6 +593,7 @@ func (m *CircleCI) validate(all bool) error {
 	if len(errors) > 0 {
 		return CircleCIMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -771,6 +775,7 @@ func (m *Confluence) validate(all bool) error {
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -904,6 +909,7 @@ func (m *DockerHub) validate(all bool) error {
 	if len(errors) > 0 {
 		return DockerHubMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1036,6 +1042,7 @@ func (m *ECR) validate(all bool) error {
 	if len(errors) > 0 {
 		return ECRMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1134,6 +1141,7 @@ func (m *Filesystem) validate(all bool) error {
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1238,6 +1246,7 @@ func (m *GCS) validate(all bool) error {
 	if len(errors) > 0 {
 		return GCSMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1401,6 +1410,7 @@ func (m *Git) validate(all bool) error {
 	if len(errors) > 0 {
 		return GitMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1579,6 +1589,7 @@ func (m *GitLab) validate(all bool) error {
 	if len(errors) > 0 {
 		return GitLabMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1761,6 +1772,7 @@ func (m *GitHub) validate(all bool) error {
 	if len(errors) > 0 {
 		return GitHubMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -1967,6 +1979,7 @@ func (m *JIRA) validate(all bool) error {
 	if len(errors) > 0 {
 		return JIRAMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -2100,6 +2113,7 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 	if len(errors) > 0 {
 		return NPMUnauthenticatedPackageMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -2236,6 +2250,7 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 	if len(errors) > 0 {
 		return PyPIUnauthenticatedPackageMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -2433,6 +2448,7 @@ func (m *S3) validate(all bool) error {
 	if len(errors) > 0 {
 		return S3MultiError(errors)
 	}
+
 	return nil
 }
 
@@ -2549,6 +2565,7 @@ func (m *Slack) validate(all bool) error {
 	if len(errors) > 0 {
 		return SlackMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -2646,6 +2663,7 @@ func (m *Test) validate(all bool) error {
 	if len(errors) > 0 {
 		return TestMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -2751,6 +2769,7 @@ func (m *Buildkite) validate(all bool) error {
 	if len(errors) > 0 {
 		return BuildkiteMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -2926,6 +2945,7 @@ func (m *Gerrit) validate(all bool) error {
 	if len(errors) > 0 {
 		return GerritMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -3101,6 +3121,7 @@ func (m *Jenkins) validate(all bool) error {
 	if len(errors) > 0 {
 		return JenkinsMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -3245,6 +3266,7 @@ func (m *Teams) validate(all bool) error {
 	if len(errors) > 0 {
 		return TeamsMultiError(errors)
 	}
+
 	return nil
 }
 
@@ -3421,6 +3443,7 @@ func (m *Artifactory) validate(all bool) error {
 	if len(errors) > 0 {
 		return ArtifactoryMultiError(errors)
 	}
+
 	return nil
 }
 
