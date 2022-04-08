@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"image4"}) + `\b([0-9a-zA-Z]{22}\==)`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"image4"}) + `\b([0-9a-zA-Z]{22}[0-9a-zA-Z\=]{2})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
