@@ -765,7 +765,7 @@ enum DetectorType {
   Qase = 761;
   Dareboost = 762;
   GTMetrics = 763;
-  Hollistic = 764;
+  Holistic = 764;
   Parsers = 765;
   ScrutinizerCi = 766;
   SonarCloud = 767;
