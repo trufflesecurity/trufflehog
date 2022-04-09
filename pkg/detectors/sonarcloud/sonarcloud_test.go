@@ -21,6 +21,7 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("SONARCLOUD")
+	org := testSecrets.MustGetField("SONARCLOUD_ORG")
 	inactiveSecret := testSecrets.MustGetField("SONARCLOUD_INACTIVE")
 
 	type args struct {
@@ -40,7 +41,7 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within sonarcloud %s", secret, org)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -56,7 +57,7 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a sonarcloud secret %s within sonarcloud %s but not valid", inactiveSecret, org)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
