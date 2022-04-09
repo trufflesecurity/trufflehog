@@ -143,6 +143,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	s.repos = s.conn.Repositories
 	s.orgs = s.conn.Organizations
 
+	// Head or base should only be used with incoming webhooks
+	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
+		return fmt.Errorf("cannot specify head or base with multiple repositories")
+	}
+
 	var apiClient *github.Client
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
@@ -261,23 +266,25 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			return errors.New(err)
 		}
 
-		err = s.addReposByApp(ctx, apiClient)
-		if err != nil {
-			return err
-		}
-
-		//check if we need to find user repos
-		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, installationClient, apiClient)
+		if len(s.repos) == 0 {
+			err = s.addReposByApp(ctx, apiClient)
 			if err != nil {
 				return err
 			}
-			log.Infof("Scanning repos from %v organization members.", len(s.members))
-			for _, member := range s.members {
-				s.addGistsByUser(ctx, apiClient, member)
-				s.addReposByUser(ctx, apiClient, member)
-			}
 
+			//check if we need to find user repos
+			if s.conn.ScanUsers {
+				err := s.addMembersByApp(ctx, installationClient, apiClient)
+				if err != nil {
+					return err
+				}
+				log.Infof("Scanning repos from %v organization members.", len(s.members))
+				for _, member := range s.members {
+					s.addGistsByUser(ctx, apiClient, member)
+					s.addReposByUser(ctx, apiClient, member)
+				}
+
+			}
 		}
 	default:
 		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
@@ -338,7 +345,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				log.WithError(err).Errorf("unable to clone repo (%s), continuing", repoURL)
 				return
 			}
-			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
+			// Base and head will only exist from incoming webhooks.
+			scanOptions := git.NewScanOptions(
+				git.ScanOptionBaseHash(s.conn.Base),
+				git.ScanOptionHeadCommit(s.conn.Head),
+			)
+
+			err = s.git.ScanRepo(ctx, repo, path, scanOptions, chunksChan)
 			if err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 			}

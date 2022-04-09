@@ -262,8 +262,13 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	if err := GitCmdCheck(); err != nil {
 		return err
 	}
-	zerolog.SetGlobalLevel(zerolog.Disabled)
-	fileChan, err := glgo.GitLog(path, scanOptions.HeadHash)
+	if log.GetLevel() < log.DebugLevel {
+		zerolog.SetGlobalLevel(zerolog.Disabled)
+	}
+
+	// Errors returned on errChan aren't blocking, so just ignore them.
+	errChan := make(chan error)
+	fileChan, err := glgo.GitLog(path, scanOptions.HeadHash, errChan)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not open repo path", 0)
 	}

@@ -446,8 +446,10 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502 h1:34icjjmqJ2HPjrSuJYEkdZ+0ItmGQAQ75cRHIiftIyE=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
-github.com/trufflesecurity/overseer v1.1.7-custom3 h1:hpSYY+ca0lug3tbpOoEbUxwrdKSDCtwLasoxruKGXPc=
-github.com/trufflesecurity/overseer v1.1.7-custom3/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
+github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom1 h1:HJPy+ciKU82lFPK0cxXJ4BYvCIANCQp29zhjU2T1UXo=
+github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom1/go.mod h1:TxBuxH8eB/1la8Mc7I6j/ZZYNG/mHGpoi09N2oHx5nQ=
+github.com/trufflesecurity/overseer v1.1.7-custom4 h1:5ed5+2+N3ZaW7oc4n7PIjkybGHUZmdCH9iAztB/2+Cc=
+github.com/trufflesecurity/overseer v1.1.7-custom4/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
 github.com/xanzy/go-gitlab v0.60.0 h1:HaIlc14k4t9eJjAhY0Gmq2fBHgKd1MthBn3+vzDtsbA=
 github.com/xanzy/go-gitlab v0.60.0/go.mod h1:F0QEXwmqiBUxCgJm8fE9S+1veX4XC9Z4cfaAbqwk4YM=
 github.com/xanzy/ssh-agent v0.3.0 h1:wUMzuKtKilRgBAD1sUb8gOwwRr2FGoBVumcjoOACClI=
@@ -460,8 +462,6 @@ github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1
 github.com/yuin/goldmark v1.4.0/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yusufpapurcu/wmi v1.2.2 h1:KBNDSne4vP5mbSWnJbO+51IMOXJB67QiYCSBrubbPRg=
 github.com/yusufpapurcu/wmi v1.2.2/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
-github.com/zricethezav/gitleaks/v8 v8.5.2 h1:+IiLvmBiMGetpgNtzC71EHktTXc1Zt7m9AwnqhhJ04g=
-github.com/zricethezav/gitleaks/v8 v8.5.2/go.mod h1:TxBuxH8eB/1la8Mc7I6j/ZZYNG/mHGpoi09N2oHx5nQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=
 go.etcd.io/etcd/client/pkg/v3 v3.5.0/go.mod h1:IJHfcCEKxYu1Os13ZdwCwIUTUVGYTSAM3YSwc9/Ac1g=
 go.etcd.io/etcd/client/v2 v2.305.0/go.mod h1:h9puh54ZTgAKtEbut2oe9P4L/oqKCVB6xsXlzd7alYQ=
