@@ -788,6 +788,7 @@ enum DetectorType {
   ExtractorAPI = 784;
   Signable = 785;
   MagicBell = 786;
+  RechargePayments = 787;
 }
 
 message Result {
