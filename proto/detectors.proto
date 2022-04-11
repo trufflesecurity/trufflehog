@@ -788,6 +788,16 @@ enum DetectorType {
   ExtractorAPI = 784;
   Signable = 785;
   MagicBell = 786;
+  Stormboard = 787;
+  Apilayer = 788;
+  Disqus = 789;
+  Woopra = 790;
+  Paperform =791;
+  Gumroad = 792;
+  Paydirtyapp = 793;
+  Detectify = 794;
+  Statuscake = 795;
+  Jumpseller = 796;
 }
 
 message Result {
