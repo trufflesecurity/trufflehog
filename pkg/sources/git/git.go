@@ -278,6 +278,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 
 	var depth int64
 	for file := range fileChan {
+		log.WithField("commit", file.PatchHeader.SHA).WithField("file", file.NewName).Trace("Scanning file from git")
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			log.Debugf("reached max depth")
 			break
@@ -311,9 +312,10 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			newLineNumber := frag.NewPosition
 			for _, line := range frag.Lines {
 				if line.Op == gitdiff.OpAdd {
-					newLines.WriteString(strings.ReplaceAll(line.String(), "\n", " ") + "\n")
+					newLines.WriteString(line.Line)
 				}
 			}
+			log.WithField("fragment", newLines.String()).Trace("detecting fragment")
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, newLineNumber)
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
