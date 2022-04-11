@@ -2,7 +2,6 @@ package rechargepayments
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 
@@ -18,7 +17,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client    = common.SaneHttpClient()
-	verifyURL = "https://api.rechargeapps.com"
+	verifyURL = "https://api.rechargeapps.com/token_information"
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	tokenPats = map[string]*regexp.Regexp{
@@ -53,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("X-Recharge-Access-Token", fmt.Sprintf("Bearer %s", token))
+				req.Header.Add("X-Recharge-Access-Token", token)
 				res, err := client.Do(req)
 				if err != nil {
 					return results, err
