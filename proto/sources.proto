@@ -219,10 +219,11 @@ message Jenkins {
 message Teams {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
-    credentials.ClientCredentials authenticated = 2;
+    credentials.AccessToken token = 2;
+    credentials.ClientCredentials authenticated = 3;
   }
-  repeated string channels = 3;
-  repeated string ignoreList = 4;
+  repeated string channels = 4;
+  repeated string ignoreList = 5;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
