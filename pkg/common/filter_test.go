@@ -163,6 +163,9 @@ func testFilterWriteFile(filename string, content []byte) error {
 	if err != nil {
 		return err
 	}
-	f.Write(content)
+	_, err = f.Write(content)
+	if err != nil {
+		return err
+	}
 	return f.Close()
 }
