@@ -3232,6 +3232,8 @@ func (m *Teams) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for TeamId
+
 	switch m.Credential.(type) {
 
 	case *Teams_Token:

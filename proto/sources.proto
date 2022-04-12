@@ -224,6 +224,7 @@ message Teams {
   }
   repeated string channels = 4;
   repeated string ignoreList = 5;
+  string team_id = 6;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
