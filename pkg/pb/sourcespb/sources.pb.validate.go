@@ -3411,14 +3411,14 @@ func (m *Artifactory) validate(all bool) error {
 			}
 		}
 
-	case *Artifactory_Header:
+	case *Artifactory_AccessToken:
 
 		if all {
-			switch v := interface{}(m.GetHeader()).(type) {
+			switch v := interface{}(m.GetAccessToken()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, ArtifactoryValidationError{
-						field:  "Header",
+						field:  "AccessToken",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -3426,16 +3426,16 @@ func (m *Artifactory) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, ArtifactoryValidationError{
-						field:  "Header",
+						field:  "AccessToken",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetHeader()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetAccessToken()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return ArtifactoryValidationError{
-					field:  "Header",
+					field:  "AccessToken",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

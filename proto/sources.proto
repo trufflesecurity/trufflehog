@@ -230,7 +230,7 @@ message Artifactory {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
-    credentials.Header header = 3;
+    credentials.AccessToken access_token = 3;
   }
   repeated string repositories = 4;
 }
