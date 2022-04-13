@@ -91,7 +91,3 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 	return detectors.CleanResults(results), nil
 }
-func prettyPrint(i interface{}) string {
-	s, _ := json.MarshalIndent(i, "", "\t")
-	return string(s)
-}
