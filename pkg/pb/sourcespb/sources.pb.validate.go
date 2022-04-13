@@ -3553,3 +3553,111 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ArtifactoryValidationError{}
+
+// Validate checks the field values on Syslog with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Syslog) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Syslog with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in SyslogMultiError, or nil if none found.
+func (m *Syslog) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Syslog) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Protocol
+
+	// no validation rules for ListenAddress
+
+	// no validation rules for TlsCert
+
+	// no validation rules for TlsKey
+
+	// no validation rules for Format
+
+	if len(errors) > 0 {
+		return SyslogMultiError(errors)
+	}
+
+	return nil
+}
+
+// SyslogMultiError is an error wrapping multiple validation errors returned by
+// Syslog.ValidateAll() if the designated constraints aren't met.
+type SyslogMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SyslogMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SyslogMultiError) AllErrors() []error { return m }
+
+// SyslogValidationError is the validation error returned by Syslog.Validate if
+// the designated constraints aren't met.
+type SyslogValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SyslogValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SyslogValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SyslogValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SyslogValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SyslogValidationError) ErrorName() string { return "SyslogValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SyslogValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSyslog.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SyslogValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SyslogValidationError{}
