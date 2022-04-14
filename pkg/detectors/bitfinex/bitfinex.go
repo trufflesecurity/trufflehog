@@ -3,6 +3,7 @@ package bitfinex
 import (
 	"context"
 	"flag"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -27,8 +28,7 @@ var (
 )
 
 var (
-	orderid = flag.String("id", "", "lookup trades for an order ID")
-	api     = flag.String("api", "https://api-pub.bitfinex.com/v2/", "v2 REST API URL")
+	api = flag.String("api", "https://api-pub.bitfinex.com/v2/", "v2 REST API URL")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -69,6 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// thankfully official golang examples exist but you just need to dig their many repos https://github.com/bitfinexcom/bitfinex-api-go/blob/master/examples/v2/rest-orders/main.go
 				key := apiKeyRes
 				secret := apiSecretRes
+				http.DefaultClient = client // filed https://github.com/bitfinexcom/bitfinex-api-go/issues/238 to improve this
 				c := rest.NewClientWithURL(*api).Credentials(key, secret)
 
 				isValid := true // assume valid

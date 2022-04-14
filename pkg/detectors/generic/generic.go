@@ -118,22 +118,22 @@ func hasReMatch(matchers []*regexp.Regexp, token string) bool {
 	return false
 }
 
-func hasDictWord(wordList []string, token string) bool {
-	lower := strings.ToLower(token)
-	for _, word := range wordList {
-		if strings.Contains(lower, word) {
-			return true
-		}
-	}
-	return false
-}
+// func hasDictWord(wordList []string, token string) bool {
+// 	lower := strings.ToLower(token)
+// 	for _, word := range wordList {
+// 		if strings.Contains(lower, word) {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
-func bytesToCleanWordList(data []byte) []string {
-	words := []string{}
-	for _, word := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(word) != "" {
-			words = append(words, strings.TrimSpace(strings.ToLower(word)))
-		}
-	}
-	return words
-}
+// func bytesToCleanWordList(data []byte) []string {
+// 	words := []string{}
+// 	for _, word := range strings.Split(string(data), "\n") {
+// 		if strings.TrimSpace(word) != "" {
+// 			words = append(words, strings.TrimSpace(strings.ToLower(word)))
+// 		}
+// 	}
+// 	return words
+// }
