@@ -798,6 +798,10 @@ enum DetectorType {
   Detectify = 794;
   Statuscake = 795;
   Jumpseller = 796;
+  LunchMoney = 797;
+  Rosette = 798;
+  Yelp = 799;
+  Atera = 800;
 }
 
 message Result {
