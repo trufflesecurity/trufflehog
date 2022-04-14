@@ -802,6 +802,17 @@ enum DetectorType {
   Rosette = 798;
   Yelp = 799;
   Atera = 800;
+  EcoStruxureIT = 801;
+  Aha = 802;
+  Parsehub = 803;
+  PackageCloud = 804;
+  Cloudsmith = 805;
+  Flowdash = 806;
+  Flowdock = 807;
+  Fibery = 808;
+  Typetalk = 809;
+  VoodooSMS = 810;
+  ZulipChat = 811;
 }
 
 message Result {
