@@ -277,6 +277,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	var depth int64
+	var reachedBase = false
 	for file := range fileChan {
 		log.WithField("commit", file.PatchHeader.SHA).WithField("file", file.NewName).Trace("Scanning file from git")
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
@@ -284,10 +285,13 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			break
 		}
 		depth++
+		if reachedBase && file.PatchHeader.SHA != scanOptions.BaseHash {
+			break
+		}
 		if len(scanOptions.BaseHash) > 0 {
 			if file.PatchHeader.SHA == scanOptions.BaseHash {
-				log.Debugf("reached base commit")
-				break
+				log.Debugf("Reached base commit. Finishing scanning files.")
+				reachedBase = true
 			}
 		}
 		if !scanOptions.Filter.Pass(file.NewName) {
