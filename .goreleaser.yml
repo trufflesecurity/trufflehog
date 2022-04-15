@@ -80,8 +80,8 @@ docker_manifests:
     - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
 brews:
   - tap:
-      owner: drewstinnett # This should likely be trufflesecurity
-      name: homebrew-trufflehog # Dependant on whatever name is chosen 
+      owner: trufflesecurity
+      name: homebrew-trufflehog
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     description: "Find credentials all over the place"
     name: "trufflehog"
