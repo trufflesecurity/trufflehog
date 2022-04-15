@@ -80,9 +80,12 @@ Here is an example of a [project that does it](https://github.com/Yelp/dumb-init
 
 Help with setting up this packaging would be appreciated!
 
-### 5. Brew (help wanted)
+### 5. Brew
 
-We'd love to distribute via brew and could use your help.
+```bash
+brew tap trufflesecurity/trufflehog
+brew install trufflehog
+```
 
 ## Usage
 
