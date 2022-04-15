@@ -285,7 +285,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			break
 		}
 		depth++
-		if reachedBase == true && file.PatchHeader.SHA != scanOptions.BaseHash {
+		if reachedBase && file.PatchHeader.SHA != scanOptions.BaseHash {
 			break
 		}
 		if len(scanOptions.BaseHash) > 0 {
