@@ -8,8 +8,7 @@
 
 
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog)
-[![Docker Hub Build Status](https://img.shields.io/docker/cloud/build/trufflesecurity/trufflehog.svg)](https://hub.docker.com/r/trufflesecurity/trufflehog/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
 ![GitHub](https://img.shields.io/github/license/trufflesecurity/trufflehog)
 
 ---
