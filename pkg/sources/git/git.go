@@ -279,6 +279,10 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	var depth int64
 	var reachedBase = false
 	for file := range fileChan {
+		if file == nil || file.PatchHeader == nil {
+			log.Debugf("file missing patch header, skipping")
+			continue
+		}
 		log.WithField("commit", file.PatchHeader.SHA).WithField("file", file.NewName).Trace("Scanning file from git")
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			log.Debugf("reached max depth")
