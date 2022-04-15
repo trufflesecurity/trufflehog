@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(`apikey=` + resMatch + `grant_type=refresh_token&response_type=delegated_refresh_token&receiver_client_ids=ce&delegated_refresh_token_expiry=3600`)
+			payload := strings.NewReader(`apikey=` + resMatch + `&grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey`)
 			req, err := http.NewRequestWithContext(ctx, "POST", "https://iam.cloud.ibm.com/identity/token", payload)
 			if err != nil {
 				continue
