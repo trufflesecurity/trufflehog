@@ -9,7 +9,7 @@
 
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
-![GitHub](https://img.shields.io/github/license/trufflesecurity/trufflehog)
+![License](https://img.shields.io/badge/license-AGPL--3.0-green)
 
 ---
 
