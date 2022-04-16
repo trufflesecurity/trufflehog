@@ -272,6 +272,10 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	if err != nil {
 		return errors.WrapPrefix(err, "could not open repo path", 0)
 	}
+	// parser can return nil chan and nil error
+	if fileChan == nil {
+		return errors.New("nothing to scan")
+	}
 
 	// get the URL metadata for reporting (may be empty)
 	urlMetadata := getSafeRemoteURL(repo, "origin")
