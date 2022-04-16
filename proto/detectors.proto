@@ -798,6 +798,27 @@ enum DetectorType {
   Detectify = 794;
   Statuscake = 795;
   Jumpseller = 796;
+  LunchMoney = 797;
+  Rosette = 798;
+  Yelp = 799;
+  Atera = 800;
+  EcoStruxureIT = 801;
+  Aha = 802;
+  Parsehub = 803;
+  PackageCloud = 804;
+  Cloudsmith = 805;
+  Flowdash = 806;
+  Flowdock = 807;
+  Fibery = 808;
+  Typetalk = 809;
+  VoodooSMS = 810;
+  ZulipChat = 811;
+  Formcarft = 812;
+  Iexapis = 813;
+  Reachmail = 814;
+  Chartmogul = 815;
+  Appointed = 816;
+  Wit = 817;
 }
 
 message Result {

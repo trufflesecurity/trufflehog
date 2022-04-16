@@ -277,16 +277,25 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	var depth int64
+	var reachedBase = false
 	for file := range fileChan {
+		if file == nil || file.PatchHeader == nil {
+			log.Debugf("file missing patch header, skipping")
+			continue
+		}
+		log.WithField("commit", file.PatchHeader.SHA).WithField("file", file.NewName).Trace("Scanning file from git")
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			log.Debugf("reached max depth")
 			break
 		}
 		depth++
+		if reachedBase && file.PatchHeader.SHA != scanOptions.BaseHash {
+			break
+		}
 		if len(scanOptions.BaseHash) > 0 {
 			if file.PatchHeader.SHA == scanOptions.BaseHash {
-				log.Debugf("reached base commit")
-				break
+				log.Debugf("Reached base commit. Finishing scanning files.")
+				reachedBase = true
 			}
 		}
 		if !scanOptions.Filter.Pass(file.NewName) {
@@ -311,9 +320,10 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			newLineNumber := frag.NewPosition
 			for _, line := range frag.Lines {
 				if line.Op == gitdiff.OpAdd {
-					newLines.WriteString(strings.ReplaceAll(line.String(), "\n", " ") + "\n")
+					newLines.WriteString(line.Line)
 				}
 			}
+			log.WithField("fragment", newLines.String()).Trace("detecting fragment")
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, newLineNumber)
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,

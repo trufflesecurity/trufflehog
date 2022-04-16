@@ -8,9 +8,8 @@
 
 
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog)
-[![Docker Hub Build Status](https://img.shields.io/docker/cloud/build/trufflesecurity/trufflehog.svg)](https://hub.docker.com/r/trufflesecurity/trufflehog/)
-![GitHub](https://img.shields.io/github/license/trufflesecurity/trufflehog)
+[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
+![License](https://img.shields.io/badge/license-AGPL--3.0-green)
 
 ---
 
@@ -80,9 +79,12 @@ Here is an example of a [project that does it](https://github.com/Yelp/dumb-init
 
 Help with setting up this packaging would be appreciated!
 
-### 5. Brew (help wanted)
+### 5. Brew
 
-We'd love to distribute via brew and could use your help.
+```bash
+brew tap trufflesecurity/trufflehog
+brew install trufflehog
+```
 
 ## Usage
 

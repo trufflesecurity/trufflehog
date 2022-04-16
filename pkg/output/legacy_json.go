@@ -73,7 +73,7 @@ func BranchHeads(repo *gogit.Repository) (map[string]*object.Commit, error) {
 		return branches, err
 	}
 
-	branchIter.ForEach(func(branchRef *plumbing.Reference) error {
+	err = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
 		branchName := branchRef.Name().String()
 		headHash, err := repo.ResolveRevision(plumbing.Revision(branchName))
 		if err != nil {
@@ -88,7 +88,7 @@ func BranchHeads(repo *gogit.Repository) (map[string]*object.Commit, error) {
 		branches[branchName] = headCommit
 		return nil
 	})
-	return branches, nil
+	return branches, err
 }
 
 // FindBranch returns the first branch a commit is a part of. Not the most accurate, but it should work similar to pre v3.0.
