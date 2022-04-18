@@ -813,7 +813,7 @@ enum DetectorType {
   Typetalk = 809;
   VoodooSMS = 810;
   ZulipChat = 811;
-  Formcarft = 812;
+  Formcraft = 812;
   Iexapis = 813;
   Reachmail = 814;
   Chartmogul = 815;
