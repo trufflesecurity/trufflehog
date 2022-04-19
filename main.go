@@ -32,8 +32,8 @@ import (
 var (
 	cli            = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
 	cmd            string
-	debug          = cli.Flag("debug", "Run in debug mode").Bool()
-	versionFlag    = cli.Flag("version", "Prints trufflehog version.").Bool()
+	debug          = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace          = cli.Flag("trace", "Run in trace mode.").Bool()
 	jsonOut        = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy     = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	concurrency    = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
@@ -91,15 +91,20 @@ func init() {
 		}
 	}
 
+	cli.Version("trufflehog " + version.BuildVersion)
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
 	if *jsonOut {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
-	if *debug {
+	switch {
+	case *trace:
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.Debugf("running version %s", version.BuildVersion)
+	case *debug:
 		logrus.SetLevel(logrus.DebugLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
-	} else {
+	default:
 		logrus.SetLevel(logrus.InfoLevel)
 	}
 }
@@ -127,11 +132,8 @@ func main() {
 }
 
 func run(state overseer.State) {
-	if *debug || *versionFlag {
+	if *debug {
 		fmt.Println("trufflehog " + version.BuildVersion)
-		if *versionFlag {
-			return
-		}
 	}
 
 	// When setting a base commit, chunks must be scanned in order.

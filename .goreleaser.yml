@@ -78,3 +78,13 @@ docker_manifests:
     image_templates:
     - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
     - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
+brews:
+  - tap:
+      owner: trufflesecurity
+      name: homebrew-trufflehog
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    description: "Find credentials all over the place"
+    name: "trufflehog"
+    homepage: "https://github.com/trufflesecurity/trufflehog"
+    install: |
+      bin.install "trufflehog"

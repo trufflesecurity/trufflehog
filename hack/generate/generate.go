@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -95,11 +96,14 @@ func mustWriteTemplates(jobs []templateJob) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		tmpl.Execute(f, templateData{
+		err = tmpl.Execute(f, templateData{
 			NameTitle: nameTitle,
 			NameLower: nameLower,
 			NameUpper: nameUpper,
 		})
+		if err != nil {
+			log.Fatal(fmt.Errorf("failed to execute template: %w", err))
+		}
 	}
 }
 
