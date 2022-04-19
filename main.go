@@ -241,8 +241,8 @@ func run(state overseer.State) {
 	}
 
 	if foundResults {
-		logrus.Debug("exiting with non-zero code because results found")
-		os.Exit(1)
+		logrus.Debug("exiting with code 183 because results found")
+		os.Exit(183)
 	}
 }
 
