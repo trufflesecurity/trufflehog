@@ -99,13 +99,18 @@ func TestSource_Scan(t *testing.T) {
 					return
 				}
 			}()
+			var chunkCnt int
 			// Commits don't come in a deterministic order, so remove metadata comparison
 			for gotChunk := range chunksCh {
+				chunkCnt++
 				gotChunk.Data = nil
 				gotChunk.SourceMetadata = nil
 				if diff := pretty.Compare(gotChunk, tt.wantChunk); diff != "" {
 					t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
 				}
+			}
+			if chunkCnt < 1 {
+				t.Errorf("0 chunks scanned.")
 			}
 		})
 	}

@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/go-errors/errors"
-	git2 "github.com/go-git/go-git/v5"
+	gg "github.com/go-git/go-git/v5"
 	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -292,7 +292,7 @@ func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk, repos
 			s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
 			var path string
-			var repo *git2.Repository
+			var repo *gg.Repository
 			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
 				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL.String())
