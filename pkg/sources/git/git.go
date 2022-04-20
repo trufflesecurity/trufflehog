@@ -84,7 +84,7 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
 
 	s.aCtx = aCtx
 	s.name = name
@@ -218,6 +218,10 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 	if err := cloneCmd.Run(); err != nil {
 		return "", nil, fmt.Errorf("unable to execute clone cmd: %v", err)
 	}
+	output, err := cloneCmd.CombinedOutput()
+	if err != nil {
+		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
+	}
 
 	//cloneCmd := exec.Command("date")
 	if cloneCmd.ProcessState == nil {
@@ -227,10 +231,6 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 		safeUrl, err := stripPassword(gitUrl)
 		if err != nil {
 			log.WithError(err).Errorf("failed to strip credentials from git url")
-		}
-		output, err := cloneCmd.CombinedOutput()
-		if err != nil {
-			err = errors.WrapPrefix(err, "error running 'git clone'", 0)
 		}
 		log.WithField("exit_code", cloneCmd.ProcessState.ExitCode()).WithField("repo", safeUrl).WithField("output", string(output)).Errorf("failed to clone repo")
 		return "", nil, fmt.Errorf("could not clone repo: %s", safeUrl)
@@ -394,7 +394,7 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 	return nil
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanRepo(_ context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	start := time.Now().UnixNano()
 	if err := s.ScanCommits(repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err

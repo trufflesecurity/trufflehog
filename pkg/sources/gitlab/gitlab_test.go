@@ -99,12 +99,13 @@ func TestSource_Scan(t *testing.T) {
 					return
 				}
 			}()
-			gotChunk := <-chunksCh
 			// Commits don't come in a deterministic order, so remove metadata comparison
-			gotChunk.Data = nil
-			gotChunk.SourceMetadata = nil
-			if diff := pretty.Compare(gotChunk, tt.wantChunk); diff != "" {
-				t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+			for gotChunk := range chunksCh {
+				gotChunk.Data = nil
+				gotChunk.SourceMetadata = nil
+				if diff := pretty.Compare(gotChunk, tt.wantChunk); diff != "" {
+					t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+				}
 			}
 		})
 	}
