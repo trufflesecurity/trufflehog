@@ -215,9 +215,7 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 
 	cloneURL.User = userInfo
 	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
-	if err := cloneCmd.Run(); err != nil {
-		return "", nil, fmt.Errorf("unable to execute clone cmd: %v", err)
-	}
+
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
 		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
