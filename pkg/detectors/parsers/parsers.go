@@ -1,4 +1,4 @@
-package securitytrails
+package parsers
 
 import (
 	"context"
@@ -20,16 +20,16 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"securitytrails"}) + `\b([a-zA-Z0-9]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"parsers"}) + `\b([0-9a-z]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"securitytrails", "security trails"}
+	return []string{"parsers"}
 }
 
-// FromData will find and optionally verify SecurityTrails secrets in a given set of bytes.
+// FromData will find and optionally verify Parsers secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -42,16 +42,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_SecurityTrails,
+			DetectorType: detectorspb.DetectorType_Parsers,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.securitytrails.com/v1/ping", nil)
+			payload := strings.NewReader(`{"sql": "CREATE TABLE t();SELECT 1; SELECT 1 FROM ; SELECT 2"}`)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.parsers.dev/api/v1/parse/postgresql/", payload)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("APIKEY", resMatch)
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("x-api-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

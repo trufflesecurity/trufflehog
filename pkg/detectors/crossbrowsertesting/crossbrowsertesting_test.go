@@ -1,4 +1,4 @@
-package securitytrails
+package crossbrowsertesting
 
 import (
 	"context"
@@ -13,15 +13,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestSecurityTrails_FromChunk(t *testing.T) {
+func TestCrossBrowserTesting_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SECURITYTRAILS")
-	inactiveSecret := testSecrets.MustGetField("SECURITYTRAILS_INACTIVE")
+	secret := testSecrets.MustGetField("CROSSBROWSERTESTING")
+	id := testSecrets.MustGetField("CROSSBROWSERTESTING_USER")
+	inactiveSecret := testSecrets.MustGetField("CROSSBROWSERTESTING_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -40,28 +41,12 @@ func TestSecurityTrails_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a securitytrails secret\n %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a crossbrowsertesting secret %s within crossbrowsertesting %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SecurityTrails,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, verified inline",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a securitytrails secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SecurityTrails,
+					DetectorType: detectorspb.DetectorType_CrossBrowserTesting,
 					Verified:     true,
 				},
 			},
@@ -72,12 +57,12 @@ func TestSecurityTrails_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a securitytrails secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a crossbrowsertesting secret %s within crossbrowsertesting %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SecurityTrails,
+					DetectorType: detectorspb.DetectorType_CrossBrowserTesting,
 					Verified:     false,
 				},
 			},
@@ -100,7 +85,7 @@ func TestSecurityTrails_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("SecurityTrails.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CrossBrowserTesting.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -110,7 +95,7 @@ func TestSecurityTrails_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("SecurityTrails.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("CrossBrowserTesting.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

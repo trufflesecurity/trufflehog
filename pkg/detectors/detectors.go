@@ -92,7 +92,7 @@ func CleanResults(results []Result) []Result {
 func PrefixRegex(keywords []string) string {
 	pre := `(?i)(?:`
 	middle := strings.Join(keywords, "|")
-	post := `).{0,40}`
+	post := `)(?:.|[\n\r]){0,40}`
 	return pre + middle + post
 }
 

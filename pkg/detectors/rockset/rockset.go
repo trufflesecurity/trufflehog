@@ -1,7 +1,8 @@
-package securitytrails
+package rockset
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -20,16 +21,16 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"securitytrails"}) + `\b([a-zA-Z0-9]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"rockset"}) + `\b([a-zA-Z0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"securitytrails", "security trails"}
+	return []string{"rockset"}
 }
 
-// FromData will find and optionally verify SecurityTrails secrets in a given set of bytes.
+// FromData will find and optionally verify Rockset secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -42,16 +43,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_SecurityTrails,
+			DetectorType: detectorspb.DetectorType_Rockset,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.securitytrails.com/v1/ping", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.rs2.usw2.rockset.com/v1/orgs/self/queries", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("APIKEY", resMatch)
+			req.Header.Add("Authorization", fmt.Sprintf("ApiKey %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
