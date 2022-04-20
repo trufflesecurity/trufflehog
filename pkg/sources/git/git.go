@@ -217,10 +217,6 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
 
 	//cloneCmd := exec.Command("date")
-	output, err := cloneCmd.CombinedOutput()
-	if err != nil {
-		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
-	}
 	if cloneCmd.ProcessState == nil {
 		return "", nil, errors.New("clone command exited with no output")
 	}
@@ -228,6 +224,10 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 		safeUrl, err := stripPassword(gitUrl)
 		if err != nil {
 			log.WithError(err).Errorf("failed to strip credentials from git url")
+		}
+		output, err := cloneCmd.CombinedOutput()
+		if err != nil {
+			err = errors.WrapPrefix(err, "error running 'git clone'", 0)
 		}
 		log.WithField("exit_code", cloneCmd.ProcessState.ExitCode()).WithField("repo", safeUrl).WithField("output", string(output)).Errorf("failed to clone repo")
 		return "", nil, fmt.Errorf("could not clone repo: %s", safeUrl)
@@ -243,6 +243,7 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 // CloneRepoUsingToken clones a repo using a provided token.
 func CloneRepoUsingToken(token, gitUrl, user string) (string, *git.Repository, error) {
 	userInfo := url.UserPassword(user, token)
+	fmt.Printf("userInfo: %v", userInfo)
 	return CloneRepo(userInfo, gitUrl)
 }
 
