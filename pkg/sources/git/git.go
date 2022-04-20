@@ -223,7 +223,6 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
 	}
 
-	//cloneCmd := exec.Command("date")
 	if cloneCmd.ProcessState == nil {
 		return "", nil, errors.New("clone command exited with no output")
 	}
