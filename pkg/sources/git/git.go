@@ -215,6 +215,9 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 
 	cloneURL.User = userInfo
 	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
+	if err := cloneCmd.Run(); err != nil {
+		return "", nil, fmt.Errorf("unable to execute clone cmd: %v", err)
+	}
 
 	//cloneCmd := exec.Command("date")
 	if cloneCmd.ProcessState == nil {
@@ -243,7 +246,6 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 // CloneRepoUsingToken clones a repo using a provided token.
 func CloneRepoUsingToken(token, gitUrl, user string) (string, *git.Repository, error) {
 	userInfo := url.UserPassword(user, token)
-	fmt.Printf("userInfo: %v", userInfo)
 	return CloneRepo(userInfo, gitUrl)
 }
 

@@ -92,6 +92,7 @@ func TestSource_Scan(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
+				defer close(chunksCh)
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
