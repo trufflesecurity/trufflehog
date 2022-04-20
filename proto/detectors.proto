@@ -764,7 +764,7 @@ enum DetectorType {
   KnapsackPro = 760;
   Qase = 761;
   Dareboost = 762;
-  GTMetrics = 763;
+  GTMetrix = 763;
   Holistic = 764;
   Parsers = 765;
   ScrutinizerCi = 766;
