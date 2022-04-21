@@ -819,6 +819,7 @@ enum DetectorType {
   Chartmogul = 815;
   Appointed = 816;
   Wit = 817;
+  RechargePayments = 818;
 }
 
 message Result {

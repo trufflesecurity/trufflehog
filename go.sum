@@ -447,12 +447,12 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502 h1:34icjjmqJ2HPjrSuJYEkdZ+0ItmGQAQ75cRHIiftIyE=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
-github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom1 h1:HJPy+ciKU82lFPK0cxXJ4BYvCIANCQp29zhjU2T1UXo=
-github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom1/go.mod h1:TxBuxH8eB/1la8Mc7I6j/ZZYNG/mHGpoi09N2oHx5nQ=
+github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom3 h1:Xc61NkfI7aDHd8eHa0gglK0ZVF5UF54M4u4C5tuAKcw=
+github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom3/go.mod h1:Em2rda83ePrhmaX4ZdvNjnUADRiOJirEAqln0ZtN8og=
 github.com/trufflesecurity/overseer v1.1.7-custom5 h1:xu+Fg6fkSRifUPzUCl7N8HmobJ6WGOkIApGnM7mJS6w=
 github.com/trufflesecurity/overseer v1.1.7-custom5/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
-github.com/xanzy/go-gitlab v0.60.0 h1:HaIlc14k4t9eJjAhY0Gmq2fBHgKd1MthBn3+vzDtsbA=
-github.com/xanzy/go-gitlab v0.60.0/go.mod h1:F0QEXwmqiBUxCgJm8fE9S+1veX4XC9Z4cfaAbqwk4YM=
+github.com/xanzy/go-gitlab v0.63.0 h1:a9fXpKWykUS6dowapFej/2Wjf4aOAEFC1q2ZIcz4IpI=
+github.com/xanzy/go-gitlab v0.63.0/go.mod h1:F0QEXwmqiBUxCgJm8fE9S+1veX4XC9Z4cfaAbqwk4YM=
 github.com/xanzy/ssh-agent v0.3.0 h1:wUMzuKtKilRgBAD1sUb8gOwwRr2FGoBVumcjoOACClI=
 github.com/xanzy/ssh-agent v0.3.0/go.mod h1:3s9xbODqPuuhK9JV1R321M/FlMZSBvE5aY6eAcqrDh0=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
