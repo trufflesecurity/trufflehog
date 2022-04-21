@@ -449,8 +449,8 @@ github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502 h1:34icjjmqJ2HP
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
 github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom3 h1:Xc61NkfI7aDHd8eHa0gglK0ZVF5UF54M4u4C5tuAKcw=
 github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom3/go.mod h1:Em2rda83ePrhmaX4ZdvNjnUADRiOJirEAqln0ZtN8og=
-github.com/trufflesecurity/overseer v1.1.7-custom4 h1:5ed5+2+N3ZaW7oc4n7PIjkybGHUZmdCH9iAztB/2+Cc=
-github.com/trufflesecurity/overseer v1.1.7-custom4/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
+github.com/trufflesecurity/overseer v1.1.7-custom5 h1:xu+Fg6fkSRifUPzUCl7N8HmobJ6WGOkIApGnM7mJS6w=
+github.com/trufflesecurity/overseer v1.1.7-custom5/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
 github.com/xanzy/go-gitlab v0.63.0 h1:a9fXpKWykUS6dowapFej/2Wjf4aOAEFC1q2ZIcz4IpI=
 github.com/xanzy/go-gitlab v0.63.0/go.mod h1:F0QEXwmqiBUxCgJm8fE9S+1veX4XC9Z4cfaAbqwk4YM=
 github.com/xanzy/ssh-agent v0.3.0 h1:wUMzuKtKilRgBAD1sUb8gOwwRr2FGoBVumcjoOACClI=

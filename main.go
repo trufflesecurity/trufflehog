@@ -42,6 +42,7 @@ var (
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
+	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
@@ -240,8 +241,9 @@ func run(state overseer.State) {
 		printAverageDetectorTime(e)
 	}
 
-	if foundResults {
-		os.Exit(1)
+	if foundResults && *fail {
+		logrus.Debug("exiting with code 183 because results were found")
+		os.Exit(183)
 	}
 }
 
