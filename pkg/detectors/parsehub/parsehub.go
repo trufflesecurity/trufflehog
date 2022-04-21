@@ -2,6 +2,7 @@ package parsehub
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -47,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://www.parsehub.com/api/v2/projects?api_key="+resMatch+"&offset=0&limit=20&include_options=1", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.parsehub.com/api/v2/projects?api_key=%s&limit=1", resMatch), nil)
 			if err != nil {
 				continue
 			}
