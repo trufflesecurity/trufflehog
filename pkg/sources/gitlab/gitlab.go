@@ -324,7 +324,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				}
 				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
-				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), s.user)
+				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), "oauth2")
 				defer os.RemoveAll(path)
 				if err != nil {
 					errsMut.Lock()
