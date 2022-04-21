@@ -27,7 +27,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"microsoft"} // should we instead look for webhook.office.com, or something required to be in the regex above?
+	return []string{"webhook.office.com"}
 }
 
 // FromData will find and optionally verify MicrosoftTeamsWebhook secrets in a given set of bytes.

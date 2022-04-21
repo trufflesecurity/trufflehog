@@ -94,5 +94,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return // Should we add detectors.CleanResults(results), nil ?
+	return detectors.CleanResults(results), nil
 }
