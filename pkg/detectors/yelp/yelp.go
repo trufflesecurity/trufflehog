@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"yelp"}) + `\b([0-9A-Za-z]{15}-[0-9A-Za-z]{27}-[0-9A-Za-z]{84})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"yelp"}) + `\b([a-zA-Z0-9_\\=\.\-]{128})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
