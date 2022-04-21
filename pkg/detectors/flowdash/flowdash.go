@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.flowdash.com/api/v1/workflows", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.flowdash.com/api/v1/workspace", nil)
 			if err != nil {
 				continue
 			}
