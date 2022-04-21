@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/go-errors/errors"
-	gg "github.com/go-git/go-git/v5"
+	gogit "github.com/go-git/go-git/v5"
 	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -265,13 +265,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 	wg := sync.WaitGroup{}
 	var errs []error
 	var errsMut sync.Mutex
-	errs = s.scan(ctx, chunksChan, repos, &wg, &errsMut, errs)
-	wg.Wait()
 
-	return errs
-}
-
-func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk, repos []*url.URL, wg *sync.WaitGroup, errsMut *sync.Mutex, errs []error) []error {
 	for i, u := range repos {
 		if common.IsDone(ctx) {
 			// We are returning nil instead of the scanErrors slice here because
@@ -292,7 +286,7 @@ func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk, repos
 			s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
 			var path string
-			var repo *gg.Repository
+			var repo *gogit.Repository
 			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
 				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL.String())
@@ -316,9 +310,10 @@ func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk, repos
 			}
 			log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(repos), repoURL.String())
 		}(ctx, u, i)
-		return errs
 	}
-	return nil
+	wg.Wait()
+
+	return errs
 }
 
 // Chunks emits chunks of bytes over a channel.

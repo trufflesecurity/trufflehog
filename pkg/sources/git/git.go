@@ -84,7 +84,7 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 
 	s.aCtx = aCtx
 	s.name = name
@@ -100,7 +100,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 	s.conn = &conn
 
-	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, runtime.NumCPU(),
+	if concurrency == 0 {
+		concurrency = runtime.NumCPU()
+	}
+
+	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
 		func(file, email, commit, repository, timestamp string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
