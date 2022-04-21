@@ -242,7 +242,7 @@ func run(state overseer.State) {
 	}
 
 	if foundResults && *fail {
-		logrus.Debug("exiting with code 183 because results found")
+		logrus.Debug("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
 }
