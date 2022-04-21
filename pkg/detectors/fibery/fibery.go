@@ -22,8 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"fibery"}) + `\b([0-9a-z.]{44})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"fibery", "domain"}) + `\b([0-9a-z]{5,20})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"fibery"}) + `\b([0-9a-f]{8}.[0-9a-f]{35})\b`)
+	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"fibery", "domain"}) + `\b([0-9A-Za-z]{2,40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				timeout := 10 * time.Second
 				client.Timeout = timeout
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://"+resDomainMatch+".fibery.io/api/commands", nil)
+				req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://%s.fibery.io/api/commands", resDomainMatch), nil)
 				if err != nil {
 					continue
 				}
