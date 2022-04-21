@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flowdock"}) + `\b([0-9a-z]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flowdock"}) + `\b([0-9a-f]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.flowdock.com/flows", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.flowdock.com/flows?users=false", nil)
 			if err != nil {
 				continue
 			}
