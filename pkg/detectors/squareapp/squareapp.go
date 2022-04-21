@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					res.Body.Close() // The request body is unused.
 
-					// 404 = Correct crentials. The fake access token should not be found
+					// 404 = Correct credentials. The fake access token should not be found.
 					if res.StatusCode == http.StatusNotFound {
 						s.Verified = true
 					}
