@@ -2,6 +2,7 @@ package typetalk
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -55,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://typetalk.com/oauth2/access_token?client_id="+resIdMatch+"&client_secret="+resMatch+"&grant_type=client_credentials", nil)
+				req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://typetalk.com/oauth2/access_token?client_id=%s&client_secret=%s&grant_type=client_credentials", resIdMatch, resMatch), nil)
 				if err != nil {
 					continue
 				}
