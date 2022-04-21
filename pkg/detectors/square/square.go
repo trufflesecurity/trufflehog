@@ -67,22 +67,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// unclear if this version needs to be set or matters, seems to work without, but docs want it
 			//req.Header.Add("Square-Version", "2020-08-12")
 			res, err := client.Do(req)
-			if err != nil {
-				return results, err
-			}
-			defer res.Body.Close()
+			if err == nil {
+				res.Body.Close() // The request body is unused.
 
-			// 200 means good key and has `merchants` scope - default allowed by square
-			// 401 is bad key
-			if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-				s.Verified = true
+				// 200 means good key and has `merchants` scope - default allowed by square
+				// 401 is bad key
+				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
+					s.Verified = true
+				}
 			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
+		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s)
