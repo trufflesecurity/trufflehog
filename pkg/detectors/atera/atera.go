@@ -2,7 +2,6 @@ package atera
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -53,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("Accept", "application/json")
-			req.Header.Add("X-API-KEY", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("X-API-KEY", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
