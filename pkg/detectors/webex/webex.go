@@ -2,10 +2,8 @@ package webex
 
 import (
 	"context"
-	// "fmt"
-	// "log"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,8 +19,6 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([A-Za-z0-9_-]{64})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([A-Za-z0-9_-]{65})\b`)
 )
@@ -64,39 +60,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				client := common.SaneHttpClient()
 				res, err := client.Do(req)
-				if err != nil {
-					continue
-				}
-
-				defer res.Body.Close()
-				body, err := ioutil.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-
-				var message struct {
-					Message string `json:"message"`
-				}
-				if err := json.Unmarshal(body, &message); err != nil {
-					continue
-				}
-
-				var getError = regexp.MustCompile(detectors.PrefixRegex([]string{"error"}) + `(redirect_uri_mismatch)`)
-				result := getError.FindAllStringSubmatch(message.Message, -1)
-				if len(result) > 0 {
-					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
+				if err == nil {
+					body, err := io.ReadAll(res.Body)
+					res.Body.Close()
+					if err == nil {
+						var message struct {
+							Message string `json:"message"`
+						}
+						if err := json.Unmarshal(body, &message); err == nil {
+							var getError = regexp.MustCompile(detectors.PrefixRegex([]string{"error"}) + `(redirect_uri_mismatch)`)
+							result := getError.FindAllStringSubmatch(message.Message, -1)
+							if len(result) > 0 {
+								s1.Verified = true
+							}
+						}
 					}
 				}
+			}
 
+			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+				continue
 			}
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return detectors.CleanResults(results), nil

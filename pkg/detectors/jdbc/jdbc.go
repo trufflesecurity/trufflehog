@@ -45,29 +45,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Redacted:     redact,
 		}
 
-		if verify {
-			//TODO can this be verified? Possibly. Could triage verification to other DBMS strings
-			s.Verified = false
-			// client := common.SaneHttpClient()
-			// req, err := http.NewRequestWithContext(ctx, "GET", "https://jdbcci.com/api/v2/me", nil)
-			if err != nil {
-				continue
-			}
-			// req.Header.Add("Accept", "application/json;")
-			// req.Header.Add("Jdbc-Token", token)
-			// res, err := client.Do(req)
-			// if err != nil {
-			// 	break
-			// }
-			// if res.StatusCode >= 200 && res.StatusCode < 300 {
-			// 	s.Verified = true
-			// }
-		}
+		//if verify {
+		//	// TODO: can this be verified? Possibly. Could triage verification to other DBMS strings
+		//	s.Verified = false
+		//	client := common.SaneHttpClient()
+		//	req, err := http.NewRequestWithContext(ctx, "GET", "https://jdbcci.com/api/v2/me", nil)
+		//	if err != nil {
+		//		continue
+		//	}
+		//	req.Header.Add("Accept", "application/json;")
+		//	req.Header.Add("Jdbc-Token", token)
+		//	res, err := client.Do(req)
+		//	if err == nil {
+		//		if res.StatusCode >= 200 && res.StatusCode < 300 {
+		//			s.Verified = true
+		//		}
+		//	}
+		//}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-				continue
-			}
+		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
+			continue
 		}
 
 		results = append(results, s)

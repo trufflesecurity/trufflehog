@@ -54,25 +54,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("X-Recharge-Access-Token", token)
 				res, err := client.Do(req)
-				if err != nil {
-					return results, err
-				}
+				if err == nil {
+					res.Body.Close() // The request body is unused.
 
-				defer res.Body.Close()
-
-				if res.StatusCode == http.StatusOK {
-					s.Verified = true
+					if res.StatusCode == http.StatusOK {
+						s.Verified = true
+					}
 				}
 			}
-			if !s.Verified {
-				if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-					continue
-				}
+
+			if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+				continue
 			}
 
 			results = append(results, s)
 		}
 	}
 
-	return
+	return detectors.CleanResults(results), nil
 }

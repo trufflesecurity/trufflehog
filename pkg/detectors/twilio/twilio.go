@@ -7,10 +7,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type Scanner struct{}
@@ -69,20 +68,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Accept", "*/*")
 				req.SetBasicAuth(sid, key)
 				res, err := client.Do(req)
-				if err != nil {
-					break
-				}
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s.Verified = true
+				if err == nil {
+					res.Body.Close() // The request body is unused.
+
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s.Verified = true
+					}
 				}
 			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
+		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		if len(keyMatches) > 0 {
