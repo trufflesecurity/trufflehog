@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudsmith"}) + `\b([0-9a-z]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudsmith"}) + `\b([0-9a-f]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudsmith.io/user/self/", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudsmith.io/v1/user/self/", nil)
 			if err != nil {
 				continue
 			}
