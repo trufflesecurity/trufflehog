@@ -141,7 +141,7 @@ $ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 Exit Codes:
 - 0: No errors and no results were found.
 - 1: An error was encountered. Sources may not have completed scans.
-- 183: No errors were encountered, but results were found.
+- 183: No errors were encountered, but results were found. Will only be returned if `--fail` flag is used.
 
 #### Scanning an organization
 
