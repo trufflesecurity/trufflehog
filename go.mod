@@ -2,9 +2,9 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.17
 
-replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom4
+replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
-replace github.com/zricethezav/gitleaks/v8 => github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom1
+replace github.com/zricethezav/gitleaks/v8 => github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom3
 
 require (
 	cloud.google.com/go/secretmanager v1.4.0
@@ -37,7 +37,7 @@ require (
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/xanzy/go-gitlab v0.60.0
+	github.com/xanzy/go-gitlab v0.63.0
 	github.com/zricethezav/gitleaks/v8 v8.5.2
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/net v0.0.0-20220325170049-de3da57026de

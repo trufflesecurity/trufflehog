@@ -1,8 +1,7 @@
-package microsoftteamswebhook
+package atera
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -18,19 +17,19 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClientTimeOut(5)
+	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(`(https:\/\/[a-zA-Z-0-9]+\.webhook\.office\.com\/webhookb2\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\@[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\/IncomingWebhook\/[a-zA-Z-0-9]{32}\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12})`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atera"}) + `\b([[0-9a-z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"webhook.office.com"}
+	return []string{"atera"}
 }
 
-// FromData will find and optionally verify MicrosoftTeamsWebhook secrets in a given set of bytes.
+// FromData will find and optionally verify Atera secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -43,30 +42,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
+			DetectorType: detectorspb.DetectorType_Atera,
 			Raw:          []byte(resMatch),
 		}
+
 		if verify {
-			payload := strings.NewReader(`{'text':'This is a verification message from TruffleHog. It means that there has been a live webhook credential found.'}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.atera.com/api/v3/alerts", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("Accept", "application/json")
+			req.Header.Add("X-API-KEY", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
-				body, err := io.ReadAll(res.Body)
-				res.Body.Close()
-				if err == nil {
-					if res.StatusCode >= 200 && string(body) == "1" {
-						s1.Verified = true
+				defer res.Body.Close()
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					s1.Verified = true
+				} else {
+					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						continue
 					}
 				}
 			}
-		}
-
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {
-			continue
 		}
 
 		results = append(results, s1)

@@ -75,21 +75,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", "application/json; charset=utf-8")
 			req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
 			res, err := client.Do(req)
-			if err != nil {
-				break
-			}
-			defer res.Body.Close()
-			if res.StatusCode >= 200 && res.StatusCode < 300 {
-				var userResponse userRes
-				err = json.NewDecoder(res.Body).Decode(&userResponse)
-				if err == nil {
-					s.Verified = true
+			if err == nil {
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					var userResponse userRes
+					err = json.NewDecoder(res.Body).Decode(&userResponse)
+					res.Body.Close()
+					if err == nil {
+						s.Verified = true
+					}
 				}
 			}
+		}
+
+		if !s.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s)
 	}
 
-	return
+	return detectors.CleanResults(results), nil
 }

@@ -54,22 +54,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.SetBasicAuth("anystring", match)
 			res, err := client.Do(req)
-			if err != nil {
-				break
-			}
-			defer res.Body.Close()
-			if res.StatusCode == 200 {
-				s.Verified = true
-			} else {
-				s.Verified = false
-			}
+			if err == nil {
+				res.Body.Close() // The request body is unused.
 
+				if res.StatusCode == 200 {
+					s.Verified = true
+				}
+			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
+		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s)
