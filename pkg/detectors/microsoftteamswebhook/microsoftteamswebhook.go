@@ -2,7 +2,7 @@ package microsoftteamswebhook
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -27,7 +27,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"microsoft"}
+	return []string{"webhook.office.com"}
 }
 
 // FromData will find and optionally verify MicrosoftTeamsWebhook secrets in a given set of bytes.
@@ -54,24 +54,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
-			if err != nil {
-				continue
-			}
-			defer res.Body.Close()
-
-			body, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				continue
-			}
-
-			if res.StatusCode >= 200 && string(body) == "1" {
-				s1.Verified = true
-			} else {
-				//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-				if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {
-					continue
+			if err == nil {
+				body, err := io.ReadAll(res.Body)
+				res.Body.Close()
+				if err == nil {
+					if res.StatusCode >= 200 && string(body) == "1" {
+						s1.Verified = true
+					}
 				}
 			}
+		}
+
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {
+			continue
 		}
 
 		results = append(results, s1)

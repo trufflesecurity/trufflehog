@@ -268,7 +268,15 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 
 	// Errors returned on errChan aren't blocking, so just ignore them.
 	errChan := make(chan error)
-	fileChan, err := glgo.GitLog(path, scanOptions.HeadHash, errChan)
+	var gitLogArgs []string
+	if scanOptions.HeadHash != "" {
+		gitLogArgs = append(gitLogArgs, scanOptions.HeadHash)
+	}
+	logOpts := glgo.LogOpts{
+		Args:           gitLogArgs,
+		DisableSafeDir: true,
+	}
+	fileChan, err := glgo.GitLog(path, logOpts, errChan)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not open repo path", 0)
 	}
