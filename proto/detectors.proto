@@ -848,6 +848,11 @@ enum DetectorType {
   Codeclimate = 844;
   Codemagic = 845;
   Vbout = 846;
+  Nightfall = 847;
+  FlightLabs = 848;
+  SpeechTextAI = 849;
+  PollsAPI = 850;
+  SimFin = 851;
 }
 
 message Result {
