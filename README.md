@@ -8,9 +8,8 @@
 
 
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog)
-[![Docker Hub Build Status](https://img.shields.io/docker/cloud/build/trufflesecurity/trufflehog.svg)](https://hub.docker.com/r/trufflesecurity/trufflehog/)
-![GitHub](https://img.shields.io/github/license/trufflesecurity/trufflehog)
+[![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
+![License](https://img.shields.io/badge/license-AGPL--3.0-green)
 
 ---
 
@@ -80,9 +79,12 @@ Here is an example of a [project that does it](https://github.com/Yelp/dumb-init
 
 Help with setting up this packaging would be appreciated!
 
-### 5. Brew (help wanted)
+### 5. Brew
 
-We'd love to distribute via brew and could use your help.
+```bash
+brew tap trufflesecurity/trufflehog
+brew install trufflehog
+```
 
 ## Usage
 
@@ -136,6 +138,10 @@ For example, to scan a  `git` repository, start with
 $ trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
 
+Exit Codes:
+- 0: No errors and no results were found.
+- 1: An error was encountered. Sources may not have completed scans.
+- 183: No errors were encountered, but results were found. Will only be returned if `--fail` flag is used.
 
 #### Scanning an organization
 
@@ -145,6 +151,41 @@ Try scanning an entire GitHub organization with the following:
 docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
+### TruffleHog OSS Github Action
+
+```- name: TruffleHog OSS
+  uses: trufflesecurity/trufflehog@v3.3.3
+  with:
+    # Repository path
+    path: 
+    # Start scanning from here (usually main branch).
+    base: 
+    # Scan commits until here (usually dev branch).
+    head: # optional
+```
+
+The TruffleHog OSS Github Action can be used to scan a range of commits for leaked credentials. The action will fail if
+any results are found.
+
+For example, to scan the contents of pull requests you could use the following workflow:
+```yaml
+name: Leaked Secrets Scan
+on: [pull_request]
+jobs:
+  TruffleHog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@v3.3.4
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+```
 
 ## Contributors
 

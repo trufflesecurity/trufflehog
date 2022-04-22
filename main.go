@@ -32,8 +32,8 @@ import (
 var (
 	cli            = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
 	cmd            string
-	debug          = cli.Flag("debug", "Run in debug mode").Bool()
-	versionFlag    = cli.Flag("version", "Prints trufflehog version.").Bool()
+	debug          = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace          = cli.Flag("trace", "Run in trace mode.").Bool()
 	jsonOut        = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy     = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	concurrency    = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
@@ -42,6 +42,7 @@ var (
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
+	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
@@ -91,15 +92,20 @@ func init() {
 		}
 	}
 
+	cli.Version("trufflehog " + version.BuildVersion)
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
 	if *jsonOut {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
-	if *debug {
+	switch {
+	case *trace:
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.Debugf("running version %s", version.BuildVersion)
+	case *debug:
 		logrus.SetLevel(logrus.DebugLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
-	} else {
+	default:
 		logrus.SetLevel(logrus.InfoLevel)
 	}
 }
@@ -127,11 +133,8 @@ func main() {
 }
 
 func run(state overseer.State) {
-	if *debug || *versionFlag {
+	if *debug {
 		fmt.Println("trufflehog " + version.BuildVersion)
-		if *versionFlag {
-			return
-		}
 	}
 
 	// When setting a base commit, chunks must be scanned in order.
@@ -238,8 +241,9 @@ func run(state overseer.State) {
 		printAverageDetectorTime(e)
 	}
 
-	if foundResults {
-		os.Exit(1)
+	if foundResults && *fail {
+		logrus.Debug("exiting with code 183 because results were found")
+		os.Exit(183)
 	}
 }
 

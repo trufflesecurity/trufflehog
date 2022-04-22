@@ -92,18 +92,25 @@ func TestSource_Scan(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
+				defer close(chunksCh)
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 			}()
-			gotChunk := <-chunksCh
+			var chunkCnt int
 			// Commits don't come in a deterministic order, so remove metadata comparison
-			gotChunk.Data = nil
-			gotChunk.SourceMetadata = nil
-			if diff := pretty.Compare(gotChunk, tt.wantChunk); diff != "" {
-				t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+			for gotChunk := range chunksCh {
+				chunkCnt++
+				gotChunk.Data = nil
+				gotChunk.SourceMetadata = nil
+				if diff := pretty.Compare(gotChunk, tt.wantChunk); diff != "" {
+					t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+				}
+			}
+			if chunkCnt < 1 {
+				t.Errorf("0 chunks scanned.")
 			}
 		})
 	}

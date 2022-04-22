@@ -2,14 +2,11 @@ package elasticemail
 
 import (
 	"context"
-	// "log"
+	"encoding/json"
+	"io"
+	"net/http"
 	"regexp"
 	"strings"
-
-	// "fmt"
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -56,42 +53,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			res, err := client.Do(req)
-			if err != nil {
-				continue
-			}
-			defer res.Body.Close()
-			var byteData []byte
-			_, err = res.Body.Read(byteData)
-			if err != nil {
-				continue
-			}
-
-			defer res.Body.Close()
-			data, readErr := ioutil.ReadAll(res.Body)
-			if readErr != nil {
-				continue
-			}
-			var ResVar struct {
-				Success bool `json:"success"`
-			}
-			if err := json.Unmarshal(data, &ResVar); err != nil {
-				continue
-			}
-			if ResVar.Success {
-				s1.Verified = true
-			} else {
-
-				if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-					continue
+			if err == nil {
+				data, readErr := io.ReadAll(res.Body)
+				res.Body.Close()
+				if readErr == nil {
+					var ResVar struct {
+						Success bool `json:"success"`
+					}
+					if err := json.Unmarshal(data, &ResVar); err == nil {
+						if ResVar.Success {
+							s1.Verified = true
+						}
+					}
 				}
 			}
+		}
+
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s1)
 	}
 	return detectors.CleanResults(results), nil
-}
-func prettyPrint(i interface{}) string {
-	s, _ := json.MarshalIndent(i, "", "\t")
-	return string(s)
 }

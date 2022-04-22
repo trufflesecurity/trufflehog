@@ -100,7 +100,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 	s.conn = &conn
 
-	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, runtime.NumCPU(),
+	if concurrency == 0 {
+		concurrency = runtime.NumCPU()
+	}
+
+	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
 		func(file, email, commit, repository, timestamp string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
@@ -216,11 +220,11 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 	cloneURL.User = userInfo
 	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
 
-	//cloneCmd := exec.Command("date")
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
 		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
 	}
+
 	if cloneCmd.ProcessState == nil {
 		return "", nil, errors.New("clone command exited with no output")
 	}
@@ -268,25 +272,46 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 
 	// Errors returned on errChan aren't blocking, so just ignore them.
 	errChan := make(chan error)
-	fileChan, err := glgo.GitLog(path, scanOptions.HeadHash, errChan)
+	var gitLogArgs []string
+	if scanOptions.HeadHash != "" {
+		gitLogArgs = append(gitLogArgs, scanOptions.HeadHash)
+	}
+	logOpts := glgo.LogOpts{
+		Args:           gitLogArgs,
+		DisableSafeDir: true,
+	}
+	fileChan, err := glgo.GitLog(path, logOpts, errChan)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not open repo path", 0)
+	}
+	// parser can return nil chan and nil error
+	if fileChan == nil {
+		return errors.New("nothing to scan")
 	}
 
 	// get the URL metadata for reporting (may be empty)
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	var depth int64
+	var reachedBase = false
 	for file := range fileChan {
+		if file == nil || file.PatchHeader == nil {
+			log.Debugf("file missing patch header, skipping")
+			continue
+		}
+		log.WithField("commit", file.PatchHeader.SHA).WithField("file", file.NewName).Trace("Scanning file from git")
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			log.Debugf("reached max depth")
 			break
 		}
 		depth++
+		if reachedBase && file.PatchHeader.SHA != scanOptions.BaseHash {
+			break
+		}
 		if len(scanOptions.BaseHash) > 0 {
 			if file.PatchHeader.SHA == scanOptions.BaseHash {
-				log.Debugf("reached base commit")
-				break
+				log.Debugf("Reached base commit. Finishing scanning files.")
+				reachedBase = true
 			}
 		}
 		if !scanOptions.Filter.Pass(file.NewName) {
@@ -311,9 +336,10 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			newLineNumber := frag.NewPosition
 			for _, line := range frag.Lines {
 				if line.Op == gitdiff.OpAdd {
-					newLines.WriteString(strings.ReplaceAll(line.String(), "\n", " ") + "\n")
+					newLines.WriteString(line.Line)
 				}
 			}
+			log.WithField("fragment", newLines.String()).Trace("detecting fragment")
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, newLineNumber)
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
@@ -377,7 +403,7 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 	return nil
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanRepo(_ context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	start := time.Now().UnixNano()
 	if err := s.ScanCommits(repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err

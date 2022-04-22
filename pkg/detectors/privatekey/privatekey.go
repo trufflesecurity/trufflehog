@@ -9,10 +9,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type Scanner struct {
@@ -23,6 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	// TODO: add base64 encoded key support
 	client = common.RetryableHttpClient()
 	keyPat = regexp.MustCompile(`(?i)-----\s*?BEGIN[ A-Z0-9_-]*?PRIVATE KEY\s*?-----[\s\S]*?----\s*?END[ A-Z0-9_-]*? PRIVATE KEY\s*?-----`)
 )
@@ -61,13 +61,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 
 		if verify {
 			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
-			if err != nil {
+			if err == nil {
+				secret.StructuredData = data
+				if data != nil {
+					secret.Verified = true
+				}
+			} else {
 				log.Warn(err)
-				return nil, err
-			}
-			secret.StructuredData = data
-			if data != nil {
-				secret.Verified = true
 			}
 		}
 
