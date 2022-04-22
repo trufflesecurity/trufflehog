@@ -324,7 +324,13 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				}
 				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
-				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), s.user)
+				// If a username is not provided we need to use a default one in order to clone a private repo.
+				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
+				user := s.user
+				if user == "" {
+					user = "placeholder"
+				}
+				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), user)
 				defer os.RemoveAll(path)
 				if err != nil {
 					errsMut.Lock()
