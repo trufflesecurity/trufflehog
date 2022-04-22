@@ -820,6 +820,21 @@ enum DetectorType {
   Appointed = 816;
   Wit = 817;
   RechargePayments = 818;
+  Bulksms = 819;
+  Databox = 820;
+  Onesignal = 821;
+  Rentman = 822;
+  Parseur = 823;
+  Docparser = 824;
+  Formsite = 825;
+  Tickettailor = 826;
+  Lemlist = 827;
+  Prodpad = 828;
+  Formstack = 829;
+  Codeclimate = 830;
+  Codemagic = 831;
+  Vbout = 832;
+
 }
 
 message Result {
