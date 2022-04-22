@@ -820,6 +820,20 @@ enum DetectorType {
   Appointed = 816;
   Wit = 817;
   RechargePayments = 818;
+  Diggernaut = 819;
+  MonkeyLearn = 820;
+  Duply = 821;
+  Postbacks = 822;
+  Collect2 = 823;
+  ZenRows = 824;
+  Zipcodebase = 825;
+  Tefter = 826;
+  Twist = 827;
+  BraintreePayments = 828;
+  CloudConvert = 829;
+  Grafana = 830;
+  ConvertApi = 831;
+  Transferwise = 832;
 }
 
 message Result {
