@@ -834,6 +834,20 @@ enum DetectorType {
   Grafana = 830;
   ConvertApi = 831;
   Transferwise = 832;
+  Bulksms = 833;
+  Databox = 834;
+  Onesignal = 835;
+  Rentman = 836;
+  Parseur = 837;
+  Docparser = 838;
+  Formsite = 839;
+  Tickettailor = 840;
+  Lemlist = 841;
+  Prodpad = 842;
+  Formstack = 843;
+  Codeclimate = 844;
+  Codemagic = 845;
+  Vbout = 846;
 }
 
 message Result {
