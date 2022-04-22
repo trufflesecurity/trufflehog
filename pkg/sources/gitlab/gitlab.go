@@ -210,7 +210,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	for _, group := range groups {
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
 			OrderBy:          gitlab.String("last_activity_at"),
-			IncludeSubgroups: gitlab.Bool(true),
+			IncludeSubGroups: gitlab.Bool(true),
 		}
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
