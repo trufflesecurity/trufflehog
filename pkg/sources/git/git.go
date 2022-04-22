@@ -100,7 +100,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 	s.conn = &conn
 
-	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, runtime.NumCPU(),
+	if concurrency == 0 {
+		concurrency = runtime.NumCPU()
+	}
+
+	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
 		func(file, email, commit, repository, timestamp string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
@@ -216,11 +220,11 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 	cloneURL.User = userInfo
 	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
 
-	//cloneCmd := exec.Command("date")
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
 		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
 	}
+
 	if cloneCmd.ProcessState == nil {
 		return "", nil, errors.New("clone command exited with no output")
 	}
@@ -399,7 +403,7 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 	return nil
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanRepo(_ context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	start := time.Now().UnixNano()
 	if err := s.ScanCommits(repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
