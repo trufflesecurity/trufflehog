@@ -2,7 +2,6 @@ package stormboard
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
