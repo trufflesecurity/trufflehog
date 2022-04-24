@@ -377,7 +377,7 @@ func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
 	if err != nil {
 		return false
 	}
-	if resp.StatusCode <= 400 {
+	if resp.StatusCode != 200 {
 		return false
 	}
 	if user != nil {
