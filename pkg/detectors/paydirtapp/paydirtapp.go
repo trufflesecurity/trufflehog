@@ -1,4 +1,4 @@
-package paydirtyapp
+package paydirtapp
 
 import (
 	"context"
@@ -20,16 +20,16 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"paydirtyapp"}) + `\b([a-z0-9]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"paydirtapp"}) + `\b([a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"paydirtyapp"}
+	return []string{"paydirtapp"}
 }
 
-// FromData will find and optionally verify Paydirtyapp secrets in a given set of bytes.
+// FromData will find and optionally verify paydirtapp secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -42,7 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Paydirtyapp,
+			DetectorType: detectorspb.DetectorType_Paydirtapp,
 			Raw:          []byte(resMatch),
 		}
 

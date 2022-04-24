@@ -794,7 +794,7 @@ enum DetectorType {
   Woopra = 790;
   Paperform =791;
   Gumroad = 792;
-  Paydirtyapp = 793;
+  Paydirtapp = 793;
   Detectify = 794;
   Statuscake = 795;
   Jumpseller = 796;
