@@ -1,4 +1,4 @@
-package paydirtyapp
+package paydirtapp
 
 import (
 	"context"
@@ -16,12 +16,12 @@ import (
 func TestPaydirtyapp_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PAYDIRTYAPP")
-	inactiveSecret := testSecrets.MustGetField("PAYDIRTYAPP_INACTIVE")
+	secret := testSecrets.MustGetField("PAYDIRTAPP")
+	inactiveSecret := testSecrets.MustGetField("PAYDIRTAPP_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -40,12 +40,12 @@ func TestPaydirtyapp_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a paydirtyapp secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a paydirtapp secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Paydirtyapp,
+					DetectorType: detectorspb.DetectorType_Paydirtapp,
 					Verified:     true,
 				},
 			},
@@ -56,12 +56,12 @@ func TestPaydirtyapp_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a paydirtyapp secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a paydirtapp secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Paydirtyapp,
+					DetectorType: detectorspb.DetectorType_Paydirtapp,
 					Verified:     false,
 				},
 			},
