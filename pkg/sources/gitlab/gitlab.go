@@ -291,7 +291,13 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			if s.authMethod == "UNAUTHENTICATED" {
 				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL.String())
 			} else {
-				path, repo, err = git.CloneRepoUsingToken(s.token, repoURL.String(), s.user)
+				// If a username is not provided we need to use a default one in order to clone a private repo.
+				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
+				user := s.user
+				if user == "" {
+					user = "placeholder"
+				}
+				path, repo, err = git.CloneRepoUsingToken(s.token, repoURL.String(), user)
 			}
 			defer os.RemoveAll(path)
 			if err != nil {
@@ -371,7 +377,7 @@ func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
 	if err != nil {
 		return false
 	}
-	if resp.StatusCode <= 400 {
+	if resp.StatusCode != 200 {
 		return false
 	}
 	if user != nil {

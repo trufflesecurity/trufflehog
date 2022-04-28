@@ -15,7 +15,7 @@ import (
 func TestGitHub_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -123,7 +123,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(unverifiedGhpLong),
+				data:   []byte(fmt.Sprintf("You can find a github secret %s within", unverifiedGhpLong)),
 				verify: true,
 			},
 			want: []detectors.Result{
