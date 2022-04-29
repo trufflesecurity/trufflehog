@@ -167,9 +167,9 @@ func run(state overseer.State) {
 	}
 
 	var repoPath string
+	var remote bool
 	switch cmd {
 	case gitScan.FullCommand():
-		var remote bool
 		repoPath, remote, err = git.PrepareRepo(*gitScanURI)
 		if err != nil || repoPath == "" {
 			logrus.WithError(err).Fatal("error preparing git repo for scanning")
@@ -219,12 +219,20 @@ func run(state overseer.State) {
 
 		switch {
 		case *jsonLegacy:
+			repoPath, remote, err = git.PrepareRepo(r.SourceMetadata.GetGithub().Repository)
+			if err != nil || repoPath == "" {
+				logrus.WithError(err).Fatal("error preparing git repo for scanning")
+			}
 			legacy := output.ConvertToLegacyJSON(&r, repoPath)
 			out, err := json.Marshal(legacy)
 			if err != nil {
 				logrus.WithError(err).Fatal("could not marshal result")
 			}
 			fmt.Println(string(out))
+
+			if remote {
+				os.RemoveAll(repoPath)
+			}
 		case *jsonOut:
 			out, err := json.Marshal(r)
 			if err != nil {
