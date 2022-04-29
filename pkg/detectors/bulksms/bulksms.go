@@ -23,7 +23,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([a-zA-Z0-9*]{29})\b`)
-	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksmsId"}) + `\b([A-Z0-9-]{37})\b`)
+	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([A-Z0-9-]{37})\b`)
 
 )
 

@@ -42,7 +42,7 @@ func TestBulksms_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a bulksms secret %s within bulksmsId %s", secret,token)),
+				data:   []byte(fmt.Sprintf("You can find a bulksms secret %s within bulksms %s", secret,token)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -58,7 +58,7 @@ func TestBulksms_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a bulksms secret %s within but bulksmsId %s not valid", inactiveSecret,token)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a bulksms secret %s within bulksms but %s not valid", inactiveSecret,token)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
