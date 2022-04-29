@@ -2,6 +2,7 @@ package zulipchat
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -22,7 +23,7 @@ var (
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + `\b([0-9a-zA-Z]{32})\b`)
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat domain"}) + `\b([0-9a-z]{6,20})\b`)
+	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat", "domain"}) + `\b([0-9a-z]{2,20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -65,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomainMatch+".zulipchat.com/api/v1/users", nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.zulipchat.com/api/v1/users", resDomainMatch), nil)
 					if err != nil {
 						continue
 					}
