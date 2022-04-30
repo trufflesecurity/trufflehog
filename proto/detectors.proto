@@ -853,6 +853,9 @@ enum DetectorType {
   SpeechTextAI = 849;
   PollsAPI = 850;
   SimFin = 851;
+  Api2Convert = 852;
+  Convert = 853;
+  PDFmyURL = 854;
 }
 
 message Result {
