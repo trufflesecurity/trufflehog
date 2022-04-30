@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(`(https:\/\/hooks.zapier.com\/hooks\/catch\/[A-Za-z0-9\/]{16})`)
+	keyPat = regexp.MustCompile(`(https:\/\/hooks\.zapier\.com\/hooks\/catch\/[A-Za-z0-9\/]{16})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
