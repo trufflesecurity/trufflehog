@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	urlPat = regexp.MustCompile(`\b([0-9a-z-]{1,}.freshdesk.com)\b`)
+	urlPat = regexp.MustCompile(`\b([0-9a-z-]{1,}\.freshdesk\.com)\b`)
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshdesk"}) + `\b([0-9A-Za-z]{20})\b`)
 )
 
