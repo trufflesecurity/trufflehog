@@ -22,7 +22,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"invoiceocean"}) + `\b([0-9A-Za-z]{20})\b`)
-	urlPat = regexp.MustCompile(`\b([0-9a-z]{1,}.invoiceocean.com)\b`)
+	urlPat = regexp.MustCompile(`\b([0-9a-z]{1,}\.invoiceocean\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
