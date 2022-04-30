@@ -54,7 +54,7 @@ type Source struct {
 
 // Ensure the Source satisfies the interface at compile time
 var _ sources.Source = (*Source)(nil)
-var endsWithGithub = regexp.MustCompile(`github.com/?$`)
+var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
