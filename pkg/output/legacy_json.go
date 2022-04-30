@@ -32,7 +32,7 @@ func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) *Lega
 	// output format.
 	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		logrus.WithError(err).Fatalf("could open repo: %s", repoPath)
+		logrus.WithError(err).Fatalf("could not open repo: %s", repoPath)
 	}
 
 	fileName := source.GetFile()
