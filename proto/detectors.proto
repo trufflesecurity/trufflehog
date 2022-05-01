@@ -853,6 +853,27 @@ enum DetectorType {
   SpeechTextAI = 849;
   PollsAPI = 850;
   SimFin = 851;
+  Scalr = 852;
+  Kanbantool = 853;
+  Brightlocal = 854;
+  Hotwire = 855;
+  Instabot = 856;
+  Timekit = 857;
+  Interseller = 858;
+  Mojohelpdesk = 859;
+  Createsend = 860;
+  Getresponse = 861;
+  Dynadot = 862;
+  Demio = 863;
+  Tokeet = 864;
+  Myexperiment = 865;
+  Copyscape = 866;
+  Besnappy = 867;
+  Salesmate = 868;
+  Heatmapapi = 869;
+  Websitepulse = 870;
+  Uclassify = 871;
+
 }
 
 message Result {
