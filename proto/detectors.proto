@@ -873,7 +873,6 @@ enum DetectorType {
   Heatmapapi = 869;
   Websitepulse = 870;
   Uclassify = 871;
-
 }
 
 message Result {
