@@ -484,7 +484,7 @@ func PrepareRepo(uriString string) (string, bool, error) {
 	switch uri.Scheme {
 	case "file":
 		path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
-	case "https":
+	case "http", "https":
 		remotePath := fmt.Sprintf("%s://%s%s", uri.Scheme, uri.Host, uri.Path)
 		remote = true
 		switch {
