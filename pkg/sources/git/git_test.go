@@ -410,25 +410,25 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 func TestPrepareRepo(t *testing.T) {
 	tests := []struct {
 		uri    string
-		path   string
+		path   bool
 		remote bool
 		err    error
 	}{
 		{
 			uri:    "https://github.com/dustin-decker/secretsandstuff.git",
-			path:   "/var/folders/1m/m4kl5q2102bfr4k4566nmf800000gn/T/trufflehog2276311773",
+			path:   true,
 			remote: true,
 			err:    nil,
 		},
 		{
 			uri:    "file:///path/to/file.json",
-			path:   "/var/folders/1m/m4kl5q2102bfr4k4566nmf800000gn/T/trufflehog2276311773",
+			path:   true,
 			remote: false,
 			err:    nil,
 		},
 		{
 			uri:    "no bueno",
-			path:   "",
+			path:   false,
 			remote: false,
 			err:    fmt.Errorf("unsupported Git URI: no bueno"),
 		},
@@ -436,7 +436,13 @@ func TestPrepareRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		repo, b, err := PrepareRepo(tt.uri)
-		if repo != tt.path && b != tt.remote && err != tt.err {
+		var repoLen bool
+		if len(repo) > 0 {
+			repoLen = true
+		} else {
+			repoLen = false
+		}
+		if repoLen != tt.path || b != tt.remote {
 			t.Errorf("PrepareRepo(%v) got: %v, %v, %v want: %v, %v, %v", tt.uri, repo, b, err, tt.path, tt.remote, tt.err)
 		}
 	}
