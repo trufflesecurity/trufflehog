@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"io"
 	"net"
 	"runtime"
@@ -81,7 +82,7 @@ func (s *Source) InjectConnection(conn *sourcespb.Syslog) {
 	s.conn = conn
 }
 
-// Init returns an initialized GitHub source.
+// Init returns an initialized Syslog source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 
 	s.aCtx = aCtx
@@ -155,54 +156,26 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		defer lis.Close()
 
-		for {
-			conn, err := lis.Accept()
-			if err != nil {
-				logrus.WithError(err).Debug("failed to accept TLS connection")
-				continue
-			}
-			go s.monitorConnection(conn, chunksChan)
-		}
+		return s.acceptTCPConnections(ctx, lis, chunksChan)
 	case s.conn.Protocol == "tcp":
 		lis, err := net.Listen(s.conn.Protocol, s.conn.ListenAddress)
 		if err != nil {
 			return errors.WrapPrefix(err, "error creating TCP listener", 0)
 		}
 		defer lis.Close()
-		for {
-			conn, err := lis.Accept()
-			if err != nil {
-				logrus.WithError(err).Debug("failed to accept TCP connection")
-				continue
-			}
-			go s.monitorConnection(conn, chunksChan)
-		}
+
+		return s.acceptTCPConnections(ctx, lis, chunksChan)
 	case s.conn.Protocol == "udp":
 		lis, err := net.ListenPacket(s.conn.Protocol, s.conn.ListenAddress)
 		if err != nil {
 			return errors.WrapPrefix(err, "error creating UDP listener", 0)
 		}
+		lis.SetDeadline(time.Now().Add(time.Second))
 		defer lis.Close()
-		for {
-			input := make([]byte, 65535)
-			_, remote, err := lis.ReadFrom(input)
-			if err != nil {
-				logrus.WithError(err).Debug("could not read UDP packet")
-				continue
-			}
-			metadata, err := s.parseSyslogMetadata(input, remote.String())
-			if err != nil {
-				logrus.WithError(err).Debug("failed to parse metadata")
-			}
-			chunksChan <- &sources.Chunk{
-				SourceName:     s.syslog.sourceName,
-				SourceID:       s.syslog.sourceID,
-				SourceType:     s.syslog.sourceType,
-				SourceMetadata: metadata,
-				Data:           input,
-				Verify:         s.verify,
-			}
-		}
+
+		return s.acceptUDPConnections(ctx, lis, chunksChan)
+	default:
+		return fmt.Errorf("unknown connection type")
 	}
 
 	return nil
@@ -230,8 +203,11 @@ func (s *Source) parseSyslogMetadata(input []byte, remote string) (*source_metad
 	return metadata, nil
 }
 
-func (s *Source) monitorConnection(conn net.Conn, chunksChan chan *sources.Chunk) {
+func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksChan chan *sources.Chunk) {
 	for {
+		if common.IsDone(ctx) {
+			return
+		}
 		conn.SetDeadline(time.Now().Add(time.Second))
 		input := make([]byte, 8096)
 		remote := conn.RemoteAddr()
@@ -240,11 +216,54 @@ func (s *Source) monitorConnection(conn net.Conn, chunksChan chan *sources.Chunk
 			if errors.Is(err, io.EOF) {
 				return
 			}
+			continue
 		}
 		logrus.Trace(string(input))
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
 			logrus.WithError(err).Debug("failed to generate metadata")
+		}
+		chunksChan <- &sources.Chunk{
+			SourceName:     s.syslog.sourceName,
+			SourceID:       s.syslog.sourceID,
+			SourceType:     s.syslog.sourceType,
+			SourceMetadata: metadata,
+			Data:           input,
+			Verify:         s.verify,
+		}
+	}
+}
+
+func (s *Source) acceptTCPConnections(ctx context.Context, netListener net.Listener, chunksChan chan *sources.Chunk) error {
+	for {
+		if common.IsDone(ctx) {
+			return nil
+		}
+		conn, err := netListener.Accept()
+		if err != nil {
+			logrus.WithError(err).Debug("failed to accept TCP connection")
+			continue
+		}
+		go s.monitorConnection(ctx, conn, chunksChan)
+	}
+}
+
+func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.PacketConn, chunksChan chan *sources.Chunk) error {
+	for {
+		if common.IsDone(ctx) {
+			return nil
+		}
+		input := make([]byte, 65535)
+		_, remote, err := netListener.ReadFrom(input)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			continue
+		}
+		metadata, err := s.parseSyslogMetadata(input, remote.String())
+		if err != nil {
+			logrus.WithError(err).Debug("failed to parse metadata")
 		}
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
