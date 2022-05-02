@@ -421,6 +421,12 @@ func TestPrepareRepo(t *testing.T) {
 			err:    nil,
 		},
 		{
+			uri:    "http://github.com/dustin-decker/secretsandstuff.git",
+			path:   true,
+			remote: true,
+			err:    nil,
+		},
+		{
 			uri:    "file:///path/to/file.json",
 			path:   true,
 			remote: false,
