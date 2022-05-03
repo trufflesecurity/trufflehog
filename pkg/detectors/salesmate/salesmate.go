@@ -59,6 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
+				
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("sessionToken", fmt.Sprintf("%s", resMatch))
 				res, err := client.Do(req)
