@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 
@@ -112,6 +113,14 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 	s.conn = &conn
 
+	s.repos = s.conn.Repositories
+	s.orgs = s.conn.Organizations
+
+	// Head or base should only be used with incoming webhooks
+	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
+		return fmt.Errorf("cannot specify head or base with multiple repositories")
+	}
+
 	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
 		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
@@ -132,173 +141,192 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	return nil
 }
 
+func (s *Source) enumerateUnauthenticated(ctx context.Context) *github.Client {
+	apiClient := github.NewClient(s.httpClient)
+	if len(s.orgs) > 30 {
+		log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
+	}
+
+	for _, org := range s.orgs {
+		errOrg := s.addReposByOrg(ctx, apiClient, org)
+		errUser := s.addReposByUser(ctx, apiClient, org)
+		if errOrg != nil && errUser != nil {
+			log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
+		}
+	}
+	return apiClient
+}
+
+func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token string) (*github.Client, error) {
+	// needed for clones
+	s.token = token
+
+	// needed to list repos
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	tc := oauth2.NewClient(context.TODO(), ts)
+
+	var err error
+	// If we're using public github, make a regular client.
+	// Otherwise make an enterprise client
+	var apiClient *github.Client
+	if apiEndpoint == "https://api.github.com" {
+		apiClient = github.NewClient(tc)
+	} else {
+		apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, tc)
+		if err != nil {
+			return nil, errors.New(err)
+		}
+	}
+
+	// TODO: this should support scanning users too
+
+	specificScope := false
+
+	if len(s.repos) > 0 {
+		specificScope = true
+	}
+
+	if len(s.orgs) > 0 {
+		specificScope = true
+		for _, org := range s.orgs {
+			errOrg := s.addReposByOrg(ctx, apiClient, org)
+			errUser := s.addReposByUser(ctx, apiClient, org)
+			if errOrg != nil || errUser != nil {
+				log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
+			}
+		}
+	}
+
+	user, _, err := apiClient.Users.Get(context.TODO(), "")
+	if err != nil {
+		return nil, errors.New(err)
+	}
+
+	// If no scope was provided, enumerate them
+	if !specificScope {
+		s.addReposByUser(ctx, apiClient, user.GetLogin())
+		// Scan for orgs is default with a token. GitHub App enumerates the repositories
+		// that were assigned to it in GitHub App settings.
+		s.addOrgsByUser(ctx, apiClient, user.GetLogin())
+		for _, org := range s.orgs {
+			s.addReposByOrg(ctx, apiClient, org)
+		}
+	}
+
+	s.addGistsByUser(ctx, apiClient, user.GetLogin())
+	for _, org := range s.orgs {
+		// TODO: Test it actually works to list org gists like this.
+		s.addGistsByUser(ctx, apiClient, org)
+	}
+	return apiClient, nil
+}
+
+func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp) (apiClient, installationClient *github.Client, err error) {
+	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
+	if err != nil {
+		return nil, nil, errors.New(err)
+	}
+
+	appID, err := strconv.ParseInt(app.AppId, 10, 64)
+	if err != nil {
+		return nil, nil, errors.New(err)
+	}
+
+	// This client is used for most APIs
+	itr, err := ghinstallation.New(
+		common.SaneHttpClient().Transport,
+		appID,
+		installationID,
+		[]byte(app.PrivateKey))
+	if err != nil {
+		return nil, nil, errors.New(err)
+	}
+	itr.BaseURL = apiEndpoint
+	apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: itr})
+	if err != nil {
+		return nil, nil, errors.New(err)
+	}
+
+	// This client is required to create installation tokens for cloning.. Otherwise the required JWT is not in the
+	// request for the token :/
+	appItr, err := ghinstallation.NewAppsTransport(
+		common.SaneHttpClient().Transport,
+		appID,
+		[]byte(app.PrivateKey))
+	if err != nil {
+		return nil, nil, errors.New(err)
+	}
+	appItr.BaseURL = apiEndpoint
+	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: appItr})
+	if err != nil {
+		return nil, nil, errors.New(err)
+	}
+
+	// If no repos were provided, enumerate them
+	if len(s.repos) == 0 {
+		err = s.addReposByApp(ctx, apiClient)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// check if we need to find user repos
+		if s.conn.ScanUsers {
+			err := s.addMembersByApp(ctx, installationClient, apiClient)
+			if err != nil {
+				return nil, nil, err
+			}
+			log.Infof("Scanning repos from %v organization members.", len(s.members))
+			for _, member := range s.members {
+				s.addGistsByUser(ctx, apiClient, member)
+				s.addReposByUser(ctx, apiClient, member)
+			}
+		}
+	}
+
+	return apiClient, installationClient, nil
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	apiEndpoint := s.conn.Endpoint
-	if len(s.conn.Endpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
+	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = "https://api.github.com"
 	}
 
-	var installationClient *github.Client
-	s.repos = s.conn.Repositories
-	s.orgs = s.conn.Organizations
+	var apiClient, installationClient *github.Client
 
-	// Head or base should only be used with incoming webhooks
-	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
-		return fmt.Errorf("cannot specify head or base with multiple repositories")
-	}
-
-	var apiClient *github.Client
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
-		apiClient = github.NewClient(s.httpClient)
-		if len(s.orgs) > 30 {
-			log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
-		}
-
-		if len(s.orgs) > 0 {
-			for _, org := range s.orgs {
-				errOrg := s.addReposByOrg(ctx, apiClient, org)
-				errUser := s.addReposByUser(ctx, apiClient, org)
-				if errOrg != nil && errUser != nil {
-					log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
-				}
-			}
-		}
+		apiClient = s.enumerateUnauthenticated(ctx)
 	case *sourcespb.GitHub_Token:
-		// needed for clones
-		s.token = cred.Token
-
-		// needed to list repos
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: cred.Token},
-		)
-		tc := oauth2.NewClient(context.TODO(), ts)
-
 		var err error
-		// If we're using public github, make a regular client.
-		// Otherwise make an enterprise client
-		if apiEndpoint == "https://api.github.com" {
-			apiClient = github.NewClient(tc)
-		} else {
-			apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, tc)
-			if err != nil {
-				return errors.New(err)
-			}
-		}
-
-		// TODO: this should support scanning users too
-
-		specificScope := false
-
-		if len(s.repos) > 0 {
-			specificScope = true
-		}
-
-		if len(s.orgs) > 0 {
-			specificScope = true
-			for _, org := range s.orgs {
-				errOrg := s.addReposByOrg(ctx, apiClient, org)
-				errUser := s.addReposByUser(ctx, apiClient, org)
-				if errOrg != nil && errUser != nil {
-					log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
-				}
-			}
-		}
-
-		user, _, err := apiClient.Users.Get(context.TODO(), "")
-		if err != nil {
-			return errors.New(err)
-		}
-
-		if !specificScope {
-			s.addReposByUser(ctx, apiClient, user.GetLogin())
-			// Scan for orgs is default with a token. GitHub App enumerates the repositories
-			// that were assigned to it in GitHub App settings.
-			s.addOrgsByUser(ctx, apiClient, user.GetLogin())
-			for _, org := range s.orgs {
-				s.addReposByOrg(ctx, apiClient, org)
-			}
-		}
-
-		s.addGistsByUser(ctx, apiClient, user.GetLogin())
-		for _, org := range s.orgs {
-			// TODO: Test it actually works to list org gists like this.
-			s.addGistsByUser(ctx, apiClient, org)
+		if apiClient, err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
+			return err
 		}
 	case *sourcespb.GitHub_GithubApp:
-		installationID, err := strconv.ParseInt(cred.GithubApp.InstallationId, 10, 64)
-		if err != nil {
-			return errors.New(err)
-		}
-
-		appID, err := strconv.ParseInt(cred.GithubApp.AppId, 10, 64)
-		if err != nil {
-			return errors.New(err)
-		}
-
-		// This client is used for most APIs
-		itr, err := ghinstallation.New(
-			common.SaneHttpClient().Transport,
-			appID,
-			installationID,
-			[]byte(cred.GithubApp.PrivateKey))
-		if err != nil {
-			return errors.New(err)
-		}
-		itr.BaseURL = apiEndpoint
-		apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: itr})
-		if err != nil {
-			return errors.New(err)
-		}
-
-		// This client is required to create installation tokens for cloning.. Otherwise the required JWT is not in the
-		// request for the token :/
-		appItr, err := ghinstallation.NewAppsTransport(
-			common.SaneHttpClient().Transport,
-			appID,
-			[]byte(cred.GithubApp.PrivateKey))
-		if err != nil {
-			return errors.New(err)
-		}
-		appItr.BaseURL = apiEndpoint
-		installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: appItr})
-		if err != nil {
-			return errors.New(err)
-		}
-
-		if len(s.repos) == 0 {
-			err = s.addReposByApp(ctx, apiClient)
-			if err != nil {
-				return err
-			}
-
-			//check if we need to find user repos
-			if s.conn.ScanUsers {
-				err := s.addMembersByApp(ctx, installationClient, apiClient)
-				if err != nil {
-					return err
-				}
-				log.Infof("Scanning repos from %v organization members.", len(s.members))
-				for _, member := range s.members {
-					s.addGistsByUser(ctx, apiClient, member)
-					s.addReposByUser(ctx, apiClient, member)
-				}
-
-			}
+		var err error
+		if apiClient, installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
+			return err
 		}
 	default:
+		// TODO: move this error to Init
 		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
 	s.normalizeRepos(ctx, apiClient)
 
 	if _, ok := os.LookupEnv("DO_NOT_RANDOMIZE"); !ok {
-		//Randomize channel scan order on each scan
+		// Randomize channel scan order on each scan
 		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(s.repos), func(i, j int) { s.repos[i], s.repos[j] = s.repos[j], s.repos[i] })
 	}
 
+	return s.scan(ctx, installationClient, chunksChan)
+}
+
+func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
 	scanned := 0
 
 	log.Debugf("Found %v total repos to scan", len(s.repos))
@@ -333,6 +361,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				var token string
 				token, err = s.Token(ctx, installationClient)
 				if err != nil {
+					// TODO: maybe we can use a channel here
 					errsMut.Lock()
 					errs = append(errs, err)
 					errsMut.Unlock()
@@ -356,7 +385,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 			}
-			scanned += 1
+			// TODO: use atomic library
+			scanned++
 			logrus.Debugf("scanned %d/%d repos", scanned, len(s.repos))
 		}(ctx, repoURL, i)
 	}
