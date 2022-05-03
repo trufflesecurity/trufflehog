@@ -198,9 +198,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		if len(s.orgs) > 0 {
 			specificScope = true
 			for _, org := range s.orgs {
-				if !strings.HasSuffix(org, ".git") {
-					s.addReposByOrg(ctx, apiClient, org)
-					s.addReposByUser(ctx, apiClient, org)
+				errOrg := s.addReposByOrg(ctx, apiClient, org)
+				errUser := s.addReposByUser(ctx, apiClient, org)
+				if errOrg != nil && errUser != nil {
+					log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
 				}
 			}
 		}
@@ -412,6 +413,7 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 			PerPage: 100,
 		},
 	}
+	var numRepos, numForks int
 	for {
 		someRepos, res, err := apiClient.Repositories.ListByOrg(ctx, org, opts)
 		if err == nil {
@@ -427,8 +429,12 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 			break
 		}
 		for _, r := range someRepos {
-			if r.GetFork() && !s.conn.IncludeForks {
-				continue
+			numRepos++
+			if r.GetFork() {
+				numForks++
+				if !s.conn.IncludeForks {
+					continue
+				}
 			}
 			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
 		}
@@ -437,6 +443,7 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 		}
 		opts.Page = res.NextPage
 	}
+	log.WithField("org", org).Debugf("Found %d repos (%d forks)", numRepos, numForks)
 	return nil
 }
 
