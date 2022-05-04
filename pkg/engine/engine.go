@@ -256,5 +256,9 @@ func fragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 	case *source_metadatapb.MetaData_Gerrit:
 		fragmentStart = &metadata.Gerrit.Line
 	}
-	return *fragmentStart, fragmentStart
+	fragStartVal := int64(0)
+	if fragmentStart != nil {
+		fragStartVal = *fragmentStart
+	}
+	return fragStartVal, fragmentStart
 }
