@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v42/github"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
@@ -37,8 +37,8 @@ import (
 
 type Source struct {
 	name       string
-	sourceId   int64
-	jobId      int64
+	sourceID   int64
+	jobID      int64
 	verify     bool
 	repos      []string
 	orgs       []string
@@ -64,11 +64,11 @@ func (s *Source) Type() sourcespb.SourceType {
 }
 
 func (s *Source) SourceID() int64 {
-	return s.sourceId
+	return s.sourceID
 }
 
 func (s *Source) JobID() int64 {
-	return s.jobId
+	return s.jobID
 }
 
 func (s *Source) Token(ctx context.Context, installationClient *github.Client) (string, error) {
@@ -94,13 +94,13 @@ func (s *Source) Token(ctx context.Context, installationClient *github.Client) (
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
 	s.aCtx = aCtx
 	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
+	s.sourceID = sourceID
+	s.jobID = jobID
 	s.verify = verify
 	s.jobSem = semaphore.NewWeighted(int64(concurrency))
 
@@ -333,16 +333,27 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
-	scanned := 0
+	var scanned uint64
 
 	log.Debugf("Found %v total repos to scan", len(s.repos))
 	wg := sync.WaitGroup{}
-	errs := []error{}
-	var errsMut sync.Mutex
+	errs := make(chan error, 1)
+	reportErr := func(err error) {
+		// save the error if there's room, otherwise log and drop it
+		select {
+		case errs <- err:
+		default:
+			log.WithError(err).Error("dropping error")
+		}
+	}
+
 	for i, repoURL := range s.repos {
 		if err := s.jobSem.Acquire(ctx, 1); err != nil {
+			// Acquire blocks until it can acquire the semaphore or returns an
+			// error if the context is finished
 			log.WithError(err).Debug("could not acquire semaphore")
-			continue
+			reportErr(err)
+			break
 		}
 		wg.Add(1)
 		go func(ctx context.Context, repoURL string, i int) {
@@ -367,10 +378,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				var token string
 				token, err = s.Token(ctx, installationClient)
 				if err != nil {
-					// TODO: maybe we can use a channel here
-					errsMut.Lock()
-					errs = append(errs, err)
-					errsMut.Unlock()
+					reportErr(err)
 					return
 				}
 				path, repo, err = git.CloneRepoUsingToken(token, repoURL, "clone")
@@ -391,20 +399,20 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			if err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 			}
-			// TODO: use atomic library
-			scanned++
-			logrus.Debugf("scanned %d/%d repos", scanned, len(s.repos))
+			atomic.AddUint64(&scanned, 1)
+			log.Debugf("scanned %d/%d repos", scanned, len(s.repos))
 		}(ctx, repoURL, i)
 	}
 
 	wg.Wait()
 
 	// This only returns first error which is what we did prior to concurrency
-	if len(errs) > 0 {
-		return errs[0]
+	select {
+	case err := <-errs:
+		return err
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 // handleRateLimit returns true if a rate limit was handled
@@ -535,7 +543,6 @@ func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, u
 		}
 		gistOpts.Page = resp.NextPage
 	}
-	return
 }
 
 func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, apiClient *github.Client) error {
