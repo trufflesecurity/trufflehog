@@ -255,10 +255,8 @@ func fragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 		fragmentStart = &metadata.Bitbucket.Line
 	case *source_metadatapb.MetaData_Gerrit:
 		fragmentStart = &metadata.Gerrit.Line
+	default:
+		return 0, nil
 	}
-	fragStartVal := int64(0)
-	if fragmentStart != nil {
-		fragStartVal = *fragmentStart
-	}
-	return fragStartVal, fragmentStart
+	return *fragmentStart, fragmentStart
 }
