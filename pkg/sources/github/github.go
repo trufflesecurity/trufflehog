@@ -193,7 +193,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		for _, org := range s.orgs {
 			errOrg := s.addReposByOrg(ctx, apiClient, org)
 			errUser := s.addReposByUser(ctx, apiClient, org)
-			if errOrg != nil || errUser != nil {
+			if errOrg != nil && errUser != nil {
 				log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
 			}
 		}
@@ -206,12 +206,16 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	// If no scope was provided, enumerate them
 	if !specificScope {
-		s.addReposByUser(ctx, apiClient, user.GetLogin())
+		if err := s.addReposByUser(ctx, apiClient, user.GetLogin()); err != nil {
+			log.WithError(err).Error("error fetching repos by user")
+		}
 		// Scan for orgs is default with a token. GitHub App enumerates the repositories
 		// that were assigned to it in GitHub App settings.
 		s.addOrgsByUser(ctx, apiClient, user.GetLogin())
 		for _, org := range s.orgs {
-			s.addReposByOrg(ctx, apiClient, org)
+			if err := s.addReposByOrg(ctx, apiClient, org); err != nil {
+				log.WithError(err).Error("error fetching repos by org")
+			}
 		}
 	}
 
@@ -280,7 +284,9 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			log.Infof("Scanning repos from %v organization members.", len(s.members))
 			for _, member := range s.members {
 				s.addGistsByUser(ctx, apiClient, member)
-				s.addReposByUser(ctx, apiClient, member)
+				if err := s.addReposByUser(ctx, apiClient, member); err != nil {
+					log.WithError(err).Error("error fetching repos by user")
+				}
 			}
 		}
 	}
@@ -650,7 +656,9 @@ func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
 		if parts := strings.Split(repo, "/"); len(parts) == 1 {
 			origSources := len(s.repos)
 			s.addGistsByUser(ctx, apiClient, repo)
-			s.addReposByUser(ctx, apiClient, repo)
+			if err := s.addReposByUser(ctx, apiClient, repo); err != nil {
+				log.WithError(err).Error("error fetching repos by user")
+			}
 			if origSources != len(s.repos) {
 				common.RemoveStringSliceItem(repo, &s.repos)
 				continue
