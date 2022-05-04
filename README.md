@@ -9,7 +9,7 @@
 
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
-![License](https://img.shields.io/badge/license-AGPL--3.0-green)
+![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)
 
 ---
 
@@ -31,8 +31,9 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
 
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
-- We've **added over 600 credential detectors that support active verification against their respective APIs**.
+- We've **added over 700 credential detectors that support active verification against their respective APIs**.
 - We've also added native **support for scanning GitHub, GitLab, filesystems, and S3**.
+- **Instantly verify private keys** against millions of github users and **billions** of TLS certificates using our [Driftwood](https://trufflesecurity.com/blog/driftwood) technology.
 
 
 ## What is credential verification?
@@ -155,7 +156,7 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
 ### TruffleHog OSS Github Action
 
 ```- name: TruffleHog OSS
-  uses: trufflesecurity/trufflehog@v3.3.3
+  uses: trufflesecurity/trufflehog@v3.4.2
   with:
     # Repository path
     path: 

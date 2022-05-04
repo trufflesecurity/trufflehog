@@ -3,11 +3,13 @@ package git
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -18,10 +20,19 @@ import (
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+	basicUser := secret.MustGetField("GITLAB_USER")
+	basicPass := secret.MustGetField("GITLAB_PASS")
+
 	type init struct {
-		name       string
-		verify     bool
-		connection *sourcespb.Git
+		name        string
+		verify      bool
+		connection  *sourcespb.Git
+		concurrency int
 	}
 	tests := []struct {
 		name      string
@@ -39,6 +50,7 @@ func TestSource_Scan(t *testing.T) {
 						Unauthenticated: &credentialspb.Unauthenticated{},
 					},
 				},
+				concurrency: 4,
 			},
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
@@ -57,6 +69,48 @@ func TestSource_Scan(t *testing.T) {
 						Unauthenticated: &credentialspb.Unauthenticated{},
 					},
 				},
+				concurrency: 4,
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+				SourceName: "test source",
+				Verify:     false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "remote repo, unauthenticated, concurrency 0",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.Git{
+					Repositories: []string{"https://github.com/dustin-decker/secretsandstuff.git"},
+					Credential: &sourcespb.Git_Unauthenticated{
+						Unauthenticated: &credentialspb.Unauthenticated{},
+					},
+				},
+				concurrency: 0,
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
+				SourceName: "test source",
+				Verify:     false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "remote repo, basic auth",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.Git{
+					Repositories: []string{"https://github.com/dustin-decker/secretsandstuff.git"},
+					Credential: &sourcespb.Git_BasicAuth{
+						BasicAuth: &credentialspb.BasicAuth{
+							Username: basicUser,
+							Password: basicPass,
+						},
+					},
+				},
+				concurrency: 4,
 			},
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GIT,
@@ -76,7 +130,7 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, tt.init.concurrency)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -192,7 +246,6 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
 			if err != nil {
 				t.Fatal(err)
@@ -229,6 +282,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				if !expected.Found {
 					t.Errorf("Expected data with key %q not found", key)
 				}
+
 			}
 		})
 	}
@@ -238,6 +292,14 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+	basicUser := secret.MustGetField("GITLAB_USER")
+	basicPass := secret.MustGetField("GITLAB_PASS")
+
 	type init struct {
 		name       string
 		verify     bool
@@ -256,6 +318,35 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 					Repositories: []string{"https://github.com/git-fixtures/empty.git"},
 					Credential: &sourcespb.Git_Unauthenticated{
 						Unauthenticated: &credentialspb.Unauthenticated{},
+					},
+				},
+			},
+			wantErr: "remote",
+		},
+		{
+			name: "no repo",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.Git{
+					Repositories: []string{""},
+					Credential: &sourcespb.Git_Unauthenticated{
+						Unauthenticated: &credentialspb.Unauthenticated{},
+					},
+				},
+			},
+			wantErr: "remote",
+		},
+		{
+			name: "no repo, basic auth",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.Git{
+					Repositories: []string{""},
+					Credential: &sourcespb.Git_BasicAuth{
+						BasicAuth: &credentialspb.BasicAuth{
+							Username: basicUser,
+							Password: basicPass,
+						},
 					},
 				},
 			},
@@ -313,5 +404,59 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestPrepareRepo(t *testing.T) {
+	tests := []struct {
+		uri    string
+		path   bool
+		remote bool
+		err    error
+	}{
+		{
+			uri:    "https://github.com/dustin-decker/secretsandstuff.git",
+			path:   true,
+			remote: true,
+			err:    nil,
+		},
+		{
+			uri:    "http://github.com/dustin-decker/secretsandstuff.git",
+			path:   true,
+			remote: true,
+			err:    nil,
+		},
+		{
+			uri:    "file:///path/to/file.json",
+			path:   true,
+			remote: false,
+			err:    nil,
+		},
+		{
+			uri:    "no bueno",
+			path:   false,
+			remote: false,
+			err:    fmt.Errorf("unsupported Git URI: no bueno"),
+		},
+	}
+
+	for _, tt := range tests {
+		repo, b, err := PrepareRepo(tt.uri)
+		var repoLen bool
+		if len(repo) > 0 {
+			repoLen = true
+		} else {
+			repoLen = false
+		}
+		if repoLen != tt.path || b != tt.remote {
+			t.Errorf("PrepareRepo(%v) got: %v, %v, %v want: %v, %v, %v", tt.uri, repo, b, err, tt.path, tt.remote, tt.err)
+		}
+	}
+}
+
+func BenchmarkPrepareRepo(b *testing.B) {
+	uri := "https://github.com/dustin-decker/secretsandstuff.git"
+	for i := 0; i < b.N; i++ {
+		_, _, _ = PrepareRepo(uri)
 	}
 }
