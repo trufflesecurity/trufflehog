@@ -94,10 +94,15 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	var conn sourcespb.Syslog
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
-		errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
 	s.conn = &conn
+
+	err = s.verifyConnectionConfig()
+	if err != nil {
+		return errors.WrapPrefix(err, "invalid configuration", 0)
+	}
 
 	s.syslog = NewSyslog(s.Type(), s.jobId, s.sourceId, s.name, s.verify, runtime.NumCPU(),
 		func(hostname, appname, procID, timestamp, facility, client string) *source_metadatapb.MetaData {
@@ -170,15 +175,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		if err != nil {
 			return errors.WrapPrefix(err, "error creating UDP listener", 0)
 		}
-		lis.SetDeadline(time.Now().Add(time.Second))
+		err = lis.SetDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			return errors.WrapPrefix(err, "could not set UDP deadline", 0)
+		}
 		defer lis.Close()
 
 		return s.acceptUDPConnections(ctx, lis, chunksChan)
 	default:
 		return fmt.Errorf("unknown connection type")
 	}
-
-	return nil
 }
 
 func (s *Source) parseSyslogMetadata(input []byte, remote string) (*source_metadatapb.MetaData, error) {
@@ -208,10 +214,13 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 		if common.IsDone(ctx) {
 			return
 		}
-		conn.SetDeadline(time.Now().Add(time.Second))
+		err := conn.SetDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			logrus.WithError(err).Debug("could not set connection deadline deadline")
+		}
 		input := make([]byte, 8096)
 		remote := conn.RemoteAddr()
-		_, err := conn.Read(input)
+		_, err = conn.Read(input)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return
