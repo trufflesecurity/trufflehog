@@ -36,6 +36,7 @@ enum SourceType {
   SOURCE_TYPE_JENKINS = 22;
   SOURCE_TYPE_TEAMS = 23;
   SOURCE_TYPE_JFROG_ARTIFACTORY = 24;
+  SOURCE_TYPE_SYSLOG = 25;
 }
 
 message LocalSource {
@@ -235,4 +236,12 @@ message Artifactory {
     credentials.AccessToken access_token = 3;
   }
   repeated string repositories = 4;
+}
+
+message Syslog {
+  string protocol = 1;
+  string listenAddress = 2;
+  string tlsCert = 3;
+  string tlsKey = 4;
+  string format = 5;
 }

@@ -198,6 +198,15 @@ message Artifactory {
   string email = 6;
 }
 
+message Syslog {
+  string hostname = 1;
+  string appname = 2;
+  string procid = 3;
+  string timestamp = 4;
+  string client = 5;
+  string facility = 6;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -222,5 +231,6 @@ message MetaData {
     Jenkins jenkins = 20;
     Teams teams = 21;
     Artifactory artifactory = 22;
+    Syslog syslog = 23;
   }
 }

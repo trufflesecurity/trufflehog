@@ -96,6 +96,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - gitlab
 - S3
 - filesystem
+- syslog
 - file and stdin (coming soon)
 
 Each subcommand can have options that you can see with the `-h` flag provided to the sub command:
