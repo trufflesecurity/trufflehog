@@ -147,6 +147,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for chunk := range e.chunks {
+		fragStart, mdLine := fragmentFirstLine(chunk)
 		for _, decoder := range e.decoders {
 			decoded := decoder.FromChunk(chunk)
 			if decoded == nil {
@@ -177,13 +178,12 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						continue
 					}
 					for _, result := range results {
-						targetChunk := chunk
 						if isGitSource(chunk.SourceType) {
-							copyChunk := *chunk
-							targetChunk = &copyChunk
-							SetLineNumber(&copyChunk, &result)
+							offset := FragmentLineOffset(chunk, &result)
+							*mdLine = fragStart + offset
 						}
-						e.results <- detectors.CopyMetadata(targetChunk, result)
+						e.results <- detectors.CopyMetadata(chunk, result)
+
 					}
 					if len(results) > 0 {
 						elapsed := time.Since(start)
@@ -229,28 +229,32 @@ func isGitSource(sourceType sourcespb.SourceType) bool {
 	return false
 }
 
-// SetLineNumber sets the line number for a provided source chunk with a given detector result.
-func SetLineNumber(chunk *sources.Chunk, result *detectors.Result) {
-	var startingLine *int64
-	switch metadata := chunk.SourceMetadata.GetData().(type) {
-	case *source_metadatapb.MetaData_Git:
-		startingLine = &metadata.Git.Line
-	case *source_metadatapb.MetaData_Github:
-		startingLine = &metadata.Github.Line
-	case *source_metadatapb.MetaData_Gitlab:
-		startingLine = &metadata.Gitlab.Line
-	case *source_metadatapb.MetaData_Bitbucket:
-		startingLine = &metadata.Bitbucket.Line
-	case *source_metadatapb.MetaData_Gerrit:
-		startingLine = &metadata.Gerrit.Line
-	}
+// FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
+func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) int64 {
 	lines := bytes.Split(chunk.Data, []byte("\n"))
-
 	for i, line := range lines {
 		if bytes.Contains(line, result.Raw) {
-			*startingLine = *startingLine + int64(i)
-			return
+			return int64(i)
 		}
 	}
-	return
+	return 0
+}
+
+// fragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
+// chunk metadata.
+func fragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
+	var fragmentStart *int64
+	switch metadata := chunk.SourceMetadata.GetData().(type) {
+	case *source_metadatapb.MetaData_Git:
+		fragmentStart = &metadata.Git.Line
+	case *source_metadatapb.MetaData_Github:
+		fragmentStart = &metadata.Github.Line
+	case *source_metadatapb.MetaData_Gitlab:
+		fragmentStart = &metadata.Gitlab.Line
+	case *source_metadatapb.MetaData_Bitbucket:
+		fragmentStart = &metadata.Bitbucket.Line
+	case *source_metadatapb.MetaData_Gerrit:
+		fragmentStart = &metadata.Gerrit.Line
+	}
+	return *fragmentStart, fragmentStart
 }
