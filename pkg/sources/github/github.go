@@ -343,7 +343,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 		select {
 		case errs <- err:
 		default:
-			log.WithError(err).Error("dropping error")
+			log.WithError(err).Warn("dropping error")
 		}
 	}
 

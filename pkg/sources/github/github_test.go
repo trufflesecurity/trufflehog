@@ -95,7 +95,8 @@ func TestAddGistsByUser(t *testing.T) {
 		JSON([]map[string]string{{"git_pull_url": "super-secret-gist"}})
 
 	s := initTestSource(nil)
-	s.addGistsByUser(context.TODO(), github.NewClient(nil), "super-secret-user")
+	err := s.addGistsByUser(context.TODO(), github.NewClient(nil), "super-secret-user")
+	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"super-secret-gist"}, s.repos)
 	assert.True(t, gock.IsDone())
@@ -168,7 +169,6 @@ func TestAddOrgsByUser(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
-// TODO: normalizeRepos doesn't appear correct
 func TestNormalizeRepos(t *testing.T) {
 	defer gock.Off()
 
@@ -242,7 +242,7 @@ func TestHandleRateLimit(t *testing.T) {
 	assert.False(t, handleRateLimit(nil, nil))
 
 	err := &github.RateLimitError{}
-	res := &github.Response{Response: &http.Response{Header: make(http.Header, 0)}}
+	res := &github.Response{Response: &http.Response{Header: make(http.Header)}}
 	res.Header.Set("x-ratelimit-remaining", "0")
 	res.Header.Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Unix()+1, 10))
 	assert.True(t, handleRateLimit(err, res))
@@ -297,10 +297,12 @@ func TestEnumerateWithApp(t *testing.T) {
 
 		data := x509.MarshalPKCS1PrivateKey(key)
 		var pemKey bytes.Buffer
-		pem.Encode(&pemKey, &pem.Block{
+		if err := pem.Encode(&pemKey, &pem.Block{
 			Type:  "RSA PRIVATE KEY",
 			Bytes: data,
-		})
+		}); err != nil {
+			panic(err)
+		}
 		return pemKey.String()
 	}()
 
