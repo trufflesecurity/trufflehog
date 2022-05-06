@@ -172,49 +172,70 @@ func TestAddOrgsByUser(t *testing.T) {
 func TestNormalizeRepos(t *testing.T) {
 	defer gock.Off()
 
-	s := initTestSource(nil)
-	s.repos = []string{"https://github.com/super-secret-user/super-secret-repo"}
-	s.normalizeRepos(context.TODO(), github.NewClient(nil))
+	tests := []struct {
+		name     string
+		setup    func()
+		repos    []string
+		expected []string
+	}{
+		{
+			name:     "repo url",
+			setup:    func() {},
+			repos:    []string{"https://github.com/super-secret-user/super-secret-repo"},
+			expected: []string{"https://github.com/super-secret-user/super-secret-repo.git"},
+		},
+		{
+			name: "username with gists",
+			setup: func() {
+				gock.New("https://api.github.com").
+					Get("/users/super-secret-user/gists").
+					Reply(200).
+					JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-user/super-secret-gist.git"}})
+				gock.New("https://api.github.com").
+					Get("/users/super-secret-user/repos").
+					Reply(200).
+					JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git"}})
+			},
+			repos: []string{"super-secret-user"},
+			expected: []string{
+				"https://github.com/super-secret-user/super-secret-repo.git",
+				"https://github.com/super-secret-user/super-secret-gist.git",
+			},
+		},
+		{
+			name: "not found",
+			setup: func() {
+				gock.New("https://api.github.com").
+					Get("/users/not-found/gists").
+					Reply(404)
+				gock.New("https://api.github.com").
+					Get("/users/not-found/repos").
+					Reply(404)
+			},
+			repos:    []string{"not-found"},
+			expected: []string{},
+		},
+		{
+			name:     "unexpected format",
+			setup:    func() {},
+			repos:    []string{"/foo/"},
+			expected: []string{},
+		},
+	}
 
-	assert.Equal(t, 2, len(s.repos))
-	assert.Equal(t, []string{
-		"https://github.com/super-secret-user/super-secret-repo",
-		"https://github.com/super-secret-user/super-secret-repo.git",
-	}, s.repos)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			tt.setup()
+			s := initTestSource(nil)
+			s.repos = tt.repos
 
-	gock.New("https://api.github.com").
-		Get("/users/super-secret-user/gists").
-		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "super-secret-gist"}})
-	gock.New("https://api.github.com").
-		Get("/users/super-secret-user/repos").
-		Reply(200).
-		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
-	s.repos = []string{"super-secret-user"}
-	s.normalizeRepos(context.TODO(), github.NewClient(nil))
-
-	assert.Equal(t, 2, len(s.repos))
-	assert.Equal(t, []string{
-		"super-secret-repo",
-		"super-secret-gist",
-	}, s.repos)
-
-	gock.New("https://api.github.com").
-		Get("/users/not-found/gists").
-		Reply(404)
-	gock.New("https://api.github.com").
-		Get("/users/not-found/repos").
-		Reply(404)
-
-	s.repos = []string{"not-found"}
-	s.normalizeRepos(context.TODO(), github.NewClient(nil))
-	assert.Equal(t, 2, len(s.repos))
-	assert.Equal(t, []string{
-		"not-found",
-		"",
-	}, s.repos)
-
-	assert.True(t, gock.IsDone())
+			s.normalizeRepos(context.TODO(), github.NewClient(nil))
+			assert.Equal(t, len(tt.expected), len(s.repos))
+			assert.Equal(t, tt.expected, s.repos)
+			assert.True(t, gock.IsDone())
+		})
+	}
 }
 
 func TestHandleRateLimit(t *testing.T) {
@@ -309,32 +330,3 @@ func TestEnumerateWithApp(t *testing.T) {
 
 	assert.True(t, gock.IsDone())
 }
-
-// func TestSource_paginateRepos(t *testing.T) {
-// 	type args struct {
-// 		ctx       context.Context
-// 		apiClient *github.Client
-// 	}
-// 	tests := []struct {
-// 		name string
-// 		org  string
-// 		args args
-// 	}{
-// 		{
-// 			org: "fakeNetflix",
-// 			args: args{
-// 				ctx:       context.Background(),
-// 				apiClient: github.NewClient(common.SaneHttpClient()),
-// 			},
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			s := &Source{httpClient: common.SaneHttpClient()}
-// 			s.paginateRepos(tt.args.ctx, tt.args.apiClient, tt.org)
-// 			if len(s.repos) < 101 {
-// 				t.Errorf("expected > 100 repos, got %d", len(s.repos))
-// 			}
-// 		})
-// 	}
-// }
