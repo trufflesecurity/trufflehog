@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -232,7 +233,11 @@ func TestNormalizeRepos(t *testing.T) {
 
 			s.normalizeRepos(context.TODO(), github.NewClient(nil))
 			assert.Equal(t, len(tt.expected), len(s.repos))
+			// sort and compare
+			sort.Slice(tt.expected, func(i, j int) bool { return tt.expected[i] < tt.expected[j] })
+			sort.Slice(s.repos, func(i, j int) bool { return s.repos[i] < s.repos[j] })
 			assert.Equal(t, tt.expected, s.repos)
+
 			assert.True(t, gock.IsDone())
 		})
 	}
