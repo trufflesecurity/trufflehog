@@ -33,7 +33,7 @@ If you think that something should be included outside of these guidelines, plea
 ### Development Guidelines
 
 - When reasonable, favor using the `net/http` library to make requests instead of bringing in another library.
-- Use the [`common.SaneHttpClient`](pkg/common/http.go) for the `http.Client` whenever possible.
+- Use the [`common.SaneHttpClient`](/pkg/common/http.go) for the `http.Client` whenever possible.
 
 ### Development Dependencies
 
