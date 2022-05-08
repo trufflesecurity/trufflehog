@@ -34,7 +34,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []
 		logrus.WithError(err).Error("failed to marshal github connection")
 		return err
 	}
-	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, concurrency)
+	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, concurrency, nil)
 	if err != nil {
 		logrus.WithError(err).Error("failed to initialize github source")
 		return err

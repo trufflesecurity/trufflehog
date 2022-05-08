@@ -60,7 +60,7 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized Gitlab source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int, _ interface{}) error {
 
 	s.aCtx = aCtx
 	s.name = name

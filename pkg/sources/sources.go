@@ -35,7 +35,7 @@ type Source interface {
 	// JobID returns the initialized job ID used for tracking relationships in the DB.
 	JobID() int64
 	// Init initializes the source.
-	Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error
+	Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int, srcClient interface{}) error
 	// Chunks emits data over a channel that is decoded and scanned for secrets.
 	Chunks(ctx context.Context, chunksChan chan *Chunk) error
 	// Completion Percentage for Scanned Source
