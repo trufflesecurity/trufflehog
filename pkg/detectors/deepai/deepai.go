@@ -50,8 +50,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			body := &bytes.Buffer{}
-			writer := multipart.NewWriter(body)
+			var body strings.Builder
+			writer := multipart.NewWriter(&body)
 			fw, err := writer.CreateFormField("text")
 			if err != nil {
 				continue
@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.deepai.org/api/text-tagging", bytes.NewReader(body.Bytes()))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.deepai.org/api/text-tagging", bytes.NewReader([]byte(body.String())))
 			if err != nil {
 				continue
 			}

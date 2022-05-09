@@ -50,8 +50,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			body := &bytes.Buffer{}
-			writer := multipart.NewWriter(body)
+			var body strings.Builder
+			writer := multipart.NewWriter(&body)
 			fw, err := writer.CreateFormField("url")
 			if err != nil {
 				continue
@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://www.virustotal.com/api/v3/urls", bytes.NewReader(body.Bytes()))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://www.virustotal.com/api/v3/urls", bytes.NewReader([]byte(body.String())))
 			if err != nil {
 				continue
 			}

@@ -60,8 +60,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				body := &bytes.Buffer{}
-				writer := multipart.NewWriter(body)
+				var body strings.Builder
+				writer := multipart.NewWriter(&body)
 				fw, err := writer.CreateFormField("url")
 				if err != nil {
 					continue
@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				writer.Close()
-				req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://neutrinoapi.net/url-info?user-id=%s&api-key=%s", resIdMatch, resMatch), bytes.NewReader(body.Bytes()))
+				req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://neutrinoapi.net/url-info?user-id=%s&api-key=%s", resIdMatch, resMatch), bytes.NewReader([]byte(body.String())))
 				if err != nil {
 					continue
 				}

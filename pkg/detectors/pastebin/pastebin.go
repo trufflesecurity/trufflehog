@@ -50,8 +50,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			body := &bytes.Buffer{}
-			writer := multipart.NewWriter(body)
+			var body strings.Builder
+			writer := multipart.NewWriter(&body)
 			fw, err := writer.CreateFormField("api_dev_key")
 			if err != nil {
 				continue
@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://pastebin.com/api/api_post.php", bytes.NewReader(body.Bytes()))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://pastebin.com/api/api_post.php", bytes.NewReader([]byte(body.String())))
 			if err != nil {
 				continue
 			}

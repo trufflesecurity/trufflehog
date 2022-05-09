@@ -332,21 +332,21 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 		}
 
 		for _, frag := range file.TextFragments {
-			newLines := bytes.Buffer{}
+			var sb strings.Builder
 			newLineNumber := frag.NewPosition
 			for _, line := range frag.Lines {
 				if line.Op == gitdiff.OpAdd {
-					newLines.WriteString(line.Line)
+					sb.WriteString(line.Line)
 				}
 			}
-			log.WithField("fragment", newLines.String()).Trace("detecting fragment")
+			log.WithField("fragment", sb.String()).Trace("detecting fragment")
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, newLineNumber)
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Data:           newLines.Bytes(),
+				Data:           []byte(sb.String()),
 				Verify:         s.verify,
 			}
 		}

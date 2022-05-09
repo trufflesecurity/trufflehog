@@ -51,8 +51,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := &bytes.Buffer{}
-			writer := multipart.NewWriter(payload)
+			var payload strings.Builder
+			writer := multipart.NewWriter(&payload)
 			fw, err := writer.CreateFormField("api_key")
 			if err != nil {
 				continue
@@ -70,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			writer.Close()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader(payload.Bytes()))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://apis.paralleldots.com/v4/intent", bytes.NewReader([]byte(payload.String())))
 			if err != nil {
 				continue
 			}
