@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v42/github"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
@@ -37,8 +37,8 @@ import (
 
 type Source struct {
 	name       string
-	sourceId   int64
-	jobId      int64
+	sourceID   int64
+	jobID      int64
 	verify     bool
 	repos      []string
 	orgs       []string
@@ -64,11 +64,11 @@ func (s *Source) Type() sourcespb.SourceType {
 }
 
 func (s *Source) SourceID() int64 {
-	return s.sourceId
+	return s.sourceID
 }
 
 func (s *Source) JobID() int64 {
-	return s.jobId
+	return s.jobID
 }
 
 func (s *Source) Token(ctx context.Context, installationClient *github.Client) (string, error) {
@@ -94,13 +94,13 @@ func (s *Source) Token(ctx context.Context, installationClient *github.Client) (
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
 	s.aCtx = aCtx
 	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
+	s.sourceID = sourceID
+	s.jobID = jobID
 	s.verify = verify
 	s.jobSem = semaphore.NewWeighted(int64(concurrency))
 
@@ -333,16 +333,27 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
-	scanned := 0
+	var scanned uint64
 
 	log.Debugf("Found %v total repos to scan", len(s.repos))
 	wg := sync.WaitGroup{}
-	errs := []error{}
-	var errsMut sync.Mutex
+	errs := make(chan error, 1)
+	reportErr := func(err error) {
+		// save the error if there's room, otherwise log and drop it
+		select {
+		case errs <- err:
+		default:
+			log.WithError(err).Warn("dropping error")
+		}
+	}
+
 	for i, repoURL := range s.repos {
 		if err := s.jobSem.Acquire(ctx, 1); err != nil {
+			// Acquire blocks until it can acquire the semaphore or returns an
+			// error if the context is finished
 			log.WithError(err).Debug("could not acquire semaphore")
-			continue
+			reportErr(err)
+			break
 		}
 		wg.Add(1)
 		go func(ctx context.Context, repoURL string, i int) {
@@ -367,10 +378,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				var token string
 				token, err = s.Token(ctx, installationClient)
 				if err != nil {
-					// TODO: maybe we can use a channel here
-					errsMut.Lock()
-					errs = append(errs, err)
-					errsMut.Unlock()
+					reportErr(err)
 					return
 				}
 				path, repo, err = git.CloneRepoUsingToken(token, repoURL, "clone")
@@ -391,20 +399,20 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			if err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 			}
-			// TODO: use atomic library
-			scanned++
-			logrus.Debugf("scanned %d/%d repos", scanned, len(s.repos))
+			atomic.AddUint64(&scanned, 1)
+			log.Debugf("scanned %d/%d repos", scanned, len(s.repos))
 		}(ctx, repoURL, i)
 	}
 
 	wg.Wait()
 
 	// This only returns first error which is what we did prior to concurrency
-	if len(errs) > 0 {
-		return errs[0]
+	select {
+	case err := <-errs:
+		return err
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 // handleRateLimit returns true if a rate limit was handled
@@ -443,7 +451,8 @@ func handleRateLimit(errIn error, res *github.Response) bool {
 	return true
 }
 
-func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, org string) error {
+func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, org string) ([]string, error) {
+	repos := []string{}
 	opts := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 100,
@@ -459,7 +468,7 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("could not list repos for org %s: %w", org, err)
+			return nil, fmt.Errorf("could not list repos for org %s: %w", org, err)
 		}
 		if len(someRepos) == 0 {
 			break
@@ -472,7 +481,7 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 					continue
 				}
 			}
-			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
+			repos = append(repos, r.GetCloneURL())
 		}
 		if res.NextPage == 0 {
 			break
@@ -480,10 +489,23 @@ func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, or
 		opts.Page = res.NextPage
 	}
 	log.WithField("org", org).Debugf("Found %d repos (%d forks)", numRepos, numForks)
+	return repos, nil
+}
+
+func (s *Source) addReposByOrg(ctx context.Context, apiClient *github.Client, org string) error {
+	repos, err := s.getReposByOrg(ctx, apiClient, org)
+	if err != nil {
+		return err
+	}
+	// add the repos to the set of repos
+	for _, repo := range repos {
+		common.AddStringSliceItem(repo, &s.repos)
+	}
 	return nil
 }
 
-func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, user string) error {
+func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, user string) ([]string, error) {
+	repos := []string{}
 	opts := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 50,
@@ -498,23 +520,36 @@ func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, u
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("could not list repos for user %s: %w", user, err)
+			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
 		for _, r := range someRepos {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
-			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
+			repos = append(repos, r.GetCloneURL())
 		}
 		if res.NextPage == 0 {
 			break
 		}
 		opts.Page = res.NextPage
 	}
+	return repos, nil
+}
+
+func (s *Source) addReposByUser(ctx context.Context, apiClient *github.Client, user string) error {
+	repos, err := s.getReposByUser(ctx, apiClient, user)
+	if err != nil {
+		return err
+	}
+	// add the repos to the set of repos
+	for _, repo := range repos {
+		common.AddStringSliceItem(repo, &s.repos)
+	}
 	return nil
 }
 
-func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, user string) {
+func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, user string) ([]string, error) {
+	gistURLs := []string{}
 	gistOpts := &github.GistListOptions{}
 	for {
 		gists, resp, err := apiClient.Gists.List(ctx, user, gistOpts)
@@ -525,21 +560,33 @@ func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, u
 			continue
 		}
 		if err != nil {
-			log.WithError(err).Warnf("Could not get gists for user %s", user)
+			log.WithError(err).Warnf("could not list repos for user %s", user)
+			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
 		for _, gist := range gists {
-			common.AddStringSliceItem(gist.GetGitPullURL(), &s.repos)
+			gistURLs = append(gistURLs, gist.GetGitPullURL())
 		}
 		if resp == nil || resp.NextPage == 0 {
 			break
 		}
 		gistOpts.Page = resp.NextPage
 	}
-	return
+	return gistURLs, nil
+}
+
+func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, user string) error {
+	gists, err := s.getGistsByUser(ctx, apiClient, user)
+	if err != nil {
+		return err
+	}
+	// add the gists to the set of repos
+	for _, gist := range gists {
+		common.AddStringSliceItem(gist, &s.repos)
+	}
+	return nil
 }
 
 func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, apiClient *github.Client) error {
-
 	opts := &github.ListOptions{
 		PerPage: 500,
 	}
@@ -650,24 +697,34 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 
 func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
 	// TODO: Add check/fix for repos that are missing scheme
-	repoIter := make([]string, len(s.repos))
-	copy(repoIter, s.repos)
-	for _, repo := range repoIter {
-		if parts := strings.Split(repo, "/"); len(parts) == 1 {
-			origSources := len(s.repos)
-			s.addGistsByUser(ctx, apiClient, repo)
-			if err := s.addReposByUser(ctx, apiClient, repo); err != nil {
-				log.WithError(err).Error("error fetching repos by user")
-			}
-			if origSources != len(s.repos) {
-				common.RemoveStringSliceItem(repo, &s.repos)
+	normalizedRepos := map[string]struct{}{}
+	for _, repo := range s.repos {
+		// if there's a '/', assume it's a URL and try to normalize it
+		if strings.ContainsRune(repo, '/') {
+			repoNormalized, err := giturl.NormalizeGithubRepo(repo)
+			if err != nil {
+				log.WithError(err).Warnf("Repo not in expected format: %s", repo)
 				continue
 			}
+			normalizedRepos[repoNormalized] = struct{}{}
+			continue
 		}
-		repoNormalized, err := giturl.NormalizeGithubRepo(repo)
-		if err != nil {
-			log.WithError(err).Warnf("Repo not in expected format: %s", repo)
+		// otherwise, assume it's a user and enumerate repositories and gists
+		if repos, err := s.getReposByUser(ctx, apiClient, repo); err == nil {
+			for _, repo := range repos {
+				normalizedRepos[repo] = struct{}{}
+			}
 		}
-		common.AddStringSliceItem(repoNormalized, &s.repos)
+		if gists, err := s.getGistsByUser(ctx, apiClient, repo); err == nil {
+			for _, gist := range gists {
+				normalizedRepos[gist] = struct{}{}
+			}
+		}
+	}
+
+	// replace s.repos
+	s.repos = s.repos[:0]
+	for key := range normalizedRepos {
+		s.repos = append(s.repos, key)
 	}
 }
