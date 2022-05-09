@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
       - name: Docker Login to DockerHub
         uses: docker/login-action@v2
         with:
