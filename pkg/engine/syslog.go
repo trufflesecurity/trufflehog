@@ -39,7 +39,7 @@ func (e *Engine) ScanSyslog(ctx context.Context, address, protocol, certPath, ke
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 	source := syslog.Source{}
-	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, concurrency)
+	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, concurrency, nil)
 	source.InjectConnection(connection)
 	if err != nil {
 		logrus.WithError(err).Error("failed to initialize syslog source")
