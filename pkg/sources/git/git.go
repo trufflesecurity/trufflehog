@@ -331,8 +331,8 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			when = file.PatchHeader.AuthorDate.String()
 		}
 
+		var sb strings.Builder
 		for _, frag := range file.TextFragments {
-			var sb strings.Builder
 			newLineNumber := frag.NewPosition
 			for _, line := range frag.Lines {
 				if line.Op == gitdiff.OpAdd {
@@ -349,6 +349,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 				Data:           []byte(sb.String()),
 				Verify:         s.verify,
 			}
+			sb.Reset()
 		}
 	}
 	return nil
