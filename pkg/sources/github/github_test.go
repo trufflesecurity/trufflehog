@@ -16,11 +16,9 @@ import (
 
 	"github.com/google/go-github/v42/github"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/anypb"
-	"gopkg.in/h2non/gock.v1"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
@@ -34,7 +32,7 @@ func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
 
 func initTestSource(src *sourcespb.GitHub) *Source {
 	s, conn := createTestSource(src)
-	if err := s.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1); err != nil {
+	if err := s.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1, nil); err != nil {
 		panic(err)
 	}
 	return s
@@ -48,7 +46,7 @@ func TestInit(t *testing.T) {
 		},
 	})
 
-	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1)
+	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1, nil)
 	assert.Nil(t, err)
 
 	// TODO: test error case
