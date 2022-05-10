@@ -19,6 +19,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"google.golang.org/protobuf/types/known/anypb"
+	"gopkg.in/h2non/gock.v1"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
