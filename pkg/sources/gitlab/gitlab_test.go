@@ -130,7 +130,7 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 10)
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 10, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
