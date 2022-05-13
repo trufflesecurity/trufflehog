@@ -36,19 +36,6 @@ type Result struct {
 	StructuredData *detectorspb.StructuredData
 }
 
-type ResultVerbose struct {
-	// DetectorType is the type of Detector.
-	DetectorType string
-	Verified     bool
-	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
-	Raw []byte
-	// Redacted contains the redacted version of the raw secret identification data for display purposes.
-	// A secret ID should be used if available.
-	Redacted       string
-	ExtraData      map[string]string
-	StructuredData *detectorspb.StructuredData
-}
-
 type ResultWithMetadata struct {
 	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
@@ -58,7 +45,7 @@ type ResultWithMetadata struct {
 	SourceType sourcespb.SourceType
 	// SourceName is the name of the Source.
 	SourceName string
-	ResultVerbose
+	Result
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
@@ -68,14 +55,7 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 		SourceID:       chunk.SourceID,
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
-		ResultVerbose: ResultVerbose{
-			DetectorType:   result.DetectorType.String(),
-			Verified:       result.Verified,
-			Raw:            result.Raw,
-			Redacted:       result.Redacted,
-			ExtraData:      result.ExtraData,
-			StructuredData: result.StructuredData,
-		},
+		Result:         result,
 	}
 }
 

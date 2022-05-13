@@ -19,10 +19,10 @@ var (
 
 func PrintPlainOutput(r *detectors.ResultWithMetadata) {
 	out := outputFormat{
-		DetectorType: r.ResultVerbose.DetectorType,
-		Verified:     r.ResultVerbose.Verified,
+		DetectorType: r.Result.DetectorType.String(),
+		Verified:     r.Result.Verified,
 		MetaData:     r.SourceMetadata,
-		Raw:          strings.TrimSpace(string(r.ResultVerbose.Raw)),
+		Raw:          strings.TrimSpace(string(r.Result.Raw)),
 	}
 
 	meta, err := structToMap(out.MetaData.Data)
