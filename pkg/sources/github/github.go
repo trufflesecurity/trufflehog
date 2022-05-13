@@ -94,7 +94,7 @@ func (s *Source) Token(ctx context.Context, installationClient *github.Client) (
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int, _ *sourcespb.TokenServiceClient) error {
+func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
 	s.aCtx = aCtx

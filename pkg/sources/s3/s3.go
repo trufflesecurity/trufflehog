@@ -55,7 +55,7 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized AWS source
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int, _ *sourcespb.TokenServiceClient) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
 	s.aCtx = aCtx

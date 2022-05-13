@@ -33,7 +33,7 @@ func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
 
 func initTestSource(src *sourcespb.GitHub) *Source {
 	s, conn := createTestSource(src)
-	if err := s.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1, nil); err != nil {
+	if err := s.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1); err != nil {
 		panic(err)
 	}
 	return s
@@ -47,7 +47,7 @@ func TestInit(t *testing.T) {
 		},
 	})
 
-	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1, nil)
+	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1)
 	assert.Nil(t, err)
 
 	// TODO: test error case

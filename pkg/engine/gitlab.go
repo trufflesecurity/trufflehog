@@ -40,7 +40,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, endpoint, token string, reposit
 	}
 
 	gitlabSource := gitlab.Source{}
-	err = gitlabSource.Init(ctx, "trufflehog - gitlab", 0, int64(sourcespb.SourceType_SOURCE_TYPE_GITLAB), true, &conn, runtime.NumCPU(), nil)
+	err = gitlabSource.Init(ctx, "trufflehog - gitlab", 0, int64(sourcespb.SourceType_SOURCE_TYPE_GITLAB), true, &conn, runtime.NumCPU())
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init GitLab source", 0)
 	}

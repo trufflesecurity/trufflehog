@@ -8,20 +8,7 @@ import "validate/validate.proto";
 import "credentials.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
-import "google/protobuf/struct.proto";
 
-
-message TokenRequest {
-  int64 source_id = 1;
-}
-
-message TokenResponse {
-  google.protobuf.Struct token_source = 1;
-}
-
-service TokenService {
-  rpc Token(TokenRequest) returns (TokenResponse);
-}
 
 enum SourceType {
   SOURCE_TYPE_AZURE_STORAGE = 0;
