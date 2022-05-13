@@ -259,7 +259,9 @@ func run(state overseer.State) {
 				// SourceName is the name of the Source.
 				SourceName string
 				// DetectorType is the type of Detector.
-				DetectorType string
+				DetectorType detectorspb.DetectorType
+				// DetectorName is the string name of the DetectorType.
+				DetectorName string
 				Verified     bool
 				// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 				Raw []byte
@@ -273,7 +275,8 @@ func run(state overseer.State) {
 				SourceID:       r.SourceID,
 				SourceType:     r.SourceType,
 				SourceName:     r.SourceName,
-				DetectorType:   r.DetectorType.String(),
+				DetectorType:   r.DetectorType,
+				DetectorName:   r.DetectorType.String(),
 				Verified:       r.Verified,
 				Raw:            r.Raw,
 				Redacted:       r.Redacted,
