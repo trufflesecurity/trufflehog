@@ -40,7 +40,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/xanzy/go-gitlab v0.64.0
+	github.com/xanzy/go-gitlab v0.65.0
 	github.com/zricethezav/gitleaks/v8 v8.5.2
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/net v0.0.0-20220325170049-de3da57026de

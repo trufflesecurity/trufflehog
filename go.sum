@@ -459,8 +459,8 @@ github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom3 h1:Xc61NkfI7aDHd8eHa0gglK0
 github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom3/go.mod h1:Em2rda83ePrhmaX4ZdvNjnUADRiOJirEAqln0ZtN8og=
 github.com/trufflesecurity/overseer v1.1.7-custom5 h1:xu+Fg6fkSRifUPzUCl7N8HmobJ6WGOkIApGnM7mJS6w=
 github.com/trufflesecurity/overseer v1.1.7-custom5/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
-github.com/xanzy/go-gitlab v0.64.0 h1:rMgQdW9S1w3qvNAH2LYpFd2xh7KNLk+JWJd7sorNuTc=
-github.com/xanzy/go-gitlab v0.64.0/go.mod h1:F0QEXwmqiBUxCgJm8fE9S+1veX4XC9Z4cfaAbqwk4YM=
+github.com/xanzy/go-gitlab v0.65.0 h1:9xSA9cRVhz3Z54JacIHdvWnNmNAoSz/BDnyMGOf3yIg=
+github.com/xanzy/go-gitlab v0.65.0/go.mod h1:F0QEXwmqiBUxCgJm8fE9S+1veX4XC9Z4cfaAbqwk4YM=
 github.com/xanzy/ssh-agent v0.3.0 h1:wUMzuKtKilRgBAD1sUb8gOwwRr2FGoBVumcjoOACClI=
 github.com/xanzy/ssh-agent v0.3.0/go.mod h1:3s9xbODqPuuhK9JV1R321M/FlMZSBvE5aY6eAcqrDh0=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
