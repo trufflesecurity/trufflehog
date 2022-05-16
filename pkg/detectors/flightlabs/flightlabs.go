@@ -2,6 +2,7 @@ package flightlabs
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -21,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flightlabs"}) + `\b([a-zA-Z-0-9.-_]{359})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flightlabs"}) + `\b(ey[a-zA-Z0-9]{34}.ey[a-zA-Z0-9._-]{300,350})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.goflightlabs.com/airports?access_key="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://app.goflightlabs.com/airports?access_key=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
