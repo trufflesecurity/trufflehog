@@ -2,6 +2,7 @@ package simfin
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -48,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://simfin.com/api/v2/companies/list?api-key="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://simfin.com/api/v2/companies/list?api-key=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
