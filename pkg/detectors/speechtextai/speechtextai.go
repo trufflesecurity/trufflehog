@@ -2,6 +2,7 @@ package speechtextai
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -47,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.speechtext.ai/recognize?key="+resMatch+"&language=en-US&punctuation=true&format=m4a", nil)
+			req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://api.speechtext.ai/recognize?key=%s&language=en-US&punctuation=true&format=m4a", resMatch), nil)
 			req.Header.Add("Content-Type", "application/octet-stream")
 
 			if err != nil {
