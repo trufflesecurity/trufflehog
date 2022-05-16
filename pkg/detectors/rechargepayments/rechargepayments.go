@@ -12,14 +12,14 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client    = common.SaneHttpClient()
 	verifyURL = "https://api.rechargeapps.com/token_information"
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	tokenPats = map[string]*regexp.Regexp{
 		"Newer API Keys":        regexp.MustCompile(`\bsk(_test)?_(1|2|3|5|10)x[123]_[0-9a-fA-F]{64}\b`),
 		"Old API key (SHA-224)": regexp.MustCompile(`\b[0-9a-fA-F]{56}\b`),
