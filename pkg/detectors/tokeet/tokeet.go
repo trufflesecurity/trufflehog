@@ -56,12 +56,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resMatch),
 			}
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://capi.tokeet.com/v1/user?account="+resIdMatch, nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://capi.tokeet.com/v1/user?account=%s", resIdMatch), nil)
 				if err != nil {
 					continue
 				}
 				req.Header.Add("Accept", "application/json")
-				req.Header.Add("Authorization", fmt.Sprintf("%s", resMatch))
+				req.Header.Add("Authorization",resMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
