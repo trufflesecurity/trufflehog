@@ -21,13 +21,13 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"speechtextai"}) + `\b([0-9a-f]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"speechtext"}) + `\b([0-9a-f]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"speechtextai"}
+	return []string{"speechtext"}
 }
 
 // FromData will find and optionally verify SpeechTextAI secrets in a given set of bytes.
