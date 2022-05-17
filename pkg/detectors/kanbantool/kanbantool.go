@@ -22,7 +22,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kanbantool"}) + `\b([0-9A-Z]{12})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kanbantoolDomain"}) + `\b([a-z0-9A-Z._]{2,22})\b`)
+	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kanbantool"}) + `\b([a-z0-9A-Z]{2,22})\b`)
 
 )
 
@@ -38,7 +38,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
-
+	fmt.Println(idMatches)
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
