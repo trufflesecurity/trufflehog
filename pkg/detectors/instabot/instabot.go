@@ -2,7 +2,6 @@ package instabot
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instabot"}) + `\b([a-z0-9A-Z+=]{44})`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instabot"}) + `\b([0-9a-zA-Z=+\/]{43}[0-9a-zA-Z+\/=]{1})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,7 +34,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
@@ -52,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("X-Instabot-Api-Key", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("X-Instabot-Api-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
