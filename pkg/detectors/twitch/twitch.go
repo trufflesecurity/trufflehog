@@ -1,12 +1,11 @@
 package twitch
 
 import (
-	"bytes"
 	"context"
-	"io"
-	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -59,38 +58,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				body := &bytes.Buffer{}
-				writer := multipart.NewWriter(body)
-				fw, err := writer.CreateFormField("client_id")
+				data := url.Values{}
+				data.Set("client_id", resIdMatch)
+				data.Set("client_secret", resMatch)
+				data.Set("grant_type", "client_credentials")
+				encodedData := data.Encode()
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://id.twitch.tv/oauth2/token", strings.NewReader(encodedData))
 				if err != nil {
 					continue
 				}
-				_, err = io.Copy(fw, strings.NewReader(resIdMatch))
-				if err != nil {
-					continue
-				}
-				fw, err = writer.CreateFormField("client_secret")
-				if err != nil {
-					continue
-				}
-				_, err = io.Copy(fw, strings.NewReader(resMatch))
-				if err != nil {
-					continue
-				}
-				fw, err = writer.CreateFormField("grant_type")
-				if err != nil {
-					continue
-				}
-				_, err = io.Copy(fw, strings.NewReader("client_credentials"))
-				if err != nil {
-					continue
-				}
-				writer.Close()
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://id.twitch.tv/oauth2/token", bytes.NewReader(body.Bytes()))
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", writer.FormDataContentType())
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
