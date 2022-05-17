@@ -22,7 +22,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmate"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmateDomain"}) + `\b([a-z0-9A-Z._]{4,22})\b`)
+	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmate"}) + `\b([a-z0-9A-Z]{3,22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				
 				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("sessionToken", fmt.Sprintf("%s", resMatch))
+				req.Header.Add("sessionToken", resMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
