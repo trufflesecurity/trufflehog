@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudconvert"}) + `\b(ey[0-9a-zA-Z]{34}.ey[0-9a-zA-Z]{412}.[0-9a-zA-Z-_]{683})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudconvert"}) + `\b(ey[0-9a-zA-Z]{34}.ey[0-9a-zA-Z-_]{200,500}.[0-9a-zA-Z-_]{600,700})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
