@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"codeclimate"}) + `\b([a-z0-9]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"codeclimate"}) + `\b([a-f0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
