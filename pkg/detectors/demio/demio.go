@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-
+	"fmt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -21,7 +21,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{32})\b`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"demioSecret"}) + `\b([a-z0-9A-Z]{15})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{10,20})\b`)
 
 )
 
@@ -37,7 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
@@ -55,7 +54,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 	
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://my.demio.com/api/v1/ping/query?api_key="+resMatch+"&api_secret="+resIdMatch, nil)
+				url := fmt.Sprintf("https://my.demio.com/api/v1/ping/query?api_key=%s&api_secret=%s",resMatch,resIdMatch)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}

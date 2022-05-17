@@ -41,7 +41,7 @@ func TestDemio_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a demio secret %s within demioSecret %s", secret,keySecret)),
+				data:   []byte(fmt.Sprintf("You can find a demio secret %s within demio %s", secret,keySecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,7 +57,7 @@ func TestDemio_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a demio secret %s within but not valid demioSecret %s", inactiveSecret,keySecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a demio secret %s within but not valid demio %s", inactiveSecret,keySecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
