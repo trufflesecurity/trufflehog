@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docparser"}) + `\b([a-zA0-9]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docparser"}) + `\b([a-fA0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,7 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.docparser.com/v1/parsers?api_key="+resMatch, nil)
+			url := fmt.Sprintf("https://api.docparser.com/v1/parsers?api_key=%s", resMatch)
+			fmt.Println(url)
+			req, err := http.NewRequestWithContext(ctx, "GET",url, nil)
 			if err != nil {
 				continue
 			}
