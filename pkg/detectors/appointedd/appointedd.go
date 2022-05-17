@@ -1,8 +1,7 @@
-package appointed
+package appointedd
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -22,16 +21,16 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appointed"}) + `\b([a-zA-Z0-9=+]{88})`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appointedd"}) + `\b([a-zA-Z0-9=+]{88})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"appointed"}
+	return []string{"appointedd"}
 }
 
-// FromData will find and optionally verify Appointed secrets in a given set of bytes.
+// FromData will find and optionally verify appointedd secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -44,7 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Appointed,
+			DetectorType: detectorspb.DetectorType_Appointedd,
 			Raw:          []byte(resMatch),
 		}
 		if verify {
@@ -52,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("X-API-KEY", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("X-API-KEY", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

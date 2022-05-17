@@ -1,4 +1,4 @@
-package appointed
+package appointedd
 
 import (
 	"context"
@@ -13,15 +13,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAppointed_FromChunk(t *testing.T) {
+func TestAppointedd_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APPOINTED")
-	inactiveSecret := testSecrets.MustGetField("APPOINTED_INACTIVE")
+	secret := testSecrets.MustGetField("APPOINTEDD")
+	inactiveSecret := testSecrets.MustGetField("APPOINTEDD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,7 +45,7 @@ func TestAppointed_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Appointed,
+					DetectorType: detectorspb.DetectorType_Appointedd,
 					Verified:     true,
 				},
 			},
@@ -61,7 +61,7 @@ func TestAppointed_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Appointed,
+					DetectorType: detectorspb.DetectorType_Appointedd,
 					Verified:     false,
 				},
 			},
@@ -84,7 +84,7 @@ func TestAppointed_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Appointed.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Appointedd.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -94,7 +94,7 @@ func TestAppointed_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Appointed.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Appointedd.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
