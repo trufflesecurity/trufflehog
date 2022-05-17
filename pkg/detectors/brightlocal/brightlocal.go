@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-
+	"fmt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"brightlocal"}) + `\b([a-z0-9]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"brightlocal"}) + `\b([a-f0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,10 +47,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://tools.brightlocal.com/seo-tools/api/v4/batch?api-key="+resMatch+"&batch-id=364854108", nil)
+			payload := strings.NewReader(fmt.Sprintf("api-key=%s",resMatch))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://tools.brightlocal.com/seo-tools/api/v4/batch", payload)
 			if err != nil {
 				continue
 			}
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
