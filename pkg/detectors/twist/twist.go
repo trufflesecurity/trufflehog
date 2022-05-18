@@ -1,14 +1,12 @@
 package twist
 
 import (
-	"bytes"
 	"context"
-	"io"
-	"mime/multipart"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -25,7 +23,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
-	passPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twist pass"}) + `\b([0-9A-Za-z\S]{7,20})\b`)
+	passPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([0-9A-Za-z\S]{7,20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,32 +58,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				timeout := 10 * time.Second
-				client.Timeout = timeout
-				body := &bytes.Buffer{}
-				writer := multipart.NewWriter(body)
-				fw, err := writer.CreateFormField("email")
+				data := url.Values{}
+				data.Set("email", resMatch)
+				data.Set("password", resPassMatch)
+				encodedData := data.Encode()
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.twist.com/api/v3/users/login", strings.NewReader(encodedData))
 				if err != nil {
 					continue
 				}
-				_, err = io.Copy(fw, strings.NewReader(resMatch))
-				if err != nil {
-					continue
-				}
-				fw, err = writer.CreateFormField("password")
-				if err != nil {
-					continue
-				}
-				_, err = io.Copy(fw, strings.NewReader(resPassMatch))
-				if err != nil {
-					continue
-				}
-				writer.Close()
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.twist.com/api/v3/users/login", bytes.NewReader(body.Bytes()))
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", writer.FormDataContentType())
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
