@@ -63,12 +63,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				bodyString := string(bodyBytes)
 				validResponse := !strings.Contains(bodyString, `"error"`)
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if validResponse {
-						s1.Verified = true
-					} else {
-						s1.Verified = false
-					}
+				if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
+					s1.Verified = true
 				} else {
 					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
