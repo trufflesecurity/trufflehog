@@ -16,12 +16,14 @@ import (
 func TestFormsite_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("FORMSITE")
 	inactiveSecret := testSecrets.MustGetField("FORMSITE_INACTIVE")
+	server := testSecrets.MustGetField("FORMSITE_SERVER")
+	user := testSecrets.MustGetField("FORMSITE_USER")
 
 	type args struct {
 		ctx    context.Context
@@ -40,7 +42,7 @@ func TestFormsite_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within formsite server %s formsite user %s", secret,server,user)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -56,7 +58,7 @@ func TestFormsite_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within but not valid formsite server %s formsite user %s", inactiveSecret,server,user)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
