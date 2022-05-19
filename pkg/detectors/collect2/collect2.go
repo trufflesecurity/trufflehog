@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"collect2"}) + `\b([0-9a-f-]{36})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"collect2"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,8 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(`{"action": "opened", "issue": {"name": "Hello", "number": 1347}, "repository": {"id": 1296269, "full_name": "octocat/Hello-World", "owner": {"login": "octocat", "id": 1}}}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://collect2.com/api/%s/datarecord/", resMatch), payload)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://collect2.com/api/%s/datarecord/", resMatch), nil)
 			if err != nil {
 				continue
 			}
