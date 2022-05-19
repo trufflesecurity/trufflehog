@@ -21,14 +21,14 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"braintreepayments"}) + `\b([0-9a-f]{32})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"braintreepayments"}) + `\b([0-9a-z]{16})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"braintree"}) + `\b([0-9a-f]{32})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"braintree"}) + `\b([0-9a-z]{16})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"braintreepayments"}
+	return []string{"braintree"}
 }
 
 // FromData will find and optionally verify BraintreePayments secrets in a given set of bytes.
