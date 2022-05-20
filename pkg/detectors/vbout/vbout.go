@@ -2,6 +2,7 @@ package vbout
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -47,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.vbout.com/1/app/me.json?key=%s",resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.vbout.com/1/app/me.json?key=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
