@@ -217,10 +217,10 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath
 		err = errors.WrapPrefix(err, "could not parse url", 0)
 		return
 	}
+	cloneURL.User = userInfo
 
 	gitArgs := []string{"clone", cloneURL.String(), clonePath}
 	gitArgs = append(gitArgs, args...)
-	cloneURL.User = userInfo
 	cloneCmd := exec.Command("git", gitArgs...)
 
 	output, err := cloneCmd.CombinedOutput()
