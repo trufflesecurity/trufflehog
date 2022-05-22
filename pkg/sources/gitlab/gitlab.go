@@ -163,7 +163,8 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	user, _, err := apiClient.Users.CurrentUser()
 
 	if err != nil {
-		return nil, errors.Errorf("unable to authenticate using: %s", s.authMethod)
+		msg := fmt.Sprintf("unable to authenticate using: %s", s.authMethod)
+		return nil, errors.WrapPrefix(err, msg, 0)
 	}
 
 	projects := map[int]*gitlab.Project{}
