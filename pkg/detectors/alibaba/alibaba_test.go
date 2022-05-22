@@ -7,20 +7,21 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestAlibaba_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("ALIBABA_SECRET")
-	secretInactive := testSecrets.MustGetField("ALIBABA_SECRET_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField("ALIBABA_SECRET_INACTIVE")
 	id := testSecrets.MustGetField("ALIBABA_ID")
 
 	type args struct {
@@ -40,14 +41,13 @@ func TestAlibaba_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("Alibaba keys are here: %s\n %s within", id, secret)),
+				data:   []byte(fmt.Sprintf("You can find a alibaba secret %s within alibaba %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Alibaba,
 					Verified:     true,
-					Redacted:     id,
 				},
 			},
 			wantErr: false,
@@ -57,14 +57,13 @@ func TestAlibaba_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("Alibaba keys are here: %s\n %s within", id, secretInactive)),
+				data:   []byte(fmt.Sprintf("You can find a alibaba secret %s within alibaba %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Alibaba,
 					Verified:     false,
-					Redacted:     id,
 				},
 			},
 			wantErr: false,
@@ -91,12 +90,27 @@ func TestAlibaba_FromChunk(t *testing.T) {
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Alibaba.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+func BenchmarkFromData(benchmark *testing.B) {
+	ctx := context.Background()
+	s := Scanner{}
+	for name, data := range detectors.MustGetBenchmarkData() {
+		benchmark.Run(name, func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_, err := s.FromData(ctx, false, data)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
