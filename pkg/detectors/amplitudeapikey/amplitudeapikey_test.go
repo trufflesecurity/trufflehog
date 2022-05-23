@@ -60,7 +60,7 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 
-				data:   []byte(fmt.Sprintf("You can find a amplitude key %s with amplitude secret %s within but not valid", inactiveKey, inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find an amplitude key %s with amplitude secret %s within but not valid", inactiveKey, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
