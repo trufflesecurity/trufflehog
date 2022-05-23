@@ -50,7 +50,7 @@ type Scanner struct {
 	excludeMatchers      []*regexp.Regexp
 }
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var keywords = []string{"pass", "token", "cred", "secret", "key"}

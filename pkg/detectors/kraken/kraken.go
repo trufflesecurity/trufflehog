@@ -22,13 +22,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	//Bounds have been removed because there are some cases that tokens have trailing frontslash(/) or plus sign (+)
 	keyPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{56}[ "'\r\n]{1})`)
 	privKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{86,88}[ "'\r\n]{1})`)

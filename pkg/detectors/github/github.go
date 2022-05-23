@@ -15,7 +15,7 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -23,7 +23,7 @@ var (
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
 	// Token type list:
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
-	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,255}\b)`)
+	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,255})\b`)
 
 	//TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
@@ -74,11 +74,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
 			res, err := client.Do(req)
 			if err == nil {
-				var userResponse userRes
-				err = json.NewDecoder(res.Body).Decode(&userResponse)
-				res.Body.Close()
-				if err == nil {
-					s.Verified = true
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					var userResponse userRes
+					err = json.NewDecoder(res.Body).Decode(&userResponse)
+					res.Body.Close()
+					if err == nil {
+						s.Verified = true
+					}
 				}
 			}
 		}

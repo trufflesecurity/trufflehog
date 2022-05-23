@@ -14,13 +14,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"shortcut"}) + `\b([0-9a-f-]{36})\b`)
 )
 

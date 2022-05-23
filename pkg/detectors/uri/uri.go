@@ -19,7 +19,7 @@ type Scanner struct {
 	allowKnownTestSites bool
 }
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (

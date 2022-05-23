@@ -8,6 +8,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 
 	log "github.com/sirupsen/logrus"
@@ -27,6 +28,8 @@ func TestSource_Scan(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
+	basicUser := secret.MustGetField("GITLAB_USER")
+	basicPass := secret.MustGetField("GITLAB_PASS")
 
 	type init struct {
 		name       string
@@ -70,6 +73,48 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source scoped",
+				Verify:     false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "basic auth, scoped repo",
+			init: init{
+				name: "test source basic auth scoped",
+				connection: &sourcespb.GitLab{
+					Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
+					Credential: &sourcespb.GitLab_BasicAuth{
+						BasicAuth: &credentialspb.BasicAuth{
+							Username: basicUser,
+							Password: basicPass,
+						},
+					},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+				SourceName: "test source basic auth scoped",
+				Verify:     false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "basic auth access token, scoped repo",
+			init: init{
+				name: "test source basic auth access token scoped",
+				connection: &sourcespb.GitLab{
+					Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
+					Credential: &sourcespb.GitLab_BasicAuth{
+						BasicAuth: &credentialspb.BasicAuth{
+							Username: basicUser,
+							Password: token,
+						},
+					},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+				SourceName: "test source basic auth access token scoped",
 				Verify:     false,
 			},
 			wantErr: false,

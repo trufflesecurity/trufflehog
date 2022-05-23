@@ -76,3 +76,28 @@ func TestGitEngine(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkGitEngine(b *testing.B) {
+	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
+	path, _, err := git.PrepareRepo(repoUrl)
+	if err != nil {
+		b.Error(err)
+	}
+	defer os.RemoveAll(path)
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	e := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(false, DefaultDetectors()...),
+	)
+	for i := 0; i < b.N; i++ {
+		e.ScanGit(ctx, path, "", "", 0, common.FilterEmpty())
+		resultCount := 0
+		for _ = range e.ResultsChan() {
+			resultCount++
+		}
+	}
+}

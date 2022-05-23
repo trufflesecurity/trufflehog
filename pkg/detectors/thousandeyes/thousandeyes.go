@@ -13,13 +13,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"thousandeyes"}) + `\b([a-zA-Z0-9]{32})\b`)
 	email  = regexp.MustCompile(detectors.PrefixRegex([]string{"thousandeyes"}) + `\b([a-zA-Z0-9]{3,20}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,5})\b`)
 )
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(tokenPatMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
