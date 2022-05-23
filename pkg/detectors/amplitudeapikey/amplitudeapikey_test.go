@@ -20,7 +20,10 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AMPLITUDEAPI_TOKEN")
+
+	key := testSecrets.MustGetField("AMPLITUDEAPI_KEY")
+	secret := testSecrets.MustGetField("AMPLITUDEAPI_SECRET")
+	inactiveKey := testSecrets.MustGetField("AMPLITUDEAPI_KEY_INACTIVE")
 	inactiveSecret := testSecrets.MustGetField("AMPLITUDEAPI_INACTIVE")
 
 	type args struct {
@@ -40,7 +43,7 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a amplitude secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find an amplitude key %s with amplitude secret %s within", key, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,7 +60,7 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 
-				data:   []byte(fmt.Sprintf("You can find a amplitudeapikey secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find an amplitude key %s with amplitude secret %s within but not valid", inactiveKey, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
