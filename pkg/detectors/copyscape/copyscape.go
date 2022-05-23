@@ -23,7 +23,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"copyscape"}) + `\b([0-9a-z]{16})\b`)
-	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"copyscape"}) + `\b([0-9a-zA-Z_]{4,22})\b`)
+	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"copyscape","id"}) + `\b([0-9a-zA-Z_]{4,22})\b`)
 
 )
 
@@ -38,7 +38,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	idmatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
