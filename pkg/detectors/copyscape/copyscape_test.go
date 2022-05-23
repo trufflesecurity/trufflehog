@@ -41,7 +41,7 @@ func TestCopyscape_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a copyscape secret %s within copyscapeId %s", secret,id)),
+				data:   []byte(fmt.Sprintf("You can find a copyscape secret %s within copyscape %s", secret,id)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,7 +57,7 @@ func TestCopyscape_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a copyscape secret %s within but not valid copyscapeId %s", inactiveSecret,id)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a copyscape secret %s within but not valid copyscape %s", inactiveSecret,id)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
