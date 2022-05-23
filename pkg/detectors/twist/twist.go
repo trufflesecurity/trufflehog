@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -23,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([0-9a-f]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([0-9a-f:]{40,47})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -43,23 +41,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
+		setAuth := resMatch
+
+		if strings.Contains(match[0], "oauth") {
+			setAuth = "oauth2:" + strings.TrimSpace(match[1])
+		}
+
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Twist,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			data := url.Values{}
-			data.Set("target_url", "google.com")
-			data.Set("event", "workspace_user_added")
-			encodedData := data.Encode()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.twist.com/api/v3/hooks/subscribe", strings.NewReader(encodedData))
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.twist.com/api/v3/users/get_session_user", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer oauth2:%s", resMatch))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", setAuth))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
