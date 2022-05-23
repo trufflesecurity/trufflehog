@@ -41,7 +41,7 @@ func TestWebsitepulse_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a websitepulse secret %s within websitepulseId %s", secret,id)),
+				data:   []byte(fmt.Sprintf("You can find a websitepulse secret %s within websitepulse %s", secret,id)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,7 +57,7 @@ func TestWebsitepulse_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a websitepulse secret %s within but not valid websitepulseId %s", inactiveSecret,id)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a websitepulse secret %s within but not valid websitepulse %s", inactiveSecret,id)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
