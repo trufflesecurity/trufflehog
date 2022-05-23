@@ -2,6 +2,7 @@ package twist
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -22,8 +23,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
-	passPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([0-9A-Za-z\S]{7,20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([0-9a-f]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,52 +37,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	passMatches := passPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
+		s1 := detectors.Result{
+			DetectorType: detectorspb.DetectorType_Twist,
+			Raw:          []byte(resMatch),
+		}
 
-		for _, passMatch := range passMatches {
-			if len(passMatch) != 2 {
+		if verify {
+			data := url.Values{}
+			data.Set("target_url", "google.com")
+			data.Set("event", "workspace_user_added")
+			encodedData := data.Encode()
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.twist.com/api/v3/hooks/subscribe", strings.NewReader(encodedData))
+			if err != nil {
 				continue
 			}
-
-			resPassMatch := strings.TrimSpace(passMatch[1])
-
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Twist,
-				Raw:          []byte(resPassMatch),
-			}
-
-			if verify {
-				data := url.Values{}
-				data.Set("email", resMatch)
-				data.Set("password", resPassMatch)
-				encodedData := data.Encode()
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.twist.com/api/v3/users/login", strings.NewReader(encodedData))
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-						if detectors.IsKnownFalsePositive(resPassMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer oauth2:%s", resMatch))
+			res, err := client.Do(req)
+			if err == nil {
+				defer res.Body.Close()
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					s1.Verified = true
+				} else {
+					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						continue
 					}
 				}
 			}
-			results = append(results, s1)
 		}
+		results = append(results, s1)
 	}
 	return detectors.CleanResults(results), nil
 }
