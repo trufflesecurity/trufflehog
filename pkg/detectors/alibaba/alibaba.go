@@ -56,8 +56,8 @@ func GetSignature(input, key string) string {
 }
 func buildStringToSign(method, input string) string {
 	filter := strings.Replace(input, "+", "%20", -1)
-	filter = strings.Replace(filter, "*", "%2A", -1)
 	filter = strings.Replace(filter, "%7E", "~", -1)
+	filter = strings.Replace(filter, "*", "%2A", -1)
 	filter = method + "&%2F&" + url.QueryEscape(filter)
 	return filter
 }
