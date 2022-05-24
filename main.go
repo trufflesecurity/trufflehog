@@ -180,7 +180,7 @@ func run(state overseer.State) {
 	var remote bool
 	switch cmd {
 	case gitScan.FullCommand():
-		repoPath, remote, err = git.PrepareRepo(*gitScanURI)
+		repoPath, remote, err = git.PrepareRepoSinceCommit(*gitScanURI, *gitScanSinceCommit)
 		if err != nil || repoPath == "" {
 			logrus.WithError(err).Fatal("error preparing git repo for scanning")
 		}

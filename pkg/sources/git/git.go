@@ -18,6 +18,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/google/go-github/v42/github"
 	"github.com/rs/zerolog"
 	log "github.com/sirupsen/logrus"
 	glgo "github.com/zricethezav/gitleaks/v8/detect/git"
@@ -201,7 +202,7 @@ func CleanOnError(err *error, path string) {
 	}
 }
 
-func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *git.Repository, err error) {
+func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath string, repo *git.Repository, err error) {
 	if err = GitCmdCheck(); err != nil {
 		return
 	}
@@ -216,9 +217,11 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 		err = errors.WrapPrefix(err, "could not parse url", 0)
 		return
 	}
-
 	cloneURL.User = userInfo
-	cloneCmd := exec.Command("git", "clone", cloneURL.String(), clonePath)
+
+	gitArgs := []string{"clone", cloneURL.String(), clonePath}
+	gitArgs = append(gitArgs, args...)
+	cloneCmd := exec.Command("git", gitArgs...)
 
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
@@ -245,14 +248,14 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string) (clonePath string, repo *g
 }
 
 // CloneRepoUsingToken clones a repo using a provided token.
-func CloneRepoUsingToken(token, gitUrl, user string) (string, *git.Repository, error) {
+func CloneRepoUsingToken(token, gitUrl, user string, args ...string) (string, *git.Repository, error) {
 	userInfo := url.UserPassword(user, token)
-	return CloneRepo(userInfo, gitUrl)
+	return CloneRepo(userInfo, gitUrl, args...)
 }
 
 // CloneRepoUsingUnauthenticated clones a repo with no authentication required.
-func CloneRepoUsingUnauthenticated(url string) (string, *git.Repository, error) {
-	return CloneRepo(nil, url)
+func CloneRepoUsingUnauthenticated(url string, args ...string) (string, *git.Repository, error) {
+	return CloneRepo(nil, url, args...)
 }
 
 func GitCmdCheck() error {
@@ -472,7 +475,71 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 	return nil, fmt.Errorf("no base refs succeeded for base: %q", base)
 }
 
-// PrepareRepo clones a repo if possible and returns the cloned repo string.
+// PrepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
+func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) {
+	if commitHash == "" {
+		return PrepareRepo(uriString)
+	}
+	// TODO: refactor with PrepareRepo to remove duplicated logic
+
+	// The git CLI doesn't have an option to shallow clone starting at a commit
+	// hash, but it does have an option to shallow clone since a timestamp. If
+	// the uriString is github.com, then we query the API for the timestamp of the
+	// hash and use that to clone.
+
+	uri, err := url.Parse(uriString)
+	if err != nil {
+		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
+	}
+
+	if uri.Scheme == "file" || uri.Host != "github.com" {
+		return PrepareRepo(uriString)
+	}
+
+	owner, repoName, found := strings.Cut(uri.Path, "/")
+	if !found {
+		return PrepareRepo(uriString)
+	}
+
+	client := github.NewClient(nil)
+	commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
+	if err != nil {
+		return PrepareRepo(uriString)
+	}
+	var timestamp string
+	{
+		author := commit.GetAuthor()
+		if author == nil {
+			return PrepareRepo(uriString)
+		}
+		timestamp = author.GetDate().Format(time.RFC3339)
+	}
+
+	remotePath := uri.String()
+	var path string
+	switch {
+	case uri.User != nil:
+		log.Debugf("Cloning remote Git repo with authentication")
+		password, ok := uri.User.Password()
+		if !ok {
+			return "", true, fmt.Errorf("password must be included in Git repo URL when username is provided")
+		}
+		path, _, err = CloneRepoUsingToken(password, remotePath, uri.User.Username(), "--shallow-since", timestamp)
+		if err != nil {
+			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
+		}
+	default:
+		log.Debugf("Cloning remote Git repo without authentication")
+		path, _, err = CloneRepoUsingUnauthenticated(remotePath, "--shallow-since", timestamp)
+		if err != nil {
+			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+		}
+	}
+	log.Debugf("Git repo local path: %s", path)
+	return path, true, nil
+}
+
+// PrepareRepo clones a repo if possible and returns the cloned repo path.
 func PrepareRepo(uriString string) (string, bool, error) {
 	var path string
 	uri, err := url.Parse(uriString)
@@ -485,7 +552,7 @@ func PrepareRepo(uriString string) (string, bool, error) {
 	case "file":
 		path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
 	case "http", "https":
-		remotePath := fmt.Sprintf("%s://%s%s", uri.Scheme, uri.Host, uri.Path)
+		remotePath := uri.String()
 		remote = true
 		switch {
 		case uri.User != nil:
