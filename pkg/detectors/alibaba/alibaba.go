@@ -54,6 +54,13 @@ func GetSignature(input, key string) string {
 	h.Write([]byte(input))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
+func buildStringToSign(method, input string) string {
+	filter := strings.Replace(input, "+", "%20", -1)
+	filter = strings.Replace(filter, "*", "%2A", -1)
+	filter = strings.Replace(filter, "%7E", "~", -1)
+	filter = method + "&%2F&" + url.QueryEscape(filter)
+	return filter
+}
 
 // FromData will find and optionally verify Alibaba secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -95,8 +102,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Timestamp", dateISO)
 				params.Add("Version", "2014-05-26")
 
-				stringToSign := req.Method + "&%2F&" + url.QueryEscape(params.Encode())
-
+				stringToSign := buildStringToSign(req.Method, params.Encode())
 				signature := GetSignature(stringToSign, resMatch+"&") //Get Signature HMAC SHA1
 				params.Add("Signature", signature)
 				req.URL.RawQuery = params.Encode()
