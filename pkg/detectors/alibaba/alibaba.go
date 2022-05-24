@@ -34,7 +34,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"alibaba"}
+	return []string{"LTAI"}
 }
 
 func randString(n int) string {
@@ -53,14 +53,6 @@ func GetSignature(input, key string) string {
 	h := hmac.New(sha1.New, key_for_sign)
 	h.Write([]byte(input))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
-}
-func buildStringToSign(input string) string {
-	filter := strings.Replace(input, "+", "%20", -1)
-	filter = strings.Replace(filter, "*", "%2A", -1)
-	filter = strings.Replace(filter, "%7E", "~", -1)
-	method := "GET"
-	filter = method + "&%2F&" + url.QueryEscape(filter)
-	return filter
 }
 
 // FromData will find and optionally verify Alibaba secrets in a given set of bytes.
@@ -103,7 +95,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Timestamp", dateISO)
 				params.Add("Version", "2014-05-26")
 
-				stringToSign := buildStringToSign(params.Encode())
+				stringToSign := req.Method + "&%2F&" + url.QueryEscape(params.Encode())
+
 				signature := GetSignature(stringToSign, resMatch+"&") //Get Signature HMAC SHA1
 				params.Add("Signature", signature)
 				req.URL.RawQuery = params.Encode()
