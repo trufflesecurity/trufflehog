@@ -506,16 +506,16 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 	if err != nil {
 		return PrepareRepo(uriString)
 	}
-	var ts string
+	var timestamp string
 	{
 		author := commit.GetAuthor()
 		if author == nil {
 			return PrepareRepo(uriString)
 		}
-		ts = author.GetDate().Format(time.RFC3339)
+		timestamp = author.GetDate().Format(time.RFC3339)
 	}
 
-	remotePath := fmt.Sprintf("%s://%s%s", uri.Scheme, uri.Host, uri.Path)
+	remotePath := uri.String()
 	var path string
 	switch {
 	case uri.User != nil:
@@ -524,13 +524,13 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 		if !ok {
 			return "", true, fmt.Errorf("password must be included in Git repo URL when username is provided")
 		}
-		path, _, err = CloneRepoUsingToken(password, remotePath, uri.User.Username(), "--shallow-since", ts)
+		path, _, err = CloneRepoUsingToken(password, remotePath, uri.User.Username(), "--shallow-since", timestamp)
 		if err != nil {
 			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
 		}
 	default:
 		log.Debugf("Cloning remote Git repo without authentication")
-		path, _, err = CloneRepoUsingUnauthenticated(remotePath, "--shallow-since", ts)
+		path, _, err = CloneRepoUsingUnauthenticated(remotePath, "--shallow-since", timestamp)
 		if err != nil {
 			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 		}
@@ -552,7 +552,7 @@ func PrepareRepo(uriString string) (string, bool, error) {
 	case "file":
 		path = fmt.Sprintf("%s%s", uri.Host, uri.Path)
 	case "http", "https":
-		remotePath := fmt.Sprintf("%s://%s%s", uri.Scheme, uri.Host, uri.Path)
+		remotePath := uri.String()
 		remote = true
 		switch {
 		case uri.User != nil:
