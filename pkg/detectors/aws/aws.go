@@ -2,11 +2,14 @@ package aws
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
-
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -19,9 +22,12 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	client = common.SaneHttpClient()
+
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
-	keyPat    = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
-	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})\b`)
+	keyPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})\b`)
+	idPat  = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,67 +41,114 @@ func (s Scanner) Keywords() []string {
 	}
 }
 
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
-	dataStr := string(data)
-	var results []detectors.Result
-
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
-
-	for _, keyMatch := range keyMatches {
-		if len(keyMatch) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(keyMatch[1])
-
-		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_AWS,
-			Raw:          []byte(key),
-			Redacted:     key,
-		}
-		// TODO: Remove possible matches if they verify positive.
-		if verify {
-			for _, secretMatch := range secretMatches {
-				if len(secretMatch) != 2 {
-					continue
-				}
-
-				secret := strings.TrimSpace(secretMatch[1])
-
-				result, err := callerIdentity(ctx, key, secret)
-				if err != nil {
-					// It also errors for signature mismatches on the client side before sending, and it's quite noisy.
-					continue
-				}
-				if result != nil && result.Account != nil {
-					s.Verified = true
-					break
-				}
-			}
-		}
-
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
-		}
-
-		if len(secretMatches) > 0 {
-			results = append(results, s)
-		}
-	}
-
-	return detectors.CleanResults(results), nil
+func GetHash(input string) string {
+	data := []byte(input)
+	hasher := sha256.New()
+	hasher.Write(data)
+	return (hex.EncodeToString(hasher.Sum(nil)))
 }
 
-func callerIdentity(ctx context.Context, key, secret string) (*sts.GetCallerIdentityOutput, error) {
-	svc := sts.New(sts.Options{
-		HTTPClient:  common.SaneHttpClient(),
-		Logger:      nil,
-		Region:      "us-west-2",
-		Credentials: credentials.NewStaticCredentialsProvider(key, secret, ""),
-	})
-	result, err := svc.GetCallerIdentity(ctx, nil)
-	return result, err
+func GetHMAC(key []byte, data []byte) []byte {
+	hasher := hmac.New(sha256.New, key)
+	hasher.Write(data)
+	return hasher.Sum(nil)
+}
+
+// FromData will find and optionally verify AWS secrets in a given set of bytes.
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	dataStr := string(data)
+
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+
+	for _, match := range matches {
+		if len(match) != 2 {
+			continue
+		}
+		resMatch := strings.TrimSpace(match[1])
+
+		for _, idMatch := range idMatches {
+			if len(idMatch) != 2 {
+				continue
+			}
+
+			resIdMatch := strings.TrimSpace(idMatch[1])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Raw:          []byte(resMatch),
+			}
+
+			if verify {
+				//REQUEST VALUES
+				method := "GET"
+				service := "iam"
+				host := "iam.amazonaws.com"
+				region := "us-east-1"
+				endpoint := "https://iam.amazonaws.com"
+				datestamp := time.Now().UTC().Format("20060102")
+				amz_date := time.Now().UTC().Format("20060102T150405Z0700")
+
+				req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
+				if err != nil {
+					continue
+				}
+
+				// TASK 1: CREATE A CANONICAL REQUEST
+				// http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
+				canonical_uri := "/"
+				canonical_headers := "host:" + host + "\n"
+				signed_headers := "host"
+				algorithm := "AWS4-HMAC-SHA256"
+				credential_scope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
+
+				params := req.URL.Query()
+				params.Add("Action", "ListUsers")
+				params.Add("Version", "2010-05-08")
+				params.Add("X-Amz-Algorithm", algorithm)
+				params.Add("X-Amz-Credential", resIdMatch+"/"+credential_scope)
+				params.Add("X-Amz-Date", amz_date)
+				params.Add("X-Amz-Expires", "30")
+				params.Add("X-Amz-SignedHeaders", signed_headers)
+
+				canonical_querystring := params.Encode()
+				payload_hash := GetHash("") //empty payload
+				canonical_request := method + "\n" + canonical_uri + "\n" + canonical_querystring + "\n" + canonical_headers + "\n" + signed_headers + "\n" + payload_hash
+
+				// TASK 2: CREATE THE STRING TO SIGN
+				string_to_sign := algorithm + "\n" + amz_date + "\n" + credential_scope + "\n" + GetHash(canonical_request)
+
+				// TASK 3: CALCULATE THE SIGNATURE
+				//https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
+				hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resMatch)), []byte(datestamp))
+				hash = GetHMAC(hash, []byte(region))
+				hash = GetHMAC(hash, []byte(service))
+				hash = GetHMAC(hash, []byte("aws4_request"))
+
+				signature2 := GetHMAC([]byte(hash), []byte(string_to_sign)) //Get Signature HMAC SHA256
+				signature := hex.EncodeToString(signature2)
+
+				// TASK 4: ADD SIGNING INFORMATION TO THE REQUEST
+				params.Add("X-Amz-Signature", signature)
+				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
+				req.URL.RawQuery = params.Encode()
+
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
+					}
+				}
+			}
+
+			results = append(results, s1)
+		}
+	}
+	return detectors.CleanResults(results), nil
 }
