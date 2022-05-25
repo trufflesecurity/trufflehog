@@ -22,7 +22,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scalr"}) + `\b([0-9a-zA-Z._]{136})`)
-	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scalrId"}) + `\b([0-9a-z]{4,50})\b`)
+	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scalr"}) + `\b([0-9a-z]{4,50})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
