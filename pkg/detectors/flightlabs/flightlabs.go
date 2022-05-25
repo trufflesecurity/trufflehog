@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				bodyString := string(bodyBytes)
-				validResponse := !strings.Contains(bodyString, `"invalid access key`)
+				validResponse := strings.Contains(bodyString, `"id"`)
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 					s1.Verified = true
