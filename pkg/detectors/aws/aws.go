@@ -99,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				canonicalURI := "/"
 				canonicalHeaders := "host:" + host + "\n"
 				signedHeaders := "host"
-				var algorithm = "AWS4-HMAC-SHA256"
+				algorithm := "AWS4-HMAC-SHA256"
 				credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
 
 				params := req.URL.Query()
