@@ -40,12 +40,13 @@ func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []
 		return err
 	}
 
+	e.sourcesWg.Add(1)
 	go func() {
+		defer e.sourcesWg.Done()
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Fatal("could not scan github")
 		}
-		close(e.ChunksChan())
 	}()
 	return nil
 }

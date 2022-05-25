@@ -26,6 +26,8 @@ type Engine struct {
 	detectors       map[bool][]detectors.Detector
 	chunksScanned   uint64
 	detectorAvgTime sync.Map
+	sourcesWg       sync.WaitGroup
+	workersWg       sync.WaitGroup
 }
 
 type EngineOption func(*Engine)
@@ -75,15 +77,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 	logrus.Debugf("running with up to %d workers", e.concurrency)
 
-	var workerWg sync.WaitGroup
-	for i := 0; i < e.concurrency; i++ {
-		workerWg.Add(1)
-		go func() {
-			e.detectorWorker(ctx)
-			workerWg.Done()
-		}()
-	}
-
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
 	}
@@ -101,16 +94,34 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		len(e.detectors[false]))
 
 	// start the workers
-	go func() {
-		// close results chan when all workers are done
-		workerWg.Wait()
-		// not entirely sure why results don't get processed without this pause
-		// since we've put all results on the channel at this point.
-		time.Sleep(time.Second)
-		close(e.ResultsChan())
-	}()
+	for i := 0; i < e.concurrency; i++ {
+		e.workersWg.Add(1)
+		go func() {
+			defer e.workersWg.Done()
+			e.detectorWorker(ctx)
+		}()
+	}
 
 	return e
+}
+
+// Finish waits for running sources to complete and workers to finish scanning
+// chunks before closing their respective channels. Once Finish is called, no
+// more sources may be scanned by the engine.
+func (e *Engine) Finish() {
+	// wait for the sources to finish putting chunks onto the chunks channel
+	e.sourcesWg.Wait()
+	close(e.chunks)
+	// wait for the workers to finish processing all of the chunks and putting
+	// results onto the results channel
+	e.workersWg.Wait()
+
+	// TODO: re-evaluate whether this is needed and investigate why if so
+	//
+	// not entirely sure why results don't get processed without this pause
+	// since we've put all results on the channel at this point.
+	time.Sleep(time.Second)
+	close(e.results)
 }
 
 func (e *Engine) ChunksChan() chan *sources.Chunk {

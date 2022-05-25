@@ -1,9 +1,11 @@
 package output
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
@@ -13,7 +15,24 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
+
+func PrintLegacyJSON(r *detectors.ResultWithMetadata) {
+	repoPath, remote, err := git.PrepareRepo(r.SourceMetadata.GetGithub().Repository)
+	if err != nil || repoPath == "" {
+		logrus.WithError(err).Fatal("error preparing git repo for scanning")
+	}
+	if remote {
+		defer os.RemoveAll(repoPath)
+	}
+	legacy := ConvertToLegacyJSON(r, repoPath)
+	out, err := json.Marshal(legacy)
+	if err != nil {
+		logrus.WithError(err).Fatal("could not marshal result")
+	}
+	fmt.Println(string(out))
+}
 
 func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) *LegacyJSONOutput {
 	var source LegacyJSONCompatibleSource
