@@ -96,7 +96,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				// TASK 1: CREATE A CANONICAL REQUEST.
 				// http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-				canonicalUri := "/"
+				canonicalURI := "/"
 				canonicalHeaders := "host:" + host + "\n"
 				signedHeaders := "host"
 				var algorithm = "AWS4-HMAC-SHA256"
@@ -113,7 +113,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				canonicalQuerystring := params.Encode()
 				payloadHash := GetHash("") //empty payload
-				canonicalRequest := method + "\n" + canonicalUri + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
+				canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
 
 				// TASK 2: CREATE THE STRING TO SIGN.
 				stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
