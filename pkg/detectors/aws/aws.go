@@ -82,10 +82,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				//REQUEST VALUES
 				method := "GET"
-				service := "iam"
-				host := "iam.amazonaws.com"
+				service := "sts"
+				host := "sts.amazonaws.com"
 				region := "us-east-1"
-				endpoint := "https://iam.amazonaws.com"
+				endpoint := "https://sts.amazonaws.com"
 				datestamp := time.Now().UTC().Format("20060102")
 				amz_date := time.Now().UTC().Format("20060102T150405Z0700")
 
@@ -103,8 +103,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				credential_scope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
 
 				params := req.URL.Query()
-				params.Add("Action", "ListUsers")
-				params.Add("Version", "2010-05-08")
+				params.Add("Action", "GetCallerIdentity")
+				params.Add("Version", "2011-06-15")
 				params.Add("X-Amz-Algorithm", algorithm)
 				params.Add("X-Amz-Credential", resIdMatch+"/"+credential_scope)
 				params.Add("X-Amz-Date", amz_date)
