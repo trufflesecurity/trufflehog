@@ -3,9 +3,10 @@ package engine
 import (
 	"context"
 	"fmt"
+	"runtime"
+
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"runtime"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -102,12 +103,13 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 			}
 		})
 
+	e.sourcesWg.Add(1)
 	go func() {
+		defer e.sourcesWg.Done()
 		err := gitSource.ScanRepo(ctx, repo, repoPath, scanOptions, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Fatal("could not scan repo")
 		}
-		close(e.ChunksChan())
 	}()
 	return nil
 }

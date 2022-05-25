@@ -2,6 +2,8 @@ package engine
 
 import (
 	"fmt"
+	"runtime"
+
 	"github.com/go-errors/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -9,7 +11,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"runtime"
 )
 
 func (e *Engine) ScanGitLab(ctx context.Context, endpoint, token string, repositories []string) error {
@@ -44,12 +45,14 @@ func (e *Engine) ScanGitLab(ctx context.Context, endpoint, token string, reposit
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init GitLab source", 0)
 	}
+
+	e.sourcesWg.Add(1)
 	go func() {
+		defer e.sourcesWg.Done()
 		err := gitlabSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Error("error scanning GitLab")
 		}
-		close(e.ChunksChan())
 	}()
 	return nil
 }

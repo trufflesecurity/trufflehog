@@ -2,11 +2,12 @@ package engine
 
 import (
 	"context"
+	"os"
+
 	"github.com/go-errors/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"os"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/syslog"
@@ -46,12 +47,13 @@ func (e *Engine) ScanSyslog(ctx context.Context, address, protocol, certPath, ke
 		return err
 	}
 
+	e.sourcesWg.Add(1)
 	go func() {
+		defer e.sourcesWg.Done()
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Fatal("could not scan syslog")
 		}
-		close(e.ChunksChan())
 	}()
 	return nil
 }
