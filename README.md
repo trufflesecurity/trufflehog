@@ -156,7 +156,7 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
 ### TruffleHog OSS Github Action
 
 ```- name: TruffleHog OSS
-  uses: trufflesecurity/trufflehog@v3.4.2
+  uses: trufflesecurity/trufflehog@main
   with:
     # Repository path
     path: 
