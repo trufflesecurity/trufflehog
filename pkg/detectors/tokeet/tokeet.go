@@ -22,7 +22,7 @@ var (
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tokeet"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
-	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tokeet"}) + `\b([0-9.]{15})\b`)
+	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tokeet"}) + `\b([0-9]{10}.[0-9]{4})\b`)
 
 )
 
