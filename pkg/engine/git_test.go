@@ -57,6 +57,7 @@ func TestGitEngine(t *testing.T) {
 			WithDetectors(false, DefaultDetectors()...),
 		)
 		e.ScanGit(ctx, path, tTest.branch, tTest.base, tTest.maxDepth, tTest.filter)
+		go e.Finish()
 		resultCount := 0
 		for result := range e.ResultsChan() {
 			switch meta := result.SourceMetadata.GetData().(type) {
@@ -93,11 +94,17 @@ func BenchmarkGitEngine(b *testing.B) {
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(false, DefaultDetectors()...),
 	)
-	for i := 0; i < b.N; i++ {
-		e.ScanGit(ctx, path, "", "", 0, common.FilterEmpty())
+	go func() {
 		resultCount := 0
-		for _ = range e.ResultsChan() {
+		for range e.ResultsChan() {
 			resultCount++
 		}
+	}()
+
+	for i := 0; i < b.N; i++ {
+		// TODO: this is measuring the time it takes to initialize the source
+		// and not to do the full scan
+		e.ScanGit(ctx, path, "", "", 0, common.FilterEmpty())
 	}
+	e.Finish()
 }
