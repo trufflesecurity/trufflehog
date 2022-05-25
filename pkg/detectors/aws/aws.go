@@ -45,7 +45,7 @@ func GetHash(input string) string {
 	data := []byte(input)
 	hasher := sha256.New()
 	hasher.Write(data)
-	return (hex.EncodeToString(hasher.Sum(nil)))
+	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func GetHMAC(key []byte, data []byte) []byte {
@@ -80,55 +80,55 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				//REQUEST VALUES
+				// REQUEST VALUES.
 				method := "GET"
 				service := "sts"
 				host := "sts.amazonaws.com"
 				region := "us-east-1"
 				endpoint := "https://sts.amazonaws.com"
 				datestamp := time.Now().UTC().Format("20060102")
-				amz_date := time.Now().UTC().Format("20060102T150405Z0700")
+				amzDate := time.Now().UTC().Format("20060102T150405Z0700")
 
 				req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 				if err != nil {
 					continue
 				}
 
-				// TASK 1: CREATE A CANONICAL REQUEST
+				// TASK 1: CREATE A CANONICAL REQUEST.
 				// http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-				canonical_uri := "/"
-				canonical_headers := "host:" + host + "\n"
-				signed_headers := "host"
-				algorithm := "AWS4-HMAC-SHA256"
-				credential_scope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
+				canonicalUri := "/"
+				canonicalHeaders := "host:" + host + "\n"
+				signedHeaders := "host"
+				var algorithm = "AWS4-HMAC-SHA256"
+				credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
 
 				params := req.URL.Query()
 				params.Add("Action", "GetCallerIdentity")
 				params.Add("Version", "2011-06-15")
 				params.Add("X-Amz-Algorithm", algorithm)
-				params.Add("X-Amz-Credential", resIdMatch+"/"+credential_scope)
-				params.Add("X-Amz-Date", amz_date)
+				params.Add("X-Amz-Credential", resIdMatch+"/"+credentialScope)
+				params.Add("X-Amz-Date", amzDate)
 				params.Add("X-Amz-Expires", "30")
-				params.Add("X-Amz-SignedHeaders", signed_headers)
+				params.Add("X-Amz-SignedHeaders", signedHeaders)
 
-				canonical_querystring := params.Encode()
-				payload_hash := GetHash("") //empty payload
-				canonical_request := method + "\n" + canonical_uri + "\n" + canonical_querystring + "\n" + canonical_headers + "\n" + signed_headers + "\n" + payload_hash
+				canonicalQuerystring := params.Encode()
+				payloadHash := GetHash("") //empty payload
+				canonicalRequest := method + "\n" + canonicalUri + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
 
-				// TASK 2: CREATE THE STRING TO SIGN
-				string_to_sign := algorithm + "\n" + amz_date + "\n" + credential_scope + "\n" + GetHash(canonical_request)
+				// TASK 2: CREATE THE STRING TO SIGN.
+				stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
 
-				// TASK 3: CALCULATE THE SIGNATURE
-				//https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
+				// TASK 3: CALCULATE THE SIGNATURE.
+				// https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
 				hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resMatch)), []byte(datestamp))
 				hash = GetHMAC(hash, []byte(region))
 				hash = GetHMAC(hash, []byte(service))
 				hash = GetHMAC(hash, []byte("aws4_request"))
 
-				signature2 := GetHMAC([]byte(hash), []byte(string_to_sign)) //Get Signature HMAC SHA256
+				signature2 := GetHMAC(hash, []byte(stringToSign)) //Get Signature HMAC SHA256
 				signature := hex.EncodeToString(signature2)
 
-				// TASK 4: ADD SIGNING INFORMATION TO THE REQUEST
+				// TASK 4: ADD SIGNING INFORMATION TO THE REQUEST.
 				params.Add("X-Amz-Signature", signature)
 				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
 				req.URL.RawQuery = params.Encode()
