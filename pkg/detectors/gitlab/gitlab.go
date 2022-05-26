@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b(glpat-[0-9a-zA-Z_\-]{20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
