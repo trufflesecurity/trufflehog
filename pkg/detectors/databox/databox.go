@@ -2,11 +2,11 @@ package databox
 
 import (
 	"context"
+	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
-	b64 "encoding/base64"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"databox"}) + `\b([a-z0-9]{21})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"databox"}) + common.BuildRegex(common.RegexPattern, 21))
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

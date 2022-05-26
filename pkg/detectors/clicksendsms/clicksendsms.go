@@ -22,8 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sms"}) + `\b([a-zA-Z0-9]{3,20}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,5})\b`)
+	keyPat = regexp.MustCompile(common.UUIDPatternUpperCase)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sms"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

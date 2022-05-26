@@ -21,9 +21,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + `\b([0-9a-zA-Z]{32})\b`)
-	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat", "domain"}) + `\b([0-9a-z]{2,20})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.BuildRegex(common.Base64Pattern, 32))
+	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.EmailPattern)
+	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat", "domain"}) + common.SubDomainPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
