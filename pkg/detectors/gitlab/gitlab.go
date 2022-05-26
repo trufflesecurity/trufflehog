@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -17,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b(glpat-[0-9a-zA-Z_\-]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b((?:glpat|)[a-zA-Z0-9\-=_]{20,22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -36,6 +37,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if len(match) != 2 {
 			continue
 		}
+		resMatch := strings.TrimSpace(match[1])
+		if strings.Contains(match[0], "glpat") {
+			keyString := strings.Split(match[0], " ")
+			resMatch = keyString[2]
+		}
 
 		secret := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitlab,
@@ -50,13 +56,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			baseURL := "https://gitlab.com/api/v4"
 
 			client := common.SaneHttpClient()
-
 			// test `read_user` scope
 			req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/user", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				res.Body.Close() // The request body is unused.
