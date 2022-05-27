@@ -23,28 +23,17 @@ func BuildRegex(pattern string, specialChar string, length int) string {
 }
 
 func BuildRegexJWT(firstRange, secondRange, thirdRange string) string {
-	first_range_split := strings.Split(firstRange, ",")
-	first_range_min, _ := strconv.ParseInt(strings.TrimSpace(first_range_split[0]), 10, 0)
-	first_range_max, _ := strconv.ParseInt(strings.TrimSpace(first_range_split[1]), 10, 0)
-	if first_range_min >= first_range_max {
-		log.Error("First min value should not be greater than or equal to max")
+	if RangeValidation(firstRange) || RangeValidation(secondRange) || RangeValidation(thirdRange) {
+		log.Error("Min value should not be greater than or equal to max")
 	}
-
-	second_range_split := strings.Split(secondRange, ",")
-	second_range_min, _ := strconv.ParseInt(strings.TrimSpace(second_range_split[0]), 10, 0)
-	second_range_max, _ := strconv.ParseInt(strings.TrimSpace(second_range_split[1]), 10, 0)
-	if second_range_min >= second_range_max {
-		log.Error("Second min value should not be greater than or equal to max")
-	}
-
-	third_range_split := strings.Split(thirdRange, ",")
-	third_range_min, _ := strconv.ParseInt(strings.TrimSpace(third_range_split[0]), 10, 0)
-	third_range_max, _ := strconv.ParseInt(strings.TrimSpace(third_range_split[1]), 10, 0)
-	if third_range_min >= third_range_max {
-		log.Error("Third min value should not be greater than or equal to max")
-	}
-
 	return fmt.Sprintf(`\b(ey[%s]{%s}.ey[%s-\/_]{%s}.[%s-\/_]{%s})\b`, AlphaNumPattern, firstRange, AlphaNumPattern, secondRange, AlphaNumPattern, thirdRange)
+}
+
+func RangeValidation(rangeInput string) bool {
+	range_split := strings.Split(rangeInput, ",")
+	range_min, _ := strconv.ParseInt(strings.TrimSpace(range_split[0]), 10, 0)
+	range_max, _ := strconv.ParseInt(strings.TrimSpace(range_split[1]), 10, 0)
+	return range_min >= range_max
 }
 
 func ToUpperCase(input string) string {
