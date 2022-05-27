@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"speechtext"}) + common.BuildRegex(common.HexPattern, 32))
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"speechtext"}) + common.BuildRegex(common.HexPattern, "", 32))
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

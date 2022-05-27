@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.BuildRegex(common.Base64Pattern, 32))
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.BuildRegex(common.AlphaNumPattern, "", 32))
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.EmailPattern)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat", "domain"}) + common.SubDomainPattern)
 )
