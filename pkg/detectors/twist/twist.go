@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		setAuth := resMatch
 
 		if strings.Contains(match[0], "oauth") {
-			setAuth = "oauth2:" + strings.TrimSpace(match[1])
+			setAuth = fmt.Sprintf("oauth2:%s", strings.TrimSpace(match[1]))
 		}
 
 		s1 := detectors.Result{
