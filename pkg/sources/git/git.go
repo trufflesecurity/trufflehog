@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog"
 	log "github.com/sirupsen/logrus"
 	glgo "github.com/zricethezav/gitleaks/v8/detect/git"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -496,12 +497,21 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 		return PrepareRepo(uriString)
 	}
 
-	owner, repoName, found := strings.Cut(uri.Path, "/")
+	uriPath := strings.TrimPrefix(uri.Path, "/")
+	owner, repoName, found := strings.Cut(uriPath, "/")
 	if !found {
 		return PrepareRepo(uriString)
 	}
 
 	client := github.NewClient(nil)
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: token},
+		)
+		tc := oauth2.NewClient(context.TODO(), ts)
+		client = github.NewClient(tc)
+	}
+
 	commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
 	if err != nil {
 		return PrepareRepo(uriString)
