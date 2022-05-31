@@ -220,7 +220,7 @@ message Jenkins {
 message Teams {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
-    credentials.AccessToken token = 2;
+    string token = 2;
     credentials.ClientCredentials authenticated = 3;
   }
   repeated string channels = 4;
@@ -233,7 +233,7 @@ message Artifactory {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
-    credentials.AccessToken access_token = 3;
+    string access_token = 3;
   }
   repeated string repositories = 4;
 }
