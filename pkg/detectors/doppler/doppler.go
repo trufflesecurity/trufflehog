@@ -20,6 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
+	// Note: For SCIM Token, you need to have an Enterprise subsciption and a verified domain where you can add a DNS Configuration given by the service
 	personalTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"doppler"}) + `\b(dp\.pt\.[a-zA-Z0-9]{40,44})\b`)
 	serviceTokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"doppler"}) + `\b(dp\.st\.(?:[a-z0-9\-_]{2,35}\.)?[a-zA-Z0-9]{40,44})\b`)
 	auditTokenPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"doppler"}) + `\b(dp\.audit\.[a-zA-Z0-9]{40,44})\b`)
