@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"transferwise"}) + `\b([0-9a-f-]{36})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"transferwise"}) + `\b([0-9a-f-]{8}-[0-9a-f-]{4}-[0-9a-f-]{4}-[0-9a-f-]{4}-[0-9a-f-]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
