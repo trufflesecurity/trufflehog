@@ -143,6 +143,12 @@ func run(state overseer.State) {
 		fmt.Println("trufflehog " + version.BuildVersion)
 	}
 
+	if *githubScanToken != "" {
+		// NOTE: this kludge is here to do an authenticated shallow commit
+		// TODO: refactor to better pass credentials
+		os.Setenv("GITHUB_TOKEN", *githubScanToken)
+	}
+
 	// When setting a base commit, chunks must be scanned in order.
 	if *gitScanSinceCommit != "" {
 		*concurrency = 1
