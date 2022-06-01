@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.transferwise.com/v1/profiles", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.transferwise.com/v2/profiles", nil)
 			if err != nil {
 				continue
 			}
