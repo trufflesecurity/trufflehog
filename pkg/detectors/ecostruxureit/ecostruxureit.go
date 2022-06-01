@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ecostruxureit"}) + `\b([0-9a-zA-Z\/]{56})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ecostruxureit"}) + `\b(AK1[0-9a-zA-Z\/]{50,55})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
