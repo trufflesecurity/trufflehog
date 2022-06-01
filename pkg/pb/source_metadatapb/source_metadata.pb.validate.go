@@ -2562,6 +2562,124 @@ var _ interface {
 	ErrorName() string
 } = SyslogValidationError{}
 
+// Validate checks the field values on PublicEventMonitoring with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *PublicEventMonitoring) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on PublicEventMonitoring with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// PublicEventMonitoringMultiError, or nil if none found.
+func (m *PublicEventMonitoring) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *PublicEventMonitoring) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Link
+
+	// no validation rules for Username
+
+	// no validation rules for Repository
+
+	// no validation rules for Commit
+
+	// no validation rules for Email
+
+	// no validation rules for File
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Line
+
+	if len(errors) > 0 {
+		return PublicEventMonitoringMultiError(errors)
+	}
+
+	return nil
+}
+
+// PublicEventMonitoringMultiError is an error wrapping multiple validation
+// errors returned by PublicEventMonitoring.ValidateAll() if the designated
+// constraints aren't met.
+type PublicEventMonitoringMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PublicEventMonitoringMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PublicEventMonitoringMultiError) AllErrors() []error { return m }
+
+// PublicEventMonitoringValidationError is the validation error returned by
+// PublicEventMonitoring.Validate if the designated constraints aren't met.
+type PublicEventMonitoringValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PublicEventMonitoringValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PublicEventMonitoringValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PublicEventMonitoringValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PublicEventMonitoringValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PublicEventMonitoringValidationError) ErrorName() string {
+	return "PublicEventMonitoringValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e PublicEventMonitoringValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPublicEventMonitoring.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PublicEventMonitoringValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PublicEventMonitoringValidationError{}
+
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -3293,6 +3411,37 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "Syslog",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_PublicEventMonitoring:
+
+		if all {
+			switch v := interface{}(m.GetPublicEventMonitoring()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "PublicEventMonitoring",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "PublicEventMonitoring",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetPublicEventMonitoring()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "PublicEventMonitoring",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

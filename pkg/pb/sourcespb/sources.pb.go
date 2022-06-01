@@ -53,6 +53,7 @@ const (
 	SourceType_SOURCE_TYPE_TEAMS                      SourceType = 23
 	SourceType_SOURCE_TYPE_JFROG_ARTIFACTORY          SourceType = 24
 	SourceType_SOURCE_TYPE_SYSLOG                     SourceType = 25
+	SourceType_SOURCE_TYPE_PUBLIC_EVENT_MONITORING    SourceType = 26
 )
 
 // Enum value maps for SourceType.
@@ -84,6 +85,7 @@ var (
 		23: "SOURCE_TYPE_TEAMS",
 		24: "SOURCE_TYPE_JFROG_ARTIFACTORY",
 		25: "SOURCE_TYPE_SYSLOG",
+		26: "SOURCE_TYPE_PUBLIC_EVENT_MONITORING",
 	}
 	SourceType_value = map[string]int32{
 		"SOURCE_TYPE_AZURE_STORAGE":              0,
@@ -112,6 +114,7 @@ var (
 		"SOURCE_TYPE_TEAMS":                      23,
 		"SOURCE_TYPE_JFROG_ARTIFACTORY":          24,
 		"SOURCE_TYPE_SYSLOG":                     25,
+		"SOURCE_TYPE_PUBLIC_EVENT_MONITORING":    26,
 	}
 )
 
@@ -2315,6 +2318,88 @@ func (x *Syslog) GetFormat() string {
 	return ""
 }
 
+type PublicEventMonitoring struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Endpoint string `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	// Types that are assignable to Credential:
+	//	*PublicEventMonitoring_Unauthenticated
+	Credential isPublicEventMonitoring_Credential `protobuf_oneof:"credential"`
+	Domain     string                             `protobuf:"bytes,3,opt,name=domain,proto3" json:"domain,omitempty"`
+}
+
+func (x *PublicEventMonitoring) Reset() {
+	*x = PublicEventMonitoring{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_sources_proto_msgTypes[24]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PublicEventMonitoring) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicEventMonitoring) ProtoMessage() {}
+
+func (x *PublicEventMonitoring) ProtoReflect() protoreflect.Message {
+	mi := &file_sources_proto_msgTypes[24]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicEventMonitoring.ProtoReflect.Descriptor instead.
+func (*PublicEventMonitoring) Descriptor() ([]byte, []int) {
+	return file_sources_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *PublicEventMonitoring) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (m *PublicEventMonitoring) GetCredential() isPublicEventMonitoring_Credential {
+	if m != nil {
+		return m.Credential
+	}
+	return nil
+}
+
+func (x *PublicEventMonitoring) GetUnauthenticated() *credentialspb.Unauthenticated {
+	if x, ok := x.GetCredential().(*PublicEventMonitoring_Unauthenticated); ok {
+		return x.Unauthenticated
+	}
+	return nil
+}
+
+func (x *PublicEventMonitoring) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+type isPublicEventMonitoring_Credential interface {
+	isPublicEventMonitoring_Credential()
+}
+
+type PublicEventMonitoring_Unauthenticated struct {
+	Unauthenticated *credentialspb.Unauthenticated `protobuf:"bytes,2,opt,name=unauthenticated,proto3,oneof"`
+}
+
+func (*PublicEventMonitoring_Unauthenticated) isPublicEventMonitoring_Credential() {}
+
 var File_sources_proto protoreflect.FileDescriptor
 
 var file_sources_proto_rawDesc = []byte{
@@ -2596,7 +2681,18 @@ var file_sources_proto_rawDesc = []byte{
 	0x52, 0x07, 0x74, 0x6c, 0x73, 0x43, 0x65, 0x72, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x74, 0x6c, 0x73,
 	0x4b, 0x65, 0x79, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x74, 0x6c, 0x73, 0x4b, 0x65,
 	0x79, 0x12, 0x16, 0x0a, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x2a, 0xd0, 0x05, 0x0a, 0x0a, 0x53, 0x6f,
+	0x09, 0x52, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x22, 0xad, 0x01, 0x0a, 0x15, 0x50, 0x75,
+	0x62, 0x6c, 0x69, 0x63, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x4d, 0x6f, 0x6e, 0x69, 0x74, 0x6f, 0x72,
+	0x69, 0x6e, 0x67, 0x12, 0x24, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x42, 0x08, 0xfa, 0x42, 0x05, 0x72, 0x03, 0x90, 0x01, 0x01, 0x52,
+	0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x12, 0x48, 0x0a, 0x0f, 0x75, 0x6e, 0x61,
+	0x75, 0x74, 0x68, 0x65, 0x6e, 0x74, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x1c, 0x2e, 0x63, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x73,
+	0x2e, 0x55, 0x6e, 0x61, 0x75, 0x74, 0x68, 0x65, 0x6e, 0x74, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64,
+	0x48, 0x00, 0x52, 0x0f, 0x75, 0x6e, 0x61, 0x75, 0x74, 0x68, 0x65, 0x6e, 0x74, 0x69, 0x63, 0x61,
+	0x74, 0x65, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x64, 0x6f, 0x6d, 0x61, 0x69, 0x6e, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x06, 0x64, 0x6f, 0x6d, 0x61, 0x69, 0x6e, 0x42, 0x0c, 0x0a, 0x0a, 0x63,
+	0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x2a, 0xf9, 0x05, 0x0a, 0x0a, 0x53, 0x6f,
 	0x75, 0x72, 0x63, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x1d, 0x0a, 0x19, 0x53, 0x4f, 0x55, 0x52,
 	0x43, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x41, 0x5a, 0x55, 0x52, 0x45, 0x5f, 0x53, 0x54,
 	0x4f, 0x52, 0x41, 0x47, 0x45, 0x10, 0x00, 0x12, 0x19, 0x0a, 0x15, 0x53, 0x4f, 0x55, 0x52, 0x43,
@@ -2641,12 +2737,14 @@ var file_sources_proto_rawDesc = []byte{
 	0x17, 0x12, 0x21, 0x0a, 0x1d, 0x53, 0x4f, 0x55, 0x52, 0x43, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45,
 	0x5f, 0x4a, 0x46, 0x52, 0x4f, 0x47, 0x5f, 0x41, 0x52, 0x54, 0x49, 0x46, 0x41, 0x43, 0x54, 0x4f,
 	0x52, 0x59, 0x10, 0x18, 0x12, 0x16, 0x0a, 0x12, 0x53, 0x4f, 0x55, 0x52, 0x43, 0x45, 0x5f, 0x54,
-	0x59, 0x50, 0x45, 0x5f, 0x53, 0x59, 0x53, 0x4c, 0x4f, 0x47, 0x10, 0x19, 0x42, 0x3b, 0x5a, 0x39,
-	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66,
-	0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66,
-	0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x62, 0x2f,
-	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x33,
+	0x59, 0x50, 0x45, 0x5f, 0x53, 0x59, 0x53, 0x4c, 0x4f, 0x47, 0x10, 0x19, 0x12, 0x27, 0x0a, 0x23,
+	0x53, 0x4f, 0x55, 0x52, 0x43, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x50, 0x55, 0x42, 0x4c,
+	0x49, 0x43, 0x5f, 0x45, 0x56, 0x45, 0x4e, 0x54, 0x5f, 0x4d, 0x4f, 0x4e, 0x49, 0x54, 0x4f, 0x52,
+	0x49, 0x4e, 0x47, 0x10, 0x1a, 0x42, 0x3b, 0x5a, 0x39, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
+	0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72,
+	0x69, 0x74, 0x79, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76,
+	0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x62, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73,
+	0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2662,7 +2760,7 @@ func file_sources_proto_rawDescGZIP() []byte {
 }
 
 var file_sources_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_sources_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_sources_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_sources_proto_goTypes = []interface{}{
 	(SourceType)(0),                         // 0: sources.SourceType
 	(Confluence_GetAllSpacesScope)(0),       // 1: sources.Confluence.GetAllSpacesScope
@@ -2690,54 +2788,56 @@ var file_sources_proto_goTypes = []interface{}{
 	(*Teams)(nil),                           // 23: sources.Teams
 	(*Artifactory)(nil),                     // 24: sources.Artifactory
 	(*Syslog)(nil),                          // 25: sources.Syslog
-	(*durationpb.Duration)(nil),             // 26: google.protobuf.Duration
-	(*anypb.Any)(nil),                       // 27: google.protobuf.Any
-	(*credentialspb.BasicAuth)(nil),         // 28: credentials.BasicAuth
-	(*credentialspb.Unauthenticated)(nil),   // 29: credentials.Unauthenticated
-	(*credentialspb.Oauth2)(nil),            // 30: credentials.Oauth2
-	(*credentialspb.KeySecret)(nil),         // 31: credentials.KeySecret
-	(*credentialspb.GitHubApp)(nil),         // 32: credentials.GitHubApp
-	(*credentialspb.CloudEnvironment)(nil),  // 33: credentials.CloudEnvironment
-	(*credentialspb.Header)(nil),            // 34: credentials.Header
-	(*credentialspb.ClientCredentials)(nil), // 35: credentials.ClientCredentials
+	(*PublicEventMonitoring)(nil),           // 26: sources.PublicEventMonitoring
+	(*durationpb.Duration)(nil),             // 27: google.protobuf.Duration
+	(*anypb.Any)(nil),                       // 28: google.protobuf.Any
+	(*credentialspb.BasicAuth)(nil),         // 29: credentials.BasicAuth
+	(*credentialspb.Unauthenticated)(nil),   // 30: credentials.Unauthenticated
+	(*credentialspb.Oauth2)(nil),            // 31: credentials.Oauth2
+	(*credentialspb.KeySecret)(nil),         // 32: credentials.KeySecret
+	(*credentialspb.GitHubApp)(nil),         // 33: credentials.GitHubApp
+	(*credentialspb.CloudEnvironment)(nil),  // 34: credentials.CloudEnvironment
+	(*credentialspb.Header)(nil),            // 35: credentials.Header
+	(*credentialspb.ClientCredentials)(nil), // 36: credentials.ClientCredentials
 }
 var file_sources_proto_depIdxs = []int32{
-	26, // 0: sources.LocalSource.scan_interval:type_name -> google.protobuf.Duration
-	27, // 1: sources.LocalSource.connection:type_name -> google.protobuf.Any
-	28, // 2: sources.AzureStorage.basic_auth:type_name -> credentials.BasicAuth
-	29, // 3: sources.AzureStorage.unauthenticated:type_name -> credentials.Unauthenticated
-	30, // 4: sources.Bitbucket.oauth:type_name -> credentials.Oauth2
-	28, // 5: sources.Bitbucket.basic_auth:type_name -> credentials.BasicAuth
-	29, // 6: sources.Confluence.unauthenticated:type_name -> credentials.Unauthenticated
-	28, // 7: sources.Confluence.basic_auth:type_name -> credentials.BasicAuth
+	27, // 0: sources.LocalSource.scan_interval:type_name -> google.protobuf.Duration
+	28, // 1: sources.LocalSource.connection:type_name -> google.protobuf.Any
+	29, // 2: sources.AzureStorage.basic_auth:type_name -> credentials.BasicAuth
+	30, // 3: sources.AzureStorage.unauthenticated:type_name -> credentials.Unauthenticated
+	31, // 4: sources.Bitbucket.oauth:type_name -> credentials.Oauth2
+	29, // 5: sources.Bitbucket.basic_auth:type_name -> credentials.BasicAuth
+	30, // 6: sources.Confluence.unauthenticated:type_name -> credentials.Unauthenticated
+	29, // 7: sources.Confluence.basic_auth:type_name -> credentials.BasicAuth
 	1,  // 8: sources.Confluence.spaces_scope:type_name -> sources.Confluence.GetAllSpacesScope
-	29, // 9: sources.DockerHub.unauthenticated:type_name -> credentials.Unauthenticated
-	31, // 10: sources.ECR.access_key:type_name -> credentials.KeySecret
-	28, // 11: sources.Git.basic_auth:type_name -> credentials.BasicAuth
-	29, // 12: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
-	30, // 13: sources.GitLab.oauth:type_name -> credentials.Oauth2
-	28, // 14: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
-	32, // 15: sources.GitHub.github_app:type_name -> credentials.GitHubApp
-	29, // 16: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
-	28, // 17: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
-	29, // 18: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
-	30, // 19: sources.JIRA.oauth:type_name -> credentials.Oauth2
-	29, // 20: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	29, // 21: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	31, // 22: sources.S3.access_key:type_name -> credentials.KeySecret
-	29, // 23: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
-	33, // 24: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
-	28, // 25: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
-	29, // 26: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
-	28, // 27: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
-	34, // 28: sources.Jenkins.header:type_name -> credentials.Header
-	35, // 29: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
-	28, // 30: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
-	31, // [31:31] is the sub-list for method output_type
-	31, // [31:31] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	30, // 9: sources.DockerHub.unauthenticated:type_name -> credentials.Unauthenticated
+	32, // 10: sources.ECR.access_key:type_name -> credentials.KeySecret
+	29, // 11: sources.Git.basic_auth:type_name -> credentials.BasicAuth
+	30, // 12: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
+	31, // 13: sources.GitLab.oauth:type_name -> credentials.Oauth2
+	29, // 14: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
+	33, // 15: sources.GitHub.github_app:type_name -> credentials.GitHubApp
+	30, // 16: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
+	29, // 17: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
+	30, // 18: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
+	31, // 19: sources.JIRA.oauth:type_name -> credentials.Oauth2
+	30, // 20: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	30, // 21: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	32, // 22: sources.S3.access_key:type_name -> credentials.KeySecret
+	30, // 23: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
+	34, // 24: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
+	29, // 25: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
+	30, // 26: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
+	29, // 27: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
+	35, // 28: sources.Jenkins.header:type_name -> credentials.Header
+	36, // 29: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
+	29, // 30: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
+	30, // 31: sources.PublicEventMonitoring.unauthenticated:type_name -> credentials.Unauthenticated
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_sources_proto_init() }
@@ -3034,6 +3134,18 @@ func file_sources_proto_init() {
 				return nil
 			}
 		}
+		file_sources_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PublicEventMonitoring); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_sources_proto_msgTypes[1].OneofWrappers = []interface{}{
 		(*AzureStorage_ConnectionString)(nil),
@@ -3115,13 +3227,16 @@ func file_sources_proto_init() {
 		(*Artifactory_BasicAuth)(nil),
 		(*Artifactory_AccessToken)(nil),
 	}
+	file_sources_proto_msgTypes[24].OneofWrappers = []interface{}{
+		(*PublicEventMonitoring_Unauthenticated)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_sources_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   24,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
