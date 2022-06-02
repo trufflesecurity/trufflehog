@@ -2600,6 +2600,15 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 
 	// no validation rules for Line
 
+	// no validation rules for Depth
+
+	switch m.EventType.(type) {
+
+	case *PublicEventMonitoring_Github:
+		// no validation rules for Github
+
+	}
+
 	if len(errors) > 0 {
 		return PublicEventMonitoringMultiError(errors)
 	}

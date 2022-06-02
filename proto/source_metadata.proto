@@ -216,6 +216,10 @@ message PublicEventMonitoring {
   string file = 6;
   string timestamp = 7;
   int64 line = 8;
+  oneof event_type {
+    string github = 9;
+  }
+  int32 depth = 10;
 }
 
 message MetaData {
