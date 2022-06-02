@@ -8,6 +8,7 @@ import "validate/validate.proto";
 import "credentials.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 
 enum SourceType {
@@ -248,9 +249,10 @@ message Syslog {
 }
 
 message PublicEventMonitoring {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
-    credentials.Unauthenticated unauthenticated = 2;
+    credentials.Unauthenticated unauthenticated = 1;
   }
-  string domain = 3;
+  string domain = 2;
+  int64 max_depth = 3;
+  google.protobuf.Timestamp since = 4;
 }
