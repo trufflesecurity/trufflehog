@@ -208,18 +208,9 @@ message Syslog {
 }
 
 message PublicEventMonitoring {
-  string link = 1;
-  string username = 2;
-  string repository = 3;
-  string commit = 4;
-  string email = 5;
-  string file = 6;
-  string timestamp = 7;
-  int64 line = 8;
-  oneof event_type {
-    string github = 9;
+  oneof metadata {
+    Github github = 1;
   }
-  int32 depth = 10;
 }
 
 message MetaData {
