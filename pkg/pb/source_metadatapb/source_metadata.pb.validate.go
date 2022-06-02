@@ -2584,28 +2584,38 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Link
-
-	// no validation rules for Username
-
-	// no validation rules for Repository
-
-	// no validation rules for Commit
-
-	// no validation rules for Email
-
-	// no validation rules for File
-
-	// no validation rules for Timestamp
-
-	// no validation rules for Line
-
-	// no validation rules for Depth
-
-	switch m.EventType.(type) {
+	switch m.Metadata.(type) {
 
 	case *PublicEventMonitoring_Github:
-		// no validation rules for Github
+
+		if all {
+			switch v := interface{}(m.GetGithub()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PublicEventMonitoringValidationError{
+						field:  "Github",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PublicEventMonitoringValidationError{
+						field:  "Github",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetGithub()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PublicEventMonitoringValidationError{
+					field:  "Github",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
 
 	}
 
