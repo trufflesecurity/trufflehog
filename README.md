@@ -90,6 +90,27 @@ Help with setting up this packaging would be appreciated!
 brew tap trufflesecurity/trufflehog
 brew install trufflehog
 ```
+### 6. BlackArch
+ If you are on an Arch Linux distribution, you can install trufflehog through the BlackArch security tool repository
+ 
+ ```bash
+ #install the blackarch package repo if it is not already installed
+ sudo nano /etc/pacman.conf
+ 
+ #append the next three lines to the end of the pacman.conf file
+ [blackarch]
+ Server = https://mirrors.fossho.st/blackarch/$repo/os/$arch
+ SigLevel = Never
+ 
+ Ctrl + X to save, Y to confirm
+ 
+ #refresh the pacman database
+ sudo pacman -Syyuu
+ 
+ #install trufflehog
+ sudo pacman -S trufflehog
+ 
+ ```
 
 ## Usage
 
