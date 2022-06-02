@@ -3628,19 +3628,38 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 
 	var errors []error
 
-	if _, err := url.Parse(m.GetEndpoint()); err != nil {
-		err = PublicEventMonitoringValidationError{
-			field:  "Endpoint",
-			reason: "value must be a valid URI",
-			cause:  err,
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	// no validation rules for Domain
+
+	// no validation rules for MaxDepth
+
+	if all {
+		switch v := interface{}(m.GetSince()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, PublicEventMonitoringValidationError{
+					field:  "Since",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, PublicEventMonitoringValidationError{
+					field:  "Since",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSince()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return PublicEventMonitoringValidationError{
+				field:  "Since",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
 
 	switch m.Credential.(type) {
 
