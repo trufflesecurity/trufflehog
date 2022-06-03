@@ -8,13 +8,17 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
+	"reflect"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-github/v42/github"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -335,4 +339,186 @@ func TestEnumerateWithApp(t *testing.T) {
 	assert.Equal(t, 0, len(s.repos))
 
 	assert.True(t, gock.IsDone())
+}
+
+// This only tests the resume info slice portion of setProgressCompleteWithRepo.
+func Test_setProgressCompleteWithRepo(t *testing.T) {
+	tests := []struct {
+		startingResumeInfoSlice []string
+		repoURL                 string
+		wantResumeInfoSlice     []string
+	}{
+		{
+			startingResumeInfoSlice: []string{},
+			repoURL:                 "a",
+			wantResumeInfoSlice:     []string{"a"},
+		},
+		{
+			startingResumeInfoSlice: []string{"b"},
+			repoURL:                 "a",
+			wantResumeInfoSlice:     []string{"a", "b"},
+		},
+	}
+
+	logger := logrus.New()
+	logger.Out = io.Discard
+	s := &Source{
+		repos:           []string{},
+		log:             logger.WithField("no", "output"),
+		resumeInfoMutex: &sync.Mutex{},
+	}
+
+	for _, tt := range tests {
+		s.resumeInfoSlice = tt.startingResumeInfoSlice
+		s.setProgressCompleteWithRepo(0, tt.repoURL)
+		if !reflect.DeepEqual(s.resumeInfoSlice, tt.wantResumeInfoSlice) {
+			t.Errorf("s.setProgressCompleteWithRepo() got: %v, want: %v", s.resumeInfoSlice, tt.wantResumeInfoSlice)
+		}
+	}
+}
+
+func Test_removeRepoFromResumeInfo(t *testing.T) {
+	tests := []struct {
+		startingResumeInfoSlice []string
+		repoURL                 string
+		wantResumeInfoSlice     []string
+	}{
+		{
+			startingResumeInfoSlice: []string{"a", "b", "c"},
+			repoURL:                 "a",
+			wantResumeInfoSlice:     []string{"b", "c"},
+		},
+		{
+			startingResumeInfoSlice: []string{"a", "b", "c"},
+			repoURL:                 "b",
+			wantResumeInfoSlice:     []string{"a", "c"},
+		},
+		{ // This is the probably can't happen case of a repo not in the list.
+			startingResumeInfoSlice: []string{"a", "b", "c"},
+			repoURL:                 "not in the list",
+			wantResumeInfoSlice:     []string{"a", "b", "c"},
+		},
+	}
+
+	logger := logrus.New()
+	logger.Out = io.Discard
+	s := &Source{
+		repos:           []string{},
+		log:             logger.WithField("no", "output"),
+		resumeInfoMutex: &sync.Mutex{},
+	}
+
+	for _, tt := range tests {
+		s.resumeInfoSlice = tt.startingResumeInfoSlice
+		s.removeRepoFromResumeInfo(tt.repoURL)
+		if !reflect.DeepEqual(s.resumeInfoSlice, tt.wantResumeInfoSlice) {
+			t.Errorf("s.removeRepoFromResumeInfo() got: %v, want: %v", s.resumeInfoSlice, tt.wantResumeInfoSlice)
+		}
+	}
+}
+
+func Test_encodeResumeInfo(t *testing.T) {
+	tests := []struct {
+		startingResumeInfoSlice []string
+		wantEncodedResumeInfo   string
+	}{
+		{
+			startingResumeInfoSlice: []string{"a", "b", "c"},
+			wantEncodedResumeInfo:   "a\tb\tc",
+		},
+		{
+			startingResumeInfoSlice: []string{},
+			wantEncodedResumeInfo:   "",
+		},
+	}
+
+	logger := logrus.New()
+	logger.Out = io.Discard
+	s := &Source{
+		repos:           []string{},
+		log:             logger.WithField("no", "output"),
+		resumeInfoMutex: &sync.Mutex{},
+	}
+
+	for _, tt := range tests {
+		s.resumeInfoSlice = tt.startingResumeInfoSlice
+		gotEncodedResumeInfo := s.encodeResumeInfo()
+		if gotEncodedResumeInfo != tt.wantEncodedResumeInfo {
+			t.Errorf("s.encodeResumeInfo() got: %q, want: %q", gotEncodedResumeInfo, tt.wantEncodedResumeInfo)
+		}
+	}
+}
+
+func Test_decodeResumeInfo(t *testing.T) {
+	tests := []struct {
+		resumeInfo          string
+		wantResumeInfoSlice []string
+	}{
+		{
+			resumeInfo:          "a\tb\tc",
+			wantResumeInfoSlice: []string{"a", "b", "c"},
+		},
+		{
+			resumeInfo:          "",
+			wantResumeInfoSlice: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		s := &Source{}
+		s.decodeResumeInfo(tt.resumeInfo)
+		if !reflect.DeepEqual(s.resumeInfoSlice, tt.wantResumeInfoSlice) {
+			t.Errorf("s.decodeResumeInfo() got: %v, want: %v", s.resumeInfoSlice, tt.wantResumeInfoSlice)
+		}
+	}
+}
+
+func Test_filterReposToResume(t *testing.T) {
+	startingRepos := []string{"a", "b", "c", "d", "e", "f", "g"}
+
+	tests := map[string]struct {
+		resumeInfo              string
+		wantProgressOffsetCount int
+		wantReposToScan         []string
+	}{
+		"blank resume info": {
+			resumeInfo:              "",
+			wantProgressOffsetCount: 0,
+			wantReposToScan:         startingRepos,
+		},
+		"starting repos": {
+			resumeInfo:              "a\tb",
+			wantProgressOffsetCount: 0,
+			wantReposToScan:         startingRepos,
+		},
+		"early contiguous repos": {
+			resumeInfo:              "b\tc",
+			wantProgressOffsetCount: 1,
+			wantReposToScan:         []string{"b", "c", "d", "e", "f", "g"},
+		},
+		"non-contiguous repos": {
+			resumeInfo:              "b\te",
+			wantProgressOffsetCount: 3,
+			wantReposToScan:         []string{"b", "e", "f", "g"},
+		},
+		"only some repos in the list": {
+			resumeInfo:              "c\tnot\tthere",
+			wantProgressOffsetCount: 2,
+			wantReposToScan:         []string{"c", "d", "e", "f", "g"},
+		},
+	}
+
+	for name, tt := range tests {
+		s := &Source{
+			repos:           startingRepos,
+			resumeInfoMutex: &sync.Mutex{},
+		}
+		gotProgressOffsetCount := s.filterReposToResume(tt.resumeInfo)
+		if gotProgressOffsetCount != tt.wantProgressOffsetCount {
+			t.Errorf("s.filterReposToResume() name: %q got: %d, want: %d", name, gotProgressOffsetCount, tt.wantProgressOffsetCount)
+		}
+		if !reflect.DeepEqual(s.repos, tt.wantReposToScan) {
+			t.Errorf("s.filterReposToResume() name: %q got: %v, want: %v", name, s.repos, tt.wantReposToScan)
+		}
+	}
 }
