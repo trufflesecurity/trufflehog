@@ -207,6 +207,12 @@ message Syslog {
   string facility = 6;
 }
 
+message PublicEventMonitoring {
+  oneof metadata {
+    Github github = 1;
+  }
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -232,5 +238,6 @@ message MetaData {
     Teams teams = 21;
     Artifactory artifactory = 22;
     Syslog syslog = 23;
+    PublicEventMonitoring publicEventMonitoring = 24;
   }
 }

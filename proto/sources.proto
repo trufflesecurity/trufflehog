@@ -8,6 +8,7 @@ import "validate/validate.proto";
 import "credentials.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 
 enum SourceType {
@@ -37,6 +38,7 @@ enum SourceType {
   SOURCE_TYPE_TEAMS = 23;
   SOURCE_TYPE_JFROG_ARTIFACTORY = 24;
   SOURCE_TYPE_SYSLOG = 25;
+  SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
 }
 
 message LocalSource {
@@ -244,4 +246,13 @@ message Syslog {
   string tlsCert = 3;
   string tlsKey = 4;
   string format = 5;
+}
+
+message PublicEventMonitoring {
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 1;
+  }
+  string domain = 2;
+  int64 max_depth = 3;
+  google.protobuf.Timestamp since = 4;
 }
