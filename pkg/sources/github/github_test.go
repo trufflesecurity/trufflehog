@@ -501,6 +501,11 @@ func Test_filterReposToResume(t *testing.T) {
 			wantProgressOffsetCount: 3,
 			wantReposToScan:         []string{"b", "e", "f", "g"},
 		},
+		"no repos found in the repo list": {
+			resumeInfo:              "not\tthere",
+			wantProgressOffsetCount: 0,
+			wantReposToScan:         startingRepos,
+		},
 		"only some repos in the list": {
 			resumeInfo:              "c\tnot\tthere",
 			wantProgressOffsetCount: 2,
@@ -513,6 +518,7 @@ func Test_filterReposToResume(t *testing.T) {
 			repos:           startingRepos,
 			resumeInfoMutex: &sync.Mutex{},
 		}
+
 		gotProgressOffsetCount := s.filterReposToResume(tt.resumeInfo)
 		if gotProgressOffsetCount != tt.wantProgressOffsetCount {
 			t.Errorf("s.filterReposToResume() name: %q got: %d, want: %d", name, gotProgressOffsetCount, tt.wantProgressOffsetCount)

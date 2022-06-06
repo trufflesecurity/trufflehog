@@ -812,7 +812,7 @@ func (s *Source) filterReposToResume(resumeInfo string) int {
 	// However, it is possible that a resumed scan does not include all or even any of the repos within the resumeInfo.
 	// In this case, we must ensure we still scan all repos that come after the last found repo in the list.
 	reposToScan := []string{}
-	lastFoundRepoIndex := 0
+	lastFoundRepoIndex := -1
 	resumeRepoIndex := 0
 	for i, repoURL := range s.repos {
 		// If the repoURL is bigger than what we're looking for, move to the next one.
