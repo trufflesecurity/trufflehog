@@ -328,15 +328,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
 
-	// TODO: Should we keep this randomization? Or make the resumable git an option rather than the default?
-	/*
-		if _, ok := os.LookupEnv("DO_NOT_RANDOMIZE"); !ok {
-			// Randomize channel scan order on each scan
-			rand.Seed(time.Now().UnixNano())
-			rand.Shuffle(len(s.repos), func(i, j int) { s.repos[i], s.repos[j] = s.repos[j], s.repos[i] })
-		}
-	*/
-
 	return s.scan(ctx, installationClient, chunksChan)
 }
 
@@ -795,6 +786,7 @@ func (s *Source) decodeResumeInfo(resumeInfo string) {
 
 // filterReposToResume filters the existing repos down to those that are included in the encoded resume info.
 // It also returns the difference between the original length of the repos and the new length to use for progress reporting.
+// It is required that both the resumeInfo repos and the existing repos in s.repos are sorted.
 func (s *Source) filterReposToResume(resumeInfo string) int {
 	if resumeInfo == "" {
 		return 0
