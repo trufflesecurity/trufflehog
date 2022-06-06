@@ -7,7 +7,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -40,6 +39,7 @@ func initTestSource(src *sourcespb.GitHub) *Source {
 	if err := s.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1); err != nil {
 		panic(err)
 	}
+	gock.InterceptClient(s.httpClient)
 	return s
 }
 
@@ -334,7 +334,6 @@ func TestEnumerateWithApp(t *testing.T) {
 			PrivateKey:     privateKey,
 		},
 	)
-	fmt.Println(err)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(s.repos))
 
