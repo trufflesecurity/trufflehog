@@ -24,12 +24,11 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -355,7 +354,8 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	}
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
-	progressIndexOffset := s.filterReposToResume(s.GetProgress().EncodedResumeInfo)
+	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
+	s.repos = reposToScan
 
 	for i, repoURL := range s.repos {
 		if err := s.jobSem.Acquire(ctx, 1); err != nil {
@@ -372,7 +372,11 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 			s.setProgressCompleteWithRepo(i+progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
-			defer s.removeRepoFromResumeInfo(repoURL)
+			defer func(s *Source) {
+				s.resumeInfoMutex.Lock()
+				defer s.resumeInfoMutex.Unlock()
+				s.resumeInfoSlice = sources.RemoveRepoFromResumeInfo(s.resumeInfoSlice, repoURL)
+			}(s)
 
 			if !strings.HasSuffix(repoURL, ".git") {
 				return
@@ -799,91 +803,7 @@ func (s *Source) setProgressCompleteWithRepo(index int, repoURL string) {
 	sort.Strings(s.resumeInfoSlice)
 
 	// Make the resume info string from the slice.
-	encodedResumeInfo := s.encodeResumeInfo()
+	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 
 	s.SetProgressComplete(index, len(s.repos), fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
-}
-
-// removeRepoFromResumeInfo removes the repoURL from the resume info.
-func (s *Source) removeRepoFromResumeInfo(repoURL string) {
-	s.resumeInfoMutex.Lock()
-	defer s.resumeInfoMutex.Unlock()
-
-	index := -1
-	for i, repo := range s.resumeInfoSlice {
-		if repoURL == repo {
-			index = i
-		}
-	}
-
-	if index == -1 {
-		// We should never be able to be here. But if we are, it means the resume info never had the repo added.
-		// So log the error and do nothing.
-		s.log.Errorf("repoURL (%q) not found in list of encode resume info: %q", repoURL, s.EncodedResumeInfo)
-		return
-	}
-
-	// This removes the element at the given index.
-	s.resumeInfoSlice = append(s.resumeInfoSlice[:index], s.resumeInfoSlice[index+1:]...)
-}
-
-func (s *Source) encodeResumeInfo() string {
-	return strings.Join(s.resumeInfoSlice, "\t")
-}
-
-func (s *Source) decodeResumeInfo(resumeInfo string) {
-	// strings.Split will, for an empty string, return []string{""},
-	// which is an element, where as when there is no resume info we want an empty slice.
-	if resumeInfo == "" {
-		return
-	}
-	s.resumeInfoSlice = strings.Split(resumeInfo, "\t")
-}
-
-// filterReposToResume filters the existing repos down to those that are included in the encoded resume info.
-// It also returns the difference between the original length of the repos and the new length to use for progress reporting.
-// It is required that both the resumeInfo repos and the existing repos in s.repos are sorted.
-func (s *Source) filterReposToResume(resumeInfo string) int {
-	if resumeInfo == "" {
-		return 0
-	}
-
-	s.resumeInfoMutex.Lock()
-	defer s.resumeInfoMutex.Unlock()
-
-	s.decodeResumeInfo(resumeInfo)
-
-	// Because this scanner is multithreaded, it is possible that we have scanned a range of repositories
-	// with some gaps of unlisted but completed repositories in between the ones in resumeInfo.
-	// So we know repositories that have not finished scanning are the ones included in the resumeInfo,
-	// and those that come after the last repository in the resumeInfo.
-	// However, it is possible that a resumed scan does not include all or even any of the repos within the resumeInfo.
-	// In this case, we must ensure we still scan all repos that come after the last found repo in the list.
-	reposToScan := []string{}
-	lastFoundRepoIndex := -1
-	resumeRepoIndex := 0
-	for i, repoURL := range s.repos {
-		// If the repoURL is bigger than what we're looking for, move to the next one.
-		if repoURL > s.resumeInfoSlice[resumeRepoIndex] {
-			resumeRepoIndex++
-		}
-
-		// If we've found all of our repositories end the filter.
-		if resumeRepoIndex == len(s.resumeInfoSlice) {
-			break
-		}
-
-		// If the repoURL is the one we're looking for, add it and update the lastFoundRepoIndex.
-		if repoURL == s.resumeInfoSlice[resumeRepoIndex] {
-			lastFoundRepoIndex = i
-			reposToScan = append(reposToScan, repoURL)
-		}
-	}
-
-	// Append all repos after the last one we've found.
-	reposToScan = append(reposToScan, s.repos[lastFoundRepoIndex+1:]...)
-
-	progressOffsetCount := len(s.repos) - len(reposToScan)
-	s.repos = reposToScan
-	return progressOffsetCount
 }
