@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-
+"fmt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"codeclimate"}) + `\b([a-f0-9]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"codeclimate"}) + `\b([a-f0-9]{40})\b	`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("Accept", "application/vnd.api+json")
-			req.Header.Add("Authorization", "Token token="+resMatch)
+			req.Header.Add("Authorization", fmt.Sprintf("Token token=%s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
