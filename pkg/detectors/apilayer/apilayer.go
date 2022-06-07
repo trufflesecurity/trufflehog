@@ -4,8 +4,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
-	"io/ioutil"
-	"strings"
+		"strings"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,7 +19,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apilayer"}) + `\b([a-z0-9]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apilayer"}) + `\b([a-zA-Z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,22 +46,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "http://apilayer.net/api/validate?access_key="+resMatch+"&number=09066200872", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.apilayer.com/number_verification/countries", nil)
 			if err != nil {
 				continue
 			}
+			req.Header.Add("apikey", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := ioutil.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-
-				if strings.Contains(body, "number") {
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
+					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
