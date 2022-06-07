@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.dynadot.com/api3.xml?key="+resMatch+"&command=create_contact&name=Webb&email=myemail@email.com&phonenum=8662623399&phonecc=1&address1=PO%20Box%20345&city=San%20Mateo&zip=94401&country=US", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.dynadot.com/api3.xml?key=%s&command=create_contact&name=Webb&email=myemail@email.com&phonenum=8662623399&phonecc=1&address1=PO%20Box%20345&city=San%20Mateo&zip=94401&country=US",resMatch), nil)
 			if err != nil {
 				continue
 			}
