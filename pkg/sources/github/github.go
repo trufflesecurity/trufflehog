@@ -172,10 +172,12 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	var err error
 	// If we're using public github, make a regular client.
 	// Otherwise make an enterprise client
+	var isGHE bool
 	var apiClient *github.Client
 	if apiEndpoint == "https://api.github.com" {
 		apiClient = github.NewClient(tc)
 	} else {
+		isGHE = true
 		apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, tc)
 		if err != nil {
 			return nil, errors.New(err)
@@ -211,9 +213,15 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		if err := s.addReposByUser(ctx, apiClient, user.GetLogin()); err != nil {
 			log.WithError(err).Error("error fetching repos by user")
 		}
-		// Scan for orgs is default with a token. GitHub App enumerates the repositories
-		// that were assigned to it in GitHub App settings.
-		s.addOrgsByUser(ctx, apiClient, user.GetLogin())
+
+		if isGHE {
+			s.addAllVisibleOrgs(ctx, apiClient)
+		} else {
+			// Scan for orgs is default with a token. GitHub App enumerates the repositories
+			// that were assigned to it in GitHub App settings.
+			s.addOrgsByUser(ctx, apiClient, user.GetLogin())
+		}
+
 		for _, org := range s.orgs {
 			if err := s.addReposByOrg(ctx, apiClient, org); err != nil {
 				log.WithError(err).Error("error fetching repos by org")
@@ -663,6 +671,42 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 		opts.Page = res.NextPage
 	}
 	return nil
+}
+
+func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client) {
+	orgOpts := &github.OrganizationsListOptions{
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+	for {
+		orgs, resp, err := apiClient.Organizations.ListAll(ctx, orgOpts)
+		if err == nil {
+			defer resp.Body.Close()
+		}
+		if handled := handleRateLimit(err, resp); handled {
+			continue
+		}
+		if err != nil {
+			log.WithError(err).Errorf("Could not list all organizations")
+			return
+		}
+		for _, org := range orgs {
+			var name string
+			if org.Name != nil {
+				name = *org.Name
+			} else if org.Login != nil {
+				name = *org.Login
+			} else {
+				continue
+			}
+			common.AddStringSliceItem(name, &s.orgs)
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		orgOpts.Page = resp.NextPage
+	}
 }
 
 func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, user string) {
