@@ -105,6 +105,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.jobID = jobID
 	s.verify = verify
 	s.jobSem = semaphore.NewWeighted(int64(concurrency))
+	s.resumeInfoMutex = &sync.Mutex{}
 
 	s.httpClient = common.SaneHttpClient()
 
