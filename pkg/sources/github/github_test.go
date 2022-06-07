@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -362,9 +361,8 @@ func Test_setProgressCompleteWithRepo(t *testing.T) {
 	logger := logrus.New()
 	logger.Out = io.Discard
 	s := &Source{
-		repos:           []string{},
-		log:             logger.WithField("no", "output"),
-		resumeInfoMutex: &sync.Mutex{},
+		repos: []string{},
+		log:   logger.WithField("no", "output"),
 	}
 
 	for _, tt := range tests {
@@ -402,9 +400,8 @@ func Test_removeRepoFromResumeInfo(t *testing.T) {
 	logger := logrus.New()
 	logger.Out = io.Discard
 	s := &Source{
-		repos:           []string{},
-		log:             logger.WithField("no", "output"),
-		resumeInfoMutex: &sync.Mutex{},
+		repos: []string{},
+		log:   logger.WithField("no", "output"),
 	}
 
 	for _, tt := range tests {
@@ -434,9 +431,8 @@ func Test_encodeResumeInfo(t *testing.T) {
 	logger := logrus.New()
 	logger.Out = io.Discard
 	s := &Source{
-		repos:           []string{},
-		log:             logger.WithField("no", "output"),
-		resumeInfoMutex: &sync.Mutex{},
+		repos: []string{},
+		log:   logger.WithField("no", "output"),
 	}
 
 	for _, tt := range tests {
@@ -514,8 +510,7 @@ func Test_filterReposToResume(t *testing.T) {
 
 	for name, tt := range tests {
 		s := &Source{
-			repos:           startingRepos,
-			resumeInfoMutex: &sync.Mutex{},
+			repos: startingRepos,
 		}
 
 		gotProgressOffsetCount := s.filterReposToResume(tt.resumeInfo)
