@@ -51,7 +51,7 @@ type Source struct {
 	conn            *sourcespb.GitHub
 	jobSem          *semaphore.Weighted
 	resumeInfoSlice []string
-	resumeInfoMutex *sync.Mutex
+	resumeInfoMutex sync.Mutex
 	sources.Progress
 }
 
