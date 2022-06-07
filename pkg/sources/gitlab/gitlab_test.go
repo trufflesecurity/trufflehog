@@ -3,6 +3,8 @@ package gitlab
 import (
 	"context"
 	"fmt"
+	"io"
+	"reflect"
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
@@ -158,5 +160,36 @@ func TestSource_Scan(t *testing.T) {
 				t.Errorf("0 chunks scanned.")
 			}
 		})
+	}
+}
+
+// This only tests the resume info slice portion of setProgressCompleteWithRepo.
+func Test_setProgressCompleteWithRepo(t *testing.T) {
+	tests := []struct {
+		startingResumeInfoSlice []string
+		repoURL                 string
+		wantResumeInfoSlice     []string
+	}{
+		{
+			startingResumeInfoSlice: []string{},
+			repoURL:                 "a",
+			wantResumeInfoSlice:     []string{"a"},
+		},
+		{
+			startingResumeInfoSlice: []string{"b"},
+			repoURL:                 "a",
+			wantResumeInfoSlice:     []string{"a", "b"},
+		},
+	}
+
+	log.SetOutput(io.Discard)
+	s := &Source{repos: []string{}}
+
+	for _, tt := range tests {
+		s.resumeInfoSlice = tt.startingResumeInfoSlice
+		s.setProgressCompleteWithRepo(0, tt.repoURL)
+		if !reflect.DeepEqual(s.resumeInfoSlice, tt.wantResumeInfoSlice) {
+			t.Errorf("s.setProgressCompleteWithRepo() got: %v, want: %v", s.resumeInfoSlice, tt.wantResumeInfoSlice)
+		}
 	}
 }
