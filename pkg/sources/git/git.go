@@ -136,15 +136,19 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if len(repoURI) == 0 {
 				continue
 			}
-			path, repo, err := CloneRepoUsingToken(token, repoURI, user)
-			defer os.RemoveAll(path)
-			if err != nil {
-				return err
-			}
-			err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
-			if err != nil {
-				return err
-			}
+			func(repoURI string) {
+				path, repo, err := CloneRepoUsingToken(token, repoURI, user)
+				defer os.RemoveAll(path)
+				if err != nil {
+					log.WithError(err).Errorf("Unable to clone repo using token: %q", repoURI)
+					return
+				}
+				err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				if err != nil {
+					log.WithError(err).Errorf("Unable to scan repo using token: %q", repoURI)
+					return
+				}
+			}(repoURI)
 		}
 	case *sourcespb.Git_Unauthenticated:
 		for i, repoURI := range s.conn.Repositories {
@@ -152,15 +156,19 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if len(repoURI) == 0 {
 				continue
 			}
-			path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
-			defer os.RemoveAll(path)
-			if err != nil {
-				return err
-			}
-			err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
-			if err != nil {
-				return err
-			}
+			func(repoURI string) {
+				path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
+				defer os.RemoveAll(path)
+				if err != nil {
+					log.WithError(err).Errorf("Unable to clone repo unauthenticated: %q", repoURI)
+					return
+				}
+				err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				if err != nil {
+					log.WithError(err).Errorf("Unable to scan repo unauthenticated: %q", repoURI)
+					return
+				}
+			}(repoURI)
 		}
 	default:
 		return errors.New("invalid connection type for git source")
@@ -178,14 +186,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			if strings.HasPrefix(u, filepath.Join(os.TempDir(), "trufflehog")) {
-				defer os.RemoveAll(u)
-			}
 
-			err = s.git.ScanRepo(ctx, repo, u, NewScanOptions(), chunksChan)
+			err = func(repoPath string) error {
+				if strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
+					defer os.RemoveAll(repoPath)
+				}
+
+				return s.git.ScanRepo(ctx, repo, repoPath, NewScanOptions(), chunksChan)
+			}(u)
 			if err != nil {
 				return err
-
 			}
 		}
 
