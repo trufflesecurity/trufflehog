@@ -464,6 +464,8 @@ func handleRateLimit(errIn error, res *github.Response) bool {
 }
 
 func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, org string) ([]string, error) {
+	log := s.log.WithField("org", org)
+
 	repos := []string{}
 	opts := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{
@@ -482,6 +484,7 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 		if err != nil {
 			return nil, fmt.Errorf("could not list repos for org %s: %w", org, err)
 		}
+		log.Debugf("listed repos page %d/%d", opts.Page, res.LastPage)
 		if len(someRepos) == 0 {
 			break
 		}
@@ -500,7 +503,7 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 		}
 		opts.Page = res.NextPage
 	}
-	log.WithField("org", org).Debugf("Found %d repos (%d forks)", numRepos, numForks)
+	log.Debugf("found %d repos (%d forks)", numRepos, numForks)
 	return repos, nil
 }
 
@@ -674,6 +677,7 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 }
 
 func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client) {
+	s.log.Debug("enumerating all visibile organizations on GHE")
 	orgOpts := &github.OrganizationsListOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 100,
@@ -691,6 +695,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 			log.WithError(err).Errorf("Could not list all organizations")
 			return
 		}
+		s.log.Debugf("listed organization page %d/%d", orgOpts.Page, resp.LastPage)
 		for _, org := range orgs {
 			var name string
 			if org.Name != nil {
@@ -700,6 +705,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 			} else {
 				continue
 			}
+			s.log.Debug("adding organization for repository enumeration: ", name)
 			common.AddStringSliceItem(name, &s.orgs)
 		}
 		if resp.NextPage == 0 {
