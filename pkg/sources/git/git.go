@@ -136,19 +136,17 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if len(repoURI) == 0 {
 				continue
 			}
-			func(repoURI string) {
+			err := func(repoURI string) error {
 				path, repo, err := CloneRepoUsingToken(token, repoURI, user)
 				defer os.RemoveAll(path)
 				if err != nil {
-					log.WithError(err).Errorf("Unable to clone repo using token: %q", repoURI)
-					return
+					return err
 				}
-				err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
-				if err != nil {
-					log.WithError(err).Errorf("Unable to scan repo using token: %q", repoURI)
-					return
-				}
+				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
 			}(repoURI)
+			if err != nil {
+				return err
+			}
 		}
 	case *sourcespb.Git_Unauthenticated:
 		for i, repoURI := range s.conn.Repositories {
@@ -156,19 +154,17 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if len(repoURI) == 0 {
 				continue
 			}
-			func(repoURI string) {
+			err := func(repoURI string) error {
 				path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
 				defer os.RemoveAll(path)
 				if err != nil {
-					log.WithError(err).Errorf("Unable to clone repo unauthenticated: %q", repoURI)
-					return
+					return err
 				}
-				err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
-				if err != nil {
-					log.WithError(err).Errorf("Unable to scan repo unauthenticated: %q", repoURI)
-					return
-				}
+				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
 			}(repoURI)
+			if err != nil {
+				return err
+			}
 		}
 	default:
 		return errors.New("invalid connection type for git source")
