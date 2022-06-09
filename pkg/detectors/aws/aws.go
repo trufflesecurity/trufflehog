@@ -26,8 +26,8 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
-	keyPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})\b`)
-	idPat  = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
+	idPat     = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
+	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -58,25 +58,25 @@ func GetHMAC(key []byte, data []byte) []byte {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, idMatch := range idMatches {
+		if len(idMatch) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resIDMatch := strings.TrimSpace(idMatch[1])
 
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
+		for _, secretMatch := range secretMatches {
+			if len(secretMatch) != 2 {
 				continue
 			}
-
-			resIdMatch := strings.TrimSpace(idMatch[1])
+			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AWS,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(resIDMatch),
+				Redacted:     resIDMatch,
 			}
 
 			if verify {
@@ -106,7 +106,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Action", "GetCallerIdentity")
 				params.Add("Version", "2011-06-15")
 				params.Add("X-Amz-Algorithm", algorithm)
-				params.Add("X-Amz-Credential", resIdMatch+"/"+credentialScope)
+				params.Add("X-Amz-Credential", resIDMatch+"/"+credentialScope)
 				params.Add("X-Amz-Date", amzDate)
 				params.Add("X-Amz-Expires", "30")
 				params.Add("X-Amz-SignedHeaders", signedHeaders)
@@ -120,7 +120,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				// TASK 3: CALCULATE THE SIGNATURE.
 				// https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
-				hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resMatch)), []byte(datestamp))
+				hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resSecretMatch)), []byte(datestamp))
 				hash = GetHMAC(hash, []byte(region))
 				hash = GetHMAC(hash, []byte(service))
 				hash = GetHMAC(hash, []byte("aws4_request"))
@@ -135,12 +135,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					// Response body is unused so close it immediately.
+					res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
@@ -148,6 +149,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, s1)
+			// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
+			if s1.Verified {
+				break
+			}
 		}
 	}
 	return detectors.CleanResults(results), nil

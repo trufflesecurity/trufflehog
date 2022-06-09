@@ -48,6 +48,7 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
+					Redacted:     "AKIAWARWQKZNHMZBLY4I",
 				},
 			},
 			wantErr: false,
@@ -64,6 +65,7 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
+					Redacted:     "AKIAWARWQKZNHMZBLY4I",
 				},
 			},
 			wantErr: false,
