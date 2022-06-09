@@ -678,7 +678,11 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 
 func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client) {
 	s.log.Debug("enumerating all visibile organizations on GHE")
+	// Enumeration on this endpoint does not use pages. it uses a since ID.
+	// The endpoint will return organizations with an ID greater than the given since ID.
+	// Empty org response is our cue to break the enumeration loop.
 	orgOpts := &github.OrganizationsListOptions{
+		Since: 0,
 		ListOptions: github.ListOptions{
 			PerPage: 100,
 		},
@@ -695,7 +699,13 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 			log.WithError(err).Errorf("Could not list all organizations")
 			return
 		}
-		s.log.Debugf("listed organization page %d/%d", orgOpts.Page, resp.LastPage)
+		if len(orgs) == 0 {
+			break
+		}
+		lastOrgID := *orgs[len(orgs)-1].ID
+		s.log.Debugf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID)
+		orgOpts.Since = lastOrgID
+
 		for _, org := range orgs {
 			var name string
 			if org.Name != nil {
@@ -705,13 +715,9 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 			} else {
 				continue
 			}
-			s.log.Debug("adding organization for repository enumeration: ", name)
+			s.log.Debugf("adding organization %d for repository enumeration: %s", org.ID, name)
 			common.AddStringSliceItem(name, &s.orgs)
 		}
-		if resp.NextPage == 0 {
-			break
-		}
-		orgOpts.Page = resp.NextPage
 	}
 }
 
