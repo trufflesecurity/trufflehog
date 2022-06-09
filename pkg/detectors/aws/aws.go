@@ -149,10 +149,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, s1)
-			// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
-			if s1.Verified {
-				break
-			}
 		}
 	}
 	return detectors.CleanResults(results), nil
