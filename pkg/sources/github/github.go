@@ -703,8 +703,8 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 			break
 		}
 		lastOrgID := *orgs[len(orgs)-1].ID
-		orgOpts.Since = lastOrgID
 		s.log.Debugf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID)
+		orgOpts.Since = lastOrgID
 
 		for _, org := range orgs {
 			var name string
@@ -715,7 +715,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 			} else {
 				continue
 			}
-			s.log.Debug("adding organization for repository enumeration: ", name)
+			s.log.Debugf("adding organization %d for repository enumeration: %s", org.ID, name)
 			common.AddStringSliceItem(name, &s.orgs)
 		}
 	}
