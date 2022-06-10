@@ -28,6 +28,10 @@ var (
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
 	idPat     = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
 	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})\b`)
+	// Hashes, like those for git, do technically match the secret pattern.
+	// But they are extremely unlikely to be generated as an actual AWS secret.
+	// So when we find them, if they're not verified, we should ignore the result.
+	falsePositiveSecretCheck = regexp.MustCompile(`[a-f0-9]{40}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -148,6 +152,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
+			// If the result is unverified and matches something like a git hash, don't include it in the results.
+			if !s1.Verified && falsePositiveSecretCheck.MatchString(resSecretMatch) {
+				continue
+			}
+
 			results = append(results, s1)
 			// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
 			if s1.Verified {
@@ -155,5 +164,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-	return detectors.CleanResults(results), nil
+	return awsCustomCleanResults(results), nil
+}
+
+func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
+	if len(results) == 0 {
+		return results
+	}
+
+	// For every ID, we want at most one result, preferrably verified.
+	idResults := map[string]detectors.Result{}
+	for _, result := range results {
+		// Always accept the verified result as the result for the given ID.
+		if result.Verified {
+			idResults[result.Redacted] = result
+			continue
+		}
+
+		// Only include an unverified result if we don't already have a result for a given ID.
+		if _, exist := idResults[result.Redacted]; !exist {
+			idResults[result.Redacted] = result
+		}
+	}
+
+	out := []detectors.Result{}
+	for _, r := range idResults {
+		out = append(out, r)
+	}
+	return out
 }
