@@ -136,12 +136,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if len(repoURI) == 0 {
 				continue
 			}
-			path, repo, err := CloneRepoUsingToken(token, repoURI, user)
-			defer os.RemoveAll(path)
-			if err != nil {
-				return err
-			}
-			err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+			err := func(repoURI string) error {
+				path, repo, err := CloneRepoUsingToken(token, repoURI, user)
+				defer os.RemoveAll(path)
+				if err != nil {
+					return err
+				}
+				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+			}(repoURI)
 			if err != nil {
 				return err
 			}
@@ -152,12 +154,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if len(repoURI) == 0 {
 				continue
 			}
-			path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
-			defer os.RemoveAll(path)
-			if err != nil {
-				return err
-			}
-			err = s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+			err := func(repoURI string) error {
+				path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
+				defer os.RemoveAll(path)
+				if err != nil {
+					return err
+				}
+				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+			}(repoURI)
 			if err != nil {
 				return err
 			}
@@ -178,14 +182,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return err
 			}
-			if strings.HasPrefix(u, filepath.Join(os.TempDir(), "trufflehog")) {
-				defer os.RemoveAll(u)
-			}
 
-			err = s.git.ScanRepo(ctx, repo, u, NewScanOptions(), chunksChan)
+			err = func(repoPath string) error {
+				if strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
+					defer os.RemoveAll(repoPath)
+				}
+
+				return s.git.ScanRepo(ctx, repo, repoPath, NewScanOptions(), chunksChan)
+			}(u)
 			if err != nil {
 				return err
-
 			}
 		}
 
