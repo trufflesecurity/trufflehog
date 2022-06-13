@@ -248,9 +248,9 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				errorCount.Store(prefix, nErr)
 				//too many consective errors on this page
 				if nErr.(int) > 3 {
-					s.log.Warnf("Too many consecutive errors. Blacklisting %s", prefix)
+					s.log.Warnf("Too many consecutive errors. Excluding %s", prefix)
 				}
-				log.Debugf("Error Counts: %s:%s", prefix, nErr)
+				log.Debugf("Error Counts: %s:%d", prefix, nErr)
 				return
 			}
 			body, err := ioutil.ReadAll(res.Body)
@@ -269,7 +269,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				errorCount.Store(prefix, nErr)
 
 				if nErr.(int) > 3 {
-					s.log.Warnf("Too many consecutive errors. Blacklisting %s", prefix)
+					s.log.Warnf("Too many consecutive errors. Excluding %s", prefix)
 				}
 				return
 			}
