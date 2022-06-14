@@ -2,15 +2,16 @@ package aws
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+
+	"github.com/kylelemons/godebug/pretty"
 )
 
 func TestAWS_FromChunk(t *testing.T) {
@@ -23,6 +24,10 @@ func TestAWS_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("AWS")
 	id := testSecrets.MustGetField("AWS_ID")
 	inactiveSecret := testSecrets.MustGetField("AWS_INACTIVE")
+	inactiveID := id[:len(id)-3] + "XYZ"
+	hasher := sha256.New()
+	hasher.Write([]byte(inactiveSecret))
+	hash := string(hasher.Sum(nil))
 
 	type args struct {
 		ctx    context.Context
@@ -79,6 +84,61 @@ func TestAWS_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "found two, one included for every ID found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("The verified ID is %s with a secret of %s, but the unverified ID is %s and this is the secret %s", id, secret, inactiveID, inactiveSecret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     true,
+					Redacted:     id,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     inactiveID,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "not found, because unverified secret was a hash",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", hash, id)), // The secret would satisfy the regex but be filtered out after not passing validation.
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "found two, returned both because the active secret for one paired with the inactive ID, despite the hash",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("The verified ID is %s with a secret of %s, but the unverified ID is %s and the secret is this hash %s", id, secret, inactiveID, hash)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     true,
+					Redacted:     id,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     inactiveID,
+				},
+			},
 			wantErr: false,
 		},
 	}
