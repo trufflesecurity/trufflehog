@@ -6,6 +6,8 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1
 
 replace github.com/zricethezav/gitleaks/v8 => github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom7
 
+replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff v0.7.6-zombies
+
 require (
 	cloud.google.com/go/secretmanager v1.4.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
