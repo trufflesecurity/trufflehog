@@ -12,6 +12,7 @@ func RemoveRepoFromResumeInfo(resumeRepos []string, repoURL string) []string {
 	for i, repo := range resumeRepos {
 		if repoURL == repo {
 			index = i
+			break
 		}
 	}
 

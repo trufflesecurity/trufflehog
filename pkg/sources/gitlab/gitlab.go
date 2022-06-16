@@ -246,22 +246,22 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 }
 
 func (s *Source) getRepos() ([]string, []error) {
+	if len(s.repos) > 0 {
+		return nil, nil
+	}
+
 	var validRepos []string
 	var errs []error
-	if len(s.repos) > 0 {
-		for _, prj := range s.repos {
-			repo, err := giturl.NormalizeGitlabRepo(prj)
-			if err != nil {
-				errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
-				continue
-			}
-
-			validRepos = append(validRepos, repo)
+	for _, prj := range s.repos {
+		repo, err := giturl.NormalizeGitlabRepo(prj)
+		if err != nil {
+			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+			continue
 		}
-		return validRepos, errs
-	}
-	return nil, nil
 
+		validRepos = append(validRepos, repo)
+	}
+	return validRepos, errs
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) []error {
