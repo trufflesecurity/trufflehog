@@ -340,7 +340,7 @@ func TestEnumerateWithApp(t *testing.T) {
 }
 
 // This only tests the resume info slice portion of setProgressCompleteWithRepo.
-func Test_setProgressCompleteWithRepo(t *testing.T) {
+func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 	tests := []struct {
 		startingResumeInfoSlice []string
 		repoURL                 string
@@ -370,6 +370,65 @@ func Test_setProgressCompleteWithRepo(t *testing.T) {
 		s.setProgressCompleteWithRepo(0, 0, tt.repoURL)
 		if !reflect.DeepEqual(s.resumeInfoSlice, tt.wantResumeInfoSlice) {
 			t.Errorf("s.setProgressCompleteWithRepo() got: %v, want: %v", s.resumeInfoSlice, tt.wantResumeInfoSlice)
+		}
+	}
+}
+
+func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
+	repos := []string{"a", "b", "c", "d", "e"}
+	tests := map[string]struct {
+		repos                 []string
+		index                 int
+		offset                int
+		wantPercentComplete   int64
+		wantSectionsCompleted int32
+		wantSectionsRemaining int32
+	}{
+		"starting from the beginning, no offset": {
+			repos:                 repos,
+			index:                 0,
+			offset:                0,
+			wantPercentComplete:   0,
+			wantSectionsCompleted: 0,
+			wantSectionsRemaining: 5,
+		},
+		"resume from the third, offset 2": {
+			repos:                 repos[2:],
+			index:                 0,
+			offset:                2,
+			wantPercentComplete:   40,
+			wantSectionsCompleted: 2,
+			wantSectionsRemaining: 5,
+		},
+		"resume from the third, on last repo, offset 2": {
+			repos:                 repos[2:],
+			index:                 2,
+			offset:                2,
+			wantPercentComplete:   80,
+			wantSectionsCompleted: 4,
+			wantSectionsRemaining: 5,
+		},
+	}
+
+	logger := logrus.New()
+	logger.Out = io.Discard
+
+	for _, tt := range tests {
+		s := &Source{
+			repos: tt.repos,
+			log:   logger.WithField("no", "output"),
+		}
+
+		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
+		gotProgress := s.GetProgress()
+		if gotProgress.PercentComplete != tt.wantPercentComplete {
+			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.PercentComplete, tt.wantPercentComplete)
+		}
+		if gotProgress.SectionsCompleted != tt.wantSectionsCompleted {
+			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsCompleted, tt.wantSectionsCompleted)
+		}
+		if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
+			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
 		}
 	}
 }
