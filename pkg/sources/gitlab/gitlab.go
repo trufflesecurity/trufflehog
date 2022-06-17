@@ -246,7 +246,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 }
 
 func (s *Source) getRepos() ([]string, []error) {
-	if len(s.repos) > 0 {
+	if len(s.repos) == 0 {
 		return nil, nil
 	}
 
