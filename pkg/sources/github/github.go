@@ -370,7 +370,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			defer s.jobSem.Release(1)
 			defer wg.Done()
 
-			s.setProgressCompleteWithRepo(i+progressIndexOffset, repoURL)
+			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
 			defer func(s *Source) {
 				s.resumeInfoMutex.Lock()
@@ -794,7 +794,7 @@ func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
 }
 
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
-func (s *Source) setProgressCompleteWithRepo(index int, repoURL string) {
+func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string) {
 	s.resumeInfoMutex.Lock()
 	defer s.resumeInfoMutex.Unlock()
 
@@ -805,5 +805,5 @@ func (s *Source) setProgressCompleteWithRepo(index int, repoURL string) {
 	// Make the resume info string from the slice.
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 
-	s.SetProgressComplete(index, len(s.repos), fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
