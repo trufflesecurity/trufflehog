@@ -8,6 +8,7 @@ func DefaultDecoders() []Decoder {
 	return []Decoder{
 		&Plain{},
 		&Base64{},
+		&Archive{},
 	}
 }
 
