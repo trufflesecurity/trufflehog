@@ -54,7 +54,7 @@ func (d *Archive) openArchive(reader io.Reader) (io.Reader, error) {
 		}
 		buf := &bytes.Buffer{}
 		teedReader := io.TeeReader(&d.newChunkData, buf)
-		if d.isArchive(teedReader) {
+		if IsArchive(teedReader) {
 			return d.openArchive(buf)
 		}
 		return buf, nil
@@ -64,7 +64,7 @@ func (d *Archive) openArchive(reader io.Reader) (io.Reader, error) {
 		if err != nil {
 			return nil, err
 		}
-		if d.isArchive(compReader) {
+		if IsArchive(compReader) {
 			return d.openArchive(compReader)
 		}
 		return compReader, nil
@@ -72,7 +72,7 @@ func (d *Archive) openArchive(reader io.Reader) (io.Reader, error) {
 	return nil, fmt.Errorf("Unknown archive type: %s", format.Name())
 }
 
-func (d *Archive) isArchive(reader io.Reader) bool {
+func IsArchive(reader io.Reader) bool {
 	format, _, err := archiver.Identify("", reader)
 	if err != nil {
 		return false

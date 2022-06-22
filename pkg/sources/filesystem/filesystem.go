@@ -2,30 +2,33 @@ package filesystem
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
 	// These buffer sizes are mainly driven by our largest credential size, which is GCP @ ~2.25KB.
 	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize = 10 * 1024 // 10KB
-	PeekSize   = 3 * 1024  // 3KB
+	BufferSize     = 10 * 1024          // 10KB
+	PeekSize       = 3 * 1024           // 3KB
+	MaxArchiveSize = 1024 * 1024 * 1024 // 1GB
 )
 
 type Source struct {
@@ -112,7 +115,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			defer inputFile.Close()
 
+			isArchive, err := s.handleArchive(path, chunksChan)
+
+			if isArchive && err == nil {
+				return nil
+			}
+
 			reader := bufio.NewReaderSize(bufio.NewReader(inputFile), BufferSize)
+
 			firstChunk := true
 			for {
 				if done {
@@ -177,4 +187,45 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	}
 	return nil
+}
+
+func (s *Source) handleArchive(path string, chunksChan chan *sources.Chunk) (bool, error) {
+	inputFile, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer inputFile.Close()
+
+	readerA := &bytes.Buffer{}
+	readerB := io.TeeReader(inputFile, readerA)
+
+	if decoders.IsArchive(readerA) {
+		fileInfo, err := inputFile.Stat()
+		if err != nil {
+			return false, err
+		}
+		if fileInfo.Size() > MaxArchiveSize {
+			return false, fmt.Errorf("archive exceeds max archive size (%d bytes)", MaxArchiveSize)
+		}
+		fullFile, err := ioutil.ReadAll(readerB)
+		if err != nil {
+			return false, err
+		}
+		chunksChan <- &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			Data:       fullFile,
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Filesystem{
+					Filesystem: &source_metadatapb.Filesystem{
+						File: sanitizer.UTF8(path),
+					},
+				},
+			},
+			Verify: s.verify,
+		}
+		return true, nil
+	}
+	return false, nil
 }
