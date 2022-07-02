@@ -873,6 +873,10 @@ enum DetectorType {
   Heatmapapi = 869;
   Websitepulse = 870;
   Uclassify = 871;
+  Convert = 872;
+  PDFmyURL = 873;
+  Api2Convert = 874;
+  Opsgenie = 875;
 }
 
 message Result {
