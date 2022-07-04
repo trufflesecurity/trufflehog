@@ -37,7 +37,7 @@ require (
 	github.com/rs/zerolog v1.26.1
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.8.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/xanzy/go-gitlab v0.65.0
 	github.com/zricethezav/gitleaks/v8 v8.5.2
