@@ -41,6 +41,23 @@ func TestJdbc_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found, unverified numeric password",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(`jdbc connection string: jdbc:postgresql://host:5342/testdb?password=123456 <-`),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_JDBC,
+					Verified:     false,
+					Redacted:     "jdbc:postgresql://host:5342/testdb?password=******",
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
