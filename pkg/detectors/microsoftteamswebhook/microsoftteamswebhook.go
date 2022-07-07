@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			payload := strings.NewReader(`{'text':'This is a verification message from TruffleHog. It means that there has been a live webhook credential found.'}`)
+			payload := strings.NewReader(`{'text':''}`)
 			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			if err != nil {
 				continue
@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				body, err := io.ReadAll(res.Body)
 				res.Body.Close()
 				if err == nil {
-					if res.StatusCode >= 200 && string(body) == "1" {
+					if res.StatusCode >= 200 && strings.Contains(string(body), "Text is required") {
 						s1.Verified = true
 					}
 				}
