@@ -11,7 +11,7 @@ replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff 
 require (
 	cloud.google.com/go/secretmanager v1.5.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
-	github.com/aws/aws-sdk-go v1.44.20
+	github.com/aws/aws-sdk-go v1.44.49
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
