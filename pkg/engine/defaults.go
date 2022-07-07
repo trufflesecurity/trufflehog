@@ -527,7 +527,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbirdorganizationapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendgrid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendinbluev2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentiment"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serphouse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serpstack"
@@ -1184,7 +1183,7 @@ func DefaultDetectors() []detectors.Detector {
 		blitapp.Scanner{},
 		restpackhtmltopdfapi.Scanner{},
 		webscraping.Scanner{},
-		sentiment.Scanner{},
+		// sentiment.Scanner{},
 		geoapify.Scanner{},
 		dfuse.Scanner{},
 		gitter.Scanner{},
