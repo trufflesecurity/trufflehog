@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package spotifykey
 
 import (
