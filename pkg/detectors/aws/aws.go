@@ -27,7 +27,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
 	idPat     = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
-	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})\b`)
+	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{40})[ \r\n'"\x60]`)
 	// Hashes, like those for git, do technically match the secret pattern.
 	// But they are extremely unlikely to be generated as an actual AWS secret.
 	// So when we find them, if they're not verified, we should ignore the result.
@@ -116,7 +116,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("X-Amz-SignedHeaders", signedHeaders)
 
 				canonicalQuerystring := params.Encode()
-				payloadHash := GetHash("") //empty payload
+				payloadHash := GetHash("") // empty payload
 				canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
 
 				// TASK 2: CREATE THE STRING TO SIGN.
@@ -129,7 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				hash = GetHMAC(hash, []byte(service))
 				hash = GetHMAC(hash, []byte("aws4_request"))
 
-				signature2 := GetHMAC(hash, []byte(stringToSign)) //Get Signature HMAC SHA256
+				signature2 := GetHMAC(hash, []byte(stringToSign)) // Get Signature HMAC SHA256
 				signature := hex.EncodeToString(signature2)
 
 				// TASK 4: ADD SIGNING INFORMATION TO THE REQUEST.
