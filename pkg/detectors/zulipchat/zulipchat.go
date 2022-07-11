@@ -47,11 +47,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-
-			resIdMatch := strings.TrimSpace(idMatch[1])
+			//getting the last word of the string
+			resIdMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
 
 			for _, domainMatch := range domainMatches {
 				if len(domainMatch) != 2 {
@@ -66,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.zulipchat.com/api/v1/users", resDomainMatch), nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v1/users", resDomainMatch), nil)
 					if err != nil {
 						continue
 					}
