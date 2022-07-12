@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			payload := strings.NewReader(`{ "input": [{ "type": "remote", "source": "https://example-files.online-convert.com/raster%20image/png/example.png" }], "conversion": [{ "category": "document", "target": "txt", "options": { "ocr": true } }] }`)
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.api2convert.com/v2/jobs", payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.api2convert.com/v2/jobs", payload)
 			if err != nil {
 				continue
 			}
