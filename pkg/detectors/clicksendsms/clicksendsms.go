@@ -44,11 +44,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
-		for _, idmatch := range idMatches {
-			if len(idmatch) != 2 {
-				continue
-			}
-			resIdMatch := strings.TrimSpace(idmatch[1])
+		for _, idMatch := range idMatches {
+			resIdMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_ClickSendsms,
