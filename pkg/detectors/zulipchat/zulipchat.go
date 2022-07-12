@@ -21,9 +21,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + `\b([0-9a-zA-Z]{32})\b`)
-	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat", "domain"}) + `\b([0-9a-z]{2,20})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.BuildRegex(common.AlphaNumPattern, "", 32))
+	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.EmailPattern)
+	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat", "domain"}) + common.SubDomainPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,11 +47,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-
-			resIdMatch := strings.TrimSpace(idMatch[1])
+			//getting the last word of the string
+			resIdMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
 
 			for _, domainMatch := range domainMatches {
 				if len(domainMatch) != 2 {

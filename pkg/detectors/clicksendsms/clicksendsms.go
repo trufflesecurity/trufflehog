@@ -22,8 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sms"}) + `\b([a-zA-Z0-9]{3,20}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,5})\b`)
+	keyPat = regexp.MustCompile(common.UUIDPatternUpperCase)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sms"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -44,11 +44,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
-		for _, idmatch := range idMatches {
-			if len(idmatch) != 2 {
-				continue
-			}
-			resIdMatch := strings.TrimSpace(idmatch[1])
+		for _, idMatch := range idMatches {
+			resIdMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_ClickSendsms,
