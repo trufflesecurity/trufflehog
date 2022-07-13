@@ -349,7 +349,6 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 					sb.WriteString(line.Line)
 				}
 			}
-			log.WithField("fragment", sb.String()).Trace("detecting fragment")
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, newLineNumber)
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
