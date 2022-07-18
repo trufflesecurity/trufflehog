@@ -24,8 +24,8 @@ func NormalizeGithubRepo(repoURL string) (string, error) {
 }
 
 func NormalizeGitlabRepo(repoURL string) (string, error) {
-	if !strings.HasPrefix(repoURL, "https") {
-		return "", errors.New("Gitlab requires https repo urls: e.g. https://gitlab.com/org/repo.git")
+	if !strings.HasPrefix(repoURL, "http:") && !strings.HasPrefix(repoURL, "https:") {
+		return "", errors.New("Gitlab requires http/https repo urls: e.g. https://gitlab.com/org/repo.git")
 	}
 
 	return NormalizeOrgRepoURL("Gitlab", repoURL)
