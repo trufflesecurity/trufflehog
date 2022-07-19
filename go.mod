@@ -6,7 +6,7 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1
 
 replace github.com/zricethezav/gitleaks/v8 => github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom7
 
-replace github.com/gitleaks/go-gitdiff => github.com/truff				lesecurity/go-gitdiff v0.7.6-zombies2
+replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff v0.7.6-zombies2
 
 require (
 	cloud.google.com/go/secretmanager v1.5.0
@@ -31,6 +31,7 @@ require (
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
 	github.com/mattn/go-colorable v0.1.12
+	github.com/mholt/archiver/v4 v4.0.0-alpha.7
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/razorpay/razorpay-go v0.0.0-20210728161131-0341409a6ab2
@@ -52,8 +53,8 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.100.2 // indirect
-	cloud.google.com/go/compute v1.5.0 // indirect
+	cloud.google.com/go v0.102.0 // indirect
+	cloud.google.com/go/compute v1.7.0 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.24 // indirect
@@ -78,6 +79,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/go-github/v45 v45.2.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
@@ -94,7 +96,6 @@ require (
 	github.com/klauspost/compress v1.15.5 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/mholt/archiver/v4 v4.0.0-alpha.7 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.14 // indirect
