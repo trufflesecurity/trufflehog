@@ -10,22 +10,24 @@ import (
 	"path/filepath"
 
 	"github.com/go-errors/errors"
+	"github.com/mholt/archiver/v4"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
 	// These buffer sizes are mainly driven by our largest credential size, which is GCP @ ~2.25KB.
 	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize = 10 * 1024 // 10KB
-	PeekSize   = 3 * 1024  // 3KB
+	BufferSize     = 10 * 1024        // 10KB
+	PeekSize       = 3 * 1024         // 3KB
+	MaxArchiveSize = 20 * 1024 * 1024 // 20MB
 )
 
 type Source struct {
@@ -106,13 +108,37 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 
 			inputFile, err := os.Open(path)
+			defer inputFile.Close()
 			if err != nil {
 				log.Warn(err)
 				return nil
 			}
 			defer inputFile.Close()
 
+			chunkSkel := &sources.Chunk{
+				SourceType: s.Type(),
+				SourceName: s.name,
+				SourceID:   s.SourceID(),
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Filesystem{
+						Filesystem: &source_metadatapb.Filesystem{
+							File: sanitizer.UTF8(path),
+						},
+					},
+				},
+				Verify: s.verify,
+			}
+			if handlers.HandleFile(inputFile, chunkSkel, chunksChan) {
+				return nil
+			}
+
+			if err != nil && !errors.Is(err, archiver.ErrNoMatch) {
+				log.WithError(err).Debug("Error reading archive")
+				return nil
+			}
+
 			reader := bufio.NewReaderSize(bufio.NewReader(inputFile), BufferSize)
+
 			firstChunk := true
 			for {
 				if done {
