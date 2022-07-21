@@ -26,7 +26,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 
 	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		return fmt.Errorf("could open repo: %s: %w", repoPath, err)
+		return fmt.Errorf("could not open repo: %s: %w", repoPath, err)
 	}
 
 	var baseCommit *object.Commit
