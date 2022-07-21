@@ -2,7 +2,6 @@ package filesystem
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-errors/errors"
+	"github.com/mholt/archiver/v4"
 	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -26,9 +26,9 @@ import (
 const (
 	// These buffer sizes are mainly driven by our largest credential size, which is GCP @ ~2.25KB.
 	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize     = 10 * 1024          // 10KB
-	PeekSize       = 3 * 1024           // 3KB
-	MaxArchiveSize = 1024 * 1024 * 1024 // 1GB
+	BufferSize     = 10 * 1024         // 10KB
+	PeekSize       = 3 * 1024          // 3KB
+	MaxArchiveSize = 100 * 1024 * 1024 // 100MB
 )
 
 type Source struct {
@@ -120,6 +120,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if isArchive && err == nil {
 				return nil
 			}
+			if err != nil && !errors.Is(err, archiver.ErrNoMatch) {
+				log.WithError(err).Debug("Error reading archive")
+				return nil
+			}
 
 			reader := bufio.NewReaderSize(bufio.NewReader(inputFile), BufferSize)
 
@@ -196,18 +200,20 @@ func (s *Source) handleArchive(path string, chunksChan chan *sources.Chunk) (boo
 	}
 	defer inputFile.Close()
 
-	readerA := &bytes.Buffer{}
-	readerB := io.TeeReader(inputFile, readerA)
-
-	if decoders.IsArchive(readerA) {
+	if decoders.IsArchive(inputFile) {
+		inputFile, err := os.Open(path)
+		if err != nil {
+			return false, err
+		}
 		fileInfo, err := inputFile.Stat()
 		if err != nil {
 			return false, err
 		}
 		if fileInfo.Size() > MaxArchiveSize {
+			log.WithField("MaxSize", MaxArchiveSize).WithField("FileSize", fileInfo.Size()).Debug("archive exceeds max archive size.")
 			return false, fmt.Errorf("archive exceeds max archive size (%d bytes)", MaxArchiveSize)
 		}
-		fullFile, err := ioutil.ReadAll(readerB)
+		fullFile, err := ioutil.ReadAll(inputFile)
 		if err != nil {
 			return false, err
 		}

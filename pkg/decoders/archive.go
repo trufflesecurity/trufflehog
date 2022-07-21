@@ -125,6 +125,9 @@ func ReadToMax(reader io.Reader) ([]byte, error) {
 		if bRead < 1024 {
 			break
 		}
+		if i == MaxSize*1024 && bRead == 1024 {
+			log.Debug("Max archive size reached.")
+		}
 	}
 	return fileContent.Bytes(), nil
 }
