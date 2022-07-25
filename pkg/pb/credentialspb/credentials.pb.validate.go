@@ -1202,3 +1202,106 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GitHubAppValidationError{}
+
+// Validate checks the field values on SlackTokens with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SlackTokens) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SlackTokens with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SlackTokensMultiError, or
+// nil if none found.
+func (m *SlackTokens) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SlackTokens) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for AppToken
+
+	// no validation rules for BotToken
+
+	if len(errors) > 0 {
+		return SlackTokensMultiError(errors)
+	}
+
+	return nil
+}
+
+// SlackTokensMultiError is an error wrapping multiple validation errors
+// returned by SlackTokens.ValidateAll() if the designated constraints aren't met.
+type SlackTokensMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SlackTokensMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SlackTokensMultiError) AllErrors() []error { return m }
+
+// SlackTokensValidationError is the validation error returned by
+// SlackTokens.Validate if the designated constraints aren't met.
+type SlackTokensValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SlackTokensValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SlackTokensValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SlackTokensValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SlackTokensValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SlackTokensValidationError) ErrorName() string { return "SlackTokensValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SlackTokensValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSlackTokens.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SlackTokensValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SlackTokensValidationError{}

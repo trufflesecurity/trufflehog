@@ -377,8 +377,8 @@ github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PK
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502 h1:34icjjmqJ2HPjrSuJYEkdZ+0ItmGQAQ75cRHIiftIyE=
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
-github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom8 h1:L3i09KBNoAfNvE1Ue4XOVDOsihidbPGkz7r7a7YAnSU=
-github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom8/go.mod h1:2iZpX4Epnmx7VK2atbIMEjHW9rivie5RRe0ZhPWUFvM=
+github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom9 h1:OvS9aj6Fasot5FaTpSyCV4WNq/8SMov9/bNUMoZFwEI=
+github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom9/go.mod h1:2iZpX4Epnmx7VK2atbIMEjHW9rivie5RRe0ZhPWUFvM=
 github.com/trufflesecurity/go-gitdiff v0.7.6-zombies2 h1:srCJzbE3b44+ZIPcgJSfvinHCOQlkMwVghtKf23un6o=
 github.com/trufflesecurity/go-gitdiff v0.7.6-zombies2/go.mod h1:pKz0X4YzCKZs30BL+weqBIG7mx0jl4tF1uXV9ZyNvrA=
 github.com/trufflesecurity/overseer v1.1.7-custom5 h1:xu+Fg6fkSRifUPzUCl7N8HmobJ6WGOkIApGnM7mJS6w=
