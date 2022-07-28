@@ -107,7 +107,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 
 	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
-		func(file, email, commit, repository, timestamp string, line int64) *source_metadatapb.MetaData {
+		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
@@ -177,7 +177,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 		if !strings.HasSuffix(u, "git") {
-			//try paths instead of url
+			// try paths instead of url
 			repo, err := RepoFromPath(u)
 			if err != nil {
 				return err
@@ -431,9 +431,9 @@ func (s *Git) ScanRepo(_ context.Context, repo *git.Repository, repoPath string,
 	return nil
 }
 
-//GenerateLink crafts a link to the specific file from a commit. This works in most major git providers (Github/Gitlab)
+// GenerateLink crafts a link to the specific file from a commit. This works in most major git providers (Github/Gitlab)
 func GenerateLink(repo, commit, file string) string {
-	//bitbucket links are commits not commit...
+	// bitbucket links are commits not commit...
 	if strings.Contains(repo, "bitbucket.org/") {
 		return repo[:len(repo)-4] + "/commits/" + commit
 	}
