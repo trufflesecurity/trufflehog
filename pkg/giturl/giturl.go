@@ -72,8 +72,8 @@ func NormalizeOrgRepoURL(provider, repoURL string) (string, error) {
 			return "", errors.Errorf("%s repo appears to be missing the repo name. Org: %q Repo url: %q", provider, org, repoURL)
 		}
 
-	case len(parts) > 3:
-		return "", errors.Errorf("%s repo appears to be too long or contains a trailing slash. Repo url: %q", provider, repoURL)
+	case len(parts) > 3 && strings.HasSuffix(parsed.Path, "/"):
+		return "", errors.Errorf("%s repo contains a trailing slash. Repo url: %q", provider, repoURL)
 	}
 
 	// If we're here it's probably a provider repo without ".git" at the end, so add it and return

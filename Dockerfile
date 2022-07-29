@@ -1,10 +1,12 @@
-FROM golang:bullseye as builder
+FROM --platform=${BUILDPLATFORM} golang:bullseye as builder
 
 WORKDIR /build
-COPY go.mod go.sum ./
-RUN go mod download
 COPY . . 
-RUN CGO_ENABLED=0 go build -a -o trufflehog main.go
+ENV CGO_ENABLED=0
+ARG TARGETOS TARGETARCH
+RUN  --mount=type=cache,target=/go/pkg/mod \
+     --mount=type=cache,target=/root/.cache/go-build \
+     GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o trufflehog .
 
 FROM alpine:3.15
 RUN apk add --no-cache git
