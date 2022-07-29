@@ -21,7 +21,7 @@ branding:
   color: "green"
 runs:
   using: "docker"
-  image: "docker://ghcr.io/trufflesecurity/trufflehog:latest"
+  image: "docker://docker.io/jwenz723/trufflehog:latest"
   args:
     - git
     - file://${{ inputs.path }}
