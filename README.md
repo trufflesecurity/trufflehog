@@ -11,7 +11,7 @@
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
-[![Total Detectors](https://shields-staging.herokuapp.com/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors) <!-- Badge must be run from staging, see badges/shields#5967 -->
+[![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
 
 </center>
 
