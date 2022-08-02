@@ -130,7 +130,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return nil
 			}
 
-			inputFile.Seek(0, io.SeekStart)
+			_, err = inputFile.Seek(0, io.SeekStart)
+			if err != nil {
+				return err
+			}
 
 			reader := bufio.NewReaderSize(bufio.NewReader(inputFile), BufferSize)
 
