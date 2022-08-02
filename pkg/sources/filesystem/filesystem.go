@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"github.com/go-errors/errors"
-	"github.com/mholt/archiver/v4"
 	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -108,7 +107,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 
 			inputFile, err := os.Open(path)
-			defer inputFile.Close()
 			if err != nil {
 				log.Warn(err)
 				return nil
@@ -132,10 +130,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return nil
 			}
 
-			if err != nil && !errors.Is(err, archiver.ErrNoMatch) {
-				log.WithError(err).Debug("Error reading archive")
-				return nil
-			}
+			inputFile.Seek(0, io.SeekStart)
 
 			reader := bufio.NewReaderSize(bufio.NewReader(inputFile), BufferSize)
 

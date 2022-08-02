@@ -14,14 +14,16 @@ func DefaultHandlers() []Handler {
 
 type Handler interface {
 	FromFile(io.Reader) chan ([]byte)
-	IsFiletype(io.Reader) bool
+	IsFiletype(io.Reader) (io.Reader, bool)
 	New()
 }
 
 func HandleFile(file io.Reader, chunkSkel *sources.Chunk, chunksChan chan (*sources.Chunk)) bool {
 	for _, handler := range DefaultHandlers() {
 		handler.New()
-		if !handler.IsFiletype(file) {
+		var isType bool
+		file, isType = handler.IsFiletype(file)
+		if !isType {
 			continue
 		}
 		handlerChan := handler.FromFile(file)

@@ -11,15 +11,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type ctxKey int
+
+const (
+	depthKey ctxKey = iota
+)
+
 var (
 	maxDepth = 5
 )
 
 // Archive is a handler for extracting and decompressing archives.
 type Archive struct {
-	newChunkData bytes.Buffer
-	maxSize      int
-	size         int
+	maxSize int
+	size    int
 }
 
 // New sets a default maximum size and current size counter.
@@ -72,7 +77,7 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 	}
 	switch archive := format.(type) {
 	case archiver.Extractor:
-		err := archive.Extract(context.WithValue(ctx, "depth", depth+1), reader, nil, d.extractorHandler(archiveChan))
+		err := archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, d.extractorHandler(archiveChan))
 		if err != nil {
 			return err
 		}
@@ -93,19 +98,18 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 }
 
 // IsFiletype returns true if the provided reader is an archive.
-func (d *Archive) IsFiletype(reader io.Reader) bool {
+func (d *Archive) IsFiletype(reader io.Reader) (io.Reader, bool) {
 	format, readerB, err := archiver.Identify("", reader)
-	reader = readerB
 	if err != nil {
-		return false
+		return readerB, false
 	}
 	switch format.(type) {
 	case archiver.Extractor:
-		return true
+		return readerB, true
 	case archiver.Decompressor:
-		return true
+		return readerB, true
 	}
-	return false
+	return readerB, false
 }
 
 // extractorHandler is applied to each file in an archiver.Extractor file.
@@ -113,7 +117,7 @@ func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Conte
 	return func(ctx context.Context, f archiver.File) error {
 		log.WithField("filename", f.Name()).Trace("Handling extracted file.")
 		depth := 0
-		if ctxDepth, ok := ctx.Value("depth").(int); ok {
+		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
 		}
 
