@@ -9,8 +9,9 @@ RUN  --mount=type=cache,target=/go/pkg/mod \
      GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o trufflehog .
 
 FROM alpine:3.15
-RUN apk add --no-cache git
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN apk add --no-cache git ca-certificates \
+    && rm -rf /var/cache/apk/* && \
+    update-ca-certificates
 COPY --from=builder /build/trufflehog /usr/bin/trufflehog
 COPY entrypoint.sh /etc/entrypoint.sh
 RUN chmod +x /etc/entrypoint.sh

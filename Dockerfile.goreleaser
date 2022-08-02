@@ -1,7 +1,10 @@
 FROM alpine:3.15
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates \
+    && rm -rf /var/cache/apk/* && \
+    update-ca-certificates
 WORKDIR /usr/bin/
 COPY trufflehog .
-
-ENTRYPOINT ["/usr/bin/trufflehog"]
+COPY entrypoint.sh /etc/entrypoint.sh
+RUN chmod +x /etc/entrypoint.sh
+ENTRYPOINT ["/etc/entrypoint.sh"]
