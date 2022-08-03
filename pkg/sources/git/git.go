@@ -652,13 +652,13 @@ func handleBinary(repo *git.Repository, chunksChan chan (*sources.Chunk), chunkS
 	if !handled {
 		log.WithField("path", path).Trace("Binary file is not recognized by file handlers. Chunking raw.")
 		chunkSize := 10 * 1024
-		chunkData := make([]byte, chunkSize)
 		reader, err = file.Reader()
 		if err != nil {
 			return err
 		}
 		eof := false
 		for !eof {
+			chunkData := make([]byte, chunkSize)
 			n, err := reader.Read(chunkData)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
