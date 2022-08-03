@@ -66,11 +66,6 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 					break
 				}
 			}
-			fileBytes, err := d.ReadToMax(reader)
-			if err != nil {
-				return err
-			}
-			archiveChan <- fileBytes
 			return nil
 		}
 		return err

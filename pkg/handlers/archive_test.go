@@ -14,12 +14,12 @@ func TestArchiveHandler(t *testing.T) {
 	}{
 		"gzip-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one-zip.gz",
-			2,
+			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
 		"gzip-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/double-zip.gz",
-			2,
+			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
 		"gzip-too-deep": {
@@ -29,12 +29,12 @@ func TestArchiveHandler(t *testing.T) {
 		},
 		"tar-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one.tar",
-			2,
+			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
 		"tar-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/two.tar",
-			2,
+			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
 		"tar-too-deep": {
@@ -44,12 +44,12 @@ func TestArchiveHandler(t *testing.T) {
 		},
 		"targz-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/tar-archive.tar.gz",
-			2,
+			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
 		"gzip-large": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
-			1545,
+			1544,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
 	}
