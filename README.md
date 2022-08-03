@@ -169,6 +169,8 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
     base: 
     # Scan commits until here (usually dev branch).
     head: # optional
+    # Extra args to be passed to the trufflehog cli.
+    extra_args: # optional
 ```
 
 The TruffleHog OSS Github Action can be used to scan a range of commits for leaked credentials. The action will fail if
@@ -192,6 +194,7 @@ jobs:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
+          extra_args: --debug
 ```
 
 ## Contributors
