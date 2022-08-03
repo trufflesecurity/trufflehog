@@ -352,7 +352,10 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 				SourceMetadata: metadata,
 				Verify:         s.verify,
 			}
-			handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName)
+			if err = handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+				log.WithError(err).Error("Error handling binary file")
+			}
+			continue
 		}
 
 		for _, frag := range file.TextFragments {
@@ -661,10 +664,10 @@ func handleBinary(repo *git.Repository, chunksChan chan (*sources.Chunk), chunkS
 			chunkData := make([]byte, chunkSize)
 			n, err := reader.Read(chunkData)
 			if err != nil {
-				if errors.Is(err, io.EOF) {
-					eof = true
+				if !errors.Is(err, io.EOF) {
+					return err
 				}
-				return err
+				eof = true
 			}
 			if n < chunkSize {
 				eof = true
