@@ -58,11 +58,12 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 	format, reader, err := archiver.Identify("", reader)
 	if err != nil {
 		if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
+			chunkSize := 10 * 1024
 			for {
-				chunk := make([]byte, 10*1024)
+				chunk := make([]byte, chunkSize)
 				n, _ := reader.Read(chunk)
 				archiveChan <- chunk
-				if n < 512 {
+				if n < chunkSize {
 					break
 				}
 			}

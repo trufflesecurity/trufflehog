@@ -49,7 +49,7 @@ func TestArchiveHandler(t *testing.T) {
 		},
 		"gzip-large": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
-			1544,
+			1543,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
 	}
