@@ -201,7 +201,7 @@ func run(state overseer.State) {
 		}
 
 		if err = e.ScanGit(ctx, sources.NewConfig(g)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan g.")
+			logrus.WithError(err).Fatal("Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
