@@ -186,7 +186,7 @@ func run(state overseer.State) {
 	case gitScan.FullCommand():
 		repoPath, remote, err = git.PrepareRepoSinceCommit(*gitScanURI, *gitScanSinceCommit)
 		if err != nil || repoPath == "" {
-			logrus.WithError(err).Fatal("error preparing g repo for scanning")
+			logrus.WithError(err).Fatal("error preparing git repo for scanning")
 		}
 		if remote {
 			defer os.RemoveAll(repoPath)
@@ -220,7 +220,7 @@ func run(state overseer.State) {
 		}
 
 		if err = e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan g.")
+			logrus.WithError(err).Fatal("Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
 		gitlab := func(c *sources.Config) {
