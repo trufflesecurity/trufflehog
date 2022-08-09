@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -113,6 +113,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			defer inputFile.Close()
 
+			reReader, err := diskbufferreader.New(inputFile)
+			if err != nil {
+				log.WithError(err).Error("Could not create re-readable reader.")
+			}
+			defer reReader.Close()
+
 			chunkSkel := &sources.Chunk{
 				SourceType: s.Type(),
 				SourceName: s.name,
@@ -126,69 +132,30 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(inputFile, chunkSkel, chunksChan) {
+			if handlers.HandleFile(reReader, chunkSkel, chunksChan) {
 				return nil
 			}
 
-			_, err = inputFile.Seek(0, io.SeekStart)
-			if err != nil {
-				return err
-			}
+			reReader.Reset()
+			reReader.Stop()
 
-			reader := bufio.NewReaderSize(bufio.NewReader(inputFile), BufferSize)
-
-			firstChunk := true
-			for {
-				if done {
-					return nil
-				}
-
-				end := BufferSize
-				buf := make([]byte, BufferSize)
-				n, err := reader.Read(buf)
-
-				if n < BufferSize {
-					end = n
-				}
-
-				if end > 0 {
-					data := buf[0:end]
-
-					if firstChunk {
-						firstChunk = false
-						if common.SkipFile(path, data) {
-							return nil
-						}
-					}
-
-					// We are peeking in case a secret exists in our chunk boundaries,
-					// but we never care if we've run into a peek error.
-					peekData, _ := reader.Peek(PeekSize)
-					chunksChan <- &sources.Chunk{
-						SourceType: s.Type(),
-						SourceName: s.name,
-						SourceID:   s.SourceID(),
-						Data:       append(data, peekData...),
-						SourceMetadata: &source_metadatapb.MetaData{
-							Data: &source_metadatapb.MetaData_Filesystem{
-								Filesystem: &source_metadatapb.Filesystem{
-									File: sanitizer.UTF8(path),
-								},
+			for chunkData := range common.ChunkReader(inputFile) {
+				chunksChan <- &sources.Chunk{
+					SourceType: s.Type(),
+					SourceName: s.name,
+					SourceID:   s.SourceID(),
+					Data:       chunkData,
+					SourceMetadata: &source_metadatapb.MetaData{
+						Data: &source_metadatapb.MetaData_Filesystem{
+							Filesystem: &source_metadatapb.Filesystem{
+								File: sanitizer.UTF8(path),
 							},
 						},
-						Verify: s.verify,
-					}
-				}
-
-				// io.EOF can be emmitted when 0<n<buffer size
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						return nil
-					} else {
-						return err
-					}
+					},
+					Verify: s.verify,
 				}
 			}
+			return nil
 		})
 
 		if err != nil && err != io.EOF {
