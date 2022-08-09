@@ -8,14 +8,12 @@ import (
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-
-	log "github.com/sirupsen/logrus"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
