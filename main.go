@@ -182,7 +182,6 @@ func run(state overseer.State) {
 
 	var repoPath string
 	var remote bool
-	cfg := sources.NewConfig()
 	switch cmd {
 	case gitScan.FullCommand():
 		repoPath, remote, err = git.PrepareRepoSinceCommit(*gitScanURI, *gitScanSinceCommit)
