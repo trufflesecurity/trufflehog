@@ -7,33 +7,36 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/s3"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/s3"
 )
 
-func (e *Engine) ScanS3(ctx context.Context, key, secret string, cloudCred bool, buckets []string) error {
+// ScanS3 scans S3 buckets.
+func (e *Engine) ScanS3(ctx context.Context, c *sources.Config) error {
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}
-	if cloudCred {
-		if len(key) > 0 || len(secret) > 0 {
+	if c.CloudCred {
+		if len(c.Key) > 0 || len(c.Secret) > 0 {
 			return fmt.Errorf("cannot use cloud credentials and basic auth together")
 		}
 		connection.Credential = &sourcespb.S3_CloudEnvironment{}
 	}
-	if len(key) > 0 && len(secret) > 0 {
+	if len(c.Key) > 0 && len(c.Secret) > 0 {
 		connection.Credential = &sourcespb.S3_AccessKey{
 			AccessKey: &credentialspb.KeySecret{
-				Key:    key,
-				Secret: secret,
+				Key:    c.Key,
+				Secret: c.Secret,
 			},
 		}
 	}
-	if len(buckets) > 0 {
-		connection.Buckets = buckets
+	if len(c.Buckets) > 0 {
+		connection.Buckets = c.Buckets
 	}
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})

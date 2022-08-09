@@ -11,34 +11,36 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string, maxDepth int, filter *common.Filter) error {
+// ScanGit scans any git source.
+func (e *Engine) ScanGit(ctx context.Context, c *sources.Config) error {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
-		git.ScanOptionFilter(filter),
+		git.ScanOptionFilter(c.Filter),
 		git.ScanOptionLogOptions(logOptions),
 	}
 
-	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
+	repo, err := gogit.PlainOpenWithOptions(c.RepoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
-		return fmt.Errorf("could open repo: %s: %w", repoPath, err)
+		return fmt.Errorf("could open repo: %s: %w", c.RepoPath, err)
 	}
 
 	var baseCommit *object.Commit
-	if len(baseRef) > 0 {
-		baseHash := plumbing.NewHash(baseRef)
-		if !plumbing.IsHash(baseRef) {
-			base, err := git.TryAdditionalBaseRefs(repo, baseRef)
+	if len(c.BaseRef) > 0 {
+		baseHash := plumbing.NewHash(c.BaseRef)
+		if !plumbing.IsHash(c.BaseRef) {
+			base, err := git.TryAdditionalBaseRefs(repo, c.BaseRef)
 			if err != nil {
 				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
 			} else {
-				baseRef = base.String()
-				baseCommit, _ = repo.CommitObject(plumbing.NewHash(baseRef))
+				c.BaseRef = base.String()
+				baseCommit, _ = repo.CommitObject(plumbing.NewHash(c.BaseRef))
 			}
 		} else {
 			baseCommit, err = repo.CommitObject(baseHash)
@@ -49,15 +51,15 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 	}
 
 	var headCommit *object.Commit
-	if len(headRef) > 0 {
-		headHash := plumbing.NewHash(headRef)
-		if !plumbing.IsHash(headRef) {
-			head, err := git.TryAdditionalBaseRefs(repo, headRef)
+	if len(c.HeadRef) > 0 {
+		headHash := plumbing.NewHash(c.HeadRef)
+		if !plumbing.IsHash(c.HeadRef) {
+			head, err := git.TryAdditionalBaseRefs(repo, c.HeadRef)
 			if err != nil {
 				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
 			} else {
-				headRef = head.String()
-				headCommit, _ = repo.CommitObject(plumbing.NewHash(baseRef))
+				c.HeadRef = head.String()
+				headCommit, _ = repo.CommitObject(plumbing.NewHash(c.BaseRef))
 			}
 		} else {
 			headCommit, err = repo.CommitObject(headHash)
@@ -67,23 +69,23 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 		}
 	}
 
-	// If baseCommit is an ancestor of headCommit, update baseRef to be the common ancestor.
+	// If baseCommit is an ancestor of headCommit, update c.BaseRef to be the common ancestor.
 	if headCommit != nil && baseCommit != nil {
 		mergeBase, err := headCommit.MergeBase(baseCommit)
 		if err != nil || len(mergeBase) < 1 {
 			return errors.WrapPrefix(err, "could not find common base between the given references", 0)
 		}
-		baseRef = mergeBase[0].Hash.String()
+		c.BaseRef = mergeBase[0].Hash.String()
 	}
 
-	if maxDepth != 0 {
-		opts = append(opts, git.ScanOptionMaxDepth(int64(maxDepth)))
+	if c.MaxDepth != 0 {
+		opts = append(opts, git.ScanOptionMaxDepth(int64(c.MaxDepth)))
 	}
-	if baseRef != "" {
-		opts = append(opts, git.ScanOptionBaseHash(baseRef))
+	if c.BaseRef != "" {
+		opts = append(opts, git.ScanOptionBaseHash(c.BaseRef))
 	}
-	if headRef != "" {
-		opts = append(opts, git.ScanOptionHeadCommit(headRef))
+	if c.HeadRef != "" {
+		opts = append(opts, git.ScanOptionHeadCommit(c.HeadRef))
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
@@ -106,7 +108,7 @@ func (e *Engine) ScanGit(ctx context.Context, repoPath, headRef, baseRef string,
 	e.sourcesWg.Add(1)
 	go func() {
 		defer e.sourcesWg.Done()
-		err := gitSource.ScanRepo(ctx, repo, repoPath, scanOptions, e.ChunksChan())
+		err := gitSource.ScanRepo(ctx, repo, c.RepoPath, scanOptions, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Fatal("could not scan repo")
 		}

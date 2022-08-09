@@ -17,9 +17,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/alecthomas/kingpin.v2"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
-	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -180,6 +182,7 @@ func run(state overseer.State) {
 
 	var repoPath string
 	var remote bool
+	var cfg sources.Config
 	switch cmd {
 	case gitScan.FullCommand():
 		repoPath, remote, err = git.PrepareRepoSinceCommit(*gitScanURI, *gitScanSinceCommit)
@@ -189,36 +192,73 @@ func run(state overseer.State) {
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
-		err = e.ScanGit(ctx, repoPath, *gitScanBranch, *gitScanSinceCommit, *gitScanMaxDepth, filter)
-		if err != nil {
+
+		cfg = sources.Config{
+			RepoPath: repoPath,
+			HeadRef:  *gitScanBranch,
+			BaseRef:  *gitScanSinceCommit,
+			MaxDepth: *gitScanMaxDepth,
+			Filter:   filter,
+		}
+		if err = e.ScanGit(ctx, &cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
 	case githubScan.FullCommand():
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			log.Fatal("You must specify at least one organization or repository.")
 		}
-		err = e.ScanGitHub(ctx, *githubScanEndpoint, *githubScanRepos, *githubScanOrgs, *githubScanToken, *githubIncludeForks, filter, *concurrency, *githubIncludeMembers)
-		if err != nil {
+
+		cfg = sources.Config{
+			Endpoint:       *githubScanEndpoint,
+			Repos:          *githubScanRepos,
+			Orgs:           *githubScanOrgs,
+			Token:          *githubScanToken,
+			IncludeForks:   *githubIncludeForks,
+			IncludeMembers: *githubIncludeMembers,
+			Concurrency:    *concurrency,
+		}
+		if err = e.ScanGitHub(ctx, &cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
 	case gitlabScan.FullCommand():
-		err := e.ScanGitLab(ctx, *gitlabScanEndpoint, *gitlabScanToken, *gitlabScanRepos)
-		if err != nil {
+		cfg = sources.Config{
+			Endpoint: *gitlabScanEndpoint,
+			Token:    *gitlabScanToken,
+			Repos:    *gitlabScanRepos,
+		}
+
+		if err = e.ScanGitLab(ctx, &cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
-		err := e.ScanFileSystem(ctx, *filesystemDirectories)
-		if err != nil {
+		cfg = sources.Config{
+			Directories: *filesystemDirectories,
+		}
+
+		if err = e.ScanFileSystem(ctx, &cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
-		err := e.ScanS3(ctx, *s3ScanKey, *s3ScanSecret, *s3ScanCloudEnv, *s3ScanBuckets)
-		if err != nil {
+		cfg = sources.Config{
+			Key:     *s3ScanKey,
+			Secret:  *s3ScanSecret,
+			Buckets: *s3ScanBuckets,
+		}
+
+		if err = e.ScanS3(ctx, &cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
-		err := e.ScanSyslog(ctx, *syslogAddress, *syslogProtocol, *syslogTLSCert, *syslogTLSKey, *syslogFormat, *concurrency)
-		if err != nil {
+		cfg = sources.Config{
+			Address:     *syslogAddress,
+			Protocol:    *syslogProtocol,
+			CertPath:    *syslogTLSCert,
+			KeyPath:     *syslogTLSKey,
+			Format:      *syslogFormat,
+			Concurrency: *concurrency,
+		}
+
+		if err = e.ScanSyslog(ctx, &cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
 		}
 	}
