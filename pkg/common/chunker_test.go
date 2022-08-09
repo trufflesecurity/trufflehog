@@ -37,34 +37,34 @@ func TestChunker(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	reReader.Reset()
+	_ = reReader.Reset()
 
 	// Get the first two chunks for comparing later.
 	baseChunkOne := make([]byte, ChunkSize)
 	baseChunkTwo := make([]byte, ChunkSize)
 
 	baseReader := bufio.NewReaderSize(reReader, ChunkSize)
-	baseReader.Read(baseChunkOne)
+	_, _ = baseReader.Read(baseChunkOne)
 	peek, _ := baseReader.Peek(PeekSize)
 	baseChunkOne = append(baseChunkOne, peek...)
-	baseReader.Read(baseChunkTwo)
+	_, _ = baseReader.Read(baseChunkTwo)
 	peek, _ = baseReader.Peek(PeekSize)
 	baseChunkTwo = append(baseChunkTwo, peek...)
 
 	// Reset the reader to the beginning and use ChunkReader.
-	reReader.Reset()
+	_ = reReader.Reset()
 
 	testChunkCount := 0
 	for chunk := range ChunkReader(reReader) {
 		testChunkCount++
 		switch testChunkCount {
 		case 1:
-			if bytes.Compare(baseChunkOne, chunk) != 0 {
+			if !bytes.Equal(baseChunkOne, chunk) {
 				t.Errorf("First chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk), len(baseChunkOne))
 			}
 		case 2:
-			if bytes.Compare(baseChunkTwo, chunk) != 0 {
-				t.Errorf("Second chunk did not match expected. Got: %d bytes, expected: %d bytes; %v", len(chunk), len(baseChunkTwo), baseChunkTwo)
+			if !bytes.Equal(baseChunkTwo, chunk) {
+				t.Errorf("Second chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk), len(baseChunkTwo))
 			}
 		}
 	}

@@ -136,7 +136,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return nil
 			}
 
-			reReader.Reset()
+			if err := reReader.Reset(); err != nil {
+				return err
+			}
 			reReader.Stop()
 
 			for chunkData := range common.ChunkReader(inputFile) {
