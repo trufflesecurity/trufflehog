@@ -19,7 +19,7 @@ import (
 )
 
 // ScanGit scans any git source.
-func (e *Engine) ScanGit(ctx context.Context, c *sources.Config) error {
+func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),

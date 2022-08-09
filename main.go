@@ -200,7 +200,7 @@ func run(state overseer.State) {
 			MaxDepth: *gitScanMaxDepth,
 			Filter:   filter,
 		}
-		if err = e.ScanGit(ctx, &cfg); err != nil {
+		if err = e.ScanGit(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
 	case githubScan.FullCommand():
@@ -217,7 +217,7 @@ func run(state overseer.State) {
 			IncludeMembers: *githubIncludeMembers,
 			Concurrency:    *concurrency,
 		}
-		if err = e.ScanGitHub(ctx, &cfg); err != nil {
+		if err = e.ScanGitHub(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
 	case gitlabScan.FullCommand():
@@ -227,7 +227,7 @@ func run(state overseer.State) {
 			Repos:    *gitlabScanRepos,
 		}
 
-		if err = e.ScanGitLab(ctx, &cfg); err != nil {
+		if err = e.ScanGitLab(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
@@ -235,7 +235,7 @@ func run(state overseer.State) {
 			Directories: *filesystemDirectories,
 		}
 
-		if err = e.ScanFileSystem(ctx, &cfg); err != nil {
+		if err = e.ScanFileSystem(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
@@ -245,7 +245,7 @@ func run(state overseer.State) {
 			Buckets: *s3ScanBuckets,
 		}
 
-		if err = e.ScanS3(ctx, &cfg); err != nil {
+		if err = e.ScanS3(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
@@ -258,7 +258,7 @@ func run(state overseer.State) {
 			Concurrency: *concurrency,
 		}
 
-		if err = e.ScanSyslog(ctx, &cfg); err != nil {
+		if err = e.ScanSyslog(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
 		}
 	}

@@ -64,7 +64,7 @@ func TestGitEngine(t *testing.T) {
 			MaxDepth: tTest.maxDepth,
 			Filter:   tTest.filter,
 		}
-		if err := e.ScanGit(ctx, &cfg); err != nil {
+		if err := e.ScanGit(ctx, cfg); err != nil {
 			return
 		}
 		go e.Finish()
@@ -118,7 +118,7 @@ func BenchmarkGitEngine(b *testing.B) {
 			RepoPath: path,
 			Filter:   common.FilterEmpty(),
 		}
-		if err := e.ScanGit(ctx, &cfg); err != nil {
+		if err := e.ScanGit(ctx, cfg); err != nil {
 			return
 		}
 	}
