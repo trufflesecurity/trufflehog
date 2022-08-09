@@ -95,6 +95,15 @@ type Config struct {
 	Filter *common.Filter
 }
 
+// NewConfig returns a new Config with optional values.
+func NewConfig(opts ...func(*Config)) *Config {
+	c := &Config{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
 // PercentComplete is used to update job completion percentages across sources
 type Progress struct {
 	mut               sync.Mutex

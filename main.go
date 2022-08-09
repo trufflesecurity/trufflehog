@@ -182,7 +182,7 @@ func run(state overseer.State) {
 
 	var repoPath string
 	var remote bool
-	var cfg sources.Config
+	cfg := sources.NewConfig()
 	switch cmd {
 	case gitScan.FullCommand():
 		repoPath, remote, err = git.PrepareRepoSinceCommit(*gitScanURI, *gitScanSinceCommit)
@@ -193,13 +193,16 @@ func run(state overseer.State) {
 			defer os.RemoveAll(repoPath)
 		}
 
-		cfg = sources.Config{
-			RepoPath: repoPath,
-			HeadRef:  *gitScanBranch,
-			BaseRef:  *gitScanSinceCommit,
-			MaxDepth: *gitScanMaxDepth,
-			Filter:   filter,
+		setup := func(c *sources.Config) {
+			c.RepoPath = repoPath
+			c.HeadRef = *gitScanBranch
+			c.BaseRef = *gitScanSinceCommit
+			c.MaxDepth = *gitScanMaxDepth
+			c.Filter = filter
 		}
+
+		cfg = sources.NewConfig(setup)
+
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
@@ -208,57 +211,61 @@ func run(state overseer.State) {
 			log.Fatal("You must specify at least one organization or repository.")
 		}
 
-		cfg = sources.Config{
-			Endpoint:       *githubScanEndpoint,
-			Repos:          *githubScanRepos,
-			Orgs:           *githubScanOrgs,
-			Token:          *githubScanToken,
-			IncludeForks:   *githubIncludeForks,
-			IncludeMembers: *githubIncludeMembers,
-			Concurrency:    *concurrency,
+		setup := func(c *sources.Config) {
+			c.Endpoint = *githubScanEndpoint
+			c.Repos = *githubScanRepos
+			c.Orgs = *githubScanOrgs
+			c.Token = *githubScanToken
+			c.IncludeForks = *githubIncludeForks
+			c.IncludeMembers = *githubIncludeMembers
+			c.Concurrency =
+				*concurrency
 		}
-		if err = e.ScanGitHub(ctx, cfg); err != nil {
+
+		if err = e.ScanGitHub(ctx, sources.NewConfig(setup)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan git.")
 		}
 	case gitlabScan.FullCommand():
-		cfg = sources.Config{
-			Endpoint: *gitlabScanEndpoint,
-			Token:    *gitlabScanToken,
-			Repos:    *gitlabScanRepos,
+		setup := func(c *sources.Config) {
+			c.Endpoint = *gitlabScanEndpoint
+			c.Token = *gitlabScanToken
+			c.Repos = *gitlabScanRepos
 		}
 
-		if err = e.ScanGitLab(ctx, cfg); err != nil {
+		if err = e.ScanGitLab(ctx, sources.NewConfig(setup)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
-		cfg = sources.Config{
-			Directories: *filesystemDirectories,
+		setup := func(c *sources.Config) {
+			c.Directories = *filesystemDirectories
 		}
 
-		if err = e.ScanFileSystem(ctx, cfg); err != nil {
+		if err = e.ScanFileSystem(ctx, sources.NewConfig(setup)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
-		cfg = sources.Config{
-			Key:     *s3ScanKey,
-			Secret:  *s3ScanSecret,
-			Buckets: *s3ScanBuckets,
+		setup := func(c *sources.Config) {
+			c.Key = *s3ScanKey
+			c.Secret = *s3ScanSecret
+			c.Buckets = *s3ScanBuckets
+
 		}
 
-		if err = e.ScanS3(ctx, cfg); err != nil {
+		if err = e.ScanS3(ctx, sources.NewConfig(setup)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
-		cfg = sources.Config{
-			Address:     *syslogAddress,
-			Protocol:    *syslogProtocol,
-			CertPath:    *syslogTLSCert,
-			KeyPath:     *syslogTLSKey,
-			Format:      *syslogFormat,
-			Concurrency: *concurrency,
+		setup := func(c *sources.Config) {
+			c.Address = *syslogAddress
+			c.Protocol = *syslogProtocol
+			c.CertPath = *syslogTLSCert
+			c.KeyPath = *syslogTLSKey
+			c.Format = *syslogFormat
+			c.Concurrency = *concurrency
+
 		}
 
-		if err = e.ScanSyslog(ctx, cfg); err != nil {
+		if err = e.ScanSyslog(ctx, sources.NewConfig(setup)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
 		}
 	}

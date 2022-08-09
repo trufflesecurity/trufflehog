@@ -15,7 +15,11 @@ import (
 )
 
 // ScanSyslog is a source that scans syslog files.
-func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanSyslog(ctx context.Context, c *sources.Config) error {
+	if c == nil {
+		return errors.New("nil config provided for ScanSyslog")
+	}
+
 	connection := &sourcespb.Syslog{
 		Protocol:      c.Protocol,
 		ListenAddress: c.Address,

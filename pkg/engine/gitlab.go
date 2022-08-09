@@ -16,7 +16,11 @@ import (
 )
 
 // ScanGitLab scans GitLab with the provided configuration.
-func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanGitLab(ctx context.Context, c *sources.Config) error {
+	if c == nil {
+		return errors.New("config is nil for ScanGitlab")
+	}
+
 	connection := &sourcespb.GitLab{}
 
 	switch {
