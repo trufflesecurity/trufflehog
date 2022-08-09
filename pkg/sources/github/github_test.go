@@ -288,7 +288,7 @@ func TestEnumerateWithToken(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": ""}})
 
 	s := initTestSource(nil)
 	_, err := s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
