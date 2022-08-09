@@ -95,9 +95,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.verify = verify
 
 	var conn sourcespb.Git
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
-	if err != nil {
-		errors.WrapPrefix(err, "error unmarshalling connection", 0)
+	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+		if err := errors.WrapPrefix(err, "error unmarshalling connection", 0); err != nil {
+			return err
+		}
 	}
 
 	s.conn = &conn

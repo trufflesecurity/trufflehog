@@ -61,7 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				var result Response
 				if errBody == nil {
-					json.Unmarshal(body, &result)
+					if err := json.Unmarshal(body, &result); err != nil {
+						continue
+					}
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 && result.ReturnCode == 0 {
 						s1.Verified = true

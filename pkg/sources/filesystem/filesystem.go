@@ -11,22 +11,22 @@ import (
 
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
 	// These buffer sizes are mainly driven by our largest credential size, which is GCP @ ~2.25KB.
 	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize     = 10 * 1024        // 10KB
-	PeekSize       = 3 * 1024         // 3KB
-	MaxArchiveSize = 20 * 1024 * 1024 // 20MB
+	BufferSize = 10 * 1024 // 10KB
+	PeekSize   = 3 * 1024  // 3KB
 )
 
 type Source struct {
@@ -58,7 +58,7 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
 	s.aCtx = aCtx
@@ -68,9 +68,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.verify = verify
 
 	var conn sourcespb.Filesystem
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
-	if err != nil {
-		errors.WrapPrefix(err, "error unmarshalling connection", 0)
+	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+		if err := errors.WrapPrefix(err, "error unmarshalling connection", 0); err != nil {
+			return err
+		}
 	}
 
 	s.paths = conn.Directories
