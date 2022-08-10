@@ -56,7 +56,9 @@ func TestGitEngine(t *testing.T) {
 			WithDecoders(decoders.DefaultDecoders()...),
 			WithDetectors(false, DefaultDetectors()...),
 		)
-		e.ScanGit(ctx, path, tTest.branch, tTest.base, tTest.maxDepth, tTest.filter)
+		if err := e.ScanGit(ctx, path, tTest.branch, tTest.base, tTest.maxDepth, tTest.filter); err != nil {
+			return
+		}
 		go e.Finish()
 		resultCount := 0
 		for result := range e.ResultsChan() {
@@ -104,7 +106,9 @@ func BenchmarkGitEngine(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// TODO: this is measuring the time it takes to initialize the source
 		// and not to do the full scan
-		e.ScanGit(ctx, path, "", "", 0, common.FilterEmpty())
+		if err := e.ScanGit(ctx, path, "", "", 0, common.FilterEmpty()); err != nil {
+			return
+		}
 	}
 	e.Finish()
 }

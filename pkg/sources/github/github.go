@@ -228,10 +228,14 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		}
 	}
 
-	s.addGistsByUser(ctx, apiClient, user.GetLogin())
+	if err := s.addGistsByUser(ctx, apiClient, user.GetLogin()); err != nil {
+		return nil, err
+	}
 	for _, org := range s.orgs {
 		// TODO: Test it actually works to list org gists like this.
-		s.addGistsByUser(ctx, apiClient, org)
+		if err := s.addGistsByUser(ctx, apiClient, org); err != nil {
+			log.WithError(err).Errorf("error fetching gists by org: %s", org)
+		}
 	}
 	return apiClient, nil
 }
