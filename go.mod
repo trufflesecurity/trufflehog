@@ -4,7 +4,7 @@ go 1.18
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
-replace github.com/zricethezav/gitleaks/v8 => github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom9
+replace github.com/zricethezav/gitleaks/v8 => github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom10
 
 replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff v0.7.6-zombies2
 

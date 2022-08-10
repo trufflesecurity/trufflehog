@@ -229,7 +229,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				"2f251b8c1e72135a375b659951097ec7749d4af9-bump": {B: []byte(" \n")},
 				"e6c8bbabd8796ea3cd85bfc2e55b27e0a491747f-bump": {B: []byte("oops \n")},
 				"735b52b0eb40610002bb1088e902bd61824eb305-bump": {B: []byte("oops\n")},
-				//"ce62d79908803153ef6e145e042d3e80488ef747-bump":  {B: []byte("\n")},
+				"ce62d79908803153ef6e145e042d3e80488ef747-bump": {B: []byte("\n")},
 				// Normally we might expect to see this commit, and we may in the future.
 				// But at the moment we're ignoring any commit unless it contains at least one non-space character.
 				"27fbead3bf883cdb7de9d7825ed401f28f9398f1-slack": {B: []byte("yup, just did that\n\ngithub_lol: \"ffc7e0f9400fb6300167009e42d2f842cd7956e2\"\n\noh, goodness. there's another one!")},
