@@ -1,18 +1,16 @@
-package common
+package sources
 
 import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-type ChunkFunc func(chunk *sources.Chunk) error
+type ChunkFunc func(chunk *Chunk) error
 
 var MatchError = errors.New("chunk doesn't match")
 
-func HandleTestChannel(chunksCh chan *sources.Chunk, cf ChunkFunc) error {
+func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
 	for {
 		select {
 		case gotChunk := <-chunksCh:

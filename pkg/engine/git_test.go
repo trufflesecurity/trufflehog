@@ -8,6 +8,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
@@ -56,7 +57,14 @@ func TestGitEngine(t *testing.T) {
 			WithDecoders(decoders.DefaultDecoders()...),
 			WithDetectors(false, DefaultDetectors()...),
 		)
-		if err := e.ScanGit(ctx, path, tTest.branch, tTest.base, tTest.maxDepth, tTest.filter); err != nil {
+		cfg := sources.Config{
+			RepoPath: path,
+			HeadRef:  tTest.branch,
+			BaseRef:  tTest.base,
+			MaxDepth: tTest.maxDepth,
+			Filter:   tTest.filter,
+		}
+		if err := e.ScanGit(ctx, &cfg); err != nil {
 			return
 		}
 		go e.Finish()
@@ -106,7 +114,11 @@ func BenchmarkGitEngine(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// TODO: this is measuring the time it takes to initialize the source
 		// and not to do the full scan
-		if err := e.ScanGit(ctx, path, "", "", 0, common.FilterEmpty()); err != nil {
+		cfg := sources.Config{
+			RepoPath: path,
+			Filter:   common.FilterEmpty(),
+		}
+		if err := e.ScanGit(ctx, &cfg); err != nil {
 			return
 		}
 	}
