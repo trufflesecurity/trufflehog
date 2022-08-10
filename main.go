@@ -215,8 +215,7 @@ func run(state overseer.State) {
 			c.Token = *githubScanToken
 			c.IncludeForks = *githubIncludeForks
 			c.IncludeMembers = *githubIncludeMembers
-			c.Concurrency =
-				*concurrency
+			c.Concurrency = *concurrency
 		}
 
 		if err = e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
