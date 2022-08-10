@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/gitleaks/go-gitdiff/gitdiff"
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
@@ -27,6 +28,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -634,7 +636,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(repo *git.Repository, chunksChan chan (*sources.Chunk), chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
 	log.WithField("path", path).Trace("Binary file found in repository.")
 	commit, err := repo.CommitObject(commitHash)
 	if err != nil {
@@ -646,36 +648,32 @@ func handleBinary(repo *git.Repository, chunksChan chan (*sources.Chunk), chunkS
 		return err
 	}
 
-	reader, err := file.Reader()
+	fileReader, err := file.Reader()
 	if err != nil {
 		return err
 	}
-	handled := handlers.HandleFile(reader, chunkSkel, chunksChan)
+	defer fileReader.Close()
 
-	if !handled {
-		log.WithField("path", path).Trace("Binary file is not recognized by file handlers. Chunking raw.")
-		chunkSize := 10 * 1024
-		reader, err = file.Reader()
-		if err != nil {
-			return err
-		}
-		eof := false
-		for !eof {
-			chunkData := make([]byte, chunkSize)
-			n, err := reader.Read(chunkData)
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					return err
-				}
-				eof = true
-			}
-			if n < chunkSize {
-				eof = true
-			}
-			chunk := *chunkSkel
-			chunk.Data = chunkData
-			chunksChan <- &chunk
-		}
+	reader, err := diskbufferreader.New(fileReader)
+	if err != nil {
+		return err
 	}
+
+	if handlers.HandleFile(reader, chunkSkel, chunksChan) {
+		return nil
+	}
+
+	log.WithField("path", path).Trace("Binary file is not recognized by file handlers. Chunking raw.")
+	if err := reader.Reset(); err != nil {
+		return err
+	}
+	reader.Stop()
+
+	for chunkData := range common.ChunkReader(reader) {
+		chunk := *chunkSkel
+		chunk.Data = chunkData
+		chunksChan <- &chunk
+	}
+
 	return nil
 }
