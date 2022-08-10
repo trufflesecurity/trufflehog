@@ -244,7 +244,6 @@ func run(state overseer.State) {
 			c.Key = *s3ScanKey
 			c.Secret = *s3ScanSecret
 			c.Buckets = *s3ScanBuckets
-
 		}
 
 		if err = e.ScanS3(ctx, sources.NewConfig(s3)); err != nil {
@@ -258,7 +257,6 @@ func run(state overseer.State) {
 			c.KeyPath = *syslogTLSKey
 			c.Format = *syslogFormat
 			c.Concurrency = *concurrency
-
 		}
 
 		if err = e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
