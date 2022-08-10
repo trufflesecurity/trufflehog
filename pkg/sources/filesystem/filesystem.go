@@ -69,9 +69,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 	var conn sourcespb.Filesystem
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
-		if err := errors.WrapPrefix(err, "error unmarshalling connection", 0); err != nil {
-			return err
-		}
+		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
 	s.paths = conn.Directories
