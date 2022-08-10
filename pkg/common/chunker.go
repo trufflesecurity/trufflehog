@@ -23,6 +23,7 @@ func ChunkReader(r io.Reader) chan []byte {
 			n, err := reader.Read(chunk)
 			if err != nil && !errors.Is(err, io.EOF) {
 				log.WithError(err).Error("Error chunking reader.")
+				break
 			}
 			peekData, _ := reader.Peek(PeekSize)
 			chunkChan <- append(chunk[:n], peekData...)
