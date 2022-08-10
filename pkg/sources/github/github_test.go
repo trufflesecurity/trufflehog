@@ -285,11 +285,16 @@ func TestEnumerateWithToken(t *testing.T) {
 		Reply(200).
 		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
 
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": ""}})
+
 	s := initTestSource(nil)
 	_, err := s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(s.repos))
-	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
+	assert.Equal(t, 2, len(s.repos))
+	assert.Equal(t, []string{"super-secret-repo", ""}, s.repos)
 	assert.True(t, gock.IsDone())
 }
 
