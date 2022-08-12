@@ -81,6 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_AWS,
 				Raw:          []byte(resIDMatch),
 				Redacted:     resIDMatch,
+				RawV2:        []byte(resIDMatch + resSecretMatch),
 			}
 
 			if verify {

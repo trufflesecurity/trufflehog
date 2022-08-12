@@ -84,6 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Alibaba,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
 
 			if verify {
@@ -103,7 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Version", "2014-05-26")
 
 				stringToSign := buildStringToSign(req.Method, params.Encode())
-				signature := GetSignature(stringToSign, resMatch+"&") //Get Signature HMAC SHA1
+				signature := GetSignature(stringToSign, resMatch+"&") // Get Signature HMAC SHA1
 				params.Add("Signature", signature)
 				req.URL.RawQuery = params.Encode()
 
