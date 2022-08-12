@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Censys,
 				Raw:          []byte(tokenPatMatch),
+				RawV2:        []byte(tokenPatMatch + userPatMatch),
 			}
 
 			if verify {
