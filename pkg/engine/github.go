@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 
-	"github.com/go-errors/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -14,11 +13,7 @@ import (
 )
 
 // ScanGitHub scans Github with the provided options.
-func (e *Engine) ScanGitHub(ctx context.Context, c *sources.Config) error {
-	if c == nil {
-		return errors.New("nil config provided for ScanGitHub")
-	}
-
+func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 	source := github.Source{}
 	connection := sourcespb.GitHub{
 		Endpoint:      c.Endpoint,
