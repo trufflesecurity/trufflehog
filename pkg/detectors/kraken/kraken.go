@@ -2,6 +2,10 @@ package kraken
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/url"
@@ -9,11 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"crypto/hmac"
-	"crypto/sha256"
-	"crypto/sha512"
-	"encoding/base64"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -29,7 +28,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	//Bounds have been removed because there are some cases that tokens have trailing frontslash(/) or plus sign (+)
+	// Bounds have been removed because there are some cases that tokens have trailing frontslash(/) or plus sign (+)
 	keyPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{56}[ "'\r\n]{1})`)
 	privKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kraken"}) + `\b([0-9A-Za-z\/\+=]{86,88}[ "'\r\n]{1})`)
 )
@@ -62,11 +61,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Kraken,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resPrivKeyMatch),
 			}
 
 			if verify {
 
-				//Increasing 64-bit integer, for each request that is made with a particular API key.
+				// Increasing 64-bit integer, for each request that is made with a particular API key.
 				apiNonce := strconv.FormatInt(time.Now().Unix(), 10)
 
 				payload := url.Values{}
@@ -106,7 +106,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return detectors.CleanResults(results), nil
 }
 
-//Code from https://docs.kraken.com/rest/#section/Authentication/Headers-and-Signature
+// Code from https://docs.kraken.com/rest/#section/Authentication/Headers-and-Signature
 func getKrakenSignature(url_path string, values url.Values, secret []byte) string {
 
 	sha := sha256.New()
