@@ -96,8 +96,8 @@ type Config struct {
 }
 
 // NewConfig returns a new Config with optional values.
-func NewConfig(opts ...func(*Config)) *Config {
-	c := &Config{}
+func NewConfig(opts ...func(Config)) Config {
+	c := Config{}
 	for _, opt := range opts {
 		opt(c)
 	}
