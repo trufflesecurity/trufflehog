@@ -2,11 +2,11 @@ package bulksms
 
 import (
 	"context"
+	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
-	b64 "encoding/base64"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,10 +21,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([a-fA-Z0-9*]{29})\b`)
-	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([A-F0-9-]{37})\b`)
-
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([A-F0-9-]{37})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -54,10 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Bulksms,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
-	
+
 			if verify {
-				data := fmt.Sprintf("%s:%s", resIdMatch,resMatch)
+				data := fmt.Sprintf("%s:%s", resIdMatch, resMatch)
 				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bulksms.com/v1/messages", nil)
 				if err != nil {
@@ -70,17 +70,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
 				}
 			}
-	
+
 			results = append(results, s1)
 		}
-		
+
 	}
 
 	return detectors.CleanResults(results), nil

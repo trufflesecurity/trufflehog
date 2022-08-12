@@ -29,6 +29,9 @@ type Result struct {
 	Verified     bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
+	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
+	// This is used for secrets that are multi part and could have the same ID. Ex: AWS credentials
+	RawV2 []byte
 	// Redacted contains the redacted version of the raw secret identification data for display purposes.
 	// A secret ID should be used if available.
 	Redacted       string
@@ -96,9 +99,9 @@ func PrefixRegex(keywords []string) string {
 	return pre + middle + post
 }
 
-//KeyIsRandom is a Low cost check to make sure that 'keys' include a number to reduce FPs.
-//Golang doesnt support regex lookaheads, so must be done in separate calls.
-//TODO improve checks. Shannon entropy did not work well.
+// KeyIsRandom is a Low cost check to make sure that 'keys' include a number to reduce FPs.
+// Golang doesnt support regex lookaheads, so must be done in separate calls.
+// TODO improve checks. Shannon entropy did not work well.
 func KeyIsRandom(key string) bool {
 	for _, ch := range key {
 		if unicode.IsDigit(ch) {

@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_APIMatic,
 				Raw:          []byte(userPatMatch),
+				RawV2:        []byte(userPatMatch + passPatMatch),
 			}
 			if verify {
 				timeout := 10 * time.Second

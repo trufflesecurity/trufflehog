@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Poloniex,
 				Raw:          []byte(resSecretMatch),
+				RawV2:        []byte(resMatch + resSecretMatch),
 			}
 
 			if verify {

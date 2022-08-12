@@ -2,14 +2,11 @@ package auth0oauth
 
 import (
 	"context"
-	// "fmt"
-	// "log"
-	"regexp"
-	"strings"
-
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -65,6 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Auth0oauth,
 					Redacted:     clientIdRes,
 					Raw:          []byte(clientSecretRes),
+					RawV2:        []byte(clientIdRes + clientSecretRes),
 				}
 
 				if verify {
