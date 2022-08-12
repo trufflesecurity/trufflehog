@@ -17,11 +17,7 @@ import (
 )
 
 // ScanS3 scans S3 buckets.
-func (e *Engine) ScanS3(ctx context.Context, c *sources.Config) error {
-	if c == nil {
-		return errors.New("nil config provided for ScanS3")
-	}
-
+func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}

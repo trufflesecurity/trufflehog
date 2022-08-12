@@ -15,11 +15,7 @@ import (
 )
 
 // ScanFileSystem scans a given file system.
-func (e *Engine) ScanFileSystem(ctx context.Context, c *sources.Config) error {
-	if c == nil {
-		return errors.New("nil config provided to ScanFileSystem")
-	}
-
+func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 	connection := &sourcespb.Filesystem{
 		Directories: c.Directories,
 	}
