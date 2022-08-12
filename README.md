@@ -197,6 +197,25 @@ jobs:
           extra_args: --debug
 ```
 
+### Precommit Hook
+
+Trufflehog can be used in a precommit hook to prevent credentials from leaking before they ever leave your computer.
+An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
+
+```yaml
+repos:
+- repo: local
+  hooks:
+    - id: trufflehog
+      name: TruffleHog
+      description: Detect secrets in your data.
+      entry: bash -c 'trufflehog git file://. --only-verified --fail'
+      # For running trufflehog in docker, use the following entry instead:
+      # entry: bash -c 'docker run -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --only-verified --fail'
+      language: system
+      stages: ["commit", "push"]
+```
+
 ## Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
