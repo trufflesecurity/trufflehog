@@ -5,8 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	// "fmt"
-	// "log"
 	"regexp"
 	"strings"
 
