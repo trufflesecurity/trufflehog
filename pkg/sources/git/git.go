@@ -15,7 +15,7 @@ import (
 	"time"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
-	"github.com/gitleaks/go-gitdiff/gitdiff"
+	gitparse "github.com/bill-rich/gitparser"
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -292,6 +292,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 		Args:           gitLogArgs,
 		DisableSafeDir: true,
 	}
+	commitChan := gitparse.BillParser(path)
 	fileChan, err := glgo.GitLog(path, logOpts, errChan)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not open repo path", 0)
@@ -306,77 +307,79 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 
 	var depth int64
 	var reachedBase = false
-	for file := range fileChan {
-		if file == nil || file.PatchHeader == nil {
-			log.Debugf("file missing patch header, skipping")
-			continue
-		}
-		log.WithField("commit", file.PatchHeader.SHA).WithField("file", file.NewName).Trace("Scanning file from git")
-		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-			log.Debugf("reached max depth")
-			break
-		}
-		depth++
-		if reachedBase && file.PatchHeader.SHA != scanOptions.BaseHash {
-			break
-		}
-		if len(scanOptions.BaseHash) > 0 {
-			if file.PatchHeader.SHA == scanOptions.BaseHash {
-				log.Debugf("Reached base commit. Finishing scanning files.")
-				reachedBase = true
+	// for file := range fileChan {
+	for commit := range commitChan {
+		for _, diff := range commit.Diffs {
+			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
+			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+				log.Debugf("reached max depth")
+				break
 			}
-		}
-		if !scanOptions.Filter.Pass(file.NewName) {
-			continue
-		}
-
-		fileName := file.NewName
-		if fileName == "" {
-			continue
-		}
-		var email, hash, when string
-		if file.PatchHeader != nil {
-			if file.PatchHeader.Author != nil {
-				email = file.PatchHeader.Author.Email
+			depth++
+			if reachedBase && commit.Hash != scanOptions.BaseHash {
+				break
 			}
-			hash = file.PatchHeader.SHA
-			when = file.PatchHeader.AuthorDate.String()
-		}
-
-		// Handle binary files by reading the entire file rather than using the diff.
-		if file.IsBinary {
-			commitHash := plumbing.NewHash(hash)
-			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
-			chunkSkel := &sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Verify:         s.verify,
-			}
-			if err = handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
-				log.WithError(err).Error("Error handling binary file")
-			}
-			continue
-		}
-
-		for _, frag := range file.TextFragments {
-			var sb strings.Builder
-			newLineNumber := frag.NewPosition
-			for _, line := range frag.Lines {
-				if line.Op == gitdiff.OpAdd {
-					sb.WriteString(line.Line)
+			if len(scanOptions.BaseHash) > 0 {
+				if commit.Hash == scanOptions.BaseHash {
+					log.Debugf("Reached base commit. Finishing scanning files.")
+					reachedBase = true
 				}
 			}
-			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, newLineNumber)
+			/*
+				if !scanOptions.Filter.Pass(diff.PathB) {
+					continue
+				}
+			*/
+
+			fileName := diff.PathB
+			if fileName == "" {
+				continue
+			}
+			var email, hash, when string
+			email = commit.Author
+			hash = commit.Hash
+			when = commit.Date.GoString()
+
+			// Handle binary files by reading the entire file rather than using the diff.
+			/*
+				if file.IsBinary {
+					commitHash := plumbing.NewHash(hash)
+					metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
+					chunkSkel := &sources.Chunk{
+						SourceName:     s.sourceName,
+						SourceID:       s.sourceID,
+						SourceType:     s.sourceType,
+						SourceMetadata: metadata,
+						Verify:         s.verify,
+					}
+					if err = handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+						log.WithError(err).Error("Error handling binary file")
+					}
+					continue
+				}
+			*/
+
+			/*
+				for _, frag := range file.TextFragments {
+					var sb strings.Builder
+					newLineNumber := frag.NewPosition
+					for _, line := range frag.Lines {
+						if line.Op == gitdiff.OpAdd {
+							sb.WriteString(line.Line)
+						}
+					}
+			*/
+
+			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
-				Data:           []byte(sb.String()),
+				Data:           diff.Content.Bytes(),
 				Verify:         s.verify,
 			}
+			//}
 		}
 	}
 	return nil
@@ -401,9 +404,11 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 			return err
 		}
 		for fh := range status {
-			if !scanOptions.Filter.Pass(fh) {
-				continue
-			}
+			/*
+				if !scanOptions.Filter.Pass(fh) {
+					continue
+				}
+			*/
 			metadata := s.sourceMetadataFunc(
 				fh, "unstaged", "unstaged", time.Now().String(), urlMetadata, 0,
 			)
