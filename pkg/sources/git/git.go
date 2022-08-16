@@ -308,8 +308,11 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	var depth int64
 	var reachedBase = false
 	// for file := range fileChan {
+	log.Debugf("Scanning repo")
 	for commit := range commitChan {
+		log.Debugf("Commit: %s", commit.Hash)
 		for _, diff := range commit.Diffs {
+			log.Debugf("Chunk: %s", diff.Content.Bytes())
 			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
 			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 				log.Debugf("reached max depth")
