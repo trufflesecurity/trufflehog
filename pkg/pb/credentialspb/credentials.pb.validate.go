@@ -1229,6 +1229,8 @@ func (m *SlackTokens) validate(all bool) error {
 
 	// no validation rules for BotToken
 
+	// no validation rules for ClientToken
+
 	if len(errors) > 0 {
 		return SlackTokensMultiError(errors)
 	}
