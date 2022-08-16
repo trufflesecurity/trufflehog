@@ -341,23 +341,21 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 			when = commit.Date.GoString()
 
 			// Handle binary files by reading the entire file rather than using the diff.
-			/*
-				if file.IsBinary {
-					commitHash := plumbing.NewHash(hash)
-					metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
-					chunkSkel := &sources.Chunk{
-						SourceName:     s.sourceName,
-						SourceID:       s.sourceID,
-						SourceType:     s.sourceType,
-						SourceMetadata: metadata,
-						Verify:         s.verify,
-					}
-					if err = handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
-						log.WithError(err).Error("Error handling binary file")
-					}
-					continue
+			if diff.IsBinary {
+				commitHash := plumbing.NewHash(hash)
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
+				chunkSkel := &sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Verify:         s.verify,
 				}
-			*/
+				if err = handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+					log.WithError(err).Error("Error handling binary file")
+				}
+				continue
+			}
 
 			/*
 				for _, frag := range file.TextFragments {
@@ -648,6 +646,7 @@ func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSke
 		return err
 	}
 
+	log.Error(path)
 	file, err := commit.File(path)
 	if err != nil {
 		return err

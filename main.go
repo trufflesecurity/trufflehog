@@ -192,15 +192,15 @@ func run(state overseer.State) {
 			defer os.RemoveAll(repoPath)
 		}
 
-		g := func(c sources.Config) {
-			c.RepoPath = repoPath
-			c.HeadRef = *gitScanBranch
-			c.BaseRef = *gitScanSinceCommit
-			c.MaxDepth = *gitScanMaxDepth
-			c.Filter = filter
+		config := sources.Config{
+			RepoPath: repoPath,
+			HeadRef:  *gitScanBranch,
+			BaseRef:  *gitScanSinceCommit,
+			MaxDepth: *gitScanMaxDepth,
+			Filter:   filter,
 		}
 
-		if err = e.ScanGit(ctx, sources.NewConfig(g)); err != nil {
+		if err = e.ScanGit(ctx, config); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
