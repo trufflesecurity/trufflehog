@@ -144,7 +144,7 @@ func TestWithValues(t *testing.T) {
 		ctx6 := WithValues(ctx2, "what does this do?")
 		ctx6.Logger().Info("silently fail I suppose")
 	}
-	sync()
+	assert.Nil(t, sync())
 	logs := strings.Split(strings.TrimSpace(buffer.String()), "\n")
 
 	assert.Equal(t, 7, len(logs))

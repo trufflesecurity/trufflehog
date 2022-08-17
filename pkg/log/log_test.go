@@ -17,7 +17,7 @@ func TestNew(t *testing.T) {
 		WithConsoleSink(&consoleBuffer),
 	)
 	logger.Info("yay")
-	sync()
+	assert.Nil(t, sync())
 
 	assert.Contains(t, jsonBuffer.String(), `"logger":"service-name"`)
 	assert.Contains(t, jsonBuffer.String(), `"msg":"yay"`)
@@ -52,7 +52,7 @@ func TestWithSentryFailure(t *testing.T) {
 		WithConsoleSink(&buffer),
 	)
 	logger.Info("yay")
-	sync()
+	assert.Nil(t, sync())
 
 	assert.Contains(t, buffer.String(), "error configuring logger")
 	assert.Contains(t, buffer.String(), "yay")
@@ -68,7 +68,7 @@ func TestAddSentryFailure(t *testing.T) {
 	assert.NotContains(t, err.Error(), "unsupported")
 
 	logger.Info("yay")
-	sync()
+	assert.Nil(t, sync())
 
 	assert.Contains(t, buffer.String(), "yay")
 }
@@ -76,7 +76,7 @@ func TestAddSentryFailure(t *testing.T) {
 func TestAddSentry(t *testing.T) {
 	var buffer bytes.Buffer
 	var sentryMessage string
-	logger, sync := New("service-name",
+	logger, _ := New("service-name",
 		WithConsoleSink(&buffer),
 	)
 	logger, sync, err := AddSentry(logger, sentry.ClientOptions{
@@ -89,7 +89,7 @@ func TestAddSentry(t *testing.T) {
 
 	logger.Info("yay")
 	logger.Error(nil, "oops")
-	sync()
+	assert.Nil(t, sync())
 
 	assert.Contains(t, buffer.String(), "yay")
 	assert.Contains(t, buffer.String(), "oops")
@@ -110,7 +110,7 @@ func TestWithSentry(t *testing.T) {
 	)
 	logger.Info("yay")
 	logger.Error(nil, "oops")
-	sync()
+	assert.Nil(t, sync())
 
 	assert.Contains(t, buffer.String(), "yay")
 	assert.Contains(t, buffer.String(), "oops")
@@ -123,7 +123,7 @@ func TestHumanReadableTimestamp(t *testing.T) {
 		WithConsoleSink(&buffer),
 	)
 	logger.Info("yay")
-	sync()
+	assert.Nil(t, sync())
 
 	ts := strings.Split(buffer.String(), "\t")[0]
 	assert.NotContains(t, ts, "e+09")
@@ -135,14 +135,14 @@ func TestHumanReadableTimestamp(t *testing.T) {
 
 func TestAddSink(t *testing.T) {
 	var buf1, buf2 bytes.Buffer
-	logger, sync := New("service-name",
+	logger, _ := New("service-name",
 		WithConsoleSink(&buf1),
 	)
 	logger.Info("line 1")
 	logger, sync, err := AddSink(logger, WithConsoleSink(&buf2))
 	assert.Nil(t, err)
 	logger.Info("line 2")
-	sync()
+	assert.Nil(t, sync())
 
 	assert.Contains(t, buf1.String(), "line 1")
 	assert.Contains(t, buf1.String(), "line 2")
