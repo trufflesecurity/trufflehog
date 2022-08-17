@@ -11,6 +11,7 @@ replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff 
 require (
 	cloud.google.com/go/secretmanager v1.5.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
+	github.com/TheZeroSlave/zapsentry v1.11.0
 	github.com/aws/aws-sdk-go v1.44.61
 	github.com/bill-rich/disk-buffer-reader v0.1.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
@@ -20,9 +21,12 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
 	github.com/fatih/color v1.13.0
 	github.com/felixge/fgprof v0.9.2
+	github.com/getsentry/sentry-go v0.13.0
 	github.com/gitleaks/go-gitdiff v0.7.4
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.4.2
+	github.com/go-logr/logr v1.2.3
+	github.com/go-logr/zapr v1.2.3
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-github/v42 v42.0.0
 	github.com/gorilla/mux v1.8.0
@@ -43,6 +47,7 @@ require (
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/xanzy/go-gitlab v0.69.0
 	github.com/zricethezav/gitleaks/v8 v8.5.2
+	go.uber.org/zap v1.22.0
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/net v0.0.0-20220617184016-355a448f1bc9
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
@@ -70,6 +75,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
+	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
@@ -107,6 +113,8 @@ require (
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opencensus.io v0.23.0 // indirect
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/mod v0.5.0 // indirect
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/text v0.3.7 // indirect
