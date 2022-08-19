@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-github/v42/github"
 	"github.com/rs/zerolog"
 	log "github.com/sirupsen/logrus"
+	giturls "github.com/whilp/git-urls"
 	glgo "github.com/zricethezav/gitleaks/v8/detect/git"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
@@ -221,12 +222,14 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath
 		return
 	}
 	defer CleanOnError(&err, clonePath)
-	cloneURL, err := url.Parse(gitUrl)
+	cloneURL, err := giturls.Parse(gitUrl)
 	if err != nil {
 		err = errors.WrapPrefix(err, "could not parse url", 0)
 		return
 	}
-	cloneURL.User = userInfo
+	if userInfo != nil{
+		cloneURL.User = userInfo
+	}
 
 	gitArgs := []string{"clone", cloneURL.String(), clonePath}
 	gitArgs = append(gitArgs, args...)
@@ -469,7 +472,7 @@ func stripPassword(u string) (string, error) {
 		return u, nil
 	}
 
-	repoURL, err := url.Parse(u)
+	repoURL, err := giturls.Parse(u)
 	if err != nil {
 		return "", errors.WrapPrefix(err, "repo remote cannot be sanitized as URI", 0)
 	}
@@ -512,7 +515,7 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 	// the uriString is github.com, then we query the API for the timestamp of the
 	// hash and use that to clone.
 
-	uri, err := url.Parse(uriString)
+	uri, err := giturls.Parse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}
@@ -576,7 +579,7 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
 func PrepareRepo(uriString string) (string, bool, error) {
 	var path string
-	uri, err := url.Parse(uriString)
+	uri, err := giturls.Parse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}
@@ -605,6 +608,12 @@ func PrepareRepo(uriString string) (string, bool, error) {
 			if err != nil {
 				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 			}
+		}
+	case "ssh":
+		remote = true
+		path, _, err = CloneRepoUsingUnauthenticated(uriString)
+		if err != nil {
+			return path, remote, fmt.Errorf("failed to clone Git repo using RSA identities known to local SSH authentication agent (%s): %s", uriString, err)
 		}
 	default:
 		return "", remote, fmt.Errorf("unsupported Git URI: %s", uriString)
