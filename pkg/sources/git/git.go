@@ -267,6 +267,12 @@ func CloneRepoUsingUnauthenticated(url string, args ...string) (string, *git.Rep
 	return CloneRepo(nil, url, args...)
 }
 
+// CloneRepoUsingUnauthenticated clones a repo with no authentication required.
+func CloneRepoUsingSSH(gitUrl string, args ...string) (string, *git.Repository, error) {
+	userInfo := url.User("git")
+	return CloneRepo(userInfo, gitUrl, args...)
+}
+
 func GitCmdCheck() error {
 	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
 		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
@@ -606,6 +612,13 @@ func PrepareRepo(uriString string) (string, bool, error) {
 				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 			}
 		}
+	case "ssh":
+		remotePath := uri.String()
+		remote = true
+		path, _, err = CloneRepoUsingSSH(remotePath)
+			if err != nil {
+				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+			}
 	default:
 		return "", remote, fmt.Errorf("unsupported Git URI: %s", uriString)
 	}
