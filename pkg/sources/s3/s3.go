@@ -3,7 +3,6 @@ package s3
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"sync"
 	"time"
@@ -13,9 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -253,29 +254,11 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				log.Debugf("Error Counts: %s:%d", prefix, nErr)
 				return
 			}
-			body, err := ioutil.ReadAll(res.Body)
+
+			defer res.Body.Close()
+			reader, err := diskbufferreader.New(res.Body)
 			if err != nil {
-				s.log.WithError(err).Error("could not read S3 object body")
-				nErr, ok := errorCount.Load(prefix)
-				if !ok {
-					nErr = 0
-				}
-				//too many consective errors on this page
-				if nErr.(int) > 3 {
-					log.Debugf("Skipped: %s", *obj.Key)
-					return
-				}
-				nErr = nErr.(int) + 1
-				errorCount.Store(prefix, nErr)
-
-				if nErr.(int) > 3 {
-					s.log.Warnf("Too many consecutive errors. Excluding %s", prefix)
-				}
-				return
-			}
-
-			// ignore files that don't have secrets
-			if common.SkipFile(*obj.Key, body) {
+				log.WithError(err).Error("Could not create reader.")
 				return
 			}
 
@@ -284,11 +267,10 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				email = *obj.Owner.DisplayName
 			}
 			modified := obj.LastModified.String()
-			chunk := sources.Chunk{
+			chunkSkel := &sources.Chunk{
 				SourceType: s.Type(),
 				SourceName: s.name,
 				SourceID:   s.SourceID(),
-				Data:       body,
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_S3{
 						S3: &source_metadatapb.S3{
@@ -302,6 +284,20 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				},
 				Verify: s.verify,
 			}
+			if handlers.HandleFile(reader, chunkSkel, chunksChan) {
+				return
+			}
+
+			if err := reader.Reset(); err != nil {
+				log.WithError(err).Error("Error resetting reader to start.")
+			}
+			reader.Stop()
+
+			for chunkData := range common.ChunkReader(reader) {
+				chunk := *chunkSkel
+				chunk.Data = chunkData
+				chunksChan <- &chunk
+			}
 			nErr, ok = errorCount.Load(prefix)
 			if !ok {
 				nErr = 0
@@ -309,7 +305,6 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			if nErr.(int) > 0 {
 				errorCount.Store(prefix, 0)
 			}
-			chunksChan <- &chunk
 		}(ctx, &wg, sem, obj)
 	}
 	wg.Wait()
