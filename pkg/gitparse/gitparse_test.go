@@ -52,6 +52,11 @@ func TestIsIndexLine(t *testing.T) {
 			fail:     []byte("notcorrect"),
 			function: isBinaryLine,
 		},
+		"lineNumberLine": {
+			pass:     []byte("@@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)"),
+			fail:     []byte("notcorrect"),
+			function: isLineNumberDiffLine,
+		},
 	}
 
 	for name, test := range tests {
