@@ -297,62 +297,60 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 	log.Debugf("Scanning repo")
 	for commit := range commitChan {
 		for _, diff := range commit.Diffs {
-			for _, frag := range diff.Fragments {
-				log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
-				if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-					log.Debugf("reached max depth")
-					break
+			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
+			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+				log.Debugf("reached max depth")
+				break
+			}
+			depth++
+			if reachedBase && commit.Hash != scanOptions.BaseHash {
+				break
+			}
+			if len(scanOptions.BaseHash) > 0 {
+				if commit.Hash == scanOptions.BaseHash {
+					log.Debugf("Reached base commit. Finishing scanning files.")
+					reachedBase = true
 				}
-				depth++
-				if reachedBase && commit.Hash != scanOptions.BaseHash {
-					break
-				}
-				if len(scanOptions.BaseHash) > 0 {
-					if commit.Hash == scanOptions.BaseHash {
-						log.Debugf("Reached base commit. Finishing scanning files.")
-						reachedBase = true
-					}
-				}
+			}
 
-				if !scanOptions.Filter.Pass(diff.PathB) {
-					continue
-				}
+			if !scanOptions.Filter.Pass(diff.PathB) {
+				continue
+			}
 
-				fileName := diff.PathB
-				if fileName == "" {
-					continue
-				}
-				var email, hash, when string
-				email = commit.Author
-				hash = commit.Hash
-				when = commit.Date.String()
+			fileName := diff.PathB
+			if fileName == "" {
+				continue
+			}
+			var email, hash, when string
+			email = commit.Author
+			hash = commit.Hash
+			when = commit.Date.String()
 
-				// Handle binary files by reading the entire file rather than using the diff.
-				if diff.IsBinary {
-					commitHash := plumbing.NewHash(hash)
-					metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
-					chunkSkel := &sources.Chunk{
-						SourceName:     s.sourceName,
-						SourceID:       s.sourceID,
-						SourceType:     s.sourceType,
-						SourceMetadata: metadata,
-						Verify:         s.verify,
-					}
-					if err := handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
-						log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
-					}
-					continue
-				}
-
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(frag.LineStart))
-				chunksChan <- &sources.Chunk{
+			// Handle binary files by reading the entire file rather than using the diff.
+			if diff.IsBinary {
+				commitHash := plumbing.NewHash(hash)
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
+				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
-					Data:           frag.Content.Bytes(),
 					Verify:         s.verify,
 				}
+				if err := handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
+				}
+				continue
+			}
+
+			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
+			chunksChan <- &sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Data:           diff.Content.Bytes(),
+				Verify:         s.verify,
 			}
 		}
 	}

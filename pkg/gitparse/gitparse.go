@@ -27,16 +27,10 @@ type Commit struct {
 
 // Diff contains the info about a file diff in a commit.
 type Diff struct {
-	PathA     string
 	PathB     string
-	Fragments []Fragment
-	IsBinary  bool
-}
-
-// Fragment is a diff fragment.
-type Fragment struct {
 	LineStart int
 	Content   bytes.Buffer
+	IsBinary  bool
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
@@ -61,31 +55,24 @@ func RepoPath(source string, head string) (chan Commit, error) {
 	if err != nil {
 		return commitChan, err
 	}
-	// stdErr, err := cmd.StderrPipe()
-	// if err != nil {
-	// 	return commitChan, err
-	// }
+	stdErr, err := cmd.StderrPipe()
+	if err != nil {
+		return commitChan, err
+	}
 
 	err = cmd.Start()
 	if err != nil {
 		return commitChan, err
 	}
 
-	//errReader := bufio.NewReader(stdErr)
 	outReader := bufio.NewReader(stdOut)
 	var currentCommit *Commit
 	var currentDiff *Diff
-	var currentFrag *Fragment
 
 	go func() {
-		for {
-			/*
-				errLine, _, err := errReader.ReadLine()
-				if err != nil && !errors.Is(err, io.EOF) {
-					log.WithError(err).Debug("Could not read stderr.")
-				}
-				log.WithError(fmt.Errorf(string(errLine))).Debug("Error received from git command.")
-			*/
+		scanner := bufio.NewScanner(stdErr)
+		for scanner.Scan() {
+			log.Debug(scanner.Text())
 		}
 	}()
 
@@ -98,7 +85,7 @@ func RepoPath(source string, head string) (chan Commit, error) {
 			switch {
 			case isCommitLine(line):
 				// If there is a currentDiff, add it to currentCommit.
-				if currentDiff != nil {
+				if currentDiff != nil && currentDiff.Content.Len() > 0 {
 					currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 				}
 				// If there is a currentCommit, send it to the channel.
@@ -106,9 +93,7 @@ func RepoPath(source string, head string) (chan Commit, error) {
 					commitChan <- *currentCommit
 				}
 				// Create a new currentDiff and currentCommit
-				currentDiff = &Diff{
-					Fragments: []Fragment{},
-				}
+				currentDiff = &Diff{}
 				currentCommit = &Commit{
 					Message: strings.Builder{},
 				}
@@ -117,7 +102,7 @@ func RepoPath(source string, head string) (chan Commit, error) {
 					currentCommit.Hash = string(line[7:47])
 				}
 			case isAuthorLine(line):
-				currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
+				currentCommit.Author = string(line[8:])
 			case isDateLine(line):
 				date, err := time.Parse(DateFormat, strings.TrimSpace(string(line[6:])))
 				if err != nil {
@@ -126,12 +111,10 @@ func RepoPath(source string, head string) (chan Commit, error) {
 				currentCommit.Date = date
 			case isDiffLine(line):
 				// This should never be nil, but check in case the stdin stream is messed up.
-				if currentDiff != nil {
+				if currentDiff != nil && currentDiff.Content.Len() > 0 {
 					currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 				}
-				currentDiff = &Diff{
-					Fragments: []Fragment{},
-				}
+				currentDiff = &Diff{}
 			case isModeLine(line):
 				// NoOp
 			case isIndexLine(line):
@@ -139,22 +122,9 @@ func RepoPath(source string, head string) (chan Commit, error) {
 			case isPlusFileLine(line):
 				currentDiff.PathB = strings.TrimRight(string(line[6:]), "\n")
 			case isMinusFileLine(line):
-				currentDiff.PathA = strings.TrimRight(string(line[6:]), "\n")
-			case isLineNumberDiffLine(line):
-				if currentFrag != nil {
-					currentDiff.Fragments = append(currentDiff.Fragments, *currentFrag)
-				}
-				currentFrag = &Fragment{}
-				words := bytes.Split(line, []byte(" "))
-				if len(words) >= 3 {
-					startSlice := bytes.Split(words[2], []byte(","))
-					lineStart, err := strconv.Atoi(string(startSlice[0]))
-					if err == nil {
-						currentFrag.LineStart = lineStart
-					}
-				}
+				// NoOp
 			case isPlusDiffLine(line):
-				currentFrag.Content.Write(line[1:])
+				currentDiff.Content.Write(line[1:])
 			case isMinusDiffLine(line):
 				// NoOp. We only care about additions.
 			case isMessageLine(line):
@@ -162,19 +132,37 @@ func RepoPath(source string, head string) (chan Commit, error) {
 			case isBinaryLine(line):
 				currentDiff.IsBinary = true
 				currentDiff.PathB = pathFromBinaryLine(line)
+			case isLineNumberDiffLine(line):
+				if currentDiff != nil && currentDiff.Content.Len() > 0 {
+					currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+				}
+				newDiff := &Diff{
+					PathB: currentDiff.PathB,
+				}
+
+				currentDiff = newDiff
+
+				words := bytes.Split(line, []byte(" "))
+				if len(words) >= 3 {
+					startSlice := bytes.Split(words[2], []byte(","))
+					lineStart, err := strconv.Atoi(string(startSlice[0]))
+					if err == nil {
+						currentDiff.LineStart = lineStart
+					}
+				}
+
 			}
 
 		}
-		if currentFrag != nil {
-			currentDiff.Fragments = append(currentDiff.Fragments, *currentFrag)
-		}
-		if currentDiff != nil {
+		if currentDiff != nil && currentDiff.Content.Len() > 0 {
 			currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 		}
 		if currentCommit != nil {
 			commitChan <- *currentCommit
 		}
-		cmd.Wait()
+		if err := cmd.Wait(); err != nil {
+			log.WithError(err).Debugf("Error waiting for git command to complete.")
+		}
 		close(commitChan)
 	}()
 	return commitChan, nil

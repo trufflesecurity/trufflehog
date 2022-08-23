@@ -235,7 +235,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				"27fbead3bf883cdb7de9d7825ed401f28f9398f1-slack": {B: []byte("yup, just did that\n\ngithub_lol: \"ffc7e0f9400fb6300167009e42d2f842cd7956e2\"\n\noh, goodness. there's another one!\n")},
 				"8afb0ecd4998b1179e428db5ebbcdc8221214432-slack": {B: []byte("oops might drop a slack token here\n\ngithub_secret=\"369963c1434c377428ca8531fbc46c0c43d037a0\"\n\nyup, just did that\n"), Multi: true},
 				"8fe6f04ef1839e3fc54b5147e3d0e0b7ab971bd5-aws":   {B: []byte("blah blaj\n\nthis is the secret: AKIA2E0A8F3B244C9986\n\nokay thank you bye\n"), Multi: true},
-				"84e9c75e388ae3e866e121087ea2dd45a71068f2-aws":   {B: []byte("this is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\nokay thank you bye\n"), Multi: true},
+				"84e9c75e388ae3e866e121087ea2dd45a71068f2-aws":   {B: []byte("this is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n"), Multi: true},
 			},
 		},
 	}
@@ -265,7 +265,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				key := ""
 				switch meta := chunk.SourceMetadata.GetData().(type) {
 				case *source_metadatapb.MetaData_Git:
-					key = meta.Git.Commit + "-" + meta.Git.File
+					key = strings.TrimRight(meta.Git.Commit+"-"+meta.Git.File, "\n")
 				}
 
 				if expectedData, exists := tt.expectedChunkData[key]; !exists {
