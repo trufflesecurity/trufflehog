@@ -99,7 +99,7 @@ func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
 }
 
 // WithConsoleSink adds a console-style output to the logger.
-func WithConsoleSink(sink io.Writer, opts ...func(*sinkConfig)) (conf logConfig) {
+func WithConsoleSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
 	return newCoreConfig(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -158,8 +158,8 @@ func getZapLogger(l logr.Logger) (*zap.Logger, error) {
 	return nil, errors.New("not a zapr logger")
 }
 
-// WithLeveler sets the sink's level to a static level. This option prevents
-// changing the log level for this sink at runtime.
+// WithLevel sets the sink's level to a static level. This option prevents
+// changing the log level for this sink later on.
 func WithLevel(level int8) func(*sinkConfig) {
 	return WithLeveler(
 		// Zap's levels get more verbose as the number gets smaller, as explained

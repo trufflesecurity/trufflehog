@@ -67,16 +67,8 @@ func AddLeveler(l logr.Logger, control levelSetter) (logr.Logger, error) {
 	}
 
 	zapLogger = zapLogger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
-		var newCore zapcore.Core
-		if newCore, err = zapcore.NewIncreaseLevelCore(core, control); err != nil {
-			return core
-		}
-		return newCore
+		return NewLevelCore(core, control)
 	}))
-	// Check err from closure.
-	if err != nil {
-		return l, err
-	}
 	return zapr.NewLogger(zapLogger), nil
 }
 

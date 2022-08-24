@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -446,6 +447,25 @@ func TestSinkWithNamedLevel(t *testing.T) {
 		"info-1\tparent.child",
 		"info-2\tparent.child",
 	}, splitLines(buf2.String()))
+}
+
+func TestAddLeveler(t *testing.T) {
+	l1, l2 := zap.NewAtomicLevel(), zap.NewAtomicLevel()
+	logger, _ := New("parent", WithConsoleSink(io.Discard, WithLeveler(l1)))
+
+	t.Run("child level more verbose", func(t *testing.T) {
+		l1.SetLevel(0)
+		l2.SetLevel(1)
+		_, err := AddLeveler(logger, l2)
+		assert.Nil(t, err)
+	})
+
+	t.Run("child level less verbose", func(t *testing.T) {
+		l1.SetLevel(1)
+		l2.SetLevel(0)
+		_, err := AddLeveler(logger, l2)
+		assert.Nil(t, err)
+	})
 }
 
 func splitLines(s string) []string {
