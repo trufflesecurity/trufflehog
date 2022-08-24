@@ -373,23 +373,44 @@ func TestWithNamedLevelConcurrency(t *testing.T) {
 	}
 }
 
-func TestParentLevel(t *testing.T) {
-	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
+func TestWithNamedLevelInheritance(t *testing.T) {
+	t.Run("child inherits parent level", func(t *testing.T) {
+		var buf bytes.Buffer
+		globalControls = make(map[string]levelSetter, 16)
 
-	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
-	parent = parent.WithValues("key", "value")
-	// NOTE: child does not inherit parent's log level, but it does inherit the values
-	child := WithNamedLevel(parent, "child")
+		parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
+		parent = parent.WithValues("key", "value")
+		// child will inherit parent's log level 2
+		child := WithNamedLevel(parent, "child")
 
-	parent.V(2).Info("yay")
-	child.V(2).Info("not logged")
-	child.Info("yay again")
-	assert.Nil(t, flush())
+		parent.V(2).Info("yay")
+		child.V(2).Info("yay again")
+		assert.Nil(t, flush())
 
-	assert.Contains(t, buf.String(), `info-2	parent	yay	{"key": "value"}`)
-	assert.NotContains(t, buf.String(), "not logged")
-	assert.Contains(t, buf.String(), `info-0	parent.child	yay again	{"key": "value"}`)
+		logLines := splitLines(buf.String())
+		assert.Equal(t, []string{
+			`info-2	parent	yay	{"key": "value"}`,
+			`info-2	parent.child	yay again	{"key": "value"}`,
+		}, logLines)
+	})
+
+	t.Run("child inherits existing named level", func(t *testing.T) {
+		var buf bytes.Buffer
+		globalControls = make(map[string]levelSetter, 16)
+
+		parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
+		parent = parent.WithValues("key", "value")
+		SetLevelFor("child", 0)
+		// child will inherit existing named level 0
+		child := WithNamedLevel(parent, "child")
+
+		parent.V(2).Info("yay")
+		child.V(2).Info("yay again")
+		assert.Nil(t, flush())
+
+		logLines := splitLines(buf.String())
+		assert.Equal(t, []string{`info-2	parent	yay	{"key": "value"}`}, logLines)
+	})
 }
 
 func TestExistingChildLevel(t *testing.T) {
@@ -476,4 +497,40 @@ func splitLines(s string) []string {
 		logLines[i] = strings.TrimSpace(logLine[strings.Index(logLine, "\t")+1:])
 	}
 	return logLines
+}
+
+func TestFindLevel(t *testing.T) {
+	lvl := zap.NewAtomicLevel()
+	logger, _ := New("parent", WithConsoleSink(io.Discard, WithLeveler(lvl)))
+
+	for i := 0; i < 128; i++ {
+		i8 := int8(i)
+		SetLevelForControl(lvl, i8)
+		assert.Equal(t, i8, findLevel(logger))
+	}
+}
+
+func TestOverwriteWithNamedLevel(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	parent, flush := New(
+		"parent",
+		WithConsoleSink(&buf, WithLevel(2)),
+	)
+	SetLevelFor("child", 0)
+	child1 := WithNamedLevel(parent, "child")
+	child2 := WithNamedLevel(parent, "child")
+	SetLevelFor("child", 2)
+
+	child1.V(2).Info("")
+	child2.V(2).Info("")
+
+	assert.Nil(t, flush())
+
+	// buf1 should get only level 0 logs
+	assert.Equal(t, []string{
+		"info-2\tparent.child",
+		"info-2\tparent.child",
+	}, splitLines(buf.String()))
 }
