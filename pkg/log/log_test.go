@@ -202,7 +202,7 @@ func TestWithLeveler(t *testing.T) {
 	assert.Contains(t, buf2.String(), "line 3")
 }
 
-func TestWithNameMoreVerbose(t *testing.T) {
+func TestWithNamedLevelMoreVerbose(t *testing.T) {
 	var buf bytes.Buffer
 	globalControls = make(map[string]levelSetter, 16)
 
@@ -212,7 +212,7 @@ func TestWithNameMoreVerbose(t *testing.T) {
 		WithConsoleSink(&buf, WithLeveler(l1)),
 	)
 
-	childLogger := WithName(logger, "child")
+	childLogger := WithNamedLevel(logger, "child")
 
 	SetLevelForControl(l1, 1)
 	SetLevelFor("child", 2)
@@ -235,7 +235,7 @@ func TestWithNameMoreVerbose(t *testing.T) {
 	assert.NotContains(t, buf.String(), "service-name.child\tline C")
 }
 
-func TestWithNameLessVerbose(t *testing.T) {
+func TestWithNamedLevelLessVerbose(t *testing.T) {
 	var buf bytes.Buffer
 	globalControls = make(map[string]levelSetter, 16)
 
@@ -245,7 +245,7 @@ func TestWithNameLessVerbose(t *testing.T) {
 		WithConsoleSink(&buf, WithLeveler(l1)),
 	)
 
-	childLogger := WithName(logger, "child")
+	childLogger := WithNamedLevel(logger, "child")
 
 	SetLevelForControl(l1, 1)
 	SetLevelFor("child", 0)
@@ -268,13 +268,13 @@ func TestWithNameLessVerbose(t *testing.T) {
 	assert.NotContains(t, buf.String(), "service-name.child\tline C")
 }
 
-func TestNestedWithName(t *testing.T) {
+func TestNestedWithNamedLevel(t *testing.T) {
 	var buf bytes.Buffer
 	globalControls = make(map[string]levelSetter, 16)
 
 	grandParent, flush := New("grandParent", WithConsoleSink(&buf, WithLevel(1)))
-	parent := WithName(grandParent, "parent")
-	child := WithName(parent, "child")
+	parent := WithNamedLevel(grandParent, "parent")
+	child := WithNamedLevel(parent, "child")
 
 	SetLevelFor("parent", 0)
 	SetLevelFor("child", 2)
@@ -302,13 +302,13 @@ func TestNestedWithName(t *testing.T) {
 	assert.Equal(t, `info-1	grandParent	line 4`, lines[3])
 }
 
-func TestSiblingsWithName(t *testing.T) {
+func TestSiblingsWithNamedLevel(t *testing.T) {
 	var buf bytes.Buffer
 	globalControls = make(map[string]levelSetter, 16)
 
 	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(1)))
-	alice := WithName(parent, "alice")
-	bob := WithName(parent, "bob")
+	alice := WithNamedLevel(parent, "alice")
+	bob := WithNamedLevel(parent, "bob")
 
 	SetLevelFor("alice", 0)
 	SetLevelFor("bob", 2)
@@ -336,14 +336,14 @@ func TestSiblingsWithName(t *testing.T) {
 	assert.Equal(t, `info-1	parent.bob	line 6`, lines[4])
 }
 
-func TestWithNameConcurrency(t *testing.T) {
+func TestWithNamedLevelConcurrency(t *testing.T) {
 	var buf bytes.Buffer
 	globalControls = make(map[string]levelSetter, 16)
 
 	parent, flush := New("parent", WithConsoleSink(&buf))
 
-	alice := WithName(parent, "alice")
-	bob := WithName(parent, "bob")
+	alice := WithNamedLevel(parent, "alice")
+	bob := WithNamedLevel(parent, "bob")
 
 	var wg sync.WaitGroup
 	f := func(logger logr.Logger) {
@@ -379,7 +379,7 @@ func TestParentLevel(t *testing.T) {
 	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
 	parent = parent.WithValues("key", "value")
 	// NOTE: child does not inherit parent's log level, but it does inherit the values
-	child := WithName(parent, "child")
+	child := WithNamedLevel(parent, "child")
 
 	parent.V(2).Info("yay")
 	child.V(2).Info("not logged")
@@ -399,7 +399,7 @@ func TestExistingChildLevel(t *testing.T) {
 
 	SetLevelFor("child", 2)
 	// child should start with a level of 2 due to SetLevelFor above
-	child := WithName(parent, "child")
+	child := WithNamedLevel(parent, "child")
 
 	parent.V(2).Info("yay")
 	child.V(2).Info("yay again")
@@ -409,7 +409,7 @@ func TestExistingChildLevel(t *testing.T) {
 	assert.Contains(t, buf.String(), "info-2\tparent.child\tyay again")
 }
 
-func TestSinkWithName(t *testing.T) {
+func TestSinkWithNamedLevel(t *testing.T) {
 	var buf1, buf2 bytes.Buffer
 	globalControls = make(map[string]levelSetter, 16)
 
@@ -418,7 +418,7 @@ func TestSinkWithName(t *testing.T) {
 		WithConsoleSink(&buf1, WithLevel(0)),
 		WithConsoleSink(&buf2, WithLevel(2)),
 	)
-	child := WithName(parent, "child")
+	child := WithNamedLevel(parent, "child")
 
 	for level := 0; level < 3; level++ {
 		SetLevelFor("child", int8(level))

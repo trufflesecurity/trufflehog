@@ -15,9 +15,9 @@ var (
 	globalLogLevel levelSetter = zap.NewAtomicLevel()
 
 	// Map of name -> level control for independently setting log levels. A new
-	// control is registered via WithName. This map is never cleaned up and new
-	// entries will overwrite previous values. Currently, this is acceptable
-	// behavior because WithName is used sparingly.
+	// control is registered via WithNamedLevel. This map is never cleaned up
+	// and new entries will overwrite previous values. Currently, this is
+	// acceptable behavior because WithNamedLevel is used sparingly.
 	globalControls map[string]levelSetter = make(map[string]levelSetter, 16)
 	// globalControls is protected (both read and write) by a mutex to make it
 	// thread safe. Access is low frequency, so performance is not a concern.
@@ -80,11 +80,11 @@ func AddLeveler(l logr.Logger, control levelSetter) (logr.Logger, error) {
 	return zapr.NewLogger(zapLogger), nil
 }
 
-// WithName creates a child logger with a new name and independent log level
-// control (see SetLevelFor). NOTE: The child logger does not inherit the
+// WithNamedLevel creates a child logger with a new name and independent log
+// level control (see SetLevelFor). NOTE: The child logger does not inherit the
 // parent's log level, but will maintain the existing level if a control exists
 // for the name.
-func WithName(logger logr.Logger, name string) logr.Logger {
+func WithNamedLevel(logger logr.Logger, name string) logr.Logger {
 	logger = logger.WithName(name)
 	leveler := zap.NewAtomicLevel()
 	newLogger, err := AddLeveler(logger, leveler)
