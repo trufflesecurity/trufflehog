@@ -120,7 +120,7 @@ func RepoPath(source string, head string) (chan Commit, error) {
 			case isIndexLine(line):
 				// NoOp
 			case isPlusFileLine(line):
-				currentDiff.PathB = strings.TrimRight(string(line[3:]), "\n")
+				currentDiff.PathB = strings.TrimRight(string(line[6:]), "\n")
 			case isMinusFileLine(line):
 				// NoOp
 			case isPlusDiffLine(line):
