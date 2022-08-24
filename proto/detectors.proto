@@ -888,6 +888,7 @@ message Result {
   string hash = 5;
   map<string, string> extra_data = 6;
   StructuredData structured_data = 7;
+  string hash_v2 = 8;
 }
 
 message StructuredData {

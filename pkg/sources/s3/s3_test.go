@@ -11,11 +11,12 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Chunks(t *testing.T) {

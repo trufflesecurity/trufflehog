@@ -17,9 +17,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/alecthomas/kingpin.v2"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
-	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -44,7 +46,7 @@ var (
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
-	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
+	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
 	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
@@ -189,36 +191,75 @@ func run(state overseer.State) {
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
-		err = e.ScanGit(ctx, repoPath, *gitScanBranch, *gitScanSinceCommit, *gitScanMaxDepth, filter)
-		if err != nil {
-			logrus.WithError(err).Fatal("Failed to scan git.")
+
+		g := func(c *sources.Config) {
+			c.RepoPath = repoPath
+			c.HeadRef = *gitScanBranch
+			c.BaseRef = *gitScanSinceCommit
+			c.MaxDepth = *gitScanMaxDepth
+			c.Filter = filter
+		}
+
+		if err = e.ScanGit(ctx, sources.NewConfig(g)); err != nil {
+			logrus.WithError(err).Fatal("Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			log.Fatal("You must specify at least one organization or repository.")
 		}
-		err = e.ScanGitHub(ctx, *githubScanEndpoint, *githubScanRepos, *githubScanOrgs, *githubScanToken, *githubIncludeForks, filter, *concurrency, *githubIncludeMembers)
-		if err != nil {
-			logrus.WithError(err).Fatal("Failed to scan git.")
+
+		github := func(c *sources.Config) {
+			c.Endpoint = *githubScanEndpoint
+			c.Repos = *githubScanRepos
+			c.Orgs = *githubScanOrgs
+			c.Token = *githubScanToken
+			c.IncludeForks = *githubIncludeForks
+			c.IncludeMembers = *githubIncludeMembers
+			c.Concurrency = *concurrency
+		}
+
+		if err = e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
+			logrus.WithError(err).Fatal("Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
-		err := e.ScanGitLab(ctx, *gitlabScanEndpoint, *gitlabScanToken, *gitlabScanRepos)
-		if err != nil {
+		gitlab := func(c *sources.Config) {
+			c.Endpoint = *gitlabScanEndpoint
+			c.Token = *gitlabScanToken
+			c.Repos = *gitlabScanRepos
+		}
+
+		if err = e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
-		err := e.ScanFileSystem(ctx, *filesystemDirectories)
-		if err != nil {
+		fs := func(c *sources.Config) {
+			c.Directories = *filesystemDirectories
+		}
+
+		if err = e.ScanFileSystem(ctx, sources.NewConfig(fs)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
-		err := e.ScanS3(ctx, *s3ScanKey, *s3ScanSecret, *s3ScanCloudEnv, *s3ScanBuckets)
-		if err != nil {
+		s3 := func(c *sources.Config) {
+			c.Key = *s3ScanKey
+			c.Secret = *s3ScanSecret
+			c.Buckets = *s3ScanBuckets
+		}
+
+		if err = e.ScanS3(ctx, sources.NewConfig(s3)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
-		err := e.ScanSyslog(ctx, *syslogAddress, *syslogProtocol, *syslogTLSCert, *syslogTLSKey, *syslogFormat, *concurrency)
-		if err != nil {
+		syslog := func(c *sources.Config) {
+			c.Address = *syslogAddress
+			c.Protocol = *syslogProtocol
+			c.CertPath = *syslogTLSCert
+			c.KeyPath = *syslogTLSKey
+			c.Format = *syslogFormat
+			c.Concurrency = *concurrency
+		}
+
+		if err = e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
 		}
 	}

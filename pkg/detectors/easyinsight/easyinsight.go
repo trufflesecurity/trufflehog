@@ -2,12 +2,11 @@ package easyinsight
 
 import (
 	"context"
+	b64 "encoding/base64"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
-
-	b64 "encoding/base64"
-	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -55,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_EasyInsight,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
 
 			if verify {

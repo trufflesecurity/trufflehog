@@ -69,6 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_CexIO,
 					Raw:          []byte(resKeyMatch),
+					RawV2:        []byte(resUserIdMatch + resSecretMatch),
 				}
 
 				if verify {
@@ -102,7 +103,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 
 						var responseObject Response
-						json.Unmarshal(body, &responseObject)
+						if err := json.Unmarshal(body, &responseObject); err != nil {
+							continue
+						}
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 							s1.Verified = true

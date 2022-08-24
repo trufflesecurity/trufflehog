@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	//Tokens starting with sk_test are used for the app's sandbox environment while tokens starting with sk only are for production environment
+	// Tokens starting with sk_test are used for the app's sandbox environment while tokens starting with sk only are for production environment
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"checkout"}) + `\b((sk_|sk_test_)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"checkout"}) + `\b(cus_[0-9a-zA-Z]{26})\b`)
 )
@@ -53,10 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Checkout,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
 
 			if verify {
-				//Used the app's sandbox environment for this case since I can't create a live account.
+				// Used the app's sandbox environment for this case since I can't create a live account.
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.sandbox.checkout.com/customers/"+resIdMatch, nil)
 				if err != nil {
 					continue

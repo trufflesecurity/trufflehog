@@ -6,14 +6,14 @@
 
 ---
 
-<center>
+<div align="center">
 
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
-[![Total Detectors](https://shields-staging.herokuapp.com/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors) <!-- Badge must be run from staging, see badges/shields#5967 -->
+[![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
 
-</center>
+</div>
 
 ---
 
@@ -135,7 +135,7 @@ Flags:
       --regex                    No-op flag for backwards compat.
 
 Args:
-  <uri>  Git repository URL. https:// or file:// schema expected.
+  <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
 ```
 
 For example, to scan a  `git` repository, start with
@@ -169,6 +169,8 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
     base: 
     # Scan commits until here (usually dev branch).
     head: # optional
+    # Extra args to be passed to the trufflehog cli.
+    extra_args: # optional
 ```
 
 The TruffleHog OSS Github Action can be used to scan a range of commits for leaked credentials. The action will fail if
@@ -192,6 +194,26 @@ jobs:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
+          extra_args: --debug
+```
+
+### Precommit Hook
+
+Trufflehog can be used in a precommit hook to prevent credentials from leaking before they ever leave your computer.
+An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
+
+```yaml
+repos:
+- repo: local
+  hooks:
+    - id: trufflehog
+      name: TruffleHog
+      description: Detect secrets in your data.
+      entry: bash -c 'trufflehog git file://. --only-verified --fail'
+      # For running trufflehog in docker, use the following entry instead:
+      # entry: bash -c 'docker run -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --only-verified --fail'
+      language: system
+      stages: ["commit", "push"]
 ```
 
 ## Contributors

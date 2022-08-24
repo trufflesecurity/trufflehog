@@ -39,7 +39,7 @@ func TestSource_Scan(t *testing.T) {
 	// For the personal access token test
 	githubToken := secret.MustGetField("GITHUB_TOKEN")
 
-	//For the  NEW github app test (+Member enum)
+	// For the  NEW github app test (+Member enum)
 	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
 	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
 	if err != nil {
@@ -49,7 +49,7 @@ func TestSource_Scan(t *testing.T) {
 	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
 	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
 
-	//OLD app for breaking app change tests
+	// OLD app for breaking app change tests
 	// githubPrivateKeyB64 := secret.MustGetField("GITHUB_PRIVATE_KEY")
 	// githubPrivateKeyBytes, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64)
 	// if err != nil {
@@ -343,7 +343,7 @@ func TestSource_Scan(t *testing.T) {
 			s := Source{}
 
 			log.SetLevel(log.DebugLevel)
-			//uncomment for windows Testing
+			// uncomment for windows Testing
 			log.SetFormatter(&log.TextFormatter{ForceColors: true})
 			log.SetOutput(colorable.NewColorableStdout())
 
@@ -368,7 +368,7 @@ func TestSource_Scan(t *testing.T) {
 					return
 				}
 			}()
-			if err = common.HandleTestChannel(chunksCh, basicCheckFunc(tt.minOrg, tt.minRepo, tt.wantChunk, &s)); err != nil {
+			if err = sources.HandleTestChannel(chunksCh, basicCheckFunc(tt.minOrg, tt.minRepo, tt.wantChunk, &s)); err != nil {
 				t.Error(err)
 			}
 		})
@@ -386,7 +386,7 @@ func TestSource_paginateGists(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	//For the  NEW github app test (+Member enum)
+	// For the  NEW github app test (+Member enum)
 	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
 	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
 	if err != nil {
@@ -492,7 +492,7 @@ func TestSource_paginateGists(t *testing.T) {
 			s := Source{}
 
 			log.SetLevel(log.DebugLevel)
-			//uncomment for windows Testing
+			// uncomment for windows Testing
 			log.SetFormatter(&log.TextFormatter{ForceColors: true})
 			log.SetOutput(colorable.NewColorableStdout())
 
@@ -515,14 +515,14 @@ func TestSource_paginateGists(t *testing.T) {
 			if tt.wantChunk != nil {
 				wantedRepo = tt.wantChunk.SourceMetadata.GetGithub().Repository
 			}
-			if err = common.HandleTestChannel(chunksCh, gistsCheckFunc(wantedRepo, tt.minRepos, &s)); err != nil {
+			if err = sources.HandleTestChannel(chunksCh, gistsCheckFunc(wantedRepo, tt.minRepos, &s)); err != nil {
 				t.Error(err)
 			}
 		})
 	}
 }
 
-func gistsCheckFunc(expected string, minRepos int, s *Source) common.ChunkFunc {
+func gistsCheckFunc(expected string, minRepos int, s *Source) sources.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
 		if minRepos != 0 && minRepos > len(s.repos) {
 			return fmt.Errorf("didn't find enough repos. expected: %d, got :%d", minRepos, len(s.repos))
@@ -539,7 +539,7 @@ func gistsCheckFunc(expected string, minRepos int, s *Source) common.ChunkFunc {
 	}
 }
 
-func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) common.ChunkFunc {
+func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) sources.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
 		if minOrg != 0 && minOrg > len(s.orgs) {
 			return fmt.Errorf("incorrect number of orgs. expected at least: %d, got %d", minOrg, len(s.orgs))
@@ -551,7 +551,7 @@ func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) co
 			if diff := pretty.Compare(chunk.SourceMetadata.GetGithub().Repository, wantChunk.SourceMetadata.GetGithub().Repository); diff == "" {
 				return nil
 			}
-			return common.MatchError
+			return sources.MatchError
 		}
 		return nil
 	}

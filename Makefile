@@ -57,3 +57,6 @@ release-protos-image:
 
 snifftest:
 	./hack/snifftest/snifftest.sh
+
+test-release:
+	goreleaser release --rm-dist --skip-publish --snapshot

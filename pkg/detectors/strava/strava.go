@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Strava,
 					Raw:          []byte(resId),
+					RawV2:        []byte(resId + resSecret),
 				}
 
 				if verify {

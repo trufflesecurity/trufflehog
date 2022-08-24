@@ -6,31 +6,34 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gitlab"
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gitlab"
 )
 
-func (e *Engine) ScanGitLab(ctx context.Context, endpoint, token string, repositories []string) error {
+// ScanGitLab scans GitLab with the provided configuration.
+func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 	connection := &sourcespb.GitLab{}
 
 	switch {
-	case len(token) > 0:
+	case len(c.Token) > 0:
 		connection.Credential = &sourcespb.GitLab_Token{
-			Token: token,
+			Token: c.Token,
 		}
 	default:
 		return fmt.Errorf("must provide token")
 	}
 
-	if len(endpoint) > 0 {
-		connection.Endpoint = endpoint
+	if len(c.Endpoint) > 0 {
+		connection.Endpoint = c.Endpoint
 	}
 
-	if len(repositories) > 0 {
-		connection.Repositories = repositories
+	if len(c.Repos) > 0 {
+		connection.Repositories = c.Repos
 	}
 
 	var conn anypb.Any

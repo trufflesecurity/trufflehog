@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_DiscordBotToken,
 				Redacted:     resId,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resId),
 			}
 
 			if verify {
