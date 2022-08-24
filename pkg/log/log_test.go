@@ -163,7 +163,7 @@ func TestStaticLevelSink(t *testing.T) {
 	logger.Info("line 1")
 	SetLevelForControl(l1, 1)
 	logger.V(1).Info("line 2")
-	flush()
+	assert.Nil(t, flush())
 
 	// buf1 should have both lines
 	assert.Contains(t, buf1.String(), "line 1")
@@ -189,7 +189,7 @@ func TestWithLeveler(t *testing.T) {
 	logger.V(0).Info("line 1")
 	logger.V(1).Info("line 2")
 	logger.V(2).Info("line 3")
-	flush()
+	assert.Nil(t, flush())
 
 	// buf1 should have lines 1 and 2
 	assert.Contains(t, buf1.String(), "line 1")
@@ -223,7 +223,7 @@ func TestWithNamedLevelMoreVerbose(t *testing.T) {
 	childLogger.V(0).Info("line A")
 	childLogger.V(1).Info("line B")
 	childLogger.V(2).Info("line C")
-	flush()
+	assert.Nil(t, flush())
 
 	// parent should log lines 1 and 2
 	// child should log lines A, B, and C
@@ -256,7 +256,7 @@ func TestWithNamedLevelLessVerbose(t *testing.T) {
 	childLogger.V(0).Info("line A")
 	childLogger.V(1).Info("line B")
 	childLogger.V(2).Info("line C")
-	flush()
+	assert.Nil(t, flush())
 
 	// parent should log lines 1 and 2
 	// child should log line A only
@@ -291,7 +291,7 @@ func TestNestedWithNamedLevel(t *testing.T) {
 	parent.V(2).Info("line 8")
 	child.V(2).Info("line 9")
 
-	flush()
+	assert.Nil(t, flush())
 
 	lines := splitLines(buf.String())
 	assert.Equal(t, 4, len(lines))
@@ -325,7 +325,7 @@ func TestSiblingsWithNamedLevel(t *testing.T) {
 	alice.V(2).Info("line 8")
 	bob.V(2).Info("line 9")
 
-	flush()
+	assert.Nil(t, flush())
 	lines := splitLines(buf.String())
 	assert.Equal(t, 5, len(lines))
 
@@ -358,7 +358,7 @@ func TestWithNamedLevelConcurrency(t *testing.T) {
 	go f(bob)
 	wg.Wait()
 
-	flush()
+	assert.Nil(t, flush())
 	logLines := splitLines(buf.String())
 	assert.Equal(t, 300_000, len(logLines))
 	sort.Slice(logLines, func(i, j int) bool {
@@ -384,7 +384,7 @@ func TestParentLevel(t *testing.T) {
 	parent.V(2).Info("yay")
 	child.V(2).Info("not logged")
 	child.Info("yay again")
-	flush()
+	assert.Nil(t, flush())
 
 	assert.Contains(t, buf.String(), `info-2	parent	yay	{"key": "value"}`)
 	assert.NotContains(t, buf.String(), "not logged")
@@ -403,7 +403,7 @@ func TestExistingChildLevel(t *testing.T) {
 
 	parent.V(2).Info("yay")
 	child.V(2).Info("yay again")
-	flush()
+	assert.Nil(t, flush())
 
 	assert.Contains(t, buf.String(), "info-2\tparent\tyay")
 	assert.Contains(t, buf.String(), "info-2\tparent.child\tyay again")
@@ -426,7 +426,7 @@ func TestSinkWithNamedLevel(t *testing.T) {
 		child.V(1).Info("")
 		child.V(2).Info("")
 	}
-	flush()
+	assert.Nil(t, flush())
 
 	// buf1 should get only level 0 logs
 	assert.Equal(t, []string{
