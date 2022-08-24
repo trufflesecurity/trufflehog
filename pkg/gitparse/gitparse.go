@@ -120,7 +120,7 @@ func RepoPath(source string, head string) (chan Commit, error) {
 			case isIndexLine(line):
 				// NoOp
 			case isPlusFileLine(line):
-				currentDiff.PathB = strings.TrimRight(string(line[4:]), "\n")
+				currentDiff.PathB = strings.TrimRight(string(line[3:]), "\n")
 			case isMinusFileLine(line):
 				// NoOp
 			case isPlusDiffLine(line):
@@ -218,7 +218,7 @@ func isModeLine(line []byte) bool {
 
 // --- a/internal/addrs/move_endpoint_module.go
 func isMinusFileLine(line []byte) bool {
-	if len(line) > 3 && bytes.Equal(line[:3], []byte("---")) {
+	if len(line) >= 6 && bytes.Equal(line[:3], []byte("---")) {
 		return true
 	}
 	return false
@@ -226,7 +226,7 @@ func isMinusFileLine(line []byte) bool {
 
 // +++ b/internal/addrs/move_endpoint_module.go
 func isPlusFileLine(line []byte) bool {
-	if len(line) > 3 && bytes.Equal(line[:3], []byte("+++")) {
+	if len(line) >= 6 && bytes.Equal(line[:3], []byte("+++")) {
 		return true
 	}
 	return false
