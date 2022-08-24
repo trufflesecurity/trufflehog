@@ -46,7 +46,7 @@ var (
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
-	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https:// or file:// schema expected.").Required().String()
+	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
 	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()

@@ -135,7 +135,7 @@ Flags:
       --regex                    No-op flag for backwards compat.
 
 Args:
-  <uri>  Git repository URL. https:// or file:// schema expected.
+  <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
 ```
 
 For example, to scan a  `git` repository, start with
