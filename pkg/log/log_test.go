@@ -2,33 +2,37 @@ package log
 
 import (
 	"bytes"
+	"fmt"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func TestNew(t *testing.T) {
 	var jsonBuffer, consoleBuffer bytes.Buffer
-	logger, sync := New("service-name",
+	logger, flush := New("service-name",
 		WithJSONSink(&jsonBuffer),
 		WithConsoleSink(&consoleBuffer),
 	)
 	logger.Info("yay")
-	assert.Nil(t, sync())
+	assert.Nil(t, flush())
 
 	assert.Contains(t, jsonBuffer.String(), `"logger":"service-name"`)
 	assert.Contains(t, jsonBuffer.String(), `"msg":"yay"`)
-	assert.Contains(t, consoleBuffer.String(), "info\tservice-name\tyay")
+	assert.Contains(t, consoleBuffer.String(), "info-0\tservice-name\tyay")
 }
 
 func TestSetLevel(t *testing.T) {
 	var buffer bytes.Buffer
-	logger, _ := New("service-name",
-		WithConsoleSink(&buffer),
-	)
+	defer SetLevel(0)
+	logger, _ := New("service-name", WithConsoleSink(&buffer))
 
 	assert.Equal(t, true, logger.GetSink().Enabled(0))
 	assert.Equal(t, false, logger.GetSink().Enabled(1))
@@ -47,12 +51,12 @@ func TestSetLevel(t *testing.T) {
 
 func TestWithSentryFailure(t *testing.T) {
 	var buffer bytes.Buffer
-	logger, sync := New("service-name",
+	logger, flush := New("service-name",
 		WithSentry(sentry.ClientOptions{Dsn: "fail"}, nil),
 		WithConsoleSink(&buffer),
 	)
 	logger.Info("yay")
-	assert.Nil(t, sync())
+	assert.Nil(t, flush())
 
 	assert.Contains(t, buffer.String(), "error configuring logger")
 	assert.Contains(t, buffer.String(), "yay")
@@ -60,15 +64,13 @@ func TestWithSentryFailure(t *testing.T) {
 
 func TestAddSentryFailure(t *testing.T) {
 	var buffer bytes.Buffer
-	logger, sync := New("service-name",
-		WithConsoleSink(&buffer),
-	)
+	logger, flush := New("service-name", WithConsoleSink(&buffer))
 	logger, _, err := AddSentry(logger, sentry.ClientOptions{Dsn: "fail"}, nil)
 	assert.NotNil(t, err)
 	assert.NotContains(t, err.Error(), "unsupported")
 
 	logger.Info("yay")
-	assert.Nil(t, sync())
+	assert.Nil(t, flush())
 
 	assert.Contains(t, buffer.String(), "yay")
 }
@@ -76,10 +78,8 @@ func TestAddSentryFailure(t *testing.T) {
 func TestAddSentry(t *testing.T) {
 	var buffer bytes.Buffer
 	var sentryMessage string
-	logger, _ := New("service-name",
-		WithConsoleSink(&buffer),
-	)
-	logger, sync, err := AddSentry(logger, sentry.ClientOptions{
+	logger, _ := New("service-name", WithConsoleSink(&buffer))
+	logger, flush, err := AddSentry(logger, sentry.ClientOptions{
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			sentryMessage = event.Message
 			return nil
@@ -89,7 +89,7 @@ func TestAddSentry(t *testing.T) {
 
 	logger.Info("yay")
 	logger.Error(nil, "oops")
-	assert.Nil(t, sync())
+	assert.Nil(t, flush())
 
 	assert.Contains(t, buffer.String(), "yay")
 	assert.Contains(t, buffer.String(), "oops")
@@ -99,7 +99,7 @@ func TestAddSentry(t *testing.T) {
 func TestWithSentry(t *testing.T) {
 	var buffer bytes.Buffer
 	var sentryMessage string
-	logger, sync := New("service-name",
+	logger, flush := New("service-name",
 		WithConsoleSink(&buffer),
 		WithSentry(sentry.ClientOptions{
 			BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
@@ -110,7 +110,7 @@ func TestWithSentry(t *testing.T) {
 	)
 	logger.Info("yay")
 	logger.Error(nil, "oops")
-	assert.Nil(t, sync())
+	assert.Nil(t, flush())
 
 	assert.Contains(t, buffer.String(), "yay")
 	assert.Contains(t, buffer.String(), "oops")
@@ -119,11 +119,11 @@ func TestWithSentry(t *testing.T) {
 
 func TestHumanReadableTimestamp(t *testing.T) {
 	var buffer bytes.Buffer
-	logger, sync := New("service-name",
+	logger, flush := New("service-name",
 		WithConsoleSink(&buffer),
 	)
 	logger.Info("yay")
-	assert.Nil(t, sync())
+	assert.Nil(t, flush())
 
 	ts := strings.Split(buffer.String(), "\t")[0]
 	assert.NotContains(t, ts, "e+09")
@@ -139,14 +139,321 @@ func TestAddSink(t *testing.T) {
 		WithConsoleSink(&buf1),
 	)
 	logger.Info("line 1")
-	logger, sync, err := AddSink(logger, WithConsoleSink(&buf2))
+	logger, flush, err := AddSink(logger, WithConsoleSink(&buf2))
 	assert.Nil(t, err)
 	logger.Info("line 2")
-	assert.Nil(t, sync())
+	assert.Nil(t, flush())
 
 	assert.Contains(t, buf1.String(), "line 1")
 	assert.Contains(t, buf1.String(), "line 2")
 	// buf2 should only have "line 2"
 	assert.NotContains(t, buf2.String(), "line 1")
 	assert.Contains(t, buf2.String(), "line 2")
+}
+
+func TestStaticLevelSink(t *testing.T) {
+	var buf1, buf2 bytes.Buffer
+	l1 := zap.NewAtomicLevel()
+	logger, flush := New(
+		"service-name",
+		WithConsoleSink(&buf1, WithLeveler(l1)),
+		WithConsoleSink(&buf2, WithLevel(0)),
+	)
+
+	logger.Info("line 1")
+	SetLevelForControl(l1, 1)
+	logger.V(1).Info("line 2")
+	flush()
+
+	// buf1 should have both lines
+	assert.Contains(t, buf1.String(), "line 1")
+	assert.Contains(t, buf1.String(), "line 2")
+
+	// buf2 should only have "line 1"
+	assert.Contains(t, buf2.String(), "line 1")
+	assert.NotContains(t, buf2.String(), "line 2")
+}
+
+func TestWithLeveler(t *testing.T) {
+	var buf1, buf2 bytes.Buffer
+	l1, l2 := zap.NewAtomicLevel(), zap.NewAtomicLevel()
+	logger, flush := New(
+		"service-name",
+		WithConsoleSink(&buf1, WithLeveler(l1)),
+		WithConsoleSink(&buf2, WithLeveler(l2)),
+	)
+
+	SetLevelForControl(l1, 1)
+	SetLevelForControl(l2, 2)
+
+	logger.V(0).Info("line 1")
+	logger.V(1).Info("line 2")
+	logger.V(2).Info("line 3")
+	flush()
+
+	// buf1 should have lines 1 and 2
+	assert.Contains(t, buf1.String(), "line 1")
+	assert.Contains(t, buf1.String(), "line 2")
+	assert.NotContains(t, buf1.String(), "line 3")
+
+	// buf2 should have all lines
+	assert.Contains(t, buf2.String(), "line 1")
+	assert.Contains(t, buf2.String(), "line 2")
+	assert.Contains(t, buf2.String(), "line 3")
+}
+
+func TestWithNameMoreVerbose(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	l1 := zap.NewAtomicLevel()
+	logger, flush := New(
+		"service-name",
+		WithConsoleSink(&buf, WithLeveler(l1)),
+	)
+
+	childLogger := WithName(logger, "child")
+
+	SetLevelForControl(l1, 1)
+	SetLevelFor("child", 2)
+
+	logger.V(0).Info("line 1")
+	logger.V(1).Info("line 2")
+	logger.V(2).Info("line 3")
+	childLogger.V(0).Info("line A")
+	childLogger.V(1).Info("line B")
+	childLogger.V(2).Info("line C")
+	flush()
+
+	// parent should log lines 1 and 2
+	// child should log lines A, B, and C
+	assert.Contains(t, buf.String(), "service-name\tline 1")
+	assert.Contains(t, buf.String(), "service-name\tline 2")
+	assert.NotContains(t, buf.String(), "service-name\tline 3")
+	assert.Contains(t, buf.String(), "service-name.child\tline A")
+	assert.Contains(t, buf.String(), "service-name.child\tline B")
+	assert.NotContains(t, buf.String(), "service-name.child\tline C")
+}
+
+func TestWithNameLessVerbose(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	l1 := zap.NewAtomicLevel()
+	logger, flush := New(
+		"service-name",
+		WithConsoleSink(&buf, WithLeveler(l1)),
+	)
+
+	childLogger := WithName(logger, "child")
+
+	SetLevelForControl(l1, 1)
+	SetLevelFor("child", 0)
+
+	logger.V(0).Info("line 1")
+	logger.V(1).Info("line 2")
+	logger.V(2).Info("line 3")
+	childLogger.V(0).Info("line A")
+	childLogger.V(1).Info("line B")
+	childLogger.V(2).Info("line C")
+	flush()
+
+	// parent should log lines 1 and 2
+	// child should log line A only
+	assert.Contains(t, buf.String(), "service-name\tline 1")
+	assert.Contains(t, buf.String(), "service-name\tline 2")
+	assert.NotContains(t, buf.String(), "service-name\tline 3")
+	assert.Contains(t, buf.String(), "service-name.child\tline A")
+	assert.NotContains(t, buf.String(), "service-name.child\tline B")
+	assert.NotContains(t, buf.String(), "service-name.child\tline C")
+}
+
+func TestNestedWithName(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	grandParent, flush := New("grandParent", WithConsoleSink(&buf, WithLevel(1)))
+	parent := WithName(grandParent, "parent")
+	child := WithName(parent, "child")
+
+	SetLevelFor("parent", 0)
+	SetLevelFor("child", 2)
+
+	grandParent.V(0).Info("line 1")
+	parent.V(0).Info("line 2")
+	child.V(0).Info("line 3")
+
+	grandParent.V(1).Info("line 4")
+	parent.V(1).Info("line 5")
+	child.V(1).Info("line 6")
+
+	grandParent.V(2).Info("line 7")
+	parent.V(2).Info("line 8")
+	child.V(2).Info("line 9")
+
+	flush()
+
+	lines := splitLines(buf.String())
+	assert.Equal(t, 4, len(lines))
+
+	assert.Equal(t, `info-0	grandParent	line 1`, lines[0])
+	assert.Equal(t, `info-0	grandParent.parent	line 2`, lines[1])
+	assert.Equal(t, `info-0	grandParent.parent.child	line 3`, lines[2])
+	assert.Equal(t, `info-1	grandParent	line 4`, lines[3])
+}
+
+func TestSiblingsWithName(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(1)))
+	alice := WithName(parent, "alice")
+	bob := WithName(parent, "bob")
+
+	SetLevelFor("alice", 0)
+	SetLevelFor("bob", 2)
+
+	parent.V(0).Info("line 1")
+	alice.V(0).Info("line 2")
+	bob.V(0).Info("line 3")
+
+	parent.V(1).Info("line 4")
+	alice.V(1).Info("line 5")
+	bob.V(1).Info("line 6")
+
+	parent.V(2).Info("line 7")
+	alice.V(2).Info("line 8")
+	bob.V(2).Info("line 9")
+
+	flush()
+	lines := splitLines(buf.String())
+	assert.Equal(t, 5, len(lines))
+
+	assert.Equal(t, `info-0	parent	line 1`, lines[0])
+	assert.Equal(t, `info-0	parent.alice	line 2`, lines[1])
+	assert.Equal(t, `info-0	parent.bob	line 3`, lines[2])
+	assert.Equal(t, `info-1	parent	line 4`, lines[3])
+	assert.Equal(t, `info-1	parent.bob	line 6`, lines[4])
+}
+
+func TestWithNameConcurrency(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	parent, flush := New("parent", WithConsoleSink(&buf))
+
+	alice := WithName(parent, "alice")
+	bob := WithName(parent, "bob")
+
+	var wg sync.WaitGroup
+	f := func(logger logr.Logger) {
+		defer wg.Done()
+		for i := 0; i < 100_000; i++ {
+			logger.Info(fmt.Sprintf("%06d", i))
+		}
+	}
+	wg.Add(3)
+	go f(parent)
+	go f(alice)
+	go f(bob)
+	wg.Wait()
+
+	flush()
+	logLines := splitLines(buf.String())
+	assert.Equal(t, 300_000, len(logLines))
+	sort.Slice(logLines, func(i, j int) bool {
+		return logLines[i] < logLines[j]
+	})
+
+	for i := 0; i < 100_000; i++ {
+		assert.Equal(t, fmt.Sprintf("info-0\tparent\t%06d", i), logLines[i])
+		assert.Equal(t, fmt.Sprintf("info-0\tparent.alice\t%06d", i), logLines[i+100_000])
+		assert.Equal(t, fmt.Sprintf("info-0\tparent.bob\t%06d", i), logLines[i+200_000])
+	}
+}
+
+func TestParentLevel(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
+	parent = parent.WithValues("key", "value")
+	// NOTE: child does not inherit parent's log level, but it does inherit the values
+	child := WithName(parent, "child")
+
+	parent.V(2).Info("yay")
+	child.V(2).Info("not logged")
+	child.Info("yay again")
+	flush()
+
+	assert.Contains(t, buf.String(), `info-2	parent	yay	{"key": "value"}`)
+	assert.NotContains(t, buf.String(), "not logged")
+	assert.Contains(t, buf.String(), `info-0	parent.child	yay again	{"key": "value"}`)
+}
+
+func TestExistingChildLevel(t *testing.T) {
+	var buf bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
+
+	SetLevelFor("child", 2)
+	// child should start with a level of 2 due to SetLevelFor above
+	child := WithName(parent, "child")
+
+	parent.V(2).Info("yay")
+	child.V(2).Info("yay again")
+	flush()
+
+	assert.Contains(t, buf.String(), "info-2\tparent\tyay")
+	assert.Contains(t, buf.String(), "info-2\tparent.child\tyay again")
+}
+
+func TestSinkWithName(t *testing.T) {
+	var buf1, buf2 bytes.Buffer
+	globalControls = make(map[string]levelSetter, 16)
+
+	parent, flush := New(
+		"parent",
+		WithConsoleSink(&buf1, WithLevel(0)),
+		WithConsoleSink(&buf2, WithLevel(2)),
+	)
+	child := WithName(parent, "child")
+
+	for level := 0; level < 3; level++ {
+		SetLevelFor("child", int8(level))
+		child.Info("")
+		child.V(1).Info("")
+		child.V(2).Info("")
+	}
+	flush()
+
+	// buf1 should get only level 0 logs
+	assert.Equal(t, []string{
+		"info-0\tparent.child",
+		"info-0\tparent.child",
+		"info-0\tparent.child",
+	}, splitLines(buf1.String()))
+
+	assert.Equal(t, []string{
+		// child level 0
+		"info-0\tparent.child",
+		// child level 1
+		"info-0\tparent.child",
+		"info-1\tparent.child",
+		// child level 2
+		"info-0\tparent.child",
+		"info-1\tparent.child",
+		"info-2\tparent.child",
+	}, splitLines(buf2.String()))
+}
+
+func splitLines(s string) []string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	logLines := make([]string, len(lines))
+	for i, logLine := range lines {
+		// remove timestamp
+		logLines[i] = strings.TrimSpace(logLine[strings.Index(logLine, "\t")+1:])
+	}
+	return logLines
 }

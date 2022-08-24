@@ -2,6 +2,7 @@ package log
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -11,11 +12,6 @@ import (
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-)
-
-var (
-	// global log level control (see SetLevel)
-	logLevel zap.AtomicLevel = zap.NewAtomicLevel()
 )
 
 type logConfig struct {
@@ -56,15 +52,6 @@ func New(service string, configs ...logConfig) (logr.Logger, func() error) {
 	return logger, firstErrorFunc(cleanupFuncs...)
 }
 
-// SetLevel sets the log level for all loggers created with WithJSONSink and
-// WithConsoleSink.
-func SetLevel(level int8) {
-	// Zap's levels get more verbose as the number gets smaller, as explained
-	// by zapr here: https://github.com/go-logr/zapr#increasing-verbosity
-	// For example setting the level to -2 below, means log.V(2) will be enabled.
-	logLevel.SetLevel(zapcore.Level(-level))
-}
-
 // WithSentry adds sentry integration to the logger. This configuration may
 // fail, in which case, sentry will not be added and execution will continue
 // normally.
@@ -95,57 +82,63 @@ func WithSentry(opts sentry.ClientOptions, tags map[string]string) logConfig {
 	}
 }
 
+type sinkConfig struct {
+	encoder zapcore.Encoder
+	sink    zapcore.WriteSyncer
+	level   levelSetter
+}
+
 // WithJSONSink adds a JSON encoded output to the logger.
-func WithJSONSink(sink io.Writer) logConfig {
-	return logConfig{
-		core: zapcore.NewCore(
-			zapcore.NewJSONEncoder(defaultEncoderConfig()),
-			zapcore.Lock(
-				zapcore.AddSync(sink),
-			),
-			logLevel,
-		),
-	}
+func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
+	return newCoreConfig(
+		zapcore.NewJSONEncoder(defaultEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(sink)),
+		globalLogLevel,
+		opts...,
+	)
 }
 
 // WithConsoleSink adds a console-style output to the logger.
-func WithConsoleSink(sink io.Writer) logConfig {
-	return logConfig{
-		core: zapcore.NewCore(
-			zapcore.NewConsoleEncoder(defaultEncoderConfig()),
-			zapcore.Lock(
-				zapcore.AddSync(sink),
-			),
-			logLevel,
-		),
-	}
+func WithConsoleSink(sink io.Writer, opts ...func(*sinkConfig)) (conf logConfig) {
+	return newCoreConfig(
+		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(sink)),
+		globalLogLevel,
+		opts...,
+	)
 }
 
 func defaultEncoderConfig() zapcore.EncoderConfig {
 	conf := zap.NewProductionEncoderConfig()
 	// Use more human-readable time format.
 	conf.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
+	conf.EncodeLevel = func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+		if level == zapcore.ErrorLevel {
+			enc.AppendString("error")
+			return
+		}
+		enc.AppendString(fmt.Sprintf("info-%d", -int8(level)))
+	}
 	return conf
 }
 
 // WithCore adds any user supplied zap core to the logger.
-func WithCore(core zapcore.Core) logConfig {
+func WithCore(core zapcore.Core) (conf logConfig) {
 	return logConfig{core: core}
 }
 
 // AddSentry initializes a sentry client and extends an existing
 // logr.Logger with the hook.
 func AddSentry(l logr.Logger, opts sentry.ClientOptions, tags map[string]string) (logr.Logger, func() error, error) {
-	conf := WithSentry(opts, tags)
-	if conf.err != nil {
-		return l, nil, conf.err
-	}
-	return AddSink(l, conf)
+	return AddSink(l, WithSentry(opts, tags))
 }
 
 // AddSink extends an existing logr.Logger with a new sink. It returns the new
 // logr.Logger, a cleanup function, and an error.
 func AddSink(l logr.Logger, sink logConfig) (logr.Logger, func() error, error) {
+	if sink.err != nil {
+		return l, nil, sink.err
+	}
 	zapLogger, err := getZapLogger(l)
 	if err != nil {
 		return l, nil, errors.New("unsupported logr implementation")
@@ -165,6 +158,24 @@ func getZapLogger(l logr.Logger) (*zap.Logger, error) {
 	return nil, errors.New("not a zapr logger")
 }
 
+// WithLeveler sets the sink's level to a static level. This option prevents
+// changing the log level for this sink at runtime.
+func WithLevel(level int8) func(*sinkConfig) {
+	return WithLeveler(
+		// Zap's levels get more verbose as the number gets smaller, as explained
+		// by zapr here: https://github.com/go-logr/zapr#increasing-verbosity
+		// For example setting the level to -2 below, means log.V(2) will be enabled.
+		zap.NewAtomicLevelAt(zapcore.Level(-level)),
+	)
+}
+
+// WithLeveler sets the sink's level enabler to leveler.
+func WithLeveler(leveler levelSetter) func(*sinkConfig) {
+	return func(conf *sinkConfig) {
+		conf.level = leveler
+	}
+}
+
 // firstErrorFunc is a helper function that returns a function that executes
 // all provided args and returns the first error, if any.
 func firstErrorFunc(fs ...func() error) func() error {
@@ -179,5 +190,30 @@ func firstErrorFunc(fs ...func() error) func() error {
 			}
 		}
 		return firstErr
+	}
+}
+
+// newCoreConfig is a helper function that creates a default sinkConfig,
+// applies the options, then creates a zapcore.Core.
+func newCoreConfig(
+	defaultEncoder zapcore.Encoder,
+	defaultSink zapcore.WriteSyncer,
+	defaultLevel levelSetter,
+	opts ...func(*sinkConfig),
+) logConfig {
+	conf := sinkConfig{
+		encoder: defaultEncoder,
+		sink:    defaultSink,
+		level:   defaultLevel,
+	}
+	for _, f := range opts {
+		f(&conf)
+	}
+	return logConfig{
+		core: zapcore.NewCore(
+			conf.encoder,
+			conf.sink,
+			conf.level,
+		),
 	}
 }
