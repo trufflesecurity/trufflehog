@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -25,9 +26,22 @@ func TestNew(t *testing.T) {
 	logger.Info("yay")
 	assert.Nil(t, flush())
 
-	assert.Contains(t, jsonBuffer.String(), `"logger":"service-name"`)
-	assert.Contains(t, jsonBuffer.String(), `"msg":"yay"`)
-	assert.Contains(t, consoleBuffer.String(), "info-0\tservice-name\tyay")
+	var parsedJSON map[string]any
+	assert.Nil(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
+	assert.NotEmpty(t, parsedJSON["ts"])
+	delete(parsedJSON, "ts")
+	assert.Equal(t,
+		map[string]any{
+			"level":  "info-0",
+			"logger": "service-name",
+			"msg":    "yay",
+		},
+		parsedJSON,
+	)
+	assert.Equal(t,
+		[]string{"info-0\tservice-name\tyay"},
+		splitLines(consoleBuffer.String()),
+	)
 }
 
 func TestSetLevel(t *testing.T) {
@@ -88,12 +102,12 @@ func TestAddSentry(t *testing.T) {
 	}, nil)
 	assert.Nil(t, err)
 
-	logger.Info("yay")
 	logger.Error(nil, "oops")
+	logger.Info("yay")
 	assert.Nil(t, flush())
 
-	assert.Contains(t, buffer.String(), "yay")
 	assert.Contains(t, buffer.String(), "oops")
+	assert.Contains(t, buffer.String(), "yay")
 	assert.Equal(t, "oops", sentryMessage)
 }
 
@@ -226,14 +240,13 @@ func TestWithNamedLevelMoreVerbose(t *testing.T) {
 	childLogger.V(2).Info("line C")
 	assert.Nil(t, flush())
 
-	// parent should log lines 1 and 2
-	// child should log lines A, B, and C
-	assert.Contains(t, buf.String(), "service-name\tline 1")
-	assert.Contains(t, buf.String(), "service-name\tline 2")
-	assert.NotContains(t, buf.String(), "service-name\tline 3")
-	assert.Contains(t, buf.String(), "service-name.child\tline A")
-	assert.Contains(t, buf.String(), "service-name.child\tline B")
-	assert.NotContains(t, buf.String(), "service-name.child\tline C")
+	// output should contain up to verbosity 1
+	assert.Equal(t, []string{
+		"info-0\tservice-name\tline 1",
+		"info-1\tservice-name\tline 2",
+		"info-0\tservice-name.child\tline A",
+		"info-1\tservice-name.child\tline B",
+	}, splitLines(buf.String()))
 }
 
 func TestWithNamedLevelLessVerbose(t *testing.T) {
@@ -259,14 +272,13 @@ func TestWithNamedLevelLessVerbose(t *testing.T) {
 	childLogger.V(2).Info("line C")
 	assert.Nil(t, flush())
 
-	// parent should log lines 1 and 2
-	// child should log line A only
-	assert.Contains(t, buf.String(), "service-name\tline 1")
-	assert.Contains(t, buf.String(), "service-name\tline 2")
-	assert.NotContains(t, buf.String(), "service-name\tline 3")
-	assert.Contains(t, buf.String(), "service-name.child\tline A")
-	assert.NotContains(t, buf.String(), "service-name.child\tline B")
-	assert.NotContains(t, buf.String(), "service-name.child\tline C")
+	// output should contain up to verbosity 1 for parent
+	// and verbosity 0 for child
+	assert.Equal(t, []string{
+		"info-0\tservice-name\tline 1",
+		"info-1\tservice-name\tline 2",
+		"info-0\tservice-name.child\tline A",
+	}, splitLines(buf.String()))
 }
 
 func TestNestedWithNamedLevel(t *testing.T) {

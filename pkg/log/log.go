@@ -123,7 +123,7 @@ func defaultEncoderConfig() zapcore.EncoderConfig {
 }
 
 // WithCore adds any user supplied zap core to the logger.
-func WithCore(core zapcore.Core) (conf logConfig) {
+func WithCore(core zapcore.Core) logConfig {
 	return logConfig{core: core}
 }
 
