@@ -24,7 +24,7 @@ func TestIsIndexLine(t *testing.T) {
 		},
 		"minusFileLine": {
 			pass:     []byte("--- a/internal/addrs/move_endpoint_module.go"),
-			fails:    [][]byte{[]byte("notcorrect")},
+			fails:    [][]byte{[]byte("notcorrect"), []byte("short")},
 			function: isMinusFileLine,
 		},
 		"plusFileLine": {
@@ -39,7 +39,6 @@ func TestIsIndexLine(t *testing.T) {
 		},
 		"minusDiffLine": {
 			pass:     []byte("-fmt.Println"),
-			fails:    [][]byte{[]byte("notcorrect"), []byte("short")},
 			function: isMinusDiffLine,
 		},
 		"messageLine": {
