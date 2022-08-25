@@ -1203,43 +1203,47 @@ var _ interface {
 	ErrorName() string
 } = GitHubAppValidationError{}
 
-// Validate checks the field values on AccessToken with the rules defined in
+// Validate checks the field values on SlackTokens with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
-func (m *AccessToken) Validate() error {
+func (m *SlackTokens) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on AccessToken with the rules defined in
+// ValidateAll checks the field values on SlackTokens with the rules defined in
 // the proto definition for this message. If any rules are violated, the
-// result is a list of violation errors wrapped in AccessTokenMultiError, or
+// result is a list of violation errors wrapped in SlackTokensMultiError, or
 // nil if none found.
-func (m *AccessToken) ValidateAll() error {
+func (m *SlackTokens) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *AccessToken) validate(all bool) error {
+func (m *SlackTokens) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Token
+	// no validation rules for AppToken
+
+	// no validation rules for BotToken
+
+	// no validation rules for ClientToken
 
 	if len(errors) > 0 {
-		return AccessTokenMultiError(errors)
+		return SlackTokensMultiError(errors)
 	}
 
 	return nil
 }
 
-// AccessTokenMultiError is an error wrapping multiple validation errors
-// returned by AccessToken.ValidateAll() if the designated constraints aren't met.
-type AccessTokenMultiError []error
+// SlackTokensMultiError is an error wrapping multiple validation errors
+// returned by SlackTokens.ValidateAll() if the designated constraints aren't met.
+type SlackTokensMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m AccessTokenMultiError) Error() string {
+func (m SlackTokensMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -1248,11 +1252,11 @@ func (m AccessTokenMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m AccessTokenMultiError) AllErrors() []error { return m }
+func (m SlackTokensMultiError) AllErrors() []error { return m }
 
-// AccessTokenValidationError is the validation error returned by
-// AccessToken.Validate if the designated constraints aren't met.
-type AccessTokenValidationError struct {
+// SlackTokensValidationError is the validation error returned by
+// SlackTokens.Validate if the designated constraints aren't met.
+type SlackTokensValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -1260,22 +1264,22 @@ type AccessTokenValidationError struct {
 }
 
 // Field function returns field value.
-func (e AccessTokenValidationError) Field() string { return e.field }
+func (e SlackTokensValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e AccessTokenValidationError) Reason() string { return e.reason }
+func (e SlackTokensValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e AccessTokenValidationError) Cause() error { return e.cause }
+func (e SlackTokensValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e AccessTokenValidationError) Key() bool { return e.key }
+func (e SlackTokensValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e AccessTokenValidationError) ErrorName() string { return "AccessTokenValidationError" }
+func (e SlackTokensValidationError) ErrorName() string { return "SlackTokensValidationError" }
 
 // Error satisfies the builtin error interface
-func (e AccessTokenValidationError) Error() string {
+func (e SlackTokensValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -1287,14 +1291,14 @@ func (e AccessTokenValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sAccessToken.%s: %s%s",
+		"invalid %sSlackTokens.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = AccessTokenValidationError{}
+var _ error = SlackTokensValidationError{}
 
 var _ interface {
 	Field() string
@@ -1302,4 +1306,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = AccessTokenValidationError{}
+} = SlackTokensValidationError{}

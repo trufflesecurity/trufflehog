@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package kucoin
 
 import (

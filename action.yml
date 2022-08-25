@@ -12,12 +12,16 @@ inputs:
   head:
     description: Scan commits until here (usually dev branch).
     required: false
+  extra_args:
+    default: ''
+    description: Extra args to be passed to the trufflehog cli.
+    required: false
 branding:
   icon: "shield"
   color: "green"
 runs:
   using: "docker"
-  image: "Dockerfile"
+  image: "docker://ghcr.io/trufflesecurity/trufflehog:latest"
   args:
     - git
     - file://${{ inputs.path }}
@@ -25,3 +29,5 @@ runs:
     - ${{ inputs.base }}
     - --branch
     - ${{ inputs.head }}
+    - --fail
+    - ${{ inputs.extra_args }}

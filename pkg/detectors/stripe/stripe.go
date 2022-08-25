@@ -6,15 +6,14 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -56,20 +55,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match))
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
-			if err != nil {
-				return results, err
-			}
-			defer res.Body.Close()
+			if err == nil {
+				res.Body.Close() // The request body is unused.
 
-			if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-				s.Verified = true
+				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
+					s.Verified = true
+				}
 			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
+		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s)

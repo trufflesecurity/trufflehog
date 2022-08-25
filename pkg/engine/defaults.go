@@ -9,6 +9,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adzuna"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aeroworkflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/agora"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aha"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeprojectkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airship"
@@ -42,6 +43,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanaoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/assemblyai"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atera"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autodesk"
@@ -59,6 +61,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baseapiio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besnappy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
@@ -74,12 +77,14 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boostnote"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/borgbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buddyns"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulbul"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulksms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buttercms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/caflou"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/calendarific"
@@ -95,6 +100,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/censys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/centralstationcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cexio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chartmogul"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chatbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/chatfule"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checio"
@@ -113,12 +119,14 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clockify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clockworksms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/closecrm"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudconvert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudelements"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflarecakey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudimage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudmersive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudplan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudsmith"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloverly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clustdoc"
@@ -128,12 +136,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/collect2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/column"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commodities"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/companyhub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/confluent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/contentfulpersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/conversiontools"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convertapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convertkit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/copper"
@@ -141,6 +152,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/courier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coveralls"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/craftmypdf"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/crossbrowsertesting"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/crowdin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cryptocompare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/currencycloud"
@@ -152,6 +164,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/customerio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/d7network"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dandelion"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dareboost"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datafire"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
@@ -159,12 +173,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/delighted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deputy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectlanguage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dfuse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diffbot"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diggernaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceantoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordbottoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordwebhook"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
@@ -190,6 +207,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/everhour"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangerateapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangeratesapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exportsdk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/extractorapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/facebookoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/faceplusplus"
@@ -198,6 +216,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fastlypersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/feedier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fetchrss"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
@@ -211,10 +230,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightstats"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/float"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowdash"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowdock"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowflu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flutterwave"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fmfw"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formbucket"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formcraft"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/foursquare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/frameio"
@@ -251,6 +273,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/guardianapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gumroad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gyazo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
@@ -270,13 +293,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hybiscus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hypertrack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/iconfinder"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/iexapis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/iexcloud"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/image4"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagekit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagga"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/impala"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/insightly"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instabot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/integromat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intercom"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/interseller"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intrinio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/invoiceocean"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipapi"
@@ -317,6 +344,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loginradius"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lokalisetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lunchmoney"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/luno"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/macaddress"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/madkudu"
@@ -357,6 +385,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moosend"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mrticktock"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mux"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myfreshworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nasdaqdatalink"
@@ -369,6 +398,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nftport"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nitro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/noticeable"
@@ -384,6 +414,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onedesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onelogin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepagecrm"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onwaterio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
@@ -392,13 +423,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/optimizely"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/owlbot"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/packagecloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pagerdutyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pandadoc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pandascore"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paperform"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paralleldots"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/parsehub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/parsers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/partnerstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/passbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pastebin"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paydirtapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paymoapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paymongo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paypaloauth"
@@ -407,6 +443,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pdfshift"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedream"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedrive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pivotaltracker"
@@ -414,10 +451,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/planviewleankit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/planyo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/plivo"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/podio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pollsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/poloniex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/polygon"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/positionstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postageapp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postbacks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/posthog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postmark"
@@ -439,10 +479,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rawg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/razorpay"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/reachmail"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/readme"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/reallysimplesystems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rebrandly"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rechargepayments"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
@@ -452,6 +495,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ritekit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roaring"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rockset"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roninapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
@@ -474,6 +518,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapingbee"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/screenshotapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/screenshotlayer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrutinizerci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/securitytrails"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/segmentapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/selectpdf"
@@ -482,7 +527,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbirdorganizationapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendgrid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendinbluev2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentiment"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serphouse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serpstack"
@@ -499,6 +543,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/signaturit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/signupgenius"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sigopt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/simfin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/simplesat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/simplynoted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/simvoly"
@@ -514,19 +559,24 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/smooch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snipcart"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snykkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sonarcloud"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/speechtextai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/splunkobservabilitytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spoonacular"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportradar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportsmonk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squarespace"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareup"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sslmate"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuscake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuspage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/statuspal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stitchdata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stockdata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storecove"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormglass"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storyblok"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storychief"
@@ -551,16 +601,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teamworkdesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teamworkspaces"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/technicalanalysisapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tefter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/telegrambottoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/teletype"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/telnyx"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/terraformcloudpersonaltoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/testingbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/text2data"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/textmagic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/theoddsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/thinkific"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/thousandeyes"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ticketmaster"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tickettailor"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tiingo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timecamp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timezoneapi"
@@ -574,22 +627,27 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trelloapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twelvedata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tyntec"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typetalk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ubidots"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uclassify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/unifyid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/unplugg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/unsplash"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/upcdatabase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uplead"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uploadcare"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uptimerobot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/upwave"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uri"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/urlscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vatlayer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vbout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vercel"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verimail"
@@ -599,6 +657,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/virustotal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/visualcrossing"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/voicegain"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/voodoosms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vouchery"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vpnapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vultrapikey"
@@ -618,11 +677,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wrike"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yandex"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yelp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youneedabudget"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yousign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youtubeapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zendeskapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zenkitapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zenrows"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zenscrape"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zenserp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zeplin"
@@ -630,7 +691,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipbooks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodeapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodebase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 )
 
 func DefaultDetectors() []detectors.Detector {
@@ -1120,7 +1183,7 @@ func DefaultDetectors() []detectors.Detector {
 		blitapp.Scanner{},
 		restpackhtmltopdfapi.Scanner{},
 		webscraping.Scanner{},
-		sentiment.Scanner{},
+		// sentiment.Scanner{},
 		geoapify.Scanner{},
 		dfuse.Scanner{},
 		gitter.Scanner{},
@@ -1290,5 +1353,69 @@ func DefaultDetectors() []detectors.Detector {
 		mockaroo.Scanner{},
 		statuspage.Scanner{},
 		statuspal.Scanner{},
+		testingbot.Scanner{},
+		conversiontools.Scanner{},
+		parsers.Scanner{},
+		scrutinizerci.Scanner{},
+		sonarcloud.Scanner{},
+		dareboost.Scanner{},
+		pinata.Scanner{},
+		exportsdk.Scanner{},
+		rechargepayments.Scanner{},
+		browserstack.Scanner{},
+		image4.Scanner{},
+		crossbrowsertesting.Scanner{},
+		flowdash.Scanner{},
+		lunchmoney.Scanner{},
+		atera.Scanner{},
+		flowdock.Scanner{},
+		parsehub.Scanner{},
+		voodoosms.Scanner{},
+		yelp.Scanner{},
+		podio.Scanner{},
+		rockset.Scanner{},
+		aha.Scanner{},
+		packagecloud.Scanner{},
+		cloudsmith.Scanner{},
+		nightfall.Scanner{},
+		mux.Scanner{},
+		statuscake.Scanner{},
+		formcraft.Scanner{},
+		sportradar.Scanner{},
+		paperform.Scanner{},
+		zulipchat.Scanner{},
+		iexapis.Scanner{},
+		detectify.Scanner{},
+		reachmail.Scanner{},
+		gumroad.Scanner{},
+		typetalk.Scanner{},
+		chartmogul.Scanner{},
+		fibery.Scanner{},
+		uptimerobot.Scanner{},
+		paydirtapp.Scanner{},
+		disqus.Scanner{},
+		bulksms.Scanner{},
+		onesignal.Scanner{},
+		stormboard.Scanner{},
+		interseller.Scanner{},
+		tickettailor.Scanner{},
+		twitch.Scanner{},
+		rentman.Scanner{},
+		tefter.Scanner{},
+		pollsapi.Scanner{},
+		diggernaut.Scanner{},
+		zenrows.Scanner{},
+		instabot.Scanner{},
+		simfin.Scanner{},
+		vbout.Scanner{},
+		besnappy.Scanner{},
+		convertapi.Scanner{},
+		cloudconvert.Scanner{},
+		zipcodebase.Scanner{},
+		speechtextai.Scanner{},
+		databox.Scanner{},
+		postbacks.Scanner{},
+		collect2.Scanner{},
+		uclassify.Scanner{},
 	}
 }

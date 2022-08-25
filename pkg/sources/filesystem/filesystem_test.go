@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"

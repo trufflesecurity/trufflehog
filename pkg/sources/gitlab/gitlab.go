@@ -6,11 +6,10 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 
-	"github.com/go-errors/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -18,6 +17,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+
+	"github.com/go-errors/errors"
+	gogit "github.com/go-git/go-git/v5"
+	log "github.com/sirupsen/logrus"
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
@@ -25,23 +28,25 @@ import (
 )
 
 type Source struct {
-	name       string
-	sourceId   int64
-	jobId      int64
-	verify     bool
-	authMethod string
-	user       string
-	password   string
-	token      string
-	url        string
-	repos      []string
-	git        *git.Git
-	aCtx       context.Context
+	name            string
+	sourceId        int64
+	jobId           int64
+	verify          bool
+	authMethod      string
+	user            string
+	password        string
+	token           string
+	url             string
+	repos           []string
+	git             *git.Git
+	aCtx            context.Context
+	resumeInfoSlice []string
+	resumeInfoMutex sync.Mutex
+	jobSem          *semaphore.Weighted
 	sources.Progress
-	jobSem *semaphore.Weighted
 }
 
-// Ensure the Source satisfies the interface at compile time
+// Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
 // Type returns the type of source.
@@ -98,7 +103,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 
 	if len(s.url) == 0 {
-		//assuming not custom gitlab url
+		// Assuming not custom gitlab url.
 		s.url = "https://gitlab.com/"
 	}
 
@@ -123,7 +128,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 }
 
 func (s *Source) newClient() (*gitlab.Client, error) {
-	// initialize a new api instance
+	// Initialize a new api instance.
 	switch s.authMethod {
 	case "OAUTH":
 		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
@@ -158,11 +163,12 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 }
 
 func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, error) {
-	// projects without repo will get user projects, groups projects, and subgroup projects.
+	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 
 	if err != nil {
-		return nil, errors.Errorf("unable to authenticate using: %s", s.authMethod)
+		msg := fmt.Sprintf("unable to authenticate using: %s", s.authMethod)
+		return nil, errors.WrapPrefix(err, msg, 0)
 	}
 
 	projects := map[int]*gitlab.Project{}
@@ -187,7 +193,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	var groups []*gitlab.Group
 
 	listGroupsOptions := gitlab.ListGroupsOptions{
-		AllAvailable: gitlab.Bool(false), // This actually grabs public groups on public GitLab if set to true
+		AllAvailable: gitlab.Bool(false), // This actually grabs public groups on public GitLab if set to true.
 		TopLevelOnly: gitlab.Bool(false),
 		Owned:        gitlab.Bool(false),
 	}
@@ -209,7 +215,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	for _, group := range groups {
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
 			OrderBy:          gitlab.String("last_activity_at"),
-			IncludeSubgroups: gitlab.Bool(true),
+			IncludeSubGroups: gitlab.Bool(true),
 		}
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
@@ -239,112 +245,92 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	return projectList, nil
 }
 
-func (s *Source) getRepos() ([]*url.URL, []error) {
-	var validRepos []*url.URL
-	var errs []error
-	if len(s.repos) > 0 {
-		for _, prj := range s.repos {
-			repo, err := giturl.NormalizeGitlabRepo(prj)
-			if err != nil {
-				errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
-				continue
-			}
-
-			// The repo normalization has already successfully parsed the URL at this point, so we can ignore the error.
-			u, _ := url.ParseRequestURI(repo)
-			validRepos = append(validRepos, u)
-		}
-		return validRepos, errs
+func (s *Source) getRepos() ([]string, []error) {
+	if len(s.repos) == 0 {
+		return nil, nil
 	}
-	return nil, nil
 
+	var validRepos []string
+	var errs []error
+	for _, prj := range s.repos {
+		repo, err := giturl.NormalizeGitlabRepo(prj)
+		if err != nil {
+			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+			continue
+		}
+
+		validRepos = append(validRepos, repo)
+	}
+	return validRepos, errs
 }
 
-func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, repos []*url.URL) []error {
+func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) []error {
 	wg := sync.WaitGroup{}
-	errs := []error{}
+	var errs []error
 	var errsMut sync.Mutex
-	if s.authMethod == "UNAUTHENTICATED" {
-		for i, u := range repos {
-			if common.IsDone(ctx) {
-				// We are returning nil instead of the scanErrors slice here because
-				// we don't want to mark this scan as errored if we cancelled it.
-				return nil
-			}
-			if err := s.jobSem.Acquire(ctx, 1); err != nil {
-				log.WithError(err).Debug("could not acquire semaphore")
-				continue
-			}
-			wg.Add(1)
-			go func(ctx context.Context, repoURL *url.URL, i int) {
-				defer s.jobSem.Release(1)
-				defer wg.Done()
-				if len(repoURL.String()) == 0 {
-					return
-				}
-				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
 
-				path, repo, err := git.CloneRepoUsingUnauthenticated(repoURL.String())
-				defer os.RemoveAll(path)
-				if err != nil {
-					errsMut.Lock()
-					errs = append(errs, err)
-					errsMut.Unlock()
-					return
-				}
-				log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(repos), repoURL.String())
-				err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
-				if err != nil {
-					errsMut.Lock()
-					errs = append(errs, err)
-					errsMut.Unlock()
-					return
-				}
-				log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(repos), repoURL.String())
-			}(ctx, u, i)
+	// If there is resume information available, limit this scan to only the repos that still need scanning.
+	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
+	s.repos = reposToScan
+
+	for i, repo := range s.repos {
+		if common.IsDone(ctx) {
+			// We are returning nil instead of the scanErrors slice here because
+			// we don't want to mark this scan as errored if we cancelled it.
+			return nil
 		}
-
-	} else {
-		for i, u := range repos {
-			if common.IsDone(ctx) {
-				// We are returning nil instead of the scanErrors slice here because
-				// we don't want to mark this scan as errored if we cancelled it.
-				return nil
-			}
-			if err := s.jobSem.Acquire(ctx, 1); err != nil {
-				log.WithError(err).Debug("could not acquire semaphore")
-				continue
-			}
-			wg.Add(1)
-			go func(ctx context.Context, repoURL *url.URL, i int) {
-				defer s.jobSem.Release(1)
-				defer wg.Done()
-				if len(repoURL.String()) == 0 {
-					return
-				}
-				s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
-
-				path, repo, err := git.CloneRepoUsingToken(s.token, repoURL.String(), s.user)
-				defer os.RemoveAll(path)
-				if err != nil {
-					errsMut.Lock()
-					errs = append(errs, err)
-					errsMut.Unlock()
-					return
-				}
-				log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(repos), repoURL.String())
-				err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
-				if err != nil {
-					errsMut.Lock()
-					errs = append(errs, err)
-					errsMut.Unlock()
-					return
-				}
-				log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(repos), repoURL.String())
-			}(ctx, u, i)
+		if err := s.jobSem.Acquire(ctx, 1); err != nil {
+			log.WithError(err).Debug("could not acquire semaphore")
+			continue
 		}
+		wg.Add(1)
+		go func(ctx context.Context, repoURL string, i int) {
+			defer s.jobSem.Release(1)
+			defer wg.Done()
+			if len(repoURL) == 0 {
+				return
+			}
+
+			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
+			// Ensure the repo is removed from the resume info after being scanned.
+			defer func(s *Source) {
+				s.resumeInfoMutex.Lock()
+				defer s.resumeInfoMutex.Unlock()
+				s.resumeInfoSlice = sources.RemoveRepoFromResumeInfo(s.resumeInfoSlice, repoURL)
+			}(s)
+
+			var path string
+			var repo *gogit.Repository
+			var err error
+			if s.authMethod == "UNAUTHENTICATED" {
+				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
+			} else {
+				// If a username is not provided we need to use a default one in order to clone a private repo.
+				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
+				user := s.user
+				if user == "" {
+					user = "placeholder"
+				}
+				path, repo, err = git.CloneRepoUsingToken(s.token, repoURL, user)
+			}
+			defer os.RemoveAll(path)
+			if err != nil {
+				errsMut.Lock()
+				errs = append(errs, err)
+				errsMut.Unlock()
+				return
+			}
+			log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(s.repos), repoURL)
+			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
+			if err != nil {
+				errsMut.Lock()
+				errs = append(errs, err)
+				errsMut.Unlock()
+				return
+			}
+			log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(s.repos), repoURL)
+		}(ctx, repo, i)
 	}
-
 	wg.Wait()
 
 	return errs
@@ -352,41 +338,47 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	// start client
+	// Start client.
 	apiClient, err := s.newClient()
 	if err != nil {
 		return errors.New(err)
 	}
-	// get repo within target
+	// Get repo within target.
 	repos, errs := s.getRepos()
 	for _, repoErr := range errs {
 		log.WithError(repoErr).Warn("error getting repo")
 	}
 
-	// End early if we had errors getting specified repos but none were validated
+	// End early if we had errors getting specified repos but none were validated.
 	if len(errs) > 0 && len(repos) == 0 {
 		return errors.New("All specified repos had validation issues, ending scan")
 	}
 
-	// get all repos if not specified
+	// Get all repos if not specified.
 	if repos == nil {
 		projects, err := s.getAllProjects(apiClient)
 		if err != nil {
 			return errors.New(err)
 		}
-		// turn projects into URLs for Git cloner
+		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
-			u, err := url.Parse(prj.HTTPURLToRepo)
+			// Ensure the urls are valid before adding them to the repo list.
+			_, err := url.Parse(prj.HTTPURLToRepo)
 			if err != nil {
 				fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
 			}
-			repos = append(repos, u)
+			repos = append(repos, prj.HTTPURLToRepo)
 		}
 		if repos == nil {
 			return errors.Errorf("unable to discover any repos")
 		}
 	}
-	errs = s.scanRepos(ctx, chunksChan, repos)
+
+	s.repos = repos
+	// We must sort the repos so we can resume later if necessary.
+	sort.Strings(s.repos)
+
+	errs = s.scanRepos(ctx, chunksChan)
 	for _, err := range errs {
 		log.WithError(err).WithFields(
 			log.Fields{
@@ -405,11 +397,27 @@ func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
 	if err != nil {
 		return false
 	}
-	if resp.StatusCode <= 400 {
+	if resp.StatusCode != 200 {
 		return false
 	}
 	if user != nil {
 		return true
 	}
 	return false
+}
+
+// setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
+func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string) {
+	s.resumeInfoMutex.Lock()
+	defer s.resumeInfoMutex.Unlock()
+
+	// Add the repoURL to the resume info slice.
+	s.resumeInfoSlice = append(s.resumeInfoSlice, repoURL)
+	sort.Strings(s.resumeInfoSlice)
+
+	// Make the resume info string from the slice.
+	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
+
+	// Add the offset to both the index and the repos to give the proper place and proper repo count.
+	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }

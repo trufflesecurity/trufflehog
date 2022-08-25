@@ -14,13 +14,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"appcues"}) + `\b([a-z0-9-]{36})\b`)
 	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appcues"}) + `\b([a-z0-9-]{39})\b`)
 	idPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"appcues"}) + `\b([0-9]{5})\b`)
@@ -63,6 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Appcues,
 					Raw:          []byte(resMatch),
+					RawV2:        []byte(resMatch + resUserMatch),
 				}
 				if verify {
 					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.appcues.com/v2/accounts/%s/flows", resIdMatch), nil)
@@ -76,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else {
-							//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 								continue
 							}

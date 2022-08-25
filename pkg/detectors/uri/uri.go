@@ -4,23 +4,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type Scanner struct {
 	allowKnownTestSites bool
 }
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -109,34 +108,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
-			if err != nil {
-				// log.WithError(err).Warn("Error in http post to SSRF proxy")
-				continue
-			}
-			defer res.Body.Close()
-			result := proxyRes{}
-			body, err := ioutil.ReadAll(res.Body)
-			if len(body) == 0 || err != nil {
-				continue
-			}
-			err = json.Unmarshal(body, &result)
-			if err != nil {
-				// log.WithField("body", string(body)).WithError(err).Debug("Error decoding SSRF proxy response")
-				continue
-			}
-			if result.Verified {
-				s.Verified = true
+			if err == nil {
+				result := proxyRes{}
+				body, err := io.ReadAll(res.Body)
+				res.Body.Close()
+				if len(body) != 0 && err == nil {
+					err = json.Unmarshal(body, &result)
+					if err == nil && result.Verified {
+						s.Verified = true
+					}
+				}
 			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-				continue
-			}
+		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
+			continue
 		}
 
 		results = append(results, s)
 	}
 
-	return
+	return detectors.CleanResults(results), nil
 }

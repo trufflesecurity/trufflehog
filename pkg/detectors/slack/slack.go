@@ -69,7 +69,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					defer res.Body.Close()
 					var authResponse authRes
-					json.NewDecoder(res.Body).Decode(&authResponse)
+					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
+						continue
+					}
 					s.Verified = authResponse.Ok
 				}
 			}

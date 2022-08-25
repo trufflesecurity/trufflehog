@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package securitytrails
 
 import (
@@ -37,6 +40,22 @@ func TestSecurityTrails_FromChunk(t *testing.T) {
 	}{
 		{
 			name: "found, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a securitytrails secret\n %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SecurityTrails,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified inline",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),

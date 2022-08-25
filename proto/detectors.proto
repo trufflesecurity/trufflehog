@@ -764,7 +764,7 @@ enum DetectorType {
   KnapsackPro = 760;
   Qase = 761;
   Dareboost = 762;
-  GTMetrics = 763;
+  GTMetrix = 763;
   Holistic = 764;
   Parsers = 765;
   ScrutinizerCi = 766;
@@ -794,7 +794,7 @@ enum DetectorType {
   Woopra = 790;
   Paperform =791;
   Gumroad = 792;
-  Paydirtyapp = 793;
+  Paydirtapp = 793;
   Detectify = 794;
   Statuscake = 795;
   Jumpseller = 796;
@@ -813,12 +813,72 @@ enum DetectorType {
   Typetalk = 809;
   VoodooSMS = 810;
   ZulipChat = 811;
-  Formcarft = 812;
+  Formcraft = 812;
   Iexapis = 813;
   Reachmail = 814;
   Chartmogul = 815;
   Appointedd = 816;
   Wit = 817;
+  RechargePayments = 818;
+  Diggernaut = 819;
+  MonkeyLearn = 820;
+  Duply = 821;
+  Postbacks = 822;
+  Collect2 = 823;
+  ZenRows = 824;
+  Zipcodebase = 825;
+  Tefter = 826;
+  Twist = 827;
+  BraintreePayments = 828;
+  CloudConvert = 829;
+  Grafana = 830;
+  ConvertApi = 831;
+  Transferwise = 832;
+  Bulksms = 833;
+  Databox = 834;
+  Onesignal = 835;
+  Rentman = 836;
+  Parseur = 837;
+  Docparser = 838;
+  Formsite = 839;
+  Tickettailor = 840;
+  Lemlist = 841;
+  Prodpad = 842;
+  Formstack = 843;
+  Codeclimate = 844;
+  Codemagic = 845;
+  Vbout = 846;
+  Nightfall = 847;
+  FlightLabs = 848;
+  SpeechTextAI = 849;
+  PollsAPI = 850;
+  SimFin = 851;
+  Scalr = 852;
+  Kanbantool = 853;
+  Brightlocal = 854;
+  Hotwire = 855;
+  Instabot = 856;
+  Timekit = 857;
+  Interseller = 858;
+  Mojohelpdesk = 859;
+  Createsend = 860;
+  Getresponse = 861;
+  Dynadot = 862;
+  Demio = 863;
+  Tokeet = 864;
+  Myexperiment = 865;
+  Copyscape = 866;
+  Besnappy = 867;
+  Salesmate = 868;
+  Heatmapapi = 869;
+  Websitepulse = 870;
+  Uclassify = 871;
+  Convert = 872;
+  PDFmyURL = 873;
+  Api2Convert = 874;
+  Opsgenie = 875;
+  Gemini = 876;
+  Honeycomb = 877;
 }
 
 message Result {
@@ -828,6 +888,7 @@ message Result {
   string hash = 5;
   map<string, string> extra_data = 6;
   StructuredData structured_data = 7;
+  string hash_v2 = 8;
 }
 
 message StructuredData {

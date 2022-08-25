@@ -121,10 +121,24 @@ func RetryableHttpClient() *http.Client {
 	return httpClient.StandardClient()
 }
 
+const DefaultResponseTimeout = 5 * time.Second
+
+var saneTransport = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{
+		Timeout:   2 * time.Second,
+		KeepAlive: 5 * time.Second,
+	}).DialContext,
+	MaxIdleConns:          5,
+	IdleConnTimeout:       5 * time.Second,
+	TLSHandshakeTimeout:   3 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
+
 func SaneHttpClient() *http.Client {
 	httpClient := &http.Client{}
-	httpClient.Timeout = time.Second * 2
-	httpClient.Transport = NewCustomTransport(nil)
+	httpClient.Timeout = DefaultResponseTimeout
+	httpClient.Transport = NewCustomTransport(saneTransport)
 	return httpClient
 }
 

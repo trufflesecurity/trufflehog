@@ -11,11 +11,7 @@ on:
 
 jobs:
   test:
-    strategy:
-      matrix:
-        go-version: [1.17.x]
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -23,7 +19,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: '1.18'
     - name: Checkout code
       uses: actions/checkout@v3
     - id: 'auth'
@@ -34,11 +30,7 @@ jobs:
     - name: Test
       run: make test
   test-detectors:
-    strategy:
-      matrix:
-        go-version: [1.17.x]
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -46,7 +38,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: '1.18'
     - name: Checkout code
       uses: actions/checkout@v3
     - id: 'auth'

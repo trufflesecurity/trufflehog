@@ -13,7 +13,7 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 //The (`) character adds secondary encoding to parsed strings by Golang which also allows for escape sequences

@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -9,12 +8,14 @@ import (
 	"os"
 	"path/filepath"
 
+	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -57,7 +58,7 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
 	s.aCtx = aCtx
@@ -67,9 +68,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.verify = verify
 
 	var conn sourcespb.Filesystem
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
-	if err != nil {
-		errors.WrapPrefix(err, "error unmarshalling connection", 0)
+	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
 	s.paths = conn.Directories
@@ -112,59 +112,51 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			defer inputFile.Close()
 
-			reader := bufio.NewReaderSize(bufio.NewReader(inputFile), BufferSize)
-			firstChunk := true
-			for {
-				if done {
-					return nil
-				}
+			reReader, err := diskbufferreader.New(inputFile)
+			if err != nil {
+				log.WithError(err).Error("Could not create re-readable reader.")
+			}
+			defer reReader.Close()
 
-				end := BufferSize
-				buf := make([]byte, BufferSize)
-				n, err := reader.Read(buf)
+			chunkSkel := &sources.Chunk{
+				SourceType: s.Type(),
+				SourceName: s.name,
+				SourceID:   s.SourceID(),
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Filesystem{
+						Filesystem: &source_metadatapb.Filesystem{
+							File: sanitizer.UTF8(path),
+						},
+					},
+				},
+				Verify: s.verify,
+			}
+			if handlers.HandleFile(reReader, chunkSkel, chunksChan) {
+				return nil
+			}
 
-				if n < BufferSize {
-					end = n
-				}
+			if err := reReader.Reset(); err != nil {
+				return err
+			}
+			reReader.Stop()
 
-				if end > 0 {
-					data := buf[0:end]
-
-					if firstChunk {
-						firstChunk = false
-						if common.SkipFile(path, data) {
-							return nil
-						}
-					}
-
-					// We are peeking in case a secret exists in our chunk boundaries,
-					// but we never care if we've run into a peek error.
-					peekData, _ := reader.Peek(PeekSize)
-					chunksChan <- &sources.Chunk{
-						SourceType: s.Type(),
-						SourceName: s.name,
-						SourceID:   s.SourceID(),
-						Data:       append(data, peekData...),
-						SourceMetadata: &source_metadatapb.MetaData{
-							Data: &source_metadatapb.MetaData_Filesystem{
-								Filesystem: &source_metadatapb.Filesystem{
-									File: sanitizer.UTF8(path),
-								},
+			for chunkData := range common.ChunkReader(inputFile) {
+				chunksChan <- &sources.Chunk{
+					SourceType: s.Type(),
+					SourceName: s.name,
+					SourceID:   s.SourceID(),
+					Data:       chunkData,
+					SourceMetadata: &source_metadatapb.MetaData{
+						Data: &source_metadatapb.MetaData_Filesystem{
+							Filesystem: &source_metadatapb.Filesystem{
+								File: sanitizer.UTF8(path),
 							},
 						},
-						Verify: s.verify,
-					}
-				}
-
-				// io.EOF can be emmitted when 0<n<buffer size
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						return nil
-					} else {
-						return err
-					}
+					},
+					Verify: s.verify,
 				}
 			}
+			return nil
 		})
 
 		if err != nil && err != io.EOF {

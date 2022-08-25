@@ -14,7 +14,7 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -63,26 +63,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("Authorization", fmt.Sprintf("client_id:%s, client_secret:%s", clientID[1], clientSecret[1]))
 					req.Header.Add("Content-Type", "application/json; charset=utf-8")
 					res, err := client.Do(req)
-					if err != nil {
-						return results, err
-					}
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s.Verified = true
-						break
+					if err == nil {
+						res.Body.Close() // The request body is unused.
+
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							s.Verified = true
+						}
 					}
 				}
 			}
 
-			if !s.Verified {
-				if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-					continue
-				}
+			if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+				continue
 			}
 
 			results = append(results, s)
 		}
 	}
 
-	return
+	return detectors.CleanResults(results), nil
 }

@@ -17,13 +17,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + `\b([0-9A-Za-z/+]{43}=[ \r\n]{1})`)
 	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + `\b([\w\.-]+@[\w-]+\.[\w\.-]{2,5})\b`)
 )
@@ -76,12 +76,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if errBody == nil {
 						response := Response{}
-						xml.Unmarshal(body, &response)
+						if err := xml.Unmarshal(body, &response); err != nil {
+							continue
+						}
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
 							s1.Verified = true
 						} else {
-							//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 								continue
 							}
