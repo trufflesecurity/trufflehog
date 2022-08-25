@@ -817,7 +817,7 @@ enum DetectorType {
   Iexapis = 813;
   Reachmail = 814;
   Chartmogul = 815;
-  Appointed = 816;
+  Appointedd = 816;
   Wit = 817;
   RechargePayments = 818;
   Diggernaut = 819;
