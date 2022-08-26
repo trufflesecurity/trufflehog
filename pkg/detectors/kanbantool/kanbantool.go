@@ -21,9 +21,8 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kanbantool"}) + `\b([0-9A-Z]{12})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"kanbantool"}) + `\b([0-9A-Z]{12})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kanbantool"}) + `\b([a-z0-9A-Z]{2,22})\b`)
-
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,47 +37,46 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
-	fmt.Println(idMatches)
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-			for _, idMatch := range idMatches {
-				if len(idMatch) != 2 {
+		for _, idMatch := range idMatches {
+			if len(idMatch) != 2 {
+				continue
+			}
+			resIdMatch := strings.TrimSpace(idMatch[1])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Kanbantool,
+				Raw:          []byte(resMatch),
+			}
+			if verify {
+				url := fmt.Sprintf("https://%s.kanbantool.com/api/v3/users/current.json", resIdMatch)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+				if err != nil {
 					continue
 				}
-				resIdMatch := strings.TrimSpace(idMatch[1])
-
-				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Kanbantool,
-					Raw:          []byte(resMatch),
-				}
-				if verify {
-					url := fmt.Sprintf("https://%s.kanbantool.com/api/v3/users/current.json",resIdMatch)
-					req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						} else {
-							//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
 						}
 					}
 				}
-		
-				results = append(results, s1)
 			}
-		
+
+			results = append(results, s1)
+		}
+
 	}
 
 	return detectors.CleanResults(results), nil

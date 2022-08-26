@@ -16,7 +16,7 @@ type Scanner struct{}
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-//The (`) character adds secondary encoding to parsed strings by Golang which also allows for escape sequences
+// The (`) character adds secondary encoding to parsed strings by Golang which also allows for escape sequences
 var (
 	keyPat    = regexp.MustCompile(`(?i)\brzp_\w{2,6}_\w{10,20}\b`)
 	secretPat = regexp.MustCompile(`(?:razor|secret|rzp|key)[-\w]*[\" :=']*([A-Za-z0-9]{20,50})`)
@@ -69,7 +69,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				//TODO debug with responses. could still be invalid at this stage
 
 				s.Verified = true
-				// fmt.Println(resp)
 			}
 		}
 

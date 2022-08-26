@@ -2,7 +2,6 @@ package stytch
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -55,8 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				fmt.Println(userPatMatch)
-				fmt.Println(tokenPatMatch)
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.stytch.com/v1/users/pending", nil)
 				if err != nil {
 					continue
