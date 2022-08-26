@@ -60,7 +60,7 @@ var (
 	githubScanEndpoint   = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
 	githubScanRepos      = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
 	githubScanOrgs       = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken      = githubScan.Flag("token", "GitHub token.").String()
+	githubScanToken      = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
 	githubIncludeForks   = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
 	githubIncludeMembers = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
 
@@ -68,7 +68,7 @@ var (
 	// TODO: Add more GitLab options
 	gitlabScanEndpoint = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
 	gitlabScanRepos    = gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
-	gitlabScanToken    = gitlabScan.Flag("token", "GitLab token.").Required().String()
+	gitlabScanToken    = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
 
 	filesystemScan        = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
@@ -78,8 +78,8 @@ var (
 	// filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
 	s3Scan         = cli.Command("s3", "Find credentials in S3 buckets.")
-	s3ScanKey      = s3Scan.Flag("key", "S3 key used to authenticate.").String()
-	s3ScanSecret   = s3Scan.Flag("secret", "S3 secret used to authenticate.").String()
+	s3ScanKey      = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
+	s3ScanSecret   = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
 	s3ScanCloudEnv = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
 	s3ScanBuckets  = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 
