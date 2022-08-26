@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
-			fmt.Println(res)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {

@@ -49,8 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			url := fmt.Sprintf("https://api.docparser.com/v1/parsers?api_key=%s", resMatch)
-			fmt.Println(url)
-			req, err := http.NewRequestWithContext(ctx, "GET",url, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 			if err != nil {
 				continue
 			}
