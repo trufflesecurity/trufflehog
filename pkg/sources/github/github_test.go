@@ -2,7 +2,6 @@ package github
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -21,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )

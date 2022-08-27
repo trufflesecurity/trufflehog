@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"context"
 	"fmt"
 	"runtime"
 
@@ -11,6 +10,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sirupsen/logrus"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -106,6 +107,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 
 	e.sourcesWg.Add(1)
 	go func() {
+		defer common.Recover(ctx)
 		defer e.sourcesWg.Done()
 		err := gitSource.ScanRepo(ctx, repo, c.RepoPath, scanOptions, e.ChunksChan())
 		if err != nil {

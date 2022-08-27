@@ -1,12 +1,12 @@
 package engine
 
 import (
-	"context"
-
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
@@ -43,6 +43,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 
 	e.sourcesWg.Add(1)
 	go func() {
+		defer common.Recover(ctx)
 		defer e.sourcesWg.Done()
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {

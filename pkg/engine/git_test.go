@@ -1,11 +1,11 @@
 package engine
 
 import (
-	"context"
 	"os"
 	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -67,7 +67,7 @@ func TestGitEngine(t *testing.T) {
 		if err := e.ScanGit(ctx, cfg); err != nil {
 			return
 		}
-		go e.Finish()
+		go e.Finish(ctx)
 		resultCount := 0
 		for result := range e.ResultsChan() {
 			switch meta := result.SourceMetadata.GetData().(type) {
@@ -122,5 +122,5 @@ func BenchmarkGitEngine(b *testing.B) {
 			return
 		}
 	}
-	e.Finish()
+	e.Finish(ctx)
 }

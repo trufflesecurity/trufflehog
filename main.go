@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,15 +18,15 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
 
 var (
@@ -264,7 +263,7 @@ func run(state overseer.State) {
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
-	go e.Finish()
+	go e.Finish(ctx)
 
 	if !*jsonLegacy && !*jsonOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")

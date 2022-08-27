@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -15,15 +14,17 @@ import (
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"golang.org/x/sync/semaphore"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Source struct {
@@ -193,6 +194,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 		}
 		wg.Add(1)
 		go func(ctx context.Context, wg *sync.WaitGroup, sem *semaphore.Weighted, obj *s3.Object) {
+			defer common.Recover(ctx)
 			defer sem.Release(1)
 			defer wg.Done()
 			//defer log.Debugf("DONE - %s", *obj.Key)

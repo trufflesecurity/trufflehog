@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"context"
 	"fmt"
 	"runtime"
 
@@ -10,6 +9,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -53,6 +54,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 
 	e.sourcesWg.Add(1)
 	go func() {
+		defer common.Recover(ctx)
 		defer e.sourcesWg.Done()
 		err := s3Source.Chunks(ctx, e.ChunksChan())
 		if err != nil {

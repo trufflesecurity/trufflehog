@@ -2,7 +2,6 @@ package git
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,6 +26,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -279,7 +279,7 @@ func GitCmdCheck() error {
 	return nil
 }
 
-func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	if err := GitCmdCheck(); err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func (s *Git) ScanCommits(repo *git.Repository, path string, scanOptions *ScanOp
 		zerolog.SetGlobalLevel(zerolog.Disabled)
 	}
 
-	commitChan, err := gitparse.RepoPath(path, scanOptions.HeadHash)
+	commitChan, err := gitparse.RepoPath(ctx, path, scanOptions.HeadHash)
 	if err != nil {
 		return err
 	}
@@ -412,9 +412,9 @@ func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunk
 	return nil
 }
 
-func (s *Git) ScanRepo(_ context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	start := time.Now().UnixNano()
-	if err := s.ScanCommits(repo, repoPath, scanOptions, chunksChan); err != nil {
+	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
 	if err := s.ScanUnstaged(repo, scanOptions, chunksChan); err != nil {
@@ -591,9 +591,9 @@ func PrepareRepo(uriString string) (string, bool, error) {
 		remotePath := uri.String()
 		remote = true
 		path, _, err = CloneRepoUsingSSH(remotePath)
-			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
-			}
+		if err != nil {
+			return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+		}
 	default:
 		return "", remote, fmt.Errorf("unsupported Git URI: %s", uriString)
 	}
