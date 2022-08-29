@@ -879,6 +879,13 @@ enum DetectorType {
   Opsgenie = 875;
   Gemini = 876;
   Honeycomb = 877;
+  KalturaAppToken = 878;
+  KalturaSession = 879;
+  BitGo = 880;
+  Optidash = 881;
+  Imgix = 882;
+  ImageToText = 883;
+  Page2Images = 884;
 }
 
 message Result {
