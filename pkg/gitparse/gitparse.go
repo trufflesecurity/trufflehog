@@ -11,6 +11,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 // DateFormat is the standard date format for git.
@@ -34,7 +37,7 @@ type Diff struct {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func RepoPath(source string, head string) (chan Commit, error) {
+func RepoPath(ctx context.Context, source string, head string) (chan Commit, error) {
 	commitChan := make(chan Commit)
 
 	args := []string{"-C", source, "log", "-p", "-U0", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
@@ -77,6 +80,7 @@ func RepoPath(source string, head string) (chan Commit, error) {
 	}()
 
 	go func() {
+		defer common.Recover(ctx)
 		for {
 			line, err := outReader.ReadBytes([]byte("\n")[0])
 			if err != nil && len(line) == 0 {

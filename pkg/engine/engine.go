@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"context"
 	"runtime"
 	"strings"
 	"sync"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -97,6 +98,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
+			defer common.Recover(ctx)
 			defer e.workersWg.Done()
 			e.detectorWorker(ctx)
 		}()
@@ -108,7 +110,8 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 // Finish waits for running sources to complete and workers to finish scanning
 // chunks before closing their respective channels. Once Finish is called, no
 // more sources may be scanned by the engine.
-func (e *Engine) Finish() {
+func (e *Engine) Finish(ctx context.Context) {
+	defer common.Recover(ctx)
 	// wait for the sources to finish putting chunks onto the chunks channel
 	e.sourcesWg.Wait()
 	close(e.chunks)
