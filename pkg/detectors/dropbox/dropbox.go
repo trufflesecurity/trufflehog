@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b(sl\.[A-Za-z0-9\-\_]{130,140})\b`)
+	keyPat = regexp.MustCompile(`\b(sl\.[A-Za-z0-9\-_]{130,140})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

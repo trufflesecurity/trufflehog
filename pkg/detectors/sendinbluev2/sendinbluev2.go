@@ -20,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(`\b(xkeysib\-[A-Za-z0-9_-]{81})\b`)
+	keyPat = regexp.MustCompile(`\b(xkeysib-[A-Za-z0-9_-]{81})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

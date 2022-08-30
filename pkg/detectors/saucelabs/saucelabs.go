@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	idPat  = regexp.MustCompile(`\b(oauth\-[a-z0-9]{8,}\-[a-z0-9]{5})\b`)
+	idPat  = regexp.MustCompile(`\b(oauth-[a-z0-9]{8,}-[a-z0-9]{5})\b`)
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"saucelabs"}) + `\b([a-z0-9]{8}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{12})\b`)
 )
 
@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
-				//req.SetBasicAuth(idMatch, keyMatch)
+				// req.SetBasicAuth(idMatch, keyMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

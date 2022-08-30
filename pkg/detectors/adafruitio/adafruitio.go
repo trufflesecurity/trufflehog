@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(aio\_[a-zA-Z0-9]{28})\b`)
+	keyPat = regexp.MustCompile(`\b(aio_[a-zA-Z0-9]{28})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

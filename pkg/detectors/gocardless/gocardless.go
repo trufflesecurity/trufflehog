@@ -21,8 +21,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	//Removed bounds at the end of the regex since there are some cases that the token ends with an underscore (_) or a dash (-)
-	keyPat = regexp.MustCompile(`\b(live_[0-9A-Za-z\_\-]{40}[ "'\r\n]{1})`)
+	// Removed bounds at the end of the regex since there are some cases that the token ends with an underscore (_) or a dash (-)
+	keyPat = regexp.MustCompile(`\b(live_[0-9A-Za-z_\-]{40}[ "'\r\n])`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

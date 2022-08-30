@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\{[^{]+auth_provider_x509_cert_url[^}]+\}`)
+	keyPat = regexp.MustCompile(`\{[^{]+auth_provider_x509_cert_url[^}]+}`)
 )
 
 type gcpKey struct {

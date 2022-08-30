@@ -23,7 +23,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b[a-zA-Z]{1,10}:?\/\/[-.%\w{}]{1,50}:([-.%\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\b[a-zA-Z]{1,10}:?//[-.%\w{}]{1,50}:([-.%\S]{3,50})@[-.%\w/:]+\b`)
 )
 
 type proxyRes struct {
@@ -48,9 +48,9 @@ func allowlistedProtos(scheme string) bool {
 
 // FromData will find and optionally verify URI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	//Prevent SSRF "https://us-central1-ssrfproxy.cloudfunctions.net/ssrfproxy-6d96c399-74bb-4299-b49d-c1c870277eb9"
-	//TODO add as config option
-	//TODO extend to other http outbound calls in other areas of code
+	// Prevent SSRF "https://us-central1-ssrfproxy.cloudfunctions.net/ssrfproxy-6d96c399-74bb-4299-b49d-c1c870277eb9"
+	// TODO add as config option
+	// TODO extend to other http outbound calls in other areas of code
 	ssrfProtectorURL := "https://us-central1-ssrfproxy.cloudfunctions.net/ssrfproxy-6d96c399-74bb-4299-b49d-c1c870277eb9"
 
 	dataStr := string(data)

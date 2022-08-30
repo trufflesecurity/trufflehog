@@ -22,7 +22,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"mite"}) + `\b([0-9a-z]{16})\b`)
-	urlPat = regexp.MustCompile(`\b([0-9a-z-]{1,}.mite.yo.lk)\b`)
+	urlPat = regexp.MustCompile(`\b([0-9a-z-]+.mite.yo.lk)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

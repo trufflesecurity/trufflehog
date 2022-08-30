@@ -20,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 	idPat  = regexp.MustCompile(`([a-zA-Z-0-9]{4,32})`)
-	keyPat = regexp.MustCompile(`\b(sk\.[a-zA-Z-0-9\.]{80,240})\b`)
+	keyPat = regexp.MustCompile(`\b(sk\.[a-zA-Z-0-9.]{80,240})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

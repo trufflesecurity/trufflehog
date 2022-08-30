@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	domainPat = regexp.MustCompile(`[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com`)
+	domainPat = regexp.MustCompile(`[a-z0-9-]{1,40}\.okta(?:preview|-emea)?\.com`)
 	tokenPat  = regexp.MustCompile(`00[a-zA-Z0-9_-]{40}`)
 	// TODO: Oauth client secrets
 )

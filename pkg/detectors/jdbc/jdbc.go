@@ -15,7 +15,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:\/\/\w[\s\S]{0,512}?password[=: \"']+(?P<pass>[^<{($]*?)[ \s'\"]+`)
+	keyPat = regexp.MustCompile(`(?i)jdbc:\w{3,10}://\w[\s\S]{0,512}?password[=: "']+(?P<pass>[^<{($]*?)[ \s'"]+`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -36,7 +36,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		token := match[0]
 		password := match[1]
 
-		//TODO if username and password are the same, username will also be redacted... I think this is  probably correct.
+		// TODO if username and password are the same, username will also be redacted... I think this is  probably correct.
 		redact := strings.TrimSpace(strings.Replace(token, password, strings.Repeat("*", len(password)), -1))
 
 		s := detectors.Result{
@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Redacted:     redact,
 		}
 
-		//if verify {
+		// if verify {
 		//	// TODO: can this be verified? Possibly. Could triage verification to other DBMS strings
 		//	s.Verified = false
 		//	client := common.SaneHttpClient()
@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		//			s.Verified = true
 		//		}
 		//	}
-		//}
+		// }
 
 		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
 			continue

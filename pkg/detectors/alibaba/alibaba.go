@@ -28,7 +28,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b([a-zA-Z0-9]{30})\b`)
-	idPat  = regexp.MustCompile(`\b(LTAI[a-zA-Z0-9]{17,21})[\"';\s]*`)
+	idPat  = regexp.MustCompile(`\b(LTAI[a-zA-Z0-9]{17,21})["';\s]*`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

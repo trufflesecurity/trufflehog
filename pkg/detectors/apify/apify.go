@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(apify\_api\_[a-zA-Z-0-9]{36})\b`)
+	keyPat = regexp.MustCompile(`\b(apify_api_[a-zA-Z-0-9]{36})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

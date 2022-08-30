@@ -19,7 +19,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 // The (`) character adds secondary encoding to parsed strings by Golang which also allows for escape sequences
 var (
 	keyPat    = regexp.MustCompile(`(?i)\brzp_\w{2,6}_\w{10,20}\b`)
-	secretPat = regexp.MustCompile(`(?:razor|secret|rzp|key)[-\w]*[\" :=']*([A-Za-z0-9]{20,50})`)
+	secretPat = regexp.MustCompile(`(?:razor|secret|rzp|key)[-\w]*[" :=']*([A-Za-z0-9]{20,50})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -44,21 +44,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			//https://dashboard.razorpay.com/#/access/signin
-			//https://gitlab.com/trufflesec/trufflehog/-/blob/master/webapi/secrets/razorpay.py
+			// https://dashboard.razorpay.com/#/access/signin
+			// https://gitlab.com/trufflesec/trufflehog/-/blob/master/webapi/secrets/razorpay.py
 			secMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 			if len(secMatches) == 0 {
-				//no secret keys were found. Declare unverified (This is how AWS secret handles the same logic)
-				//TODO determine if key alone without secret is reportable
+				// no secret keys were found. Declare unverified (This is how AWS secret handles the same logic)
+				// TODO determine if key alone without secret is reportable
 				s.Verified = false
 				return
 			}
-			//we only want the secret, not its surrounding info - grabbing capture groups
+			// we only want the secret, not its surrounding info - grabbing capture groups
 			for _, secMatch := range secMatches {
 				client := razorpay.NewClient(token, secMatch[1])
 				resp, err := client.Order.All(nil, nil)
-				//TODO Error handling is broken in SDK, fixed by https://github.com/razorpay/razorpay-go/pull/23
-				//waiting to be reviewed and merged
+				// TODO Error handling is broken in SDK, fixed by https://github.com/razorpay/razorpay-go/pull/23
+				// waiting to be reviewed and merged
 				if resp == nil {
 					continue
 				}
@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					log.Debugf("Error verifying likely razorpay key/secret combo: %v", err)
 					continue
 				}
-				//TODO debug with responses. could still be invalid at this stage
+				// TODO debug with responses. could still be invalid at this stage
 
 				s.Verified = true
 			}
