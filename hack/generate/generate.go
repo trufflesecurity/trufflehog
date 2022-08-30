@@ -77,7 +77,7 @@ func mustWriteTemplates(jobs []templateJob) {
 
 	// Write the files from templates.
 	for _, job := range jobs {
-		tmplBytes, err := ioutil.ReadFile(job.TemplatePath)
+		tmplBytes, err := os.ReadFile(job.TemplatePath)
 		if err != nil {
 			log.Fatal(err)
 		}

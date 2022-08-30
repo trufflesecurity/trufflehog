@@ -2,14 +2,14 @@ package heatmapapi
 
 import (
 	"context"
-	"net/http"
-	"regexp"
-	"strings"
-	"io/ioutil"
 	"fmt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"io/ioutil"
+	"net/http"
+	"regexp"
+	"strings"
 )
 
 type Scanner struct{}
@@ -20,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"heatmapapi"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
@@ -48,14 +48,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://www.heatmapapi.com/javascript/HeatmapAPI2.aspx?k=%s",resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://www.heatmapapi.com/javascript/HeatmapAPI2.aspx?k=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := os.ReadAll(res.Body)
 				if err != nil {
 					continue
 				}

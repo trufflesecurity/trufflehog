@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"io/ioutil"
-"fmt"
+	"fmt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,9 +20,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"websitepulse"}) + `\b([0-9a-f]{32})\b`)
-	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"websitepulse"}) + `\b([0-9a-zA-Z._]{4,22})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"websitepulse"}) + `\b([0-9a-zA-Z._]{4,22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -54,13 +54,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resMatch),
 			}
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.websitepulse.com/textserver.php?method=GetContacts&username=%s&key=%s",resIdMatch,resMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.websitepulse.com/textserver.php?method=GetContacts&username=%s&key=%s", resIdMatch, resMatch), nil)
 				if err != nil {
 					continue
 				}
 				res, err := client.Do(req)
 				if err == nil {
-					bodyBytes, err := ioutil.ReadAll(res.Body)
+					bodyBytes, err := os.ReadAll(res.Body)
 					if err != nil {
 						continue
 					}
@@ -75,10 +75,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 			}
-	
+
 			results = append(results, s1)
 		}
-	
+
 	}
 
 	return detectors.CleanResults(results), nil
