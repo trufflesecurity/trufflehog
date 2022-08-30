@@ -886,6 +886,14 @@ enum DetectorType {
   Imgix = 882;
   ImageToText = 883;
   Page2Images = 884;
+  Quickbase = 885;
+  Redbooth = 886;
+  Nubela = 887;
+  Infobip = 888;
+  Uproc = 889;
+  Supportbee = 890;
+  3scale = 891;
+  Aftership = 892;
 }
 
 message Result {
