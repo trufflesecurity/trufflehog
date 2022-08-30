@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := io.ReadAll(res.Body)
 				if err == nil {
 					isJson := json.Valid(bodyBytes)
 					defer res.Body.Close()

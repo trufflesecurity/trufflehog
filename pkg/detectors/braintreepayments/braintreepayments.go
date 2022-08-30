@@ -2,7 +2,7 @@ package braintreepayments
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.SetBasicAuth(resIdMatch, resMatch)
 				res, err := client.Do(req)
 				if err == nil {
-					bodyBytes, err := ioutil.ReadAll(res.Body)
+					bodyBytes, err := io.ReadAll(res.Body)
 					if err != nil {
 						continue
 					}
