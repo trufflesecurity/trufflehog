@@ -3,12 +3,10 @@ package allsports
 import (
 	"context"
 	"io/ioutil"
-
+	"net/http"
 	// "log"
 	"regexp"
 	"strings"
-
-	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

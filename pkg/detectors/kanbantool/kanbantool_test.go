@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -41,7 +42,7 @@ func TestKanbantool_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a kanbantool secret %s within kanbantool %s", secret,domain)),
+				data:   []byte(fmt.Sprintf("You can find a kanbantool secret %s within kanbantool %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,7 +58,7 @@ func TestKanbantool_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a kanbantool secret %s within but not valid kanbantool %s", inactiveSecret,domain)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a kanbantool secret %s within but not valid kanbantool %s", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

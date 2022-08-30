@@ -9,6 +9,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -34,8 +35,8 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
-	results := []detectors.Result{}
+func (s Scanner) FromData(_ context.Context, verify bool, data []byte) ([]detectors.Result, error) {
+	var results []detectors.Result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllString(dataStr, -1)

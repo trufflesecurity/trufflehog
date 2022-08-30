@@ -2,7 +2,6 @@ package testdetector
 
 import (
 	"context"
-
 	"regexp"
 	"strings"
 
@@ -28,7 +27,7 @@ func (d Detector) Keywords() []string {
 }
 
 // FromData will find and optionally verify testdetector secrets in a given set of bytes.
-func (d Detector) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (d Detector) FromData(_ context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)

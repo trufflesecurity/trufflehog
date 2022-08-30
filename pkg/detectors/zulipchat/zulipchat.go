@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			//getting the last word of the string
+			// getting the last word of the string
 			resIdMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
 
 			for _, domainMatch := range domainMatches {

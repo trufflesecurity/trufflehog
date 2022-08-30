@@ -15,7 +15,6 @@ import (
 
 var (
 	ErrNotSupported = errors.New("key type not supported")
-	ErrEncryptedKey = errors.New("key is encrypted")
 )
 
 func FingerprintPEMKey(in []byte) (string, error) {

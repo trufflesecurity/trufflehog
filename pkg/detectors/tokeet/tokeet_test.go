@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -23,7 +24,6 @@ func TestTokeet_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("TOKEET")
 	inactiveSecret := testSecrets.MustGetField("TOKEET_INACTIVE")
 	id := testSecrets.MustGetField("TOKEET_ID")
-
 
 	type args struct {
 		ctx    context.Context
@@ -42,7 +42,7 @@ func TestTokeet_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a tokeet secret %s within tokeet %s", secret,id)),
+				data:   []byte(fmt.Sprintf("You can find a tokeet secret %s within tokeet %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -58,7 +58,7 @@ func TestTokeet_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a tokeet secret %s within but not valid tokeet %s", inactiveSecret,id)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a tokeet secret %s within but not valid tokeet %s", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

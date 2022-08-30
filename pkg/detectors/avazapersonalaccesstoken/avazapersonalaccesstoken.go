@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	//The number prefix increments for every Personal Access Token created.
+	// The number prefix increments for every Personal Access Token created.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"avaza"}) + `\b([0-9]+-[0-9a-f]{40})\b`)
 )
 
@@ -32,7 +32,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify AvazaPersonalAccessToken secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)

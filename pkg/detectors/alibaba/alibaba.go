@@ -49,8 +49,8 @@ func randString(n int) string {
 }
 
 func GetSignature(input, key string) string {
-	key_for_sign := []byte(key)
-	h := hmac.New(sha1.New, key_for_sign)
+	keyForSign := []byte(key)
+	h := hmac.New(sha1.New, keyForSign)
 	h.Write([]byte(input))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }

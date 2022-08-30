@@ -2,10 +2,10 @@ package spotifykey
 
 import (
 	"context"
-	"golang.org/x/oauth2"
-
 	"regexp"
 	"strings"
+
+	"golang.org/x/oauth2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

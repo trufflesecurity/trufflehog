@@ -25,7 +25,7 @@ var (
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
 	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,255})\b`)
 
-	//TODO: Oauth2 client_id and client_secret
+	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
 )
 

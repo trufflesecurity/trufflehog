@@ -4,7 +4,8 @@ import (
 	"context"
 	"net/http"
 	"regexp"
-		"strings"
+	"strings"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -18,7 +19,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apilayer"}) + `\b([a-zA-Z0-9]{32})\b`)
 )
 
@@ -57,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
