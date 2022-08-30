@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -92,7 +92,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err == nil {
 						defer res.Body.Close()
 
-						body, err := ioutil.ReadAll(res.Body)
+						body, err := io.ReadAll(res.Body)
 						if err != nil {
 							continue
 						}
