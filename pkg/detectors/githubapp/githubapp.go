@@ -18,13 +18,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([0-9]{6})\b`)
 
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `(-----BEGIN RSA PRIVATE KEY-----\s[A-Za-z0-9+\/\s]*\s-----END RSA PRIVATE KEY-----)`)

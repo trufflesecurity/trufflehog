@@ -13,14 +13,15 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"amplitude"}) + `\b([a-f0-9]{32})`)
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"amplitude"}) + `\b([0-9a-f]{32})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"amplitude"}) + `\b([0-9a-f]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,6 +35,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -41,33 +43,40 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
-			Raw:          []byte(resMatch),
-		}
-
-		if verify {
-			payload := strings.NewReader("api_key=" + resMatch + "&identification=%5B%7B%22user_id%22%3A%22datamonster%40gmail.com%22%2C%20%22user_properties%22%3A%7B%22Age%22%3A%2235%22%7D%2C%20%22groups%22%3A%7B%22company_id%22%3A%221234%22%7D%2C%20%22country%22%3A%22United%20States%22%7D%5D")
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.amplitude.com/identify", payload)
-			if err != nil {
+		for _, secretMatch := range secretMatches {
+			if len(secretMatch) != 2 {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
+			resSecretMatch := strings.TrimSpace(secretMatch[1])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resSecretMatch),
+			}
+
+			if verify {
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://amplitude.com/api/2/taxonomy/category", nil)
+				if err != nil {
+					continue
+				}
+				req.SetBasicAuth(resMatch, resSecretMatch)
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
 					}
 				}
 			}
-		}
 
-		results = append(results, s1)
+			results = append(results, s1)
+		}
 	}
 
 	return detectors.CleanResults(results), nil

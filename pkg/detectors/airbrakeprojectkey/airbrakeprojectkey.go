@@ -13,13 +13,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"airbrake"}) + `\b([a-zA-Z-0-9]{32})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"airbrake"}) + `\b([0-9]{6})\b`)
 )
@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AirbrakeProjectKey,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
 
 			if verify {

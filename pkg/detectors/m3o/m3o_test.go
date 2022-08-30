@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package m3o
 
 import (

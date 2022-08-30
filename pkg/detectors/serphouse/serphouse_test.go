@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package serphouse
 
 import (

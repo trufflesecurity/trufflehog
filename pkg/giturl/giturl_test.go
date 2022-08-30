@@ -22,8 +22,8 @@ func Test_NormalizeOrgRepoURL(t *testing.T) {
 		"org but no repo":            {Provider: "Github", Repo: "https://github.com/org", Out: "", Err: errors.Errorf("Github repo appears to be missing the repo name. Org: %q Repo url: %q", "org", "https://github.com/org")},
 		"org but no repo with slash": {Provider: "Github", Repo: "https://github.com/org/", Out: "", Err: errors.Errorf("Github repo appears to be missing the repo name. Org: %q Repo url: %q", "org", "https://github.com/org/")},
 		"two slashes":                {Provider: "Github", Repo: "https://github.com//", Out: "", Err: errors.Errorf("Github repo appears to be missing the org name. Repo url: %q", "https://github.com//")},
-		"repo with trailing slash":   {Provider: "Github", Repo: "https://github.com/org/repo/", Out: "", Err: errors.Errorf("Github repo appears to be too long or contains a trailing slash. Repo url: %q", "https://github.com/org/repo/")},
-		"too many url path parts":    {Provider: "Github", Repo: "https://github.com/org/repo/unknown/", Out: "", Err: errors.Errorf("Github repo appears to be too long or contains a trailing slash. Repo url: %q", "https://github.com/org/repo/unknown/")},
+		"repo with trailing slash":   {Provider: "Github", Repo: "https://github.com/org/repo/", Out: "", Err: errors.Errorf("Github repo contains a trailing slash. Repo url: %q", "https://github.com/org/repo/")},
+		"too many url path parts":    {Provider: "Github", Repo: "https://github.com/org/repo/unknown/", Out: "", Err: errors.Errorf("Github repo contains a trailing slash. Repo url: %q", "https://github.com/org/repo/unknown/")},
 	}
 
 	for name, tt := range tests {
@@ -74,8 +74,8 @@ func Test_NormalizeGitlabRepo(t *testing.T) {
 		Out  string
 		Err  error
 	}{
-		"good":               {Repo: "https://gitlab.com/org/repo", Out: "https://gitlab.com/org/repo.git", Err: nil},
-		"gitlab needs https": {Repo: "git@gitlab.com:org/repo.git:", Out: "", Err: errors.New("Gitlab requires https repo urls: e.g. https://gitlab.com/org/repo.git")},
+		"good":                    {Repo: "https://gitlab.com/org/repo", Out: "https://gitlab.com/org/repo.git", Err: nil},
+		"gitlab needs http/https": {Repo: "git@gitlab.com:org/repo.git:", Out: "", Err: errors.New("Gitlab requires http/https repo urls: e.g. https://gitlab.com/org/repo.git")},
 	}
 
 	for name, tt := range tests {

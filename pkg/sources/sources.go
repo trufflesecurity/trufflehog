@@ -1,12 +1,14 @@
 package sources
 
 import (
-	"context"
 	"sync"
 
+	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.
@@ -42,6 +44,66 @@ type Source interface {
 	GetProgress() *Progress
 }
 
+// Config defines the optional configuration for a source.
+type Config struct {
+	// Endpoint is the endpoint of the source.
+	Endpoint,
+	// Repo is the repository to scan.
+	Repo,
+	// Token is the token to use to authenticate with the source.
+	Token,
+	// Key is any key to use to authenticate with the source. (ex: S3)
+	Key,
+	// Secret is any secret to use to authenticate with the source. (ex: S3)
+	Secret,
+	// Address used to connect to the source. (ex: syslog)
+	Address,
+	// Protocol used to connect to the source.
+	Protocol,
+	// CertPath is the path to the certificate to use to connect to the source.
+	CertPath,
+	// KeyPath is the path to the key to use to connect to the source.
+	KeyPath,
+	// Format is the format used to connect to the source.
+	Format,
+	// RepoPath is the path to the repository to scan.
+	RepoPath,
+	// HeadRef is the head reference to use to scan from.
+	HeadRef,
+	// BaseRef is the base reference to use to scan from.
+	BaseRef string
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency,
+	// MaxDepth is the maximum depth to scan the source.
+	MaxDepth int
+	// IncludeForks indicates whether to include forks in the scan.
+	IncludeForks,
+	// IncludeMembers indicates whether to include members in the scan.
+	IncludeMembers,
+	// CloudCred determines whether to use cloud credentials.
+	// This can NOT be used with a secret.
+	CloudCred bool
+	// Repos is the list of repositories to scan.
+	Repos,
+	// Orgs is the list of organizations to scan.
+	Orgs,
+	// Buckets is the list of buckets to scan.
+	Buckets,
+	// Directories is the list of directories to scan.
+	Directories []string
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
+}
+
+// NewConfig returns a new Config with optional values.
+func NewConfig(opts ...func(*Config)) Config {
+	c := &Config{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return *c
+}
+
 // PercentComplete is used to update job completion percentages across sources
 type Progress struct {
 	mut               sync.Mutex
@@ -68,7 +130,7 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 	p.PercentComplete = int64((float64(i) / float64(scope)) * 100)
 }
 
-//GetProgressComplete gets job completion percentage for metrics reporting
+// GetProgressComplete gets job completion percentage for metrics reporting
 func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()

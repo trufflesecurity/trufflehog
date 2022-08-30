@@ -1,6 +1,7 @@
 PROTOS_IMAGE ?= trufflesecurity/protos:1.18-0
 
 .PHONY: check
+.PHONY: lint
 .PHONY: test
 .PHONY: test-race
 .PHONY: run
@@ -20,17 +21,20 @@ check:
 	go fmt $(shell go list ./... | grep -v /vendor/)
 	go vet $(shell go list ./... | grep -v /vendor/)
 
+lint:
+	golangci-lint run --out-format=colored-line-number --timeout 10m
+
 test-failing:
 	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/) | grep FAIL
 
 test:
-	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v /pkg/detectors)
+	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
 
 test-race:
-	CGO_ENABLED=1 go test -timeout=5m -race $(shell go list ./... | grep -v /vendor/ | grep -v /pkg/detectors)
+	CGO_ENABLED=1 go test -timeout=5m -race $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
 
 test-detectors:
-	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep /pkg/detectors)
+	CGO_ENABLED=0 go test -tags=detectors -timeout=5m $(shell go list ./... | grep pkg/detectors)
 
 bench:
 	CGO_ENABLED=0 go test $(shell go list ./pkg/secrets/... | grep -v /vendor/) -benchmem -run=xxx -bench .
@@ -53,3 +57,6 @@ release-protos-image:
 
 snifftest:
 	./hack/snifftest/snifftest.sh
+
+test-release:
+	goreleaser release --rm-dist --skip-publish --snapshot

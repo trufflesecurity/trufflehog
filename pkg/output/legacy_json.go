@@ -1,9 +1,11 @@
 package output
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
@@ -13,7 +15,38 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
+
+func PrintLegacyJSON(r *detectors.ResultWithMetadata) {
+	var repo string
+	switch r.SourceType {
+	case sourcespb.SourceType_SOURCE_TYPE_GIT:
+		repo = r.SourceMetadata.GetGit().Repository
+	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
+		repo = r.SourceMetadata.GetGithub().Repository
+	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
+		repo = r.SourceMetadata.GetGitlab().Repository
+	default:
+		logrus.Errorf("unsupported source type for legacy json output: %s", r.SourceType)
+	}
+
+	// cloning the repo again here is not great and only works with unauthed repos
+	repoPath, remote, err := git.PrepareRepo(repo)
+	if err != nil || repoPath == "" {
+		logrus.WithError(err).Fatal("error preparing git repo for scanning")
+	}
+	if remote {
+		defer os.RemoveAll(repoPath)
+	}
+
+	legacy := ConvertToLegacyJSON(r, repoPath)
+	out, err := json.Marshal(legacy)
+	if err != nil {
+		logrus.WithError(err).Fatal("could not marshal result")
+	}
+	fmt.Println(string(out))
+}
 
 func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) *LegacyJSONOutput {
 	var source LegacyJSONCompatibleSource

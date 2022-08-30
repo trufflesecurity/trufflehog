@@ -15,7 +15,7 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Plivo,
 				Redacted:     id,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + id),
 			}
 			stringResMatch := fmt.Sprintf("%s:%s", id, resMatch)
 			decodeSecret := b64.StdEncoding.EncodeToString([]byte(stringResMatch))

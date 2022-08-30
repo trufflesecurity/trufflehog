@@ -15,15 +15,15 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(`\b([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sms"}) + `\b([a-zA-Z0-9]{3,20}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,5})\b`)
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
+	keyPat = regexp.MustCompile(common.UUIDPatternUpperCase)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sms"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -44,15 +44,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
-		for _, idmatch := range idMatches {
-			if len(idmatch) != 2 {
-				continue
-			}
-			resIdMatch := strings.TrimSpace(idmatch[1])
+		for _, idMatch := range idMatches {
+			resIdMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_ClickSendsms,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
 
 			if verify {
@@ -71,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}

@@ -86,6 +86,9 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 
 // Pass returns true if the include FilterRuleSet matches the pattern and the exclude FilterRuleSet does not match.
 func (filter *Filter) Pass(object string) bool {
+	if filter == nil {
+		return true
+	}
 	excluded := filter.exclude.Matches(object)
 	included := filter.include.Matches(object)
 	return !excluded && included

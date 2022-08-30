@@ -13,7 +13,7 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CloudflareGlobalApiKey,
 				Redacted:     emailRes,
 				Raw:          []byte(apiKeyRes),
+				RawV2:        []byte(apiKeyRes + emailRes),
 			}
 
 			if verify {

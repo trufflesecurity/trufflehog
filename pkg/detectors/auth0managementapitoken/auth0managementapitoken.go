@@ -14,7 +14,7 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -23,7 +23,7 @@ var (
 	// long jwt token but note this is default 8640000 seconds = 24 hours but could be set to maximum 2592000 seconds = 720 hours = 30 days
 	// at https://manage.auth0.com/dashboard/us/dev-63memjo3/apis/management/explorer
 	managementApiTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"auth0"}) + `\b(ey[a-zA-Z0-9._-]+)\b`)
-	domainPat             = regexp.MustCompile(`([a-zA-Z0-9\-]{2,16}\.[a-zA-Z0-9_-]{2,3}\.auth0.com)`) // could be part of url
+	domainPat             = regexp.MustCompile(`([a-zA-Z0-9\-]{2,16}\.[a-zA-Z0-9_-]{2,3}\.auth0\.com)`) // could be part of url
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
 				Redacted:     domainRes,
 				Raw:          []byte(managementApiTokenRes),
+				RawV2:        []byte(managementApiTokenRes + domainRes),
 			}
 
 			if verify {
