@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package gitlab
 
 import (
@@ -15,15 +12,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestGitlab_FromChunk(t *testing.T) {
+func TestGitlabv2_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLAB")
-	secretInactive := testSecrets.MustGetField("GITLAB_INACTIVE")
+	secret := testSecrets.MustGetField("GITLABV2")
+	secretInactive := testSecrets.MustGetField("GITLABV2_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -101,7 +98,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 	}
 }
 
-func BenchmarkFromData(benchmark *testing.B) {
+func BenchmarkFromData2(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
