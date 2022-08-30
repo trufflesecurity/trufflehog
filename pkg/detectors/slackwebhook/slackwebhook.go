@@ -2,7 +2,7 @@ package slackwebhook
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"

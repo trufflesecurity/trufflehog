@@ -2,10 +2,10 @@ package appointedd
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
-	"io/ioutil"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

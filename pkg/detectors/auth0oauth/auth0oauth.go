@@ -2,7 +2,7 @@ package auth0oauth
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"

@@ -2,7 +2,7 @@ package braintreepayments
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
