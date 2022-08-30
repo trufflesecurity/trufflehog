@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("X-Auth-Token", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					continue
 				}

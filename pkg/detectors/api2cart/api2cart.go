@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				body, errBody := ioutil.ReadAll(res.Body)
+				body, errBody := io.ReadAll(res.Body)
 
 				var result Response
 				if errBody == nil {

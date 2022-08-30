@@ -34,7 +34,7 @@ type OSS struct {
 
 // Init validates the provided config
 func (g *OSS) Init() error {
-	//initiate OSS connection
+	// initiate OSS connection
 	return nil
 }
 
@@ -81,7 +81,7 @@ func (g *OSS) Fetch() (io.Reader, error) {
 
 	log.Debug("fetching trufflehog update")
 
-	newBinBytes, err := ioutil.ReadAll(resp.Body)
+	newBinBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
