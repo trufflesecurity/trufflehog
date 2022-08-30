@@ -140,7 +140,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			reReader.Stop()
 
-			for chunkData := range common.ChunkReader(inputFile) {
+			for chunkData := range common.ChunkReader(reReader) {
 				chunksChan <- &sources.Chunk{
 					SourceType: s.Type(),
 					SourceName: s.name,
