@@ -25,7 +25,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura"}) + common.BuildRegex(common.HexPattern, "", 32))
 	idPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura", "id"}) + common.BuildRegex("0-9", "", 7))
-	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura", "email"}) + `\b([a-z0-9]{4,25}@[a-zA-Z0-9]{2,12}.[a-zA-Z0-9]{2,6})\b`)
+	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura", "email"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -55,10 +55,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			for _, emailMatch := range emailMatches {
-				if len(emailMatch) != 2 {
-					continue
-				}
-				resEmailMatch := strings.TrimSpace(emailMatch[1])
+				//getting the last word of the string
+				resEmailMatch := strings.TrimSpace(emailMatch[0][strings.LastIndex(emailMatch[0], " ")+1:])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_KalturaSession,
