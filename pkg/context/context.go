@@ -17,7 +17,7 @@ type Context interface {
 	context.Context
 	Logger() logr.Logger
 	Parent() context.Context
-	SetParentCtx(ctx context.Context) Context
+	SetParent(ctx context.Context) Context
 }
 
 // Parent returns the parent context.
@@ -25,8 +25,8 @@ func (l logCtx) Parent() context.Context {
 	return l.Context
 }
 
-// SetParentCtx sets the parent context on the context.
-func (l logCtx) SetParentCtx(ctx context.Context) Context {
+// SetParent sets the parent context on the context.
+func (l logCtx) SetParent(ctx context.Context) Context {
 	l.Context = ctx
 	return l
 }
