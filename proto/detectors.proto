@@ -892,8 +892,7 @@ enum DetectorType {
   Infobip = 888;
   Uproc = 889;
   Supportbee = 890;
-  3scale = 891;
-  Aftership = 892;
+  Aftership = 891;
 }
 
 message Result {
