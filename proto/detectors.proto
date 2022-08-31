@@ -893,6 +893,8 @@ enum DetectorType {
   Uproc = 889;
   Supportbee = 890;
   Aftership = 891;
+  Edusign = 892;
+  Teamup = 893;
 }
 
 message Result {
