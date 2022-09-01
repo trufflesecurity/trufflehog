@@ -895,6 +895,7 @@ enum DetectorType {
   Aftership = 891;
   Edusign = 892;
   Teamup = 893;
+  Workday = 894;
 }
 
 message Result {
