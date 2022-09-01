@@ -123,3 +123,7 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
    ```bash
    make protos
    ```
+### Testing a detector
+```bash
+   go test ./pkg/detectors/<detector> -tags=detectors
+   ```
