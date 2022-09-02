@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				url := fmt.Sprintf("http://www.copyscape.com/api/?u=%s&k=%s&o=csearch&x=1",resIdMatch,resMatch)
+				url := fmt.Sprintf("http://www.copyscape.com/api/?u=%s&k=%s&o=balance&x=1",resIdMatch,resMatch)
 				req, err := http.NewRequestWithContext(ctx, "GET",url , nil)
 				if err != nil {
 					continue
@@ -70,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// }
 					body := string(bodyBytes)
 					//Used error as base for the fail safe, due to late response on success token
-					if !strings.Contains(body, "error") {
+					if !strings.Contains(body, "Username or API key not correct") {
 						s1.Verified = true
 					} else {
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
