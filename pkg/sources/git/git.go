@@ -1,9 +1,7 @@
 package git
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -363,48 +361,77 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	return nil
 }
 
-func (s *Git) ScanUnstaged(repo *git.Repository, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+// ScanUnstaged chunks unstaged changes.
+func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	// get the URL metadata for reporting (may be empty)
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
-	// Also scan any unstaged changes in the working tree of the repo
-	_, err := repo.Head()
-	if err == nil || err == plumbing.ErrReferenceNotFound {
-		wt, err := repo.Worktree()
-		if err != nil {
-			log.WithError(err).Error("error obtaining repo worktree")
-			return err
-		}
+	commitChan, err := gitparse.Unstaged(ctx, path)
+	if err != nil {
+		return err
+	}
+	if commitChan == nil {
+		return nil
+	}
 
-		status, err := wt.Status()
-		if err != nil {
-			log.WithError(err).Error("error obtaining worktree status")
-			return err
-		}
-		for fh := range status {
-			if !scanOptions.Filter.Pass(fh) {
-				continue
+	var depth int64
+	var reachedBase = false
+	log.Debugf("Scanning repo")
+	for commit := range commitChan {
+		for _, diff := range commit.Diffs {
+			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
+			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+				log.Debugf("reached max depth")
+				break
 			}
-			metadata := s.sourceMetadataFunc(
-				fh, "unstaged", "unstaged", time.Now().String(), urlMetadata, 0,
-			)
+			depth++
+			if reachedBase && commit.Hash != scanOptions.BaseHash {
+				break
+			}
+			if len(scanOptions.BaseHash) > 0 {
+				if commit.Hash == scanOptions.BaseHash {
+					log.Debugf("Reached base commit. Finishing scanning files.")
+					reachedBase = true
+				}
+			}
 
-			fileBuf := bytes.NewBuffer(nil)
-			fileHandle, err := wt.Filesystem.Open(fh)
-			if err != nil {
+			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
 			}
-			defer fileHandle.Close()
-			_, err = io.Copy(fileBuf, fileHandle)
-			if err != nil {
+
+			fileName := diff.PathB
+			if fileName == "" {
 				continue
 			}
+			var email, hash, when string
+			email = commit.Author
+			hash = commit.Hash
+			when = commit.Date.String()
+
+			// Handle binary files by reading the entire file rather than using the diff.
+			if diff.IsBinary {
+				commitHash := plumbing.NewHash(hash)
+				metadata := s.sourceMetadataFunc(fileName, email, "Unstaged", when, urlMetadata, 0)
+				chunkSkel := &sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Verify:         s.verify,
+				}
+				if err := handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
+				}
+				continue
+			}
+
+			metadata := s.sourceMetadataFunc(fileName, email, "Unstaged", when, urlMetadata, int64(diff.LineStart))
 			chunksChan <- &sources.Chunk{
-				SourceType:     s.sourceType,
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
-				Data:           fileBuf.Bytes(),
+				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
+				Data:           diff.Content.Bytes(),
 				Verify:         s.verify,
 			}
 		}
@@ -417,14 +444,8 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
-	if err := s.ScanUnstaged(repo, scanOptions, chunksChan); err != nil {
-		// https://github.com/src-d/go-git/issues/879
-		if strings.Contains(err.Error(), "object not found") {
-			log.WithError(err).Error("known issue: probably caused by a dangling reference in the repo")
-		} else {
-			return errors.New(err)
-		}
-		return err
+	if err := s.ScanUnstaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
+		log.WithError(err).Error("Error scanning unstaged changes")
 	}
 	scanTime := time.Now().UnixNano() - start
 	log.Debugf("Scanning complete. Scan time: %f", time.Duration(scanTime).Seconds())
