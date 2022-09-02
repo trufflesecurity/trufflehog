@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// -H "Accept: application/json" \
 				// -H "Content-Type: application/json" \
 				// -H "Authorization: Bearer token" \
-				// "https://subdomain.okta.com/api/v1/groups?limit=1"
+				// "https://subdomain.okta.com/api/v1/users/me"
 				//
 
 				url := fmt.Sprintf("https://%s/api/v1/users/me", domain)

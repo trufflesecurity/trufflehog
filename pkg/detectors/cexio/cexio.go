@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -98,9 +97,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 						bodyString := string(body)
 						validResponse := strings.Contains(bodyString, `timestamp`)
-						if err != nil {
-							fmt.Print(err.Error())
-						}
 
 						var responseObject Response
 						if err := json.Unmarshal(body, &responseObject); err != nil {
