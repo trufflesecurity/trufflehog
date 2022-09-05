@@ -2,34 +2,39 @@ package engine
 
 import (
 	"fmt"
+	"runtime"
+
 	"github.com/go-errors/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gitlab"
-	"golang.org/x/net/context"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"runtime"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gitlab"
 )
 
-func (e *Engine) ScanGitLab(ctx context.Context, endpoint, token string, repositories []string) error {
+// ScanGitLab scans GitLab with the provided configuration.
+func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 	connection := &sourcespb.GitLab{}
 
 	switch {
-	case len(token) > 0:
+	case len(c.Token) > 0:
 		connection.Credential = &sourcespb.GitLab_Token{
-			Token: token,
+			Token: c.Token,
 		}
 	default:
 		return fmt.Errorf("must provide token")
 	}
 
-	if len(endpoint) > 0 {
-		connection.Endpoint = endpoint
+	if len(c.Endpoint) > 0 {
+		connection.Endpoint = c.Endpoint
 	}
 
-	if len(repositories) > 0 {
-		connection.Repositories = repositories
+	if len(c.Repos) > 0 {
+		connection.Repositories = c.Repos
 	}
 
 	var conn anypb.Any
@@ -44,12 +49,15 @@ func (e *Engine) ScanGitLab(ctx context.Context, endpoint, token string, reposit
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init GitLab source", 0)
 	}
+
+	e.sourcesWg.Add(1)
 	go func() {
+		defer common.Recover(ctx)
+		defer e.sourcesWg.Done()
 		err := gitlabSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
 			logrus.WithError(err).Error("error scanning GitLab")
 		}
-		close(e.ChunksChan())
 	}()
 	return nil
 }

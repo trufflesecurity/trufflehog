@@ -18,7 +18,7 @@ type Scanner struct {
 	IncludeExpired bool
 }
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (

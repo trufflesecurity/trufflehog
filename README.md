@@ -6,10 +6,14 @@
 
 ---
 
+<div align="center">
 
 [![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
-![License](https://img.shields.io/badge/license-AGPL--3.0-green)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
+[![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
+
+</div>
 
 ---
 
@@ -31,8 +35,9 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
 
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
-- We've **added over 600 credential detectors that support active verification against their respective APIs**.
+- We've **added over 700 credential detectors that support active verification against their respective APIs**.
 - We've also added native **support for scanning GitHub, GitLab, filesystems, and S3**.
+- **Instantly verify private keys** against millions of github users and **billions** of TLS certificates using our [Driftwood](https://trufflesecurity.com/blog/driftwood) technology.
 
 
 ## What is credential verification?
@@ -95,6 +100,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - gitlab
 - S3
 - filesystem
+- syslog
 - file and stdin (coming soon)
 
 Each subcommand can have options that you can see with the `-h` flag provided to the sub command:
@@ -129,7 +135,7 @@ Flags:
       --regex                    No-op flag for backwards compat.
 
 Args:
-  <uri>  Git repository URL. https:// or file:// schema expected.
+  <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
 ```
 
 For example, to scan a  `git` repository, start with
@@ -153,8 +159,9 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
 
 ### TruffleHog OSS Github Action
 
-```- name: TruffleHog OSS
-  uses: trufflesecurity/trufflehog@v3.3.3
+```yaml
+- name: TruffleHog OSS
+  uses: trufflesecurity/trufflehog@main
   with:
     # Repository path
     path: 
@@ -162,6 +169,8 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
     base: 
     # Scan commits until here (usually dev branch).
     head: # optional
+    # Extra args to be passed to the trufflehog cli.
+    extra_args: # optional
 ```
 
 The TruffleHog OSS Github Action can be used to scan a range of commits for leaked credentials. The action will fail if
@@ -180,11 +189,31 @@ jobs:
         with:
           fetch-depth: 0
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@v3.3.4
+        uses: trufflesecurity/trufflehog@v3.4.3
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
+          extra_args: --debug
+```
+
+### Precommit Hook
+
+Trufflehog can be used in a precommit hook to prevent credentials from leaking before they ever leave your computer.
+An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
+
+```yaml
+repos:
+- repo: local
+  hooks:
+    - id: trufflehog
+      name: TruffleHog
+      description: Detect secrets in your data.
+      entry: bash -c 'trufflehog git file://. --only-verified --fail'
+      # For running trufflehog in docker, use the following entry instead:
+      # entry: bash -c 'docker run -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --only-verified --fail'
+      language: system
+      stages: ["commit", "push"]
 ```
 
 ## Contributors

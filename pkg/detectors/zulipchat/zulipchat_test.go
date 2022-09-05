@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package zulipchat
 
 import (
@@ -22,7 +25,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 	}
 	secret := testSecrets.MustGetField("ZULIPCHAT")
 	id := testSecrets.MustGetField("ZULIPCHAT_ID")
-	domain := testSecrets.MustGetField("ZULIPCHAT_DOMAIN")
+	domain := testSecrets.MustGetField("ZULIPCHAT_DOMAINV2")
 	inactiveSecret := testSecrets.MustGetField("ZULIPCHAT_INACTIVE")
 
 	type args struct {
@@ -42,7 +45,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat domain %s", secret, id, domain)),
+				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat %s", secret, id, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -58,7 +61,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat domain %s but not valid", inactiveSecret, id, domain)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat %s but not valid", inactiveSecret, id, domain)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

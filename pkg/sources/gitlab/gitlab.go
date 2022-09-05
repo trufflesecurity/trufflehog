@@ -1,24 +1,26 @@
 package gitlab
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 
-	"github.com/go-errors/errors"
-	gogit "github.com/go-git/go-git/v5"
-	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+
+	"github.com/go-errors/errors"
+	gogit "github.com/go-git/go-git/v5"
+	log "github.com/sirupsen/logrus"
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
@@ -26,20 +28,22 @@ import (
 )
 
 type Source struct {
-	name       string
-	sourceId   int64
-	jobId      int64
-	verify     bool
-	authMethod string
-	user       string
-	password   string
-	token      string
-	url        string
-	repos      []string
-	git        *git.Git
-	aCtx       context.Context
+	name            string
+	sourceId        int64
+	jobId           int64
+	verify          bool
+	authMethod      string
+	user            string
+	password        string
+	token           string
+	url             string
+	repos           []string
+	git             *git.Git
+	aCtx            context.Context
+	resumeInfoSlice []string
+	resumeInfoMutex sync.Mutex
+	jobSem          *semaphore.Weighted
 	sources.Progress
-	jobSem *semaphore.Weighted
 }
 
 // Ensure the Source satisfies the interface at compile time.
@@ -163,7 +167,8 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	user, _, err := apiClient.Users.CurrentUser()
 
 	if err != nil {
-		return nil, errors.Errorf("unable to authenticate using: %s", s.authMethod)
+		msg := fmt.Sprintf("unable to authenticate using: %s", s.authMethod)
+		return nil, errors.WrapPrefix(err, msg, 0)
 	}
 
 	projects := map[int]*gitlab.Project{}
@@ -240,33 +245,35 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	return projectList, nil
 }
 
-func (s *Source) getRepos() ([]*url.URL, []error) {
-	var validRepos []*url.URL
-	var errs []error
-	if len(s.repos) > 0 {
-		for _, prj := range s.repos {
-			repo, err := giturl.NormalizeGitlabRepo(prj)
-			if err != nil {
-				errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
-				continue
-			}
-
-			// The repo normalization has already successfully parsed the URL at this point, so we can ignore the error.
-			u, _ := url.ParseRequestURI(repo)
-			validRepos = append(validRepos, u)
-		}
-		return validRepos, errs
+func (s *Source) getRepos() ([]string, []error) {
+	if len(s.repos) == 0 {
+		return nil, nil
 	}
-	return nil, nil
 
+	var validRepos []string
+	var errs []error
+	for _, prj := range s.repos {
+		repo, err := giturl.NormalizeGitlabRepo(prj)
+		if err != nil {
+			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+			continue
+		}
+
+		validRepos = append(validRepos, repo)
+	}
+	return validRepos, errs
 }
 
-func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, repos []*url.URL) []error {
+func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) []error {
 	wg := sync.WaitGroup{}
 	var errs []error
 	var errsMut sync.Mutex
 
-	for i, u := range repos {
+	// If there is resume information available, limit this scan to only the repos that still need scanning.
+	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
+	s.repos = reposToScan
+
+	for i, repo := range s.repos {
 		if common.IsDone(ctx) {
 			// We are returning nil instead of the scanErrors slice here because
 			// we don't want to mark this scan as errored if we cancelled it.
@@ -277,19 +284,26 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			continue
 		}
 		wg.Add(1)
-		go func(ctx context.Context, repoURL *url.URL, i int) {
+		go func(ctx context.Context, repoURL string, i int) {
 			defer s.jobSem.Release(1)
 			defer wg.Done()
-			if len(repoURL.String()) == 0 {
+			if len(repoURL) == 0 {
 				return
 			}
-			s.SetProgressComplete(i, len(repos), fmt.Sprintf("Repo: %s", repoURL), "")
+
+			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
+			// Ensure the repo is removed from the resume info after being scanned.
+			defer func(s *Source) {
+				s.resumeInfoMutex.Lock()
+				defer s.resumeInfoMutex.Unlock()
+				s.resumeInfoSlice = sources.RemoveRepoFromResumeInfo(s.resumeInfoSlice, repoURL)
+			}(s)
 
 			var path string
 			var repo *gogit.Repository
 			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
-				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL.String())
+				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
 			} else {
 				// If a username is not provided we need to use a default one in order to clone a private repo.
 				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
@@ -297,7 +311,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				if user == "" {
 					user = "placeholder"
 				}
-				path, repo, err = git.CloneRepoUsingToken(s.token, repoURL.String(), user)
+				path, repo, err = git.CloneRepoUsingToken(s.token, repoURL, user)
 			}
 			defer os.RemoveAll(path)
 			if err != nil {
@@ -306,7 +320,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				errsMut.Unlock()
 				return
 			}
-			log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(repos), repoURL.String())
+			log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(s.repos), repoURL)
 			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 			if err != nil {
 				errsMut.Lock()
@@ -314,8 +328,8 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				errsMut.Unlock()
 				return
 			}
-			log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(repos), repoURL.String())
-		}(ctx, u, i)
+			log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(s.repos), repoURL)
+		}(ctx, repo, i)
 	}
 	wg.Wait()
 
@@ -348,17 +362,23 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
-			u, err := url.Parse(prj.HTTPURLToRepo)
+			// Ensure the urls are valid before adding them to the repo list.
+			_, err := url.Parse(prj.HTTPURLToRepo)
 			if err != nil {
 				fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
 			}
-			repos = append(repos, u)
+			repos = append(repos, prj.HTTPURLToRepo)
 		}
 		if repos == nil {
 			return errors.Errorf("unable to discover any repos")
 		}
 	}
-	errs = s.scanRepos(ctx, chunksChan, repos)
+
+	s.repos = repos
+	// We must sort the repos so we can resume later if necessary.
+	sort.Strings(s.repos)
+
+	errs = s.scanRepos(ctx, chunksChan)
 	for _, err := range errs {
 		log.WithError(err).WithFields(
 			log.Fields{
@@ -384,4 +404,20 @@ func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
 		return true
 	}
 	return false
+}
+
+// setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
+func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string) {
+	s.resumeInfoMutex.Lock()
+	defer s.resumeInfoMutex.Unlock()
+
+	// Add the repoURL to the resume info slice.
+	s.resumeInfoSlice = append(s.resumeInfoSlice, repoURL)
+	sort.Strings(s.resumeInfoSlice)
+
+	// Make the resume info string from the slice.
+	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
+
+	// Add the offset to both the index and the repos to give the proper place and proper repo count.
+	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }

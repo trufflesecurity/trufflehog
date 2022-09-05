@@ -6,8 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -22,13 +21,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `\b([0-9A-Za-z]{24,27})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `\b([0-9A-Za-z]{24,27})\b`)
 	userIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `\b([a-z]{2}[0-9]{9})\b`)
@@ -69,6 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_CexIO,
 					Raw:          []byte(resKeyMatch),
+					RawV2:        []byte(resUserIdMatch + resSecretMatch),
 				}
 
 				if verify {
@@ -91,23 +91,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err == nil {
 						defer res.Body.Close()
 
-						body, err := ioutil.ReadAll(res.Body)
+						body, err := io.ReadAll(res.Body)
 						if err != nil {
 							continue
 						}
 						bodyString := string(body)
 						validResponse := strings.Contains(bodyString, `timestamp`)
-						if err != nil {
-							fmt.Print(err.Error())
-						}
 
 						var responseObject Response
-						json.Unmarshal(body, &responseObject)
+						if err := json.Unmarshal(body, &responseObject); err != nil {
+							continue
+						}
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 							s1.Verified = true
 						} else {
-							//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 							if detectors.IsKnownFalsePositive(resUserIdMatch, detectors.DefaultFalsePositives, true) {
 								continue
 							}

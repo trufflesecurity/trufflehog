@@ -13,13 +13,13 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time
+// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gumroad"}) + `\b([a-z0-9A-Z-]{43})\b`)
 )
 
@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Gumroad,
 			Raw:          []byte(resMatch),
 		}
-		payload := strings.NewReader("access_token="+resMatch)
+		payload := strings.NewReader("access_token=" + resMatch)
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.gumroad.com/v2/products", payload)
 			if err != nil {
@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
