@@ -23,7 +23,10 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura"}) + common.BuildRegex(common.AlphaNumPattern, "-_", 122))
+	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura"}) + common.BuildRegex(common.HexPattern, "", 32))
+	idPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura", "id"}) + common.BuildRegex("0-9", "", 7))
+	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kaltura", "email"}) + common.EmailPattern)
+	token    = regexp.MustCompile(common.BuildRegex(common.AlphaNumPattern, "-_", 122))
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,6 +40,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -44,46 +49,90 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_KalturaAppToken,
-			Raw:          []byte(resMatch),
-		}
-
-		if verify {
-			data := url.Values{}
-			data.Set("ks", resMatch)
-			encodedData := data.Encode()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://www.kaltura.com/api_v3/service/uploadtoken/action/add", strings.NewReader(encodedData))
-			if err != nil {
+		for _, idMatch := range idMatches {
+			if len(idMatch) != 2 {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+			resIdMatch := strings.TrimSpace(idMatch[1])
 
-			res, err := client.Do(req)
-			if err == nil {
-				bodyBytes, err := ioutil.ReadAll(res.Body)
-				if err != nil {
-					continue
+			for _, emailMatch := range emailMatches {
+				//getting the last word of the string
+				resEmailMatch := strings.TrimSpace(emailMatch[0][strings.LastIndex(emailMatch[0], " ")+1:])
+
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_KalturaAppToken,
+					Raw:          []byte(resMatch),
 				}
 
-				bodyString := string(bodyBytes)
-				errorResponse := strings.Contains(bodyString, `error`)
-
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 && !errorResponse {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+				if verify {
+					data := url.Values{}
+					data.Set("secret", resMatch)
+					data.Set("userId", resEmailMatch)
+					data.Set("partnerId", resIdMatch)
+					data.Set("expiry", "31536000")
+					encodedData := data.Encode()
+					req, err := http.NewRequestWithContext(ctx, "POST", "https://www.kaltura.com/api_v3/service/session/action/start", strings.NewReader(encodedData))
+					if err != nil {
 						continue
 					}
+					req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+					req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+
+					res, err := client.Do(req)
+					if err == nil {
+						bodyBytes, err := ioutil.ReadAll(res.Body)
+						if err != nil {
+							continue
+						}
+						bodyString := string(bodyBytes)
+						//matched return token
+						tokenMatches := token.FindStringSubmatch(bodyString)
+
+						for _, tokenMatch := range tokenMatches {
+							if len(tokenMatch) != 122 {
+								continue
+							}
+							tokenMatchString := strings.TrimSpace(tokenMatch)
+							defer res.Body.Close()
+
+							data2 := url.Values{}
+							data2.Set("ks", tokenMatchString)
+							encodedData2 := data2.Encode()
+							req2, err := http.NewRequestWithContext(ctx, "POST", "https://www.kaltura.com/api_v3/service/uploadtoken/action/add", strings.NewReader(encodedData2))
+							if err != nil {
+								continue
+							}
+							req2.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+							req2.Header.Add("Content-Length", strconv.Itoa(len(data2.Encode())))
+
+							res2, err := client.Do(req2)
+							if err == nil {
+								bodyBytes, err := ioutil.ReadAll(res2.Body)
+								if err != nil {
+									continue
+								}
+
+								bodyString := string(bodyBytes)
+								errorResponse := strings.Contains(bodyString, `error`)
+
+								defer res2.Body.Close()
+								if res2.StatusCode >= 200 && res2.StatusCode < 300 && !errorResponse {
+									s1.Verified = true
+								} else {
+									// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+									if detectors.IsKnownFalsePositive(tokenMatchString, detectors.DefaultFalsePositives, true) {
+										continue
+									}
+								}
+							}
+						}
+					}
 				}
+
+				results = append(results, s1)
 			}
+
 		}
-
-		results = append(results, s1)
 	}
-
 	return detectors.CleanResults(results), nil
 }
