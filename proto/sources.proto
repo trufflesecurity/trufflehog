@@ -136,6 +136,7 @@ message GitLab {
     credentials.BasicAuth basic_auth = 4;
   }
   repeated string repositories = 5;
+  repeated string groupids = 6;
 }
 
 message GitHub {
