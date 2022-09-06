@@ -1,4 +1,7 @@
-	package quickbase
+//go:build detectors
+//+build detectors
+
+package quickbase
 
 import (
 	"context"
