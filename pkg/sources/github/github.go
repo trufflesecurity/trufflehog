@@ -373,6 +373,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 	var scanErrs []error
 	for i, repoURL := range s.repos {
+		repoURL := repoURL
 		s.jobPool.Go(func() error {
 			if common.IsDone(ctx) {
 				return nil
