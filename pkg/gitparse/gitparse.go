@@ -39,8 +39,6 @@ type Diff struct {
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 func RepoPath(ctx context.Context, source string, head string) (chan Commit, error) {
-	commitChan := make(chan Commit)
-
 	args := []string{"-C", source, "log", "-p", "-U0", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if head != "" {
 		args = append(args, head)
@@ -54,6 +52,27 @@ func RepoPath(ctx context.Context, source string, head string) (chan Commit, err
 	if err == nil {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
 	}
+
+	return executeCommand(ctx, cmd)
+}
+
+// Unstaged parses the output of the `git diff` command for the `source` path.
+func Unstaged(ctx context.Context, source string) (chan Commit, error) {
+	args := []string{"-C", source, "diff", "-p", "-U0", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
+
+	cmd := exec.Command("git", args...)
+
+	absPath, err := filepath.Abs(source)
+	if err == nil {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+	}
+
+	return executeCommand(ctx, cmd)
+}
+
+// executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
+func executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
+	commitChan := make(chan Commit)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
@@ -126,6 +145,9 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 			currentCommit.Date = date
 		case isDiffLine(line):
 			// This should never be nil, but check in case the stdin stream is messed up.
+			if currentCommit == nil {
+				currentCommit = &Commit{}
+			}
 			if currentDiff != nil && currentDiff.Content.Len() > 0 {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}

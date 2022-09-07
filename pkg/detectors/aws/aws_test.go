@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/kylelemons/godebug/pretty"
 )
 
 func TestAWS_FromChunk(t *testing.T) {
@@ -57,6 +57,11 @@ func TestAWS_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
 					Redacted:     "AKIAWARWQKZNHMZBLY4I",
+					ExtraData: map[string]string{
+						"account": "413504919130",
+						"arn":     "arn:aws:iam::413504919130:root",
+						"user_id": "413504919130",
+					},
 				},
 			},
 			wantErr: false,
@@ -74,6 +79,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIAWARWQKZNHMZBLY4I",
+					ExtraData:    nil,
 				},
 			},
 			wantErr: false,
@@ -102,6 +108,11 @@ func TestAWS_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
 					Redacted:     id,
+					ExtraData: map[string]string{
+						"account": "413504919130",
+						"arn":     "arn:aws:iam::413504919130:root",
+						"user_id": "413504919130",
+					},
 				},
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
@@ -135,6 +146,11 @@ func TestAWS_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
 					Redacted:     id,
+					ExtraData: map[string]string{
+						"account": "413504919130",
+						"arn":     "arn:aws:iam::413504919130:root",
+						"user_id": "413504919130",
+					},
 				},
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
@@ -174,9 +190,9 @@ func TestAWS_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AWS.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
