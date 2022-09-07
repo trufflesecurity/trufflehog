@@ -40,7 +40,7 @@ type Source interface {
 	Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error
 	// Chunks emits data over a channel that is decoded and scanned for secrets.
 	Chunks(ctx context.Context, chunksChan chan *Chunk) error
-	// Completion Percentage for Scanned Source
+	// GetProgress is the completion progress (percentage) for Scanned Source.
 	GetProgress() *Progress
 }
 
@@ -104,7 +104,7 @@ func NewConfig(opts ...func(*Config)) Config {
 	return *c
 }
 
-// PercentComplete is used to update job completion percentages across sources
+// Progress is used to update job completion progress across sources.
 type Progress struct {
 	mut               sync.Mutex
 	PercentComplete   int64
@@ -128,7 +128,7 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 	p.SectionsCompleted = int32(i)
 	p.SectionsRemaining = int32(scope)
 
-	// If the iteration and scope are both 0, completion is 100%
+	// If the iteration and scope are both 0, completion is 100%.
 	if i == 0 && scope == 0 {
 		p.PercentComplete = 100
 		return
@@ -137,7 +137,7 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 	p.PercentComplete = int64((float64(i) / float64(scope)) * 100)
 }
 
-// GetProgressComplete gets job completion percentage for metrics reporting
+// GetProgress gets job completion percentage for metrics reporting.
 func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()
