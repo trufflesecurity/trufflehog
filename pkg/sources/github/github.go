@@ -437,6 +437,10 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	}
 
 	_ = s.jobPool.Wait()
+	// if len(scanErrs) == 0 {
+	// 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
+	// }
+
 	return scanErrs
 }
 
