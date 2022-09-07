@@ -148,10 +148,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						err := json.NewDecoder(res.Body).Decode(&identityInfo)
 						if err == nil {
 							s1.Verified = true
-							s1.ExtraData = make(map[string]string)
-							s1.ExtraData["account"] = identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account
-							s1.ExtraData["user_id"] = identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID
-							s1.ExtraData["arn"] = identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn
+							s1.ExtraData = map[string]string{
+								"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
+								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
+								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
+							}
 						}
 						res.Body.Close()
 					} else {
