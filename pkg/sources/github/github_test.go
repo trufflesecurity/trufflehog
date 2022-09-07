@@ -446,11 +446,39 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 }
 
 func Test_scan_SetProgressComplete(t *testing.T) {
-	src := &Source{}
-	src.jobPool = &errgroup.Group{}
+	testCases := []struct {
+		name         string
+		repos        []string
+		wantComplete bool
+		wantErr      bool
+	}{
+		{
+			name:         "no repos",
+			wantComplete: true,
+		},
+		{
+			name:    "no repos",
+			repos:   []string{"a"},
+			wantErr: true,
+		},
+	}
 
-	err := src.scan(context.Background(), nil, nil)
-	assert.Nil(t, err)
-	assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
-	assert.Equal(t, int64(100), src.GetProgress().PercentComplete)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := &Source{
+				repos: tc.repos,
+			}
+			src.jobPool = &errgroup.Group{}
+
+			_ = src.scan(context.Background(), nil, nil)
+			if !tc.wantErr {
+				assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
+			}
+
+			gotComplete := src.GetProgress().PercentComplete == 100
+			if gotComplete != tc.wantComplete {
+				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
+			}
+		})
+	}
 }

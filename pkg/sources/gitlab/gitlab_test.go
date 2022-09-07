@@ -8,6 +8,8 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -245,5 +247,43 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
 			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
 		}
+	}
+}
+
+func Test_scanRepos_SetProgressComplete(t *testing.T) {
+	testCases := []struct {
+		name         string
+		repos        []string
+		wantComplete bool
+		wantErr      bool
+	}{
+		{
+			name:         "no repos",
+			wantComplete: true,
+		},
+		{
+			name:    "no repos",
+			repos:   []string{"a"},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := &Source{
+				repos: tc.repos,
+			}
+			src.jobSem = semaphore.NewWeighted(1)
+
+			_ = src.scanRepos(context.Background(), nil)
+			if !tc.wantErr {
+				assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
+			}
+
+			gotComplete := src.GetProgress().PercentComplete == 100
+			if gotComplete != tc.wantComplete {
+				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
+			}
+		})
 	}
 }
