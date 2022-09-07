@@ -127,6 +127,13 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 	p.EncodedResumeInfo = encodedResumeInfo
 	p.SectionsCompleted = int32(i)
 	p.SectionsRemaining = int32(scope)
+
+	// If the iteration and scope are both 0, completion is 100%
+	if i == 0 && scope == 0 {
+		p.PercentComplete = 100
+		return
+	}
+
 	p.PercentComplete = int64((float64(i) / float64(scope)) * 100)
 }
 

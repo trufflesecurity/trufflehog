@@ -20,7 +20,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -55,7 +54,6 @@ type Source struct {
 	log             *log.Entry
 	token           string
 	conn            *sourcespb.GitHub
-	jobSem          *semaphore.Weighted
 	jobPool         *errgroup.Group
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
@@ -111,7 +109,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.sourceID = sourceID
 	s.jobID = jobID
 	s.verify = verify
-	s.jobSem = semaphore.NewWeighted(int64(concurrency))
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
@@ -437,9 +434,9 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	}
 
 	_ = s.jobPool.Wait()
-	// if len(scanErrs) == 0 {
-	// 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
-	// }
+	if len(scanErrs) == 0 {
+		s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
+	}
 
 	return scanErrs
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-github/v42/github"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
@@ -438,4 +439,14 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
 		}
 	}
+}
+
+func Test_scan_SetProgressComplete(t *testing.T) {
+	src := &Source{}
+	src.jobPool = &errgroup.Group{}
+
+	err := src.scan(context.Background(), nil, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
+	assert.Equal(t, int64(100), src.GetProgress().PercentComplete)
 }
