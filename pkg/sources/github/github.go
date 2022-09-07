@@ -380,11 +380,11 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
-			defer func(s *Source) {
+			defer func(s *Source, repoURL string) {
 				s.resumeInfoMutex.Lock()
 				defer s.resumeInfoMutex.Unlock()
 				s.resumeInfoSlice = sources.RemoveRepoFromResumeInfo(s.resumeInfoSlice, repoURL)
-			}(s)
+			}(s, repoURL)
 
 			if !strings.HasSuffix(repoURL, ".git") {
 				scanErrs = append(scanErrs, fmt.Errorf("repo %s does not end in .git", repoURL))
