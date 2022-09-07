@@ -67,7 +67,7 @@ func TestAddReposByOrg(t *testing.T) {
 
 	s := initTestSource(nil)
 	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.addReposByOrg(context.TODO(), github.NewClient(nil), "super-secret-org")
+	err := s.addRepos(context.TODO(), github.NewClient(nil), "super-secret-org", s.getReposByOrg)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
@@ -83,7 +83,7 @@ func TestAddReposByUser(t *testing.T) {
 		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
 
 	s := initTestSource(nil)
-	err := s.addReposByUser(context.TODO(), github.NewClient(nil), "super-secret-user")
+	err := s.addRepos(context.TODO(), github.NewClient(nil), "super-secret-user", s.getReposByUser)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
@@ -266,7 +266,8 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 
 	s := initTestSource(nil)
 	s.orgs = []string{"super-secret-org"}
-	_ = s.enumerateUnauthenticated(context.TODO())
+	_, err := s.enumerateUnauthenticated(context.TODO())
+	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
 	assert.True(t, gock.IsDone())
