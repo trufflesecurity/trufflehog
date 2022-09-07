@@ -149,24 +149,20 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
-func (s *Source) enumerateUnauthenticated(ctx context.Context) (*github.Client, error) {
+func (s *Source) enumerateUnauthenticated(ctx context.Context) *github.Client {
 	apiClient := github.NewClient(s.httpClient)
 	if len(s.orgs) > unauthGithubOrgRateLimt {
 		log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
 
-	user, _, err := apiClient.Users.Get(context.TODO(), "")
-	if err != nil {
-		return nil, fmt.Errorf("unable to get user: %v", err)
-	}
 	for _, org := range s.orgs {
 		errOrg := s.addRepos(ctx, apiClient, org, s.getReposByOrg)
-		errUser := s.addRepos(ctx, apiClient, user.GetLogin(), s.getReposByUser)
+		errUser := s.addRepos(ctx, apiClient, org, s.getReposByUser)
 		if errOrg != nil && errUser != nil {
 			log.WithError(errOrg).Error("error fetching repos for org or user: ", org)
 		}
 	}
-	return apiClient, nil
+	return apiClient
 }
 
 func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token string) (*github.Client, error) {
@@ -331,9 +327,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
-		if apiClient, err = s.enumerateUnauthenticated(ctx); err != nil {
-			return fmt.Errorf("error enumerating unauthenticated: %w", err)
-		}
+		apiClient = s.enumerateUnauthenticated(ctx)
 	case *sourcespb.GitHub_Token:
 		if apiClient, err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
 			return err

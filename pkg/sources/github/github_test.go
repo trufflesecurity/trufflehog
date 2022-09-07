@@ -272,8 +272,7 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 
 	s := initTestSource(nil)
 	s.orgs = []string{"super-secret-org"}
-	_, err := s.enumerateUnauthenticated(context.TODO())
-	assert.Nil(t, err)
+	_ = s.enumerateUnauthenticated(context.TODO())
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
 	assert.True(t, gock.IsDone())
