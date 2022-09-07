@@ -399,23 +399,23 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
 				if err != nil {
 					scanErrs = append(scanErrs, fmt.Errorf("error cloning repo %s: %w", repoURL, err))
-					return nil
 				}
 			default:
 				var token string
 				token, err = s.Token(ctx, installationClient)
 				if err != nil {
 					scanErrs = append(scanErrs, fmt.Errorf("error getting token for repo %s: %w", repoURL, err))
-					return nil
 				}
 				path, repo, err = git.CloneRepoUsingToken(token, repoURL, "")
 				if err != nil {
 					scanErrs = append(scanErrs, fmt.Errorf("error cloning repo %s: %w", repoURL, err))
-					return nil
 				}
 			}
 
 			defer os.RemoveAll(path)
+			if err != nil {
+				return nil
+			}
 			// Base and head will only exist from incoming webhooks.
 			scanOptions := git.NewScanOptions(
 				git.ScanOptionBaseHash(s.conn.Base),
