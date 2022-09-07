@@ -265,6 +265,11 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 		Reply(200).
 		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
 
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
 	s := initTestSource(nil)
 	s.orgs = []string{"super-secret-org"}
 	_, err := s.enumerateUnauthenticated(context.TODO())
