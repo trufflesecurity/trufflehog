@@ -346,10 +346,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
 
-	errs := s.scan(ctx, installationClient, chunksChan)
-	for _, err := range errs {
+	for _, err := range s.scan(ctx, installationClient, chunksChan) {
 		log.WithError(err).Error("error scanning repository")
 	}
+
 	return nil
 }
 
