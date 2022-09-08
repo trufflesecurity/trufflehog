@@ -484,7 +484,7 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 	for {
 		someRepos, res, err := apiClient.Repositories.ListByOrg(ctx, org, opts)
 		if err == nil {
-			defer res.Body.Close()
+			res.Body.Close()
 		}
 		if handled := handleRateLimit(err, res); handled {
 			continue
@@ -492,10 +492,10 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 		if err != nil {
 			return nil, fmt.Errorf("could not list repos for org %s: %w", org, err)
 		}
-		logger.Debugf("listed repos page %d/%d", opts.Page, res.LastPage)
-		if len(someRepos) == 0 {
+		if len(someRepos) == 0 || res == nil {
 			break
 		}
+		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
 		for _, r := range someRepos {
 			numRepos++
 			if r.GetFork() {
@@ -537,7 +537,7 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 	for {
 		someRepos, res, err := apiClient.Repositories.List(ctx, user, opts)
 		if err == nil {
-			defer res.Body.Close()
+			res.Body.Close()
 		}
 		if handled := handleRateLimit(err, res); handled {
 			continue
@@ -545,6 +545,10 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 		if err != nil {
 			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
+		if res == nil {
+			break
+		}
+		s.log.Debugf("Listed repos for user %s page %d/%d", user, opts.Page, res.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
@@ -563,11 +567,11 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 	var gistURLs []string
 	gistOpts := &github.GistListOptions{}
 	for {
-		gists, resp, err := apiClient.Gists.List(ctx, user, gistOpts)
+		gists, res, err := apiClient.Gists.List(ctx, user, gistOpts)
 		if err == nil {
-			defer resp.Body.Close()
+			res.Body.Close()
 		}
-		if handled := handleRateLimit(err, resp); handled {
+		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -577,10 +581,11 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 		for _, gist := range gists {
 			gistURLs = append(gistURLs, gist.GetGitPullURL())
 		}
-		if resp == nil || resp.NextPage == 0 {
+		if res == nil || res.NextPage == 0 {
 			break
 		}
-		gistOpts.Page = resp.NextPage
+		s.log.Debugf("Listed gists for user %s page %d/%d", user, gistOpts.Page, res.LastPage)
+		gistOpts.Page = res.NextPage
 	}
 	return gistURLs, nil
 }
@@ -615,7 +620,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 		for {
 			members, res, err := apiClient.Organizations.ListMembers(ctx, *org.Account.Login, optsOrg)
 			if err == nil {
-				defer res.Body.Close()
+				res.Body.Close()
 			}
 			if handled := handleRateLimit(err, res); handled {
 				continue
@@ -625,6 +630,10 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 				log.WithError(err).Warnf(errText)
 				return errors.New(errText)
 			}
+			if res == nil {
+				break
+			}
+			s.log.Debugf("Listed members for org %s page %d/%d", org, opts.Page, res.LastPage)
 			for _, m := range members {
 				usr := m.Login
 				if usr == nil || *usr == "" {
@@ -650,7 +659,7 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 	for {
 		someRepos, res, err := apiClient.Apps.ListRepos(ctx, opts)
 		if err == nil {
-			defer res.Body.Close()
+			res.Body.Close()
 		}
 		if handled := handleRateLimit(err, res); handled {
 			continue
@@ -658,11 +667,16 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 		if err != nil {
 			return errors.WrapPrefix(err, "unable to list repositories", 0)
 		}
+		if res == nil {
+			break
+		}
+		s.log.Debugf("Listed repos for app page %d/%d", opts.Page, res.LastPage)
 		for _, r := range someRepos.Repositories {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
 			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
+			s.log.Debugf("Enumerated repo %s", r.GetCloneURL())
 		}
 		if res.NextPage == 0 {
 			break
@@ -686,7 +700,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 	for {
 		orgs, resp, err := apiClient.Organizations.ListAll(ctx, orgOpts)
 		if err == nil {
-			defer resp.Body.Close()
+			resp.Body.Close()
 		}
 		if handled := handleRateLimit(err, resp); handled {
 			continue
@@ -724,7 +738,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 	for {
 		orgs, resp, err := apiClient.Organizations.List(ctx, "", orgOpts)
 		if err == nil {
-			defer resp.Body.Close()
+			resp.Body.Close()
 		}
 		if handled := handleRateLimit(err, resp); handled {
 			continue
@@ -733,6 +747,10 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 			log.WithError(err).Errorf("Could not list organizations for %s", user)
 			return
 		}
+		if resp == nil {
+			break
+		}
+		s.log.Debugf("Listed orgs for user %s page %d/%d", user, orgOpts.Page, resp.LastPage)
 		for _, org := range orgs {
 			var name string
 			if org.Name != nil {
