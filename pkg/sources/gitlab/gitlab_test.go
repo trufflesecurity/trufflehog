@@ -262,7 +262,7 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			wantComplete: true,
 		},
 		{
-			name:    "no repos",
+			name:    "one valid repo",
 			repos:   []string{"a"},
 			wantErr: true,
 		},
