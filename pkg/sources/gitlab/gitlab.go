@@ -332,6 +332,9 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 		}(ctx, repo, i)
 	}
 	wg.Wait()
+	if len(errs) == 0 {
+		s.SetProgressComplete(len(s.repos), len(s.repos), fmt.Sprintf("Completed scanning source %s", s.name), "")
+	}
 
 	return errs
 }

@@ -121,6 +121,15 @@ func RetryableHttpClient() *http.Client {
 	return httpClient.StandardClient()
 }
 
+func RetryableHttpClientTimeout(timeOutSeconds int64) *http.Client {
+	httpClient := retryablehttp.NewClient()
+	httpClient.RetryMax = 3
+	httpClient.Logger = nil
+	httpClient.HTTPClient.Timeout = time.Duration(timeOutSeconds) * time.Second
+	httpClient.HTTPClient.Transport = NewCustomTransport(nil)
+	return httpClient.StandardClient()
+}
+
 const DefaultResponseTimeout = 5 * time.Second
 
 var saneTransport = &http.Transport{
@@ -142,7 +151,7 @@ func SaneHttpClient() *http.Client {
 	return httpClient
 }
 
-//custom timeout for some scanners
+// SaneHttpClientTimeOut adds a custom timeout for some scanners
 func SaneHttpClientTimeOut(timeOutSeconds int64) *http.Client {
 	httpClient := &http.Client{}
 	httpClient.Timeout = time.Second * time.Duration(timeOutSeconds)

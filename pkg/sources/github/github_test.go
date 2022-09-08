@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-github/v42/github"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
@@ -67,7 +68,7 @@ func TestAddReposByOrg(t *testing.T) {
 
 	s := initTestSource(nil)
 	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.addReposByOrg(context.TODO(), github.NewClient(nil), "super-secret-org")
+	err := s.addRepos(context.TODO(), github.NewClient(nil), "super-secret-org", s.getReposByOrg)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
@@ -83,7 +84,7 @@ func TestAddReposByUser(t *testing.T) {
 		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
 
 	s := initTestSource(nil)
-	err := s.addReposByUser(context.TODO(), github.NewClient(nil), "super-secret-user")
+	err := s.addRepos(context.TODO(), github.NewClient(nil), "super-secret-user", s.getReposByUser)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
@@ -436,5 +437,43 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
 			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
 		}
+	}
+}
+
+func Test_scan_SetProgressComplete(t *testing.T) {
+	testCases := []struct {
+		name         string
+		repos        []string
+		wantComplete bool
+		wantErr      bool
+	}{
+		{
+			name:         "no repos",
+			wantComplete: true,
+		},
+		{
+			name:    "one valid repo",
+			repos:   []string{"a"},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := &Source{
+				repos: tc.repos,
+			}
+			src.jobPool = &errgroup.Group{}
+
+			_ = src.scan(context.Background(), nil, nil)
+			if !tc.wantErr {
+				assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
+			}
+
+			gotComplete := src.GetProgress().PercentComplete == 100
+			if gotComplete != tc.wantComplete {
+				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
+			}
+		})
 	}
 }
