@@ -492,10 +492,10 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 		if err != nil {
 			return nil, fmt.Errorf("could not list repos for org %s: %w", org, err)
 		}
-		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
-		if len(someRepos) == 0 {
+		if len(someRepos) == 0 || res == nil {
 			break
 		}
+		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
 		for _, r := range someRepos {
 			numRepos++
 			if r.GetFork() {
@@ -545,6 +545,9 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 		if err != nil {
 			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
+		if res == nil {
+			break
+		}
 		s.log.Debugf("Listed repos for user %s page %d/%d", user, opts.Page, res.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() && !s.conn.IncludeForks {
@@ -575,13 +578,13 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 			log.WithError(err).Warnf("could not list repos for user %s", user)
 			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
-		s.log.Debugf("Listed gists for user %s page %d/%d", user, gistOpts.Page, res.LastPage)
 		for _, gist := range gists {
 			gistURLs = append(gistURLs, gist.GetGitPullURL())
 		}
 		if res == nil || res.NextPage == 0 {
 			break
 		}
+		s.log.Debugf("Listed gists for user %s page %d/%d", user, gistOpts.Page, res.LastPage)
 		gistOpts.Page = res.NextPage
 	}
 	return gistURLs, nil
@@ -627,6 +630,9 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 				log.WithError(err).Warnf(errText)
 				return errors.New(errText)
 			}
+			if res == nil {
+				break
+			}
 			s.log.Debugf("Listed members for org %s page %d/%d", org, opts.Page, res.LastPage)
 			for _, m := range members {
 				usr := m.Login
@@ -660,6 +666,9 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 		}
 		if err != nil {
 			return errors.WrapPrefix(err, "unable to list repositories", 0)
+		}
+		if res == nil {
+			break
 		}
 		s.log.Debugf("Listed repos for app page %d/%d", opts.Page, res.LastPage)
 		for _, r := range someRepos.Repositories {
@@ -737,6 +746,9 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 		if err != nil {
 			log.WithError(err).Errorf("Could not list organizations for %s", user)
 			return
+		}
+		if resp == nil {
+			break
 		}
 		s.log.Debugf("Listed orgs for user %s page %d/%d", user, orgOpts.Page, resp.LastPage)
 		for _, org := range orgs {
