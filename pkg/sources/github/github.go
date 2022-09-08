@@ -483,9 +483,7 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 	var numRepos, numForks int
 	for {
 		someRepos, res, err := apiClient.Repositories.ListByOrg(ctx, org, opts)
-		if err == nil {
-			defer res.Body.Close()
-		}
+		res.Body.Close()
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
@@ -536,9 +534,7 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 	}
 	for {
 		someRepos, res, err := apiClient.Repositories.List(ctx, user, opts)
-		if err == nil {
-			defer res.Body.Close()
-		}
+		res.Body.Close()
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
@@ -575,11 +571,9 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 	gistURLs := []string{}
 	gistOpts := &github.GistListOptions{}
 	for {
-		gists, resp, err := apiClient.Gists.List(ctx, user, gistOpts)
-		if err == nil {
-			defer resp.Body.Close()
-		}
-		if handled := handleRateLimit(err, resp); handled {
+		gists, res, err := apiClient.Gists.List(ctx, user, gistOpts)
+		res.Body.Close()
+		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -589,10 +583,10 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 		for _, gist := range gists {
 			gistURLs = append(gistURLs, gist.GetGitPullURL())
 		}
-		if resp == nil || resp.NextPage == 0 {
+		if res == nil || res.NextPage == 0 {
 			break
 		}
-		gistOpts.Page = resp.NextPage
+		gistOpts.Page = res.NextPage
 	}
 	return gistURLs, nil
 }
@@ -626,9 +620,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 	for _, org := range installs {
 		for {
 			members, res, err := apiClient.Organizations.ListMembers(ctx, *org.Account.Login, optsOrg)
-			if err == nil {
-				defer res.Body.Close()
-			}
+			res.Body.Close()
 			if handled := handleRateLimit(err, res); handled {
 				continue
 			}
@@ -661,9 +653,7 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 	}
 	for {
 		someRepos, res, err := apiClient.Apps.ListRepos(ctx, opts)
-		if err == nil {
-			defer res.Body.Close()
-		}
+		res.Body.Close()
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
@@ -697,9 +687,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 	}
 	for {
 		orgs, resp, err := apiClient.Organizations.ListAll(ctx, orgOpts)
-		if err == nil {
-			defer resp.Body.Close()
-		}
+		resp.Body.Close()
 		if handled := handleRateLimit(err, resp); handled {
 			continue
 		}
@@ -735,9 +723,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 	}
 	for {
 		orgs, resp, err := apiClient.Organizations.List(ctx, "", orgOpts)
-		if err == nil {
-			defer resp.Body.Close()
-		}
+		resp.Body.Close()
 		if handled := handleRateLimit(err, resp); handled {
 			continue
 		}
