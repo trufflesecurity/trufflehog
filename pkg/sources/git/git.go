@@ -195,6 +195,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 
 	}
+	s.SetProgressComplete(len(s.conn.Repositories), len(s.conn.Repositories), fmt.Sprintf("Completed scanning source %s", s.name), "")
 	return nil
 }
 

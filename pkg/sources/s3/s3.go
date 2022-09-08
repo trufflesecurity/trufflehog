@@ -157,8 +157,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		} else {
 			regionalClient = client
 		}
-		//Forced prefix for testing
-		//pf := "public"
+		// Forced prefix for testing
+		// pf := "public"
 		errorCount := sync.Map{}
 
 		err = regionalClient.ListObjectsV2PagesWithContext(
@@ -172,8 +172,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			s.log.WithError(err).Errorf("could not list objects in s3 bucket: %s", bucket)
 			return errors.WrapPrefix(err, fmt.Sprintf("could not list objects in s3 bucket: %s", bucket), 0)
 		}
-
 	}
+	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s", s.name), "")
 
 	return nil
 }
@@ -197,12 +197,12 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			defer common.Recover(ctx)
 			defer sem.Release(1)
 			defer wg.Done()
-			//defer log.Debugf("DONE - %s", *obj.Key)
+			// defer log.Debugf("DONE - %s", *obj.Key)
 
 			if (*obj.Key)[len(*obj.Key)-1:] == "/" {
 				return
 			}
-			//log.Debugf("Object: %s", *obj.Key)
+			// log.Debugf("Object: %s", *obj.Key)
 
 			path := strings.Split(*obj.Key, "/")
 			prefix := strings.Join(path[:len(path)-1], "/")
@@ -221,13 +221,13 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				return
 			}
 
-			//file is 0 bytes - likely no permissions - skipping
+			// file is 0 bytes - likely no permissions - skipping
 			if *obj.Size == 0 {
 				return
 			}
 
-			//files break with spaces, must replace with +
-			//objKey := strings.ReplaceAll(*obj.Key, " ", "+")
+			// files break with spaces, must replace with +
+			// objKey := strings.ReplaceAll(*obj.Key, " ", "+")
 			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 			defer cancel()
 			res, err := client.GetObjectWithContext(ctx, &s3.GetObjectInput{
@@ -249,7 +249,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				}
 				nErr = nErr.(int) + 1
 				errorCount.Store(prefix, nErr)
-				//too many consective errors on this page
+				// too many consective errors on this page
 				if nErr.(int) > 3 {
 					s.log.Warnf("Too many consecutive errors. Excluding %s", prefix)
 				}
