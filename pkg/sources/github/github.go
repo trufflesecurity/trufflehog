@@ -483,7 +483,9 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 	var numRepos, numForks int
 	for {
 		someRepos, res, err := apiClient.Repositories.ListByOrg(ctx, org, opts)
-		res.Body.Close()
+		if err == nil {
+			res.Body.Close()
+		}
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
@@ -534,7 +536,9 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 	}
 	for {
 		someRepos, res, err := apiClient.Repositories.List(ctx, user, opts)
-		res.Body.Close()
+		if err == nil {
+			res.Body.Close()
+		}
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
@@ -561,7 +565,9 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 	gistOpts := &github.GistListOptions{}
 	for {
 		gists, res, err := apiClient.Gists.List(ctx, user, gistOpts)
-		res.Body.Close()
+		if err == nil {
+			res.Body.Close()
+		}
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
@@ -610,7 +616,9 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 	for _, org := range installs {
 		for {
 			members, res, err := apiClient.Organizations.ListMembers(ctx, *org.Account.Login, optsOrg)
-			res.Body.Close()
+			if err == nil {
+				res.Body.Close()
+			}
 			if handled := handleRateLimit(err, res); handled {
 				continue
 			}
@@ -644,7 +652,9 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 	}
 	for {
 		someRepos, res, err := apiClient.Apps.ListRepos(ctx, opts)
-		res.Body.Close()
+		if err == nil {
+			res.Body.Close()
+		}
 		if handled := handleRateLimit(err, res); handled {
 			continue
 		}
@@ -680,7 +690,9 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 	}
 	for {
 		orgs, resp, err := apiClient.Organizations.ListAll(ctx, orgOpts)
-		resp.Body.Close()
+		if err == nil {
+			resp.Body.Close()
+		}
 		if handled := handleRateLimit(err, resp); handled {
 			continue
 		}
@@ -716,7 +728,9 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 	}
 	for {
 		orgs, resp, err := apiClient.Organizations.List(ctx, "", orgOpts)
-		resp.Body.Close()
+		if err == nil {
+			resp.Body.Close()
+		}
 		if handled := handleRateLimit(err, resp); handled {
 			continue
 		}
