@@ -490,7 +490,7 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 		if err != nil {
 			return nil, fmt.Errorf("could not list repos for org %s: %w", org, err)
 		}
-		log.Debugf("listed repos page %d/%d", opts.Page, res.LastPage)
+		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
 		if len(someRepos) == 0 {
 			break
 		}
@@ -541,6 +541,7 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 		if err != nil {
 			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
+		s.log.Debugf("Listed repos for user %s page %d/%d", user, opts.Page, res.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
@@ -580,6 +581,7 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 			log.WithError(err).Warnf("could not list repos for user %s", user)
 			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
+		s.log.Debugf("Listed gists for user %s page %d/%d", user, gistOpts.Page, res.LastPage)
 		for _, gist := range gists {
 			gistURLs = append(gistURLs, gist.GetGitPullURL())
 		}
@@ -629,6 +631,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 				log.WithError(err).Warnf(errText)
 				return errors.New(errText)
 			}
+			s.log.Debugf("Listed members for org %s page %d/%d", org, opts.Page, res.LastPage)
 			for _, m := range members {
 				usr := m.Login
 				if usr == nil || *usr == "" {
@@ -660,11 +663,13 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 		if err != nil {
 			return errors.WrapPrefix(err, "unable to list repositories", 0)
 		}
+		s.log.Debugf("Listed repos for app page %d/%d", opts.Page, res.LastPage)
 		for _, r := range someRepos.Repositories {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
 			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
+			s.log.Debugf("Enumerated repo %s", r.GetCloneURL())
 		}
 		if res.NextPage == 0 {
 			break
@@ -731,6 +736,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 			log.WithError(err).Errorf("Could not list organizations for %s", user)
 			return
 		}
+		s.log.Debugf("Listed orgs for user %s page %d/%d", user, orgOpts.Page, resp.LastPage)
 		for _, org := range orgs {
 			var name string
 			if org.Name != nil {
