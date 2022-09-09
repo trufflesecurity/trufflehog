@@ -896,6 +896,7 @@ enum DetectorType {
   Edusign = 892;
   Teamup = 893;
   Workday = 894;
+  NGC = 895;
 }
 
 message Result {
