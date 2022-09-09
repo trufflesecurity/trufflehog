@@ -37,6 +37,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 		connection.Repositories = c.Repos
 	}
 
+	if len(c.Groups) > 0 {
+		connection.Groupids = c.Groups
+	}
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {

@@ -89,6 +89,8 @@ type Config struct {
 	Orgs,
 	// Buckets is the list of buckets to scan.
 	Buckets,
+	//Groups is the list of Groups to scan in Gitlab
+	Groups,
 	// Directories is the list of directories to scan.
 	Directories []string
 	// Filter is the filter to use to scan the source.
