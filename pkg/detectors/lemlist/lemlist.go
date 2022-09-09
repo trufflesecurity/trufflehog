@@ -2,14 +2,14 @@ package lemlist
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-	"regexp"
-	"strings"
 	b64 "encoding/base64"
+	"fmt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"net/http"
+	"regexp"
+	"strings"
 )
 
 type Scanner struct{}

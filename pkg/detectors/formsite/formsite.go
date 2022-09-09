@@ -21,9 +21,9 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{32})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{32})\b`)
 	serverPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b(fs[0-9]{1,4})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{6})\b`)
+	userPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{6})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -59,9 +59,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Formsite,
 					Raw:          []byte(resMatch),
 				}
-		
+
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.formsite.com/api/v2/%s/forms",resServerMatch,resUserMatch), nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.formsite.com/api/v2/%s/forms", resServerMatch, resUserMatch), nil)
 					if err != nil {
 						continue
 					}
@@ -79,11 +79,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 					}
 				}
-		
+
 				results = append(results, s1)
-			}		
-		}	
-		
+			}
+		}
+
 	}
 
 	return detectors.CleanResults(results), nil

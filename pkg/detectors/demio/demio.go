@@ -2,13 +2,13 @@ package demio
 
 import (
 	"context"
-	"net/http"
-	"regexp"
-	"strings"
 	"fmt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"net/http"
+	"regexp"
+	"strings"
 )
 
 type Scanner struct{}
@@ -20,9 +20,8 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{32})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{32})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{10,20})\b`)
-
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -52,9 +51,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Demio,
 				Raw:          []byte(resMatch),
 			}
-	
+
 			if verify {
-				url := fmt.Sprintf("https://my.demio.com/api/v1/ping/query?api_key=%s&api_secret=%s",resMatch,resIdMatch)
+				url := fmt.Sprintf("https://my.demio.com/api/v1/ping/query?api_key=%s&api_secret=%s", resMatch, resIdMatch)
 				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
@@ -72,10 +71,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 			}
-	
+
 			results = append(results, s1)
 		}
-		
+
 	}
 
 	return detectors.CleanResults(results), nil

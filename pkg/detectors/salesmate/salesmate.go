@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmate"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmate"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmate"}) + `\b([a-z0-9A-Z]{3,22})\b`)
 )
 
@@ -52,14 +52,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Salesmate,
 				Raw:          []byte(resMatch),
 			}
-	
+
 			if verify {
-				url := fmt.Sprintf("https://%s.salesmate.io/apis/v3/companies/1?trackingRecentSearch=true",resIdMatch)
+				url := fmt.Sprintf("https://%s.salesmate.io/apis/v3/companies/1?trackingRecentSearch=true", resIdMatch)
 				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}
-				
+
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("sessionToken", resMatch)
 				res, err := client.Do(req)
@@ -75,10 +75,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 			}
-	
+
 			results = append(results, s1)
 		}
-		
+
 	}
 
 	return detectors.CleanResults(results), nil

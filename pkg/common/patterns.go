@@ -17,7 +17,7 @@ const RegexPattern = "0-9a-z"
 const AlphaNumPattern = "0-9a-zA-Z"
 const HexPattern = "0-9a-f"
 
-//Custom Regex functions
+// Custom Regex functions
 func BuildRegex(pattern string, specialChar string, length int) string {
 	return fmt.Sprintf(`\b([%s%s]{%s})\b`, pattern, specialChar, strconv.Itoa(length))
 }

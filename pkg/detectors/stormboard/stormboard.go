@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("X-API-Key",resMatch)
+			req.Header.Add("X-API-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

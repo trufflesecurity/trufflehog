@@ -2,12 +2,12 @@ package interseller
 
 import (
 	"context"
-	"net/http"
-	"regexp"
-	"strings"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"net/http"
+	"regexp"
+	"strings"
 )
 
 type Scanner struct{}
