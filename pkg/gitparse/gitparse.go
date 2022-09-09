@@ -37,6 +37,38 @@ type Diff struct {
 	IsBinary  bool
 }
 
+// Equal compares the content of two Commits to determine if they are the same.
+func (c1 *Commit) Equal(c2 *Commit) bool {
+	switch {
+	case c1.Hash != c2.Hash:
+		return false
+	case c1.Author != c2.Author:
+		return false
+	case !c1.Date.Equal(c2.Date):
+		return false
+	case c1.Message.String() != c2.Message.String():
+		return false
+	case len(c1.Diffs) != len(c2.Diffs):
+		return false
+	}
+	for i := range c1.Diffs {
+		d1 := c1.Diffs[i]
+		d2 := c2.Diffs[i]
+		switch {
+		case d1.PathB != d2.PathB:
+			return false
+		case d1.LineStart != d2.LineStart:
+			return false
+		case d1.Content.String() != d2.Content.String():
+			return false
+		case d1.IsBinary != d2.IsBinary:
+			return false
+		}
+	}
+	return true
+
+}
+
 // RepoPath parses the output of the `git log` command for the `source` path.
 func RepoPath(ctx context.Context, source string, head string) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "-U0", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
@@ -136,7 +168,7 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 				currentCommit.Hash = string(line[7:47])
 			}
 		case isAuthorLine(line):
-			currentCommit.Author = string(line[8:])
+			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
 		case isDateLine(line):
 			date, err := time.Parse(DateFormat, strings.TrimSpace(string(line[6:])))
 			if err != nil {
