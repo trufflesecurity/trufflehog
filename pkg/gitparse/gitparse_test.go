@@ -123,18 +123,18 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 	}
 }
 
-func TestMultiCommitBrokenDiff(t *testing.T) {
-	r := bytes.NewReader([]byte(singleCommitBrokenDiff))
+func TestMultiCommitContextDiff(t *testing.T) {
+	r := bytes.NewReader([]byte(singleCommitContextDiff))
 	commitChan := make(chan Commit)
 	dateOne, _ := time.Parse(DateFormat, "Mon Mar 15 23:27:16 2021 -0700")
 	dateTwo, _ := time.Parse(DateFormat, "Wed Dec 12 18:19:21 2018 -0800")
-	diffOneA := bytes.NewBuffer([]byte(singleCommitBrokenDiffDiffOneA))
-	diffTwoA := bytes.NewBuffer([]byte(singleCommitBrokenDiffDiffTwoA))
-	diffTwoB := bytes.NewBuffer([]byte(singleCommitBrokenDiffDiffTwoB))
+	diffOneA := bytes.NewBuffer([]byte(singleCommitContextDiffDiffOneA))
+	diffTwoA := bytes.NewBuffer([]byte(singleCommitContextDiffDiffTwoA))
+	// diffTwoB := bytes.NewBuffer([]byte(singleCommitContextDiffDiffTwoB))
 	messageOne := strings.Builder{}
-	messageOne.Write([]byte(singleCommitBrokenDiffMessageOne))
+	messageOne.Write([]byte(singleCommitContextDiffMessageOne))
 	messageTwo := strings.Builder{}
-	messageTwo.Write([]byte(singleCommitBrokenDiffMessageTwo))
+	messageTwo.Write([]byte(singleCommitContextDiffMessageTwo))
 	expected := []Commit{
 		{
 			Hash:    "70001020fab32b1fcf2f1f0e5c66424eae649826",
@@ -158,14 +158,8 @@ func TestMultiCommitBrokenDiff(t *testing.T) {
 			Diffs: []Diff{
 				{
 					PathB:     "aws",
-					LineStart: 3,
+					LineStart: 1,
 					Content:   *diffTwoA,
-					IsBinary:  false,
-				},
-				{
-					PathB:     "aws",
-					LineStart: 7,
-					Content:   *diffTwoB,
 					IsBinary:  false,
 				},
 			},
@@ -181,7 +175,7 @@ func TestMultiCommitBrokenDiff(t *testing.T) {
 		}
 
 		if !commit.Equal(&expected[i]) {
-			t.Errorf("Commit does not match. Got: %v, expected: %v", commit, expected)
+			t.Errorf("Commit does not match. Got: %v, expected: %v", commit, expected[i])
 		}
 		i++
 	}
@@ -220,7 +214,7 @@ aws_secret_access_key = Tg0pz8Jii8hkLx4+PnUisM8GmKs3a2DK+9qz/lie
 output = json
 region = us-east-2
 `
-const singleCommitBrokenDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
+const singleCommitContextDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
 Date:   Mon Mar 15 23:27:16 2021 -0700
 
@@ -254,34 +248,37 @@ diff --git a/aws b/aws
 index 239b415..2ee133b 100644
 --- a/aws
 +++ b/aws
-@@ -3 +3,3 @@ blah blaj
+@@ -1,5 +1,7 @@
+ blah blaj
+ 
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
-@@ -5 +7 @@ this is the secret: AKIA2E0A8F3B244C9986
+ 
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
 `
 
-const singleCommitBrokenDiffMessageOne = `Update aws
+const singleCommitContextDiffMessageOne = `Update aws
 `
 
-const singleCommitBrokenDiffMessageTwo = `Update aws again
+const singleCommitContextDiffMessageTwo = `Update aws again
 `
 
-const singleCommitBrokenDiffDiffOneA = `[default]
+const singleCommitContextDiffDiffOneA = `[default]
 aws_access_key_id = AKIAXYZDQCEN4B6JSJQI
 aws_secret_access_key = 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
 output = json
 region = us-east-2
 `
 
-const singleCommitBrokenDiffDiffTwoA = `this is the secret: [Default]
+const singleCommitContextDiffDiffTwoA = `
+
+this is the secret: [Default]
 Access key Id: AKIAILE3JG6KMS3HZGCA
 Secret Access Key: 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
-`
 
-const singleCommitBrokenDiffDiffTwoB = `okay thank you bye
+okay thank you bye
 `
