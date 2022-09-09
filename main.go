@@ -68,6 +68,7 @@ var (
 	gitlabScanEndpoint = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
 	gitlabScanRepos    = gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
 	gitlabScanToken    = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
+	gitlabScanGroupIDs = gitlabScan.Flag("groupId", "GitLab group ID. If you specify this it will scan the group and subgroups").Strings()
 
 	filesystemScan        = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
@@ -225,6 +226,7 @@ func run(state overseer.State) {
 			c.Endpoint = *gitlabScanEndpoint
 			c.Token = *gitlabScanToken
 			c.Repos = *gitlabScanRepos
+			c.Groups = *gitlabScanGroupIDs
 		}
 
 		if err = e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {

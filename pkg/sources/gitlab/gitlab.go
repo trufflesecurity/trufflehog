@@ -38,6 +38,7 @@ type Source struct {
 	token           string
 	url             string
 	repos           []string
+	groupIds        []string
 	git             *git.Git
 	aCtx            context.Context
 	resumeInfoSlice []string
@@ -80,6 +81,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 
 	s.repos = conn.Repositories
+	s.groupIds = conn.Groupids
 	s.url = conn.Endpoint
 	if conn.Endpoint != "" && !strings.HasSuffix(s.url, "/") {
 		s.url = s.url + "/"
@@ -245,6 +247,37 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	return projectList, nil
 }
 
+func (s *Source) getAllProjectsByGroupID(apiClient *gitlab.Client) ([]*gitlab.Project, error) {
+	//Get all the projects under a group, includes subgroups
+
+	var projects []*gitlab.Project
+
+	for _, gid := range s.groupIds {
+		groupProjectOptions := &gitlab.ListGroupProjectsOptions{
+			OrderBy:          gitlab.String("last_activity_at"),
+			IncludeSubGroups: gitlab.Bool(true),
+		}
+
+		for {
+			groupProjects, res, err := apiClient.Groups.ListGroupProjects(gid, groupProjectOptions)
+			if err != nil {
+				return nil, errors.Errorf("receivec error on listing group projects: %s\n", err)
+			}
+
+			for _, prj := range groupProjects {
+				projects = append(projects, prj)
+			}
+
+			groupProjectOptions.Page = res.NextPage
+			if res.NextPage == 0 {
+				break
+			}
+		}
+	}
+
+	return projects, nil
+}
+
 func (s *Source) getRepos() ([]string, []error) {
 	if len(s.repos) == 0 {
 		return nil, nil
@@ -356,7 +389,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	// Get all repos if not specified.
 	if repos == nil {
-		projects, err := s.getAllProjects(apiClient)
+		//If groups are specfied then use them
+		var projects []*gitlab.Project
+		var err error
+		if len(s.groupIds) > 0 {
+			projects, err = s.getAllProjectsByGroupID(apiClient)
+		} else {
+			projects, err = s.getAllProjects(apiClient)
+		}
+
 		if err != nil {
 			return errors.New(err)
 		}
