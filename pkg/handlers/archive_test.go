@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"regexp"
 	"testing"
+
+	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 )
 
 func TestArchiveHandler(t *testing.T) {
@@ -52,6 +54,11 @@ func TestArchiveHandler(t *testing.T) {
 			1543,
 			"AKIAYVP4CIPPH5TNP3SW",
 		},
+		"zip-single": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip",
+			1,
+			"AKIAYVP4CIPPH5TNP3SW",
+		},
 	}
 
 	for name, testCase := range tests {
@@ -64,7 +71,11 @@ func TestArchiveHandler(t *testing.T) {
 		archive := Archive{}
 		archive.New()
 
-		archiveChan := archive.FromFile(resp.Body)
+		newReader, err := diskbufferreader.New(resp.Body)
+		if err != nil {
+			t.Errorf("error creating reusable reader: %s", err)
+		}
+		archiveChan := archive.FromFile(newReader)
 
 		count := 0
 		re := regexp.MustCompile(testCase.matchString)
