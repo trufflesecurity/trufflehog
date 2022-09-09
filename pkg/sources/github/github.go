@@ -364,12 +364,13 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 	var scanErrs []error
 	for i, repoURL := range s.repos {
-		repoURL := repoURL
+		i, repoURL := i, repoURL
 		s.jobPool.Go(func() error {
 			if common.IsDone(ctx) {
 				return nil
 			}
 
+			// TODO: set progress complete is being called concurrently with i
 			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
 			defer func(s *Source, repoURL string) {
@@ -388,22 +389,9 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			var repo *gogit.Repository
 			var err error
 
-			switch s.conn.GetCredential().(type) {
-			case *sourcespb.GitHub_Unauthenticated:
-				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
-				if err != nil {
-					scanErrs = append(scanErrs, fmt.Errorf("error cloning repo %s: %w", repoURL, err))
-				}
-			default:
-				var token string
-				token, err = s.Token(ctx, installationClient)
-				if err != nil {
-					scanErrs = append(scanErrs, fmt.Errorf("error getting token for repo %s: %w", repoURL, err))
-				}
-				path, repo, err = git.CloneRepoUsingToken(token, repoURL, "")
-				if err != nil {
-					scanErrs = append(scanErrs, fmt.Errorf("error cloning repo %s: %w", repoURL, err))
-				}
+			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
+			if err != nil {
+				scanErrs = append(scanErrs, err)
 			}
 
 			defer os.RemoveAll(path)
@@ -433,6 +421,35 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	}
 
 	return scanErrs
+}
+
+func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClient *github.Client) (string, *gogit.Repository, error) {
+	var path string
+	var repo *gogit.Repository
+	var err error
+
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_Unauthenticated:
+		path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
+		if err != nil {
+			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+		}
+	default:
+		var token string
+		token, err := s.Token(ctx, installationClient)
+		if err != nil {
+			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
+		}
+		user := ""
+		if _, ok := cred.(*sourcespb.GitHub_GithubApp); ok {
+			user = "x-access-token"
+		}
+		path, repo, err = git.CloneRepoUsingToken(token, repoURL, user)
+		if err != nil {
+			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+		}
+	}
+	return path, repo, nil
 }
 
 // handleRateLimit returns true if a rate limit was handled
@@ -633,7 +650,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 			if res == nil {
 				break
 			}
-			s.log.Debugf("Listed members for org %s page %d/%d", org, opts.Page, res.LastPage)
+			s.log.Debugf("Listed members for org %s page %d/%d", *org.Account.Login, opts.Page, res.LastPage)
 			for _, m := range members {
 				usr := m.Login
 				if usr == nil || *usr == "" {
