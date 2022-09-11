@@ -64,7 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = true
 			}()
 		}
-
 		results = append(results, s1)
 	}
 
