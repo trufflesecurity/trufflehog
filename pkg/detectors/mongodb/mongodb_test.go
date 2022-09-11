@@ -45,7 +45,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("%s", secret)),
+				data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
