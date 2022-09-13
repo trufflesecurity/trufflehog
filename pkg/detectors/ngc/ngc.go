@@ -3,7 +3,6 @@ package ngc
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -53,20 +52,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.ngc.nvidia.com/v2/users/me", nil)
+				key := "Basic " + string(base64.StdEncoding.EncodeToString([]byte("$oauthtoken:"+resMatch)))
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://authn.nvidia.com/token?service=ngc", nil)
 				if err != nil {
 					continue
 				}
-				fmt.Print(resMatch + string('\n'))
-				fmt.Printf("Length is %d\n", len(resMatch))
 				req.Header = http.Header{
 					"accept":        {"*/*"},
-					"Authorization": {resMatch},
+					"Authorization": {key},
 				}
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					fmt.Print(fmt.Sprint(res.StatusCode) + string('\n'))
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
@@ -74,7 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
-						s1.Verified = false
 					}
 				}
 			}
