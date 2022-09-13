@@ -1836,6 +1836,8 @@ func (m *Slack) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Visibility
+
 	if len(errors) > 0 {
 		return SlackMultiError(errors)
 	}
