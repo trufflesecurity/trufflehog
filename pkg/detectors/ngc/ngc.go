@@ -2,6 +2,7 @@ package ngc
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -21,7 +22,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngc"}) + `\b([[:alnum:]]{84})\b`)
+	// keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngc"}) + `\b([[:alnum:]]{26}:[[:alnum:]]{8}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{12})\b`)
+	keyPat1 = regexp.MustCompile(`\b([[:alnum:]]{84})\b`)
+	keyPat2 = regexp.MustCompile(`\b([[:alnum:]]{26}:[[:alnum:]]{8}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -33,43 +36,52 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify NGC secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat1.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
+		decode, _ := base64.StdEncoding.DecodeString(resMatch)
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_NGC,
-			Raw:          []byte(resMatch),
-		}
-
-		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.ngc.com/apps", nil)
-			if err != nil {
-				continue
+		contains_key := keyPat2.MatchString(string(decode))
+		if contains_key {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_NGC,
+				Raw:          []byte(resMatch),
 			}
-			req.Header.Add("Accept", "application/vnd.ngc+json; version=3")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
+
+			if verify {
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.ngc.nvidia.com/v2/users/me", nil)
+				if err != nil {
+					continue
+				}
+				fmt.Print(resMatch + string('\n'))
+				fmt.Printf("Length is %d\n", len(resMatch))
+				req.Header = http.Header{
+					"accept":        {"*/*"},
+					"Authorization": {resMatch},
+				}
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					fmt.Print(fmt.Sprint(res.StatusCode) + string('\n'))
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
+						s1.Verified = false
 					}
 				}
 			}
+
+			results = append(results, s1)
 		}
 
-		results = append(results, s1)
 	}
-
 	return detectors.CleanResults(results), nil
 }
