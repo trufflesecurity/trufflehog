@@ -148,6 +148,12 @@ message S3 {
   string timestamp = 6;
 }
 
+enum Visibility {
+  public = 0;
+  private = 1;
+  shared = 2;
+}
+
 message Slack {
   string channel_id = 1;
   string channel_name = 2;
@@ -156,6 +162,7 @@ message Slack {
   string link = 5;
   string file = 6;
   string email = 7;
+  Visibility visibility = 8;
 }
 
 message Gerrit {
