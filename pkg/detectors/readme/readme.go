@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"readme"}) + `\b([a-zA-Z0-9_]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"rdme_"}) + `\b([a-z0-9]{70})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
