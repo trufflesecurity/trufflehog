@@ -71,7 +71,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 func RepoPath(ctx context.Context, source string, head string) (chan Commit, error) {
-	args := []string{"-C", source, "log", "-p", "-U0", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
+	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if head != "" {
 		args = append(args, head)
 	} else {
@@ -90,7 +90,7 @@ func RepoPath(ctx context.Context, source string, head string) (chan Commit, err
 
 // Unstaged parses the output of the `git diff` command for the `source` path.
 func Unstaged(ctx context.Context, source string) (chan Commit, error) {
-	args := []string{"-C", source, "diff", "-p", "-U0", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
+	args := []string{"-C", source, "diff", "-p", "-U5", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
 
 	cmd := exec.Command("git", args...)
 
@@ -198,6 +198,8 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 			// NoOp. We only care about additions.
 		case isMessageLine(line):
 			currentCommit.Message.Write(line[4:])
+		case isContextDiffLine(line):
+			currentDiff.Content.Write([]byte("\n"))
 		case isBinaryLine(line):
 			currentDiff.IsBinary = true
 			currentDiff.PathB = pathFromBinaryLine(line)
@@ -219,7 +221,6 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 					currentDiff.LineStart = lineStart
 				}
 			}
-
 		}
 
 	}
@@ -307,6 +308,14 @@ func isPlusDiffLine(line []byte) bool {
 // -fmt.Println("ok")
 func isMinusDiffLine(line []byte) bool {
 	if len(line) >= 1 && bytes.Equal(line[:1], []byte("-")) {
+		return true
+	}
+	return false
+}
+
+//  fmt.Println("ok")
+func isContextDiffLine(line []byte) bool {
+	if len(line) >= 1 && bytes.Equal(line[:1], []byte(" ")) {
 		return true
 	}
 	return false
