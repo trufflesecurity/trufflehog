@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -22,7 +23,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLAB")
+	secret := testSecrets.MustGetField("GITLABV2")
 	secretInactive := testSecrets.MustGetField("GITLAB_INACTIVE")
 	type args struct {
 		ctx    context.Context
@@ -41,7 +42,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
