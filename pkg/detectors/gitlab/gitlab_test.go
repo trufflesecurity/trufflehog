@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -41,7 +42,23 @@ func TestGitlab_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found only secret phrase",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("gitlab %s", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
