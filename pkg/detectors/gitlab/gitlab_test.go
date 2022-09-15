@@ -54,6 +54,22 @@ func TestGitlab_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found only secret phrase",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("gitlab %s", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
