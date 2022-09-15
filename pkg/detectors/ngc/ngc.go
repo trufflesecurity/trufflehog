@@ -44,8 +44,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 		decode, _ := base64.StdEncoding.DecodeString(resMatch)
 
-		contains_key := keyPat2.MatchString(string(decode))
-		if contains_key {
+		containsKey := keyPat2.MatchString(string(decode))
+		if containsKey {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_NGC,
 				Raw:          []byte(resMatch),
