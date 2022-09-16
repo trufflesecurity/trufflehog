@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,13 +19,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"rdme_"}) + `\b([a-z0-9]{70})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex(`(rdme_[a-z0-9]{70})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"readme"}
+	return []string{"rdme_"}
 }
 
 // FromData will find and optionally verify ReadMe secrets in a given set of bytes.
@@ -39,7 +38,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := match[1]
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ReadMe,
