@@ -520,6 +520,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for Timestamp
 
+	// no validation rules for Location
+
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}
@@ -1837,6 +1839,8 @@ func (m *Slack) validate(all bool) error {
 	// no validation rules for Email
 
 	// no validation rules for Visibility
+
+	// no validation rules for Location
 
 	if len(errors) > 0 {
 		return SlackMultiError(errors)
