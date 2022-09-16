@@ -39,6 +39,7 @@ enum SourceType {
   SOURCE_TYPE_JFROG_ARTIFACTORY = 24;
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
+  SOURCE_TYPE_SLACK_REALTIME = 27;
 }
 
 message LocalSource {
@@ -159,7 +160,6 @@ message JIRA {
     credentials.BasicAuth basic_auth = 2;
     credentials.Unauthenticated unauthenticated = 3;
     credentials.Oauth2 oauth = 4;
-
   }
   repeated string projects = 5;
 }
@@ -256,4 +256,10 @@ message PublicEventMonitoring {
   string domain = 2;
   int64 max_depth = 3;
   google.protobuf.Timestamp since = 4;
+}
+
+message SlackRealtime {
+  oneof credential {
+    credentials.SlackTokens tokens = 1;
+  }
 }
