@@ -421,22 +421,29 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 	logger.Out = io.Discard
 
 	for _, tt := range tests {
-		s := &Source{
-			repos: tt.repos,
-			log:   logger.WithField("no", "output"),
-		}
+		t.Run("", func(t *testing.T) {
+			s := &Source{
+				repos: tt.repos,
+				log:   logger.WithField("no", "output"),
+			}
 
-		s.setProgressCompleteWithRepo(tt.offset, "")
-		gotProgress := s.GetProgress()
-		if gotProgress.PercentComplete != tt.wantPercentComplete {
-			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.PercentComplete, tt.wantPercentComplete)
-		}
-		if gotProgress.SectionsCompleted != tt.wantSectionsCompleted {
-			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsCompleted, tt.wantSectionsCompleted)
-		}
-		if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
-			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
-		}
+			// Increment the progress counter by number of repos already processed.
+			for i := 0; i < tt.offset; i++ {
+				s.Counter.Inc()
+			}
+
+			s.setProgressCompleteWithRepo(tt.offset, "")
+			gotProgress := s.GetProgress()
+			if gotProgress.PercentComplete != tt.wantPercentComplete {
+				t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.PercentComplete, tt.wantPercentComplete)
+			}
+			if gotProgress.SectionsCompleted != tt.wantSectionsCompleted {
+				t.Errorf("s.setProgressCompleteWithRepo() SectionsCompleted got: %v want: %v", gotProgress.SectionsCompleted, tt.wantSectionsCompleted)
+			}
+			if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
+				t.Errorf("s.setProgressCompleteWithRepo() SectionsRemaining got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
+			}
+		})
 	}
 }
 
