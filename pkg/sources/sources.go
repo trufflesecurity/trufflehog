@@ -110,7 +110,7 @@ type Counter struct {
 	mu    sync.Mutex
 }
 
-// Inc increments the counter.
+// Inc increments the counter and returns the new value.
 func (c *Counter) Inc() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
