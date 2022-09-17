@@ -143,7 +143,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 
 		cnt := s.Counter.Inc()
-		s.SetProgressComplete(cnt, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
+		s.Update(len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 
 		s.log.Debugf("Scanning bucket: %s", bucket)
 		region, err := s3manager.GetBucketRegionWithClient(context.Background(), client, bucket)
@@ -178,7 +178,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		log.Debugf("scanned %d/%d buckets", cnt, numBuckets)
 	}
-	s.SetProgressComplete(numBuckets, numBuckets, fmt.Sprintf("Completed scanning source %s", s.name), "")
+	s.Complete(fmt.Sprintf("Completed scanning source %s", s.name))
 
 	return nil
 }

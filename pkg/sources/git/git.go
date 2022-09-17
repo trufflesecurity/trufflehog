@@ -131,7 +131,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		token := cred.BasicAuth.Password
 
 		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+			s.Update(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -149,7 +149,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 	case *sourcespb.Git_Unauthenticated:
 		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+			s.Update(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -170,7 +170,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	for i, u := range s.conn.Directories {
-		s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")
+		s.Update(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")
 
 		if len(u) == 0 {
 			continue
@@ -195,7 +195,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 
 	}
-	s.SetProgressComplete(len(s.conn.Repositories), len(s.conn.Repositories), fmt.Sprintf("Completed scanning source %s", s.name), "")
+	s.Update(len(s.conn.Repositories), len(s.conn.Repositories), fmt.Sprintf("Completed scanning source %s", s.name), "")
 	return nil
 }
 

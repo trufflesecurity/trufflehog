@@ -17,12 +17,13 @@ import (
 	"github.com/google/go-github/v42/github"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
@@ -373,7 +374,7 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		s.resumeInfoSlice = tt.startingResumeInfoSlice
-		s.setProgressCompleteWithRepo(0, 0, tt.repoURL)
+		s.setProgressCompleteWithRepo(0, tt.repoURL)
 		if !reflect.DeepEqual(s.resumeInfoSlice, tt.wantResumeInfoSlice) {
 			t.Errorf("s.setProgressCompleteWithRepo() got: %v, want: %v", s.resumeInfoSlice, tt.wantResumeInfoSlice)
 		}
@@ -425,7 +426,7 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 			log:   logger.WithField("no", "output"),
 		}
 
-		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
+		s.setProgressCompleteWithRepo(tt.offset, "")
 		gotProgress := s.GetProgress()
 		if gotProgress.PercentComplete != tt.wantPercentComplete {
 			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.PercentComplete, tt.wantPercentComplete)

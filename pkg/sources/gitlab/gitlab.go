@@ -292,7 +292,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 
 			cnt := s.Counter.Inc()
-			s.setProgressCompleteWithRepo(cnt, progressIndexOffset, repoURL)
+			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repoURL is removed from the resume info after being scanned.
 			defer func(s *Source) {
 				s.resumeInfoMutex.Lock()
@@ -335,7 +335,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 
 	_ = s.jobPool.Wait()
 	if len(scanErrs) == 0 {
-		s.SetProgressComplete(repoCnt, repoCnt, fmt.Sprintf("Completed scanning source %s", s.name), "")
+		s.Complete(fmt.Sprintf("Completed scanning source %s", s.name))
 	}
 
 	return scanErrs
@@ -411,8 +411,8 @@ func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
 	return false
 }
 
-// setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
-func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string) {
+// setProgressCompleteWithRepo calls the s.Update after safely setting up the encoded resume info string.
+func (s *Source) setProgressCompleteWithRepo(offset int, repoURL string) {
 	s.resumeInfoMutex.Lock()
 	defer s.resumeInfoMutex.Unlock()
 
@@ -424,5 +424,5 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 
 	// Add the offset to both the index and the repos to give the proper place and proper repo count.
-	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+	s.Update(len(s.repos)-offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
