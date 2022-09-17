@@ -130,8 +130,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		user := cred.BasicAuth.Username
 		token := cred.BasicAuth.Password
 
-		for i, repoURI := range s.conn.Repositories {
-			s.Update(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+		for _, repoURI := range s.conn.Repositories {
+			s.Update(len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -148,8 +148,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 		}
 	case *sourcespb.Git_Unauthenticated:
-		for i, repoURI := range s.conn.Repositories {
-			s.Update(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+		for _, repoURI := range s.conn.Repositories {
+			s.Update(len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -169,8 +169,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return errors.New("invalid connection type for git source")
 	}
 
-	for i, u := range s.conn.Directories {
-		s.Update(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")
+	for _, u := range s.conn.Directories {
+		s.Update(len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")
 
 		if len(u) == 0 {
 			continue
@@ -195,7 +195,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 
 	}
-	s.Update(len(s.conn.Repositories), len(s.conn.Repositories), fmt.Sprintf("Completed scanning source %s", s.name), "")
+	s.Complete(fmt.Sprintf("Completed scanning source %s", s.name))
 	return nil
 }
 
