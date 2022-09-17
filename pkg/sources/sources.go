@@ -104,14 +104,36 @@ func NewConfig(opts ...func(*Config)) Config {
 	return *c
 }
 
+// Counter is a simple monotonically-increasing counter for tracking progress.
+type Counter struct {
+	count uint32
+	mu    sync.Mutex
+}
+
+// Inc increments the counter.
+func (c *Counter) Inc() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.count++
+	return int(c.count)
+}
+
+// Get returns the current count.
+func (c *Counter) Get() uint32 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.count
+}
+
 // Progress is used to update job completion progress across sources.
 type Progress struct {
-	mut               sync.Mutex
+	Counter           Counter
+	SectionsCompleted int32
+	SectionsRemaining int32
 	PercentComplete   int64
 	Message           string
 	EncodedResumeInfo string
-	SectionsCompleted int32
-	SectionsRemaining int32
+	mut               sync.Mutex
 }
 
 // SetProgressComplete sets job progress information for a running job based on the highest level objects in the source.
@@ -119,9 +141,11 @@ type Progress struct {
 // scope should be the len(scopedItems)
 // message is the public facing user information about the current progress
 // encodedResumeInfo is an optional string representing any information necessary to resume the job if interrupted
-func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo string) {
+func (p *Progress) SetProgressComplete(_, scope int, message, encodedResumeInfo string) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
+
+	i := p.Counter.Get()
 
 	p.Message = message
 	p.EncodedResumeInfo = encodedResumeInfo

@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -44,6 +47,7 @@ type Source struct {
 	resumeInfoMutex sync.Mutex
 	jobSem          *semaphore.Weighted
 	sources.Progress
+	jobPool *errgroup.Group
 }
 
 // Ensure the Source satisfies the interface at compile time.
@@ -71,7 +75,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
-	s.jobSem = semaphore.NewWeighted(int64(concurrency))
+	s.jobPool = &errgroup.Group{}
+	s.jobPool.SetLimit(concurrency)
 
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -265,34 +270,30 @@ func (s *Source) getRepos() ([]string, []error) {
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) []error {
-	wg := sync.WaitGroup{}
-	var errs []error
-	var errsMut sync.Mutex
+	var scanned uint64
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
 	s.repos = reposToScan
+	log.Debugf("Found %v total repos to scan", len(s.repos))
 
-	for i, repo := range s.repos {
-		if common.IsDone(ctx) {
-			// We are returning nil instead of the scanErrors slice here because
-			// we don't want to mark this scan as errored if we cancelled it.
-			return nil
-		}
-		if err := s.jobSem.Acquire(ctx, 1); err != nil {
-			log.WithError(err).Debug("could not acquire semaphore")
-			continue
-		}
-		wg.Add(1)
-		go func(ctx context.Context, repoURL string, i int) {
-			defer s.jobSem.Release(1)
-			defer wg.Done()
+	var scanErrs []error
+	repoCnt := len(s.repos)
+	for _, repoURL := range s.repos {
+		repoURL := repoURL
+		s.jobPool.Go(func() error {
+			if common.IsDone(ctx) {
+				// We are returning nil instead of the scanErrors slice here because
+				// we don't want to mark this scan as errored if we cancelled it.
+				return nil
+			}
 			if len(repoURL) == 0 {
-				return
+				return nil
 			}
 
-			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
-			// Ensure the repo is removed from the resume info after being scanned.
+			cnt := s.Counter.Inc()
+			s.setProgressCompleteWithRepo(cnt, progressIndexOffset, repoURL)
+			// Ensure the repoURL is removed from the resume info after being scanned.
 			defer func(s *Source) {
 				s.resumeInfoMutex.Lock()
 				defer s.resumeInfoMutex.Unlock()
@@ -305,7 +306,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			if s.authMethod == "UNAUTHENTICATED" {
 				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
 			} else {
-				// If a username is not provided we need to use a default one in order to clone a private repo.
+				// If a username is not provided we need to use a default one in order to clone a private repoURL.
 				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
 				user := s.user
 				if user == "" {
@@ -315,28 +316,29 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 			defer os.RemoveAll(path)
 			if err != nil {
-				errsMut.Lock()
-				errs = append(errs, err)
-				errsMut.Unlock()
-				return
+				scanErrs = append(scanErrs, err)
+				return nil
 			}
-			log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(s.repos), repoURL)
+			log.Debugf("Starting to scan repoURL #%d of %d: %s", cnt, repoCnt, repo)
 			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 			if err != nil {
-				errsMut.Lock()
-				errs = append(errs, err)
-				errsMut.Unlock()
-				return
+				scanErrs = append(scanErrs, err)
+				return nil
 			}
-			log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(s.repos), repoURL)
-		}(ctx, repo, i)
-	}
-	wg.Wait()
-	if len(errs) == 0 {
-		s.SetProgressComplete(len(s.repos), len(s.repos), fmt.Sprintf("Completed scanning source %s", s.name), "")
+			atomic.AddUint64(&scanned, 1)
+			log.Debugf("scanned %d/%d repos", scanned, repoCnt)
+			log.Debugf("Completed scanning repoURL # %d of %d: %s", cnt, repoCnt, repo)
+
+			return nil
+		})
 	}
 
-	return errs
+	_ = s.jobPool.Wait()
+	if len(scanErrs) == 0 {
+		s.SetProgressComplete(repoCnt, repoCnt, fmt.Sprintf("Completed scanning source %s", s.name), "")
+	}
+
+	return scanErrs
 }
 
 // Chunks emits chunks of bytes over a channel.

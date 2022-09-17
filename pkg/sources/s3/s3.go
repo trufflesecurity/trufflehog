@@ -135,12 +135,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return errors.Errorf("invalid configuration given for %s source", s.name)
 	}
 
-	for i, bucket := range bucketsToScan {
+	numBuckets := len(bucketsToScan)
+	log.Debugf("Found %v total buckets to scan", numBuckets)
+	for _, bucket := range bucketsToScan {
 		if common.IsDone(ctx) {
 			return nil
 		}
 
-		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
+		cnt := s.Counter.Inc()
+		s.SetProgressComplete(cnt, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 
 		s.log.Debugf("Scanning bucket: %s", bucket)
 		region, err := s3manager.GetBucketRegionWithClient(context.Background(), client, bucket)
@@ -161,6 +164,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		// pf := "public"
 		errorCount := sync.Map{}
 
+		log.Debugf("Starting to scan bucket #%d of %d: %s", cnt, numBuckets, bucket)
 		err = regionalClient.ListObjectsV2PagesWithContext(
 			ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
 			func(page *s3.ListObjectsV2Output, last bool) bool {
@@ -172,8 +176,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			s.log.WithError(err).Errorf("could not list objects in s3 bucket: %s", bucket)
 			return errors.WrapPrefix(err, fmt.Sprintf("could not list objects in s3 bucket: %s", bucket), 0)
 		}
+		log.Debugf("scanned %d/%d buckets", cnt, numBuckets)
 	}
-	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s", s.name), "")
+	s.SetProgressComplete(numBuckets, numBuckets, fmt.Sprintf("Completed scanning source %s", s.name), "")
 
 	return nil
 }

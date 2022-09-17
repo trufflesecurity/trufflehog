@@ -394,15 +394,16 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	s.repos = reposToScan
 
 	var scanErrs []error
-	for i, repoURL := range s.repos {
-		i, repoURL := i, repoURL
+	repoCnt := len(s.repos)
+	for _, repoURL := range s.repos {
+		repoURL := repoURL
 		s.jobPool.Go(func() error {
 			if common.IsDone(ctx) {
 				return nil
 			}
 
-			// TODO: set progress complete is being called concurrently with i
-			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
+			cnt := s.Counter.Inc()
+			s.setProgressCompleteWithRepo(cnt, progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
 			defer func(s *Source, repoURL string) {
 				s.resumeInfoMutex.Lock()
@@ -415,7 +416,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo %d/%d", i+1, len(s.repos))
+			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo #%d of %d", cnt, repoCnt)
 			var path string
 			var repo *gogit.Repository
 			var err error
@@ -435,12 +436,13 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				git.ScanOptionHeadCommit(s.conn.Head),
 			)
 
+			log.Debugf("Starting to scan repo #%d of %d: %s", cnt, repoCnt, repo)
 			if err = s.git.ScanRepo(ctx, repo, path, scanOptions, chunksChan); err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
-			log.Debugf("scanned %d/%d repos", scanned, len(s.repos))
+			log.Debugf("scanned %d/%d repos", scanned, repoCnt)
 
 			return nil
 		})
@@ -448,7 +450,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 	_ = s.jobPool.Wait()
 	if len(scanErrs) == 0 {
-		s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
+		s.SetProgressComplete(repoCnt, repoCnt, "Completed Github scan", "")
 	}
 
 	return scanErrs
