@@ -186,7 +186,7 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		s.resumeInfoSlice = tt.startingResumeInfoSlice
-		s.setProgressCompleteWithRepo(0, 0, tt.repoURL)
+		s.setProgressCompleteWithRepo(0, tt.repoURL)
 		if !reflect.DeepEqual(s.resumeInfoSlice, tt.wantResumeInfoSlice) {
 			t.Errorf("s.setProgressCompleteWithRepo() got: %v, want: %v", s.resumeInfoSlice, tt.wantResumeInfoSlice)
 		}
@@ -236,7 +236,7 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 			repos: tt.repos,
 		}
 
-		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
+		s.setProgressCompleteWithRepo(tt.offset, "")
 		gotProgress := s.GetProgress()
 		if gotProgress.PercentComplete != tt.wantPercentComplete {
 			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.PercentComplete, tt.wantPercentComplete)
