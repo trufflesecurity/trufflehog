@@ -140,13 +140,13 @@ func (c *Counter) Get() uint32 {
 
 // Progress is used to update job completion progress across sources.
 type Progress struct {
-	Counter           Counter
 	SectionsCompleted int32
 	SectionsRemaining int32
 	PercentComplete   int64
 	Message           string
 	EncodedResumeInfo string
 	mut               sync.Mutex
+	Counter           Counter
 }
 
 // Update sets job progress information for a running job based on the highest level objects in the source.
