@@ -402,7 +402,14 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			cnt := s.Counter.Inc()
+			var err error
+			// Only increement the progress counter if the scan was successful.
+			defer func() {
+				if err == nil {
+					s.Counter.Inc()
+				}
+			}()
+			cnt := s.Counter.Get()
 			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
 			defer func(s *Source, repoURL string) {
@@ -412,14 +419,14 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			}(s, repoURL)
 
 			if !strings.HasSuffix(repoURL, ".git") {
-				scanErrs = append(scanErrs, fmt.Errorf("repo %s does not end in .git", repoURL))
+				err = fmt.Errorf("repo %s does not end in .git", repoURL)
+				scanErrs = append(scanErrs, err)
 				return nil
 			}
 
-			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo #%d of %d", cnt, repoCnt)
+			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo #%d of %d", cnt+1, repoCnt)
 			var path string
 			var repo *gogit.Repository
-			var err error
 
 			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
 			if err != nil {
@@ -436,7 +443,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				git.ScanOptionHeadCommit(s.conn.Head),
 			)
 
-			log.Debugf("Starting to scan repo #%d of %d: %s", cnt, repoCnt, repo)
+			log.Debugf("Starting to scan repo #%d of %d: %s", cnt+1, repoCnt, repo)
 			if err = s.git.ScanRepo(ctx, repo, path, scanOptions, chunksChan); err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 				return nil
@@ -890,5 +897,5 @@ func (s *Source) setProgressCompleteWithRepo(offset int, repoURL string) {
 	// Make the resume info string from the slice.
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 
-	s.Update(len(s.repos)-offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+	s.Update(len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }

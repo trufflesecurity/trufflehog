@@ -291,7 +291,14 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				return nil
 			}
 
-			cnt := s.Counter.Inc()
+			var err error
+			// Only increment the progress counter if the scan was successful.
+			defer func() {
+				if err == nil {
+					s.Counter.Inc()
+				}
+			}()
+			cnt := s.Counter.Get()
 			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repoURL is removed from the resume info after being scanned.
 			defer func(s *Source) {
@@ -302,7 +309,6 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 
 			var path string
 			var repo *gogit.Repository
-			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
 				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
 			} else {
@@ -319,7 +325,8 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				scanErrs = append(scanErrs, err)
 				return nil
 			}
-			log.Debugf("Starting to scan repoURL #%d of %d: %s", cnt, repoCnt, repo)
+
+			log.Debugf("Starting to scan repoURL #%d of %d: %s", cnt+1, repoCnt, repo)
 			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 			if err != nil {
 				scanErrs = append(scanErrs, err)
@@ -327,7 +334,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 			atomic.AddUint64(&scanned, 1)
 			log.Debugf("scanned %d/%d repos", scanned, repoCnt)
-			log.Debugf("Completed scanning repoURL # %d of %d: %s", cnt, repoCnt, repo)
+			log.Debugf("Completed scanning repoURL # %d of %d: %s", cnt+1, repoCnt, repo)
 
 			return nil
 		})
@@ -424,5 +431,5 @@ func (s *Source) setProgressCompleteWithRepo(offset int, repoURL string) {
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 
 	// Add the offset to both the index and the repos to give the proper place and proper repo count.
-	s.Update(len(s.repos)-offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+	s.Update(len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
