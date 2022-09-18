@@ -9,7 +9,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/sync/semaphore"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -197,7 +197,6 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 	repos := []string{"a", "b", "c", "d", "e"}
 	tests := map[string]struct {
 		repos                 []string
-		index                 int
 		offset                int
 		wantPercentComplete   int64
 		wantSectionsCompleted int32
@@ -205,7 +204,6 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 	}{
 		"starting from the beginning, no offset": {
 			repos:                 repos,
-			index:                 0,
 			offset:                0,
 			wantPercentComplete:   0,
 			wantSectionsCompleted: 0,
@@ -213,18 +211,16 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		},
 		"resume from the third, offset 2": {
 			repos:                 repos[2:],
-			index:                 0,
 			offset:                2,
 			wantPercentComplete:   40,
 			wantSectionsCompleted: 2,
 			wantSectionsRemaining: 5,
 		},
 		"resume from the third, on last repo, offset 2": {
-			repos:                 repos[2:],
-			index:                 2,
-			offset:                2,
-			wantPercentComplete:   80,
-			wantSectionsCompleted: 4,
+			repos:                 repos[3:],
+			offset:                3,
+			wantPercentComplete:   60,
+			wantSectionsCompleted: 3,
 			wantSectionsRemaining: 5,
 		},
 	}
@@ -232,21 +228,28 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 	log.SetOutput(io.Discard)
 
 	for _, tt := range tests {
-		s := &Source{
-			repos: tt.repos,
-		}
+		t.Run("", func(t *testing.T) {
+			s := &Source{
+				repos: tt.repos,
+			}
 
-		s.setProgressCompleteWithRepo(tt.offset, "")
-		gotProgress := s.GetProgress()
-		if gotProgress.PercentComplete != tt.wantPercentComplete {
-			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.PercentComplete, tt.wantPercentComplete)
-		}
-		if gotProgress.SectionsCompleted != tt.wantSectionsCompleted {
-			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsCompleted, tt.wantSectionsCompleted)
-		}
-		if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
-			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
-		}
+			// Increment the progress counter by number of repos already processed.
+			for i := 1; i <= tt.offset; i++ {
+				s.Counter.Inc()
+			}
+
+			s.setProgressCompleteWithRepo(tt.offset, "")
+			gotProgress := s.GetProgress()
+			if gotProgress.PercentComplete != tt.wantPercentComplete {
+				t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.PercentComplete, tt.wantPercentComplete)
+			}
+			if gotProgress.SectionsCompleted != tt.wantSectionsCompleted {
+				t.Errorf("s.setProgressCompleteWithRepo() SectionsCompleted got: %v want: %v", gotProgress.SectionsCompleted, tt.wantSectionsCompleted)
+			}
+			if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
+				t.Errorf("s.setProgressCompleteWithRepo() SectionsRemaining got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
+			}
+		})
 	}
 }
 
@@ -273,7 +276,7 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			src := &Source{
 				repos: tc.repos,
 			}
-			src.jobSem = semaphore.NewWeighted(1)
+			src.jobPool = &errgroup.Group{}
 
 			_ = src.scanRepos(context.Background(), nil)
 			if !tc.wantErr {
