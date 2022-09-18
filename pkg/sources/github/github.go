@@ -401,15 +401,15 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			if common.IsDone(ctx) {
 				return nil
 			}
+			cnt := s.Counter.IncTotal()
 
 			var err error
-			// Only increement the progress counter if the scan was successful.
+			// Only increement the success progress counter if the scan was successful.
 			defer func() {
 				if err == nil {
-					s.Counter.Inc()
+					s.Counter.IncSuccess()
 				}
 			}()
-			cnt := s.Counter.Get()
 			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
 			defer func(s *Source, repoURL string) {
@@ -424,7 +424,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo #%d of %d", cnt+1, repoCnt)
+			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo #%d of %d", cnt, repoCnt)
 			var path string
 			var repo *gogit.Repository
 
@@ -443,7 +443,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				git.ScanOptionHeadCommit(s.conn.Head),
 			)
 
-			log.Debugf("Starting to scan repo #%d of %d: %s", cnt+1, repoCnt, repo)
+			log.Debugf("Starting to scan repo #%d of %d: %s", cnt, repoCnt, repo)
 			if err = s.git.ScanRepo(ctx, repo, path, scanOptions, chunksChan); err != nil {
 				log.WithError(err).Errorf("unable to scan repo, continuing")
 				return nil

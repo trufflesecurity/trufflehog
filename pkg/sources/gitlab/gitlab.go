@@ -291,14 +291,14 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				return nil
 			}
 
+			cnt := s.Counter.IncTotal()
 			var err error
-			// Only increment the progress counter if the scan was successful.
+			// Only increment the success progress counter if the scan was successful.
 			defer func() {
 				if err == nil {
-					s.Counter.Inc()
+					s.Counter.IncSuccess()
 				}
 			}()
-			cnt := s.Counter.Get()
 			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repoURL is removed from the resume info after being scanned.
 			defer func(s *Source) {
@@ -326,7 +326,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				return nil
 			}
 
-			log.Debugf("Starting to scan repoURL #%d of %d: %s", cnt+1, repoCnt, repo)
+			log.Debugf("Starting to scan repoURL #%d of %d: %s", cnt, repoCnt, repo)
 			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 			if err != nil {
 				scanErrs = append(scanErrs, err)
@@ -334,7 +334,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 			atomic.AddUint64(&scanned, 1)
 			log.Debugf("scanned %d/%d repos", scanned, repoCnt)
-			log.Debugf("Completed scanning repoURL # %d of %d: %s", cnt+1, repoCnt, repo)
+			log.Debugf("Completed scanning repoURL # %d of %d: %s", cnt, repoCnt, repo)
 
 			return nil
 		})
@@ -355,7 +355,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	if err != nil {
 		return errors.New(err)
 	}
-	// Get repo within target.
+	// GetSuccess repo within target.
 	repos, errs := s.getRepos()
 	for _, repoErr := range errs {
 		log.WithError(repoErr).Warn("error getting repo")
@@ -366,7 +366,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return errors.New("All specified repos had validation issues, ending scan")
 	}
 
-	// Get all repos if not specified.
+	// GetSuccess all repos if not specified.
 	if repos == nil {
 		projects, err := s.getAllProjects(apiClient)
 		if err != nil {

@@ -105,24 +105,37 @@ func NewConfig(opts ...func(*Config)) Config {
 }
 
 // Counter is a simple monotonically-increasing counter for tracking progress.
+// It includes a successCnt that records the number of successful scans.
+// It also includes a totalCnt that records the total number of scans.
+// This is necessary in order to display the number of concurrent scans
+// regardless of whether they are successful or not.
+// successCnt is the only field used when calculating the percentage complete.
 type Counter struct {
-	count uint32
-	mu    sync.Mutex
+	successCnt, totalCnt uint32
+	mu                   sync.Mutex
 }
 
-// Inc increments the counter and returns the new value.
-func (c *Counter) Inc() int {
+// IncTotal increments the total field of counter and returns the new value.
+func (c *Counter) IncTotal() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.count++
-	return int(c.count)
+	c.totalCnt++
+	return int(c.totalCnt)
 }
 
-// Get returns the current count.
-func (c *Counter) Get() uint32 {
+// IncSuccess increments the success field of counter and returns the new value.
+func (c *Counter) IncSuccess() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.count
+	c.successCnt++
+	return int(c.successCnt)
+}
+
+// GetSuccess returns the current successCnt.
+func (c *Counter) GetSuccess() uint32 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.successCnt
 }
 
 // Progress is used to update job completion progress across sources.
@@ -144,7 +157,7 @@ func (p *Progress) Update(scope int, message, encodedResumeInfo string) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 
-	i := p.Counter.Get()
+	i := p.Counter.GetSuccess()
 
 	p.Message = message
 	p.EncodedResumeInfo = encodedResumeInfo
@@ -160,7 +173,7 @@ func (p *Progress) Complete(msg string) {
 	defer p.mut.Unlock()
 
 	p.SectionsRemaining = 0
-	p.SectionsCompleted = int32(p.Counter.Get())
+	p.SectionsCompleted = int32(p.Counter.GetSuccess())
 	p.Message = msg
 	p.EncodedResumeInfo = ""
 	p.PercentComplete = 100

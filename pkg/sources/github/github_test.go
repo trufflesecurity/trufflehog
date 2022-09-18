@@ -425,7 +425,7 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 
 			// Increment the progress counter by number of repos already processed.
 			for i := 1; i <= tt.offset; i++ {
-				s.Counter.Inc()
+				s.Counter.IncSuccess()
 			}
 
 			s.setProgressCompleteWithRepo(tt.offset, "")

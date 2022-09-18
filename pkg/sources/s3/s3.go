@@ -142,7 +142,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			return nil
 		}
 
-		cnt := s.Counter.Inc()
+		cnt := s.Counter.IncSuccess()
 		s.Update(len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 
 		s.log.Debugf("Scanning bucket: %s", bucket)
