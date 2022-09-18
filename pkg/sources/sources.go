@@ -131,8 +131,8 @@ func (c *Counter) IncSuccess() int {
 	return int(c.successCnt)
 }
 
-// GetSuccess returns the current successCnt.
-func (c *Counter) GetSuccess() uint32 {
+// Get returns the current successCnt.
+func (c *Counter) Get() uint32 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.successCnt
@@ -157,7 +157,7 @@ func (p *Progress) Update(scope int, message, encodedResumeInfo string) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 
-	i := p.Counter.GetSuccess()
+	i := p.Counter.Get()
 
 	p.Message = message
 	p.EncodedResumeInfo = encodedResumeInfo
@@ -173,7 +173,7 @@ func (p *Progress) Complete(msg string) {
 	defer p.mut.Unlock()
 
 	p.SectionsRemaining = 0
-	p.SectionsCompleted = int32(p.Counter.GetSuccess())
+	p.SectionsCompleted = int32(p.Counter.Get())
 	p.Message = msg
 	p.EncodedResumeInfo = ""
 	p.PercentComplete = 100
