@@ -6,11 +6,9 @@ package github
 import (
 	"encoding/base64"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/google/go-github/v42/github"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/mattn/go-colorable"
 	log "github.com/sirupsen/logrus"
@@ -62,13 +60,18 @@ func TestSource_Token(t *testing.T) {
 		log:        log.WithField("source", "github"),
 	}
 
-	_, installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
+	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
 	assert.NoError(t, err)
 
-	token, err := s.Token(ctx, installationClient)
+	user, token, err := s.UserAndToken(ctx, installationClient)
 	assert.NotEmpty(t, token)
 	assert.NoError(t, err)
 
+	// user provided
+	_, _, err = git.CloneRepoUsingToken(token, "https://github.com/trufflesecurity/trufflehog-updater.git", user)
+	assert.NoError(t, err)
+
+	// no user provided
 	_, _, err = git.CloneRepoUsingToken(token, "https://github.com/trufflesecurity/trufflehog-updater.git", "")
 	assert.Error(t, err)
 
@@ -77,8 +80,6 @@ func TestSource_Token(t *testing.T) {
 }
 
 func TestSource_Scan(t *testing.T) {
-	os.Setenv("DO_NOT_RANDOMIZE", "true")
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
 
@@ -427,9 +428,6 @@ func TestSource_Scan(t *testing.T) {
 }
 
 func TestSource_paginateGists(t *testing.T) {
-
-	os.Setenv("DO_NOT_RANDOMIZE", "true")
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -559,7 +557,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.addGistsByUser(ctx, github.NewClient(s.httpClient), tt.user)
+				s.addGistsByUser(ctx, tt.user)
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
