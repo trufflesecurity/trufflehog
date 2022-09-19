@@ -97,6 +97,7 @@ message Github {
   string file = 6;
   string timestamp = 7;
   int64 line = 8;
+  bool public = 9;
 }
 
 message Gitlab {
