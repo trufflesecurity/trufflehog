@@ -79,26 +79,30 @@ func (s *Source) JobID() int64 {
 	return s.jobID
 }
 
-func (s *Source) Token(ctx context.Context, installationClient *github.Client) (string, error) {
+func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Client) (string, string, error) {
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
 		// do nothing
 	case *sourcespb.GitHub_GithubApp:
 		id, err := strconv.ParseInt(cred.GithubApp.InstallationId, 10, 64)
 		if err != nil {
-			return "", errors.New(err)
+			return "", "", errors.New(err)
 		}
 		token, _, err := installationClient.Apps.CreateInstallationToken(
 			ctx, id, &github.InstallationTokenOptions{})
 		if err != nil {
-			return "", errors.WrapPrefix(err, "unable to create installation token", 0)
+			return "", "", errors.WrapPrefix(err, "unable to create installation token", 0)
 		}
-		return token.GetToken(), nil // TODO: multiple workers request this, track the TTL
+		return "x-access-token", token.GetToken(), nil // TODO: multiple workers request this, track the TTL
 	case *sourcespb.GitHub_Token:
-		return cred.Token, nil
+		ghUser, _, err := s.apiClient.Users.Get(context.TODO(), "")
+		if err != nil {
+			return "", "", errors.New(err)
+		}
+		return ghUser.GetLogin(), cred.Token, nil
 	}
 
-	return "", errors.New("unhandled credential type for token fetch")
+	return "", "", errors.New("unhandled credential type for token fetch")
 }
 
 // Init returns an initialized GitHub source.
@@ -114,6 +118,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.jobPool.SetLimit(concurrency)
 
 	s.httpClient = common.SaneHttpClient()
+	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -457,7 +462,7 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 	var repo *gogit.Repository
 	var err error
 
-	switch cred := s.conn.GetCredential().(type) {
+	switch s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
 		path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
 		if err != nil {
@@ -465,13 +470,9 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 		}
 	default:
 		var token string
-		token, err := s.Token(ctx, installationClient)
+		user, token, err := s.UserAndToken(ctx, installationClient)
 		if err != nil {
 			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-		}
-		user := ""
-		if _, ok := cred.(*sourcespb.GitHub_GithubApp); ok {
-			user = "x-access-token"
 		}
 		path, repo, err = git.CloneRepoUsingToken(token, repoURL, user)
 		if err != nil {
