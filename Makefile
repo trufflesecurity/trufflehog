@@ -30,6 +30,9 @@ test-failing:
 test:
 	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
 
+test-integration:
+	CGO_ENABLED=0 go test -timeout=5m -tags=integration $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
+
 test-race:
 	CGO_ENABLED=1 go test -timeout=5m -race $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
 
