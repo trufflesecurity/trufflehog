@@ -51,6 +51,7 @@ message Confluence {
   string link = 4;
   string email = 5;
   string timestamp = 6;
+  string location = 7;
 }
 
 message Dockerhub {
@@ -163,6 +164,7 @@ message Slack {
   string file = 6;
   string email = 7;
   Visibility visibility = 8;
+  string location = 9;
 }
 
 message Gerrit {
