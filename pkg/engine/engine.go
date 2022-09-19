@@ -163,7 +163,12 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for chunk := range e.chunks {
 		fragStart, mdLine := fragmentFirstLine(chunk)
 		for _, decoder := range e.decoders {
-			decoded := decoder.FromChunk(chunk)
+			decoded := func(ctx context.Context) *sources.Chunk {
+				defer func(ctx context.Context) {
+					common.Recover(ctx)
+				}(ctx)
+				return decoder.FromChunk(chunk)
+			}(ctx)
 			if decoded == nil {
 				continue
 			}
