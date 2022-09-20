@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -98,6 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
+				req.Header.Set("Accept", "application/json")
 
 				// TASK 1: CREATE A CANONICAL REQUEST.
 				// http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
@@ -140,10 +142,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					// Response body is unused so close it immediately.
-					res.Body.Close()
+
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
+						identityInfo := identityRes{}
+						err := json.NewDecoder(res.Body).Decode(&identityInfo)
+						if err == nil {
+							s1.Verified = true
+							s1.ExtraData = map[string]string{
+								"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
+								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
+								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
+							}
+						}
+						res.Body.Close()
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
 						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
@@ -193,4 +204,17 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 		out = append(out, r)
 	}
 	return out
+}
+
+type identityRes struct {
+	GetCallerIdentityResponse struct {
+		GetCallerIdentityResult struct {
+			Account string `json:"Account"`
+			Arn     string `json:"Arn"`
+			UserID  string `json:"UserId"`
+		} `json:"GetCallerIdentityResult"`
+		ResponseMetadata struct {
+			RequestID string `json:"RequestId"`
+		} `json:"ResponseMetadata"`
+	} `json:"GetCallerIdentityResponse"`
 }

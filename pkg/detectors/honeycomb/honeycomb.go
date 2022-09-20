@@ -20,7 +20,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"Honeycomb"}) + `\b([0-9a-zA-Z]{22})\b`)
+	// Older + Newer API key format. See pull#687 for discussion
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"Honeycomb"}) + `\b([0-9a-f]{32}|[0-9a-zA-Z]{22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

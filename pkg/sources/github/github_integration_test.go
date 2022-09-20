@@ -6,15 +6,13 @@ package github
 import (
 	"encoding/base64"
 	"fmt"
-	"os"
 	"testing"
 	"time"
-
-	"github.com/google/go-github/v42/github"
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/mattn/go-colorable"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -23,11 +21,65 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func TestSource_Scan(t *testing.T) {
-	os.Setenv("DO_NOT_RANDOMIZE", "true")
+func TestSource_Token(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
+	defer cancel()
 
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
+	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
+	if err != nil {
+		t.Fatal(err)
+	}
+	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
+	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
+	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
+
+	conn := &sourcespb.GitHub{
+		Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     githubPrivateKeyNew,
+				InstallationId: githubInstallationIDNew,
+				AppId:          githubAppIDNew,
+			},
+		},
+	}
+
+	s := Source{
+		conn:       conn,
+		httpClient: common.SaneHttpClient(),
+		log:        log.WithField("source", "github"),
+	}
+
+	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
+	assert.NoError(t, err)
+
+	user, token, err := s.UserAndToken(ctx, installationClient)
+	assert.NotEmpty(t, token)
+	assert.NoError(t, err)
+
+	// user provided
+	_, _, err = git.CloneRepoUsingToken(token, "https://github.com/trufflesecurity/trufflehog-updater.git", user)
+	assert.NoError(t, err)
+
+	// no user provided
+	_, _, err = git.CloneRepoUsingToken(token, "https://github.com/trufflesecurity/trufflehog-updater.git", "")
+	assert.Error(t, err)
+
+	_, _, err = s.cloneRepo(ctx, "https://github.com/trufflesecurity/trufflehog-updater.git", installationClient)
+	assert.NoError(t, err)
+}
+
+func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
 
@@ -376,9 +428,6 @@ func TestSource_Scan(t *testing.T) {
 }
 
 func TestSource_paginateGists(t *testing.T) {
-
-	os.Setenv("DO_NOT_RANDOMIZE", "true")
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -508,7 +557,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.addGistsByUser(ctx, github.NewClient(s.httpClient), tt.user)
+				s.addGistsByUser(ctx, tt.user)
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string

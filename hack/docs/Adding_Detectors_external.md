@@ -100,3 +100,8 @@ Now, the detector test should attempt to load the given env key from that file.
    ```bash
    make protos
    ```
+
+### Testing a detector
+```bash
+   go test ./pkg/detectors/<detector> -tags=detectors
+   ```

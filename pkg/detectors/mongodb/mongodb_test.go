@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package gitlab
+package mongodb
 
 import (
 	"context"
@@ -9,22 +9,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestGitlab_FromChunk(t *testing.T) {
+func TestMongoDB_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLAB")
-	secretInactive := testSecrets.MustGetField("GITLAB_INACTIVE")
+	secret := testSecrets.MustGetField("MONGODB_URI")
+	inactiveSecret := testSecrets.MustGetField("MONGODB_INACTIVE_URI")
+
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -38,32 +41,16 @@ func TestGitlab_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found",
+			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found only secret phrase",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("gitlab %s", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detectorspb.DetectorType_MongoDB,
 					Verified:     true,
 				},
 			},
@@ -74,12 +61,12 @@ func TestGitlab_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secretInactive)),
+				data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
+					DetectorType: detectorspb.DetectorType_MongoDB,
 					Verified:     false,
 				},
 			},
@@ -102,17 +89,18 @@ func TestGitlab_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Gitlab.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MongoDB.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2")
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+				t.Errorf("MongoDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

@@ -1,13 +1,15 @@
-package besttime
+package mongodb
 
 import (
 	"context"
-	"io"
-	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -18,60 +20,50 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"besttime"}) + `\b([0-9A-Za-z_]{36})\b`)
+	keyPat = regexp.MustCompile(`\b(mongodb(\+srv)?://(?:[^:]+:(?:[^@]+)?@)?(?:[^/]+|/.+.sock?,?)+(?:/([^/."*<>:|?]*))?\?(?:(.+=?=\S+)&?)+)\b`)
+	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"besttime"}
+	return []string{"mongodb"}
 }
 
-// FromData will find and optionally verify Besttime secrets in a given set of bytes.
+// FromData will find and optionally verify MongoDB secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Besttime,
+			DetectorType: detectorspb.DetectorType_MongoDB,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://besttime.app/api/v1/keys/"+resMatch, nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
+			func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+				client, err := mongo.Connect(ctx, options.Client().ApplyURI(resMatch))
 				if err != nil {
-					continue
+					return
 				}
-				body := string(bodyBytes)
-
-				if strings.Contains(body, `"status": "OK"`) {
-					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
+				defer func() {
+					if err := client.Disconnect(ctx); err != nil {
+						return
 					}
+				}()
+				if err := client.Ping(ctx, readpref.Primary()); err != nil {
+					return
 				}
-
-			}
+				s1.Verified = true
+			}()
 		}
-
 		results = append(results, s1)
 	}
 

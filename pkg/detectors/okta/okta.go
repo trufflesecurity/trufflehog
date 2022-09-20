@@ -3,8 +3,10 @@ package okta
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -46,10 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// -H "Accept: application/json" \
 				// -H "Content-Type: application/json" \
 				// -H "Authorization: Bearer token" \
-				// "https://subdomain.okta.com/api/v1/groups?limit=1"
+				// "https://subdomain.okta.com/api/v1/users/me"
 				//
 
-				url := fmt.Sprintf("https://%s/api/v1/groups?limit=1", domain)
+				url := fmt.Sprintf("https://%s/api/v1/users/me", domain)
 				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					return results, err
@@ -64,7 +66,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				defer resp.Body.Close()
 				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-					s.Verified = true
+					body, _ := io.ReadAll(resp.Body)
+					if strings.Contains(string(body), "activated") {
+						s.Verified = true
+					}
 				}
 			}
 

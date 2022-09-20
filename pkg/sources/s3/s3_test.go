@@ -10,6 +10,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -93,6 +94,8 @@ func TestSource_Chunks(t *testing.T) {
 			if diff := pretty.Compare(gotChunk.Data, wantData); diff != "" {
 				t.Errorf("%s: Source.Chunks() diff: (-got +want)\n%s", tt.name, diff)
 			}
+			assert.Equal(t, "", s.GetProgress().EncodedResumeInfo)
+			assert.Equal(t, int64(100), s.GetProgress().PercentComplete)
 		})
 	}
 }

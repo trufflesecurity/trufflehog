@@ -399,6 +399,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mockaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moderation"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mongodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monkeylearn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerck"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerk"
@@ -1471,5 +1472,6 @@ func DefaultDetectors() []detectors.Detector {
 		prodpad.Scanner{},
 		transferwise.Scanner{},
 		codemagic.Scanner{},
+		mongodb.Scanner{},
 	}
 }

@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.codacy.com/api/v3/version", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.codacy.com/api/v3/user", nil)
 			if err != nil {
 				continue
 			}

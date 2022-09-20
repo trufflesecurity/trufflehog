@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package gitlab
 
 import (
@@ -10,21 +7,20 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestGitlab_FromChunk(t *testing.T) {
+func TestGitlabv2_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLAB")
-	secretInactive := testSecrets.MustGetField("GITLAB_INACTIVE")
+	secret := testSecrets.MustGetField("GITLABV2")
+	secretInactive := testSecrets.MustGetField("GITLABV2_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -42,23 +38,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found only secret phrase",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("gitlab %s", secret)),
+				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -118,7 +98,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 	}
 }
 
-func BenchmarkFromData(benchmark *testing.B) {
+func BenchmarkFromData2(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {

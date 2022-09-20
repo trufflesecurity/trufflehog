@@ -3806,3 +3806,138 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = PublicEventMonitoringValidationError{}
+
+// Validate checks the field values on SlackRealtime with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SlackRealtime) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SlackRealtime with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SlackRealtimeMultiError, or
+// nil if none found.
+func (m *SlackRealtime) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SlackRealtime) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch m.Credential.(type) {
+
+	case *SlackRealtime_Tokens:
+
+		if all {
+			switch v := interface{}(m.GetTokens()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SlackRealtimeValidationError{
+						field:  "Tokens",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SlackRealtimeValidationError{
+						field:  "Tokens",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTokens()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SlackRealtimeValidationError{
+					field:  "Tokens",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return SlackRealtimeMultiError(errors)
+	}
+
+	return nil
+}
+
+// SlackRealtimeMultiError is an error wrapping multiple validation errors
+// returned by SlackRealtime.ValidateAll() if the designated constraints
+// aren't met.
+type SlackRealtimeMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SlackRealtimeMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SlackRealtimeMultiError) AllErrors() []error { return m }
+
+// SlackRealtimeValidationError is the validation error returned by
+// SlackRealtime.Validate if the designated constraints aren't met.
+type SlackRealtimeValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SlackRealtimeValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SlackRealtimeValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SlackRealtimeValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SlackRealtimeValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SlackRealtimeValidationError) ErrorName() string { return "SlackRealtimeValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SlackRealtimeValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSlackRealtime.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SlackRealtimeValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SlackRealtimeValidationError{}

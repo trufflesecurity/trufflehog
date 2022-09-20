@@ -16,6 +16,19 @@ var (
 type Context interface {
 	context.Context
 	Logger() logr.Logger
+	Parent() context.Context
+	SetParent(ctx context.Context) Context
+}
+
+// Parent returns the parent context.
+func (l logCtx) Parent() context.Context {
+	return l.Context
+}
+
+// SetParent sets the parent context on the context.
+func (l logCtx) SetParent(ctx context.Context) Context {
+	l.Context = ctx
+	return l
 }
 
 type CancelFunc context.CancelFunc
