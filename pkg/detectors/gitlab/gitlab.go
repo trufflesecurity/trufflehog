@@ -40,7 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 		if strings.Contains(match[0], "glpat") {
 			keyString := strings.Split(match[0], " ")
-			resMatch = keyString[2]
+			resMatch = keyString[len(keyString)-1]
 		}
 
 		secret := detectors.Result{
