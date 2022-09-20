@@ -897,6 +897,7 @@ enum DetectorType {
   Teamup = 893;
   Workday = 894;
   MongoDB = 895;
+  NGC = 896;
 }
 
 message Result {
