@@ -54,7 +54,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 
 	e.sourcesWg.Add(1)
 	go func() {
-		defer common.Recover(ctx)
+		defer common.RecoverWithExit(ctx)
 		defer e.sourcesWg.Done()
 		err := s3Source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
