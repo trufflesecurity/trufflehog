@@ -21,18 +21,16 @@ func TestJdbc_FromChunk(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		s       Scanner
 		args    args
 		want    []detectors.Result
 		wantErr bool
 	}{
 		{
 			name: "found, unverified",
-			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(`jdbc connection string: jdbc:mysql://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=testpassword <-`),
-				verify: true,
+				verify: false,
 			},
 			want: []detectors.Result{
 				{
@@ -45,7 +43,6 @@ func TestJdbc_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified numeric password",
-			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(`jdbc connection string: jdbc:postgresql://host:5342/testdb?password=123456 <-`),
@@ -62,13 +59,60 @@ func TestJdbc_FromChunk(t *testing.T) {
 		},
 		{
 			name: "not found",
-			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte("You cannot find the secret within"),
-				verify: true,
+				verify: false,
 			},
 			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "sqlite unverified",
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("jdbc:sqlite::memory:"),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_JDBC,
+					Verified:     false,
+					Redacted:     "jdbc:sqlite::memory:",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found double quoted string, unverified",
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(`CONN="jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=testpassword"`),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_JDBC,
+					Verified:     false,
+					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found single quoted string, unverified",
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(`CONN='jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=testpassword'`),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_JDBC,
+					Verified:     false,
+					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
+				},
+			},
 			wantErr: false,
 		},
 	}
