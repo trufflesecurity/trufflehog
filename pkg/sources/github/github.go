@@ -788,16 +788,15 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 }
 
 func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
-	opts := &github.ListOptions{
-		PerPage: membersAppPagination,
-	}
-	optsOrg := &github.ListMembersOptions{
-		PublicOnly:  false,
-		ListOptions: *opts,
+	opts := &github.ListMembersOptions{
+		PublicOnly: false,
+		ListOptions: github.ListOptions{
+			PerPage: membersAppPagination,
+		},
 	}
 
 	for {
-		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, optsOrg)
+		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
 		if err == nil {
 			defer res.Body.Close()
 		}
