@@ -417,6 +417,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nftport"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ngc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
@@ -1473,5 +1474,6 @@ func DefaultDetectors() []detectors.Detector {
 		transferwise.Scanner{},
 		codemagic.Scanner{},
 		mongodb.Scanner{},
+		ngc.Scanner{},
 	}
 }
