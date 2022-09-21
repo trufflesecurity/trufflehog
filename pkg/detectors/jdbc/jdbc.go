@@ -47,7 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			s.Verified = j.ping()
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			s.Verified = j.ping(ctx)
 			// TODO: specialized redaction
 		}
 
@@ -93,7 +95,7 @@ var supportedSubprotocols = map[string]func(string) (jdbc, error){
 }
 
 type jdbc interface {
-	ping() bool
+	ping(context.Context) bool
 }
 
 func newJDBC(conn string) (jdbc, error) {
@@ -114,22 +116,20 @@ func newJDBC(conn string) (jdbc, error) {
 	return parser(subname)
 }
 
-func ping(driverName, conn string) bool {
-	if err := pingErr(driverName, conn); err != nil {
+func ping(ctx context.Context, driverName, conn string) bool {
+	if err := pingErr(ctx, driverName, conn); err != nil {
 		return false
 	}
 	return true
 }
 
-func pingErr(driverName, conn string) error {
+func pingErr(ctx context.Context, driverName, conn string) error {
 	db, err := sql.Open(driverName, conn)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		return err
 	}

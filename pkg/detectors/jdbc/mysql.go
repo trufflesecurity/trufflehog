@@ -1,6 +1,7 @@
 package jdbc
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -15,17 +16,17 @@ type mysqlJDBC struct {
 	params   string
 }
 
-func (s *mysqlJDBC) ping() bool {
-	if ping("mysql", s.conn) {
+func (s *mysqlJDBC) ping(ctx context.Context) bool {
+	if ping(ctx, "mysql", s.conn) {
 		return true
 	}
 	// try building connection string (should be same as s.conn though)
-	if ping("mysql", s.build()) {
+	if ping(ctx, "mysql", s.build()) {
 		return true
 	}
 	// try removing database
 	s.database = ""
-	return ping("mysql", s.build())
+	return ping(ctx, "mysql", s.build())
 }
 
 func (s *mysqlJDBC) build() string {

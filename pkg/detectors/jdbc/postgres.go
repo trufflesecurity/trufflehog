@@ -1,6 +1,7 @@
 package jdbc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,13 +14,13 @@ type postgresJDBC struct {
 	params map[string]string
 }
 
-func (s *postgresJDBC) ping() bool {
+func (s *postgresJDBC) ping(ctx context.Context) bool {
 	// try the provided connection string directly
-	if ping("postgres", s.conn) {
+	if ping(ctx, "postgres", s.conn) {
 		return true
 	}
 	// try as a URL
-	if ping("postgres", "postgres://"+s.conn) {
+	if ping(ctx, "postgres", "postgres://"+s.conn) {
 		return true
 	}
 	// build a connection string
@@ -37,12 +38,12 @@ func (s *postgresJDBC) ping() bool {
 		}
 		data[key] = val
 	}
-	if ping("postgres", joinKeyValues(data)) {
+	if ping(ctx, "postgres", joinKeyValues(data)) {
 		return true
 	}
 	if s.params["dbname"] != "" {
 		delete(s.params, "dbname")
-		return s.ping()
+		return s.ping(ctx)
 	}
 	return false
 }

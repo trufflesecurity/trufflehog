@@ -5,6 +5,7 @@ package jdbc
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os/exec"
 	"testing"
@@ -58,7 +59,7 @@ func TestMySQL(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantPing, j.ping())
+			assert.Equal(t, tt.wantPing, j.ping(context.Background()))
 		})
 	}
 }

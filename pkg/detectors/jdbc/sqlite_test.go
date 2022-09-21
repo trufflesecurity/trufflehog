@@ -4,6 +4,7 @@
 package jdbc
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +39,7 @@ func TestParseSqlite(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.True(t, j.ping())
+				assert.True(t, j.ping(context.Background()))
 			}
 		})
 	}

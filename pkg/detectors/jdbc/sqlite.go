@@ -1,6 +1,7 @@
 package jdbc
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -13,12 +14,12 @@ type sqliteJDBC struct {
 	testing  bool
 }
 
-func (s *sqliteJDBC) ping() bool {
+func (s *sqliteJDBC) ping(ctx context.Context) bool {
 	if !s.testing {
 		// sqlite is not a networked database, so we cannot verify
 		return false
 	}
-	return ping("sqlite3", s.filename)
+	return ping(ctx, "sqlite3", s.filename)
 }
 
 func parseSqlite(subname string) (jdbc, error) {
