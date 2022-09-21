@@ -301,22 +301,22 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	var reachedBase = false
 	log.Debugf("Scanning repo")
 	for commit := range commitChan {
+		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+			log.Debugf("reached max depth")
+			break
+		}
+		depth++
+		if reachedBase && commit.Hash != scanOptions.BaseHash {
+			break
+		}
+		if len(scanOptions.BaseHash) > 0 {
+			if commit.Hash == scanOptions.BaseHash {
+				log.Debugf("Reached base commit. Finishing scanning files.")
+				reachedBase = true
+			}
+		}
 		for _, diff := range commit.Diffs {
 			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
-			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-				log.Debugf("reached max depth")
-				break
-			}
-			depth++
-			if reachedBase && commit.Hash != scanOptions.BaseHash {
-				break
-			}
-			if len(scanOptions.BaseHash) > 0 {
-				if commit.Hash == scanOptions.BaseHash {
-					log.Debugf("Reached base commit. Finishing scanning files.")
-					reachedBase = true
-				}
-			}
 
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
