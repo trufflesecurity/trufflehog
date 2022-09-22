@@ -210,7 +210,7 @@ func (s *Source) parseSyslogMetadata(input []byte, remote string) (*source_metad
 }
 
 func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksChan chan *sources.Chunk) {
-	defer common.Recover(ctx)
+	defer common.RecoverWithExit(ctx)
 	for {
 		if common.IsDone(ctx) {
 			return

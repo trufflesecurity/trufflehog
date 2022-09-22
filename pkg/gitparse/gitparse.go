@@ -142,7 +142,7 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 	var currentCommit *Commit
 	var currentDiff *Diff
 
-	defer common.Recover(ctx)
+	defer common.RecoverWithExit(ctx)
 	for {
 		line, err := outReader.ReadBytes([]byte("\n")[0])
 		if err != nil && len(line) == 0 {
@@ -313,7 +313,7 @@ func isMinusDiffLine(line []byte) bool {
 	return false
 }
 
-//  fmt.Println("ok")
+// fmt.Println("ok")
 func isContextDiffLine(line []byte) bool {
 	if len(line) >= 1 && bytes.Equal(line[:1], []byte(" ")) {
 		return true

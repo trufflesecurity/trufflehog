@@ -98,7 +98,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
-			defer common.Recover(ctx)
+			defer common.RecoverWithExit(ctx)
 			defer e.workersWg.Done()
 			e.detectorWorker(ctx)
 		}()
@@ -111,7 +111,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 // chunks before closing their respective channels. Once Finish is called, no
 // more sources may be scanned by the engine.
 func (e *Engine) Finish(ctx context.Context) {
-	defer common.Recover(ctx)
+	defer common.RecoverWithExit(ctx)
 	// wait for the sources to finish putting chunks onto the chunks channel
 	e.sourcesWg.Wait()
 	close(e.chunks)
@@ -163,7 +163,12 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for chunk := range e.chunks {
 		fragStart, mdLine := fragmentFirstLine(chunk)
 		for _, decoder := range e.decoders {
-			decoded := decoder.FromChunk(chunk)
+			decoded := func(ctx context.Context) *sources.Chunk {
+				defer func(ctx context.Context) {
+					common.Recover(ctx)
+				}(ctx)
+				return decoder.FromChunk(chunk)
+			}(ctx)
 			if decoded == nil {
 				continue
 			}
