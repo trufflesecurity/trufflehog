@@ -163,12 +163,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for chunk := range e.chunks {
 		fragStart, mdLine := fragmentFirstLine(chunk)
 		for _, decoder := range e.decoders {
-			decoded := func(ctx context.Context) *sources.Chunk {
-				defer func(ctx context.Context) {
-					common.Recover(ctx)
-				}(ctx)
-				return decoder.FromChunk(chunk)
-			}(ctx)
+			decoded := decoder.FromChunk(chunk)
 			if decoded == nil {
 				continue
 			}
@@ -186,9 +181,13 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					if !foundKeyword {
 						continue
 					}
-					ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-					defer cancel()
-					results, err := detector.FromData(ctx, verify, decoded.Data)
+
+					results, err := func() ([]detectors.Result, error) {
+						ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+						defer cancel()
+						defer common.Recover(ctx)
+						return detector.FromData(ctx, verify, decoded.Data)
+					}()
 					if err != nil {
 						logrus.WithFields(logrus.Fields{
 							"source_type": decoded.SourceType.String(),
@@ -196,6 +195,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						}).WithError(err).Error("could not scan chunk")
 						continue
 					}
+
 					for _, result := range results {
 						if isGitSource(chunk.SourceType) {
 							offset := FragmentLineOffset(chunk, &result)
