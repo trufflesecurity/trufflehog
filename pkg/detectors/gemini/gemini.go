@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -95,7 +94,7 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 }
 
 func constructRequest(secret, keyID string) (*http.Request, error) {
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s%s", baseURL, accountDetail), bytes.NewBuffer([]byte{}))
+	req, err := http.NewRequest("POST", baseURL+accountDetail, &bytes.Buffer{})
 	if err != nil {
 		return nil, err
 	}
