@@ -399,6 +399,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mockaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moderation"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mongodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monkeylearn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerck"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerk"
@@ -416,6 +417,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nftport"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ngc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
@@ -1471,5 +1473,7 @@ func DefaultDetectors() []detectors.Detector {
 		prodpad.Scanner{},
 		transferwise.Scanner{},
 		codemagic.Scanner{},
+		mongodb.Scanner{},
+		ngc.Scanner{},
 	}
 }

@@ -57,6 +57,7 @@ type Source struct {
 	jobPool         *errgroup.Group
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
+	apiClient       *github.Client
 	sources.Progress
 }
 
@@ -78,26 +79,30 @@ func (s *Source) JobID() int64 {
 	return s.jobID
 }
 
-func (s *Source) Token(ctx context.Context, installationClient *github.Client) (string, error) {
+func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Client) (string, string, error) {
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
 		// do nothing
 	case *sourcespb.GitHub_GithubApp:
 		id, err := strconv.ParseInt(cred.GithubApp.InstallationId, 10, 64)
 		if err != nil {
-			return "", errors.New(err)
+			return "", "", errors.New(err)
 		}
 		token, _, err := installationClient.Apps.CreateInstallationToken(
 			ctx, id, &github.InstallationTokenOptions{})
 		if err != nil {
-			return "", errors.WrapPrefix(err, "unable to create installation token", 0)
+			return "", "", errors.WrapPrefix(err, "unable to create installation token", 0)
 		}
-		return token.GetToken(), nil // TODO: multiple workers request this, track the TTL
+		return "x-access-token", token.GetToken(), nil // TODO: multiple workers request this, track the TTL
 	case *sourcespb.GitHub_Token:
-		return cred.Token, nil
+		ghUser, _, err := s.apiClient.Users.Get(context.TODO(), "")
+		if err != nil {
+			return "", "", errors.New(err)
+		}
+		return ghUser.GetLogin(), cred.Token, nil
 	}
 
-	return "", errors.New("unhandled credential type for token fetch")
+	return "", "", errors.New("unhandled credential type for token fetch")
 }
 
 // Init returns an initialized GitHub source.
@@ -113,6 +118,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.jobPool.SetLimit(concurrency)
 
 	s.httpClient = common.SaneHttpClient()
+	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -149,18 +155,18 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
-func (s *Source) enumerateUnauthenticated(ctx context.Context) *github.Client {
-	apiClient := github.NewClient(s.httpClient)
+func (s *Source) enumerateUnauthenticated(ctx context.Context) {
+	s.apiClient = github.NewClient(s.httpClient)
 	if len(s.orgs) > unauthGithubOrgRateLimt {
 		log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
 
 	for _, org := range s.orgs {
-		if err := s.addRepos(ctx, apiClient, org, s.getReposByOrg); err != nil {
+		if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
 			log.WithError(err).Errorf("error fetching repos for org or user: %s", org)
 		}
 		// We probably don't need to do this, since getting repos by org makes more sense?
-		if err := s.addRepos(ctx, apiClient, org, s.getReposByUser); err != nil {
+		if err := s.addRepos(ctx, org, s.getReposByUser); err != nil {
 			log.WithError(err).Errorf("error fetching repos for org or user: %s", org)
 		}
 
@@ -168,11 +174,9 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context) *github.Client {
 			log.Warn("Enumerating unauthenticated does not support scanning organization members")
 		}
 	}
-
-	return apiClient
 }
 
-func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token string) (*github.Client, error) {
+func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token string) error {
 	// Needed for clones.
 	s.token = token
 
@@ -186,14 +190,13 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	// If we're using public Github, make a regular client.
 	// Otherwise, make an enterprise client.
 	var isGHE bool
-	var apiClient *github.Client
 	if apiEndpoint == "https://api.github.com" {
-		apiClient = github.NewClient(tc)
+		s.apiClient = github.NewClient(tc)
 	} else {
 		isGHE = true
-		apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, tc)
+		s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, tc)
 		if err != nil {
-			return nil, errors.New(err)
+			return errors.New(err)
 		}
 	}
 
@@ -205,23 +208,23 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		specificScope = true
 	}
 
-	user, _, err := apiClient.Users.Get(context.TODO(), "")
+	user, _, err := s.apiClient.Users.Get(context.TODO(), "")
 	if err != nil {
-		return nil, errors.New(err)
+		return errors.New(err)
 	}
 
 	if len(s.orgs) > 0 {
 		specificScope = true
 		for _, org := range s.orgs {
-			if err := s.addRepos(ctx, apiClient, org, s.getReposByOrg); err != nil {
+			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
 				log.WithError(err).Errorf("error fetching repos for org: %s", org)
 			}
-			if err := s.addRepos(ctx, apiClient, user.GetLogin(), s.getReposByUser); err != nil {
+			if err := s.addRepos(ctx, user.GetLogin(), s.getReposByUser); err != nil {
 				log.WithError(err).Errorf("error fetching repos for user: %s", user.GetLogin())
 			}
 
 			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, apiClient, org)
+				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
 					log.WithError(err).Infof("Unable to add members by org for org %s", org)
 					continue
@@ -232,25 +235,25 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	// If no scope was provided, enumerate them.
 	if !specificScope {
-		if err := s.addRepos(ctx, apiClient, user.GetLogin(), s.getReposByUser); err != nil {
+		if err := s.addRepos(ctx, user.GetLogin(), s.getReposByUser); err != nil {
 			log.WithError(err).Error("error fetching repos by user")
 		}
 
 		if isGHE {
-			s.addAllVisibleOrgs(ctx, apiClient)
+			s.addAllVisibleOrgs(ctx)
 		} else {
 			// Scan for orgs is default with a token. GitHub App enumerates the repositories
 			// that were assigned to it in GitHub App settings.
-			s.addOrgsByUser(ctx, apiClient, user.GetLogin())
+			s.addOrgsByUser(ctx, user.GetLogin())
 		}
 
 		for _, org := range s.orgs {
-			if err := s.addRepos(ctx, apiClient, org, s.getReposByOrg); err != nil {
+			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
 				log.WithError(err).Error("error fetching repos by org")
 			}
 
 			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, apiClient, org)
+				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
 					log.WithError(err).Infof("Unable to add members by org for org %s", org)
 					continue
@@ -261,32 +264,32 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	if s.conn.ScanUsers {
 		log.Infof("Adding repos from %d members in %d organizations.", len(s.members), len(s.orgs))
-		s.addReposForMembers(ctx, apiClient)
+		s.addReposForMembers(ctx)
 	} else {
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
-		if err := s.addGistsByUser(ctx, apiClient, user.GetLogin()); err != nil {
-			return nil, err
+		if err := s.addGistsByUser(ctx, user.GetLogin()); err != nil {
+			return err
 		}
 		for _, org := range s.orgs {
 			// TODO: Test it actually works to list org gists like this.
-			if err := s.addGistsByUser(ctx, apiClient, org); err != nil {
+			if err := s.addGistsByUser(ctx, org); err != nil {
 				log.WithError(err).Errorf("error fetching gists by org: %s", org)
 			}
 		}
 	}
-	return apiClient, nil
+	return nil
 }
 
-func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp) (apiClient, installationClient *github.Client, err error) {
+func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp) (installationClient *github.Client, err error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
-		return nil, nil, errors.New(err)
+		return nil, errors.New(err)
 	}
 
 	appID, err := strconv.ParseInt(app.AppId, 10, 64)
 	if err != nil {
-		return nil, nil, errors.New(err)
+		return nil, errors.New(err)
 	}
 
 	// This client is used for most APIs.
@@ -296,12 +299,12 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		installationID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, nil, errors.New(err)
+		return nil, errors.New(err)
 	}
 	itr.BaseURL = apiEndpoint
-	apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: itr})
+	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: itr})
 	if err != nil {
-		return nil, nil, errors.New(err)
+		return nil, errors.New(err)
 	}
 
 	// This client is required to create installation tokens for cloning.
@@ -311,39 +314,39 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		appID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, nil, errors.New(err)
+		return nil, errors.New(err)
 	}
 	appItr.BaseURL = apiEndpoint
 	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: appItr})
 	if err != nil {
-		return nil, nil, errors.New(err)
+		return nil, errors.New(err)
 	}
 
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
-		if err = s.addReposByApp(ctx, apiClient); err != nil {
-			return nil, nil, err
+		if err = s.addReposByApp(ctx); err != nil {
+			return nil, err
 		}
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, installationClient, apiClient)
+			err := s.addMembersByApp(ctx, installationClient)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			log.Infof("Scanning repos from %v organization members.", len(s.members))
 			for _, member := range s.members {
-				if err = s.addGistsByUser(ctx, apiClient, member); err != nil {
-					return nil, nil, err
+				if err = s.addGistsByUser(ctx, member); err != nil {
+					return nil, err
 				}
-				if err := s.addRepos(ctx, apiClient, member, s.getReposByUser); err != nil {
+				if err := s.addRepos(ctx, member, s.getReposByUser); err != nil {
 					log.WithError(err).Error("error fetching repos by user")
 				}
 			}
 		}
 	}
 
-	return apiClient, installationClient, nil
+	return installationClient, nil
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -353,18 +356,18 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		apiEndpoint = "https://api.github.com"
 	}
 
-	var apiClient, installationClient *github.Client
+	var installationClient *github.Client
 	var err error
 
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
-		apiClient = s.enumerateUnauthenticated(ctx)
+		s.enumerateUnauthenticated(ctx)
 	case *sourcespb.GitHub_Token:
-		if apiClient, err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
+		if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
 			return err
 		}
 	case *sourcespb.GitHub_GithubApp:
-		if apiClient, installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
+		if installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
 			return err
 		}
 	default:
@@ -372,7 +375,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	s.normalizeRepos(ctx, apiClient)
+	s.normalizeRepos(ctx)
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
@@ -459,7 +462,7 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 	var repo *gogit.Repository
 	var err error
 
-	switch cred := s.conn.GetCredential().(type) {
+	switch s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
 		path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
 		if err != nil {
@@ -467,13 +470,9 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 		}
 	default:
 		var token string
-		token, err := s.Token(ctx, installationClient)
+		user, token, err := s.UserAndToken(ctx, installationClient)
 		if err != nil {
 			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-		}
-		user := ""
-		if _, ok := cred.(*sourcespb.GitHub_GithubApp); ok {
-			user = "x-access-token"
 		}
 		path, repo, err = git.CloneRepoUsingToken(token, repoURL, user)
 		if err != nil {
@@ -519,7 +518,7 @@ func handleRateLimit(errIn error, res *github.Response) bool {
 	return true
 }
 
-func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, org string) ([]string, error) {
+func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error) {
 	logger := s.log.WithField("org", org)
 
 	var repos []string
@@ -530,7 +529,7 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 	}
 	var numRepos, numForks int
 	for {
-		someRepos, res, err := apiClient.Repositories.ListByOrg(ctx, org, opts)
+		someRepos, res, err := s.apiClient.Repositories.ListByOrg(ctx, org, opts)
 		if err == nil {
 			res.Body.Close()
 		}
@@ -563,8 +562,8 @@ func (s *Source) getReposByOrg(ctx context.Context, apiClient *github.Client, or
 	return repos, nil
 }
 
-func (s *Source) addRepos(ctx context.Context, client *github.Client, entity string, getRepos func(context.Context, *github.Client, string) ([]string, error)) error {
-	repos, err := getRepos(ctx, client, entity)
+func (s *Source) addRepos(ctx context.Context, entity string, getRepos func(context.Context, string) ([]string, error)) error {
+	repos, err := getRepos(ctx, entity)
 	if err != nil {
 		return err
 	}
@@ -575,7 +574,7 @@ func (s *Source) addRepos(ctx context.Context, client *github.Client, entity str
 	return nil
 }
 
-func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, user string) ([]string, error) {
+func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, error) {
 	var repos []string
 	opts := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{
@@ -583,7 +582,7 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 		},
 	}
 	for {
-		someRepos, res, err := apiClient.Repositories.List(ctx, user, opts)
+		someRepos, res, err := s.apiClient.Repositories.List(ctx, user, opts)
 		if err == nil {
 			res.Body.Close()
 		}
@@ -611,11 +610,11 @@ func (s *Source) getReposByUser(ctx context.Context, apiClient *github.Client, u
 	return repos, nil
 }
 
-func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, user string) ([]string, error) {
+func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, error) {
 	var gistURLs []string
 	gistOpts := &github.GistListOptions{}
 	for {
-		gists, res, err := apiClient.Gists.List(ctx, user, gistOpts)
+		gists, res, err := s.apiClient.Gists.List(ctx, user, gistOpts)
 		if err == nil {
 			res.Body.Close()
 		}
@@ -638,8 +637,8 @@ func (s *Source) getGistsByUser(ctx context.Context, apiClient *github.Client, u
 	return gistURLs, nil
 }
 
-func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, user string) error {
-	gists, err := s.getGistsByUser(ctx, apiClient, user)
+func (s *Source) addGistsByUser(ctx context.Context, user string) error {
+	gists, err := s.getGistsByUser(ctx, user)
 	if err != nil {
 		return err
 	}
@@ -650,7 +649,7 @@ func (s *Source) addGistsByUser(ctx context.Context, apiClient *github.Client, u
 	return nil
 }
 
-func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, apiClient *github.Client) error {
+func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client) error {
 	opts := &github.ListOptions{
 		PerPage: membersAppPagination,
 	}
@@ -662,7 +661,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 	}
 
 	for _, org := range installs {
-		if err := s.addMembersByOrg(ctx, apiClient, *org.Account.Login); err != nil {
+		if err := s.addMembersByOrg(ctx, *org.Account.Login); err != nil {
 			return err
 		}
 	}
@@ -670,13 +669,13 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 	return nil
 }
 
-func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) error {
+func (s *Source) addReposByApp(ctx context.Context) error {
 	// Authenticated enumeration of repos
 	opts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
 	for {
-		someRepos, res, err := apiClient.Apps.ListRepos(ctx, opts)
+		someRepos, res, err := s.apiClient.Apps.ListRepos(ctx, opts)
 		if err == nil {
 			res.Body.Close()
 		}
@@ -705,7 +704,7 @@ func (s *Source) addReposByApp(ctx context.Context, apiClient *github.Client) er
 	return nil
 }
 
-func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client) {
+func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 	s.log.Debug("enumerating all visible organizations on GHE")
 	// Enumeration on this endpoint does not use pages it uses a since ID.
 	// The endpoint will return organizations with an ID greater than the given since ID.
@@ -717,7 +716,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 		},
 	}
 	for {
-		orgs, resp, err := apiClient.Organizations.ListAll(ctx, orgOpts)
+		orgs, resp, err := s.apiClient.Organizations.ListAll(ctx, orgOpts)
 		if err == nil {
 			resp.Body.Close()
 		}
@@ -750,12 +749,12 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context, apiClient *github.Client
 	}
 }
 
-func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, user string) {
+func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	orgOpts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
 	for {
-		orgs, resp, err := apiClient.Organizations.List(ctx, "", orgOpts)
+		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
 		if err == nil {
 			resp.Body.Close()
 		}
@@ -788,17 +787,16 @@ func (s *Source) addOrgsByUser(ctx context.Context, apiClient *github.Client, us
 	}
 }
 
-func (s *Source) addMembersByOrg(ctx context.Context, apiClient *github.Client, org string) error {
-	opts := &github.ListOptions{
-		PerPage: membersAppPagination,
-	}
-	optsOrg := &github.ListMembersOptions{
-		PublicOnly:  false,
-		ListOptions: *opts,
+func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
+	opts := &github.ListMembersOptions{
+		PublicOnly: false,
+		ListOptions: github.ListOptions{
+			PerPage: membersAppPagination,
+		},
 	}
 
 	for {
-		members, res, err := apiClient.Organizations.ListMembers(ctx, org, optsOrg)
+		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
 		if err == nil {
 			defer res.Body.Close()
 		}
@@ -830,19 +828,19 @@ func (s *Source) addMembersByOrg(ctx context.Context, apiClient *github.Client, 
 	return nil
 }
 
-func (s *Source) addReposForMembers(ctx context.Context, apiClient *github.Client) {
+func (s *Source) addReposForMembers(ctx context.Context) {
 	log.Infof("Fetching repos from %d members", len(s.members))
 	for _, member := range s.members {
-		if err := s.addGistsByUser(ctx, apiClient, member); err != nil {
+		if err := s.addGistsByUser(ctx, member); err != nil {
 			log.WithError(err).Infof("Unable to fetch gists by user %s", member)
 		}
-		if err := s.addRepos(ctx, apiClient, member, s.getReposByUser); err != nil {
+		if err := s.addRepos(ctx, member, s.getReposByUser); err != nil {
 			log.WithError(err).Infof("Unable to fetch repos by user %s", member)
 		}
 	}
 }
 
-func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
+func (s *Source) normalizeRepos(ctx context.Context) {
 	// TODO: Add check/fix for repos that are missing scheme
 	normalizedRepos := map[string]struct{}{}
 	for _, repo := range s.repos {
@@ -857,12 +855,12 @@ func (s *Source) normalizeRepos(ctx context.Context, apiClient *github.Client) {
 			continue
 		}
 		// Otherwise, assume it's a user and enumerate repositories and gists.
-		if repos, err := s.getReposByUser(ctx, apiClient, repo); err == nil {
+		if repos, err := s.getReposByUser(ctx, repo); err == nil {
 			for _, repo := range repos {
 				normalizedRepos[repo] = struct{}{}
 			}
 		}
-		if gists, err := s.getGistsByUser(ctx, apiClient, repo); err == nil {
+		if gists, err := s.getGistsByUser(ctx, repo); err == nil {
 			for _, gist := range gists {
 				normalizedRepos[gist] = struct{}{}
 			}

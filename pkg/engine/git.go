@@ -59,7 +59,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
 			} else {
 				c.HeadRef = head.String()
-				headCommit, _ = repo.CommitObject(plumbing.NewHash(c.BaseRef))
+				headCommit, _ = repo.CommitObject(plumbing.NewHash(c.HeadRef))
 			}
 		} else {
 			headCommit, err = repo.CommitObject(headHash)
@@ -107,7 +107,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 
 	e.sourcesWg.Add(1)
 	go func() {
-		defer common.Recover(ctx)
+		defer common.RecoverWithExit(ctx)
 		defer e.sourcesWg.Done()
 		err := gitSource.ScanRepo(ctx, repo, c.RepoPath, scanOptions, e.ChunksChan())
 		if err != nil {
