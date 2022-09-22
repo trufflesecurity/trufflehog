@@ -45,7 +45,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Gemini secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	idMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -106,6 +106,7 @@ func constructRequest(secret, keyID string) (*http.Request, error) {
 	}
 
 	acct := strings.Split(keyID, "-")
+	// Not entirely sure how to handle master account keys where one of the accounts is named "primary".
 	if len(acct) > 1 && acct[0] == "master" {
 		params["account"] = account
 	}
