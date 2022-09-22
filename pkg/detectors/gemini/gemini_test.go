@@ -24,7 +24,10 @@ func TestGemini_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GEMINI")
+	secretMaster := testSecrets.MustGetField("GEMINI")
+	keyMaster := testSecrets.MustGetField("GEMINI_KEY")
+	secretAccount := testSecrets.MustGetField("GEMINI_ACCOUNT")
+	keyAccount := testSecrets.MustGetField("GEMINI_KEY_ACCOUNT")
 	inactiveSecret := testSecrets.MustGetField("GEMINI_INACTIVE")
 
 	type args struct {
@@ -40,11 +43,27 @@ func TestGemini_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, verified; master",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gemini secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a gemini %s and secretMaster %s within", keyMaster, secretMaster)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gemini,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified; account",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gemini %s and secretAccount %s within", keyAccount, secretAccount)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -60,7 +79,7 @@ func TestGemini_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gemini secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a gemini secretMaster %s and secretMaster %s within but not valid", keyMaster, inactiveSecret)), // the secretMaster would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -76,7 +95,7 @@ func TestGemini_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
+				data:   []byte("You cannot find the secretMaster within"),
 				verify: true,
 			},
 			want:    nil,
@@ -93,7 +112,7 @@ func TestGemini_FromChunk(t *testing.T) {
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
+					t.Fatalf("no raw secretMaster present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
 			}
