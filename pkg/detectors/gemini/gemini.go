@@ -71,20 +71,18 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 					continue
 				}
 
-				func() {
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							return
-						}
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-							return
+							continue
 						}
 					}
-				}()
+				}
 			}
 			results = append(results, s1)
 		}
