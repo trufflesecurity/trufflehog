@@ -18,13 +18,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const (
-	// BufferSize is mainly driven by our largest credential size, which is GCP @ ~2.25KB.
-	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize = 10 * 1024 // 10KB
-	PeekSize   = 3 * 1024  // 3KB
-)
-
 type Source struct {
 	sourceId, jobId, fileSize int64
 	verify                    bool
@@ -87,7 +80,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 	defer func(file *os.File) {
 		if err := file.Close(); err != nil {
-			s.log.WithError(err).Error("Failed to close file: %v.", s.path)
+			s.log.WithError(err).Errorf("Failed to close file: %v.", s.path)
 		}
 	}(file)
 
