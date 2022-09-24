@@ -40,6 +40,7 @@ enum SourceType {
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
+  SOURCE_TYPE_FILE = 28;
 }
 
 message LocalSource {
@@ -111,6 +112,10 @@ message ECR {
 
 message Filesystem{
   repeated string directories = 1;
+}
+
+message File{
+  string path = 1;
 }
 
 message GCS {

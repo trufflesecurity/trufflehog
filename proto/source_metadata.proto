@@ -79,6 +79,11 @@ message Filesystem {
   string email = 3;
 }
 
+message File {
+  string name = 1;
+  string path = 2;
+}
+
 message Git {
   string commit = 1;
   string file = 2;
@@ -248,5 +253,6 @@ message MetaData {
     Artifactory artifactory = 22;
     Syslog syslog = 23;
     PublicEventMonitoring publicEventMonitoring = 24;
+    File file = 25;
   }
 }

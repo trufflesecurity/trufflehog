@@ -76,6 +76,9 @@ var (
 	// filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	// filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
+	fileScan     = cli.Command("file", "Scan a file (defaults to standard in)")
+	fileScanPath = fileScan.Flag("path", "Path of the file to scan").Default(os.Stdin.Name()).String()
+
 	s3Scan         = cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey      = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
 	s3ScanSecret   = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
@@ -237,6 +240,14 @@ func run(state overseer.State) {
 
 		if err = e.ScanFileSystem(ctx, sources.NewConfig(fs)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
+		}
+	case fileScan.FullCommand():
+		fs := func(c *sources.Config) {
+			c.FilePath = *fileScanPath
+		}
+
+		if err = e.ScanFile(ctx, sources.NewConfig(fs)); err != nil {
+			logrus.WithError(err).Fatal("Failed to scan file")
 		}
 	case s3Scan.FullCommand():
 		s3 := func(c *sources.Config) {

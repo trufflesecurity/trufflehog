@@ -789,6 +789,61 @@ func (x *Filesystem) GetEmail() string {
 	return ""
 }
 
+type File struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+}
+
+func (x *File) Reset() {
+	*x = File{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_source_metadata_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *File) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*File) ProtoMessage() {}
+
+func (x *File) ProtoReflect() protoreflect.Message {
+	mi := &file_source_metadata_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use File.ProtoReflect.Descriptor instead.
+func (*File) Descriptor() ([]byte, []int) {
+	return file_source_metadata_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *File) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *File) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
 type Git struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -805,7 +860,7 @@ type Git struct {
 func (x *Git) Reset() {
 	*x = Git{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[8]
+		mi := &file_source_metadata_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -818,7 +873,7 @@ func (x *Git) String() string {
 func (*Git) ProtoMessage() {}
 
 func (x *Git) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[8]
+	mi := &file_source_metadata_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -831,7 +886,7 @@ func (x *Git) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Git.ProtoReflect.Descriptor instead.
 func (*Git) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{8}
+	return file_source_metadata_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Git) GetCommit() string {
@@ -894,7 +949,7 @@ type Github struct {
 func (x *Github) Reset() {
 	*x = Github{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[9]
+		mi := &file_source_metadata_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -907,7 +962,7 @@ func (x *Github) String() string {
 func (*Github) ProtoMessage() {}
 
 func (x *Github) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[9]
+	mi := &file_source_metadata_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -920,7 +975,7 @@ func (x *Github) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Github.ProtoReflect.Descriptor instead.
 func (*Github) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{9}
+	return file_source_metadata_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Github) GetLink() string {
@@ -996,7 +1051,7 @@ type Gitlab struct {
 func (x *Gitlab) Reset() {
 	*x = Gitlab{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[10]
+		mi := &file_source_metadata_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1009,7 +1064,7 @@ func (x *Gitlab) String() string {
 func (*Gitlab) ProtoMessage() {}
 
 func (x *Gitlab) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[10]
+	mi := &file_source_metadata_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1022,7 +1077,7 @@ func (x *Gitlab) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Gitlab.ProtoReflect.Descriptor instead.
 func (*Gitlab) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{10}
+	return file_source_metadata_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Gitlab) GetCommit() string {
@@ -1088,7 +1143,7 @@ type GCS struct {
 func (x *GCS) Reset() {
 	*x = GCS{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[11]
+		mi := &file_source_metadata_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1101,7 +1156,7 @@ func (x *GCS) String() string {
 func (*GCS) ProtoMessage() {}
 
 func (x *GCS) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[11]
+	mi := &file_source_metadata_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1114,7 +1169,7 @@ func (x *GCS) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GCS.ProtoReflect.Descriptor instead.
 func (*GCS) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{11}
+	return file_source_metadata_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GCS) GetBucket() string {
@@ -1161,7 +1216,7 @@ type Jira struct {
 func (x *Jira) Reset() {
 	*x = Jira{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[12]
+		mi := &file_source_metadata_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1174,7 +1229,7 @@ func (x *Jira) String() string {
 func (*Jira) ProtoMessage() {}
 
 func (x *Jira) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[12]
+	mi := &file_source_metadata_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1187,7 +1242,7 @@ func (x *Jira) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Jira.ProtoReflect.Descriptor instead.
 func (*Jira) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{12}
+	return file_source_metadata_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Jira) GetIssue() string {
@@ -1247,7 +1302,7 @@ type NPM struct {
 func (x *NPM) Reset() {
 	*x = NPM{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[13]
+		mi := &file_source_metadata_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1260,7 +1315,7 @@ func (x *NPM) String() string {
 func (*NPM) ProtoMessage() {}
 
 func (x *NPM) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[13]
+	mi := &file_source_metadata_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1273,7 +1328,7 @@ func (x *NPM) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NPM.ProtoReflect.Descriptor instead.
 func (*NPM) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{13}
+	return file_source_metadata_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *NPM) GetFile() string {
@@ -1326,7 +1381,7 @@ type PyPi struct {
 func (x *PyPi) Reset() {
 	*x = PyPi{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[14]
+		mi := &file_source_metadata_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1339,7 +1394,7 @@ func (x *PyPi) String() string {
 func (*PyPi) ProtoMessage() {}
 
 func (x *PyPi) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[14]
+	mi := &file_source_metadata_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1352,7 +1407,7 @@ func (x *PyPi) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PyPi.ProtoReflect.Descriptor instead.
 func (*PyPi) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{14}
+	return file_source_metadata_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PyPi) GetFile() string {
@@ -1405,7 +1460,7 @@ type S3 struct {
 func (x *S3) Reset() {
 	*x = S3{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[15]
+		mi := &file_source_metadata_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1418,7 +1473,7 @@ func (x *S3) String() string {
 func (*S3) ProtoMessage() {}
 
 func (x *S3) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[15]
+	mi := &file_source_metadata_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1431,7 +1486,7 @@ func (x *S3) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use S3.ProtoReflect.Descriptor instead.
 func (*S3) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{15}
+	return file_source_metadata_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *S3) GetBucket() string {
@@ -1488,7 +1543,7 @@ type Slack struct {
 func (x *Slack) Reset() {
 	*x = Slack{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[16]
+		mi := &file_source_metadata_proto_msgTypes[17]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1501,7 +1556,7 @@ func (x *Slack) String() string {
 func (*Slack) ProtoMessage() {}
 
 func (x *Slack) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[16]
+	mi := &file_source_metadata_proto_msgTypes[17]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1514,7 +1569,7 @@ func (x *Slack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Slack.ProtoReflect.Descriptor instead.
 func (*Slack) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{16}
+	return file_source_metadata_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *Slack) GetChannelId() string {
@@ -1596,7 +1651,7 @@ type Gerrit struct {
 func (x *Gerrit) Reset() {
 	*x = Gerrit{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[17]
+		mi := &file_source_metadata_proto_msgTypes[18]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1609,7 +1664,7 @@ func (x *Gerrit) String() string {
 func (*Gerrit) ProtoMessage() {}
 
 func (x *Gerrit) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[17]
+	mi := &file_source_metadata_proto_msgTypes[18]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1622,7 +1677,7 @@ func (x *Gerrit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Gerrit.ProtoReflect.Descriptor instead.
 func (*Gerrit) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{17}
+	return file_source_metadata_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Gerrit) GetCommit() string {
@@ -1678,7 +1733,7 @@ type Test struct {
 func (x *Test) Reset() {
 	*x = Test{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[18]
+		mi := &file_source_metadata_proto_msgTypes[19]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1691,7 +1746,7 @@ func (x *Test) String() string {
 func (*Test) ProtoMessage() {}
 
 func (x *Test) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[18]
+	mi := &file_source_metadata_proto_msgTypes[19]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1704,7 +1759,7 @@ func (x *Test) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Test.ProtoReflect.Descriptor instead.
 func (*Test) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{18}
+	return file_source_metadata_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Test) GetFile() string {
@@ -1728,7 +1783,7 @@ type Jenkins struct {
 func (x *Jenkins) Reset() {
 	*x = Jenkins{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[19]
+		mi := &file_source_metadata_proto_msgTypes[20]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1741,7 +1796,7 @@ func (x *Jenkins) String() string {
 func (*Jenkins) ProtoMessage() {}
 
 func (x *Jenkins) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[19]
+	mi := &file_source_metadata_proto_msgTypes[20]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1754,7 +1809,7 @@ func (x *Jenkins) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Jenkins.ProtoReflect.Descriptor instead.
 func (*Jenkins) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{19}
+	return file_source_metadata_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Jenkins) GetProjectName() string {
@@ -1802,7 +1857,7 @@ type Teams struct {
 func (x *Teams) Reset() {
 	*x = Teams{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[20]
+		mi := &file_source_metadata_proto_msgTypes[21]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1815,7 +1870,7 @@ func (x *Teams) String() string {
 func (*Teams) ProtoMessage() {}
 
 func (x *Teams) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[20]
+	mi := &file_source_metadata_proto_msgTypes[21]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1828,7 +1883,7 @@ func (x *Teams) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Teams.ProtoReflect.Descriptor instead.
 func (*Teams) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{20}
+	return file_source_metadata_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Teams) GetChannelId() string {
@@ -1897,7 +1952,7 @@ type Artifactory struct {
 func (x *Artifactory) Reset() {
 	*x = Artifactory{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[21]
+		mi := &file_source_metadata_proto_msgTypes[22]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1910,7 +1965,7 @@ func (x *Artifactory) String() string {
 func (*Artifactory) ProtoMessage() {}
 
 func (x *Artifactory) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[21]
+	mi := &file_source_metadata_proto_msgTypes[22]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1923,7 +1978,7 @@ func (x *Artifactory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Artifactory.ProtoReflect.Descriptor instead.
 func (*Artifactory) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{21}
+	return file_source_metadata_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Artifactory) GetRepo() string {
@@ -1984,7 +2039,7 @@ type Syslog struct {
 func (x *Syslog) Reset() {
 	*x = Syslog{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[22]
+		mi := &file_source_metadata_proto_msgTypes[23]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1997,7 +2052,7 @@ func (x *Syslog) String() string {
 func (*Syslog) ProtoMessage() {}
 
 func (x *Syslog) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[22]
+	mi := &file_source_metadata_proto_msgTypes[23]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2010,7 +2065,7 @@ func (x *Syslog) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Syslog.ProtoReflect.Descriptor instead.
 func (*Syslog) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{22}
+	return file_source_metadata_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Syslog) GetHostname() string {
@@ -2068,7 +2123,7 @@ type PublicEventMonitoring struct {
 func (x *PublicEventMonitoring) Reset() {
 	*x = PublicEventMonitoring{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[23]
+		mi := &file_source_metadata_proto_msgTypes[24]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2081,7 +2136,7 @@ func (x *PublicEventMonitoring) String() string {
 func (*PublicEventMonitoring) ProtoMessage() {}
 
 func (x *PublicEventMonitoring) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[23]
+	mi := &file_source_metadata_proto_msgTypes[24]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2094,7 +2149,7 @@ func (x *PublicEventMonitoring) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicEventMonitoring.ProtoReflect.Descriptor instead.
 func (*PublicEventMonitoring) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{23}
+	return file_source_metadata_proto_rawDescGZIP(), []int{24}
 }
 
 func (m *PublicEventMonitoring) GetMetadata() isPublicEventMonitoring_Metadata {
@@ -2151,13 +2206,14 @@ type MetaData struct {
 	//	*MetaData_Artifactory
 	//	*MetaData_Syslog
 	//	*MetaData_PublicEventMonitoring
+	//	*MetaData_File
 	Data isMetaData_Data `protobuf_oneof:"data"`
 }
 
 func (x *MetaData) Reset() {
 	*x = MetaData{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_source_metadata_proto_msgTypes[24]
+		mi := &file_source_metadata_proto_msgTypes[25]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2170,7 +2226,7 @@ func (x *MetaData) String() string {
 func (*MetaData) ProtoMessage() {}
 
 func (x *MetaData) ProtoReflect() protoreflect.Message {
-	mi := &file_source_metadata_proto_msgTypes[24]
+	mi := &file_source_metadata_proto_msgTypes[25]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2183,7 +2239,7 @@ func (x *MetaData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetaData.ProtoReflect.Descriptor instead.
 func (*MetaData) Descriptor() ([]byte, []int) {
-	return file_source_metadata_proto_rawDescGZIP(), []int{24}
+	return file_source_metadata_proto_rawDescGZIP(), []int{25}
 }
 
 func (m *MetaData) GetData() isMetaData_Data {
@@ -2361,6 +2417,13 @@ func (x *MetaData) GetPublicEventMonitoring() *PublicEventMonitoring {
 	return nil
 }
 
+func (x *MetaData) GetFile() *File {
+	if x, ok := x.GetData().(*MetaData_File); ok {
+		return x.File
+	}
+	return nil
+}
+
 type isMetaData_Data interface {
 	isMetaData_Data()
 }
@@ -2461,6 +2524,10 @@ type MetaData_PublicEventMonitoring struct {
 	PublicEventMonitoring *PublicEventMonitoring `protobuf:"bytes,24,opt,name=publicEventMonitoring,proto3,oneof"`
 }
 
+type MetaData_File struct {
+	File *File `protobuf:"bytes,25,opt,name=file,proto3,oneof"`
+}
+
 func (*MetaData_Azure) isMetaData_Data() {}
 
 func (*MetaData_Bitbucket) isMetaData_Data() {}
@@ -2508,6 +2575,8 @@ func (*MetaData_Artifactory) isMetaData_Data() {}
 func (*MetaData_Syslog) isMetaData_Data() {}
 
 func (*MetaData_PublicEventMonitoring) isMetaData_Data() {}
+
+func (*MetaData_File) isMetaData_Data() {}
 
 var File_source_metadata_proto protoreflect.FileDescriptor
 
@@ -2597,7 +2666,10 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x0a, 0x04, 0x66, 0x69, 0x6c, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x66, 0x69,
 	0x6c, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6c, 0x69, 0x6e, 0x6b, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x04, 0x6c, 0x69, 0x6e, 0x6b, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x6d, 0x61, 0x69, 0x6c, 0x18,
-	0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x65, 0x6d, 0x61, 0x69, 0x6c, 0x22, 0x99, 0x01, 0x0a,
+	0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x65, 0x6d, 0x61, 0x69, 0x6c, 0x22, 0x2e, 0x0a, 0x04,
+	0x46, 0x69, 0x6c, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74, 0x68,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x22, 0x99, 0x01, 0x0a,
 	0x03, 0x47, 0x69, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x12, 0x12, 0x0a, 0x04,
 	0x66, 0x69, 0x6c, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x66, 0x69, 0x6c, 0x65,
@@ -2745,7 +2817,7 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74,
 	0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x47, 0x69, 0x74, 0x68, 0x75, 0x62, 0x48, 0x00, 0x52, 0x06,
 	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x42, 0x0a, 0x0a, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61,
-	0x74, 0x61, 0x22, 0x87, 0x0a, 0x0a, 0x08, 0x4d, 0x65, 0x74, 0x61, 0x44, 0x61, 0x74, 0x61, 0x12,
+	0x74, 0x61, 0x22, 0xb4, 0x0a, 0x0a, 0x08, 0x4d, 0x65, 0x74, 0x61, 0x44, 0x61, 0x74, 0x61, 0x12,
 	0x2e, 0x0a, 0x05, 0x61, 0x7a, 0x75, 0x72, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16,
 	0x2e, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61,
 	0x2e, 0x41, 0x7a, 0x75, 0x72, 0x65, 0x48, 0x00, 0x52, 0x05, 0x61, 0x7a, 0x75, 0x72, 0x65, 0x12,
@@ -2825,15 +2897,18 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x45, 0x76, 0x65, 0x6e,
 	0x74, 0x4d, 0x6f, 0x6e, 0x69, 0x74, 0x6f, 0x72, 0x69, 0x6e, 0x67, 0x48, 0x00, 0x52, 0x15, 0x70,
 	0x75, 0x62, 0x6c, 0x69, 0x63, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x4d, 0x6f, 0x6e, 0x69, 0x74, 0x6f,
-	0x72, 0x69, 0x6e, 0x67, 0x42, 0x06, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x2a, 0x31, 0x0a, 0x0a,
-	0x56, 0x69, 0x73, 0x69, 0x62, 0x69, 0x6c, 0x69, 0x74, 0x79, 0x12, 0x0a, 0x0a, 0x06, 0x70, 0x75,
-	0x62, 0x6c, 0x69, 0x63, 0x10, 0x00, 0x12, 0x0b, 0x0a, 0x07, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74,
-	0x65, 0x10, 0x01, 0x12, 0x0a, 0x0a, 0x06, 0x73, 0x68, 0x61, 0x72, 0x65, 0x64, 0x10, 0x02, 0x42,
-	0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72,
-	0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72,
-	0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f,
-	0x70, 0x62, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61,
-	0x74, 0x61, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x72, 0x69, 0x6e, 0x67, 0x12, 0x2b, 0x0a, 0x04, 0x66, 0x69, 0x6c, 0x65, 0x18, 0x19, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x15, 0x2e, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61,
+	0x64, 0x61, 0x74, 0x61, 0x2e, 0x46, 0x69, 0x6c, 0x65, 0x48, 0x00, 0x52, 0x04, 0x66, 0x69, 0x6c,
+	0x65, 0x42, 0x06, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x2a, 0x31, 0x0a, 0x0a, 0x56, 0x69, 0x73,
+	0x69, 0x62, 0x69, 0x6c, 0x69, 0x74, 0x79, 0x12, 0x0a, 0x0a, 0x06, 0x70, 0x75, 0x62, 0x6c, 0x69,
+	0x63, 0x10, 0x00, 0x12, 0x0b, 0x0a, 0x07, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x10, 0x01,
+	0x12, 0x0a, 0x0a, 0x06, 0x73, 0x68, 0x61, 0x72, 0x65, 0x64, 0x10, 0x02, 0x42, 0x43, 0x5a, 0x41,
+	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66,
+	0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66,
+	0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x62, 0x2f,
+	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x70,
+	0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2849,7 +2924,7 @@ func file_source_metadata_proto_rawDescGZIP() []byte {
 }
 
 var file_source_metadata_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_source_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_source_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_source_metadata_proto_goTypes = []interface{}{
 	(Visibility)(0),               // 0: source_metadata.Visibility
 	(*Azure)(nil),                 // 1: source_metadata.Azure
@@ -2860,56 +2935,58 @@ var file_source_metadata_proto_goTypes = []interface{}{
 	(*Dockerhub)(nil),             // 6: source_metadata.Dockerhub
 	(*ECR)(nil),                   // 7: source_metadata.ECR
 	(*Filesystem)(nil),            // 8: source_metadata.Filesystem
-	(*Git)(nil),                   // 9: source_metadata.Git
-	(*Github)(nil),                // 10: source_metadata.Github
-	(*Gitlab)(nil),                // 11: source_metadata.Gitlab
-	(*GCS)(nil),                   // 12: source_metadata.GCS
-	(*Jira)(nil),                  // 13: source_metadata.Jira
-	(*NPM)(nil),                   // 14: source_metadata.NPM
-	(*PyPi)(nil),                  // 15: source_metadata.PyPi
-	(*S3)(nil),                    // 16: source_metadata.S3
-	(*Slack)(nil),                 // 17: source_metadata.Slack
-	(*Gerrit)(nil),                // 18: source_metadata.Gerrit
-	(*Test)(nil),                  // 19: source_metadata.Test
-	(*Jenkins)(nil),               // 20: source_metadata.Jenkins
-	(*Teams)(nil),                 // 21: source_metadata.Teams
-	(*Artifactory)(nil),           // 22: source_metadata.Artifactory
-	(*Syslog)(nil),                // 23: source_metadata.Syslog
-	(*PublicEventMonitoring)(nil), // 24: source_metadata.PublicEventMonitoring
-	(*MetaData)(nil),              // 25: source_metadata.MetaData
+	(*File)(nil),                  // 9: source_metadata.File
+	(*Git)(nil),                   // 10: source_metadata.Git
+	(*Github)(nil),                // 11: source_metadata.Github
+	(*Gitlab)(nil),                // 12: source_metadata.Gitlab
+	(*GCS)(nil),                   // 13: source_metadata.GCS
+	(*Jira)(nil),                  // 14: source_metadata.Jira
+	(*NPM)(nil),                   // 15: source_metadata.NPM
+	(*PyPi)(nil),                  // 16: source_metadata.PyPi
+	(*S3)(nil),                    // 17: source_metadata.S3
+	(*Slack)(nil),                 // 18: source_metadata.Slack
+	(*Gerrit)(nil),                // 19: source_metadata.Gerrit
+	(*Test)(nil),                  // 20: source_metadata.Test
+	(*Jenkins)(nil),               // 21: source_metadata.Jenkins
+	(*Teams)(nil),                 // 22: source_metadata.Teams
+	(*Artifactory)(nil),           // 23: source_metadata.Artifactory
+	(*Syslog)(nil),                // 24: source_metadata.Syslog
+	(*PublicEventMonitoring)(nil), // 25: source_metadata.PublicEventMonitoring
+	(*MetaData)(nil),              // 26: source_metadata.MetaData
 }
 var file_source_metadata_proto_depIdxs = []int32{
 	0,  // 0: source_metadata.Slack.visibility:type_name -> source_metadata.Visibility
-	10, // 1: source_metadata.PublicEventMonitoring.github:type_name -> source_metadata.Github
+	11, // 1: source_metadata.PublicEventMonitoring.github:type_name -> source_metadata.Github
 	1,  // 2: source_metadata.MetaData.azure:type_name -> source_metadata.Azure
 	2,  // 3: source_metadata.MetaData.bitbucket:type_name -> source_metadata.Bitbucket
 	4,  // 4: source_metadata.MetaData.circleci:type_name -> source_metadata.CircleCI
 	5,  // 5: source_metadata.MetaData.confluence:type_name -> source_metadata.Confluence
 	6,  // 6: source_metadata.MetaData.dockerhub:type_name -> source_metadata.Dockerhub
 	7,  // 7: source_metadata.MetaData.ecr:type_name -> source_metadata.ECR
-	12, // 8: source_metadata.MetaData.gcs:type_name -> source_metadata.GCS
-	10, // 9: source_metadata.MetaData.github:type_name -> source_metadata.Github
-	11, // 10: source_metadata.MetaData.gitlab:type_name -> source_metadata.Gitlab
-	13, // 11: source_metadata.MetaData.jira:type_name -> source_metadata.Jira
-	14, // 12: source_metadata.MetaData.npm:type_name -> source_metadata.NPM
-	15, // 13: source_metadata.MetaData.pypi:type_name -> source_metadata.PyPi
-	16, // 14: source_metadata.MetaData.s3:type_name -> source_metadata.S3
-	17, // 15: source_metadata.MetaData.slack:type_name -> source_metadata.Slack
+	13, // 8: source_metadata.MetaData.gcs:type_name -> source_metadata.GCS
+	11, // 9: source_metadata.MetaData.github:type_name -> source_metadata.Github
+	12, // 10: source_metadata.MetaData.gitlab:type_name -> source_metadata.Gitlab
+	14, // 11: source_metadata.MetaData.jira:type_name -> source_metadata.Jira
+	15, // 12: source_metadata.MetaData.npm:type_name -> source_metadata.NPM
+	16, // 13: source_metadata.MetaData.pypi:type_name -> source_metadata.PyPi
+	17, // 14: source_metadata.MetaData.s3:type_name -> source_metadata.S3
+	18, // 15: source_metadata.MetaData.slack:type_name -> source_metadata.Slack
 	8,  // 16: source_metadata.MetaData.filesystem:type_name -> source_metadata.Filesystem
-	9,  // 17: source_metadata.MetaData.git:type_name -> source_metadata.Git
-	19, // 18: source_metadata.MetaData.test:type_name -> source_metadata.Test
+	10, // 17: source_metadata.MetaData.git:type_name -> source_metadata.Git
+	20, // 18: source_metadata.MetaData.test:type_name -> source_metadata.Test
 	3,  // 19: source_metadata.MetaData.buildkite:type_name -> source_metadata.Buildkite
-	18, // 20: source_metadata.MetaData.gerrit:type_name -> source_metadata.Gerrit
-	20, // 21: source_metadata.MetaData.jenkins:type_name -> source_metadata.Jenkins
-	21, // 22: source_metadata.MetaData.teams:type_name -> source_metadata.Teams
-	22, // 23: source_metadata.MetaData.artifactory:type_name -> source_metadata.Artifactory
-	23, // 24: source_metadata.MetaData.syslog:type_name -> source_metadata.Syslog
-	24, // 25: source_metadata.MetaData.publicEventMonitoring:type_name -> source_metadata.PublicEventMonitoring
-	26, // [26:26] is the sub-list for method output_type
-	26, // [26:26] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	19, // 20: source_metadata.MetaData.gerrit:type_name -> source_metadata.Gerrit
+	21, // 21: source_metadata.MetaData.jenkins:type_name -> source_metadata.Jenkins
+	22, // 22: source_metadata.MetaData.teams:type_name -> source_metadata.Teams
+	23, // 23: source_metadata.MetaData.artifactory:type_name -> source_metadata.Artifactory
+	24, // 24: source_metadata.MetaData.syslog:type_name -> source_metadata.Syslog
+	25, // 25: source_metadata.MetaData.publicEventMonitoring:type_name -> source_metadata.PublicEventMonitoring
+	9,  // 26: source_metadata.MetaData.file:type_name -> source_metadata.File
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_source_metadata_proto_init() }
@@ -3015,7 +3092,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Git); i {
+			switch v := v.(*File); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3027,7 +3104,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Github); i {
+			switch v := v.(*Git); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3039,7 +3116,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Gitlab); i {
+			switch v := v.(*Github); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3051,7 +3128,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GCS); i {
+			switch v := v.(*Gitlab); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3063,7 +3140,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Jira); i {
+			switch v := v.(*GCS); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3075,7 +3152,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*NPM); i {
+			switch v := v.(*Jira); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3087,7 +3164,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PyPi); i {
+			switch v := v.(*NPM); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3099,7 +3176,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*S3); i {
+			switch v := v.(*PyPi); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3111,7 +3188,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Slack); i {
+			switch v := v.(*S3); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3123,7 +3200,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Gerrit); i {
+			switch v := v.(*Slack); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3135,7 +3212,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Test); i {
+			switch v := v.(*Gerrit); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3147,7 +3224,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Jenkins); i {
+			switch v := v.(*Test); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3159,7 +3236,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Teams); i {
+			switch v := v.(*Jenkins); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3171,7 +3248,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Artifactory); i {
+			switch v := v.(*Teams); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3183,7 +3260,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Syslog); i {
+			switch v := v.(*Artifactory); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3195,7 +3272,7 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PublicEventMonitoring); i {
+			switch v := v.(*Syslog); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -3207,6 +3284,18 @@ func file_source_metadata_proto_init() {
 			}
 		}
 		file_source_metadata_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PublicEventMonitoring); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_source_metadata_proto_msgTypes[25].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MetaData); i {
 			case 0:
 				return &v.state
@@ -3219,10 +3308,10 @@ func file_source_metadata_proto_init() {
 			}
 		}
 	}
-	file_source_metadata_proto_msgTypes[23].OneofWrappers = []interface{}{
+	file_source_metadata_proto_msgTypes[24].OneofWrappers = []interface{}{
 		(*PublicEventMonitoring_Github)(nil),
 	}
-	file_source_metadata_proto_msgTypes[24].OneofWrappers = []interface{}{
+	file_source_metadata_proto_msgTypes[25].OneofWrappers = []interface{}{
 		(*MetaData_Azure)(nil),
 		(*MetaData_Bitbucket)(nil),
 		(*MetaData_Circleci)(nil),
@@ -3247,6 +3336,7 @@ func file_source_metadata_proto_init() {
 		(*MetaData_Artifactory)(nil),
 		(*MetaData_Syslog)(nil),
 		(*MetaData_PublicEventMonitoring)(nil),
+		(*MetaData_File)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -3254,7 +3344,7 @@ func file_source_metadata_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_source_metadata_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

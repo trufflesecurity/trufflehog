@@ -71,7 +71,9 @@ type Config struct {
 	// HeadRef is the head reference to use to scan from.
 	HeadRef,
 	// BaseRef is the base reference to use to scan from.
-	BaseRef string
+	BaseRef,
+	// FilePath is the path to the file to scan.
+	FilePath string
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency,
 	// MaxDepth is the maximum depth to scan the source.
