@@ -22,7 +22,7 @@ import (
 type Source struct {
 	sourceId, jobId, fileSize int64
 	verify                    bool
-	name, path                string
+	name, path, fileName      string
 	aCtx                      context.Context
 	log                       *log.Entry
 	sources.Progress
@@ -87,6 +87,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			s.log.WithError(err).Errorf("Failed to close file: %v.", s.path)
 		}
 	}(file)
+	s.fileName = file.Name()
 
 	reReader, err := diskbufferreader.New(file)
 	if err != nil {
@@ -135,6 +136,7 @@ func constructChunk(s *Source) *sources.Chunk {
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_File{
 				File: &source_metadatapb.File{
+					Name: s.fileName,
 					Path: sanitizer.UTF8(s.path),
 				},
 			},
