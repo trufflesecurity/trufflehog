@@ -13,6 +13,8 @@ const (
 	PeekSize  = 3 * 1024
 )
 
+// ChunkReader is a wrapper around an io.Reader that chunks the data into smaller
+// chunks of size ChunkSize. It returns a channel of []byte that can be read from.
 func ChunkReader(r io.Reader) chan []byte {
 	chunkChan := make(chan []byte)
 	go func() {

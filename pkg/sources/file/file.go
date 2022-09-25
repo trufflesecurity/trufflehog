@@ -96,11 +96,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	chunkSkel := constructChunk(s)
 	if handlers.HandleFile(reReader, chunkSkel, chunksChan) {
+		s.log.Debugf("File %v was handled by a handler.", s.path)
 		return nil
 	}
 
 	if err := reReader.Reset(); err != nil {
-		return err
+		return fmt.Errorf("failed to reset re-readable reader: %w", err)
 	}
 	reReader.Stop()
 
