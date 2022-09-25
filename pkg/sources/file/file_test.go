@@ -41,6 +41,7 @@ func TestSource_Scan(t *testing.T) {
 			wantSourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_File{
 					File: &source_metadatapb.File{
+						Name: "file.go",
 						Path: "file.go",
 					},
 				},
