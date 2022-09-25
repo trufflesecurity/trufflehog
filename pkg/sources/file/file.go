@@ -18,6 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+// Source is a file entity.
 type Source struct {
 	sourceId, jobId, fileSize int64
 	verify                    bool
@@ -31,14 +32,17 @@ type Source struct {
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
+// Type returns the type of the source.
 func (s *Source) Type() sourcespb.SourceType {
 	return sourcespb.SourceType_SOURCE_TYPE_FILE
 }
 
+// SourceID returns the source ID.
 func (s *Source) SourceID() int64 {
 	return s.sourceId
 }
 
+// JobID returns the job ID.
 func (s *Source) JobID() int64 {
 	return s.jobId
 }
@@ -73,6 +77,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	return nil
 }
 
+// Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	file, err := os.Open(s.path)
 	if err != nil {
