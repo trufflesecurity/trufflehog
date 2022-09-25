@@ -3,6 +3,7 @@ package file
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	log "github.com/sirupsen/logrus"
@@ -66,10 +67,14 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	if s.path == "" {
 		s.path = os.Stdin.Name()
 	}
+	s.fileName = filepath.Base(s.path)
 
 	fi, err := os.Stat(s.path)
 	if err != nil {
 		return fmt.Errorf("failed to stat file: %w", err)
+	}
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("file is not a regular file: %v", s.path)
 	}
 	s.fileSize = fi.Size()
 
@@ -87,7 +92,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			s.log.WithError(err).Errorf("Failed to close file: %v.", s.path)
 		}
 	}(file)
-	s.fileName = file.Name()
 
 	reReader, err := diskbufferreader.New(file)
 	if err != nil {
