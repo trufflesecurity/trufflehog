@@ -71,19 +71,16 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 					continue
 				}
 
-				f := func() bool {
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							return true
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+							continue
 						}
 					}
-					return false
-				}
-				if !f() && detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-					continue
 				}
 			}
 			results = append(results, s1)
