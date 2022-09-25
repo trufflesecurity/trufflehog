@@ -23,7 +23,6 @@ type Source struct {
 	sourceId, jobId, fileSize int64
 	verify                    bool
 	name, path                string
-	file                      *os.File
 	aCtx                      context.Context
 	log                       *log.Entry
 	sources.Progress
