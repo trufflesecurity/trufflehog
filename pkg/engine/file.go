@@ -36,8 +36,7 @@ func (e *Engine) ScanFile(ctx context.Context, c sources.Config) error {
 	go func() {
 		defer common.RecoverWithExit(ctx)
 		defer e.sourcesWg.Done()
-		err := fileSrc.Chunks(ctx, e.ChunksChan())
-		if err != nil {
+		if err := fileSrc.Chunks(ctx, e.ChunksChan()); err != nil {
 			logrus.WithError(err).Error("error scanning file")
 		}
 	}()
