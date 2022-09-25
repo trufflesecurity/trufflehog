@@ -114,6 +114,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		progress += len(chunkData)
 		s.SetProgressComplete(progress, int(s.fileSize), fmt.Sprintf("Read %d bytes", progress), "")
 		log.Debugf("Progress: %d/%d", progress, s.fileSize)
+	
 		c := constructChunk(s)
 		c.Data = chunkData
 
