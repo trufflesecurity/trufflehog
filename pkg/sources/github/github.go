@@ -187,7 +187,6 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 		if err != nil || gist == nil {
 			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
 				log.Warn("Unauthenticated scans cannot determine if a repository is private.")
-				s.publicMap[repoURL] = source_metadatapb.Visibility_private
 				visibility = source_metadatapb.Visibility_private
 			}
 			log.WithError(err).Errorf("Could not get Github repository: %s", repoURL)
