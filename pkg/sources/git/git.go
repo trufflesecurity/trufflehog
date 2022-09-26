@@ -252,6 +252,7 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath
 		err = errors.WrapPrefix(err, "could not open cloned repo", 0)
 		return
 	}
+	log.WithField("clone_path", clonePath).WithField("repo", gitUrl).Debug("cloned repo")
 	return
 }
 
@@ -300,7 +301,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 	var reachedBase = false
-	log.Debugf("Scanning repo")
+	log.WithField("repo", urlMetadata).Debugf("Scanning repo")
 	for commit := range commitChan {
 		log.Debugf("Scanning commit %s", commit.Hash)
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
