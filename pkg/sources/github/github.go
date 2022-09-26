@@ -3,6 +3,7 @@ package github
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"runtime"
@@ -58,6 +59,7 @@ type Source struct {
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
 	apiClient       *github.Client
+	publicMap       map[string]source_metadatapb.Visibility
 	sources.Progress
 }
 
@@ -135,6 +137,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
 	}
 
+	s.publicMap = map[string]source_metadatapb.Visibility{}
+
 	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
 		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
@@ -147,12 +151,81 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 						Link:       git.GenerateLink(repository, commit, file),
 						Timestamp:  sanitizer.UTF8(timestamp),
 						Line:       line,
+						Visibility: s.visibilityOf(repository),
 					},
 				},
 			}
 		})
 
 	return nil
+}
+
+func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visibility) {
+	if visibility, exists := s.publicMap[repoURL]; exists {
+		return visibility
+	}
+	visibility = source_metadatapb.Visibility_public
+	defer func() {
+		s.publicMap[repoURL] = visibility
+	}()
+	log.Debugf("Checking public status for %s", repoURL)
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		log.WithError(err).Errorf("Could not parse repository URL.")
+		return
+	}
+
+	var resp *github.Response
+	urlPathParts := strings.Split(u.Path, "/")
+	switch len(urlPathParts) {
+	case 2:
+		// Check if repoURL is a gist.
+		var gist *github.Gist
+		repoName := urlPathParts[1]
+		repoName = strings.TrimSuffix(repoName, ".git")
+		for {
+			gist, resp, err = s.apiClient.Gists.Get(context.TODO(), repoName)
+			if !handleRateLimit(err, resp) {
+				break
+			}
+		}
+		if err != nil || gist == nil {
+			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
+				log.Warn("Unauthenticated scans cannot determine if a repository is private.")
+				visibility = source_metadatapb.Visibility_private
+			}
+			log.WithError(err).Errorf("Could not get Github repository: %s", repoURL)
+			return
+		}
+		if !(*gist.Public) {
+			visibility = source_metadatapb.Visibility_private
+		}
+	case 3:
+		var repo *github.Repository
+		owner := urlPathParts[1]
+		repoName := urlPathParts[2]
+		repoName = strings.TrimSuffix(repoName, ".git")
+		for {
+			repo, resp, err = s.apiClient.Repositories.Get(context.TODO(), owner, repoName)
+			if !handleRateLimit(err, resp) {
+				break
+			}
+		}
+		if err != nil || repo == nil {
+			log.WithError(err).Errorf("Could not get Github repository: %s", repoURL)
+			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
+				log.Warn("Unauthenticated scans cannot determine if a repository is private.")
+				visibility = source_metadatapb.Visibility_private
+			}
+			return
+		}
+		if *repo.Private {
+			visibility = source_metadatapb.Visibility_private
+		}
+	default:
+		log.Errorf("RepoURL (%s) split into unexpected number of parts. Got: %d, expected: 2 or 3", repoURL, len(urlPathParts))
+	}
+	return
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context) {

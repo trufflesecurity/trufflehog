@@ -97,6 +97,7 @@ message Github {
   string file = 6;
   string timestamp = 7;
   int64 line = 8;
+  Visibility visibility = 9;
 }
 
 message Gitlab {
