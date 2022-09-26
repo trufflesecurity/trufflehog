@@ -337,7 +337,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			log.Infof("Scanning repos from %v organization members.", len(s.members))
 			for _, member := range s.members {
 				if err = s.addGistsByUser(ctx, member); err != nil {
-					return nil, err
+					log.WithError(err).WithField("member", member).Error("error fetching gists by user")
 				}
 				if err := s.addRepos(ctx, member, s.getReposByUser); err != nil {
 					log.WithError(err).Error("error fetching repos by user")
@@ -622,7 +622,6 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, err
 			continue
 		}
 		if err != nil {
-			log.WithError(err).Warnf("could not list repos for user %s", user)
 			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
 		for _, gist := range gists {
@@ -656,8 +655,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 
 	installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
 	if err != nil {
-		log.WithError(err).Warn("Could not enumerate organizations using user")
-		return err
+		return fmt.Errorf("could not enumerate installed orgs: %w", err)
 	}
 
 	for _, org := range installs {
