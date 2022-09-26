@@ -146,7 +146,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 						Link:       git.GenerateLink(repository, commit, file),
 						Timestamp:  sanitizer.UTF8(timestamp),
 						Line:       line,
-						Visibility: s.isPublic(repository),
+						Visibility: s.visibilityOf(repository),
 					},
 				},
 			}
@@ -155,14 +155,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
-func (s *Source) isPublic(repoURL string) (visability source_metadatapb.Visibility) {
-	visability, exists := s.publicMap[repoURL]
-	if exists {
-		return visability
+func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visibility) {
+	if visibility, exists := s.publicMap[repoURL]; exists {
+		return visibility
 	}
-	visability = source_metadatapb.Visibility_public
+	visibility = source_metadatapb.Visibility_public
 	defer func() {
-		s.publicMap[repoURL] = visability
+		s.publicMap[repoURL] = visibility
 	}()
 	log.Debugf("Checking public status for %s", repoURL)
 	u, err := url.Parse(repoURL)
@@ -189,13 +188,13 @@ func (s *Source) isPublic(repoURL string) (visability source_metadatapb.Visibili
 			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
 				log.Warn("Unauthenticated scans cannot determine if a repository is private.")
 				s.publicMap[repoURL] = source_metadatapb.Visibility_private
-				visability = source_metadatapb.Visibility_private
+				visibility = source_metadatapb.Visibility_private
 			}
 			log.WithError(err).Errorf("Could not get Github repository: %s", repoURL)
 			return
 		}
 		if !(*gist.Public) {
-			visability = source_metadatapb.Visibility_private
+			visibility = source_metadatapb.Visibility_private
 		}
 	case 3:
 		var repo *github.Repository
@@ -212,12 +211,12 @@ func (s *Source) isPublic(repoURL string) (visability source_metadatapb.Visibili
 			log.WithError(err).Errorf("Could not get Github repository: %s", repoURL)
 			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
 				log.Warn("Unauthenticated scans cannot determine if a repository is private.")
-				visability = source_metadatapb.Visibility_private
+				visibility = source_metadatapb.Visibility_private
 			}
 			return
 		}
 		if *repo.Private {
-			visability = source_metadatapb.Visibility_private
+			visibility = source_metadatapb.Visibility_private
 		}
 	default:
 		log.Errorf("RepoURL (%s) split into unexpected number of parts. Got: %d, expected: 2 or 3", repoURL, len(urlPathParts))
