@@ -260,6 +260,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gengo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geoapify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geocode"
@@ -1475,5 +1476,6 @@ func DefaultDetectors() []detectors.Detector {
 		codemagic.Scanner{},
 		mongodb.Scanner{},
 		ngc.Scanner{},
+		gemini.Scanner{},
 	}
 }
