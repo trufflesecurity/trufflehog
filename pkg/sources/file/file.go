@@ -73,7 +73,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	if err != nil {
 		return fmt.Errorf("failed to stat file: %w", err)
 	}
-	if !fi.Mode().IsRegular() {
+	if !fi.Mode().IsDir() {
 		return fmt.Errorf("file is not a regular file: %v", s.path)
 	}
 	s.fileSize = fi.Size()
