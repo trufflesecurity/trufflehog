@@ -342,7 +342,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
 		if err := s.addGistsByUser(ctx, user.GetLogin()); err != nil {
-			return err
+			log.WithError(err).Errorf("error fetching gists for user %s", user.GetLogin())
 		}
 		for _, org := range s.orgs {
 			// TODO: Test it actually works to list org gists like this.
@@ -695,7 +695,7 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, err
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
+			return nil, fmt.Errorf("could not list gists for user %s: %w", user, err)
 		}
 		for _, gist := range gists {
 			gistURLs = append(gistURLs, gist.GetGitPullURL())
