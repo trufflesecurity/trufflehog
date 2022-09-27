@@ -1978,6 +1978,9 @@ func (m *JIRA) validate(all bool) error {
 			}
 		}
 
+	case *JIRA_Token:
+		// no validation rules for Token
+
 	}
 
 	if len(errors) > 0 {

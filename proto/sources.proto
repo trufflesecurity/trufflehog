@@ -160,6 +160,7 @@ message JIRA {
     credentials.BasicAuth basic_auth = 2;
     credentials.Unauthenticated unauthenticated = 3;
     credentials.Oauth2 oauth = 4;
+    string token = 6;
   }
   repeated string projects = 5;
 }
