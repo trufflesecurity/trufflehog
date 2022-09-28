@@ -1477,5 +1477,6 @@ func DefaultDetectors() []detectors.Detector {
 		mongodb.Scanner{},
 		ngc.Scanner{},
 		gemini.Scanner{},
+		digitaloceanv2.Scanner{},
 	}
 }
