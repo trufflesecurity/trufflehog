@@ -126,6 +126,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	// TODO: refactor to remove duplicate code
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.Git_BasicAuth:
 		user := cred.BasicAuth.Username
@@ -156,6 +157,24 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			err := func(repoURI string) error {
 				path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
+				defer os.RemoveAll(path)
+				if err != nil {
+					return err
+				}
+				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+			}(repoURI)
+			if err != nil {
+				return err
+			}
+		}
+	case *sourcespb.Git_SshAuth:
+		for i, repoURI := range s.conn.Repositories {
+			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+			if len(repoURI) == 0 {
+				continue
+			}
+			err := func(repoURI string) error {
+				path, repo, err := CloneRepoUsingSSH(repoURI)
 				defer os.RemoveAll(path)
 				if err != nil {
 					return err

@@ -185,6 +185,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diffbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diggernaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceantoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceanv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordbottoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordwebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
