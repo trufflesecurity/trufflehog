@@ -135,6 +135,104 @@ var _ interface {
 	ErrorName() string
 } = UnauthenticatedValidationError{}
 
+// Validate checks the field values on SSHAuth with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SSHAuth) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SSHAuth with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in SSHAuthMultiError, or nil if none found.
+func (m *SSHAuth) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SSHAuth) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return SSHAuthMultiError(errors)
+	}
+
+	return nil
+}
+
+// SSHAuthMultiError is an error wrapping multiple validation errors returned
+// by SSHAuth.ValidateAll() if the designated constraints aren't met.
+type SSHAuthMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SSHAuthMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SSHAuthMultiError) AllErrors() []error { return m }
+
+// SSHAuthValidationError is the validation error returned by SSHAuth.Validate
+// if the designated constraints aren't met.
+type SSHAuthValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SSHAuthValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SSHAuthValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SSHAuthValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SSHAuthValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SSHAuthValidationError) ErrorName() string { return "SSHAuthValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SSHAuthValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSSHAuth.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SSHAuthValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SSHAuthValidationError{}
+
 // Validate checks the field values on CloudEnvironment with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
