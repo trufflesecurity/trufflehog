@@ -898,6 +898,7 @@ enum DetectorType {
   Workday = 894;
   MongoDB = 895;
   NGC = 896;
+  DigitalOceanV2 = 897;
 }
 
 message Result {
