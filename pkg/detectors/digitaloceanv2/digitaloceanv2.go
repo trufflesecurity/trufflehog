@@ -21,13 +21,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(dop\_v1\_[a-f0-9]{64})\b`)
+	keyPat = regexp.MustCompile(`\b(dop\_v1\_[a-f0-9]{64} | doo\_v1\_[a-f0-9]{64} | dor\_v1\_[a-f0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"dop_v1_"}
+	return []string{"dop_v1_", "doo_v1_", "dor_v1_"}
 }
 
 // FromData will find and optionally verify DigitalOceanV2 secrets in a given set of bytes.
