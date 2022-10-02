@@ -3,6 +3,7 @@ package digitaloceanv2
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(dop\_v1\_[a-f0-9]{64} | doo\_v1\_[a-f0-9]{64} | dor\_v1\_[a-f0-9]{64})\b`)
+	keyPat = regexp.MustCompile(`\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -41,6 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
+		println("resmatch: " + resMatch)
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_DigitalOceanV2,
@@ -54,14 +56,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
+
 			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+				switch {
+				case strings.HasPrefix(resMatch, "dor_v1_"):
+					bodyBytes, err := io.ReadAll(res.Body)
+
+					if err != nil {
 						continue
+					}
+
+					bodyString := string(bodyBytes)
+					validResponse := strings.Contains(bodyString, `"access_token"`)
+					defer res.Body.Close()
+
+					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
+						s1.Verified = true
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
+					}
+				case strings.HasPrefix(resMatch, "doo_v1_"), strings.HasPrefix(resMatch, "dop_v1_"):
+					defer res.Body.Close()
+
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
 					}
 				}
 			}
