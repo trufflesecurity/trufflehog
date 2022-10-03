@@ -50,16 +50,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.digitalocean.com/v2/account", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
+			switch {
+			case strings.HasPrefix(resMatch, "dor_v1_"):
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://cloud.digitalocean.com/v1/oauth/token?grant_type=refresh_token&refresh_token="+resMatch, nil)
+				if err != nil {
+					continue
+				}
 
-			if err == nil {
-				switch {
-				case strings.HasPrefix(resMatch, "dor_v1_"):
+				res, err := client.Do(req)
+				if err == nil {
 					bodyBytes, err := io.ReadAll(res.Body)
 
 					if err != nil {
@@ -78,9 +77,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							continue
 						}
 					}
-				case strings.HasPrefix(resMatch, "doo_v1_"), strings.HasPrefix(resMatch, "dop_v1_"):
-					defer res.Body.Close()
+				}
 
+			case strings.HasPrefix(resMatch, "doo_v1_"), strings.HasPrefix(resMatch, "dop_v1_"):
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.digitalocean.com/v2/account", nil)
+				if err != nil {
+					continue
+				}
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
