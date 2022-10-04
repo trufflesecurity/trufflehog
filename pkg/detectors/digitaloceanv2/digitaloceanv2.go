@@ -42,7 +42,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
-		println("resmatch: " + resMatch)
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_DigitalOceanV2,
