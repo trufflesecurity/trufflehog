@@ -2,6 +2,7 @@ package sources
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -117,18 +118,12 @@ type Counter struct {
 
 // IncTotal increments the total field of counter and returns the new value.
 func (c *Counter) IncTotal() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.totalCnt++
-	return int(c.totalCnt)
+	return int(atomic.AddUint32(&c.totalCnt, 1))
 }
 
 // IncSuccess increments the success field of counter and returns the new value.
 func (c *Counter) IncSuccess() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.successCnt++
-	return int(c.successCnt)
+	return int(atomic.AddUint32(&c.successCnt, 1))
 }
 
 // Get returns the current successCnt.

@@ -168,8 +168,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 		}
 	case *sourcespb.Git_SshAuth:
-		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+		for _, repoURI := range s.conn.Repositories {
+			s.Update(len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -190,6 +190,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	for _, u := range s.conn.Directories {
+		_ = s.Counter.IncTotal()
+		var err error
+		// Only increment the success progress counter if the scan was successful.
+		go func() {
+			defer func() {
+				if err == nil {
+					s.Counter.IncSuccess()
+				}
+			}()
+		}()
 		s.Update(len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")
 
 		if len(u) == 0 {
