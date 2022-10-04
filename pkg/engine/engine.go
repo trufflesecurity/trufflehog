@@ -98,7 +98,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
-			defer common.Recover(ctx)
+			defer common.RecoverWithExit(ctx)
 			defer e.workersWg.Done()
 			e.detectorWorker(ctx)
 		}()
@@ -111,7 +111,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 // chunks before closing their respective channels. Once Finish is called, no
 // more sources may be scanned by the engine.
 func (e *Engine) Finish(ctx context.Context) {
-	defer common.Recover(ctx)
+	defer common.RecoverWithExit(ctx)
 	// wait for the sources to finish putting chunks onto the chunks channel
 	e.sourcesWg.Wait()
 	close(e.chunks)
@@ -181,9 +181,13 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					if !foundKeyword {
 						continue
 					}
-					ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-					defer cancel()
-					results, err := detector.FromData(ctx, verify, decoded.Data)
+
+					results, err := func() ([]detectors.Result, error) {
+						ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+						defer cancel()
+						defer common.Recover(ctx)
+						return detector.FromData(ctx, verify, decoded.Data)
+					}()
 					if err != nil {
 						logrus.WithFields(logrus.Fields{
 							"source_type": decoded.SourceType.String(),
@@ -191,6 +195,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						}).WithError(err).Error("could not scan chunk")
 						continue
 					}
+
 					for _, result := range results {
 						if isGitSource(chunk.SourceType) {
 							offset := FragmentLineOffset(chunk, &result)

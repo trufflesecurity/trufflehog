@@ -185,6 +185,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diffbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/diggernaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceantoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceanv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordbottoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordwebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
@@ -260,6 +261,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gengo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geoapify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geocode"
@@ -399,6 +401,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mockaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moderation"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mongodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monkeylearn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerck"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerk"
@@ -416,6 +419,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newscatcher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nftport"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ngc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
@@ -1471,5 +1475,9 @@ func DefaultDetectors() []detectors.Detector {
 		prodpad.Scanner{},
 		transferwise.Scanner{},
 		codemagic.Scanner{},
+		mongodb.Scanner{},
+		ngc.Scanner{},
+		gemini.Scanner{},
+		digitaloceanv2.Scanner{},
 	}
 }

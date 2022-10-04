@@ -26,8 +26,8 @@ func PrintJSON(r *detectors.ResultWithMetadata) {
 		// DetectorName is the string name of the DetectorType.
 		DetectorName string
 		Verified     bool
-		// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
-		Raw []byte
+		// Raw contains the raw secret data.
+		Raw string
 		// Redacted contains the redacted version of the raw secret identification data for display purposes.
 		// A secret ID should be used if available.
 		Redacted       string
@@ -41,7 +41,7 @@ func PrintJSON(r *detectors.ResultWithMetadata) {
 		DetectorType:   r.DetectorType,
 		DetectorName:   r.DetectorType.String(),
 		Verified:       r.Verified,
-		Raw:            r.Raw,
+		Raw:            string(r.Raw),
 		Redacted:       r.Redacted,
 		ExtraData:      r.ExtraData,
 		StructuredData: r.StructuredData,

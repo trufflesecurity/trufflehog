@@ -34,7 +34,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 	}
 	e.sourcesWg.Add(1)
 	go func() {
-		defer common.Recover(ctx)
+		defer common.RecoverWithExit(ctx)
 		defer e.sourcesWg.Done()
 		err := fileSystemSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {

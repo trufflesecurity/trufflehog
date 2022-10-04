@@ -124,6 +124,7 @@ message Git {
   oneof credential {
     credentials.BasicAuth basic_auth = 1;
     credentials.Unauthenticated unauthenticated = 2;
+    credentials.SSHAuth ssh_auth = 5;
   }
   repeated string directories = 3;
   repeated string repositories = 4;
@@ -160,6 +161,7 @@ message JIRA {
     credentials.BasicAuth basic_auth = 2;
     credentials.Unauthenticated unauthenticated = 3;
     credentials.Oauth2 oauth = 4;
+    string token = 6;
   }
   repeated string projects = 5;
 }

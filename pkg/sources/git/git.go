@@ -15,6 +15,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
 	"github.com/rs/zerolog"
 	log "github.com/sirupsen/logrus"
@@ -125,6 +126,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	// TODO: refactor to remove duplicate code
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.Git_BasicAuth:
 		user := cred.BasicAuth.Username
@@ -155,6 +157,24 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			err := func(repoURI string) error {
 				path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
+				defer os.RemoveAll(path)
+				if err != nil {
+					return err
+				}
+				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+			}(repoURI)
+			if err != nil {
+				return err
+			}
+		}
+	case *sourcespb.Git_SshAuth:
+		for i, repoURI := range s.conn.Repositories {
+			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+			if len(repoURI) == 0 {
+				continue
+			}
+			err := func(repoURI string) error {
+				path, repo, err := CloneRepoUsingSSH(repoURI)
 				defer os.RemoveAll(path)
 				if err != nil {
 					return err
@@ -251,6 +271,7 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath
 		err = errors.WrapPrefix(err, "could not open cloned repo", 0)
 		return
 	}
+	log.WithField("clone_path", clonePath).WithField("repo", gitUrl).Debug("cloned repo")
 	return
 }
 
@@ -299,24 +320,25 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 	var reachedBase = false
-	log.Debugf("Scanning repo")
+	log.WithField("repo", urlMetadata).Debugf("Scanning repo")
 	for commit := range commitChan {
+		log.Debugf("Scanning commit %s", commit.Hash)
+		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+			log.Debugf("reached max depth")
+			break
+		}
+		depth++
+		if reachedBase && commit.Hash != scanOptions.BaseHash {
+			break
+		}
+		if len(scanOptions.BaseHash) > 0 {
+			if commit.Hash == scanOptions.BaseHash {
+				log.Debugf("Reached base commit. Finishing scanning files.")
+				reachedBase = true
+			}
+		}
 		for _, diff := range commit.Diffs {
 			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
-			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-				log.Debugf("reached max depth")
-				break
-			}
-			depth++
-			if reachedBase && commit.Hash != scanOptions.BaseHash {
-				break
-			}
-			if len(scanOptions.BaseHash) > 0 {
-				if commit.Hash == scanOptions.BaseHash {
-					log.Debugf("Reached base commit. Finishing scanning files.")
-					reachedBase = true
-				}
-			}
 
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
@@ -441,6 +463,9 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 }
 
 func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	if err := normalizeConfig(scanOptions, repo); err != nil {
+		return err
+	}
 	start := time.Now().UnixNano()
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
@@ -450,6 +475,55 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	}
 	scanTime := time.Now().UnixNano() - start
 	log.Debugf("Scanning complete. Scan time: %f", time.Duration(scanTime).Seconds())
+	return nil
+}
+
+func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error) {
+	var baseCommit *object.Commit
+	if len(scanOptions.BaseHash) > 0 {
+		baseHash := plumbing.NewHash(scanOptions.BaseHash)
+		if !plumbing.IsHash(scanOptions.BaseHash) {
+			base, err := TryAdditionalBaseRefs(repo, scanOptions.BaseHash)
+			if err != nil {
+				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
+			}
+			scanOptions.BaseHash = base.String()
+			baseCommit, _ = repo.CommitObject(plumbing.NewHash(scanOptions.BaseHash))
+		} else {
+			baseCommit, err = repo.CommitObject(baseHash)
+			if err != nil {
+				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
+			}
+		}
+	}
+
+	var headCommit *object.Commit
+	if len(scanOptions.HeadHash) > 0 {
+		headHash := plumbing.NewHash(scanOptions.HeadHash)
+		if !plumbing.IsHash(scanOptions.HeadHash) {
+			head, err := TryAdditionalBaseRefs(repo, scanOptions.HeadHash)
+			if err != nil {
+				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
+			}
+			scanOptions.HeadHash = head.String()
+			headCommit, _ = repo.CommitObject(plumbing.NewHash(scanOptions.HeadHash))
+		} else {
+			headCommit, err = repo.CommitObject(headHash)
+			if err != nil {
+				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
+			}
+		}
+	}
+
+	// If baseCommit is an ancestor of headCommit, update c.BaseRef to be the common ancestor.
+	if headCommit != nil && baseCommit != nil {
+		mergeBase, err := headCommit.MergeBase(baseCommit)
+		if err != nil || len(mergeBase) < 1 {
+			return errors.WrapPrefix(err, "could not find common base between the given references", 0)
+		}
+		scanOptions.BaseHash = mergeBase[0].Hash.String()
+	}
+
 	return nil
 }
 

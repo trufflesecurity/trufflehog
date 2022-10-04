@@ -210,19 +210,13 @@ func TestSource_Chunks_Integration(t *testing.T) {
 		name string
 		init init
 		//verified
+		repoURL           string
 		expectedChunkData map[string]*byteCompare
+		scanOptions       ScanOptions
 	}{
 		{
-			name: "remote repo, unauthenticated",
-			init: init{
-				name: "test source",
-				connection: &sourcespb.Git{
-					Repositories: []string{"https://github.com/dustin-decker/secretsandstuff.git"},
-					Credential: &sourcespb.Git_Unauthenticated{
-						Unauthenticated: &credentialspb.Unauthenticated{},
-					},
-				},
-			},
+			name:    "remote repo, unauthenticated",
+			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
 			expectedChunkData: map[string]*byteCompare{
 				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws":  {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
 				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
@@ -237,6 +231,40 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				"8afb0ecd4998b1179e428db5ebbcdc8221214432-slack": {B: []byte("oops might drop a slack token here\n\ngithub_secret=\"369963c1434c377428ca8531fbc46c0c43d037a0\"\n\nyup, just did that\n"), Multi: true},
 				"8fe6f04ef1839e3fc54b5147e3d0e0b7ab971bd5-aws":   {B: []byte("blah blaj\n\nthis is the secret: AKIA2E0A8F3B244C9986\n\nokay thank you bye\n"), Multi: true},
 				"84e9c75e388ae3e866e121087ea2dd45a71068f2-aws":   {B: []byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n"), Multi: false},
+			},
+		},
+		{
+			name:    "remote repo, limited",
+			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
+			expectedChunkData: map[string]*byteCompare{
+				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws":  {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
+				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
+			},
+			scanOptions: ScanOptions{
+				HeadHash: "70001020fab32b1fcf2f1f0e5c66424eae649826",
+				BaseHash: "a6f8aa55736d4a85be31a0048a4607396898647a",
+			},
+		},
+		{
+			name:    "remote repo, base ahead of head",
+			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
+			expectedChunkData: map[string]*byteCompare{
+				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
+			},
+			scanOptions: ScanOptions{
+				HeadHash: "a6f8aa55736d4a85be31a0048a4607396898647a",
+				BaseHash: "70001020fab32b1fcf2f1f0e5c66424eae649826",
+			},
+		},
+		{
+			name:    "remote repo, main ahead of branch",
+			repoURL: "https://github.com/bill-rich/bad-secrets.git",
+			expectedChunkData: map[string]*byteCompare{
+				"547865c6cc0da46622306902b1b66f7e25dd0412-some_branch_file": {B: []byte("[default]\naws_access_key=AKIAYVP4CIPPH5TNP3SW\naws_secret_access_key=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\nregion=us-east-2\noutput=json\n\n#addibng a comment\n")},
+			},
+			scanOptions: ScanOptions{
+				HeadHash: "some_branch",
+				BaseHash: "master",
 			},
 		},
 	}
@@ -256,7 +284,11 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
 				defer close(chunksCh)
-				err := s.Chunks(ctx, chunksCh)
+				repoPath, repo, err := CloneRepoUsingUnauthenticated(tt.repoURL)
+				if err != nil {
+					panic(err)
+				}
+				err = s.git.ScanRepo(ctx, repo, repoPath, &tt.scanOptions, chunksCh)
 				if err != nil {
 					panic(err)
 				}

@@ -199,7 +199,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 		}
 		wg.Add(1)
 		go func(ctx context.Context, wg *sync.WaitGroup, sem *semaphore.Weighted, obj *s3.Object) {
-			defer common.Recover(ctx)
+			defer common.RecoverWithExit(ctx)
 			defer sem.Release(1)
 			defer wg.Done()
 			// defer log.Debugf("DONE - %s", *obj.Key)
