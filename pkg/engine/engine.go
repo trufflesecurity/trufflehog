@@ -14,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -163,6 +164,16 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for chunk := range e.chunks {
 		fragStart, mdLine := fragmentFirstLine(chunk)
 		for _, decoder := range e.decoders {
+			var decoderType detectorspb.DecoderType
+			switch decoder.(type) {
+			case *decoders.Plain:
+				decoderType = detectorspb.DecoderType_PLAIN
+			case *decoders.Base64:
+				decoderType = detectorspb.DecoderType_BASE64
+			default:
+				logrus.Warnf("unknown decoder type: %T", decoder)
+				decoderType = detectorspb.DecoderType_UNKNOWN
+			}
 			decoded := decoder.FromChunk(chunk)
 			if decoded == nil {
 				continue
@@ -201,6 +212,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							offset := FragmentLineOffset(chunk, &result)
 							*mdLine = fragStart + offset
 						}
+						result.DecoderType = decoderType
 						e.results <- detectors.CopyMetadata(chunk, result)
 
 					}

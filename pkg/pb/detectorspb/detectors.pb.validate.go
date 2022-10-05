@@ -97,6 +97,8 @@ func (m *Result) validate(all bool) error {
 
 	// no validation rules for HashV2
 
+	// no validation rules for Decoder
+
 	if len(errors) > 0 {
 		return ResultMultiError(errors)
 	}
