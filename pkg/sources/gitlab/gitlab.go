@@ -292,7 +292,6 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 
 			cnt := s.Counter.IncTotal()
-			// Only increment the success progress counter if the scan was successful.
 			defer func() {
 				s.Counter.IncSuccess()
 			}()

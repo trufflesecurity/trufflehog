@@ -479,7 +479,6 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			}
 			cnt := s.Counter.IncTotal()
 
-			// Only increement the success progress counter if the scan was successful.
 			defer func() {
 				s.Counter.IncSuccess()
 			}()

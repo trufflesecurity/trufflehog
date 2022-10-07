@@ -191,7 +191,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	for _, u := range s.conn.Directories {
 		_ = s.Counter.IncTotal()
-		// Only increment the success progress counter if the scan was successful.
 		go func() {
 			defer func() {
 				s.Counter.IncSuccess()
