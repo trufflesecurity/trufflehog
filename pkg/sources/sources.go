@@ -112,7 +112,6 @@ func NewConfig(opts ...func(*Config)) Config {
 // regardless of whether they are successful or not.
 type Counter struct {
 	successCnt, totalCnt uint32
-	mu                   sync.Mutex
 }
 
 // IncTotal increments the total field of counter and returns the new value.
