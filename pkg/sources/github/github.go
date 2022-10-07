@@ -532,9 +532,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	}
 
 	_ = s.jobPool.Wait()
-	if len(scanErrs) == 0 {
-		s.Complete(fmt.Sprintf("Completed scanning source %s", s.name))
-	}
+	s.Complete(fmt.Sprintf("Completed scanning source %s", s.name))
 
 	return scanErrs
 }

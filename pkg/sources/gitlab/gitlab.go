@@ -341,9 +341,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	}
 
 	_ = s.jobPool.Wait()
-	if len(scanErrs) == 0 {
-		s.Complete(fmt.Sprintf("Completed scanning source %s", s.name))
-	}
+	s.Complete(fmt.Sprintf("Completed scanning source %s", s.name))
 
 	return scanErrs
 }

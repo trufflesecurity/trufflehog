@@ -128,9 +128,7 @@ func (c *Counter) IncSuccess() int {
 
 // Get returns the current successCnt.
 func (c *Counter) Get() uint32 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.successCnt
+	return atomic.LoadUint32(&c.successCnt)
 }
 
 // Progress is used to update job completion progress across sources.
