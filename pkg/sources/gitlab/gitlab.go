@@ -292,12 +292,9 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 
 			cnt := s.Counter.IncTotal()
-			var err error
 			// Only increment the success progress counter if the scan was successful.
 			defer func() {
-				if err == nil {
-					s.Counter.IncSuccess()
-				}
+				s.Counter.IncSuccess()
 			}()
 			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repoURL is removed from the resume info after being scanned.
@@ -309,6 +306,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 
 			var path string
 			var repo *gogit.Repository
+			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
 				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
 			} else {

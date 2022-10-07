@@ -479,12 +479,9 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			}
 			cnt := s.Counter.IncTotal()
 
-			var err error
 			// Only increement the success progress counter if the scan was successful.
 			defer func() {
-				if err == nil {
-					s.Counter.IncSuccess()
-				}
+				s.Counter.IncSuccess()
 			}()
 			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repo is removed from the resume info after being scanned.
@@ -494,6 +491,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				s.resumeInfoSlice = sources.RemoveRepoFromResumeInfo(s.resumeInfoSlice, repoURL)
 			}(s, repoURL)
 
+			var err error
 			if !strings.HasSuffix(repoURL, ".git") {
 				err = fmt.Errorf("repo %s does not end in .git", repoURL)
 				scanErrs = append(scanErrs, err)

@@ -191,13 +191,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	for _, u := range s.conn.Directories {
 		_ = s.Counter.IncTotal()
-		var err error
 		// Only increment the success progress counter if the scan was successful.
 		go func() {
 			defer func() {
-				if err == nil {
-					s.Counter.IncSuccess()
-				}
+				s.Counter.IncSuccess()
 			}()
 		}()
 		s.Update(len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")

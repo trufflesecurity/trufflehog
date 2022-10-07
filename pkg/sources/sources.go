@@ -110,7 +110,6 @@ func NewConfig(opts ...func(*Config)) Config {
 // It also includes a totalCnt that records the total number of scans.
 // This is necessary in order to display the number of concurrent scans
 // regardless of whether they are successful or not.
-// successCnt is the only field used when calculating the percentage complete.
 type Counter struct {
 	successCnt, totalCnt uint32
 	mu                   sync.Mutex
