@@ -449,16 +449,15 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 		name         string
 		repos        []string
 		wantComplete bool
-		wantErr      bool
 	}{
 		{
 			name:         "no repos",
 			wantComplete: true,
 		},
 		{
-			name:    "one valid repo",
-			repos:   []string{"a"},
-			wantErr: true,
+			name:         "one valid repo",
+			repos:        []string{"a"},
+			wantComplete: true,
 		},
 	}
 
@@ -470,9 +469,6 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 			src.jobPool = &errgroup.Group{}
 
 			_ = src.scan(context.Background(), nil, nil)
-			if !tc.wantErr {
-				assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
-			}
 
 			gotComplete := src.GetProgress().PercentComplete == 100
 			if gotComplete != tc.wantComplete {

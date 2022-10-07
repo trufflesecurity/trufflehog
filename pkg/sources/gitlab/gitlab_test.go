@@ -8,7 +8,6 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -258,16 +257,15 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 		name         string
 		repos        []string
 		wantComplete bool
-		wantErr      bool
 	}{
 		{
 			name:         "no repos",
 			wantComplete: true,
 		},
 		{
-			name:    "one valid repo",
-			repos:   []string{"a"},
-			wantErr: true,
+			name:         "one valid repo",
+			repos:        []string{"a"},
+			wantComplete: true,
 		},
 	}
 
@@ -279,9 +277,6 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			src.jobPool = &errgroup.Group{}
 
 			_ = src.scanRepos(context.Background(), nil)
-			if !tc.wantErr {
-				assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
-			}
 
 			gotComplete := src.GetProgress().PercentComplete == 100
 			if gotComplete != tc.wantComplete {
