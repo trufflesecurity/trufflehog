@@ -350,7 +350,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	if err != nil {
 		return errors.New(err)
 	}
-	// GetSuccess repo within target.
+	// Get repo within target.
 	repos, errs := s.getRepos()
 	for _, repoErr := range errs {
 		log.WithError(repoErr).Warn("error getting repo")
