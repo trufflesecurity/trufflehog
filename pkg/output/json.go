@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -25,7 +26,9 @@ func PrintJSON(r *detectors.ResultWithMetadata) {
 		DetectorType detectorspb.DetectorType
 		// DetectorName is the string name of the DetectorType.
 		DetectorName string
-		Verified     bool
+		// DecoderName is the string name of the DecoderType.
+		DecoderName string
+		Verified    bool
 		// Raw contains the raw secret data.
 		Raw string
 		// Redacted contains the redacted version of the raw secret identification data for display purposes.
@@ -40,6 +43,7 @@ func PrintJSON(r *detectors.ResultWithMetadata) {
 		SourceName:     r.SourceName,
 		DetectorType:   r.DetectorType,
 		DetectorName:   r.DetectorType.String(),
+		DecoderName:    r.DecoderType.String(),
 		Verified:       r.Verified,
 		Raw:            string(r.Raw),
 		Redacted:       r.Redacted,

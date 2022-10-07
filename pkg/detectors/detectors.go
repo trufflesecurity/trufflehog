@@ -26,7 +26,9 @@ type Detector interface {
 type Result struct {
 	// DetectorType is the type of Detector.
 	DetectorType detectorspb.DetectorType
-	Verified     bool
+	// DecoderType is the type of Decoder.
+	DecoderType detectorspb.DecoderType
+	Verified    bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
