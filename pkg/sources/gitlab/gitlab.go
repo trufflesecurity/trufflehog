@@ -361,7 +361,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return errors.New("All specified repos had validation issues, ending scan")
 	}
 
-	// GetSuccess all repos if not specified.
+	// Get all repos if not specified.
 	if repos == nil {
 		projects, err := s.getAllProjects(apiClient)
 		if err != nil {
