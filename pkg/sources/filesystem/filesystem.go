@@ -111,6 +111,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return nil
 			}
 			defer inputFile.Close()
+			log.WithField("file_path", path).Trace("scanning file")
 
 			reReader, err := diskbufferreader.New(inputFile)
 			if err != nil {
