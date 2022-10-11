@@ -4,6 +4,12 @@ package detectors;
 
 option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb";
 
+enum DecoderType {
+  UNKNOWN = 0;
+  PLAIN = 1;
+  BASE64 = 2;
+}
+
 enum DetectorType {
   Alibaba = 0;
   AMQP = 1;
@@ -909,6 +915,7 @@ message Result {
   map<string, string> extra_data = 6;
   StructuredData structured_data = 7;
   string hash_v2 = 8;
+  DecoderType decoder_type = 9;
 }
 
 message StructuredData {
