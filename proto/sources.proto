@@ -153,6 +153,7 @@ message GitHub {
   bool includeForks = 8;
   string head = 9;
   string base = 10;
+  repeated string ignoreRepos = 11;
 }
 
 message JIRA {
