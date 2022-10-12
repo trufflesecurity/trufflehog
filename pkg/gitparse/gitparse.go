@@ -104,7 +104,7 @@ func Unstaged(ctx context.Context, source string) (chan Commit, error) {
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
 func executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
-	commitChan := make(chan Commit)
+	commitChan := make(chan Commit, 64)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
