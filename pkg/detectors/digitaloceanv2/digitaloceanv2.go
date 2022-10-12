@@ -22,7 +22,6 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	pat    = regexp.MustCompile(`\b(?:npm_)?([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-zA-Z]{36})\b`)
 	keyPat = regexp.MustCompile(`\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\b`)
 )
 
