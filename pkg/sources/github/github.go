@@ -42,22 +42,23 @@ const (
 )
 
 type Source struct {
-	name            string
-	sourceID        int64
-	jobID           int64
-	verify          bool
-	repos           []string
-	orgs            []string
-	members         []string
+	name     string
+	token    string
+	sourceID int64
+	jobID    int64
+	verify   bool
+	repos,
+	orgs,
+	members,
+	ignoreRepos []string
 	git             *git.Git
 	httpClient      *http.Client
 	aCtx            context.Context
 	log             *log.Entry
-	token           string
 	conn            *sourcespb.GitHub
 	jobPool         *errgroup.Group
-	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
+	resumeInfoSlice []string
 	apiClient       *github.Client
 	publicMap       map[string]source_metadatapb.Visibility
 	sources.Progress
@@ -131,6 +132,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.repos = s.conn.Repositories
 	s.orgs = s.conn.Organizations
+	s.ignoreRepos = s.conn.IgnoreRepos
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -600,6 +602,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 			PerPage: defaultPagination,
 		},
 	}
+
 	var numRepos, numForks int
 	for {
 		someRepos, res, err := s.apiClient.Repositories.ListByOrg(ctx, org, opts)
@@ -615,8 +618,13 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 		if len(someRepos) == 0 || res == nil {
 			break
 		}
+
 		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
 		for _, r := range someRepos {
+			if s.ignoreRepo(r.GetName()) {
+				continue
+			}
+
 			numRepos++
 			if r.GetFork() {
 				numForks++
@@ -654,6 +662,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 			PerPage: 50,
 		},
 	}
+
 	for {
 		someRepos, res, err := s.apiClient.Repositories.List(ctx, user, opts)
 		if err == nil {
@@ -668,8 +677,13 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 		if res == nil {
 			break
 		}
+
 		s.log.Debugf("Listed repos for user %s page %d/%d", user, opts.Page, res.LastPage)
 		for _, r := range someRepos {
+			if s.ignoreRepo(r.GetName()) {
+				continue
+			}
+
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
@@ -681,6 +695,23 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 		opts.Page = res.NextPage
 	}
 	return repos, nil
+}
+
+func (s *Source) ignoreRepo(r string) bool {
+	if stringInSlice(r, s.ignoreRepos) {
+		s.log.Debugf("ignoring repo %s", r)
+		return true
+	}
+	return false
+}
+
+func stringInSlice(s string, l []string) bool {
+	for _, b := range l {
+		if b == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, error) {
