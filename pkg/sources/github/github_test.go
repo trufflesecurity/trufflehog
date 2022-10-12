@@ -17,12 +17,13 @@ import (
 	"github.com/google/go-github/v42/github"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
@@ -64,9 +65,13 @@ func TestAddReposByOrg(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
+		JSON([]map[string]string{
+			{"clone_url": "super-secret-repo", "name": "super-secret-repo"},
+			{"clone_url": "super-secret-repo2", "name": "super-secret-repo2"},
+		})
 
 	s := initTestSource(nil)
+	s.ignoreRepos = []string{"super-secret-repo2"}
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.addRepos(context.TODO(), "super-secret-org", s.getReposByOrg)
 	assert.Nil(t, err)
@@ -81,9 +86,13 @@ func TestAddReposByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
+		JSON([]map[string]string{
+			{"clone_url": "super-secret-repo", "name": "super-secret-repo"},
+			{"clone_url": "super-secret-repo2", "name": "super-secret-repo2"},
+		})
 
 	s := initTestSource(nil)
+	s.ignoreRepos = []string{"super-secret-repo2"}
 	err := s.addRepos(context.TODO(), "super-secret-user", s.getReposByUser)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
