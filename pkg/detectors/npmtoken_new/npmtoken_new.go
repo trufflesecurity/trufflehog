@@ -1,4 +1,4 @@
-package npmtoken
+package npmtoken_new
 
 import (
 	"context"
@@ -21,20 +21,21 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"npm"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	keyPat = regexp.MustCompile(`(npm_[0-9a-zA-Z]{36})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"npm"}
+	return []string{"npm_"}
 }
 
-// FromData will find and optionally verify NpmToken secrets in a given set of bytes.
+// FromData will find and optionally verify NpmToken_New secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-  	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
