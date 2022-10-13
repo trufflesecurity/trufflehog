@@ -1,4 +1,4 @@
-package npmtoken_new
+package npmtokenv2
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"npm_"}
 }
 
-// FromData will find and optionally verify NpmToken_New secrets in a given set of bytes.
+// FromData will find and optionally verify NpmTokenV2 secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
