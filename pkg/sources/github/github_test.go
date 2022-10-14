@@ -67,11 +67,11 @@ func TestAddReposByOrg(t *testing.T) {
 		Reply(200).
 		JSON([]map[string]string{
 			{"clone_url": "super-secret-repo", "name": "super-secret-repo"},
-			{"clone_url": "super-secret-repo2", "name": "super-secret-repo2"},
+			{"clone_url": "super-secret-repo2", "full_name": "secret/super-secret-repo2"},
 		})
 
 	s := initTestSource(nil)
-	s.ignoreRepos = []string{"super-secret-repo2"}
+	s.ignoreRepos = []string{"secret/super-secret-repo2"}
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.addRepos(context.TODO(), "super-secret-org", s.getReposByOrg)
 	assert.Nil(t, err)
@@ -88,11 +88,11 @@ func TestAddReposByUser(t *testing.T) {
 		Reply(200).
 		JSON([]map[string]string{
 			{"clone_url": "super-secret-repo", "name": "super-secret-repo"},
-			{"clone_url": "super-secret-repo2", "name": "super-secret-repo2"},
+			{"clone_url": "super-secret-repo2", "full_name": "secret/super-secret-repo2"},
 		})
 
 	s := initTestSource(nil)
-	s.ignoreRepos = []string{"super-secret-repo2"}
+	s.ignoreRepos = []string{"secret/super-secret-repo2"}
 	err := s.addRepos(context.TODO(), "super-secret-user", s.getReposByUser)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))

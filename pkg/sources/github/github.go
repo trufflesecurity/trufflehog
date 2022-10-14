@@ -621,7 +621,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 
 		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
 		for _, r := range someRepos {
-			if s.ignoreRepo(r.GetName()) {
+			if s.ignoreRepo(r.GetFullName()) {
 				continue
 			}
 
@@ -680,7 +680,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 
 		s.log.Debugf("Listed repos for user %s page %d/%d", user, opts.Page, res.LastPage)
 		for _, r := range someRepos {
-			if s.ignoreRepo(r.GetName()) {
+			if s.ignoreRepo(r.GetFullName()) {
 				continue
 			}
 
