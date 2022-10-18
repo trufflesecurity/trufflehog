@@ -38,7 +38,6 @@ type Source struct {
 	token           string
 	url             string
 	repos           []string
-	ignoreRepos     []string
 	git             *git.Git
 	aCtx            context.Context
 	resumeInfoSlice []string
