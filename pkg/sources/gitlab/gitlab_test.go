@@ -59,10 +59,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source",
-				Verify:     false,
 			},
 			wantReposScanned: 2,
-			wantErr:          false,
 		},
 		{
 			name: "token auth, scoped repo",
@@ -78,10 +76,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source scoped",
-				Verify:     false,
 			},
 			wantReposScanned: 1,
-			wantErr:          false,
 		},
 		{
 			name: "basic auth, scoped repo",
@@ -100,10 +96,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source basic auth scoped",
-				Verify:     false,
 			},
 			wantReposScanned: 1,
-			wantErr:          false,
 		},
 		{
 			name: "basic auth access token, scoped repo",
@@ -122,10 +116,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source basic auth access token scoped",
-				Verify:     false,
 			},
 			wantReposScanned: 1,
-			wantErr:          false,
 		},
 	}
 
