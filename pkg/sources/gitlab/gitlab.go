@@ -22,6 +22,7 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	log "github.com/sirupsen/logrus"
 	"github.com/xanzy/go-gitlab"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -366,7 +367,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
-			if common.Contains(s.ignoreRepos, prj.PathWithNamespace) {
+			if slices.Contains(s.ignoreRepos, prj.PathWithNamespace) {
 				log.Debugf("Ignoring repo %s", prj.PathWithNamespace)
 				continue
 			}
