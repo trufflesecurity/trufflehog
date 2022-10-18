@@ -698,18 +698,9 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 }
 
 func (s *Source) ignoreRepo(r string) bool {
-	if stringInSlice(r, s.ignoreRepos) {
+	if common.Contains(s.ignoreRepos, r) {
 		s.log.Debugf("ignoring repo %s", r)
 		return true
-	}
-	return false
-}
-
-func stringInSlice(s string, l []string) bool {
-	for _, b := range l {
-		if b == s {
-			return true
-		}
 	}
 	return false
 }

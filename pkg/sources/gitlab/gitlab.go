@@ -38,6 +38,7 @@ type Source struct {
 	token           string
 	url             string
 	repos           []string
+	ignoreRepos     []string
 	git             *git.Git
 	aCtx            context.Context
 	resumeInfoSlice []string
@@ -365,6 +366,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
+			if common.Contains(s.ignoreRepos, prj.PathWithNamespace) {
+				log.Debugf("Ignoring repo %s", prj.PathWithNamespace)
+				continue
+			}
 			// Ensure the urls are valid before adding them to the repo list.
 			_, err := url.Parse(prj.HTTPURLToRepo)
 			if err != nil {
