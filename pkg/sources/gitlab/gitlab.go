@@ -82,7 +82,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 
 	s.repos = conn.Repositories
+	s.ignoreRepos = conn.IgnoreRepos
 	s.url = conn.Endpoint
+
 	if conn.Endpoint != "" && !strings.HasSuffix(s.url, "/") {
 		s.url = s.url + "/"
 	}
@@ -385,7 +387,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	s.repos = repos
 	// We must sort the repos so we can resume later if necessary.
-	sort.Strings(s.repos)
+	slices.Sort(s.repos)
 
 	errs = s.scanRepos(ctx, chunksChan)
 	for _, err := range errs {
