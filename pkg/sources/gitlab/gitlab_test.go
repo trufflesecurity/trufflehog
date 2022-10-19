@@ -39,10 +39,11 @@ func TestSource_Scan(t *testing.T) {
 		connection *sourcespb.GitLab
 	}
 	tests := []struct {
-		name      string
-		init      init
-		wantChunk *sources.Chunk
-		wantErr   bool
+		name             string
+		init             init
+		wantChunk        *sources.Chunk
+		wantReposScanned int
+		wantErr          bool
 	}{
 		{
 			name: "token auth, enumerate repo",
@@ -52,14 +53,14 @@ func TestSource_Scan(t *testing.T) {
 					Credential: &sourcespb.GitLab_Token{
 						Token: token,
 					},
+					IgnoreRepos: []string{"tes1188/learn-gitlab"},
 				},
 			},
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 2,
 		},
 		{
 			name: "token auth, scoped repo",
@@ -75,9 +76,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source scoped",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 1,
 		},
 		{
 			name: "basic auth, scoped repo",
@@ -96,9 +96,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source basic auth scoped",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 1,
 		},
 		{
 			name: "basic auth access token, scoped repo",
@@ -117,11 +116,11 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source basic auth access token scoped",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 1,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
@@ -156,6 +155,8 @@ func TestSource_Scan(t *testing.T) {
 					t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
 				}
 			}
+
+			assert.Equal(t, tt.wantReposScanned, len(s.repos))
 			if chunkCnt < 1 {
 				t.Errorf("0 chunks scanned.")
 			}

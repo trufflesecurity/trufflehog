@@ -19,6 +19,7 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v42/github"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -698,18 +699,9 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 }
 
 func (s *Source) ignoreRepo(r string) bool {
-	if stringInSlice(r, s.ignoreRepos) {
+	if slices.Contains(s.ignoreRepos, r) {
 		s.log.Debugf("ignoring repo %s", r)
 		return true
-	}
-	return false
-}
-
-func stringInSlice(s string, l []string) bool {
-	for _, b := range l {
-		if b == s {
-			return true
-		}
 	}
 	return false
 }
