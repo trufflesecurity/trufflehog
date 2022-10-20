@@ -1,7 +1,10 @@
 package git
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -370,6 +373,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				continue
 			}
 
+			if diff.Content.Len() > common.ChunkSize+common.PeekSize {
+				s.gitChunk(diff, fileName, email, hash, when, urlMetadata, chunksChan)
+				continue
+			}
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
@@ -382,6 +389,62 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 	}
 	return nil
+}
+
+func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, chunksChan chan *sources.Chunk) {
+	originalChunk := bufio.NewScanner(&diff.Content)
+	newChunkBuffer := bytes.Buffer{}
+	lastOffset := 0
+	for offset := 0; originalChunk.Scan(); offset++ {
+		line := originalChunk.Bytes()
+		if len(line) > common.ChunkSize || len(line)+newChunkBuffer.Len() > common.ChunkSize {
+			// Add oversize chunk info
+			if newChunkBuffer.Len() > 0 {
+				// Send the existing fragment.
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+lastOffset))
+				chunksChan <- &sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           newChunkBuffer.Bytes(),
+					Verify:         s.verify,
+				}
+				newChunkBuffer.Reset()
+				lastOffset = offset
+			}
+			if len(line) > common.ChunkSize {
+				// Send the oversize line.
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+offset))
+				chunksChan <- &sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           line,
+					Verify:         s.verify,
+				}
+				continue
+			}
+		}
+
+		_, err := newChunkBuffer.Write(line)
+		if err != nil {
+			log.WithError(err).Error("Could not write line to git diff buffer.")
+		}
+	}
+	// Send anything still in the new chunk buffer
+	if newChunkBuffer.Len() > 0 {
+		metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+lastOffset))
+		chunksChan <- &sources.Chunk{
+			SourceName:     s.sourceName,
+			SourceID:       s.sourceID,
+			SourceType:     s.sourceType,
+			SourceMetadata: metadata,
+			Data:           newChunkBuffer.Bytes(),
+			Verify:         s.verify,
+		}
+	}
 }
 
 // ScanUnstaged chunks unstaged changes.
@@ -753,11 +816,13 @@ func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSke
 	}
 	reader.Stop()
 
-	for chunkData := range common.ChunkReader(reader) {
-		chunk := *chunkSkel
-		chunk.Data = chunkData
-		chunksChan <- &chunk
+	chunk := *chunkSkel
+	chunkData, err := io.ReadAll(reader)
+	if err != nil {
+		return err
 	}
+	chunk.Data = chunkData
+	chunksChan <- &chunk
 
 	return nil
 }
