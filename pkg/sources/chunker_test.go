@@ -1,4 +1,4 @@
-package common
+package sources
 
 import (
 	"bufio"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 func TestChunker(t *testing.T) {
@@ -28,7 +29,7 @@ func TestChunker(t *testing.T) {
 	// Count chunks from looping using chunk size.
 	for {
 		baseChunkCount++
-		tmpChunk := make([]byte, ChunkSize)
+		tmpChunk := make([]byte, common.ChunkSize)
 		_, err := reReader.Read(tmpChunk)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -40,31 +41,35 @@ func TestChunker(t *testing.T) {
 	_ = reReader.Reset()
 
 	// Get the first two chunks for comparing later.
-	baseChunkOne := make([]byte, ChunkSize)
-	baseChunkTwo := make([]byte, ChunkSize)
+	baseChunkOne := make([]byte, common.ChunkSize)
+	baseChunkTwo := make([]byte, common.ChunkSize)
 
-	baseReader := bufio.NewReaderSize(reReader, ChunkSize)
+	baseReader := bufio.NewReaderSize(reReader, common.ChunkSize)
 	_, _ = baseReader.Read(baseChunkOne)
-	peek, _ := baseReader.Peek(PeekSize)
+	peek, _ := baseReader.Peek(common.PeekSize)
 	baseChunkOne = append(baseChunkOne, peek...)
 	_, _ = baseReader.Read(baseChunkTwo)
-	peek, _ = baseReader.Peek(PeekSize)
+	peek, _ = baseReader.Peek(common.PeekSize)
 	baseChunkTwo = append(baseChunkTwo, peek...)
 
 	// Reset the reader to the beginning and use ChunkReader.
 	_ = reReader.Reset()
 
 	testChunkCount := 0
-	for chunk := range ChunkReader(reReader) {
+	chunkData, _ := io.ReadAll(reReader)
+	originalChunk := &Chunk{
+		Data: chunkData,
+	}
+	for chunk := range Chunker(originalChunk) {
 		testChunkCount++
 		switch testChunkCount {
 		case 1:
-			if !bytes.Equal(baseChunkOne, chunk) {
-				t.Errorf("First chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk), len(baseChunkOne))
+			if !bytes.Equal(baseChunkOne, chunk.Data) {
+				t.Errorf("First chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk.Data), len(baseChunkOne))
 			}
 		case 2:
-			if !bytes.Equal(baseChunkTwo, chunk) {
-				t.Errorf("Second chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk), len(baseChunkTwo))
+			if !bytes.Equal(baseChunkTwo, chunk.Data) {
+				t.Errorf("Second chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk.Data), len(baseChunkTwo))
 			}
 		}
 	}

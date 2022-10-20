@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -295,11 +296,15 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			}
 			reader.Stop()
 
-			for chunkData := range common.ChunkReader(reader) {
-				chunk := *chunkSkel
-				chunk.Data = chunkData
-				chunksChan <- &chunk
+			chunk := *chunkSkel
+			chunkData, err := io.ReadAll(reader)
+			if err != nil {
+				log.WithError(err).Error("Could not read file data.")
+				return
 			}
+			chunk.Data = chunkData
+			chunksChan <- &chunk
+
 			nErr, ok = errorCount.Load(prefix)
 			if !ok {
 				nErr = 0

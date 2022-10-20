@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -753,11 +753,13 @@ func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSke
 	}
 	reader.Stop()
 
-	for chunkData := range common.ChunkReader(reader) {
-		chunk := *chunkSkel
-		chunk.Data = chunkData
-		chunksChan <- &chunk
+	chunkData, err := io.ReadAll(reader)
+	if err != nil {
+		return err
 	}
+	chunk := *chunkSkel
+	chunk.Data = chunkData
+	chunksChan <- &chunk
 
 	return nil
 }
