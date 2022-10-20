@@ -43,11 +43,12 @@ const (
 )
 
 type Source struct {
-	name     string
-	token    string
-	sourceID int64
-	jobID    int64
-	verify   bool
+	name        string
+	githubUser  string
+	githubToken string
+	sourceID    int64
+	jobID       int64
+	verify      bool
 	repos,
 	orgs,
 	members,
@@ -92,6 +93,7 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 		if err != nil {
 			return "", "", errors.New(err)
 		}
+		// TODO: Check rate limit for this call.
 		token, _, err := installationClient.Apps.CreateInstallationToken(
 			ctx, id, &github.InstallationTokenOptions{})
 		if err != nil {
@@ -99,9 +101,20 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 		}
 		return "x-access-token", token.GetToken(), nil // TODO: multiple workers request this, track the TTL
 	case *sourcespb.GitHub_Token:
-		ghUser, _, err := s.apiClient.Users.Get(context.TODO(), "")
-		if err != nil {
-			return "", "", errors.New(err)
+		var (
+			ghUser *github.User
+			resp   *github.Response
+			err    error
+		)
+		for {
+			ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
+			if handled := handleRateLimit(err, resp); handled {
+				continue
+			}
+			if err != nil {
+				return "", "", errors.New(err)
+			}
+			break
 		}
 		return ghUser.GetLogin(), cred.Token, nil
 	}
@@ -254,7 +267,7 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 
 func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token string) error {
 	// Needed for clones.
-	s.token = token
+	s.githubToken = token
 
 	// Needed to list repos.
 	ts := oauth2.StaticTokenSource(
@@ -284,9 +297,19 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		specificScope = true
 	}
 
-	user, _, err := s.apiClient.Users.Get(context.TODO(), "")
-	if err != nil {
-		return errors.New(err)
+	var (
+		ghUser *github.User
+		resp   *github.Response
+	)
+	for {
+		ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
+		if handled := handleRateLimit(err, resp); handled {
+			continue
+		}
+		if err != nil {
+			return errors.New(err)
+		}
+		break
 	}
 
 	if len(s.orgs) > 0 {
@@ -295,8 +318,8 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
 				log.WithError(err).Errorf("error fetching repos for org: %s", org)
 			}
-			if err := s.addRepos(ctx, user.GetLogin(), s.getReposByUser); err != nil {
-				log.WithError(err).Errorf("error fetching repos for user: %s", user.GetLogin())
+			if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
+				log.WithError(err).Errorf("error fetching repos for user: %s", ghUser.GetLogin())
 			}
 
 			if s.conn.ScanUsers {
@@ -311,7 +334,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	// If no scope was provided, enumerate them.
 	if !specificScope {
-		if err := s.addRepos(ctx, user.GetLogin(), s.getReposByUser); err != nil {
+		if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
 			log.WithError(err).Error("error fetching repos by user")
 		}
 
@@ -320,7 +343,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		} else {
 			// Scan for orgs is default with a token. GitHub App enumerates the repositories
 			// that were assigned to it in GitHub App settings.
-			s.addOrgsByUser(ctx, user.GetLogin())
+			s.addOrgsByUser(ctx, ghUser.GetLogin())
 		}
 
 		for _, org := range s.orgs {
@@ -344,8 +367,8 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	} else {
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
-		if err := s.addGistsByUser(ctx, user.GetLogin()); err != nil {
-			log.WithError(err).Errorf("error fetching gists for user %s", user.GetLogin())
+		if err := s.addGistsByUser(ctx, ghUser.GetLogin()); err != nil {
+			log.WithError(err).Errorf("error fetching gists for user %s", ghUser.GetLogin())
 		}
 		for _, org := range s.orgs {
 			// TODO: Test it actually works to list org gists like this.
@@ -544,13 +567,27 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 		}
-	default:
-		var token string
-		user, token, err := s.UserAndToken(ctx, installationClient)
+
+	case *sourcespb.GitHub_GithubApp:
+		s.githubUser, s.githubToken, err = s.UserAndToken(ctx, installationClient)
 		if err != nil {
 			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
 		}
-		path, repo, err = git.CloneRepoUsingToken(token, repoURL, user)
+
+		path, repo, err = git.CloneRepoUsingToken(s.githubToken, repoURL, s.githubUser)
+		if err != nil {
+			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+		}
+
+	case *sourcespb.GitHub_Token:
+		// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
+		if s.githubUser == "" || s.githubToken == "" {
+			s.githubUser, s.githubToken, err = s.UserAndToken(ctx, installationClient)
+			if err != nil {
+				return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
+			}
+		}
+		path, repo, err = git.CloneRepoUsingToken(s.githubToken, repoURL, s.githubUser)
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 		}
@@ -749,6 +786,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 		PerPage: membersAppPagination,
 	}
 
+	// TODO: Check rate limit for this call.
 	installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("could not enumerate installed orgs: %w", err)
