@@ -410,7 +410,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mux"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myfreshworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nasdaqdatalink"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nethunt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
@@ -427,6 +426,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/noticeable"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
+        "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtoken"
+        "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
@@ -1147,7 +1148,7 @@ func DefaultDetectors() []detectors.Detector {
 		zenserp.Scanner{},
 		restpackscreenshotapi.Scanner{},
 		shortcut.Scanner{},
-		nasdaqdatalink.Scanner{},
+		// nasdaqdatalink.Scanner{},
 		quickmetrics.Scanner{},
 		neutrinoapi.Scanner{},
 		bitmex.Scanner{},
@@ -1479,5 +1480,7 @@ func DefaultDetectors() []detectors.Detector {
 		ngc.Scanner{},
 		gemini.Scanner{},
 		digitaloceanv2.Scanner{},
+		npmtoken.Scanner{},
+		npmtokenv2.Scanner{},
 	}
 }

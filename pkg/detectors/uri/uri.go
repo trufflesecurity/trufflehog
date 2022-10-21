@@ -76,6 +76,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
+		// Skip findings where the password only has "*" characters, this is a redacted password
+		if strings.Trim(password, "*") == "" {
+			continue
+		}
+
 		parsedURL, err := url.Parse(urlMatch)
 		if err != nil {
 			continue

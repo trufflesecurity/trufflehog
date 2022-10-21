@@ -25,6 +25,7 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	log "github.com/sirupsen/logrus"
 	"github.com/xanzy/go-gitlab"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -41,6 +42,7 @@ type Source struct {
 	token           string
 	url             string
 	repos           []string
+	ignoreRepos     []string
 	git             *git.Git
 	aCtx            context.Context
 	resumeInfoSlice []string
@@ -85,7 +87,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 
 	s.repos = conn.Repositories
+	s.ignoreRepos = conn.IgnoreRepos
 	s.url = conn.Endpoint
+
 	if conn.Endpoint != "" && !strings.HasSuffix(s.url, "/") {
 		s.url = s.url + "/"
 	}
@@ -369,6 +373,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
+			if slices.Contains(s.ignoreRepos, prj.PathWithNamespace) {
+				log.Debugf("Ignoring repo %s", prj.PathWithNamespace)
+				continue
+			}
 			// Ensure the urls are valid before adding them to the repo list.
 			_, err := url.Parse(prj.HTTPURLToRepo)
 			if err != nil {
@@ -383,7 +391,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	s.repos = repos
 	// We must sort the repos so we can resume later if necessary.
-	sort.Strings(s.repos)
+	slices.Sort(s.repos)
 
 	errs = s.scanRepos(ctx, chunksChan)
 	for _, err := range errs {
