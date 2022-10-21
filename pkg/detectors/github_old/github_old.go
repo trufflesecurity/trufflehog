@@ -22,7 +22,7 @@ var (
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
 	keyPat = regexp.MustCompile(`(?i)(?:github)[^\.].{0,40}[ =:'"]+([a-f0-9]{40})\b`)
 
-	//TODO: Oauth2 client_id and client_secret
+	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
 )
 
@@ -94,5 +94,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
