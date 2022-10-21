@@ -281,6 +281,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	s.repos = reposToScan
 	log.Debugf("Found %v total repos to scan", len(s.repos))
 
+	var errMut sync.Mutex
 	var scanErrs []error
 	repoCnt := len(s.repos)
 	for _, repoURL := range s.repos {
@@ -296,9 +297,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 
 			cnt := s.Counter.IncTotal()
-			defer func() {
-				s.Counter.IncSuccess()
-			}()
+			defer s.Counter.IncSuccess()
 			s.setProgressCompleteWithRepo(progressIndexOffset, repoURL)
 			// Ensure the repoURL is removed from the resume info after being scanned.
 			defer func(s *Source) {
@@ -330,7 +329,9 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			log.Debugf("Starting to scan repoURL #%d of %d: %s", cnt, repoCnt, repo)
 			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 			if err != nil {
+				errMut.Lock()
 				scanErrs = append(scanErrs, err)
+				errMut.Unlock()
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)

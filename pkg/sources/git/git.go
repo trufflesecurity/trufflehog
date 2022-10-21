@@ -190,11 +190,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	for _, u := range s.conn.Directories {
-		_ = s.Counter.IncTotal()
+		s.Counter.IncTotal()
 		go func() {
-			defer func() {
-				s.Counter.IncSuccess()
-			}()
+			defer s.Counter.IncSuccess()
 		}()
 		s.Update(len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")
 
