@@ -8,6 +8,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
