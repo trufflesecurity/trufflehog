@@ -322,7 +322,9 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 			defer os.RemoveAll(path)
 			if err != nil {
+				errMut.Lock()
 				scanErrs = append(scanErrs, err)
+				errMut.Unlock()
 				return nil
 			}
 
