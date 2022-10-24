@@ -322,7 +322,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	var reachedBase = false
 	log.WithField("repo", urlMetadata).Debugf("Scanning repo")
 	for commit := range commitChan {
-		log.Debugf("Scanning commit %s", commit.Hash)
+		log.Tracef("Scanning commit %s", commit.Hash)
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			log.Debugf("reached max depth")
 			break
