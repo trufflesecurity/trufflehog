@@ -1,4 +1,4 @@
-package common
+package sources
 
 import (
 	"bufio"
@@ -55,16 +55,20 @@ func TestChunker(t *testing.T) {
 	_ = reReader.Reset()
 
 	testChunkCount := 0
-	for chunk := range ChunkReader(reReader) {
+	chunkData, _ := io.ReadAll(reReader)
+	originalChunk := &Chunk{
+		Data: chunkData,
+	}
+	for chunk := range Chunker(originalChunk) {
 		testChunkCount++
 		switch testChunkCount {
 		case 1:
-			if !bytes.Equal(baseChunkOne, chunk) {
-				t.Errorf("First chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk), len(baseChunkOne))
+			if !bytes.Equal(baseChunkOne, chunk.Data) {
+				t.Errorf("First chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk.Data), len(baseChunkOne))
 			}
 		case 2:
-			if !bytes.Equal(baseChunkTwo, chunk) {
-				t.Errorf("Second chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk), len(baseChunkTwo))
+			if !bytes.Equal(baseChunkTwo, chunk.Data) {
+				t.Errorf("Second chunk did not match expected. Got: %d bytes, expected: %d bytes", len(chunk.Data), len(baseChunkTwo))
 			}
 		}
 	}

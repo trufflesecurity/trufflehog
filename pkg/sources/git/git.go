@@ -27,7 +27,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -373,7 +372,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				continue
 			}
 
-			if diff.Content.Len() > common.ChunkSize+common.PeekSize {
+			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
 				s.gitChunk(diff, fileName, email, hash, when, urlMetadata, chunksChan)
 				continue
 			}
@@ -397,7 +396,7 @@ func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetad
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
 		line := originalChunk.Bytes()
-		if len(line) > common.ChunkSize || len(line)+newChunkBuffer.Len() > common.ChunkSize {
+		if len(line) > sources.ChunkSize || len(line)+newChunkBuffer.Len() > sources.ChunkSize {
 			// Add oversize chunk info
 			if newChunkBuffer.Len() > 0 {
 				// Send the existing fragment.
@@ -413,7 +412,7 @@ func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetad
 				newChunkBuffer.Reset()
 				lastOffset = offset
 			}
-			if len(line) > common.ChunkSize {
+			if len(line) > sources.ChunkSize {
 				// Send the oversize line.
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+offset))
 				chunksChan <- &sources.Chunk{
@@ -816,11 +815,12 @@ func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSke
 	}
 	reader.Stop()
 
-	chunk := *chunkSkel
 	chunkData, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}
+
+	chunk := *chunkSkel
 	chunk.Data = chunkData
 	chunksChan <- &chunk
 
