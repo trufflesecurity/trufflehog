@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 func TestChunker(t *testing.T) {
@@ -29,7 +28,7 @@ func TestChunker(t *testing.T) {
 	// Count chunks from looping using chunk size.
 	for {
 		baseChunkCount++
-		tmpChunk := make([]byte, common.ChunkSize)
+		tmpChunk := make([]byte, ChunkSize)
 		_, err := reReader.Read(tmpChunk)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -41,15 +40,15 @@ func TestChunker(t *testing.T) {
 	_ = reReader.Reset()
 
 	// Get the first two chunks for comparing later.
-	baseChunkOne := make([]byte, common.ChunkSize)
-	baseChunkTwo := make([]byte, common.ChunkSize)
+	baseChunkOne := make([]byte, ChunkSize)
+	baseChunkTwo := make([]byte, ChunkSize)
 
-	baseReader := bufio.NewReaderSize(reReader, common.ChunkSize)
+	baseReader := bufio.NewReaderSize(reReader, ChunkSize)
 	_, _ = baseReader.Read(baseChunkOne)
-	peek, _ := baseReader.Peek(common.PeekSize)
+	peek, _ := baseReader.Peek(PeekSize)
 	baseChunkOne = append(baseChunkOne, peek...)
 	_, _ = baseReader.Read(baseChunkTwo)
-	peek, _ = baseReader.Peek(common.PeekSize)
+	peek, _ = baseReader.Peek(PeekSize)
 	baseChunkTwo = append(baseChunkTwo, peek...)
 
 	// Reset the reader to the beginning and use ChunkReader.
