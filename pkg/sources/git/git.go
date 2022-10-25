@@ -406,7 +406,7 @@ func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetad
 					SourceID:       s.sourceID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
-					Data:           newChunkBuffer.Bytes(),
+					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 					Verify:         s.verify,
 				}
 				newChunkBuffer.Reset()
@@ -440,7 +440,7 @@ func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetad
 			SourceID:       s.sourceID,
 			SourceType:     s.sourceType,
 			SourceMetadata: metadata,
-			Data:           newChunkBuffer.Bytes(),
+			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 			Verify:         s.verify,
 		}
 	}
