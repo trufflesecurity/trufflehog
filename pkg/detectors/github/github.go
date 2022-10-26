@@ -23,7 +23,8 @@ var (
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
 	// Token type list:
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
-	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,255})\b`)
+	// https://github.blog/changelog/2022-10-18-introducing-fine-grained-personal-access-tokens/
+	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
 
 	//TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
@@ -36,12 +37,13 @@ type userRes struct {
 	SiteAdmin bool   `json:"site_admin"`
 	Name      string `json:"name"`
 	Company   string `json:"company"`
+	UserURL   string `json:"html_url"`
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_"}
+	return []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"}
 }
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
@@ -58,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		token := match[1]
 
-		s := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
 		}
@@ -79,17 +81,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					err = json.NewDecoder(res.Body).Decode(&userResponse)
 					res.Body.Close()
 					if err == nil {
-						s.Verified = true
+						s1.Verified = true
+						s1.ExtraData = map[string]string{
+							"username":     userResponse.Login,
+							"url":          userResponse.UserURL,
+							"account_type": userResponse.Type,
+							"site_admin":   fmt.Sprintf("%t", userResponse.SiteAdmin),
+							"name":         userResponse.Name,
+							"company":      userResponse.Company,
+						}
 					}
 				}
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
-		results = append(results, s)
+		results = append(results, s1)
 	}
 
 	return
