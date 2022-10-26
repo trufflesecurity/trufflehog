@@ -426,8 +426,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/noticeable"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
-        "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtoken"
-        "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
@@ -593,6 +593,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spoonacular"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportradar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportsmonk"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sqlserver"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squareapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/squarespace"
@@ -1482,5 +1483,6 @@ func DefaultDetectors() []detectors.Detector {
 		digitaloceanv2.Scanner{},
 		npmtoken.Scanner{},
 		npmtokenv2.Scanner{},
+		sqlserver.Scanner{},
 	}
 }
