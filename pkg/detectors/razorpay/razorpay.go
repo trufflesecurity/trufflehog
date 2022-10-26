@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			for _, secret := range secMatches {
 
-				s := detectors.Result{
+				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_RazorPay,
 					Raw:          []byte(key),
 					RawV2:        []byte(key + secret),
@@ -65,9 +65,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if json.Valid(bodyBytes) {
-							s.Verified = true
+							s1.Verified = true
 						} else {
-							s.Verified = false
+							s1.Verified = false
 						}
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 
-				results = append(results, s)
+				results = append(results, s1)
 			}
 		}
 
