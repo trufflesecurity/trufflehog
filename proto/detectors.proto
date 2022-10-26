@@ -905,6 +905,7 @@ enum DetectorType {
   MongoDB = 895;
   NGC = 896;
   DigitalOceanV2 = 897;
+  SQLServer = 898;
 }
 
 message Result {
