@@ -43,7 +43,6 @@ require (
 	github.com/mholt/archiver/v4 v4.0.0-alpha.7
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/razorpay/razorpay-go v0.0.0-20210728161131-0341409a6ab2
 	github.com/rs/zerolog v1.28.0
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.9.0

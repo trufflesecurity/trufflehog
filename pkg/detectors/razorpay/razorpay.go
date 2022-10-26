@@ -2,13 +2,14 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
+	"io"
+	"net/http"
 	"regexp"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/razorpay/razorpay-go"
 )
 
 type Scanner struct{}
@@ -18,8 +19,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 // The (`) character adds secondary encoding to parsed strings by Golang which also allows for escape sequences
 var (
-	keyPat    = regexp.MustCompile(`(?i)\brzp_\w{2,6}_\w{10,20}\b`)
-	secretPat = regexp.MustCompile(`(?:razor|secret|rzp|key)[-\w]*[\" :=']*([A-Za-z0-9]{20,50})`)
+	client = common.SaneHttpClient()
+
+	keyPat    = regexp.MustCompile(`(?i)\brzp_live_\w{10,20}\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"razor|secret|rzp|key"}) + `([A-Za-z0-9]{20,50})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -32,54 +35,54 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllString(dataStr, -1)
+	keyMatches := keyPat.FindAllString(dataStr, -1)
 
-	for _, match := range matches {
-		token := match
-
-		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_RazorPay,
-			Raw:          []byte(token),
-			Redacted:     token,
-		}
+	for _, key := range keyMatches {
 
 		if verify {
-			//https://dashboard.razorpay.com/#/access/signin
-			//https://gitlab.com/trufflesec/trufflehog/-/blob/master/webapi/secrets/razorpay.py
-			secMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
-			if len(secMatches) == 0 {
-				//no secret keys were found. Declare unverified (This is how AWS secret handles the same logic)
-				//TODO determine if key alone without secret is reportable
-				s.Verified = false
-				return
-			}
-			//we only want the secret, not its surrounding info - grabbing capture groups
-			for _, secMatch := range secMatches {
-				client := razorpay.NewClient(token, secMatch[1])
-				resp, err := client.Order.All(nil, nil)
-				//TODO Error handling is broken in SDK, fixed by https://github.com/razorpay/razorpay-go/pull/23
-				//waiting to be reviewed and merged
-				if resp == nil {
-					continue
+			secMatches := secretPat.FindAllString(dataStr, -1)
+
+			for _, secret := range secMatches {
+
+				s := detectors.Result{
+					DetectorType: detectorspb.DetectorType_RazorPay,
+					Raw:          []byte(key),
+					RawV2:        []byte(key + secret),
+					Redacted:     key,
 				}
+
+				req, err := http.NewRequest("GET", "https://api.razorpay.com/v1/items?count=1", nil)
 				if err != nil {
-					log.Debugf("Error verifying likely razorpay key/secret combo: %v", err)
 					continue
 				}
-				//TODO debug with responses. could still be invalid at this stage
+				req.SetBasicAuth(key, secret)
+				res, err := client.Do(req)
+				if err == nil {
+					bodyBytes, err := io.ReadAll(res.Body)
+					if err != nil {
+						continue
+					}
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						if json.Valid(bodyBytes) {
+							s.Verified = true
+						} else {
+							s.Verified = false
+						}
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+						if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
+							continue
+						}
+					}
+				}
 
-				s.Verified = true
+				results = append(results, s)
 			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-				continue
-			}
-		}
-
-		results = append(results, s)
 	}
 
+	results = detectors.CleanResults(results)
 	return
 }
