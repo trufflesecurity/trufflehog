@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		token := match[1]
 
-		s := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
 		}
@@ -81,8 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					err = json.NewDecoder(res.Body).Decode(&userResponse)
 					res.Body.Close()
 					if err == nil {
-						s.Verified = true
-						s.ExtraData = map[string]string{
+						s1.Verified = true
+						s1.ExtraData = map[string]string{
 							"username":     userResponse.Login,
 							"url":          userResponse.UserURL,
 							"account_type": userResponse.Type,
@@ -95,11 +95,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
-		results = append(results, s)
+		results = append(results, s1)
 	}
 
 	return
