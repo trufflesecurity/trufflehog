@@ -57,6 +57,7 @@ var (
 
 	githubScan           = cli.Command("github", "Find credentials in GitHub repositories.")
 	githubScanEndpoint   = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+        githubScanBranch     = githubScan.Flag("branch", "Branch to scan.").String()
 	githubScanRepos      = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
 	githubScanOrgs       = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
 	githubScanToken      = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
@@ -209,6 +210,7 @@ func run(state overseer.State) {
 
 		github := func(c *sources.Config) {
 			c.Endpoint = *githubScanEndpoint
+                        c.HeadRef = *githubScanBranch
 			c.Repos = *githubScanRepos
 			c.Orgs = *githubScanOrgs
 			c.Token = *githubScanToken
