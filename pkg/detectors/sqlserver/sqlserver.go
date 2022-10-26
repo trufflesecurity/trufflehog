@@ -2,14 +2,14 @@ package sqlserver
 
 import (
 	"context"
-	"fmt"
-	"net/http"
+	"database/sql"
 	"regexp"
-	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/denisenkom/go-mssqldb/msdsn"
+	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 type Scanner struct{}
@@ -18,10 +18,8 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sqlserver"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	// SQLServer connection string is a semicolon delimited set of case-insensitive parameters which may go in any order.
+	pattern = regexp.MustCompile("(?:\n|`|'|\"| )?((?:[A-Za-z0-9_ ]+=[^;$'`\"$]+;?){3,})(?:'|`|\"|\r\n|\n)?")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -30,46 +28,62 @@ func (s Scanner) Keywords() []string {
 	return []string{"sqlserver"}
 }
 
-// FromData will find and optionally verify SQLServer secrets in a given set of bytes.
+// FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
+	matches := pattern.FindAllStringSubmatch(string(data), -1)
 	for _, match := range matches {
-		if len(match) != 2 {
+		params, _, err := msdsn.Parse(match[1])
+		if err != nil {
+			log.Debugf("sqlserver: unable to parse connection string '%s' because '%s'", match[1], err.Error())
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
+		if params.Password == "" {
+			log.Debugf("sqlserver: skip connection string '%s' because it does not contain password", match[1])
+			continue
+		}
+
+		detected := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SQLServer,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(params.Password),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.sqlserver.com/apps", nil)
+			verified, err := ping(params)
 			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/vnd.sqlserver+json; version=3")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
+				log.Debugf("sqlserver: unable to verify '%s' because '%s'", params.URL(), err.Error())
+			} else {
+				detected.Verified = verified
 			}
 		}
 
-		results = append(results, s1)
+		results = append(results, detected)
 	}
 
 	return detectors.CleanResults(results), nil
+}
+
+var ping = func(config msdsn.Config) (bool, error) {
+	url := config.URL()
+	query := url.Query()
+	query.Set("dial timeout", "3")
+	query.Set("connection timeout", "3")
+	url.RawQuery = query.Encode()
+
+	conn, err := sql.Open("mssql", url.String())
+	if err != nil {
+		return false, err
+	}
+
+	err = conn.Ping()
+	if err != nil {
+		return false, err
+	}
+
+	err = conn.Close()
+	if err != nil {
+		log.Debugf("sqlserver: unable to close connection '%s' because '%s'", url.String(), err.Error())
+	}
+
+	return true, nil
 }

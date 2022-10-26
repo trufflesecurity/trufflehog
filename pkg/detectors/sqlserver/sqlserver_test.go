@@ -6,25 +6,19 @@ package sqlserver
 import (
 	"context"
 	"fmt"
+	"github.com/denisenkom/go-mssqldb/msdsn"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestSQLServer_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("SQLSERVER")
-	inactiveSecret := testSecrets.MustGetField("SQLSERVER_INACTIVE")
+	secret := "Server=localhost;Initial Catalog=Demo;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"
+	inactiveSecret := "Server=localhost;User ID=sa;Password=123"
 
 	type args struct {
 		ctx    context.Context
@@ -32,11 +26,12 @@ func TestSQLServer_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name     string
+		s        Scanner
+		args     args
+		want     []detectors.Result
+		wantErr  bool
+		mockFunc func()
 	}{
 		{
 			name: "found, verified",
@@ -53,6 +48,11 @@ func TestSQLServer_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr: false,
+			mockFunc: func() {
+				ping = func(config msdsn.Config) (bool, error) {
+					return true, nil
+				}
+			},
 		},
 		{
 			name: "found, unverified",
@@ -69,6 +69,11 @@ func TestSQLServer_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr: false,
+			mockFunc: func() {
+				ping = func(config msdsn.Config) (bool, error) {
+					return false, nil
+				}
+			},
 		},
 		{
 			name: "not found",
@@ -78,12 +83,18 @@ func TestSQLServer_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:    nil,
-			wantErr: false,
+			want:     nil,
+			wantErr:  false,
+			mockFunc: func() {},
 		},
 	}
+
+	// preserve the original function
+	originalPing := ping
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.mockFunc()
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -96,10 +107,25 @@ func TestSQLServer_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2")
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
 				t.Errorf("SQLServer.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
+	}
+
+	ping = originalPing
+}
+
+func TestSQLServer_pattern(t *testing.T) {
+	if !pattern.Match([]byte(`builder.Services.AddDbContext<Database>(optionsBuilder => optionsBuilder.UseSqlServer("Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"));`)) {
+		t.Errorf("SQLServer.pattern: did not catched connection string from Program.cs")
+	}
+	if !pattern.Match([]byte(`{"ConnectionStrings": {"Demo": "Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"}}`)) {
+		t.Errorf("SQLServer.pattern: did not catched connection string from appsettings.json")
+	}
+	if !pattern.Match([]byte(`CONNECTION_STRING: Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true`)) {
+		t.Errorf("SQLServer.pattern: did not catched connection string from .env")
 	}
 }
 
