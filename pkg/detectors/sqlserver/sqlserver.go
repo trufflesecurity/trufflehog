@@ -6,7 +6,6 @@ import (
 	"regexp"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
-	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -34,12 +33,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		params, _, err := msdsn.Parse(match[1])
 		if err != nil {
-			log.Debugf("sqlserver: unable to parse connection string '%s' because '%s'", match[1], err.Error())
 			continue
 		}
 
 		if params.Password == "" {
-			log.Debugf("sqlserver: skip connection string '%s' because it does not contain password", match[1])
 			continue
 		}
 
@@ -51,7 +48,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			verified, err := ping(params)
 			if err != nil {
-				log.Debugf("sqlserver: unable to verify '%s' because '%s'", params.URL(), err.Error())
 			} else {
 				detected.Verified = verified
 			}
@@ -74,15 +70,13 @@ var ping = func(config msdsn.Config) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	err = conn.Ping()
 	if err != nil {
 		return false, err
-	}
-
-	err = conn.Close()
-	if err != nil {
-		log.Debugf("sqlserver: unable to close connection '%s' because '%s'", url.String(), err.Error())
 	}
 
 	return true, nil
