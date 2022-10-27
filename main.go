@@ -288,6 +288,7 @@ func run(state overseer.State) {
 		}
 	}
 	logrus.Debugf("scanned %d chunks", e.ChunksScanned())
+	logrus.Debugf("scanned %d bytes", e.BytesScanned())
 
 	if *printAvgDetectorTime {
 		printAverageDetectorTime(e)
