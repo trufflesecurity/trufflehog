@@ -27,6 +27,7 @@ type Engine struct {
 	decoders        []decoders.Decoder
 	detectors       map[bool][]detectors.Detector
 	chunksScanned   uint64
+	bytesScanned    uint64
 	detectorAvgTime sync.Map
 	sourcesWg       sync.WaitGroup
 	workersWg       sync.WaitGroup
@@ -140,6 +141,10 @@ func (e *Engine) ChunksScanned() uint64 {
 	return e.chunksScanned
 }
 
+func (e *Engine) BytesScanned() uint64 {
+	return e.bytesScanned
+}
+
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	avgTime := map[string][]time.Duration{}
 	e.detectorAvgTime.Range(func(k, v interface{}) bool {
@@ -163,6 +168,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
+			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
 			fragStart, mdLine := fragmentFirstLine(chunk)
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
