@@ -27,6 +27,7 @@ type Engine struct {
 	decoders        []decoders.Decoder
 	detectors       map[bool][]detectors.Detector
 	chunksScanned   uint64
+	bytesScanned    uint64
 	detectorAvgTime sync.Map
 	sourcesWg       sync.WaitGroup
 	workersWg       sync.WaitGroup
@@ -140,6 +141,10 @@ func (e *Engine) ChunksScanned() uint64 {
 	return e.chunksScanned
 }
 
+func (e *Engine) BytesScanned() uint64 {
+	return e.bytesScanned
+}
+
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	avgTime := map[string][]time.Duration{}
 	e.detectorAvgTime.Range(func(k, v interface{}) bool {
@@ -161,74 +166,77 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {
-	for chunk := range e.chunks {
-		fragStart, mdLine := fragmentFirstLine(chunk)
-		for _, decoder := range e.decoders {
-			var decoderType detectorspb.DecoderType
-			switch decoder.(type) {
-			case *decoders.Plain:
-				decoderType = detectorspb.DecoderType_PLAIN
-			case *decoders.Base64:
-				decoderType = detectorspb.DecoderType_BASE64
-			default:
-				logrus.Warnf("unknown decoder type: %T", decoder)
-				decoderType = detectorspb.DecoderType_UNKNOWN
-			}
-			decoded := decoder.FromChunk(chunk)
-			if decoded == nil {
-				continue
-			}
-			dataLower := strings.ToLower(string(decoded.Data))
-			for verify, detectorsSet := range e.detectors {
-				for _, detector := range detectorsSet {
-					start := time.Now()
-					foundKeyword := false
-					for _, kw := range detector.Keywords() {
-						if strings.Contains(dataLower, strings.ToLower(kw)) {
-							foundKeyword = true
-							break
-						}
-					}
-					if !foundKeyword {
-						continue
-					}
-
-					results, err := func() ([]detectors.Result, error) {
-						ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-						defer cancel()
-						defer common.Recover(ctx)
-						return detector.FromData(ctx, verify, decoded.Data)
-					}()
-					if err != nil {
-						logrus.WithFields(logrus.Fields{
-							"source_type": decoded.SourceType.String(),
-							"metadata":    decoded.SourceMetadata,
-						}).WithError(err).Error("could not scan chunk")
-						continue
-					}
-
-					for _, result := range results {
-						if isGitSource(chunk.SourceType) {
-							offset := FragmentLineOffset(chunk, &result)
-							*mdLine = fragStart + offset
-						}
-						result.DecoderType = decoderType
-						e.results <- detectors.CopyMetadata(chunk, result)
-
-					}
-					if len(results) > 0 {
-						elapsed := time.Since(start)
-						detectorName := results[0].DetectorType.String()
-						avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
-						var avgTime []time.Duration
-						if ok {
-							avgTime, ok = avgTimeI.([]time.Duration)
-							if !ok {
-								continue
+	for originalChunk := range e.chunks {
+		for chunk := range sources.Chunker(originalChunk) {
+			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
+			fragStart, mdLine := fragmentFirstLine(chunk)
+			for _, decoder := range e.decoders {
+				var decoderType detectorspb.DecoderType
+				switch decoder.(type) {
+				case *decoders.Plain:
+					decoderType = detectorspb.DecoderType_PLAIN
+				case *decoders.Base64:
+					decoderType = detectorspb.DecoderType_BASE64
+				default:
+					logrus.Warnf("unknown decoder type: %T", decoder)
+					decoderType = detectorspb.DecoderType_UNKNOWN
+				}
+				decoded := decoder.FromChunk(chunk)
+				if decoded == nil {
+					continue
+				}
+				dataLower := strings.ToLower(string(decoded.Data))
+				for verify, detectorsSet := range e.detectors {
+					for _, detector := range detectorsSet {
+						start := time.Now()
+						foundKeyword := false
+						for _, kw := range detector.Keywords() {
+							if strings.Contains(dataLower, strings.ToLower(kw)) {
+								foundKeyword = true
+								break
 							}
 						}
-						avgTime = append(avgTime, elapsed)
-						e.detectorAvgTime.Store(detectorName, avgTime)
+						if !foundKeyword {
+							continue
+						}
+
+						results, err := func() ([]detectors.Result, error) {
+							ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+							defer cancel()
+							defer common.Recover(ctx)
+							return detector.FromData(ctx, verify, decoded.Data)
+						}()
+						if err != nil {
+							logrus.WithFields(logrus.Fields{
+								"source_type": decoded.SourceType.String(),
+								"metadata":    decoded.SourceMetadata,
+							}).WithError(err).Error("could not scan chunk")
+							continue
+						}
+
+						for _, result := range results {
+							if isGitSource(chunk.SourceType) {
+								offset := FragmentLineOffset(chunk, &result)
+								*mdLine = fragStart + offset
+							}
+							result.DecoderType = decoderType
+							e.results <- detectors.CopyMetadata(chunk, result)
+
+						}
+						if len(results) > 0 {
+							elapsed := time.Since(start)
+							detectorName := results[0].DetectorType.String()
+							avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
+							var avgTime []time.Duration
+							if ok {
+								avgTime, ok = avgTimeI.([]time.Duration)
+								if !ok {
+									continue
+								}
+							}
+							avgTime = append(avgTime, elapsed)
+							e.detectorAvgTime.Store(detectorName, avgTime)
+						}
 					}
 				}
 			}

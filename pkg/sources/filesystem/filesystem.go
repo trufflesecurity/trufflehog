@@ -13,7 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -132,7 +131,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(reReader, chunkSkel, chunksChan) {
+			if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
 				return nil
 			}
 
@@ -140,22 +139,23 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return err
 			}
 			reReader.Stop()
-
-			for chunkData := range common.ChunkReader(reReader) {
-				chunksChan <- &sources.Chunk{
-					SourceType: s.Type(),
-					SourceName: s.name,
-					SourceID:   s.SourceID(),
-					Data:       chunkData,
-					SourceMetadata: &source_metadatapb.MetaData{
-						Data: &source_metadatapb.MetaData_Filesystem{
-							Filesystem: &source_metadatapb.Filesystem{
-								File: sanitizer.UTF8(path),
-							},
+			data, err := io.ReadAll(reReader)
+			if err != nil {
+				return err
+			}
+			chunksChan <- &sources.Chunk{
+				SourceType: s.Type(),
+				SourceName: s.name,
+				SourceID:   s.SourceID(),
+				Data:       data,
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Filesystem{
+						Filesystem: &source_metadatapb.Filesystem{
+							File: sanitizer.UTF8(path),
 						},
 					},
-					Verify: s.verify,
-				}
+				},
+				Verify: s.verify,
 			}
 			return nil
 		})
