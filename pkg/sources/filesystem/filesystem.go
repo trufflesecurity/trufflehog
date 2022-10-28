@@ -131,7 +131,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(reReader, chunkSkel, chunksChan) {
+			if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
 				return nil
 			}
 

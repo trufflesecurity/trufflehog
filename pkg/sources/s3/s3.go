@@ -287,7 +287,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(reader, chunkSkel, chunksChan) {
+			if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
 				return
 			}
 

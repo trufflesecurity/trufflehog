@@ -366,7 +366,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
 					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
 				}
 				continue
@@ -504,7 +504,7 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
 					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
 				}
 				continue
@@ -782,7 +782,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
 	log.WithField("path", path).Trace("Binary file found in repository.")
 	commit, err := repo.CommitObject(commitHash)
 	if err != nil {
@@ -805,7 +805,7 @@ func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSke
 		return err
 	}
 
-	if handlers.HandleFile(reader, chunkSkel, chunksChan) {
+	if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
 		return nil
 	}
 
