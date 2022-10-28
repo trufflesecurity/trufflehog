@@ -8,6 +8,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -492,5 +493,66 @@ func BenchmarkPrepareRepo(b *testing.B) {
 	uri := "https://github.com/dustin-decker/secretsandstuff.git"
 	for i := 0; i < b.N; i++ {
 		_, _, _ = PrepareRepo(uri)
+	}
+}
+
+func TestGitURLParse(t *testing.T) {
+	for _, tt := range []struct {
+		url      string
+		host     string
+		user     string
+		password string
+		port     string
+		path     string
+		scheme   string
+	}{
+		{
+			"https://user@github.com/org/repo",
+			"github.com",
+			"user",
+			"",
+			"",
+			"/org/repo",
+			"https",
+		},
+		{
+			"https://user:pass@github.com/org/repo",
+			"github.com",
+			"user",
+			"pass",
+			"",
+			"/org/repo",
+			"https",
+		},
+		{
+			"ssh://user@github.com/org/repo",
+			"github.com",
+			"user",
+			"",
+			"",
+			"/org/repo",
+			"ssh",
+		},
+		{
+			"user@github.com:org/repo",
+			"github.com",
+			"user",
+			"",
+			"",
+			"/org/repo",
+			"ssh",
+		},
+	} {
+		u, err := gitURLParse(tt.url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, tt.host, u.Host)
+		assert.Equal(t, tt.user, u.User.Username())
+		password, _ := u.User.Password()
+		assert.Equal(t, tt.password, password)
+		assert.Equal(t, tt.port, u.Port())
+		assert.Equal(t, tt.path, u.Path)
+		assert.Equal(t, tt.scheme, u.Scheme)
 	}
 }
