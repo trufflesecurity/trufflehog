@@ -35,7 +35,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 				chunk.Data = data
 				chunksChan <- &chunk
 			case <-ctx.Done():
-				break
+				return false
 			}
 			if handlerChan == nil {
 				break
