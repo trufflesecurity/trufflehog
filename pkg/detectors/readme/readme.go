@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -68,5 +69,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return detectors.CleanResults(results), nil
 }

@@ -20,8 +20,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "key", "automate", "local"}) + `\b([0-9a-zA-Z]{20})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "user", "automate", "local"}) + `\b(^[a-zA-Z\d]+([._-]?[a-zA-Z\d]+)*[a-zA-Z\d]+$)\b`)
+	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack","key","automate","local"}) + `\b([0-9a-zA-Z]{20})\b`)
+	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack","user","automate","local"}) + `\b(^[a-zA-Z\d]+([._-]?[a-zA-Z\d]+)*[a-zA-Z\d]+$)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -79,5 +79,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			results = append(results, s1)
 		}
 	}
-	return results, nil
+	return detectors.CleanResults(results), nil
 }

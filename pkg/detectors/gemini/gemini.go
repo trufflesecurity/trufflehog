@@ -87,7 +87,7 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 		}
 	}
 
-	return results, nil
+	return detectors.CleanResults(results), nil
 }
 
 func constructRequest(secret, keyID string) (*http.Request, error) {

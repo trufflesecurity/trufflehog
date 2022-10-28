@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	// Removed bounds at the end of the regex since there are some cases that the token ends with an underscore (_) or a dash (-)
+	//Removed bounds at the end of the regex since there are some cases that the token ends with an underscore (_) or a dash (-)
 	keyPat = regexp.MustCompile(`\b(live_[0-9A-Za-z\_\-]{40}[ "'\r\n]{1})`)
 )
 
@@ -73,5 +73,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return detectors.CleanResults(results), nil
 }

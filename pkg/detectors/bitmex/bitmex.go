@@ -99,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return results, nil
+	return detectors.CleanResults(results), nil
 }
 
 func getBitmexSignature(timeStamp string, secret string, action string, path string, payload string) string {

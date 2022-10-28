@@ -103,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return results, nil
+	return detectors.CleanResults(results), nil
 }
 
 // Code from https://docs.kraken.com/rest/#section/Authentication/Headers-and-Signature

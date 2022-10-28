@@ -48,9 +48,9 @@ func allowlistedProtos(scheme string) bool {
 
 // FromData will find and optionally verify URI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	// Prevent SSRF "https://us-central1-ssrfproxy.cloudfunctions.net/ssrfproxy-6d96c399-74bb-4299-b49d-c1c870277eb9"
-	// TODO add as config option
-	// TODO extend to other http outbound calls in other areas of code
+	//Prevent SSRF "https://us-central1-ssrfproxy.cloudfunctions.net/ssrfproxy-6d96c399-74bb-4299-b49d-c1c870277eb9"
+	//TODO add as config option
+	//TODO extend to other http outbound calls in other areas of code
 	ssrfProtectorURL := "https://us-central1-ssrfproxy.cloudfunctions.net/ssrfproxy-6d96c399-74bb-4299-b49d-c1c870277eb9"
 
 	dataStr := string(data)
@@ -133,5 +133,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return results, nil
+	return detectors.CleanResults(results), nil
 }

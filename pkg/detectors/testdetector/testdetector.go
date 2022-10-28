@@ -51,5 +51,5 @@ func (d Detector) FromData(ctx context.Context, verify bool, data []byte) (resul
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return detectors.CleanResults(results), nil
 }
