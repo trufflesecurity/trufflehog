@@ -61,6 +61,23 @@ func TestURI_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found, verified, defused",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", "https://httpwatch:pass@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?foo=bar")),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_URI,
+					Verified:     true,
+					Redacted:     "https://httpwatch:****@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx",
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "bad scheme",
 			s:    Scanner{},
 			args: args{
