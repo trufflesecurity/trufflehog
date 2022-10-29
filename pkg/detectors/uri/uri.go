@@ -134,11 +134,8 @@ func verifyFTP(ctx context.Context, u *url.URL) bool {
 
 	password, _ := u.User.Password()
 	err = c.Login(u.User.Username(), password)
-	if err != nil {
-		return false
-	}
 
-	return true
+	return err == nil
 }
 
 func verifyRedis(ctx context.Context, u *url.URL) bool {
