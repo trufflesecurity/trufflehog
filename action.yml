@@ -30,4 +30,5 @@ runs:
     - --branch
     - ${{ inputs.head }}
     - --fail
+    - --no-update
     - ${{ inputs.extra_args }}
