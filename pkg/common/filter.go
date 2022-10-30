@@ -57,6 +57,7 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 	}
 
 	commentPattern := regexp.MustCompile(`^\s*#`)
+	emptyLinePattern := regexp.MustCompile(`^\s*$`)
 
 	file, err := os.Open(source)
 	if err != nil {
@@ -73,6 +74,9 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if commentPattern.MatchString(line) {
+			continue
+		}
+		if emptyLinePattern.MatchString(line) {
 			continue
 		}
 		pattern, err := regexp.Compile(line)
