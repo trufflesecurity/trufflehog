@@ -32,6 +32,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init filesystem source", 0)
 	}
+	fileSystemSource.WithFilter(c.Filter)
 	e.sourcesWg.Add(1)
 	go func() {
 		defer common.RecoverWithExit(ctx)

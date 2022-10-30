@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -35,6 +36,7 @@ type Source struct {
 	verify   bool
 	paths    []string
 	log      *log.Entry
+	filter   *common.Filter
 	sources.Progress
 }
 
@@ -74,6 +76,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	return nil
 }
 
+func (s *Source) WithFilter(filter *common.Filter) {
+	s.filter = filter
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	for i, path := range s.paths {
@@ -99,6 +105,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return nil
 			}
 			if !fileStat.Mode().IsRegular() {
+				return nil
+			}
+
+			if s.filter != nil && !s.filter.Pass(path) {
 				return nil
 			}
 
