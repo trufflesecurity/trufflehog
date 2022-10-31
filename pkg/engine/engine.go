@@ -31,6 +31,10 @@ type Engine struct {
 	detectorAvgTime sync.Map
 	sourcesWg       sync.WaitGroup
 	workersWg       sync.WaitGroup
+	// filterUnverified is used to reduce the number of unverified results.
+	// If there are multiple unverified results for the same chunk for the same detector,
+	// only the first one will be kept.
+	filterUnverified bool
 }
 
 type EngineOption func(*Engine)
@@ -57,6 +61,14 @@ func WithDetectors(verify bool, d ...detectors.Detector) EngineOption {
 func WithDecoders(decoders ...decoders.Decoder) EngineOption {
 	return func(e *Engine) {
 		e.decoders = decoders
+	}
+}
+
+// WithFilterUnverified sets the filterUnverified flag on the engine. If set to
+// true, the engine will only return the first unverified result for a chunk for a detector.
+func WithFilterUnverified(filter bool) EngineOption {
+	return func(e *Engine) {
+		e.filterUnverified = filter
 	}
 }
 
@@ -214,6 +226,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							continue
 						}
 
+						if e.filterUnverified {
+							results = detectors.CleanResults(results)
+						}
 						for _, result := range results {
 							if isGitSource(chunk.SourceType) {
 								offset := FragmentLineOffset(chunk, &result)
