@@ -906,6 +906,8 @@ enum DetectorType {
   NGC = 896;
   DigitalOceanV2 = 897;
   SQLServer = 898;
+  FTP = 899;
+  Redis = 900;
 }
 
 message Result {

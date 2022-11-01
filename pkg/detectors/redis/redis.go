@@ -2,11 +2,11 @@ package uri
 
 import (
 	"context"
-	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
-	"time"
+
+	"github.com/go-redis/redis"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,19 +21,15 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b(?:http(?:s)?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\bredis:\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 
 	client = common.SaneHttpClient()
 )
 
-type proxyRes struct {
-	Verified bool `json:"verified"`
-}
-
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"http"}
+	return []string{"redis"}
 }
 
 // FromData will find and optionally verify URI secrets in a given set of bytes.
@@ -43,16 +39,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-
-		if !s.allowKnownTestSites {
-			if strings.Contains(match[0], "httpbin.org") {
-				continue
-			}
-			if strings.Contains(match[0], "httpwatch.com") {
-				continue
-			}
-		}
-
 		urlMatch := match[0]
 		password := match[1]
 
@@ -72,13 +58,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		redact := strings.TrimSpace(strings.Replace(urlMatch, password, strings.Repeat("*", len(password)), -1))
 
 		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_URI,
+			DetectorType: detectorspb.DetectorType_Redis,
 			Raw:          []byte(urlMatch),
 			Redacted:     redact,
 		}
 
 		if verify {
-			s.Verified = verifyURL(ctx, parsedURL)
+			s.Verified = verifyRedis(ctx, parsedURL)
 		}
 
 		if !s.Verified {
@@ -98,51 +84,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return detectors.CleanResults(results), nil
 }
 
-func verifyURL(ctx context.Context, u *url.URL) bool {
-	// defuse most SSRF payloads
-	u.Path = strings.TrimSuffix(u.Path, "/")
-	u.RawQuery = ""
-	u.Fragment = ""
-
-	credentialedURL := u.String()
-
-	u.User = nil
-	nonCredentialedURL := u.String()
-
-	req, err := http.NewRequest("GET", credentialedURL, nil)
+func verifyRedis(ctx context.Context, u *url.URL) bool {
+	opt, err := redis.ParseURL(u.String())
 	if err != nil {
 		return false
 	}
-	req = req.WithContext(ctx)
-	credentialedRes, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	credentialedRes.Body.Close()
 
-	// If the credentialed URL returns a non 2XX code, we can assume it's a false positive.
-	if credentialedRes.StatusCode < 200 || credentialedRes.StatusCode > 299 {
-		return false
-	}
+	client := redis.NewClient(opt)
 
-	time.Sleep(time.Millisecond * 10)
-
-	req, err = http.NewRequest("GET", nonCredentialedURL, nil)
-	if err != nil {
-		return false
-	}
-	req = req.WithContext(ctx)
-	nonCredentialedRes, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	nonCredentialedRes.Body.Close()
-
-	// If the non-credentialed URL returns a non 400-428 code and basic auth header, we can assume it's verified now.
-	if nonCredentialedRes.StatusCode >= 400 && nonCredentialedRes.StatusCode < 429 {
-		if nonCredentialedRes.Header.Get("WWW-Authenticate") != "" {
-			return true
-		}
+	status, err := client.Ping().Result()
+	if err == nil && status == "PONG" {
+		return true
 	}
 
 	return false

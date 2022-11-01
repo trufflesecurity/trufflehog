@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package npmtoken_new
+package npmtokenv2
 
 import (
 	"context"
