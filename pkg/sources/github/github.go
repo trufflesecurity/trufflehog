@@ -62,6 +62,7 @@ type Source struct {
 	resumeInfoMutex sync.Mutex
 	resumeInfoSlice []string
 	apiClient       *github.Client
+	mu              sync.Mutex
 	publicMap       map[string]source_metadatapb.Visibility
 	sources.Progress
 }
@@ -177,12 +178,18 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 }
 
 func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visibility) {
-	if visibility, exists := s.publicMap[repoURL]; exists {
+	s.mu.Lock()
+	visibility, ok := s.publicMap[repoURL]
+	s.mu.Unlock()
+	if ok {
 		return visibility
 	}
+
 	visibility = source_metadatapb.Visibility_public
 	defer func() {
+		s.mu.Lock()
 		s.publicMap[repoURL] = visibility
+		s.mu.Unlock()
 	}()
 	log.Debugf("Checking public status for %s", repoURL)
 	u, err := url.Parse(repoURL)
