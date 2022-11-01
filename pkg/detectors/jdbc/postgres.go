@@ -38,7 +38,7 @@ func (s *postgresJDBC) ping(ctx context.Context) bool {
 		}
 		data[key] = val
 	}
-	if ping(ctx, "postgres", joinKeyValues(data)) {
+	if ping(ctx, "postgres", joinKeyValues(data, " ")) {
 		return true
 	}
 	if s.params["dbname"] != "" {
@@ -48,7 +48,7 @@ func (s *postgresJDBC) ping(ctx context.Context) bool {
 	return false
 }
 
-func joinKeyValues(m map[string]string) string {
+func joinKeyValues(m map[string]string, sep string) string {
 	var data []string
 	for k, v := range m {
 		if v == "" {
@@ -56,7 +56,7 @@ func joinKeyValues(m map[string]string) string {
 		}
 		data = append(data, fmt.Sprintf("%s=%s", k, v))
 	}
-	return strings.Join(data, " ")
+	return strings.Join(data, sep)
 }
 
 func parsePostgres(subname string) (jdbc, error) {
