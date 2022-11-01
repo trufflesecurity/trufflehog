@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, detected)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 var ping = func(config msdsn.Config) (bool, error) {

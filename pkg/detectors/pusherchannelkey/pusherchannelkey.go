@@ -127,7 +127,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 func hmacBytes(toSign, secret []byte) []byte {
 	_authSignature := hmac.New(sha256.New, secret)

@@ -180,6 +180,7 @@ Flags:
       --concurrency=1            Number of concurrent workers.
       --no-verification          Don't verify the results.
       --only-verified            Only output verified results.
+      --filter-unverified        Only output first unverified result per chunk per detector if there are more than one results.
       --print-avg-detector-time  Print the average time spent on each detector.
       --no-update                Don't check for updates.
   -i, --include-paths=INCLUDE-PATHS

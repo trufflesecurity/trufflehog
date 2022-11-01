@@ -95,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 func verifyURL(ctx context.Context, u *url.URL) bool {

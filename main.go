@@ -30,15 +30,16 @@ import (
 )
 
 var (
-	cli            = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd            string
-	debug          = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace          = cli.Flag("trace", "Run in trace mode.").Bool()
-	jsonOut        = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy     = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	concurrency    = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified   = cli.Flag("only-verified", "Only output verified results.").Bool()
+	cli              = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd              string
+	debug            = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace            = cli.Flag("trace", "Run in trace mode.").Bool()
+	jsonOut          = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy       = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	concurrency      = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification   = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified     = cli.Flag("only-verified", "Only output verified results.").Bool()
+	filterUnverified = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
@@ -172,6 +173,7 @@ func run(state overseer.State) {
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
+		engine.WithFilterUnverified(*filterUnverified),
 	)
 
 	filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
