@@ -255,6 +255,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/freshbooks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/freshdesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/front"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ftp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fulcrum"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fusebill"
@@ -510,6 +511,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/reallysimplesystems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rebrandly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rechargepayments"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/redis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
@@ -1484,5 +1486,7 @@ func DefaultDetectors() []detectors.Detector {
 		npmtoken.Scanner{},
 		npmtokenv2.Scanner{},
 		sqlserver.Scanner{},
+		redis.Scanner{},
+		ftp.Scanner{},
 	}
 }

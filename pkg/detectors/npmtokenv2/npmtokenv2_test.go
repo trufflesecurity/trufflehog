@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package npmtoken_new
+package npmtokenv2
 
 import (
 	"context"
@@ -48,7 +48,7 @@ func TestNpmToken_New_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NpmToken_New,
+					DetectorType: detectorspb.DetectorType_NpmToken,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestNpmToken_New_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NpmToken_New,
+					DetectorType: detectorspb.DetectorType_NpmToken,
 					Verified:     false,
 				},
 			},
