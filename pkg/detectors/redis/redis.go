@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-redis/redis"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -20,8 +19,6 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\bredis://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
-
-	client = common.SaneHttpClient()
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
