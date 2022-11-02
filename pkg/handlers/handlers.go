@@ -22,10 +22,11 @@ type Handler interface {
 func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan (*sources.Chunk)) bool {
 	// Find a handler for this file.
 	var handler Handler
-	for _, handler = range DefaultHandlers() {
-		handler.New()
+	for _, h := range DefaultHandlers() {
+		h.New()
 		var isType bool
-		if file, isType = handler.IsFiletype(file); isType {
+		if file, isType = h.IsFiletype(file); isType {
+			handler = h
 			break
 		}
 	}
