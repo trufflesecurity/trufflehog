@@ -115,6 +115,22 @@ func TestJdbc_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "sqlserver, unverified",
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(`jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=super-secret-password`),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_JDBC,
+					Verified:     false,
+					Redacted:     "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=*********************",
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
