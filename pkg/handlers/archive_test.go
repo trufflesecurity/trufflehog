@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
+	"github.com/stretchr/testify/assert"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func TestArchiveHandler(t *testing.T) {
@@ -93,4 +97,27 @@ func TestArchiveHandler(t *testing.T) {
 			t.Errorf("%s: Unexpected number of chunks. Got %d, expected: %d", name, count, testCase.expectedChunks)
 		}
 	}
+}
+
+func TestHandleFile(t *testing.T) {
+	ch := make(chan *sources.Chunk, 2)
+
+	// Context cancels the operation.
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	assert.False(t, HandleFile(canceledCtx, strings.NewReader("file"), &sources.Chunk{}, ch))
+
+	// Only one chunk is sent on the channel.
+	// TODO: Embed a zip without making an HTTP request.
+	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+	archive := Archive{}
+	archive.New()
+	reader, err := diskbufferreader.New(resp.Body)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, len(ch))
+	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, ch))
+	assert.Equal(t, 1, len(ch))
 }
