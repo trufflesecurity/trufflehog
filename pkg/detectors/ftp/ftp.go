@@ -1,4 +1,4 @@
-package uri
+package ftp
 
 import (
 	"context"
@@ -9,22 +9,17 @@ import (
 
 	"github.com/jlaffaye/ftp"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct {
-	allowKnownTestSites bool
-}
+type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\bftp:\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
-
-	client = common.SaneHttpClient()
+	keyPat = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

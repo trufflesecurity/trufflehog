@@ -1,4 +1,4 @@
-package uri
+package redis
 
 import (
 	"context"
@@ -13,15 +13,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct {
-	allowKnownTestSites bool
-}
+type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\bredis:\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\bredis://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 
 	client = common.SaneHttpClient()
 )

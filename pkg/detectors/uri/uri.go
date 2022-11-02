@@ -21,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b(?:http(?:s)?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\b(?:https?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 
 	client = common.SaneHttpClient()
 )

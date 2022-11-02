@@ -48,7 +48,7 @@ func TestNpmToken_New_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NpmToken_New,
+					DetectorType: detectorspb.DetectorType_NpmToken,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestNpmToken_New_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_NpmToken_New,
+					DetectorType: detectorspb.DetectorType_NpmToken,
 					Verified:     false,
 				},
 			},
