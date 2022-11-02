@@ -28,17 +28,23 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 			continue
 		}
 		handlerChan := handler.FromFile(file)
-		for {
+		var closed bool
+		for !closed {
 			select {
-			case data := <-handlerChan:
+			case data, open := <-handlerChan:
+				if !open {
+					closed = true
+					break
+				}
 				chunk := *chunkSkel
 				chunk.Data = data
-				chunksChan <- &chunk
+				select {
+				case chunksChan <- &chunk:
+				case <-ctx.Done():
+					return false
+				}
 			case <-ctx.Done():
 				return false
-			}
-			if handlerChan == nil {
-				break
 			}
 		}
 		return true
