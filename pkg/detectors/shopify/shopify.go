@@ -2,6 +2,7 @@ package shopify
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -51,28 +52,49 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/admin/api/2022-10/shop.json", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/admin/oauth/access_scopes.json", nil)
 				if err != nil {
 					continue
 				}
 				req.Header.Add("X-Shopify-Access-Token", fmt.Sprintf("%s", resMatch))
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
+						shopifyTokenAccessScopes := shopifyTokenAccessScopes{}
+						err := json.NewDecoder(res.Body).Decode(&shopifyTokenAccessScopes)
+						if err == nil {
+							handle_array := []string{}
+							for _, handle := range shopifyTokenAccessScopes.AccessScopes {
+								handle_array = append(handle_array, handle.Handle)
+
+							}
+							s1.Verified = true
+							s1.ExtraData = map[string]string{
+								"handles": strings.Join(handle_array, ","),
+							}
 						}
+						res.Body.Close()
+					}
+				} else {
+					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						continue
 					}
 				}
 			}
 
 			results = append(results, s1)
+
 		}
+
 	}
 
 	return detectors.CleanResults(results), nil
+
+}
+
+type shopifyTokenAccessScopes struct {
+	AccessScopes []struct {
+		Handle string `json:"handle"`
+	} `json:"access_scopes"`
 }

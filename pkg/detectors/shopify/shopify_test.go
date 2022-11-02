@@ -41,14 +41,17 @@ func TestShopify_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-                data:   []byte(fmt.Sprintf("You can find a shopify secret %s domain https://%s", secret, domain)),
+				data:   []byte(fmt.Sprintf("You can find a shopify secret %s domain https://%s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Shopify,
-                    Redacted:   domain,
+					Redacted:     domain,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"handles": "read_analytics,write_assigned_fulfillment_orders,read_assigned_fulfillment_orders",
+					},
 				},
 			},
 			wantErr: false,
@@ -58,14 +61,15 @@ func TestShopify_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-                data:   []byte(fmt.Sprintf("You can find a shopify secret %s within (domain https://%s) but not valid", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a shopify secret %s within (domain https://%s) but not valid", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Shopify,
-                    Redacted:    domain,
+					Redacted:     domain,
 					Verified:     false,
+					ExtraData:    nil,
 				},
 			},
 			wantErr: false,
