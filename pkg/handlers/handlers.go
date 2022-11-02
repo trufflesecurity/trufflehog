@@ -20,34 +20,38 @@ type Handler interface {
 }
 
 func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan (*sources.Chunk)) bool {
-	for _, handler := range DefaultHandlers() {
+	// Find a handler for this file.
+	var handler Handler
+	for _, handler = range DefaultHandlers() {
 		handler.New()
 		var isType bool
-		file, isType = handler.IsFiletype(file)
-		if !isType {
-			continue
+		if file, isType = handler.IsFiletype(file); isType {
+			break
 		}
-		handlerChan := handler.FromFile(file)
-		var closed bool
-		for !closed {
+	}
+	if handler == nil {
+		return false
+	}
+
+	// Process the file and read all []byte chunks from handlerChan.
+	handlerChan := handler.FromFile(file)
+	for {
+		select {
+		case data, open := <-handlerChan:
+			if !open {
+				// We finished reading everything from handlerChan.
+				return true
+			}
+			chunk := *chunkSkel
+			chunk.Data = data
+			// Send data on chunksChan.
 			select {
-			case data, open := <-handlerChan:
-				if !open {
-					closed = true
-					break
-				}
-				chunk := *chunkSkel
-				chunk.Data = data
-				select {
-				case chunksChan <- &chunk:
-				case <-ctx.Done():
-					return false
-				}
+			case chunksChan <- &chunk:
 			case <-ctx.Done():
 				return false
 			}
+		case <-ctx.Done():
+			return false
 		}
-		return true
 	}
-	return false
 }
