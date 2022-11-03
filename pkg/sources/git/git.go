@@ -339,7 +339,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	ctx.Logger().V(1).Info("scanning repo", "repo", urlMetadata, "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
-		ctx.Logger().V(2).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
+		ctx.Logger().V(5).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			ctx.Logger().V(1).Info("reached max depth", "depth", depth)
 			break
@@ -441,7 +441,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 		}
 
 		if _, err := newChunkBuffer.Write(line); err != nil {
-			ctx.Logger().V(1).Info("error writing to chunk buffer", "error", err, "filename", fileName, "commit", hash, "file", diff.PathB)
+			ctx.Logger().Error(err, "error writing to chunk buffer", "filename", fileName, "commit", hash, "file", diff.PathB)
 		}
 	}
 	// Send anything still in the new chunk buffer
@@ -801,7 +801,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 }
 
 func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	ctx.Logger().V(1).Info("handling binary file", "path", path)
+	ctx.Logger().V(5).Info("handling binary file", "path", path)
 	commit, err := repo.CommitObject(commitHash)
 	if err != nil {
 		return err
