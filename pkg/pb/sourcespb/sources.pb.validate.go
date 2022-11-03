@@ -703,6 +703,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for SpacesScope
 
+	// no validation rules for InsecureSkipVerifyTls
+
 	switch m.Credential.(type) {
 
 	case *Confluence_Unauthenticated:
