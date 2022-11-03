@@ -281,7 +281,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 			ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
 		}
 		ctx.Logger().V(1).Info("git clone failed", "error", err, "repo", safeUrl, "output", string(output))
-		return "", nil, fmt.Errorf("could not clone repo: %s", safeUrl)
+		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
 	repo, err := git.PlainOpen(clonePath)
