@@ -68,11 +68,11 @@ func TestSource_Token(t *testing.T) {
 	assert.NoError(t, err)
 
 	// user provided
-	_, _, err = git.CloneRepoUsingToken(token, "https://github.com/trufflesecurity/trufflehog-updater.git", user)
+	_, _, err = git.CloneRepoUsingToken(ctx, token, "https://github.com/trufflesecurity/trufflehog-updater.git", user)
 	assert.NoError(t, err)
 
 	// no user provided
-	_, _, err = git.CloneRepoUsingToken(token, "https://github.com/trufflesecurity/trufflehog-updater.git", "")
+	_, _, err = git.CloneRepoUsingToken(ctx, token, "https://github.com/trufflesecurity/trufflehog-updater.git", "")
 	assert.Error(t, err)
 
 	_, _, err = s.cloneRepo(ctx, "https://github.com/trufflesecurity/trufflehog-updater.git", installationClient)

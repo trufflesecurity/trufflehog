@@ -210,7 +210,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 	tests := []struct {
 		name string
 		init init
-		//verified
+		// verified
 		repoURL           string
 		expectedChunkData map[string]*byteCompare
 		scanOptions       ScanOptions
@@ -285,7 +285,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
 				defer close(chunksCh)
-				repoPath, repo, err := CloneRepoUsingUnauthenticated(tt.repoURL)
+				repoPath, repo, err := CloneRepoUsingUnauthenticated(ctx, tt.repoURL)
 				if err != nil {
 					panic(err)
 				}
@@ -476,7 +476,8 @@ func TestPrepareRepo(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		repo, b, err := PrepareRepo(tt.uri)
+		ctx := context.Background()
+		repo, b, err := PrepareRepo(ctx, tt.uri)
 		var repoLen bool
 		if len(repo) > 0 {
 			repoLen = true
@@ -491,8 +492,9 @@ func TestPrepareRepo(t *testing.T) {
 
 func BenchmarkPrepareRepo(b *testing.B) {
 	uri := "https://github.com/dustin-decker/secretsandstuff.git"
+	ctx := context.Background()
 	for i := 0; i < b.N; i++ {
-		_, _, _ = PrepareRepo(uri)
+		_, _, _ = PrepareRepo(ctx, uri)
 	}
 }
 

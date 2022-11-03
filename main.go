@@ -185,7 +185,7 @@ func run(state overseer.State) {
 	var remote bool
 	switch cmd {
 	case gitScan.FullCommand():
-		repoPath, remote, err = git.PrepareRepoSinceCommit(*gitScanURI, *gitScanSinceCommit)
+		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
 		if err != nil || repoPath == "" {
 			logrus.WithError(err).Fatal("error preparing git repo for scanning")
 		}
@@ -282,7 +282,7 @@ func run(state overseer.State) {
 
 		switch {
 		case *jsonLegacy:
-			output.PrintLegacyJSON(&r)
+			output.PrintLegacyJSON(ctx, &r)
 		case *jsonOut:
 			output.PrintJSON(&r)
 		default:
