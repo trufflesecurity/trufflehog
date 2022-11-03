@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -20,8 +19,6 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	uriPat = regexp.MustCompile(`\b(?i)ldaps?://[\S]+\b`)
 	// ldap://127.0.0.1:389
