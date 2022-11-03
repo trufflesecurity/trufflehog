@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(mongodb(\+srv)?://(?:[^:]+:(?:[^@]+)?@)?(?:[^/]+|/.+.sock?,?)+(?:/([^/."*<>:|?]*))?\?(?:(.+=?=\S+)&?)+)\b`)
+	keyPat = regexp.MustCompile(`\b(mongodb(\+srv)?://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+)\b`)
 	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.
 )
 
@@ -67,5 +67,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }

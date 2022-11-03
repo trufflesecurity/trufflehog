@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"io"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -18,21 +19,40 @@ type Handler interface {
 	New()
 }
 
-func HandleFile(file io.Reader, chunkSkel *sources.Chunk, chunksChan chan (*sources.Chunk)) bool {
-	for _, handler := range DefaultHandlers() {
-		handler.New()
+func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan (*sources.Chunk)) bool {
+	// Find a handler for this file.
+	var handler Handler
+	for _, h := range DefaultHandlers() {
+		h.New()
 		var isType bool
-		file, isType = handler.IsFiletype(file)
-		if !isType {
-			continue
+		if file, isType = h.IsFiletype(file); isType {
+			handler = h
+			break
 		}
-		handlerChan := handler.FromFile(file)
-		for data := range handlerChan {
+	}
+	if handler == nil {
+		return false
+	}
+
+	// Process the file and read all []byte chunks from handlerChan.
+	handlerChan := handler.FromFile(file)
+	for {
+		select {
+		case data, open := <-handlerChan:
+			if !open {
+				// We finished reading everything from handlerChan.
+				return true
+			}
 			chunk := *chunkSkel
 			chunk.Data = data
-			chunksChan <- &chunk
+			// Send data on chunksChan.
+			select {
+			case chunksChan <- &chunk:
+			case <-ctx.Done():
+				return false
+			}
+		case <-ctx.Done():
+			return false
 		}
-		return true
 	}
-	return false
 }

@@ -20,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"digitalocean"}) + `\b([A-Za-z0-9_-]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ocean", "do"}) + `\b([A-Za-z0-9_-]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -68,5 +68,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }

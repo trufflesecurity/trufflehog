@@ -905,7 +905,10 @@ enum DetectorType {
   MongoDB = 895;
   NGC = 896;
   DigitalOceanV2 = 897;
-  Shopify = 898;
+  SQLServer = 898;
+  FTP = 899;
+  Redis = 900;
+  Shopify = 902;
 }
 
 message Result {

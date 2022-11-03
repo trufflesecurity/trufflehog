@@ -1,7 +1,10 @@
 package git
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -24,7 +27,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -229,6 +231,21 @@ func CleanOnError(err *error, path string) {
 	}
 }
 
+func gitURLParse(gitURL string) (*url.URL, error) {
+	parsedURL, originalError := url.Parse(gitURL)
+	if originalError != nil {
+		var err error
+		gitURLBytes := []byte("ssh://" + gitURL)
+		colonIndex := bytes.LastIndex(gitURLBytes, []byte(":"))
+		gitURLBytes[colonIndex] = byte('/')
+		parsedURL, err = url.Parse(string(gitURLBytes))
+		if err != nil {
+			return nil, originalError
+		}
+	}
+	return parsedURL, nil
+}
+
 func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath string, repo *git.Repository, err error) {
 	if err = GitCmdCheck(); err != nil {
 		return
@@ -239,12 +256,13 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath
 		return
 	}
 	defer CleanOnError(&err, clonePath)
-	cloneURL, err := url.Parse(gitUrl)
+	cloneURL, err := gitURLParse(gitUrl)
 	if err != nil {
-		err = errors.WrapPrefix(err, "could not parse url", 0)
-		return
+		return "", nil, err
 	}
-	cloneURL.User = userInfo
+	if cloneURL.User == nil {
+		cloneURL.User = userInfo
+	}
 
 	gitArgs := []string{"clone", cloneURL.String(), clonePath}
 	gitArgs = append(gitArgs, args...)
@@ -322,7 +340,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	var reachedBase = false
 	log.WithField("repo", urlMetadata).Debugf("Scanning repo")
 	for commit := range commitChan {
-		log.Debugf("Scanning commit %s", commit.Hash)
+		log.Tracef("Scanning commit %s", commit.Hash)
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			log.Debugf("reached max depth")
 			break
@@ -364,12 +382,16 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
 					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
 				}
 				continue
 			}
 
+			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
+				s.gitChunk(diff, fileName, email, hash, when, urlMetadata, chunksChan)
+				continue
+			}
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
@@ -382,6 +404,62 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 	}
 	return nil
+}
+
+func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, chunksChan chan *sources.Chunk) {
+	originalChunk := bufio.NewScanner(&diff.Content)
+	newChunkBuffer := bytes.Buffer{}
+	lastOffset := 0
+	for offset := 0; originalChunk.Scan(); offset++ {
+		line := originalChunk.Bytes()
+		if len(line) > sources.ChunkSize || len(line)+newChunkBuffer.Len() > sources.ChunkSize {
+			// Add oversize chunk info
+			if newChunkBuffer.Len() > 0 {
+				// Send the existing fragment.
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+lastOffset))
+				chunksChan <- &sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
+					Verify:         s.verify,
+				}
+				newChunkBuffer.Reset()
+				lastOffset = offset
+			}
+			if len(line) > sources.ChunkSize {
+				// Send the oversize line.
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+offset))
+				chunksChan <- &sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           line,
+					Verify:         s.verify,
+				}
+				continue
+			}
+		}
+
+		_, err := newChunkBuffer.Write(line)
+		if err != nil {
+			log.WithError(err).Error("Could not write line to git diff buffer.")
+		}
+	}
+	// Send anything still in the new chunk buffer
+	if newChunkBuffer.Len() > 0 {
+		metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+lastOffset))
+		chunksChan <- &sources.Chunk{
+			SourceName:     s.sourceName,
+			SourceID:       s.sourceID,
+			SourceType:     s.sourceType,
+			SourceMetadata: metadata,
+			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
+			Verify:         s.verify,
+		}
+	}
 }
 
 // ScanUnstaged chunks unstaged changes.
@@ -442,7 +520,7 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
 					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
 				}
 				continue
@@ -589,7 +667,7 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 	// the uriString is github.com, then we query the API for the timestamp of the
 	// hash and use that to clone.
 
-	uri, err := url.Parse(uriString)
+	uri, err := gitURLParse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}
@@ -653,7 +731,7 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
 func PrepareRepo(uriString string) (string, bool, error) {
 	var path string
-	uri, err := url.Parse(uriString)
+	uri, err := gitURLParse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}
@@ -720,7 +798,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
 	log.WithField("path", path).Trace("Binary file found in repository.")
 	commit, err := repo.CommitObject(commitHash)
 	if err != nil {
@@ -743,7 +821,7 @@ func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSke
 		return err
 	}
 
-	if handlers.HandleFile(reader, chunkSkel, chunksChan) {
+	if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
 		return nil
 	}
 
@@ -753,11 +831,14 @@ func handleBinary(repo *git.Repository, chunksChan chan *sources.Chunk, chunkSke
 	}
 	reader.Stop()
 
-	for chunkData := range common.ChunkReader(reader) {
-		chunk := *chunkSkel
-		chunk.Data = chunkData
-		chunksChan <- &chunk
+	chunkData, err := io.ReadAll(reader)
+	if err != nil {
+		return err
 	}
+
+	chunk := *chunkSkel
+	chunk.Data = chunkData
+	chunksChan <- &chunk
 
 	return nil
 }

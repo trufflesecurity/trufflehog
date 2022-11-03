@@ -31,6 +31,66 @@ https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkii
 docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
+## Examples
+
+### Example 1: Scan a repo for only verified secrets
+
+Command:
+```
+trufflehog git https://github.com/trufflesecurity/test_keys --only-verified
+```
+
+Expected output:
+```
+🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
+
+Found verified result 🐷🔑
+Detector Type: AWS
+Decoder Type: PLAIN
+Raw result: AKIAYVP4CIPPERUVIFXG
+Line: 4
+Commit: fbc14303ffbf8fb1c2c1914e8dda7d0121633aca
+File: keys
+Email: counter <counter@counters-MacBook-Air.local>
+Repository: https://github.com/trufflesecurity/test_keys
+Timestamp: 2022-06-16 10:17:40 -0700 PDT
+...
+```
+
+### Example 2: Scan a GitHub Org for only verified secrets
+
+```
+trufflehog github --org=trufflesecurity --only-verified
+```
+
+### Example 3: Scan a GitHub Repo for only verified keys and get JSON output
+
+Command:
+```
+trufflehog git https://github.com/trufflesecurity/test_keys --only-verified --json
+```
+
+Expected output:
+```
+{"SourceMetadata":{"Data":{"Git":{"commit":"fbc14303ffbf8fb1c2c1914e8dda7d0121633aca","file":"keys","email":"counter \u003ccounter@counters-MacBook-Air.local\u003e","repository":"https://github.com/trufflesecurity/test_keys","timestamp":"2022-06-16 10:17:40 -0700 PDT","line":4}}},"SourceID":0,"SourceType":16,"SourceName":"trufflehog - git","DetectorType":2,"DetectorName":"AWS","DecoderName":"PLAIN","Verified":true,"Raw":"AKIAYVP4CIPPERUVIFXG","Redacted":"AKIAYVP4CIPPERUVIFXG","ExtraData":{"account":"595918472158","arn":"arn:aws:iam::595918472158:user/canarytokens.com@@mirux23ppyky6hx3l6vclmhnj","user_id":"AIDAYVP4CIPPJ5M54LRCY"},"StructuredData":null}
+...
+```
+
+### Example 4: Scan an S3 bucket for verified keys
+```
+trufflehog s3 --bucket=<bucket name> --only-verified
+```
+
+### FAQ
+
++ All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
+  + That means no secrets were detected
++ Why is the scan is taking a long time when I scan a GitHub org
+  + Unathenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
++ It says a private key was verified, what does that mean?
+  + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)  
+
+
 # What's new in v3?
 
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
@@ -120,6 +180,7 @@ Flags:
       --concurrency=1            Number of concurrent workers.
       --no-verification          Don't verify the results.
       --only-verified            Only output verified results.
+      --filter-unverified        Only output first unverified result per chunk per detector if there are more than one results.
       --print-avg-detector-time  Print the average time spent on each detector.
       --no-update                Don't check for updates.
   -i, --include-paths=INCLUDE-PATHS

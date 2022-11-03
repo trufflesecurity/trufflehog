@@ -29,26 +29,26 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"shppa_", "shpat_", "X-Shopify-Access-Token"}
+	return []string{"shppa_", "shpat_"}
 }
 
 // FromData will find and optionally verify Shopify secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := keyPat.FindAllString(dataStr, -1)
+	domainMatches := domainPat.FindAllString(dataStr, -1)
 
 	for _, match := range keyMatches {
-		resMatch := strings.TrimSpace(match[0])
+		key := strings.TrimSpace(match)
 
 		for _, domainMatch := range domainMatches {
-			domainRes := strings.TrimSpace(domainMatch[0])
+			domainRes := strings.TrimSpace(domainMatch)
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Shopify,
 				Redacted:     domainRes,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(key + domainRes),
 			}
 
 			if verify {
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.Header.Add("X-Shopify-Access-Token", fmt.Sprintf("%s", resMatch))
+				req.Header.Add("X-Shopify-Access-Token", fmt.Sprintf("%s", key))
 				res, err := client.Do(req)
 				if err == nil {
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
@@ -70,14 +70,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							}
 							s1.Verified = true
 							s1.ExtraData = map[string]string{
-								"handles": strings.Join(handle_array, ","),
+								"access_scopes": strings.Join(handle_array, ","),
 							}
 						}
 						res.Body.Close()
 					}
 				} else {
 					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}
@@ -89,7 +89,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 
 }
 

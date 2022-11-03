@@ -16,12 +16,12 @@ import (
 func TestShopify_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SHOPIFY")
-	inactiveSecret := testSecrets.MustGetField("SHOPIFY_INACTIVE")
+	secret := testSecrets.MustGetField("SHOPIFY_ADMIN_SECRET")
+	inactiveSecret := testSecrets.MustGetField("SHOPIFY_ADMIN_SECRET_INACTIVE")
 	domain := testSecrets.MustGetField("SHOPIFY_DOMAIN")
 
 	type args struct {
@@ -50,7 +50,7 @@ func TestShopify_FromChunk(t *testing.T) {
 					Redacted:     domain,
 					Verified:     true,
 					ExtraData: map[string]string{
-						"handles": "read_analytics,write_assigned_fulfillment_orders,read_assigned_fulfillment_orders",
+						"access_scopes": "read_analytics,unauthenticated_read_selling_plans",
 					},
 				},
 			},
