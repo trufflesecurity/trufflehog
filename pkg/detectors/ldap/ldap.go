@@ -47,28 +47,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	// Check for matches in the URI + username + password format
 	uriMatches := uriPat.FindAllString(dataStr, -1)
-	usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
-	passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
-	if len(uriMatches) > 0 && len(usernameMatches) > 0 && len(passwordMatches) > 0 {
-		for _, uri := range uriMatches {
-			ldapURL, err := url.Parse(uri)
-			if err != nil {
-				continue
-			}
+	for _, uri := range uriMatches {
+		ldapURL, err := url.Parse(uri)
+		if err != nil {
+			continue
+		}
 
-			for _, username := range usernameMatches {
-				for _, password := range passwordMatches {
-					s1 := detectors.Result{
-						DetectorType: detectorspb.DetectorType_LDAP,
-						Raw:          []byte(strings.Join([]string{ldapURL.String(), username[1], password[1]}, "\t")),
-					}
-
-					if verify {
-						s1.Verified = verifyLDAP(ctx, username[1], password[1], ldapURL)
-					}
-
-					results = append(results, s1)
+		usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
+		for _, username := range usernameMatches {
+			passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
+			for _, password := range passwordMatches {
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_LDAP,
+					Raw:          []byte(strings.Join([]string{ldapURL.String(), username[1], password[1]}, "\t")),
 				}
+
+				if verify {
+					s1.Verified = verifyLDAP(ctx, username[1], password[1], ldapURL)
+				}
+
+				results = append(results, s1)
 			}
 		}
 	}
