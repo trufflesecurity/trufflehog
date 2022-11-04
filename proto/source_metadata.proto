@@ -217,6 +217,10 @@ message Syslog {
   string facility = 6;
 }
 
+message Bytes {
+  bytes metadata = 1;
+}
+
 message PublicEventMonitoring {
   oneof metadata {
     Github github = 1;
@@ -249,5 +253,6 @@ message MetaData {
     Artifactory artifactory = 22;
     Syslog syslog = 23;
     PublicEventMonitoring publicEventMonitoring = 24;
+    Bytes bytes = 25;
   }
 }

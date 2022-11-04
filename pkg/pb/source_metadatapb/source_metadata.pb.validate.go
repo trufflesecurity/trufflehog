@@ -2570,6 +2570,106 @@ var _ interface {
 	ErrorName() string
 } = SyslogValidationError{}
 
+// Validate checks the field values on Bytes with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Bytes) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Bytes with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in BytesMultiError, or nil if none found.
+func (m *Bytes) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Bytes) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Metadata
+
+	if len(errors) > 0 {
+		return BytesMultiError(errors)
+	}
+
+	return nil
+}
+
+// BytesMultiError is an error wrapping multiple validation errors returned by
+// Bytes.ValidateAll() if the designated constraints aren't met.
+type BytesMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m BytesMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m BytesMultiError) AllErrors() []error { return m }
+
+// BytesValidationError is the validation error returned by Bytes.Validate if
+// the designated constraints aren't met.
+type BytesValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e BytesValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e BytesValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e BytesValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e BytesValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e BytesValidationError) ErrorName() string { return "BytesValidationError" }
+
+// Error satisfies the builtin error interface
+func (e BytesValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sBytes.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = BytesValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = BytesValidationError{}
+
 // Validate checks the field values on PublicEventMonitoring with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -3469,6 +3569,37 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "PublicEventMonitoring",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Bytes:
+
+		if all {
+			switch v := interface{}(m.GetBytes()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Bytes",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Bytes",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetBytes()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Bytes",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

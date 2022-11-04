@@ -300,19 +300,22 @@ func main() {
 		engine.WithDetectors(verify, engine.DefaultDetectors()...),
 	)
 
-	c := make(chan []byte)
+	c := make(chan engine.BytesChunck)
 	e.ScanBytes(ctx, c)
 
 	go e.Finish(ctx)
 	go func() {
-		c <- []byte(`[default]
+		c <- engine.BytesChunck{
+			Bytes: []byte(`[default]
 aws_access_key_id = AKIAWARWQKZNHMZBLY4I
-aws_secret_access_key = awssecretkeyawssecretkeyawssecretkey0000`)
+aws_secret_access_key = awssecretkeyawssecretkeyawssecretkey0000`),
+			Metadata: []byte("aws-test"),
+		}
 		close(c)
 	}()
 
 	for r := range e.ResultsChan() {
-		log.Println(string(r.Result.Raw), r.Result.Verified)
+		log.Println(string(r.Result.RawV2), r.Result.Verified, string(r.SourceMetadata.GetBytes().Metadata))
 	}
 }
 ```
