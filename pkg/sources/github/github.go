@@ -570,7 +570,7 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_Unauthenticated:
-		path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
+		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 		}
@@ -581,7 +581,7 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
 		}
 
-		path, repo, err = git.CloneRepoUsingToken(s.githubToken, repoURL, s.githubUser)
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 		}
@@ -594,7 +594,7 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 				return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
 			}
 		}
-		path, repo, err = git.CloneRepoUsingToken(s.githubToken, repoURL, s.githubUser)
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 		}

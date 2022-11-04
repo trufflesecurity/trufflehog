@@ -18,8 +18,9 @@ type expResult struct {
 }
 
 func TestGitEngine(t *testing.T) {
+	ctx := context.Background()
 	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
-	path, _, err := git.PrepareRepo(repoUrl)
+	path, _, err := git.PrepareRepo(ctx, repoUrl)
 	if err != nil {
 		t.Error(err)
 	}
@@ -89,8 +90,9 @@ func TestGitEngine(t *testing.T) {
 }
 
 func BenchmarkGitEngine(b *testing.B) {
+	ctx := context.Background()
 	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
-	path, _, err := git.PrepareRepo(repoUrl)
+	path, _, err := git.PrepareRepo(ctx, repoUrl)
 	if err != nil {
 		b.Error(err)
 	}
