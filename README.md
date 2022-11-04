@@ -277,6 +277,46 @@ repos:
       stages: ["commit", "push"]
 ```
 
+### Go library
+
+```go
+package main
+
+import (
+	"log"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+)
+
+func main() {
+	ctx := context.Background()
+	verify := true
+
+	e := engine.Start(ctx,
+		engine.WithConcurrency(200),
+		engine.WithDecoders(decoders.DefaultDecoders()...),
+		engine.WithDetectors(verify, engine.DefaultDetectors()...),
+	)
+
+	c := make(chan []byte)
+	e.ScanBytes(ctx, c)
+
+	go e.Finish(ctx)
+	go func() {
+		c <- []byte(`[default]
+aws_access_key_id = AKIAWARWQKZNHMZBLY4I
+aws_secret_access_key = awssecretkeyawssecretkeyawssecretkey0000`)
+		close(c)
+	}()
+
+	for r := range e.ResultsChan() {
+		log.Println(string(r.Result.Raw), r.Result.Verified)
+	}
+}
+```
+
 ## Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
