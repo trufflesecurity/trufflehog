@@ -155,7 +155,9 @@ func (d *Archive) ReadToMax(reader io.Reader) ([]byte, error) {
 			return []byte{}, err
 		}
 		d.size += bRead
-		fileContent.Write(fileChunk[0:bRead])
+		if len(fileChunk) > 0 {
+			fileContent.Write(fileChunk[0:bRead])
+		}
 		if bRead < 512 {
 			break
 		}
