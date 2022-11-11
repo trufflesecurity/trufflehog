@@ -147,8 +147,7 @@ Help with setting up this packaging would be appreciated!
 ### 5. Brew
 
 ```bash
-brew tap trufflesecurity/trufflehog
-brew install trufflehog
+brew install trufflesecurity/trufflehog/trufflehog
 ```
 
 ## Usage
