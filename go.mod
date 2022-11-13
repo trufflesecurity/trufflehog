@@ -33,7 +33,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-github/v42 v42.0.0
 	github.com/gorilla/mux v1.8.0
-	github.com/h2non/filetype v1.1.3
+	github.com/h2non/filetype v1.1.4-0.20221103170307-1ca4dcddb44f
 	github.com/hashicorp/go-retryablehttp v0.7.1
 	github.com/jlaffaye/ftp v0.1.0
 	github.com/joho/godotenv v1.4.0

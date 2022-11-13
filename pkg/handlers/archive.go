@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/mholt/archiver/v4"
 	log "github.com/sirupsen/logrus"
 )
@@ -34,7 +35,7 @@ func (d *Archive) New() {
 }
 
 // FromFile extracts the files from an archive.
-func (d *Archive) FromFile(data io.Reader) chan ([]byte) {
+func (d *Archive) FromFile(data *diskbufferreader.DiskBufferReader) chan ([]byte) {
 	ctx := context.Background()
 	archiveChan := make(chan ([]byte), 512)
 	go func() {
@@ -94,18 +95,18 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 }
 
 // IsFiletype returns true if the provided reader is an archive.
-func (d *Archive) IsFiletype(reader io.Reader) (io.Reader, bool) {
-	format, readerB, err := archiver.Identify("", reader)
+func (d *Archive) IsFiletype(reader *diskbufferreader.DiskBufferReader) bool {
+	format, _, err := archiver.Identify("", reader)
 	if err != nil {
-		return readerB, false
+		return false
 	}
 	switch format.(type) {
 	case archiver.Extractor:
-		return readerB, true
+		return true
 	case archiver.Decompressor:
-		return readerB, true
+		return true
 	}
-	return readerB, false
+	return false
 }
 
 // extractorHandler is applied to each file in an archiver.Extractor file.
