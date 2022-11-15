@@ -41,6 +41,7 @@ type Source struct {
 	repos           []string
 	ignoreRepos     []string
 	git             *git.Git
+	scanOptions     *git.ScanOptions
 	aCtx            context.Context
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
@@ -325,7 +326,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				return
 			}
 			log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(s.repos), repoURL)
-			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			if err != nil {
 				errsMut.Lock()
 				errs = append(errs, err)
@@ -431,4 +432,8 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 	// Add the offset to both the index and the repos to give the proper place and proper repo count.
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+}
+
+func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
+	s.scanOptions = scanOptions
 }

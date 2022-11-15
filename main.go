@@ -66,9 +66,11 @@ var (
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
-	gitlabScanEndpoint = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
-	gitlabScanRepos    = gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
-	gitlabScanToken    = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
+	gitlabScanEndpoint     = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
+	gitlabScanRepos        = gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
+	gitlabScanToken        = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
+	gitlabScanIncludePaths = gitlabScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	gitlabScanExcludePaths = gitlabScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
 	filesystemScan        = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
@@ -223,10 +225,16 @@ func run(state overseer.State) {
 			logrus.WithError(err).Fatal("Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
+		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
+		if err != nil {
+			logrus.WithError(err).Fatal("could not create filter")
+		}
+
 		gitlab := func(c *sources.Config) {
 			c.Endpoint = *gitlabScanEndpoint
 			c.Token = *gitlabScanToken
 			c.Repos = *gitlabScanRepos
+			c.Filter = filter
 		}
 
 		if err = e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {
