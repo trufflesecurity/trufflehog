@@ -185,7 +185,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
-				case *decoders.Plain:
+				case *decoders.UTF8:
 					decoderType = detectorspb.DecoderType_PLAIN
 				case *decoders.Base64:
 					decoderType = detectorspb.DecoderType_BASE64
