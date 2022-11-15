@@ -22,7 +22,6 @@ func Recover(ctx context.Context) {
 			"stack-trace", panicStack,
 			"recover", err,
 		)
-		fmt.Fprint(os.Stderr, panicStack)
 		if !sentry.Flush(time.Second * 5) {
 			ctx.Logger().Info("sentry flush failed")
 		}
@@ -40,7 +39,6 @@ func RecoverWithExit(ctx context.Context) {
 			"stack-trace", panicStack,
 			"recover", err,
 		)
-		fmt.Fprint(os.Stderr, panicStack)
 		if !sentry.Flush(time.Second * 5) {
 			ctx.Logger().Info("sentry flush failed")
 		}
