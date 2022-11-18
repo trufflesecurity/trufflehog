@@ -35,75 +35,76 @@ var (
 	_ = sort.Sort
 )
 
-// Validate checks the field values on CustomDetector with the rules defined in
-// the proto definition for this message. If any rules are violated, the first
-// error encountered is returned, or nil if there are no violations.
-func (m *CustomDetector) Validate() error {
+// Validate checks the field values on CustomDetectors with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *CustomDetectors) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on CustomDetector with the rules defined
-// in the proto definition for this message. If any rules are violated, the
-// result is a list of violation errors wrapped in CustomDetectorMultiError,
-// or nil if none found.
-func (m *CustomDetector) ValidateAll() error {
+// ValidateAll checks the field values on CustomDetectors with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CustomDetectorsMultiError, or nil if none found.
+func (m *CustomDetectors) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *CustomDetector) validate(all bool) error {
+func (m *CustomDetectors) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for Type
+	for idx, item := range m.GetDetectors() {
+		_, _ = idx, item
 
-	// no validation rules for Name
-
-	if all {
-		switch v := interface{}(m.GetConnection()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, CustomDetectorValidationError{
-					field:  "Connection",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CustomDetectorsValidationError{
+						field:  fmt.Sprintf("Detectors[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CustomDetectorsValidationError{
+						field:  fmt.Sprintf("Detectors[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
 			}
-		case interface{ Validate() error }:
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				errors = append(errors, CustomDetectorValidationError{
-					field:  "Connection",
+				return CustomDetectorsValidationError{
+					field:  fmt.Sprintf("Detectors[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
-				})
+				}
 			}
 		}
-	} else if v, ok := interface{}(m.GetConnection()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return CustomDetectorValidationError{
-				field:  "Connection",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
+
 	}
 
 	if len(errors) > 0 {
-		return CustomDetectorMultiError(errors)
+		return CustomDetectorsMultiError(errors)
 	}
 
 	return nil
 }
 
-// CustomDetectorMultiError is an error wrapping multiple validation errors
-// returned by CustomDetector.ValidateAll() if the designated constraints
+// CustomDetectorsMultiError is an error wrapping multiple validation errors
+// returned by CustomDetectors.ValidateAll() if the designated constraints
 // aren't met.
-type CustomDetectorMultiError []error
+type CustomDetectorsMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m CustomDetectorMultiError) Error() string {
+func (m CustomDetectorsMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -112,11 +113,11 @@ func (m CustomDetectorMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m CustomDetectorMultiError) AllErrors() []error { return m }
+func (m CustomDetectorsMultiError) AllErrors() []error { return m }
 
-// CustomDetectorValidationError is the validation error returned by
-// CustomDetector.Validate if the designated constraints aren't met.
-type CustomDetectorValidationError struct {
+// CustomDetectorsValidationError is the validation error returned by
+// CustomDetectors.Validate if the designated constraints aren't met.
+type CustomDetectorsValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -124,22 +125,22 @@ type CustomDetectorValidationError struct {
 }
 
 // Field function returns field value.
-func (e CustomDetectorValidationError) Field() string { return e.field }
+func (e CustomDetectorsValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e CustomDetectorValidationError) Reason() string { return e.reason }
+func (e CustomDetectorsValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e CustomDetectorValidationError) Cause() error { return e.cause }
+func (e CustomDetectorsValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e CustomDetectorValidationError) Key() bool { return e.key }
+func (e CustomDetectorsValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e CustomDetectorValidationError) ErrorName() string { return "CustomDetectorValidationError" }
+func (e CustomDetectorsValidationError) ErrorName() string { return "CustomDetectorsValidationError" }
 
 // Error satisfies the builtin error interface
-func (e CustomDetectorValidationError) Error() string {
+func (e CustomDetectorsValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -151,14 +152,14 @@ func (e CustomDetectorValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sCustomDetector.%s: %s%s",
+		"invalid %sCustomDetectors.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = CustomDetectorValidationError{}
+var _ error = CustomDetectorsValidationError{}
 
 var _ interface {
 	Field() string
@@ -166,7 +167,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = CustomDetectorValidationError{}
+} = CustomDetectorsValidationError{}
 
 // Validate checks the field values on CustomRegex with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
@@ -189,6 +190,8 @@ func (m *CustomRegex) validate(all bool) error {
 	}
 
 	var errors []error
+
+	// no validation rules for Name
 
 	// no validation rules for Regex
 
