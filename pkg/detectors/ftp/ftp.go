@@ -50,6 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if _, ok := parsedURL.User.Password(); !ok {
 			continue
 		}
+		if parsedURL.User.Username() == "anonymous" {
+			continue
+		}
 
 		redact := strings.TrimSpace(strings.Replace(urlMatch, password, strings.Repeat("*", len(password)), -1))
 
