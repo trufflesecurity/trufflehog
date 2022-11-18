@@ -2,6 +2,7 @@ package custom_detectors
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -28,6 +29,13 @@ func ValidateRegex(regex map[string]string) error {
 	if len(regex) == 0 {
 		return fmt.Errorf("no regex")
 	}
+
+	for _, r := range regex {
+		if _, err := regexp.Compile(r); err != nil {
+			return fmt.Errorf("invalid regex %q", r)
+		}
+	}
+
 	return nil
 }
 
@@ -95,6 +103,21 @@ func ValidateVerifyRanges(ranges []string) error {
 	return nil
 }
 
+func ValidateRegexVars(regex map[string]string, body ...string) error {
+	r := regexp.MustCompile(`{(.+?)}`)
+	for _, b := range body {
+		matches := r.FindAllStringSubmatch(b, -1)
+
+		for _, match := range matches {
+			if _, ok := regex[match[1]]; !ok {
+				return fmt.Errorf("body %q contains an unknown variable", b)
+			}
+		}
+	}
+
+	return nil
+}
+
 func NewCustomRegex(pb *custom_detectorspb.CustomRegex) (customRegex, error) {
 	if err := ValidateKeywords(pb.Keywords); err != nil {
 		return nil, err
@@ -117,6 +140,11 @@ func NewCustomRegex(pb *custom_detectorspb.CustomRegex) (customRegex, error) {
 		if err := ValidateVerifyRanges(verify.SuccessRanges); err != nil {
 			return nil, err
 		}
+
+		if err := ValidateRegexVars(pb.Regex, append(verify.Headers, verify.Endpoint)...); err != nil {
+			return nil, err
+		}
+
 	}
 
 	return pb, nil

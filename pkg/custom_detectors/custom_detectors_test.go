@@ -253,3 +253,46 @@ func TestCustomDetectorsVerifyRangeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestCustomDetectorsVerifyRegexVarsValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		regex   map[string]string
+		body    string
+		wantErr bool
+	}{
+		{
+			name:    "Regex defined but not used in body",
+			regex:   map[string]string{"id": "[0-9]{1,10}", "id_pat_example": "([a-zA-Z0-9]{32})"},
+			body:    "hello world",
+			wantErr: false,
+		},
+		{
+			name:    "Regex defined and is used in body",
+			regex:   map[string]string{"id": "[0-9]{1,10}", "id_pat_example": "([a-zA-Z0-9]{32})"},
+			body:    "hello world {id}",
+			wantErr: false,
+		},
+		{
+			name:    "Regex var in body but not defined",
+			regex:   map[string]string{"id": "[0-9]{1,10}", "id_pat_example": "([a-zA-Z0-9]{32})"},
+			body:    "hello world {hello}",
+			wantErr: true,
+		},
+		{
+			name:    "Nested regex var in body",
+			regex:   map[string]string{"id{}": "[0-9]{1,10}", "id_pat_example": "([a-zA-Z0-9]{32})"},
+			body:    "hello world {id{}}",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ValidateRegexVars(tt.regex, tt.body)
+
+			if (got != nil && !tt.wantErr) || (got == nil && tt.wantErr) {
+				t.Errorf("ValidateRegexVars() error = %v, wantErr %v", got, tt.wantErr)
+			}
+		})
+	}
+}
