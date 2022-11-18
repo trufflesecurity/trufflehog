@@ -276,6 +276,11 @@ repos:
       stages: ["commit", "push"]
 ```
 
+## Use as a library
+
+Currently, trufflehog is in heavy development and no guarantees can be made on
+the stability of the public APIs at this time.
+
 ## Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
