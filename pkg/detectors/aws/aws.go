@@ -17,10 +17,35 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type scanner struct {
+	skipIDs map[string]struct{}
+}
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+func New(opts ...func(*scanner)) *scanner {
+	scanner := &scanner{
+		skipIDs: map[string]struct{}{},
+	}
+	for _, opt := range opts {
+
+		opt(scanner)
+	}
+
+	return scanner
+}
+
+func WithSkipIDs(skipIDs []string) func(*scanner) {
+	return func(s *scanner) {
+		ids := map[string]struct{}{}
+		for _, id := range skipIDs {
+			ids[id] = struct{}{}
+		}
+
+		s.skipIDs = ids
+	}
+}
+
+// Ensure the scanner satisfies the interface at compile time.
+var _ detectors.Detector = (*scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -37,7 +62,7 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
+func (s scanner) Keywords() []string {
 	return []string{
 		"AKIA",
 		"ABIA",
@@ -60,7 +85,7 @@ func GetHMAC(key []byte, data []byte) []byte {
 }
 
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
@@ -71,6 +96,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resIDMatch := strings.TrimSpace(idMatch[1])
+
+		if s.skipIDs != nil {
+			if _, ok := s.skipIDs[resIDMatch]; ok {
+				continue
+			}
+		}
 
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
