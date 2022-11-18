@@ -4,19 +4,17 @@ package custom_detectors;
 
 option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb";
 
-import "google/protobuf/any.proto";
 import "validate/validate.proto";
 
-message CustomDetector {
-  string type = 1;
-  string name = 2;
-  google.protobuf.Any connection = 3;
+message CustomDetectors {
+  repeated CustomRegex detectors = 1;
 }
 
 message CustomRegex {
-  repeated string keywords = 1;
-  map<string, string> regex = 2;
-  repeated VerifierConfig verify = 3;
+  string name = 1;
+  repeated string keywords = 2;
+  map<string, string> regex = 3;
+  repeated VerifierConfig verify = 4;
 }
 
 message VerifierConfig {
