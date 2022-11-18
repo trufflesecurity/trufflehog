@@ -20,8 +20,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
-	"github.com/rs/zerolog"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
@@ -140,7 +138,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				continue
 			}
 			err := func(repoURI string) error {
-				path, repo, err := CloneRepoUsingToken(token, repoURI, user)
+				path, repo, err := CloneRepoUsingToken(ctx, token, repoURI, user)
 				defer os.RemoveAll(path)
 				if err != nil {
 					return err
@@ -158,7 +156,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				continue
 			}
 			err := func(repoURI string) error {
-				path, repo, err := CloneRepoUsingUnauthenticated(repoURI)
+				path, repo, err := CloneRepoUsingUnauthenticated(ctx, repoURI)
 				defer os.RemoveAll(path)
 				if err != nil {
 					return err
@@ -176,7 +174,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				continue
 			}
 			err := func(repoURI string) error {
-				path, repo, err := CloneRepoUsingSSH(repoURI)
+				path, repo, err := CloneRepoUsingSSH(ctx, repoURI)
 				defer os.RemoveAll(path)
 				if err != nil {
 					return err
@@ -217,6 +215,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 
 	}
+
+	ctx.Logger().V(1).Info("Git source finished scanning", "repo-count", len(s.conn.Repositories))
 	s.SetProgressComplete(len(s.conn.Repositories), len(s.conn.Repositories), fmt.Sprintf("Completed scanning source %s", s.name), "")
 	return nil
 }
@@ -246,14 +246,13 @@ func gitURLParse(gitURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
-func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath string, repo *git.Repository, err error) {
-	if err = GitCmdCheck(); err != nil {
-		return
+func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args ...string) (string, *git.Repository, error) {
+	if err := gitCmdCheck(); err != nil {
+		return "", nil, err
 	}
-	clonePath, err = ioutil.TempDir(os.TempDir(), "trufflehog")
+	clonePath, err := ioutil.TempDir(os.TempDir(), "trufflehog")
 	if err != nil {
-		err = errors.New(err)
-		return
+		return "", nil, err
 	}
 	defer CleanOnError(&err, clonePath)
 	cloneURL, err := gitURLParse(gitUrl)
@@ -279,38 +278,40 @@ func CloneRepo(userInfo *url.Userinfo, gitUrl string, args ...string) (clonePath
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
 		safeUrl, err := stripPassword(gitUrl)
 		if err != nil {
-			log.WithError(err).Errorf("failed to strip credentials from git url")
+			ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
 		}
-		log.WithField("exit_code", cloneCmd.ProcessState.ExitCode()).WithField("repo", safeUrl).WithField("output", string(output)).Errorf("failed to clone repo")
-		return "", nil, fmt.Errorf("could not clone repo: %s", safeUrl)
+		ctx.Logger().V(1).Info("git clone failed", "error", err, "repo", safeUrl, "output", string(output))
+		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
-	repo, err = git.PlainOpen(clonePath)
+
+	repo, err := git.PlainOpen(clonePath)
 	if err != nil {
-		err = errors.WrapPrefix(err, "could not open cloned repo", 0)
-		return
+		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-	log.WithField("clone_path", clonePath).WithField("repo", gitUrl).Debug("cloned repo")
-	return
+
+	ctx.Logger().V(1).Info("cloned repo", "repo", gitUrl, "clone-path", clonePath)
+	return clonePath, repo, nil
 }
 
 // CloneRepoUsingToken clones a repo using a provided token.
-func CloneRepoUsingToken(token, gitUrl, user string, args ...string) (string, *git.Repository, error) {
+func CloneRepoUsingToken(ctx context.Context, token, gitUrl, user string, args ...string) (string, *git.Repository, error) {
 	userInfo := url.UserPassword(user, token)
-	return CloneRepo(userInfo, gitUrl, args...)
+	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
 // CloneRepoUsingUnauthenticated clones a repo with no authentication required.
-func CloneRepoUsingUnauthenticated(url string, args ...string) (string, *git.Repository, error) {
-	return CloneRepo(nil, url, args...)
+func CloneRepoUsingUnauthenticated(ctx context.Context, url string, args ...string) (string, *git.Repository, error) {
+	return CloneRepo(ctx, nil, url, args...)
 }
 
-// CloneRepoUsingUnauthenticated clones a repo with no authentication required.
-func CloneRepoUsingSSH(gitUrl string, args ...string) (string, *git.Repository, error) {
+// CloneRepoUsingSSH clones a repo using SSH.
+func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (string, *git.Repository, error) {
 	userInfo := url.User("git")
-	return CloneRepo(userInfo, gitUrl, args...)
+	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
-func GitCmdCheck() error {
+// gitCmdCheck checks if git is installed.
+func gitCmdCheck() error {
 	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
 		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
 	}
@@ -318,11 +319,8 @@ func GitCmdCheck() error {
 }
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	if err := GitCmdCheck(); err != nil {
+	if err := gitCmdCheck(); err != nil {
 		return err
-	}
-	if log.GetLevel() < log.DebugLevel {
-		zerolog.SetGlobalLevel(zerolog.Disabled)
 	}
 
 	commitChan, err := gitparse.RepoPath(ctx, path, scanOptions.HeadHash)
@@ -338,11 +336,12 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 	var reachedBase = false
-	log.WithField("repo", urlMetadata).Debugf("Scanning repo")
+
+	ctx.Logger().V(1).Info("scanning repo", "repo", urlMetadata, "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
-		log.Tracef("Scanning commit %s", commit.Hash)
+		ctx.Logger().V(5).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-			log.Debugf("reached max depth")
+			ctx.Logger().V(1).Info("reached max depth", "depth", depth)
 			break
 		}
 		depth++
@@ -351,13 +350,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 		if len(scanOptions.BaseHash) > 0 {
 			if commit.Hash == scanOptions.BaseHash {
-				log.Debugf("Reached base commit. Finishing scanning files.")
+				ctx.Logger().V(1).Info("reached base commit", "commit", commit.Hash)
 				reachedBase = true
 			}
 		}
 		for _, diff := range commit.Diffs {
-			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
-
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
 			}
@@ -383,13 +380,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					Verify:         s.verify,
 				}
 				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
-					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
+					ctx.Logger().V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 				continue
 			}
 
 			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(diff, fileName, email, hash, when, urlMetadata, chunksChan)
+				s.gitChunk(ctx, diff, fileName, email, hash, when, urlMetadata, chunksChan)
 				continue
 			}
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
@@ -406,7 +403,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	return nil
 }
 
-func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, chunksChan chan *sources.Chunk) {
+func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, chunksChan chan *sources.Chunk) {
 	originalChunk := bufio.NewScanner(&diff.Content)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
@@ -443,9 +440,8 @@ func (s *Git) gitChunk(diff gitparse.Diff, fileName, email, hash, when, urlMetad
 			}
 		}
 
-		_, err := newChunkBuffer.Write(line)
-		if err != nil {
-			log.WithError(err).Error("Could not write line to git diff buffer.")
+		if _, err := newChunkBuffer.Write(line); err != nil {
+			ctx.Logger().Error(err, "error writing to chunk buffer", "filename", fileName, "commit", hash, "file", diff.PathB)
 		}
 	}
 	// Send anything still in the new chunk buffer
@@ -477,12 +473,15 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 
 	var depth int64
 	var reachedBase = false
-	log.Debugf("Scanning repo")
+
+	ctx.Logger().V(1).Info("scanning unstaged changes", "path", path)
 	for commit := range commitChan {
 		for _, diff := range commit.Diffs {
-			log.WithField("commit", commit.Hash).WithField("file", diff.PathB).Trace("Scanning file from git")
+			logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", commit.Hash, "file", diff.PathB)
+			logger.V(2).Info("scanning unstaged changes from git")
+
 			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-				log.Debugf("reached max depth")
+				logger.V(1).Info("reached max depth")
 				break
 			}
 			depth++
@@ -491,7 +490,7 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 			}
 			if len(scanOptions.BaseHash) > 0 {
 				if commit.Hash == scanOptions.BaseHash {
-					log.Debugf("Reached base commit. Finishing scanning files.")
+					logger.V(1).Info("reached base hash, finishing scanning files")
 					reachedBase = true
 				}
 			}
@@ -521,7 +520,7 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 					Verify:         s.verify,
 				}
 				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
-					log.WithError(err).WithField("file", fileName).Debug("Error handling binary file")
+					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
 				}
 				continue
 			}
@@ -541,6 +540,9 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 }
 
 func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	if scanOptions == nil {
+		scanOptions = NewScanOptions()
+	}
 	if err := normalizeConfig(scanOptions, repo); err != nil {
 		return err
 	}
@@ -549,10 +551,11 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		return err
 	}
 	if err := s.ScanUnstaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
-		log.WithError(err).Error("Error scanning unstaged changes")
+		ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 	}
+
 	scanTime := time.Now().UnixNano() - start
-	log.Debugf("Scanning complete. Scan time: %f", time.Duration(scanTime).Seconds())
+	ctx.Logger().V(1).Info("scanning git repo complete", "path", repoPath, "time", scanTime)
 	return nil
 }
 
@@ -656,9 +659,9 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 }
 
 // PrepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
-func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) {
+func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (string, bool, error) {
 	if commitHash == "" {
-		return PrepareRepo(uriString)
+		return PrepareRepo(ctx, uriString)
 	}
 	// TODO: refactor with PrepareRepo to remove duplicated logic
 
@@ -673,13 +676,13 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 	}
 
 	if uri.Scheme == "file" || uri.Host != "github.com" {
-		return PrepareRepo(uriString)
+		return PrepareRepo(ctx, uriString)
 	}
 
 	uriPath := strings.TrimPrefix(uri.Path, "/")
 	owner, repoName, found := strings.Cut(uriPath, "/")
 	if !found {
-		return PrepareRepo(uriString)
+		return PrepareRepo(ctx, uriString)
 	}
 
 	client := github.NewClient(nil)
@@ -693,13 +696,13 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 
 	commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
 	if err != nil {
-		return PrepareRepo(uriString)
+		return PrepareRepo(ctx, uriString)
 	}
 	var timestamp string
 	{
 		author := commit.GetAuthor()
 		if author == nil {
-			return PrepareRepo(uriString)
+			return PrepareRepo(ctx, uriString)
 		}
 		timestamp = author.GetDate().Format(time.RFC3339)
 	}
@@ -708,28 +711,29 @@ func PrepareRepoSinceCommit(uriString, commitHash string) (string, bool, error) 
 	var path string
 	switch {
 	case uri.User != nil:
-		log.Debugf("Cloning remote Git repo with authentication")
+		ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri)
 		password, ok := uri.User.Password()
 		if !ok {
 			return "", true, fmt.Errorf("password must be included in Git repo URL when username is provided")
 		}
-		path, _, err = CloneRepoUsingToken(password, remotePath, uri.User.Username(), "--shallow-since", timestamp)
+		path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username(), "--shallow-since", timestamp)
 		if err != nil {
 			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
 		}
 	default:
-		log.Debugf("Cloning remote Git repo without authentication")
-		path, _, err = CloneRepoUsingUnauthenticated(remotePath, "--shallow-since", timestamp)
+		ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
+		path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath, "--shallow-since", timestamp)
 		if err != nil {
 			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 		}
 	}
-	log.Debugf("Git repo local path: %s", path)
+
+	ctx.Logger().V(1).Info("cloned repo", "path", path)
 	return path, true, nil
 }
 
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
-func PrepareRepo(uriString string) (string, bool, error) {
+func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 	var path string
 	uri, err := gitURLParse(uriString)
 	if err != nil {
@@ -745,18 +749,18 @@ func PrepareRepo(uriString string) (string, bool, error) {
 		remote = true
 		switch {
 		case uri.User != nil:
-			log.Debugf("Cloning remote Git repo with authentication")
+			ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri)
 			password, ok := uri.User.Password()
 			if !ok {
 				return "", remote, fmt.Errorf("password must be included in Git repo URL when username is provided")
 			}
-			path, _, err = CloneRepoUsingToken(password, remotePath, uri.User.Username())
+			path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username())
 			if err != nil {
 				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
 			}
 		default:
-			log.Debugf("Cloning remote Git repo without authentication")
-			path, _, err = CloneRepoUsingUnauthenticated(remotePath)
+			ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
+			path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath)
 			if err != nil {
 				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 			}
@@ -764,14 +768,15 @@ func PrepareRepo(uriString string) (string, bool, error) {
 	case "ssh":
 		remotePath := uri.String()
 		remote = true
-		path, _, err = CloneRepoUsingSSH(remotePath)
+		path, _, err = CloneRepoUsingSSH(ctx, remotePath)
 		if err != nil {
 			return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 		}
 	default:
 		return "", remote, fmt.Errorf("unsupported Git URI: %s", uriString)
 	}
-	log.Debugf("Git repo local path: %s", path)
+
+	ctx.Logger().V(1).Info("cloned repo", "path", path)
 	return path, remote, nil
 }
 
@@ -799,7 +804,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 }
 
 func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	log.WithField("path", path).Trace("Binary file found in repository.")
+	ctx.Logger().V(5).Info("handling binary file", "path", path)
 	commit, err := repo.CommitObject(commitHash)
 	if err != nil {
 		return err
@@ -825,7 +830,7 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 		return nil
 	}
 
-	log.WithField("path", path).Trace("Binary file is not recognized by file handlers. Chunking raw.")
+	ctx.Logger().V(1).Info("binary file not handled, chunking raw", "path", path)
 	if err := reader.Reset(); err != nil {
 		return err
 	}

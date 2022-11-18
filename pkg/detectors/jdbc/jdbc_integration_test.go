@@ -27,14 +27,19 @@ func TestMain(m *testing.M) {
 }
 
 func runMain(m *testing.M) (int, error) {
-	if err := startPostgres(); err != nil {
-		return 0, err
+	for _, ctrl := range []struct {
+		start func() error
+		stop  func()
+	}{
+		{startPostgres, stopPostgres},
+		{startMySQL, stopMySQL},
+		{startSqlServer, stopSqlServer},
+	} {
+		if err := ctrl.start(); err != nil {
+			return 0, err
+		}
+		defer ctrl.stop()
 	}
-	defer stopPostgres()
-	if err := startMySQL(); err != nil {
-		return 0, err
-	}
-	defer stopMySQL()
 	return m.Run(), nil
 }
 

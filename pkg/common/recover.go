@@ -18,7 +18,10 @@ func Recover(ctx context.Context) {
 		if eventID := sentry.CurrentHub().Recover(err); eventID != nil {
 			ctx.Logger().Info("panic captured", "event_id", *eventID)
 		}
-		fmt.Fprint(os.Stderr, panicStack)
+		ctx.Logger().Error(fmt.Errorf("panic"), "recovered from panic",
+			"stack-trace", panicStack,
+			"recover", err,
+		)
 		if !sentry.Flush(time.Second * 5) {
 			ctx.Logger().Info("sentry flush failed")
 		}
@@ -32,7 +35,10 @@ func RecoverWithExit(ctx context.Context) {
 		if eventID := sentry.CurrentHub().Recover(err); eventID != nil {
 			ctx.Logger().Info("panic captured", "event_id", *eventID)
 		}
-		fmt.Fprint(os.Stderr, panicStack)
+		ctx.Logger().Error(fmt.Errorf("panic"), "recovered from panic before exiting",
+			"stack-trace", panicStack,
+			"recover", err,
+		)
 		if !sentry.Flush(time.Second * 5) {
 			ctx.Logger().Info("sentry flush failed")
 		}

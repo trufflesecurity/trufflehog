@@ -13,12 +13,14 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/sirupsen/logrus"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func PrintLegacyJSON(r *detectors.ResultWithMetadata) {
+func PrintLegacyJSON(ctx context.Context, r *detectors.ResultWithMetadata) {
 	var repo string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
@@ -32,7 +34,7 @@ func PrintLegacyJSON(r *detectors.ResultWithMetadata) {
 	}
 
 	// cloning the repo again here is not great and only works with unauthed repos
-	repoPath, remote, err := git.PrepareRepo(repo)
+	repoPath, remote, err := git.PrepareRepo(ctx, repo)
 	if err != nil || repoPath == "" {
 		logrus.WithError(err).Fatal("error preparing git repo for scanning")
 	}

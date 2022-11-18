@@ -136,14 +136,20 @@ func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Conte
 }
 
 // ReadToMax reads up to the max size.
-func (d *Archive) ReadToMax(reader io.Reader) ([]byte, error) {
+func (d *Archive) ReadToMax(reader io.Reader) (data []byte, err error) {
 	// Archiver v4 is in alpha and using an experimental version of
 	// rardecode. There is a bug somewhere with rar decoder format 29
 	// that can lead to a panic. An issue is open in rardecode repo
 	// https://github.com/nwaples/rardecode/issues/30.
 	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("Panic occurred when reading archive: %v", err)
+		if r := recover(); r != nil {
+			log.Errorf("Panic occurred when reading archive: %v", r)
+			// Return an error from ReadToMax.
+			if e, ok := r.(error); ok {
+				err = e
+			} else {
+				err = fmt.Errorf("Panic occurred: %v", r)
+			}
 		}
 	}()
 	fileContent := bytes.Buffer{}
@@ -155,7 +161,9 @@ func (d *Archive) ReadToMax(reader io.Reader) ([]byte, error) {
 			return []byte{}, err
 		}
 		d.size += bRead
-		fileContent.Write(fileChunk[0:bRead])
+		if len(fileChunk) > 0 {
+			fileContent.Write(fileChunk[0:bRead])
+		}
 		if bRead < 512 {
 			break
 		}

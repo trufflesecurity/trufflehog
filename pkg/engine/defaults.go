@@ -565,6 +565,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sherpadesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shipday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shodankey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shopify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shortcut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shotstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/shutterstock"
@@ -737,7 +738,7 @@ func DefaultDetectors() []detectors.Detector {
 		&heroku.Scanner{},
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
-		&aws.Scanner{},
+		aws.New(),
 		&azure.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlabv2.Scanner{},
@@ -1490,5 +1491,6 @@ func DefaultDetectors() []detectors.Detector {
 		redis.Scanner{},
 		ftp.Scanner{},
 		ldap.Scanner{},
+		shopify.Scanner{},
 	}
 }

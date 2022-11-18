@@ -39,14 +39,14 @@ func TestAWS_FromChunk(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		s       Scanner
+		s       scanner
 		args    args
 		want    []detectors.Result
 		wantErr bool
 	}{
 		{
 			name: "found, verified",
-			s:    Scanner{},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
@@ -68,7 +68,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified",
-			s:    Scanner{},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
@@ -86,7 +86,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "not found",
-			s:    Scanner{},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte("You cannot find the secret within"),
@@ -97,7 +97,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found two, one included for every ID found",
-			s:    Scanner{},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("The verified ID is %s with a secret of %s, but the unverified ID is %s and this is the secret %s", id, secret, inactiveID, inactiveSecret)),
@@ -124,7 +124,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "not found, because unverified secret was a hash",
-			s:    Scanner{},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", hash, id)), // The secret would satisfy the regex but be filtered out after not passing validation.
@@ -135,7 +135,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found two, returned both because the active secret for one paired with the inactive ID, despite the hash",
-			s:    Scanner{},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("The verified ID is %s with a secret of %s, but the unverified ID is %s and the secret is this hash %s", id, secret, inactiveID, hash)),
@@ -162,7 +162,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified, with leading +",
-			s:    Scanner{},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", "+HaNv9cTwheDKGJaws/+BMF2GgybQgBWdhcOOdfF", id)), // the secret would satisfy the regex but not pass validation
@@ -177,10 +177,24 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "skipped",
+			s: scanner{
+				skipIDs: map[string]struct{}{
+					"AKIAWARWQKZNHMZBLY4I": {},
+				},
+			},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", "+HaNv9cTwheDKGJaws/+BMF2GgybQgBWdhcOOdfF", id)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
+			s := tt.s
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AWS.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -201,7 +215,7 @@ func TestAWS_FromChunk(t *testing.T) {
 
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
-	s := Scanner{}
+	s := scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
 			for n := 0; n < b.N; n++ {

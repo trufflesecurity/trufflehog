@@ -41,6 +41,7 @@ type Source struct {
 	repos           []string
 	ignoreRepos     []string
 	git             *git.Git
+	scanOptions     *git.ScanOptions
 	aCtx            context.Context
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
@@ -307,7 +308,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			var repo *gogit.Repository
 			var err error
 			if s.authMethod == "UNAUTHENTICATED" {
-				path, repo, err = git.CloneRepoUsingUnauthenticated(repoURL)
+				path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
 			} else {
 				// If a username is not provided we need to use a default one in order to clone a private repo.
 				// Not setting "placeholder" as s.user on purpose in case any downstream services rely on a "" value for s.user.
@@ -315,7 +316,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				if user == "" {
 					user = "placeholder"
 				}
-				path, repo, err = git.CloneRepoUsingToken(s.token, repoURL, user)
+				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
 			}
 			defer os.RemoveAll(path)
 			if err != nil {
@@ -325,7 +326,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				return
 			}
 			log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(s.repos), repoURL)
-			err = s.git.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
+			err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			if err != nil {
 				errsMut.Lock()
 				errs = append(errs, err)
@@ -431,4 +432,8 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 	// Add the offset to both the index and the repos to give the proper place and proper repo count.
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+}
+
+func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
+	s.scanOptions = scanOptions
 }

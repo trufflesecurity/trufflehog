@@ -38,7 +38,7 @@ func TestURI_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_URI,
 					Verified:     false,
-					Redacted:     "https://user:****@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx",
+					Redacted:     "https://user:****@www.httpwatch.com",
 				},
 			},
 			wantErr: false,
@@ -55,7 +55,7 @@ func TestURI_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_URI,
 					Verified:     true,
-					Redacted:     "https://httpwatch:****@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx",
+					Redacted:     "https://httpwatch:****@www.httpwatch.com",
 				},
 			},
 			wantErr: false,
@@ -72,7 +72,7 @@ func TestURI_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_URI,
 					Verified:     true,
-					Redacted:     "https://httpwatch:****@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx",
+					Redacted:     "https://httpwatch:****@www.httpwatch.com",
 				},
 			},
 			wantErr: false,
