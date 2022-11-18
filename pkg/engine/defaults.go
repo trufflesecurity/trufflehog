@@ -737,7 +737,7 @@ func DefaultDetectors() []detectors.Detector {
 		&heroku.Scanner{},
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
-		&aws.Scanner{},
+		aws.New(),
 		&azure.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlabv2.Scanner{},
