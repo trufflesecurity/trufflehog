@@ -908,6 +908,7 @@ enum DetectorType {
   SQLServer = 898;
   FTP = 899;
   Redis = 900;
+  LDAP = 901;
   Shopify = 902;
 }
 
