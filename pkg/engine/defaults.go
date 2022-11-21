@@ -350,6 +350,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lastfm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/launchdarkly"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ldap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/leadfeeder"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lemlist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lendflow"
@@ -737,7 +738,7 @@ func DefaultDetectors() []detectors.Detector {
 		&heroku.Scanner{},
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
-		&aws.Scanner{},
+		aws.New(),
 		&azure.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlabv2.Scanner{},
@@ -1489,6 +1490,7 @@ func DefaultDetectors() []detectors.Detector {
 		sqlserver.Scanner{},
 		redis.Scanner{},
 		ftp.Scanner{},
+		ldap.Scanner{},
 		shopify.Scanner{},
 	}
 }

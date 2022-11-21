@@ -71,8 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		rawURL, _ := url.Parse(urlMatch)
 		rawURL.Path = ""
-
-		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, strings.Repeat("*", len(password)), -1))
+		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_URI,

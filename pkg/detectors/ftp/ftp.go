@@ -50,12 +50,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if _, ok := parsedURL.User.Password(); !ok {
 			continue
 		}
+		if parsedURL.User.Username() == "anonymous" {
+			continue
+		}
 
-		redact := strings.TrimSpace(strings.Replace(urlMatch, password, strings.Repeat("*", len(password)), -1))
+		rawURL, _ := url.Parse(urlMatch)
+		rawURL.Path = ""
+		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FTP,
-			Raw:          []byte(urlMatch),
+			Raw:          []byte(rawURL.String()),
 			Redacted:     redact,
 		}
 
@@ -70,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
+		if detectors.IsKnownFalsePositive(string(s.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
 			continue
 		}
 

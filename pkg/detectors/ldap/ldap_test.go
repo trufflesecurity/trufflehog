@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package ftp
+package ldap
 
 import (
 	"context"
@@ -9,10 +9,11 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestFTP_FromChunk(t *testing.T) {
+func TestLdap_FromChunk(t *testing.T) {
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -26,59 +27,30 @@ func TestFTP_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "bad scheme",
+			name: "found with IAD lib usage, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("file://user:pass@foo.com:123/wh/at/ever"),
-				verify: true,
-			},
-			wantErr: false,
-		},
-		{
-			name: "verified FTP",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				// https://dlptest.com/ftp-test/
-				data:   []byte("ftp://dlpuser:rNrKYTX9g7z3RgJRmxWuGHbeu@ftp.dlptest.com"),
+				data:   []byte(`Set ou = dso.OpenDSObject("LDAP://DC.business.com/OU=IT,DC=Business,DC=com", "Business\administrator", "Pa$$word01", 1)`),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FTP,
-					Verified:     true,
-					Redacted:     "ftp://dlpuser:*************************@ftp.dlptest.com",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "unverified FTP",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				// https://dlptest.com/ftp-test/
-				data:   []byte("ftp://dlpuser:invalid@ftp.dlptest.com"),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_FTP,
+					DetectorType: detectorspb.DetectorType_LDAP,
 					Verified:     false,
-					Redacted:     "ftp://dlpuser:*******@ftp.dlptest.com",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "blocked FP",
+			name: "not found",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("ftp://abc:123@ftp.freebsd.org/pub/FreeBSD/doc/tr/articles/explaining-bsd/explaining-bsd_tr.pdf"),
+				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
+			want:    nil,
 			wantErr: false,
 		},
 	}
@@ -87,17 +59,17 @@ func TestFTP_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("URI.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Ldap.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// if os.Getenv("FORCE_PASS_DIFF") == "true" {
-			// 	return
-			// }
 			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Ldap.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
