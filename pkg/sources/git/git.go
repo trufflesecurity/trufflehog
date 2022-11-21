@@ -540,6 +540,9 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 }
 
 func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	if scanOptions == nil {
+		scanOptions = NewScanOptions()
+	}
 	if err := normalizeConfig(scanOptions, repo); err != nil {
 		return err
 	}

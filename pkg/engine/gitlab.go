@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"github.com/go-errors/errors"
+	gogit "github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -13,11 +14,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gitlab"
 )
 
 // ScanGitLab scans GitLab with the provided configuration.
 func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
+	logOptions := &gogit.LogOptions{}
+	opts := []git.ScanOption{
+		git.ScanOptionFilter(c.Filter),
+		git.ScanOptionLogOptions(logOptions),
+	}
+	scanOptions := git.NewScanOptions(opts...)
+
 	connection := &sourcespb.GitLab{}
 
 	switch {
@@ -49,6 +58,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init GitLab source", 0)
 	}
+	gitlabSource.WithScanOptions(scanOptions)
 
 	e.sourcesWg.Add(1)
 	go func() {
