@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestURI_FromChunk(t *testing.T) {
+func TestFTP_FromChunk(t *testing.T) {
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -68,6 +68,16 @@ func TestURI_FromChunk(t *testing.T) {
 					Verified:     false,
 					Redacted:     "ftp://dlpuser:*******@ftp.dlptest.com",
 				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "blocked FP",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("ftp://abc:123@ftp.freebsd.org/pub/FreeBSD/doc/tr/articles/explaining-bsd/explaining-bsd_tr.pdf"),
+				verify: true,
 			},
 			wantErr: false,
 		},
