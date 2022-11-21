@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(parsedURL.String(), password, strings.Repeat("*", len(password)), -1))
+		redact := strings.TrimSpace(strings.Replace(parsedURL.String(), password, "********", -1))
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_RabbitMQ,
