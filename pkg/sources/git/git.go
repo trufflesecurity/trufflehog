@@ -408,7 +408,9 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
-		line := originalChunk.Bytes()
+		line := make([]byte, len(originalChunk.Bytes())+1)
+		copy(line, originalChunk.Bytes())
+		line[len(line)-1] = byte('\n')
 		if len(line) > sources.ChunkSize || len(line)+newChunkBuffer.Len() > sources.ChunkSize {
 			// Add oversize chunk info
 			if newChunkBuffer.Len() > 0 {
