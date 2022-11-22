@@ -7,7 +7,7 @@ import (
 )
 
 // nameGroupRegex matches `{ name . group }` ignoring any whitespace.
-var nameGroupRegex = regexp.MustCompile(`{\s*([a-zA-Z-_]+)\s*(\.\s*[0-9]*)?\s*}`)
+var nameGroupRegex = regexp.MustCompile(`{\s*([a-zA-Z0-9-_]+)\s*(\.\s*[0-9]*)?\s*}`)
 
 // RegexVarString is a string with embedded {name.group} variables. A name may
 // only contain alphanumeric, hyphen, and underscore characters. Group is

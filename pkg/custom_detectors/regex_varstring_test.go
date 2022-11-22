@@ -33,9 +33,9 @@ func TestVarString(t *testing.T) {
 		},
 		{
 			name:  "subgroup with spaces",
-			input: "{\thello  . 123  }",
+			input: "{\thell0  . 123  }",
 			wantVars: map[string]int{
-				"hello": 123,
+				"hell0": 123,
 			},
 		},
 		{
