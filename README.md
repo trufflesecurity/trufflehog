@@ -86,7 +86,7 @@ trufflehog s3 --bucket=<bucket name> --only-verified
 + All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
   + That means no secrets were detected
 + Why is the scan is taking a long time when I scan a GitHub org
-  + Unathenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
+  + Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
 + It says a private key was verified, what does that mean?
   + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)  
 
@@ -130,7 +130,7 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo ht
 #### **Apple M1 users**
 
 The `linux/arm64` image is better to run on the M1 than the amd64 image.
-Even better is running the native darwin binary avilable, but there is not container image for that.
+Even better is running the native darwin binary available, but there is no container image for that.
 
 ```bash
 docker run --platform linux/arm64 -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys 
