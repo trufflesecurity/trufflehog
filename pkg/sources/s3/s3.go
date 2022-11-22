@@ -278,6 +278,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				s.log.Error(err, "Could not create reader.")
 				return
 			}
+			defer reader.Close()
 
 			email := "Unknown"
 			if obj.Owner != nil {
