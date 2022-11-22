@@ -827,6 +827,7 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	if err != nil {
 		return err
 	}
+	defer reader.Close()
 
 	if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
 		return nil
