@@ -181,7 +181,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
-			fragStart, mdLine := fragmentFirstLine(chunk)
+			fragStart, _ := fragmentFirstLine(chunk)
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
@@ -229,13 +229,15 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						if e.filterUnverified {
 							results = detectors.CleanResults(results)
 						}
+						newChunk := chunk
 						for _, result := range results {
 							if isGitSource(chunk.SourceType) {
-								offset := FragmentLineOffset(chunk, &result)
-								*mdLine = fragStart + offset
+								newChunk = deepCopyGitChunk(chunk)
+								offset := FragmentLineOffset(newChunk, &result)
+								newChunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Git).Git.Line = fragStart + offset
 							}
 							result.DecoderType = decoderType
-							e.results <- detectors.CopyMetadata(chunk, result)
+							e.results <- detectors.CopyMetadata(newChunk, result)
 
 						}
 						if len(results) > 0 {
@@ -313,4 +315,32 @@ func fragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 		return 0, nil
 	}
 	return *fragmentStart, fragmentStart
+}
+
+// deepCopyGitChunk will copy a Git chunk down to the source metadata. Nothing
+// will be shared between the new and original chunks
+func deepCopyGitChunk(chunk *sources.Chunk) *sources.Chunk {
+	originalMetaData := chunk.SourceMetadata.Data.(*source_metadatapb.MetaData_Git)
+	newMetaData := source_metadatapb.MetaData_Git{
+		Git: &source_metadatapb.Git{
+			Commit:     originalMetaData.Git.Commit,
+			File:       originalMetaData.Git.File,
+			Email:      originalMetaData.Git.Email,
+			Repository: originalMetaData.Git.Repository,
+			Timestamp:  originalMetaData.Git.Timestamp,
+			Line:       originalMetaData.Git.Line,
+		},
+	}
+	newChunk := &sources.Chunk{
+		SourceName: chunk.SourceName,
+		SourceID:   chunk.SourceID,
+		SourceType: chunk.SourceType,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &newMetaData,
+		},
+		Data:   make([]byte, len(chunk.Data)),
+		Verify: chunk.Verify,
+	}
+	copy(newChunk.Data, chunk.Data)
+	return newChunk
 }
