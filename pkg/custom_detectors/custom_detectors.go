@@ -60,8 +60,8 @@ func ValidateVerifyHeaders(headers []string) error {
 }
 
 func ValidateVerifyRanges(ranges []string) error {
-	const httpLowerRange = 100
-	const httpUpperRange = 599
+	const httpLowerBound = 100
+	const httpUpperBound = 599
 
 	for _, successRange := range ranges {
 		if !strings.Contains(successRange, "-") {
@@ -70,7 +70,7 @@ func ValidateVerifyRanges(ranges []string) error {
 				return fmt.Errorf("unable to convert http code to int %q", successRange)
 			}
 
-			if httpCode < httpLowerRange || httpCode > httpUpperRange {
+			if httpCode < httpLowerBound || httpCode > httpUpperBound {
 				return fmt.Errorf("invalid http status code %q", successRange)
 			}
 
@@ -96,7 +96,7 @@ func ValidateVerifyRanges(ranges []string) error {
 			return fmt.Errorf("lower bound greater than upper bound on range %q", successRange)
 		}
 
-		if lowerBound < httpLowerRange || upperBound > httpUpperRange {
+		if lowerBound < httpLowerBound || upperBound > httpUpperBound {
 			return fmt.Errorf("invalid http status code range %q", successRange)
 		}
 	}
@@ -104,12 +104,11 @@ func ValidateVerifyRanges(ranges []string) error {
 }
 
 func ValidateRegexVars(regex map[string]string, body ...string) error {
-	r := regexp.MustCompile(`{(.+?)}`)
 	for _, b := range body {
-		matches := r.FindAllStringSubmatch(b, -1)
+		matches := NewRegexVarString(b).variables
 
-		for _, match := range matches {
-			if _, ok := regex[match[1]]; !ok {
+		for match := range matches {
+			if _, ok := regex[match]; !ok {
 				return fmt.Errorf("body %q contains an unknown variable", b)
 			}
 		}
@@ -119,6 +118,7 @@ func ValidateRegexVars(regex map[string]string, body ...string) error {
 }
 
 func NewCustomRegex(pb *custom_detectorspb.CustomRegex) (customRegex, error) {
+	// TODO: Return all validation errors.
 	if err := ValidateKeywords(pb.Keywords); err != nil {
 		return nil, err
 	}

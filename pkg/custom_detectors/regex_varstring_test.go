@@ -13,6 +13,11 @@ func TestVarString(t *testing.T) {
 		wantVars map[string]int
 	}{
 		{
+			name:     "empty",
+			input:    "{}",
+			wantVars: map[string]int{},
+		},
+		{
 			name:  "no subgroup",
 			input: "{hello}",
 			wantVars: map[string]int{

@@ -279,12 +279,6 @@ func TestCustomDetectorsVerifyRegexVarsValidation(t *testing.T) {
 			body:    "hello world {hello}",
 			wantErr: true,
 		},
-		{
-			name:    "Nested regex var in body",
-			regex:   map[string]string{"id{}": "[0-9]{1,10}", "id_pat_example": "([a-zA-Z0-9]{32})"},
-			body:    "hello world {id{}}",
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
