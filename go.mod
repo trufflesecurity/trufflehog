@@ -13,7 +13,7 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/TheZeroSlave/zapsentry v1.12.0
 	github.com/aws/aws-sdk-go v1.44.83
-	github.com/bill-rich/disk-buffer-reader v0.1.4
+	github.com/bill-rich/disk-buffer-reader v0.1.5
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
