@@ -34,7 +34,6 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-github/v42 v42.0.0
 	github.com/gorilla/mux v1.8.0
-	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-retryablehttp v0.7.1
 	github.com/jlaffaye/ftp v0.1.0
 	github.com/joho/godotenv v1.4.0
@@ -46,6 +45,7 @@ require (
 	github.com/mholt/archiver/v4 v4.0.0-alpha.7
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
+	github.com/rabbitmq/amqp091-go v1.5.0
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
@@ -122,7 +122,6 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.14 // indirect
 	github.com/pkg/diff v0.0.0-20200914180035-5b29258ca4f7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rabbitmq/amqp091-go v1.5.0 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
