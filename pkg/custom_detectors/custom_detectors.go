@@ -9,8 +9,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 )
 
-// customRegex is a CustomRegex that is guaranteed to be valid.
-type customRegex *custom_detectorspb.CustomRegex
+// customRegexWebhook is a CustomRegex with webhook validation that is
+// guaranteed to be valid.
+type customRegexWebhook *custom_detectorspb.CustomRegex
 
 func ValidateKeywords(keywords []string) error {
 	if len(keywords) == 0 {
@@ -117,34 +118,22 @@ func ValidateRegexVars(regex map[string]string, body ...string) error {
 	return nil
 }
 
-func NewCustomRegex(pb *custom_detectorspb.CustomRegex) (customRegex, error) {
+func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (customRegexWebhook, error) {
 	// TODO: Return all validation errors.
 	if err := ValidateKeywords(pb.Keywords); err != nil {
 		return nil, err
 	}
-
 	if err := ValidateRegex(pb.Regex); err != nil {
 		return nil, err
 	}
 
 	for _, verify := range pb.Verify {
-
 		if err := ValidateVerifyEndpoint(verify.Endpoint, verify.Unsafe); err != nil {
 			return nil, err
 		}
-
 		if err := ValidateVerifyHeaders(verify.Headers); err != nil {
 			return nil, err
 		}
-
-		if err := ValidateVerifyRanges(verify.SuccessRanges); err != nil {
-			return nil, err
-		}
-
-		if err := ValidateRegexVars(pb.Regex, append(verify.Headers, verify.Endpoint)...); err != nil {
-			return nil, err
-		}
-
 	}
 
 	return pb, nil
