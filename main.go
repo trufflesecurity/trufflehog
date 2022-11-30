@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -16,12 +15,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -91,6 +92,8 @@ var (
 	syslogTLSCert  = syslogScan.Flag("cert", "Path to TLS cert.").String()
 	syslogTLSKey   = syslogScan.Flag("key", "Path to TLS key.").String()
 	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").String()
+
+	stderrLevel = zap.NewAtomicLevel()
 )
 
 func init() {
@@ -169,6 +172,9 @@ func run(state overseer.State) {
 			}
 		}()
 	}
+	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr, log.WithLeveler(stderrLevel)))
+	context.SetDefaultLogger(logger)
+	defer func() { _ = sync() }()
 
 	ctx := context.TODO()
 	e := engine.Start(ctx,
@@ -208,7 +214,7 @@ func run(state overseer.State) {
 		}
 	case githubScan.FullCommand():
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
-			log.Fatal("You must specify at least one organization or repository.")
+			logrus.Fatal("You must specify at least one organization or repository.")
 		}
 
 		github := func(c *sources.Config) {
