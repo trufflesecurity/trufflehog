@@ -214,7 +214,7 @@ func run(state overseer.State) {
 		}
 	case githubScan.FullCommand():
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
-			logrus.Error("You must specify at least one organization or repository.")
+			logrus.Fatal("You must specify at least one organization or repository.")
 		}
 
 		github := func(c *sources.Config) {
