@@ -101,3 +101,71 @@ func TestCustomDetectorsParsing(t *testing.T) {
 	assert.Equal(t, true, got.Verify[0].Unsafe)
 	assert.Equal(t, []string{"Authorization: Bearer token"}, got.Verify[0].Headers)
 }
+
+func TestProductIndices(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []int
+		want  [][]int
+	}{
+		{
+			name:  "zero",
+			input: []int{3, 0},
+			want:  nil,
+		},
+		{
+			name:  "one input",
+			input: []int{3},
+			want:  [][]int{{0}, {1}, {2}},
+		},
+		{
+			name:  "two inputs",
+			input: []int{3, 2},
+			want: [][]int{
+				{0, 0}, {1, 0}, {2, 0},
+				{0, 1}, {1, 1}, {2, 1},
+			},
+		},
+		{
+			name:  "three inputs",
+			input: []int{3, 2, 3},
+			want: [][]int{
+				{0, 0, 0}, {1, 0, 0}, {2, 0, 0},
+				{0, 1, 0}, {1, 1, 0}, {2, 1, 0},
+				{0, 0, 1}, {1, 0, 1}, {2, 0, 1},
+				{0, 1, 1}, {1, 1, 1}, {2, 1, 1},
+				{0, 0, 2}, {1, 0, 2}, {2, 0, 2},
+				{0, 1, 2}, {1, 1, 2}, {2, 1, 2},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := productIndices(tt.input...)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPermutateMatches(t *testing.T) {
+	tests := []struct {
+		name  string
+		input map[string][][]string
+		want  []map[string][]string
+	}{
+		{
+			name:  "two matches",
+			input: map[string][][]string{"foo": {{"matchA"}, {"matchB"}}, "bar": {{"matchC"}}},
+			want: []map[string][]string{
+				{"foo": {"matchA"}, "bar": {"matchC"}},
+				{"foo": {"matchB"}, "bar": {"matchC"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := permutateMatches(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
