@@ -911,6 +911,7 @@ enum DetectorType {
   LDAP = 901;
   Shopify = 902;
   RabbitMQ = 903;
+  CustomRegex = 904;
 }
 
 message Result {

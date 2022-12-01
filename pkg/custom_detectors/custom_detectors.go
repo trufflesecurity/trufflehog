@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 // customRegexWebhook is a CustomRegex with webhook validation that is
@@ -59,8 +60,6 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 			continue
 		}
 		regexMatches[name] = regex.FindAllStringSubmatch(dataStr, -1)
-		// lengths = append(lengths, len(regexMatches[name]))
-		// names = append(names, name)
 	}
 
 	// Permutate each individual match.
@@ -77,15 +76,14 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 
 	// Create result object and test for verification.
 	for _, match := range matches {
-		var rawV2 string
+		var raw string
 		for _, values := range match {
 			// values[0] contains the entire regex match.
-			rawV2 += values[0]
+			raw += values[0]
 		}
 		result := detectors.Result{
-			// FIXME: Add a custom regex detector type.
-			DetectorType: -1,
-			RawV2:        []byte(rawV2),
+			DetectorType: detectorspb.DetectorType_CustomRegex,
+			Raw:          []byte(raw),
 		}
 
 		if isKnownFalsePositive(match) {
