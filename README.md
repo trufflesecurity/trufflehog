@@ -304,3 +304,10 @@ We have published some [documentation and tooling to get started on adding new s
 ## License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
+
+
+## Enterprise product
+
+Are you interested in continously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
+
+We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
