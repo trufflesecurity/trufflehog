@@ -13,6 +13,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+// The maximum number of matches from one chunk. This const is used when
+// permutating each regex match to protect the scanner from doing too much work
+// for poorly defined regexps.
+const maxTotalMatches = 100
+
 // customRegexWebhook is a CustomRegex with webhook validation that is
 // guaranteed to be valid (assuming the data is not changed after
 // initialization).
@@ -126,7 +131,8 @@ func (c *customRegexWebhook) Keywords() []string {
 }
 
 // productIndices produces a permutation of indices for each length. Example:
-// productIndices(3, 2) -> [[0 0] [1 0] [2 0] [0 1] [1 1] [2 1]]
+// productIndices(3, 2) -> [[0 0] [1 0] [2 0] [0 1] [1 1] [2 1]]. It returns
+// a slice of length no larger than maxTotalMatches.
 func productIndices(lengths ...int) [][]int {
 	result := [][]int{{}}
 	for _, length := range lengths {
@@ -135,6 +141,9 @@ func productIndices(lengths ...int) [][]int {
 			// Append index to all existing results.
 			for _, curResult := range result {
 				nextResult = append(nextResult, append(curResult, i))
+				if len(nextResult) >= maxTotalMatches {
+					return nextResult
+				}
 			}
 		}
 		result = nextResult

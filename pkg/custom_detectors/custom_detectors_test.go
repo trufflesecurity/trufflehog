@@ -147,6 +147,12 @@ func TestProductIndices(t *testing.T) {
 	}
 }
 
+func TestProductIndicesMax(t *testing.T) {
+	got := productIndices(2, 3, 4, 5, 6)
+	assert.GreaterOrEqual(t, 2*3*4*5*6, maxTotalMatches)
+	assert.Equal(t, maxTotalMatches, len(got))
+}
+
 func TestPermutateMatches(t *testing.T) {
 	tests := []struct {
 		name  string
