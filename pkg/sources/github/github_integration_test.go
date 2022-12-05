@@ -384,7 +384,7 @@ func TestSource_Scan(t *testing.T) {
 			},
 			wantChunk: nil,
 			wantErr:   false,
-			minRepo:   3,
+			minRepo:   1,
 			minOrg:    1,
 		},
 	}
