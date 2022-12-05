@@ -81,6 +81,10 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 
 	// Create result object and test for verification.
 	for _, match := range matches {
+		if common.IsDone(ctx) {
+			// TODO: Log we're possibly leaving out results.
+			return results, nil
+		}
 		var raw string
 		for _, values := range match {
 			// values[0] contains the entire regex match.
@@ -105,6 +109,10 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 		}
 		// Try each config until we successfully verify.
 		for _, verifyConfig := range c.GetVerify() {
+			if common.IsDone(ctx) {
+				// TODO: Log we're possibly leaving out results.
+				return results, nil
+			}
 			req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
 			if err != nil {
 				continue
