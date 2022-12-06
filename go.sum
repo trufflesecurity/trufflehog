@@ -94,10 +94,8 @@ github.com/aws/aws-sdk-go v1.44.83 h1:7+Rtc2Eio6EKUNoZeMV/IVxzVrY5oBQcNPtCcgIHYJ
 github.com/aws/aws-sdk-go v1.44.83/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
-github.com/bill-rich/disk-buffer-reader v0.1.4 h1:boaUh/NBiTGyH/ZmJvBE48CqK3UAsnezkONE4GT7H1w=
-github.com/bill-rich/disk-buffer-reader v0.1.4/go.mod h1:VVzzsK1Ac2AnpOfp/5r9JlIFaFkZ9uSf7zisZayCt0Y=
-github.com/bill-rich/disk-buffer-reader v0.1.5 h1:XJcEjqE9nVzFinQpVFVGF+fK2Zv2Pl5LQVkmC9p/aaA=
-github.com/bill-rich/disk-buffer-reader v0.1.5/go.mod h1:VVzzsK1Ac2AnpOfp/5r9JlIFaFkZ9uSf7zisZayCt0Y=
+github.com/bill-rich/disk-buffer-reader v0.1.6 h1:4e2q22GPlYFBLSuxm2Af10C89DaUEVTTrUBWKdkMPGg=
+github.com/bill-rich/disk-buffer-reader v0.1.6/go.mod h1:VVzzsK1Ac2AnpOfp/5r9JlIFaFkZ9uSf7zisZayCt0Y=
 github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c h1:tSME5FDS02qQll3JYodI6RZR/g4EKOHApGv1wMZT+Z0=
 github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c/go.mod h1:+sCc6hztur+oZCLOsNk6wCCy+GLrnSNHSRmTnnL+8iQ=
 github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb h1:9v7Bzlg+1EBYi2IYcUmOwHReBEfqBbYIj3ZCi9cIe1Q=
