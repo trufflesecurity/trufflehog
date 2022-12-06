@@ -52,7 +52,7 @@ require (
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/xanzy/go-gitlab v0.74.0
 	go.mongodb.org/mongo-driver v1.11.0
-	go.uber.org/zap v1.23.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783
