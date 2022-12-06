@@ -5,19 +5,14 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"net/http"
 	"testing"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 )
 
 func TestChunker(t *testing.T) {
-	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	reReader, err := diskbufferreader.New(resp.Body)
+	byteBuffer := bytes.NewBuffer(make([]byte, ChunkSize*9))
+	reReader, err := diskbufferreader.New(byteBuffer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,15 +22,15 @@ func TestChunker(t *testing.T) {
 
 	// Count chunks from looping using chunk size.
 	for {
-		baseChunkCount++
 		tmpChunk := make([]byte, ChunkSize)
 		_, err := reReader.Read(tmpChunk)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			t.Error(err)
+			t.Fatal(err)
 		}
+		baseChunkCount++
 	}
 	_ = reReader.Reset()
 

@@ -910,6 +910,7 @@ enum DetectorType {
   Redis = 900;
   LDAP = 901;
   Shopify = 902;
+  RabbitMQ = 903;
 }
 
 message Result {

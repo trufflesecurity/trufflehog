@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/go-logr/logr"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -35,7 +35,7 @@ type Source struct {
 	verify      bool
 	concurrency int
 	aCtx        context.Context
-	log         *log.Entry
+	log         logr.Logger
 	sources.Progress
 	errorCount *sync.Map
 	conn       *sourcespb.S3
@@ -59,7 +59,7 @@ func (s *Source) JobID() int64 {
 
 // Init returns an initialized AWS source
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
-	s.log = log.WithField("source", s.Type()).WithField("name", name)
+	s.log = context.WithValues(aCtx, "source", s.Type(), "name", name).Logger()
 
 	s.aCtx = aCtx
 	s.name = name
@@ -120,7 +120,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		if len(s.conn.Buckets) == 0 {
 			res, err := client.ListBuckets(&s3.ListBucketsInput{})
 			if err != nil {
-				s.log.Errorf("could not list s3 buckets: %s", err)
+				s.log.Error(err, "could not list s3 buckets")
 				return errors.WrapPrefix(err, "could not list s3 buckets", 0)
 			}
 			buckets := res.Buckets
@@ -143,23 +143,22 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 
-		s.log.Debugf("Scanning bucket: %s", bucket)
+		s.log.Info("Scanning bucket", "bucket", bucket)
 		region, err := s3manager.GetBucketRegionWithClient(context.Background(), client, bucket)
 		if err != nil {
-			s.log.WithError(err).Errorf("could not get s3 region for bucket: %s", bucket)
+			s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
 			continue
 		}
 		var regionalClient *s3.S3
 		if region != "us-east-1" {
 			regionalClient, err = s.newClient(region)
 			if err != nil {
-				s.log.WithError(err).Error("could not make regional s3 client")
+				s.log.Error(err, "could not make regional s3 client")
 			}
 		} else {
 			regionalClient = client
 		}
-		// Forced prefix for testing
-		// pf := "public"
+
 		errorCount := sync.Map{}
 
 		err = regionalClient.ListObjectsV2PagesWithContext(
@@ -170,7 +169,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			})
 
 		if err != nil {
-			s.log.WithError(err).Errorf("could not list objects in s3 bucket: %s", bucket)
+			s.log.Error(err, "could not list objects in s3 bucket", "bucket", bucket)
 			return errors.WrapPrefix(err, fmt.Sprintf("could not list objects in s3 bucket: %s", bucket), 0)
 		}
 	}
@@ -188,9 +187,37 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			return
 		}
 
+		if obj == nil {
+			continue
+		}
+
+		// skip GLACIER and GLACIER_IR objects
+		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
+			s.log.V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass, "object", *obj.Key)
+			continue
+		}
+
+		// ignore large files
+		if *obj.Size > int64(250*common.MB) {
+			s.log.V(3).Info("Skipping %d byte file (over 250MB limit)", "object", *obj.Key)
+			return
+		}
+
+		// file empty file
+		if *obj.Size == 0 {
+			s.log.V(5).Info("Skipping 0 byte file", "object", *obj.Key)
+			return
+		}
+
+		// skip incompatible extensions
+		if common.SkipFile(*obj.Key) {
+			s.log.V(5).Info("Skipping file with incompatible extension", "object", *obj.Key)
+			return
+		}
+
 		err := sem.Acquire(ctx, 1)
 		if err != nil {
-			log.WithError(err).Error("could not acquire semaphore")
+			s.log.Error(err, "could not acquire semaphore")
 			continue
 		}
 		wg.Add(1)
@@ -198,12 +225,10 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			defer common.RecoverWithExit(ctx)
 			defer sem.Release(1)
 			defer wg.Done()
-			// defer log.Debugf("DONE - %s", *obj.Key)
 
 			if (*obj.Key)[len(*obj.Key)-1:] == "/" {
 				return
 			}
-			// log.Debugf("Object: %s", *obj.Key)
 
 			path := strings.Split(*obj.Key, "/")
 			prefix := strings.Join(path[:len(path)-1], "/")
@@ -213,17 +238,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				nErr = 0
 			}
 			if nErr.(int) > 3 {
-				log.Debugf("Skipped: %s", *obj.Key)
-				return
-			}
-
-			// ignore large files
-			if *obj.Size > int64(10*common.MB) {
-				return
-			}
-
-			// file is 0 bytes - likely no permissions - skipping
-			if *obj.Size == 0 {
+				s.log.V(2).Info("Skipped due to excessive errors", "object", *obj.Key)
 				return
 			}
 
@@ -237,7 +252,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			})
 			if err != nil {
 				if !strings.Contains(err.Error(), "AccessDenied") {
-					s.log.WithError(err).Errorf("could not get S3 object: %s", *obj.Key)
+					s.log.Error(err, "could not get S3 object", "object", *obj.Key)
 				}
 
 				nErr, ok := errorCount.Load(prefix)
@@ -245,25 +260,25 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 					nErr = 0
 				}
 				if nErr.(int) > 3 {
-					log.Debugf("Skipped: %s", *obj.Key)
+					s.log.V(3).Info("Skipped due to excessive errors", "object", *obj.Key)
 					return
 				}
 				nErr = nErr.(int) + 1
 				errorCount.Store(prefix, nErr)
 				// too many consective errors on this page
 				if nErr.(int) > 3 {
-					s.log.Warnf("Too many consecutive errors. Excluding %s", prefix)
+					s.log.V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
 				}
-				log.Debugf("Error Counts: %s:%d", prefix, nErr)
 				return
 			}
 
 			defer res.Body.Close()
 			reader, err := diskbufferreader.New(res.Body)
 			if err != nil {
-				log.WithError(err).Error("Could not create reader.")
+				s.log.Error(err, "Could not create reader.")
 				return
 			}
+			defer reader.Close()
 
 			email := "Unknown"
 			if obj.Owner != nil {
@@ -292,14 +307,14 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			}
 
 			if err := reader.Reset(); err != nil {
-				log.WithError(err).Error("Error resetting reader to start.")
+				s.log.Error(err, "Error resetting reader to start.")
 			}
 			reader.Stop()
 
 			chunk := *chunkSkel
 			chunkData, err := io.ReadAll(reader)
 			if err != nil {
-				log.WithError(err).Error("Could not read file data.")
+				s.log.Error(err, "Could not read file data.")
 				return
 			}
 			chunk.Data = chunkData

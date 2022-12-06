@@ -335,25 +335,21 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	var depth int64
-	var reachedBase = false
 
 	ctx.Logger().V(1).Info("scanning repo", "repo", urlMetadata, "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
-		ctx.Logger().V(5).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
+		if len(scanOptions.BaseHash) > 0 {
+			if commit.Hash == scanOptions.BaseHash {
+				ctx.Logger().V(1).Info("reached base commit", "commit", commit.Hash)
+				break
+			}
+		}
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			ctx.Logger().V(1).Info("reached max depth", "depth", depth)
 			break
 		}
 		depth++
-		if reachedBase && commit.Hash != scanOptions.BaseHash {
-			break
-		}
-		if len(scanOptions.BaseHash) > 0 {
-			if commit.Hash == scanOptions.BaseHash {
-				ctx.Logger().V(1).Info("reached base commit", "commit", commit.Hash)
-				reachedBase = true
-			}
-		}
+		ctx.Logger().V(5).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
 		for _, diff := range commit.Diffs {
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
@@ -408,7 +404,9 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
-		line := originalChunk.Bytes()
+		line := make([]byte, len(originalChunk.Bytes())+1)
+		copy(line, originalChunk.Bytes())
+		line[len(line)-1] = byte('\n')
 		if len(line) > sources.ChunkSize || len(line)+newChunkBuffer.Len() > sources.ChunkSize {
 			// Add oversize chunk info
 			if newChunkBuffer.Len() > 0 {
@@ -825,6 +823,7 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	if err != nil {
 		return err
 	}
+	defer reader.Close()
 
 	if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
 		return nil

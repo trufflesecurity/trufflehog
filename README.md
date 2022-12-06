@@ -86,7 +86,7 @@ trufflehog s3 --bucket=<bucket name> --only-verified
 + All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
   + That means no secrets were detected
 + Why is the scan is taking a long time when I scan a GitHub org
-  + Unathenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
+  + Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
 + It says a private key was verified, what does that mean?
   + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)  
 
@@ -130,7 +130,7 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo ht
 #### **Apple M1 users**
 
 The `linux/arm64` image is better to run on the M1 than the amd64 image.
-Even better is running the native darwin binary avilable, but there is not container image for that.
+Even better is running the native darwin binary available, but there is no container image for that.
 
 ```bash
 docker run --platform linux/arm64 -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys 
@@ -269,9 +269,9 @@ repos:
     - id: trufflehog
       name: TruffleHog
       description: Detect secrets in your data.
-      entry: bash -c 'trufflehog git file://. --only-verified --fail'
+      entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
       # For running trufflehog in docker, use the following entry instead:
-      # entry: bash -c 'docker run -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --only-verified --fail'
+      # entry: bash -c 'docker run -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --only-verified --fail'
       language: system
       stages: ["commit", "push"]
 ```
@@ -304,3 +304,10 @@ We have published some [documentation and tooling to get started on adding new s
 ## License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
+
+
+## Enterprise product
+
+Are you interested in continously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
+
+We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.

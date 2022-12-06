@@ -1,4 +1,4 @@
-package redis
+package rabbitmq
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/go-redis/redis"
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -18,16 +18,16 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\bredis://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\b(?:amqp:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"redis"}
+	return []string{"amqp"}
 }
 
-// FromData will find and optionally verify URI secrets in a given set of bytes.
+// FromData will find and optionally verify RabbitMQ secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -50,16 +50,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "********", -1))
+		redact := strings.TrimSpace(strings.Replace(parsedURL.String(), password, "********", -1))
 
 		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Redis,
+			DetectorType: detectorspb.DetectorType_RabbitMQ,
 			Raw:          []byte(urlMatch),
 			Redacted:     redact,
 		}
 
 		if verify {
-			s.Verified = verifyRedis(ctx, parsedURL)
+			_, err := amqp.Dial(urlMatch)
+			if err == nil {
+				s.Verified = true
+			}
 		}
 
 		if !s.Verified {
@@ -77,20 +80,4 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
-}
-
-func verifyRedis(ctx context.Context, u *url.URL) bool {
-	opt, err := redis.ParseURL(u.String())
-	if err != nil {
-		return false
-	}
-
-	client := redis.NewClient(opt)
-
-	status, err := client.Ping().Result()
-	if err == nil && status == "PONG" {
-		return true
-	}
-
-	return false
 }
