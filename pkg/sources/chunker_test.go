@@ -27,15 +27,15 @@ func TestChunker(t *testing.T) {
 
 	// Count chunks from looping using chunk size.
 	for {
-		baseChunkCount++
 		tmpChunk := make([]byte, ChunkSize)
 		_, err := reReader.Read(tmpChunk)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			t.Error(err)
+			t.Fatal(err)
 		}
+		baseChunkCount++
 	}
 	_ = reReader.Reset()
 
