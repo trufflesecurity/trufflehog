@@ -335,25 +335,21 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	var depth int64
-	var reachedBase = false
 
 	ctx.Logger().V(1).Info("scanning repo", "repo", urlMetadata, "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
-		ctx.Logger().V(5).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
+		if len(scanOptions.BaseHash) > 0 {
+			if commit.Hash == scanOptions.BaseHash {
+				ctx.Logger().V(1).Info("reached base commit", "commit", commit.Hash)
+				break
+			}
+		}
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			ctx.Logger().V(1).Info("reached max depth", "depth", depth)
 			break
 		}
 		depth++
-		if reachedBase && commit.Hash != scanOptions.BaseHash {
-			break
-		}
-		if len(scanOptions.BaseHash) > 0 {
-			if commit.Hash == scanOptions.BaseHash {
-				ctx.Logger().V(1).Info("reached base commit", "commit", commit.Hash)
-				reachedBase = true
-			}
-		}
+		ctx.Logger().V(5).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
 		for _, diff := range commit.Diffs {
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
