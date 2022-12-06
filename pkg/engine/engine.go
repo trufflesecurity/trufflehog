@@ -181,7 +181,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
-			fragStart, mdLine := fragmentFirstLine(chunk)
+			fragStart, mdLine := FragmentFirstLine(chunk)
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
@@ -230,10 +230,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							results = detectors.CleanResults(results)
 						}
 						for _, result := range results {
-							if isGitSource(chunk.SourceType) {
-								offset := FragmentLineOffset(chunk, &result)
-								*mdLine = fragStart + offset
-							}
+							SetResultLineNumber(chunk, &result, fragStart, mdLine)
 							result.DecoderType = decoderType
 							e.results <- detectors.CopyMetadata(chunk, result)
 
@@ -294,9 +291,9 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) int64 {
 	return 0
 }
 
-// fragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
+// FragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
 // chunk metadata.
-func fragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
+func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 	var fragmentStart *int64
 	switch metadata := chunk.SourceMetadata.GetData().(type) {
 	case *source_metadatapb.MetaData_Git:
@@ -313,4 +310,12 @@ func fragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 		return 0, nil
 	}
 	return *fragmentStart, fragmentStart
+}
+
+// SetResultLineNumber sets the line number in the provided result.
+func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) {
+	if isGitSource(chunk.SourceType) {
+		offset := FragmentLineOffset(chunk, result)
+		*mdLine = fragStart + offset
+	}
 }
