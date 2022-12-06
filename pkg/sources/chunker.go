@@ -37,10 +37,10 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 			}
 			peekData, _ := reader.Peek(PeekSize)
 			chunk.Data = append(chunkBytes[:n], peekData...)
-			chunkChan <- &chunk
 			if errors.Is(err, io.EOF) {
 				break
 			}
+			chunkChan <- &chunk
 		}
 	}()
 	return chunkChan
