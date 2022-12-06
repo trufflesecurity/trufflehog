@@ -238,23 +238,11 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			name:    "remote repo, limited",
 			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
 			expectedChunkData: map[string]*byteCompare{
-				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws":  {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
-				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
+				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws": {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
 			},
 			scanOptions: ScanOptions{
 				HeadHash: "70001020fab32b1fcf2f1f0e5c66424eae649826",
 				BaseHash: "a6f8aa55736d4a85be31a0048a4607396898647a",
-			},
-		},
-		{
-			name:    "remote repo, base ahead of head",
-			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
-			expectedChunkData: map[string]*byteCompare{
-				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
-			},
-			scanOptions: ScanOptions{
-				HeadHash: "a6f8aa55736d4a85be31a0048a4607396898647a",
-				BaseHash: "70001020fab32b1fcf2f1f0e5c66424eae649826",
 			},
 		},
 		{
