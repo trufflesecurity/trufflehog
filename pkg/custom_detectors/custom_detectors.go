@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -116,6 +117,14 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 			req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
 			if err != nil {
 				continue
+			}
+			for _, header := range verifyConfig.GetHeaders() {
+				key, value, found := strings.Cut(header, ":")
+				if !found {
+					// Should be unreachable due to validation.
+					continue
+				}
+				req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
 			}
 			res, err := httpClient.Do(req)
 			if err != nil {
