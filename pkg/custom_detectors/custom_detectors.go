@@ -104,7 +104,9 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 			continue
 		}
 		// Verify via webhook.
-		jsonBody, err := json.Marshal(match)
+		jsonBody, err := json.Marshal(map[string]map[string][]string{
+			c.GetName(): match,
+		})
 		if err != nil {
 			continue
 		}
