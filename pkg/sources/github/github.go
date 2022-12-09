@@ -325,9 +325,6 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
 				log.WithError(err).Errorf("error fetching repos for org: %s", org)
 			}
-			if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
-				log.WithError(err).Errorf("error fetching repos for user: %s", ghUser.GetLogin())
-			}
 
 			if s.conn.ScanUsers {
 				err := s.addMembersByOrg(ctx, org)
@@ -358,6 +355,15 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 				log.WithError(err).Error("error fetching repos by org")
 			}
 
+			if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
+				log.WithError(err).Errorf("error fetching repos for user: %s", ghUser.GetLogin())
+			}
+
+			// TODO: Test it actually works to list org gists like this.
+			if err := s.addGistsByUser(ctx, org); err != nil {
+				log.WithError(err).Errorf("error fetching gists by org: %s", org)
+			}
+
 			if s.conn.ScanUsers {
 				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
@@ -366,24 +372,20 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 				}
 			}
 		}
-	}
 
-	if s.conn.ScanUsers {
-		log.Infof("Adding repos from %d members in %d organizations.", len(s.members), len(s.orgs))
-		s.addReposForMembers(ctx)
-	} else {
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
 		if err := s.addGistsByUser(ctx, ghUser.GetLogin()); err != nil {
 			log.WithError(err).Errorf("error fetching gists for user %s", ghUser.GetLogin())
 		}
-		for _, org := range s.orgs {
-			// TODO: Test it actually works to list org gists like this.
-			if err := s.addGistsByUser(ctx, org); err != nil {
-				log.WithError(err).Errorf("error fetching gists by org: %s", org)
-			}
-		}
 	}
+
+	if s.conn.ScanUsers {
+		log.Infof("Adding repos from %d members in %d organizations.", len(s.members), len(s.orgs))
+		s.addReposForMembers(ctx)
+		return nil
+	}
+
 	return nil
 }
 
