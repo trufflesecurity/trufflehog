@@ -347,7 +347,11 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 
 func (s *Source) ignoreRepo(r string) bool {
 	for _, ignore := range s.ignoreRepos {
-		g := glob.MustCompile(ignore)
+		g, err := glob.Compile(ignore)
+		if err != nil {
+			log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
+			continue
+		}
 		if g.Match(r) {
 			log.Debugf("Ignoring repo %s", r)
 			return true

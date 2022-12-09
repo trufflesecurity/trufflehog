@@ -746,7 +746,11 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 
 func (s *Source) ignoreRepo(r string) bool {
 	for _, ignore := range s.ignoreRepos {
-		g := glob.MustCompile(ignore)
+		g, err := glob.Compile(ignore)
+		if err != nil {
+			s.log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
+			continue
+		}
 		if g.Match(r) {
 			s.log.Debugf("ignoring repo %s", r)
 			return true
