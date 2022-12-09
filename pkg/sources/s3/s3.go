@@ -15,7 +15,7 @@ import (
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	"golang.org/x/sync/semaphore"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -29,16 +29,16 @@ import (
 )
 
 type Source struct {
-	name        string
-	sourceId    int64
-	jobId       int64
-	verify      bool
-	concurrency int
-	aCtx        context.Context
-	log         logr.Logger
+	name     string
+	sourceId int64
+	jobId    int64
+	verify   bool
+	aCtx     context.Context
+	log      logr.Logger
 	sources.Progress
 	errorCount *sync.Map
 	conn       *sourcespb.S3
+	jobPool    *errgroup.Group
 }
 
 // Ensure the Source satisfies the interface at compile time
@@ -66,7 +66,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
-	s.concurrency = concurrency
+	s.jobPool = &errgroup.Group{}
+	s.jobPool.SetLimit(concurrency)
 	s.errorCount = &sync.Map{}
 
 	var conn sourcespb.S3
@@ -108,23 +109,23 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	client, err := s.newClient("us-east-1")
+	const defaultAWSRegion = "us-east-1"
+
+	client, err := s.newClient(defaultAWSRegion)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not create s3 client", 0)
 	}
 
-	bucketsToScan := []string{}
+	var bucketsToScan []string
 
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.S3_AccessKey, *sourcespb.S3_CloudEnvironment:
 		if len(s.conn.Buckets) == 0 {
 			res, err := client.ListBuckets(&s3.ListBucketsInput{})
 			if err != nil {
-				s.log.Error(err, "could not list s3 buckets")
-				return errors.WrapPrefix(err, "could not list s3 buckets", 0)
+				return fmt.Errorf("could not list s3 buckets: %w", err)
 			}
-			buckets := res.Buckets
-			for _, bucket := range buckets {
+			for _, bucket := range res.Buckets {
 				bucketsToScan = append(bucketsToScan, *bucket.Name)
 			}
 		} else {
@@ -150,7 +151,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 		var regionalClient *s3.S3
-		if region != "us-east-1" {
+		if region != defaultAWSRegion {
 			regionalClient, err = s.newClient(region)
 			if err != nil {
 				s.log.Error(err, "could not make regional s3 client")
@@ -170,7 +171,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 		if err != nil {
 			s.log.Error(err, "could not list objects in s3 bucket", "bucket", bucket)
-			return errors.WrapPrefix(err, fmt.Sprintf("could not list objects in s3 bucket: %s", bucket), 0)
 		}
 	}
 	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s", s.name), "")
@@ -180,9 +180,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 // pageChunker emits chunks onto the given channel from a page
 func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan *sources.Chunk, bucket string, page *s3.ListObjectsV2Output, errorCount *sync.Map) {
-	sem := semaphore.NewWeighted(int64(s.concurrency))
-	var wg sync.WaitGroup
 	for _, obj := range page.Contents {
+		obj := obj
 		if common.IsDone(ctx) {
 			return
 		}
@@ -215,19 +214,12 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			return
 		}
 
-		err := sem.Acquire(ctx, 1)
-		if err != nil {
-			s.log.Error(err, "could not acquire semaphore")
-			continue
-		}
-		wg.Add(1)
-		go func(ctx context.Context, wg *sync.WaitGroup, sem *semaphore.Weighted, obj *s3.Object) {
+		s.jobPool.Go(func() error {
 			defer common.RecoverWithExit(ctx)
-			defer sem.Release(1)
-			defer wg.Done()
 
 			if (*obj.Key)[len(*obj.Key)-1:] == "/" {
-				return
+				s.log.V(5).Info("Skipping directory", "object", *obj.Key)
+				return nil
 			}
 
 			path := strings.Split(*obj.Key, "/")
@@ -239,7 +231,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			}
 			if nErr.(int) > 3 {
 				s.log.V(2).Info("Skipped due to excessive errors", "object", *obj.Key)
-				return
+				return nil
 			}
 
 			// files break with spaces, must replace with +
@@ -261,7 +253,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				}
 				if nErr.(int) > 3 {
 					s.log.V(3).Info("Skipped due to excessive errors", "object", *obj.Key)
-					return
+					return nil
 				}
 				nErr = nErr.(int) + 1
 				errorCount.Store(prefix, nErr)
@@ -269,14 +261,14 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				if nErr.(int) > 3 {
 					s.log.V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
 				}
-				return
+				return nil
 			}
 
 			defer res.Body.Close()
 			reader, err := diskbufferreader.New(res.Body)
 			if err != nil {
 				s.log.Error(err, "Could not create reader.")
-				return
+				return nil
 			}
 			defer reader.Close()
 
@@ -303,7 +295,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				Verify: s.verify,
 			}
 			if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
-				return
+				return nil
 			}
 
 			if err := reader.Reset(); err != nil {
@@ -315,7 +307,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			chunkData, err := io.ReadAll(reader)
 			if err != nil {
 				s.log.Error(err, "Could not read file data.")
-				return
+				return nil
 			}
 			chunk.Data = chunkData
 			chunksChan <- &chunk
@@ -327,9 +319,12 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			if nErr.(int) > 0 {
 				errorCount.Store(prefix, 0)
 			}
-		}(ctx, &wg, sem, obj)
+			return nil
+		})
+
+		_ = s.jobPool.Wait()
+		s.log.V(5).Info("Finished processing object", "object", *obj.Key)
 	}
-	wg.Wait()
 }
 
 // S3 links currently have the general format of:
