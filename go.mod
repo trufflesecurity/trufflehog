@@ -30,6 +30,7 @@ require (
 	github.com/go-logr/zapr v1.2.3
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.7.0
+	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-github/v42 v42.0.0

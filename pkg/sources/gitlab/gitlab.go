@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
+	"github.com/gobwas/glob"
 	log "github.com/sirupsen/logrus"
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/exp/slices"
@@ -344,6 +345,21 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	return errs
 }
 
+func (s *Source) ignoreRepo(r string) bool {
+	for _, ignore := range s.ignoreRepos {
+		g, err := glob.Compile(ignore)
+		if err != nil {
+			log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
+			continue
+		}
+		if g.Match(r) {
+			log.Debugf("Ignoring repo %s", r)
+			return true
+		}
+	}
+	return false
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// Start client.
@@ -370,10 +386,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
-			if slices.Contains(s.ignoreRepos, prj.PathWithNamespace) {
-				log.Debugf("Ignoring repo %s", prj.PathWithNamespace)
+			if s.ignoreRepo(prj.PathWithNamespace) {
 				continue
 			}
+
 			// Ensure the urls are valid before adding them to the repo list.
 			_, err := url.Parse(prj.HTTPURLToRepo)
 			if err != nil {

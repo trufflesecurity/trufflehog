@@ -71,7 +71,7 @@ func TestAddReposByOrg(t *testing.T) {
 		})
 
 	s := initTestSource(nil)
-	s.ignoreRepos = []string{"secret/super-secret-repo2"}
+	s.ignoreRepos = []string{"secret/super-*-repo2"}
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.addRepos(context.TODO(), "super-secret-org", s.getReposByOrg)
 	assert.Nil(t, err)

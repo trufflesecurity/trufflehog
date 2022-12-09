@@ -17,9 +17,9 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
+	"github.com/gobwas/glob"
 	"github.com/google/go-github/v42/github"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -745,9 +745,16 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 }
 
 func (s *Source) ignoreRepo(r string) bool {
-	if slices.Contains(s.ignoreRepos, r) {
-		s.log.Debugf("ignoring repo %s", r)
-		return true
+	for _, ignore := range s.ignoreRepos {
+		g, err := glob.Compile(ignore)
+		if err != nil {
+			s.log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
+			continue
+		}
+		if g.Match(r) {
+			s.log.Debugf("ignoring repo %s", r)
+			return true
+		}
 	}
 	return false
 }
