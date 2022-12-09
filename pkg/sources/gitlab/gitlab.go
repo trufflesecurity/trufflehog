@@ -345,6 +345,17 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	return errs
 }
 
+func (s *Source) ignoreRepo(r string) bool {
+	for _, ignore := range s.ignoreRepos {
+		g := glob.MustCompile(ignore)
+		if g.Match(r) {
+			log.Debugf("Ignoring repo %s", r)
+			return true
+		}
+	}
+	return false
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// Start client.
@@ -371,16 +382,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
-			ignored := false
-			for _, ignore := range s.ignoreRepos {
-				g := glob.MustCompile(ignore)
-				if g.Match(prj.PathWithNamespace) {
-					ignored = true
-					break
-				}
-			}
-			if ignored {
-				log.Debugf("Ignoring repo %s", prj.PathWithNamespace)
+			if s.ignoreRepo(prj.PathWithNamespace) {
 				continue
 			}
 
