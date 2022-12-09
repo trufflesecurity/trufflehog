@@ -426,8 +426,8 @@ github.com/trufflesecurity/overseer v1.1.7-custom5/go.mod h1:nT9w37AiO1Nop2VhVhN
 github.com/ulikunitz/xz v0.5.6/go.mod h1:2bypXElzHzzJZwzH67Y6wb67pO62Rzfn7BSiF4ABRW8=
 github.com/ulikunitz/xz v0.5.10 h1:t92gobL9l3HE202wg3rlk19F6X+JOxl9BBrCCMYEYd8=
 github.com/ulikunitz/xz v0.5.10/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
-github.com/xanzy/go-gitlab v0.74.0 h1:Ha1cokbjn0PXy6B19t3W324dwM4AOT52fuHr7nERPrc=
-github.com/xanzy/go-gitlab v0.74.0/go.mod h1:d/a0vswScO7Agg1CZNz15Ic6SSvBG9vfw8egL99t4kA=
+github.com/xanzy/go-gitlab v0.76.0 h1:mkmuB27RDVZY/iXR61pEUfIqJ15Iivfu1kc3KZtBICI=
+github.com/xanzy/go-gitlab v0.76.0/go.mod h1:d/a0vswScO7Agg1CZNz15Ic6SSvBG9vfw8egL99t4kA=
 github.com/xanzy/ssh-agent v0.3.0 h1:wUMzuKtKilRgBAD1sUb8gOwwRr2FGoBVumcjoOACClI=
 github.com/xanzy/ssh-agent v0.3.0/go.mod h1:3s9xbODqPuuhK9JV1R321M/FlMZSBvE5aY6eAcqrDh0=
 github.com/xdg-go/pbkdf2 v1.0.0 h1:Su7DPu48wXMwC3bs7MCNG+z4FhcyEuz5dlvchbq0B0c=

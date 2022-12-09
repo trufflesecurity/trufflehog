@@ -51,7 +51,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/xanzy/go-gitlab v0.74.0
+	github.com/xanzy/go-gitlab v0.76.0
 	go.mongodb.org/mongo-driver v1.11.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
