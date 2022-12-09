@@ -322,10 +322,11 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			return nil
 		})
 
-		s.log.V(5).Info("Finished processing object", "object", *obj.Key)
+		s.log.V(3).Info("Finished processing object", "object", *obj.Key)
 	}
 
 	_ = s.jobPool.Wait()
+	s.log.V(1).Info("Finished processing page", "page", page.Name)
 }
 
 // S3 links currently have the general format of:
