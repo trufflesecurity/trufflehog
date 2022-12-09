@@ -46,7 +46,7 @@ func TestSource_Scan(t *testing.T) {
 		wantErr          bool
 	}{
 		{
-			name: "token auth, enumerate repo",
+			name: "token auth, enumerate repo, with explicit ignore",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitLab{
@@ -54,6 +54,23 @@ func TestSource_Scan(t *testing.T) {
 						Token: token,
 					},
 					IgnoreRepos: []string{"tes1188/learn-gitlab"},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+				SourceName: "test source",
+			},
+			wantReposScanned: 2,
+		},
+		{
+			name: "token auth, enumerate repo, with glob ignore",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitLab{
+					Credential: &sourcespb.GitLab_Token{
+						Token: token,
+					},
+					IgnoreRepos: []string{"tes1188/*-gitlab"},
 				},
 			},
 			wantChunk: &sources.Chunk{
