@@ -378,6 +378,7 @@ def find_strings(git_url, since_commit=None, max_depth=1000000, printJson=False,
     output["clone_uri"] = git_url
     output["issues_path"] = output_dir
     if not repo_path:
+        repo.close()
         shutil.rmtree(project_path, onerror=del_rw)
     return output
 

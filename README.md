@@ -1,27 +1,27 @@
 
 
 # truffleHog
-[![codecov](https://codecov.io/gh/dxa4481/truffleHog/branch/master/graph/badge.svg)](https://codecov.io/gh/dxa4481/truffleHog)
+[![codecov](https://codecov.io/gh/trufflesecurity/truffleHog/branch/master/graph/badge.svg)](https://codecov.io/gh/trufflesecurity/truffleHog)
 
 Searches through git repositories for secrets, digging deep into commit history and branches. This is effective at finding secrets accidentally committed.
 
 ## Join The Slack
 Have questions? Feedback? Jump in slack and hang out with me 
 
-https://join.slack.com/t/trufflehog-community/shared_invite/zt-nzznzf8w-y1Lg4PnnLupzlYuwq_AUHA
+https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ
 
 ## NEW
 truffleHog previously functioned by running entropy checks on git diffs. This functionality still exists, but high signal regex checks have been added, and the ability to suppress entropy checking has also been added.
 
 
 ```
-truffleHog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
+trufflehog --regex --entropy=False https://github.com/dxa4481/truffleHog.git
 ```
 
 or
 
 ```
-truffleHog file:///user/dxa4481/codeprojects/truffleHog/
+trufflehog file:///user/dxa4481/codeprojects/truffleHog/
 ```
 
 With the `--include_paths` and `--exclude_paths` options, it is also possible to limit scanning to a subset of objects in the Git history by defining regular expressions (one per line) in a file to match the targeted object paths. To illustrate, see the example include and exclude files below:
