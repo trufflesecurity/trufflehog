@@ -15,7 +15,6 @@ import (
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -40,7 +39,6 @@ type Source struct {
 	sources.Progress
 	errorCount *sync.Map
 	conn       *sourcespb.S3
-	jobPool    *errgroup.Group
 }
 
 // Ensure the Source satisfies the interface at compile time
