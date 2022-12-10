@@ -67,7 +67,7 @@ func TestSource_Chunks(t *testing.T) {
 			var cancelOnce sync.Once
 			defer cancelOnce.Do(cancel)
 
-			s := &Source{}
+			s := Source{}
 			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)

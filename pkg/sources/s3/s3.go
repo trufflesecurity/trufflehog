@@ -124,7 +124,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			if err != nil {
 				return fmt.Errorf("could not list s3 buckets: %w", err)
 			}
-			for _, bucket := range res.Buckets {
+			buckets := res.Buckets
+			for _, bucket := range buckets {
 				bucketsToScan = append(bucketsToScan, *bucket.Name)
 			}
 		} else {
