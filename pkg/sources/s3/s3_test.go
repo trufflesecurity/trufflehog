@@ -67,7 +67,7 @@ func TestSource_Chunks(t *testing.T) {
 			var cancelOnce sync.Once
 			defer cancelOnce.Do(cancel)
 
-			s := Source{}
+			s := &Source{}
 			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
@@ -75,7 +75,7 @@ func TestSource_Chunks(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 10)
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return

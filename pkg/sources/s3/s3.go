@@ -16,6 +16,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -29,12 +30,13 @@ import (
 )
 
 type Source struct {
-	name     string
-	sourceId int64
-	jobId    int64
-	verify   bool
-	aCtx     context.Context
-	log      logr.Logger
+	name        string
+	sourceId    int64
+	jobId       int64
+	verify      bool
+	concurrency int
+	aCtx        context.Context
+	log         logr.Logger
 	sources.Progress
 	errorCount *sync.Map
 	conn       *sourcespb.S3
@@ -66,8 +68,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
-	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
+	s.concurrency = concurrency
 	s.errorCount = &sync.Map{}
 
 	var conn sourcespb.S3
@@ -180,8 +181,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 // pageChunker emits chunks onto the given channel from a page
 func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan *sources.Chunk, bucket string, page *s3.ListObjectsV2Output, errorCount *sync.Map) {
+	sem := semaphore.NewWeighted(int64(s.concurrency))
+	var wg sync.WaitGroup
 	for _, obj := range page.Contents {
-		obj := obj
 		if common.IsDone(ctx) {
 			return
 		}
@@ -214,12 +216,19 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			return
 		}
 
-		s.jobPool.Go(func() error {
+		err := sem.Acquire(ctx, 1)
+		if err != nil {
+			s.log.Error(err, "could not acquire semaphore")
+			continue
+		}
+		wg.Add(1)
+		go func(ctx context.Context, wg *sync.WaitGroup, sem *semaphore.Weighted, obj *s3.Object) {
 			defer common.RecoverWithExit(ctx)
+			defer sem.Release(1)
+			defer wg.Done()
 
 			if (*obj.Key)[len(*obj.Key)-1:] == "/" {
-				s.log.V(5).Info("Skipping directory", "object", *obj.Key)
-				return nil
+				return
 			}
 
 			path := strings.Split(*obj.Key, "/")
@@ -231,7 +240,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			}
 			if nErr.(int) > 3 {
 				s.log.V(2).Info("Skipped due to excessive errors", "object", *obj.Key)
-				return nil
+				return
 			}
 
 			// files break with spaces, must replace with +
@@ -253,7 +262,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				}
 				if nErr.(int) > 3 {
 					s.log.V(3).Info("Skipped due to excessive errors", "object", *obj.Key)
-					return nil
+					return
 				}
 				nErr = nErr.(int) + 1
 				errorCount.Store(prefix, nErr)
@@ -261,14 +270,14 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				if nErr.(int) > 3 {
 					s.log.V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
 				}
-				return nil
+				return
 			}
 
 			defer res.Body.Close()
 			reader, err := diskbufferreader.New(res.Body)
 			if err != nil {
 				s.log.Error(err, "Could not create reader.")
-				return nil
+				return
 			}
 			defer reader.Close()
 
@@ -295,7 +304,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				Verify: s.verify,
 			}
 			if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
-				return nil
+				return
 			}
 
 			if err := reader.Reset(); err != nil {
@@ -307,7 +316,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			chunkData, err := io.ReadAll(reader)
 			if err != nil {
 				s.log.Error(err, "Could not read file data.")
-				return nil
+				return
 			}
 			chunk.Data = chunkData
 			chunksChan <- &chunk
@@ -319,14 +328,9 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			if nErr.(int) > 0 {
 				errorCount.Store(prefix, 0)
 			}
-			return nil
-		})
-
-		s.log.V(3).Info("Finished processing object", "object", *obj.Key)
+		}(ctx, &wg, sem, obj)
 	}
-
-	_ = s.jobPool.Wait()
-	s.log.V(1).Info("Finished processing page", "page", page.Name)
+	wg.Wait()
 }
 
 // S3 links currently have the general format of:
