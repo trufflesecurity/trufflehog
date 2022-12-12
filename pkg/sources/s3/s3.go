@@ -108,20 +108,21 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	client, err := s.newClient("us-east-1")
+	const defaultAWSRegion = "us-east-1"
+
+	client, err := s.newClient(defaultAWSRegion)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not create s3 client", 0)
 	}
 
-	bucketsToScan := []string{}
+	var bucketsToScan []string
 
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.S3_AccessKey, *sourcespb.S3_CloudEnvironment:
 		if len(s.conn.Buckets) == 0 {
 			res, err := client.ListBuckets(&s3.ListBucketsInput{})
 			if err != nil {
-				s.log.Error(err, "could not list s3 buckets")
-				return errors.WrapPrefix(err, "could not list s3 buckets", 0)
+				return fmt.Errorf("could not list s3 buckets: %w", err)
 			}
 			buckets := res.Buckets
 			for _, bucket := range buckets {
@@ -150,7 +151,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 		var regionalClient *s3.S3
-		if region != "us-east-1" {
+		if region != defaultAWSRegion {
 			regionalClient, err = s.newClient(region)
 			if err != nil {
 				s.log.Error(err, "could not make regional s3 client")
@@ -170,7 +171,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 		if err != nil {
 			s.log.Error(err, "could not list objects in s3 bucket", "bucket", bucket)
-			return errors.WrapPrefix(err, fmt.Sprintf("could not list objects in s3 bucket: %s", bucket), 0)
 		}
 	}
 	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s", s.name), "")
