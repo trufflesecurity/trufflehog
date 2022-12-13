@@ -93,7 +93,7 @@ var (
 	syslogTLSKey   = syslogScan.Flag("key", "Path to TLS key.").String()
 	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").String()
 
-	stderrLevel = zap.NewAtomicLevel()
+	logLevel = zap.NewAtomicLevel()
 )
 
 func init() {
@@ -113,9 +113,13 @@ func init() {
 	}
 	switch {
 	case *trace:
+		log.SetLevel(5)
+		log.SetLevelForControl(logLevel, 5)
 		logrus.SetLevel(logrus.TraceLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
 	case *debug:
+		log.SetLevel(3)
+		log.SetLevelForControl(logLevel, 3)
 		logrus.SetLevel(logrus.DebugLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
 	default:
@@ -172,11 +176,11 @@ func run(state overseer.State) {
 			}
 		}()
 	}
-	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr, log.WithLeveler(stderrLevel)))
-	context.SetDefaultLogger(logger)
+	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr, log.WithLeveler(logLevel)))
+	ctx := context.WithLogger(context.TODO(), logger)
+
 	defer func() { _ = sync() }()
 
-	ctx := context.TODO()
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
