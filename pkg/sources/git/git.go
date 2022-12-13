@@ -267,20 +267,29 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 	gitArgs = append(gitArgs, args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
+	safeUrl, err := stripPassword(gitUrl)
+	if err != nil {
+		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
+	}
+	logger := ctx.Logger().WithValues(
+		"subcommand", "git clone",
+		"repo", safeUrl,
+		"path", clonePath,
+		"args", args,
+	)
+
+	// Execute command and wait for the stdout / stderr.
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
 		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
 	}
+	logger.V(3).Info("git subcommand finished", "output", string(output))
 
 	if cloneCmd.ProcessState == nil {
 		return "", nil, errors.New("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		safeUrl, err := stripPassword(gitUrl)
-		if err != nil {
-			ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
-		}
-		ctx.Logger().V(1).Info("git clone failed", "error", err, "repo", safeUrl, "output", string(output))
+		logger.V(1).Info("git clone failed", "error", err)
 		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
@@ -289,7 +298,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
 
-	ctx.Logger().V(1).Info("cloned repo", "repo", gitUrl, "clone-path", clonePath)
+	logger.V(1).Info("successfully cloned repo")
 	return clonePath, repo, nil
 }
 
@@ -336,20 +345,21 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 
-	ctx.Logger().V(1).Info("scanning repo", "repo", urlMetadata, "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
+	logger := ctx.Logger().WithValues("repo", urlMetadata)
+	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
 		if len(scanOptions.BaseHash) > 0 {
 			if commit.Hash == scanOptions.BaseHash {
-				ctx.Logger().V(1).Info("reached base commit", "commit", commit.Hash)
+				logger.V(1).Info("reached base commit", "commit", commit.Hash)
 				break
 			}
 		}
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-			ctx.Logger().V(1).Info("reached max depth", "depth", depth)
+			logger.V(1).Info("reached max depth", "depth", depth)
 			break
 		}
 		depth++
-		ctx.Logger().V(5).Info("scanning commit", "commit", commit.Hash, "message", commit.Message)
+		logger.V(5).Info("scanning commit", "commit", commit.Hash)
 		for _, diff := range commit.Diffs {
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
@@ -376,7 +386,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					Verify:         s.verify,
 				}
 				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
-					ctx.Logger().V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
+					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 				continue
 			}
