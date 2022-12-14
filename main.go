@@ -118,8 +118,8 @@ func init() {
 		logrus.SetLevel(logrus.TraceLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
 	case *debug:
-		log.SetLevel(3)
-		log.SetLevelForControl(logLevel, 3)
+		log.SetLevel(2)
+		log.SetLevelForControl(logLevel, 2)
 		logrus.SetLevel(logrus.DebugLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
 	default:
