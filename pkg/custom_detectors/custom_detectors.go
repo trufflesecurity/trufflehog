@@ -1,151 +1,226 @@
 package custom_detectors
 
 import (
-	"fmt"
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-// customRegex is a CustomRegex that is guaranteed to be valid.
-type customRegex *custom_detectorspb.CustomRegex
+// The maximum number of matches from one chunk. This const is used when
+// permutating each regex match to protect the scanner from doing too much work
+// for poorly defined regexps.
+const maxTotalMatches = 100
 
-func ValidateKeywords(keywords []string) error {
-	if len(keywords) == 0 {
-		return fmt.Errorf("no keywords")
-	}
-
-	for _, keyword := range keywords {
-		if len(keyword) == 0 {
-			return fmt.Errorf("empty keyword")
-		}
-	}
-	return nil
+// customRegexWebhook is a CustomRegex with webhook validation that is
+// guaranteed to be valid (assuming the data is not changed after
+// initialization).
+type customRegexWebhook struct {
+	*custom_detectorspb.CustomRegex
 }
 
-func ValidateRegex(regex map[string]string) error {
-	if len(regex) == 0 {
-		return fmt.Errorf("no regex")
-	}
+// Ensure the Scanner satisfies the interface at compile time.
+var _ detectors.Detector = (*customRegexWebhook)(nil)
 
-	for _, r := range regex {
-		if _, err := regexp.Compile(r); err != nil {
-			return fmt.Errorf("invalid regex %q", r)
-		}
-	}
-
-	return nil
-}
-
-func ValidateVerifyEndpoint(endpoint string, unsafe bool) error {
-	if len(endpoint) == 0 {
-		return fmt.Errorf("no endpoint")
-	}
-
-	if strings.HasPrefix(endpoint, "http://") && !unsafe {
-		return fmt.Errorf("http endpoint must have unsafe=true")
-	}
-	return nil
-}
-
-func ValidateVerifyHeaders(headers []string) error {
-	for _, header := range headers {
-		if !strings.Contains(header, ":") {
-			return fmt.Errorf("header %q must contain a colon", header)
-		}
-	}
-	return nil
-}
-
-func ValidateVerifyRanges(ranges []string) error {
-	const httpLowerBound = 100
-	const httpUpperBound = 599
-
-	for _, successRange := range ranges {
-		if !strings.Contains(successRange, "-") {
-			httpCode, err := strconv.Atoi(successRange)
-			if err != nil {
-				return fmt.Errorf("unable to convert http code to int %q", successRange)
-			}
-
-			if httpCode < httpLowerBound || httpCode > httpUpperBound {
-				return fmt.Errorf("invalid http status code %q", successRange)
-			}
-
-			continue
-		}
-
-		httpRange := strings.Split(successRange, "-")
-		if len(httpRange) != 2 {
-			return fmt.Errorf("invalid range format %q", successRange)
-		}
-
-		lowerBound, err := strconv.Atoi(httpRange[0])
-		if err != nil {
-			return fmt.Errorf("unable to convert lower bound to int %q", successRange)
-		}
-
-		upperBound, err := strconv.Atoi(httpRange[1])
-		if err != nil {
-			return fmt.Errorf("unable to convert upper bound to int %q", successRange)
-		}
-
-		if lowerBound > upperBound {
-			return fmt.Errorf("lower bound greater than upper bound on range %q", successRange)
-		}
-
-		if lowerBound < httpLowerBound || upperBound > httpUpperBound {
-			return fmt.Errorf("invalid http status code range %q", successRange)
-		}
-	}
-	return nil
-}
-
-func ValidateRegexVars(regex map[string]string, body ...string) error {
-	for _, b := range body {
-		matches := NewRegexVarString(b).variables
-
-		for match := range matches {
-			if _, ok := regex[match]; !ok {
-				return fmt.Errorf("body %q contains an unknown variable", b)
-			}
-		}
-	}
-
-	return nil
-}
-
-func NewCustomRegex(pb *custom_detectorspb.CustomRegex) (customRegex, error) {
+// NewWebhookCustomRegex initializes and validates a customRegexWebhook. An
+// unexported type is intentionally returned here to ensure the values have
+// been validated.
+func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*customRegexWebhook, error) {
 	// TODO: Return all validation errors.
 	if err := ValidateKeywords(pb.Keywords); err != nil {
 		return nil, err
 	}
-
 	if err := ValidateRegex(pb.Regex); err != nil {
 		return nil, err
 	}
 
 	for _, verify := range pb.Verify {
-
 		if err := ValidateVerifyEndpoint(verify.Endpoint, verify.Unsafe); err != nil {
 			return nil, err
 		}
-
 		if err := ValidateVerifyHeaders(verify.Headers); err != nil {
 			return nil, err
 		}
-
-		if err := ValidateVerifyRanges(verify.SuccessRanges); err != nil {
-			return nil, err
-		}
-
-		if err := ValidateRegexVars(pb.Regex, append(verify.Headers, verify.Endpoint)...); err != nil {
-			return nil, err
-		}
-
 	}
 
-	return pb, nil
+	// TODO: Copy only necessary data out of pb.
+	return &customRegexWebhook{pb}, nil
+}
+
+var httpClient = common.SaneHttpClient()
+
+func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	dataStr := string(data)
+	regexMatches := make(map[string][][]string, len(c.GetRegex()))
+
+	// Find all submatches for each regex.
+	for name, regex := range c.GetRegex() {
+		regex, err := regexp.Compile(regex)
+		if err != nil {
+			// TODO: Log error.
+			// This should never happen due to validation.
+			continue
+		}
+		regexMatches[name] = regex.FindAllStringSubmatch(dataStr, -1)
+	}
+
+	// Permutate each individual match.
+	// {
+	//    "foo": [["match1"]]
+	//    "bar": [["match2"], ["match3"]]
+	// }
+	// becomes
+	// [
+	//    {"foo": ["match1"], "bar": ["match2"]},
+	//    {"foo": ["match1"], "bar": ["match3"]},
+	// ]
+	matches := permutateMatches(regexMatches)
+
+	// Create result object and test for verification.
+	for _, match := range matches {
+		if common.IsDone(ctx) {
+			// TODO: Log we're possibly leaving out results.
+			return results, nil
+		}
+		var raw string
+		for _, values := range match {
+			// values[0] contains the entire regex match.
+			raw += values[0]
+		}
+		result := detectors.Result{
+			DetectorType: detectorspb.DetectorType_CustomRegex,
+			Raw:          []byte(raw),
+		}
+
+		if isKnownFalsePositive(match) {
+			continue
+		}
+		if !verify {
+			results = append(results, result)
+			continue
+		}
+		// Verify via webhook.
+		jsonBody, err := json.Marshal(map[string]map[string][]string{
+			c.GetName(): match,
+		})
+		if err != nil {
+			continue
+		}
+		// Try each config until we successfully verify.
+		for _, verifyConfig := range c.GetVerify() {
+			if common.IsDone(ctx) {
+				// TODO: Log we're possibly leaving out results.
+				return results, nil
+			}
+			req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
+			if err != nil {
+				continue
+			}
+			for _, header := range verifyConfig.GetHeaders() {
+				key, value, found := strings.Cut(header, ":")
+				if !found {
+					// Should be unreachable due to validation.
+					continue
+				}
+				req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
+			}
+			res, err := httpClient.Do(req)
+			if err != nil {
+				continue
+			}
+			// TODO: Read response body.
+			res.Body.Close()
+			if res.StatusCode == http.StatusOK {
+				result.Verified = true
+				break
+			}
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+func (c *customRegexWebhook) Keywords() []string {
+	return c.GetKeywords()
+}
+
+// productIndices produces a permutation of indices for each length. Example:
+// productIndices(3, 2) -> [[0 0] [1 0] [2 0] [0 1] [1 1] [2 1]]. It returns
+// a slice of length no larger than maxTotalMatches.
+func productIndices(lengths ...int) [][]int {
+	count := 1
+	for _, l := range lengths {
+		count *= l
+	}
+	if count == 0 {
+		return nil
+	}
+	if count > maxTotalMatches {
+		count = maxTotalMatches
+	}
+
+	results := make([][]int, count)
+	for i := 0; i < count; i++ {
+		j := 1
+		result := make([]int, 0, len(lengths))
+		for _, l := range lengths {
+			result = append(result, (i/j)%l)
+			j *= l
+		}
+		results[i] = result
+	}
+	return results
+}
+
+// permutateMatches converts the list of all regex matches into all possible
+// permutations selecting one from each named entry in the map. For example:
+// {"foo": [matchA, matchB], "bar": [matchC]} becomes
+//     [{"foo": matchA, "bar": matchC}, {"foo": matchB, "bar": matchC}]
+func permutateMatches(regexMatches map[string][][]string) []map[string][]string {
+	// Get a consistent order for names and their matching lengths.
+	// The lengths are used in calculating the permutation so order matters.
+	names := make([]string, 0, len(regexMatches))
+	lengths := make([]int, 0, len(regexMatches))
+	for key, value := range regexMatches {
+		names = append(names, key)
+		lengths = append(lengths, len(value))
+	}
+
+	// Permutate all the indices for each match. For example, if "foo" has
+	// [matchA, matchB] and "bar" has [matchC], we will get indices [0 0] [1 0].
+	permutationIndices := productIndices(lengths...)
+
+	// Build {"foo": matchA, "bar": matchC} and {"foo": matchB, "bar": matchC}
+	// from the indices.
+	var matches []map[string][]string
+	for _, permutation := range permutationIndices {
+		candidate := make(map[string][]string, len(permutationIndices))
+		for i, name := range names {
+			candidate[name] = regexMatches[name][permutation[i]]
+		}
+		matches = append(matches, candidate)
+	}
+
+	return matches
+}
+
+// This function will check false positives for common test words, but also it
+// will make sure the key appears 'random' enough to be a real key.
+func isKnownFalsePositive(match map[string][]string) bool {
+	for _, values := range match {
+		for _, value := range values {
+			if detectors.IsKnownFalsePositive(value, detectors.DefaultFalsePositives, true) {
+				return true
+			}
+		}
+	}
+	return false
 }
