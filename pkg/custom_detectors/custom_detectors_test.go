@@ -175,3 +175,9 @@ func TestPermutateMatches(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkProductIndices(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = productIndices(3, 2, 6)
+	}
+}

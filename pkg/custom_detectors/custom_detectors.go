@@ -29,6 +29,9 @@ type customRegexWebhook struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*customRegexWebhook)(nil)
 
+// NewWebhookCustomRegex initializes and validates a customRegexWebhook. An
+// unexported type is intentionally returned here to ensure the values have
+// been validated.
 func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*customRegexWebhook, error) {
 	// TODO: Return all validation errors.
 	if err := ValidateKeywords(pb.Keywords); err != nil {
@@ -153,21 +156,28 @@ func (c *customRegexWebhook) Keywords() []string {
 // productIndices(3, 2) -> [[0 0] [1 0] [2 0] [0 1] [1 1] [2 1]]. It returns
 // a slice of length no larger than maxTotalMatches.
 func productIndices(lengths ...int) [][]int {
-	result := [][]int{{}}
-	for _, length := range lengths {
-		var nextResult [][]int
-		for i := 0; i < length; i++ {
-			// Append index to all existing results.
-			for _, curResult := range result {
-				nextResult = append(nextResult, append(curResult, i))
-				if len(nextResult) >= maxTotalMatches {
-					return nextResult
-				}
-			}
-		}
-		result = nextResult
+	count := 1
+	for _, l := range lengths {
+		count *= l
 	}
-	return result
+	if count == 0 {
+		return nil
+	}
+	if count > maxTotalMatches {
+		count = maxTotalMatches
+	}
+
+	results := make([][]int, count)
+	for i := 0; i < count; i++ {
+		j := 1
+		result := make([]int, 0, len(lengths))
+		for _, l := range lengths {
+			result = append(result, (i/j)%l)
+			j *= l
+		}
+		results[i] = result
+	}
+	return results
 }
 
 // permutateMatches converts the list of all regex matches into all possible
