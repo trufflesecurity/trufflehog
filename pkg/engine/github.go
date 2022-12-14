@@ -15,12 +15,11 @@ import (
 // ScanGitHub scans Github with the provided options.
 func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 	source := github.Source{}
-	var repos []string
 
 	connection := sourcespb.GitHub{
 		Endpoint:      c.Endpoint,
 		Organizations: c.Orgs,
-		Repositories:  repos,
+		Repositories:  c.Repos,
 		ScanUsers:     c.IncludeMembers,
 		IgnoreRepos:   c.ExcludeRepos,
 	}
