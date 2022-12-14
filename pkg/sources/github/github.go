@@ -149,7 +149,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.repos = s.conn.Repositories
 	s.orgs = s.conn.Organizations
 	// If an org is specified along with repos, all the repos should be
-	// added to the includeRepos list. This way they are separate from repo scans.
+	// added to the includeRepos list. This way they are treated independently of the repo scans.
 	if len(s.orgs) > 0 {
 		s.includeRepos = append(s.includeRepos, s.repos...)
 		s.repos = nil
