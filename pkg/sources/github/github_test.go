@@ -80,6 +80,31 @@ func TestAddReposByOrg(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestAddReposByOrg_IncludeRepos(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/super-secret-org/repos").
+		Reply(200).
+		JSON([]map[string]string{
+			{"clone_url": "super-secret-repo", "full_name": "secret/super-secret-repo"},
+			{"clone_url": "super-secret-repo2", "full_name": "secret/super-secret-repo2"},
+			{"clone_url": "super-secret-repo2", "full_name": "secret/not-super-secret-repo"},
+		})
+
+	src := &sourcespb.GitHub{
+		Organizations: []string{"super-secret-org"},
+	}
+	s := initTestSource(src)
+	s.includeRepos = []string{"secret/super*"}
+	// gock works here because github.NewClient is using the default HTTP Transport
+	err := s.addRepos(context.TODO(), "super-secret-org", s.getReposByOrg)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(s.repos))
+	assert.Equal(t, []string{"super-secret-repo", "super-secret-repo2"}, s.repos)
+	assert.True(t, gock.IsDone())
+}
+
 func TestAddReposByUser(t *testing.T) {
 	defer gock.Off()
 
