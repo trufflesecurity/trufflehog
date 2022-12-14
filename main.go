@@ -224,7 +224,7 @@ func run(state overseer.State) {
 		}
 		var repos []string
 		// If an org is provided, the repos would be the IncludeRepos.
-		// If an org is not provided, the repos would be the Repos.
+		// If an org is not provided, the repos would be the repos passed in via the --repo flag.
 		if len(*githubScanOrgs) == 0 {
 			repos = *githubScanRepos
 		} else {
