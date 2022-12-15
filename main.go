@@ -222,24 +222,17 @@ func run(state overseer.State) {
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			logrus.Fatal("You must specify at least one organization or repository.")
 		}
-		var repos []string
-		// If an org is provided, the repos would be the IncludeRepos.
-		// If an org is not provided, the repos would be the repos passed in via the --repo flag.
-		if len(*githubScanOrgs) == 0 {
-			repos = *githubScanRepos
-		} else {
-			repos = *githubIncludeRepos
-		}
 
 		github := func(c *sources.Config) {
 			c.Endpoint = *githubScanEndpoint
-			c.Repos = repos
+			c.Repos = *githubScanRepos
 			c.Orgs = *githubScanOrgs
 			c.Token = *githubScanToken
 			c.IncludeForks = *githubIncludeForks
 			c.IncludeMembers = *githubIncludeMembers
 			c.Concurrency = *concurrency
 			c.ExcludeRepos = *githubExcludeRepos
+			c.IncludeRepos = *githubIncludeRepos
 		}
 
 		if err = e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {

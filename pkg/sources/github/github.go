@@ -148,12 +148,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.repos = s.conn.Repositories
 	s.orgs = s.conn.Organizations
-	// If an org is specified along with repos, all the repos should be
-	// added to the includeRepos list. This way they are treated independently of the repo scans.
-	if len(s.orgs) > 0 {
-		s.includeRepos = append(s.includeRepos, s.repos...)
-		s.repos = nil
-	}
+	s.includeRepos = s.conn.IncludeRepos
 	s.ignoreRepos = s.conn.IgnoreRepos
 
 	// Head or base should only be used with incoming webhooks
@@ -765,7 +760,7 @@ func (s *Source) includeRepo(r string) bool {
 	for _, include := range s.includeRepos {
 		g, err := glob.Compile(include)
 		if err != nil {
-			s.log.WithError(err).Errorf("invalid glob %s", include)
+			s.log.WithField("repo", r).Debugf("invalid glob %q: %s", include, err)
 			continue
 		}
 		if g.Match(r) {
