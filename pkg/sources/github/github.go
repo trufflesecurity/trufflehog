@@ -52,6 +52,7 @@ type Source struct {
 	repos,
 	orgs,
 	members,
+	includeRepos,
 	ignoreRepos []string
 	git             *git.Git
 	httpClient      *http.Client
@@ -147,6 +148,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.repos = s.conn.Repositories
 	s.orgs = s.conn.Organizations
+	s.includeRepos = s.conn.IncludeRepos
 	s.ignoreRepos = s.conn.IgnoreRepos
 
 	// Head or base should only be used with incoming webhooks
@@ -671,6 +673,9 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 			if s.ignoreRepo(r.GetFullName()) {
 				continue
 			}
+			if !s.includeRepo(r.GetFullName()) {
+				continue
+			}
 
 			numRepos++
 			if r.GetFork() {
@@ -730,6 +735,9 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 			if s.ignoreRepo(r.GetFullName()) {
 				continue
 			}
+			if !s.includeRepo(r.GetFullName()) {
+				continue
+			}
 
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
@@ -742,6 +750,25 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 		opts.Page = res.NextPage
 	}
 	return repos, nil
+}
+
+func (s *Source) includeRepo(r string) bool {
+	if len(s.includeRepos) == 0 {
+		return true
+	}
+
+	for _, include := range s.includeRepos {
+		g, err := glob.Compile(include)
+		if err != nil {
+			s.log.WithField("repo", r).Debugf("invalid glob %q: %s", include, err)
+			continue
+		}
+		if g.Match(r) {
+			s.log.Debugf("including repo %s", r)
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Source) ignoreRepo(r string) bool {

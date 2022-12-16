@@ -89,6 +89,10 @@ type Config struct {
 	Orgs,
 	// Buckets is the list of buckets to scan.
 	Buckets,
+	// ExcludeRepos is a list of repositories to exclude from the scan.
+	ExcludeRepos,
+	// IncludeRepos is a list of repositories to include in the scan.
+	IncludeRepos,
 	// Directories is the list of directories to scan.
 	Directories []string
 	// Filter is the filter to use to scan the source.
