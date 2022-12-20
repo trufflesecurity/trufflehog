@@ -19,6 +19,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
@@ -41,6 +42,7 @@ var (
 	noVerification   = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified     = cli.Flag("only-verified", "Only output verified results.").Bool()
 	filterUnverified = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	configFilename   = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
@@ -183,10 +185,21 @@ func run(state overseer.State) {
 
 	defer func() { _ = sync() }()
 
+	conf := &config.Config{}
+	if *configFilename != "" {
+		var err error
+		conf, err = config.Read(*configFilename)
+		if err != nil {
+			logger.Error(err, "error parsing the provided configuration file")
+			os.Exit(1)
+		}
+	}
+
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
+		engine.WithDetectors(!*noVerification, conf.Detectors...),
 		engine.WithFilterUnverified(*filterUnverified),
 	)
 
