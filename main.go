@@ -15,7 +15,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/zap"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -96,8 +95,6 @@ var (
 	syslogTLSCert  = syslogScan.Flag("cert", "Path to TLS cert.").String()
 	syslogTLSKey   = syslogScan.Flag("key", "Path to TLS key.").String()
 	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").String()
-
-	logLevel = zap.NewAtomicLevel()
 )
 
 func init() {
@@ -118,12 +115,10 @@ func init() {
 	switch {
 	case *trace:
 		log.SetLevel(5)
-		log.SetLevelForControl(logLevel, 5)
 		logrus.SetLevel(logrus.TraceLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
 	case *debug:
 		log.SetLevel(2)
-		log.SetLevelForControl(logLevel, 2)
 		logrus.SetLevel(logrus.DebugLevel)
 		logrus.Debugf("running version %s", version.BuildVersion)
 	default:
@@ -180,9 +175,8 @@ func run(state overseer.State) {
 			}
 		}()
 	}
-	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr, log.WithLeveler(logLevel)))
-	ctx := context.WithLogger(context.TODO(), logger)
-
+	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr))
+	context.SetDefaultLogger(logger)
 	defer func() { _ = sync() }()
 
 	conf := &config.Config{}
@@ -195,6 +189,7 @@ func run(state overseer.State) {
 		}
 	}
 
+	ctx := context.TODO()
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
