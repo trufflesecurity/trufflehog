@@ -16,9 +16,6 @@ type Config struct {
 
 // Read parses a given filename into a Config.
 func Read(filename string) (*Config, error) {
-	if filename == "" {
-		return &Config{}, nil
-	}
 	input, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
