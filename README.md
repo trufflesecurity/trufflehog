@@ -276,6 +276,99 @@ repos:
       stages: ["commit", "push"]
 ```
 
+## Regex Detector (alpha)
+
+Trufflehog supports detection and verification of custom regular expressions.
+For detection, at least one **regular expression** and **keyword** is required.
+A **keyword** is a fixed literal string identifier that appears in or around
+the regex to be detected. To allow maximum flexibility for verification, a
+webhook is used containing the regular expression matches.
+
+Trufflehog will send a JSON POST request containing the regex matches to a
+configured webhook endpoint. If the endpoint responds with a `200 OK` response
+status code, the secret is considered verified.
+
+**NB:** This feature is alpha and subject to change.
+
+### Regex Detector Example
+
+```yaml
+# config.yaml
+detectors:
+- name: hog detector
+  keywords:
+  - hog
+  regex:
+    adjective: hogs are (\S+)
+  verify:
+  - endpoint: http://localhost:8000/
+    # unsafe must be set if the endpoint is HTTP
+    unsafe: true
+    headers:
+    - 'Authorization: super secret authorization header'
+```
+
+```
+» trufflehog filesystem --directory /tmp --config config.yaml --only-verified
+🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
+
+Found verified result 🐷🔑
+Detector Type: CustomRegex
+Decoder Type: PLAIN
+Raw result: hogs are cool
+File: /tmp/hog-facts.txt
+```
+
+#### Verification Server Example (Python)
+
+Unless you run a verification server, secrets found by the custom regex
+detector will be unverified. Here is an example Python implementation of a
+verification server for the above `config.yaml` file.
+
+```python
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+AUTH_HEADER = 'super secret authorization header'
+
+
+class Verifier(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(405)
+        self.end_headers()
+
+    def do_POST(self):
+        try:
+            if self.headers['Authorization'] != AUTH_HEADER:
+                self.send_response(401)
+                self.end_headers()
+                return
+
+            # read the body
+            length = int(self.headers['Content-Length'])
+            request = json.loads(self.rfile.read(length))
+            self.log_message("%s", request)
+
+            # check the match
+            if request['hog detector']['adjective'][-1] == 'cool':
+                self.send_response(200)
+                self.end_headers()
+            else:
+                # any other response besides 200
+                self.send_response(406)
+                self.end_headers()
+        except Exception:
+            self.send_response(400)
+            self.end_headers()
+
+
+with HTTPServer(('', 8000), Verifier) as server:
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+```
+
 ## Use as a library
 
 Currently, trufflehog is in heavy development and no guarantees can be made on
