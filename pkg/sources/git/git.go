@@ -40,7 +40,6 @@ type Source struct {
 	jobId    int64
 	verify   bool
 	git      *Git
-	aCtx     context.Context
 	sources.Progress
 	conn *sourcespb.Git
 }
@@ -89,7 +88,6 @@ func (s *Source) JobID() int64 {
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 
-	s.aCtx = aCtx
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId

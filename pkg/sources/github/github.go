@@ -56,7 +56,6 @@ type Source struct {
 	ignoreRepos []string
 	git             *git.Git
 	httpClient      *http.Client
-	aCtx            context.Context
 	log             *log.Entry
 	conn            *sourcespb.GitHub
 	jobPool         *errgroup.Group
@@ -128,7 +127,6 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
-	s.aCtx = aCtx
 	s.name = name
 	s.sourceID = sourceID
 	s.jobID = jobID
