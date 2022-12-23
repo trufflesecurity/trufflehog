@@ -35,7 +35,6 @@ type Source struct {
 	jobId       int64
 	verify      bool
 	concurrency int
-	aCtx        context.Context
 	log         logr.Logger
 	sources.Progress
 	errorCount *sync.Map
@@ -62,7 +61,6 @@ func (s *Source) JobID() int64 {
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = context.WithValues(aCtx, "source", s.Type(), "name", name).Logger()
 
-	s.aCtx = aCtx
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
