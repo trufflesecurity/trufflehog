@@ -34,7 +34,6 @@ type Source struct {
 	jobId    int64
 	verify   bool
 	paths    []string
-	aCtx     context.Context
 	log      *log.Entry
 	sources.Progress
 }
@@ -60,7 +59,6 @@ func (s *Source) JobID() int64 {
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
 
-	s.aCtx = aCtx
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId

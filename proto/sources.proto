@@ -157,6 +157,7 @@ message GitHub {
   string head = 9;
   string base = 10;
   repeated string ignoreRepos = 11;
+  repeated string includeRepos = 12;
 }
 
 message JIRA {

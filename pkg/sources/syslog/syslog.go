@@ -32,7 +32,6 @@ type Source struct {
 	jobId    int64
 	verify   bool
 	syslog   *Syslog
-	aCtx     context.Context
 	sources.Progress
 	conn *sourcespb.Syslog
 }
@@ -83,9 +82,8 @@ func (s *Source) InjectConnection(conn *sourcespb.Syslog) {
 }
 
 // Init returns an initialized Syslog source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 
-	s.aCtx = aCtx
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
