@@ -150,7 +150,7 @@ func main() {
 
 func run(state overseer.State) {
 	if *debug {
-		fmt.Println("trufflehog " + version.BuildVersion)
+		logrus.Debugf("trufflehog %s", version.BuildVersion)
 	}
 
 	if *githubScanToken != "" {
