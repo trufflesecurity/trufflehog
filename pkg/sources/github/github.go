@@ -134,7 +134,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	s.httpClient = common.SaneHttpClient()
+	s.httpClient = common.RetryableHttpClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
@@ -280,17 +280,20 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
-	tc := oauth2.NewClient(context.TODO(), ts)
+	s.httpClient.Transport = &oauth2.Transport{
+		Base:   s.httpClient.Transport,
+		Source: oauth2.ReuseTokenSource(nil, ts),
+	}
 
 	var err error
 	// If we're using public Github, make a regular client.
 	// Otherwise, make an enterprise client.
 	var isGHE bool
 	if apiEndpoint == "https://api.github.com" {
-		s.apiClient = github.NewClient(tc)
+		s.apiClient = github.NewClient(s.httpClient)
 	} else {
 		isGHE = true
-		s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, tc)
+		s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
 		if err != nil {
 			return errors.New(err)
 		}
