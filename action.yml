@@ -27,7 +27,7 @@ runs:
     - git
     - file://${{ inputs.path }}
     - --since-commit
-    - ${{ inputs.base }}
+    - ${{ inputs.base.default }}
     - --branch
     - ${{ inputs.head }}
     - --fail
