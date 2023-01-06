@@ -96,7 +96,7 @@ trufflehog s3 --bucket=<bucket name> --only-verified
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
 - We've **added over 700 credential detectors that support active verification against their respective APIs**.
-- We've also added native **support for scanning GitHub, GitLab, filesystems, and S3**.
+- We've also added native **support for scanning GitHub, GitLab, filesystems, S3, and Circle CI**.
 - **Instantly verify private keys** against millions of github users and **billions** of TLS certificates using our [Driftwood](https://trufflesecurity.com/blog/driftwood) technology.
 
 
@@ -160,6 +160,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - S3
 - filesystem
 - syslog
+- circleci
 - file and stdin (coming soon)
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:

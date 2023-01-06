@@ -42,7 +42,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal github connection")
+		logrus.WithError(err).Error("failed to marshal S3 connection")
 		return err
 	}
 
@@ -58,7 +58,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := s3Source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Error("error scanning s3")
+			logrus.WithError(err).Error("error scanning S3")
 		}
 	}()
 	return nil
