@@ -173,29 +173,19 @@ Find credentials in git repositories.
 
 Flags:
       --help                     Show context-sensitive help (also try --help-long and --help-man).
-      --trace                    Run in trace mode
-      --debug                    Run in debug mode
-      --version                  Prints trufflehog version.
+      --debug                    Run in debug mode.
+      --trace                    Run in trace mode.
   -j, --json                     Output in JSON format.
       --json-legacy              Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
-      --concurrency=1            Number of concurrent workers.
+      --concurrency=10           Number of concurrent workers.
       --no-verification          Don't verify the results.
       --only-verified            Only output verified results.
       --filter-unverified        Only output first unverified result per chunk per detector if there are more than one results.
-      --configFilename           Path to configuration file
+      --config=CONFIG            Path to configuration file.
       --print-avg-detector-time  Print the average time spent on each detector.
       --no-update                Don't check for updates.
-  -i, --include-paths=INCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to include in scan.
-  -x, --exclude-paths=EXCLUDE-PATHS
-                                 Path to file with newline separated regexes for files to exclude in scan.
-      --since-commit=SINCE-COMMIT
-                                 Commit to start scan from.
-      --branch=BRANCH            Branch to scan.
-      --max-depth=MAX-DEPTH      Maximum depth of commits to scan.
-      --allow                    No-op flag for backwards compat.
-      --entropy                  No-op flag for backwards compat.
-      --regex                    No-op flag for backwards compat.
+      --fail                     Exit with code 183 if results are found.
+      --version                  Show application version.
 
 Args:
   <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
