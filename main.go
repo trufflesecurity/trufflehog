@@ -95,6 +95,9 @@ var (
 	syslogTLSCert  = syslogScan.Flag("cert", "Path to TLS cert.").String()
 	syslogTLSKey   = syslogScan.Flag("key", "Path to TLS key.").String()
 	syslogFormat   = syslogScan.Flag("format", "Log format. Can be rfc3164 or rfc5424").String()
+
+	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
+	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 )
 
 func init() {
@@ -292,6 +295,10 @@ func run(state overseer.State) {
 
 		if err = e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
+		}
+	case circleCiScan.FullCommand():
+		if err = e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
+			logrus.WithError(err).Fatal("Failed to scan CircleCI.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
