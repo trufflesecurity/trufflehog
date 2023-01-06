@@ -8,7 +8,8 @@ inputs:
     required: true
   base:
     description: Start scanning from here (usually main branch).
-    required: true
+    required: false
+    default: ''
   head:
     description: Scan commits until here (usually dev branch).
     required: false
