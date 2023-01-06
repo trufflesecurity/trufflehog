@@ -246,7 +246,7 @@ func removeCircleSha1Line(input []byte) []byte {
 	// Iterate over the lines and add the ones that don't contain "CIRCLE_SHA1=" to the result slice
 	result := make([][]byte, 0, len(lines))
 	for _, line := range lines {
-		if !bytes.Contains(bytes.TrimSpace(line), []byte("CIRCLE_SHA1=")) {
+		if !bytes.Contains(line, []byte("CIRCLE_SHA1=")) {
 			result = append(result, line)
 		}
 	}
