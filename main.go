@@ -13,6 +13,7 @@ import (
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
+	"github.com/mattn/go-isatty"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
@@ -144,7 +146,13 @@ func init() {
 	}
 
 	cli.Version("trufflehog " + version.BuildVersion)
-	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
+
+	commands := os.Args[1:]
+	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
+		commands = tui.Run()
+	}
+
+	cmd = kingpin.MustParse(cli.Parse(commands))
 
 	switch {
 	case *trace:

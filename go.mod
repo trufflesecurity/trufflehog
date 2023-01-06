@@ -18,6 +18,7 @@ require (
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.6.0
+	github.com/charmbracelet/bubbletea v0.23.1
 	github.com/couchbase/gocb/v2 v2.6.3
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/denisenkom/go-mssqldb v0.12.3
@@ -45,6 +46,7 @@ require (
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
 	github.com/lib/pq v1.10.9
+	github.com/mattn/go-isatty v0.0.17
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -91,6 +93,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
+	github.com/aymanbagabas/go-osc52 v1.0.3 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bodgit/plumbing v1.2.0 // indirect
@@ -99,6 +102,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/connesc/cipherio v0.2.1 // indirect
+	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/couchbase/gocbcore/v10 v10.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -135,11 +139,17 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-localereader v0.0.1 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
+	github.com/muesli/ansi v0.0.0-20211018074035-2e021307bc4b // indirect
+	github.com/muesli/cancelreader v0.2.2 // indirect
+	github.com/muesli/reflow v0.3.0 // indirect
+	github.com/muesli/termenv v0.13.0 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.23.0 // indirect
@@ -152,6 +162,7 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/skeema/knownhosts v1.2.0 // indirect
@@ -171,6 +182,7 @@ require (
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/term v0.10.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
