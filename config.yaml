@@ -1,0 +1,13 @@
+# config.yaml
+detectors:
+- name: hog detector
+  keywords:
+  - email
+  regex:
+    adjective: ([\w.-]+)@(\[(\d{1,3}\.){3}|(?!hotmail)(([a-zA-Z\d-]+\.)+))([a-zA-Z]{2,4}|\d{1,3})(\]?) 
+  verify:
+  - endpoint: http://localhost:8000/
+    # unsafe must be set if the endpoint is HTTP
+    unsafe: true
+    headers:
+    - 'Authorization: super secret authorization header'
