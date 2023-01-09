@@ -560,8 +560,16 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 	}
 
+	// We're logging time, but the repoPath is usally a dynamically generated folder in /tmp
+	// To make this duration logging useful, we need to log the remote as well
+	remotes, _ := repo.Remotes()
+	repoUrl := "Could not get remote for repo"
+	if len(remotes) != 0 {
+		repoUrl = getSafeRemoteURL(repo, remotes[0].Config().Name)
+	}
+
 	scanTime := time.Now().UnixNano() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "path", repoPath, "time", scanTime)
+	ctx.Logger().V(1).Info("scanning git repo complete", "Repo", repoUrl, "path", repoPath, "time", scanTime)
 	return nil
 }
 
