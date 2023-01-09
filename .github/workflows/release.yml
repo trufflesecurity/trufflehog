@@ -44,7 +44,7 @@ jobs:
         with:
           go-version: '1.18'
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
           version: latest
