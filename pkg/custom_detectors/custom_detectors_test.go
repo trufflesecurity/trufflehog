@@ -1,9 +1,11 @@
 package custom_detectors
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/protoyaml"
 )
@@ -100,6 +102,21 @@ func TestCustomDetectorsParsing(t *testing.T) {
 	assert.Equal(t, "http://localhost:8000/", got.Verify[0].Endpoint)
 	assert.Equal(t, true, got.Verify[0].Unsafe)
 	assert.Equal(t, []string{"Authorization: Bearer token"}, got.Verify[0].Headers)
+}
+
+func TestFromData_InvalidRegEx(t *testing.T) {
+	c := &customRegexWebhook{
+		&custom_detectorspb.CustomRegex{
+			Name:     "Internal bi tool",
+			Keywords: []string{"secret_v1_", "pat_v2_"},
+			Regex: map[string]string{
+				"test": "!!?(?:?)[a-zA-Z0-9]{32}", // invalid regex
+			},
+		},
+	}
+
+	_, err := c.FromData(context.Background(), false, []byte("test"))
+	assert.Error(t, err)
 }
 
 func TestProductIndices(t *testing.T) {
