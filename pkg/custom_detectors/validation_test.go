@@ -53,6 +53,13 @@ func TestCustomDetectorsRegexValidation(t *testing.T) {
 			input:   map[string]string{},
 			wantErr: true,
 		},
+		{
+			name: "Test invalid regex",
+			input: map[string]string{
+				"test": "!!?(?:?)[a-zA-Z0-9]{32}",
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
