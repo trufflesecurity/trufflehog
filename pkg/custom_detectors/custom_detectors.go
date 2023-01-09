@@ -64,9 +64,8 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	for name, regex := range c.GetRegex() {
 		regex, err := regexp.Compile(regex)
 		if err != nil {
-			// TODO: Log error.
-			// This should never happen due to validation.
-			continue
+			// This will only happen if the regex is invalid.
+			return nil, err
 		}
 		regexMatches[name] = regex.FindAllStringSubmatch(dataStr, -1)
 	}
@@ -183,7 +182,8 @@ func productIndices(lengths ...int) [][]int {
 // permutateMatches converts the list of all regex matches into all possible
 // permutations selecting one from each named entry in the map. For example:
 // {"foo": [matchA, matchB], "bar": [matchC]} becomes
-//     [{"foo": matchA, "bar": matchC}, {"foo": matchB, "bar": matchC}]
+//
+//	[{"foo": matchA, "bar": matchC}, {"foo": matchB, "bar": matchC}]
 func permutateMatches(regexMatches map[string][][]string) []map[string][]string {
 	// Get a consistent order for names and their matching lengths.
 	// The lengths are used in calculating the permutation so order matters.
