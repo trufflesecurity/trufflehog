@@ -2,6 +2,8 @@ package context
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -38,11 +40,19 @@ type logCtx struct {
 	// Embed context.Context to get all methods for free.
 	context.Context
 	log logr.Logger
+	err *error
 }
 
 // Logger returns a structured logger.
 func (l logCtx) Logger() logr.Logger {
 	return l.log
+}
+
+func (l logCtx) Err() error {
+	if l.err != nil && *l.err != nil {
+		return *l.err
+	}
+	return l.Context.Err()
 }
 
 // Background returns context.Background with a default logger.
@@ -64,30 +74,33 @@ func TODO() Context {
 // WithCancel returns context.WithCancel with the log object propagated.
 func WithCancel(parent Context) (Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
-	return logCtx{
+	lCtx := logCtx{
 		log:     parent.Logger(),
 		Context: ctx,
-	}, cancel
+	}
+	return captureCancelCallstack(lCtx, cancel)
 }
 
 // WithDeadline returns context.WithDeadline with the log object propagated and
 // the deadline added to the structured log values.
 func WithDeadline(parent Context, d time.Time) (Context, context.CancelFunc) {
 	ctx, cancel := context.WithDeadline(parent, d)
-	return logCtx{
+	lCtx := logCtx{
 		log:     parent.Logger().WithValues("deadline", d),
 		Context: ctx,
-	}, cancel
+	}
+	return captureCancelCallstack(lCtx, cancel)
 }
 
 // WithTimeout returns context.WithTimeout with the log object propagated and
 // the timeout added to the structured log values.
 func WithTimeout(parent Context, timeout time.Duration) (Context, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
-	return logCtx{
+	lCtx := logCtx{
 		log:     parent.Logger().WithValues("timeout", timeout),
 		Context: ctx,
-	}, cancel
+	}
+	return captureCancelCallstack(lCtx, cancel)
 }
 
 // WithValue returns context.WithValue with the log object propagated and
@@ -135,4 +148,24 @@ func AddLogger(parent context.Context) Context {
 // used for Background and TODO contexts.
 func SetDefaultLogger(l logr.Logger) {
 	defaultLogger = l
+}
+
+// captureCancelCallstack is a helper function to capture the callstack where
+// the cancel function was first called.
+func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.CancelFunc) {
+	if ctx.err == nil {
+		var err error
+		ctx.err = &err
+	}
+	return ctx, func() {
+		// We must check Err() before calling f() since f() sets the error.
+		// If there's already an error, do nothing special.
+		if ctx.Err() != nil {
+			f()
+			return
+		}
+		f()
+		// Set the error with the stacktrace if the err pointer is non-nil.
+		*ctx.err = fmt.Errorf("%w (%s)", ctx.Err(), string(debug.Stack()))
+	}
 }
