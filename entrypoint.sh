@@ -1,5 +1,4 @@
 #!/usr/bin/env ash
 
-# `$*` expands the `args` supplied in an `array` individually
-# or splits `args` in a string separated by whitespace.
+# "$@" should expand all args in an 'array' as they were passed in
 /usr/bin/trufflehog "$@"
