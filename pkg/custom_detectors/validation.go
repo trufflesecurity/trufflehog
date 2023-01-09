@@ -24,9 +24,9 @@ func ValidateRegex(regex map[string]string) error {
 	if len(regex) == 0 {
 		return fmt.Errorf("no regex")
 	}
-	for _, reg := range regex {
+	for name, reg := range regex {
 		if _, err := regexp.Compile(reg); err != nil {
-			return err
+			return fmt.Errorf("regex '%s': %w", name, err)
 		}
 	}
 	return nil
