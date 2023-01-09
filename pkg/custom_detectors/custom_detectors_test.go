@@ -110,7 +110,7 @@ func TestFromData_InvalidRegEx(t *testing.T) {
 			Name:     "Internal bi tool",
 			Keywords: []string{"secret_v1_", "pat_v2_"},
 			Regex: map[string]string{
-				"test": "!!?(?:?)[a-zA-Z0-9]{32}",
+				"test": "!!?(?:?)[a-zA-Z0-9]{32}", // invalid regex
 			},
 		},
 	}

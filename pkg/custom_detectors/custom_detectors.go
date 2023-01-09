@@ -183,7 +183,7 @@ func productIndices(lengths ...int) [][]int {
 // permutations selecting one from each named entry in the map. For example:
 // {"foo": [matchA, matchB], "bar": [matchC]} becomes
 //
-//	[{"foo": matchA, "bar": matchC}, {"foo": matchB, "bar": matchC}]
+// [{"foo": matchA, "bar": matchC}, {"foo": matchB, "bar": matchC}]
 func permutateMatches(regexMatches map[string][][]string) []map[string][]string {
 	// Get a consistent order for names and their matching lengths.
 	// The lengths are used in calculating the permutation so order matters.
