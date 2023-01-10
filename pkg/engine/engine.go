@@ -231,7 +231,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						}
 						for _, result := range results {
 							resultChunk := chunk
-							if isGitSource(chunk.SourceType) {
+							if SupportsLineNumbers(chunk.SourceType) {
 								copyChunk := *chunk
 								copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
 								if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
@@ -281,7 +281,8 @@ func gitSources() []sourcespb.SourceType {
 	}
 }
 
-func isGitSource(sourceType sourcespb.SourceType) bool {
+// SupportsLineNumbers determines if a line number can be found for a source type.
+func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	for _, i := range gitSources() {
 		if i == sourceType {
 			return true
