@@ -32,5 +32,5 @@ runs:
     - ${{ inputs.head }}
     - --fail
     - --no-update
-    - ${{each arg in inputs.extra_args.split(' ')}}${{arg}}${{end}}
+    - ${{arg in inputs.extra_args.split(' ')}}${{arg}}${{end}}
       - ${{ arg }}
