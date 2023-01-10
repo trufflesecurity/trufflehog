@@ -234,8 +234,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							if isGitSource(chunk.SourceType) {
 								copyChunk := *chunk
 								copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
-								copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData)
-								if ok {
+								if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 									copyChunk.SourceMetadata = copyMetaData
 								}
 								fragStart, mdLine := FragmentFirstLine(&copyChunk)
