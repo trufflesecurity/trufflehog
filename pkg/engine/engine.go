@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -181,7 +182,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
-			fragStart, mdLine := FragmentFirstLine(chunk)
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
@@ -230,9 +230,19 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							results = detectors.CleanResults(results)
 						}
 						for _, result := range results {
-							SetResultLineNumber(chunk, &result, fragStart, mdLine)
+							resultChunk := chunk
+							if SupportsLineNumbers(chunk.SourceType) {
+								copyChunk := *chunk
+								copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
+								if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
+									copyChunk.SourceMetadata = copyMetaData
+								}
+								fragStart, mdLine := FragmentFirstLine(&copyChunk)
+								SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
+								resultChunk = &copyChunk
+							}
 							result.DecoderType = decoderType
-							e.results <- detectors.CopyMetadata(chunk, result)
+							e.results <- detectors.CopyMetadata(resultChunk, result)
 
 						}
 						if len(results) > 0 {
@@ -271,7 +281,8 @@ func gitSources() []sourcespb.SourceType {
 	}
 }
 
-func isGitSource(sourceType sourcespb.SourceType) bool {
+// SupportsLineNumbers determines if a line number can be found for a source type.
+func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	for _, i := range gitSources() {
 		if i == sourceType {
 			return true
@@ -314,8 +325,6 @@ func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 
 // SetResultLineNumber sets the line number in the provided result.
 func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) {
-	if isGitSource(chunk.SourceType) {
-		offset := FragmentLineOffset(chunk, result)
-		*mdLine = fragStart + offset
-	}
+	offset := FragmentLineOffset(chunk, result)
+	*mdLine = fragStart + offset
 }
