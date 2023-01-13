@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
-	"github.com/sirupsen/logrus"
 )
 
 var caCerts = []string{
@@ -94,7 +93,7 @@ func NewCustomTransport(T http.RoundTripper) *CustomTransport {
 
 func PinnedRetryableHttpClient() *http.Client {
 	httpClient := retryablehttp.NewClient()
-	httpClient.Logger = logrus.WithField("name", "PinnedRetryableHttpClient").WithField("level", logrus.DebugLevel)
+	httpClient.Logger = nil
 	httpClient.HTTPClient.Transport = NewCustomTransport(&http.Transport{
 		TLSClientConfig: &tls.Config{
 			RootCAs: PinnedCertPool(),
@@ -116,7 +115,7 @@ func PinnedRetryableHttpClient() *http.Client {
 func RetryableHttpClient() *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = 3
-	httpClient.Logger = logrus.WithField("name", "RetryableHttpClient").WithField("level", logrus.DebugLevel)
+	httpClient.Logger = nil
 	httpClient.HTTPClient.Timeout = 3 * time.Second
 	httpClient.HTTPClient.Transport = NewCustomTransport(nil)
 	return httpClient.StandardClient()
@@ -125,7 +124,7 @@ func RetryableHttpClient() *http.Client {
 func RetryableHttpClientTimeout(timeOutSeconds int64) *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = 3
-	httpClient.Logger = logrus.WithField("name", "RetryableHttpClientTimeout").WithField("level", logrus.DebugLevel)
+	httpClient.Logger = nil
 	httpClient.HTTPClient.Timeout = time.Duration(timeOutSeconds) * time.Second
 	httpClient.HTTPClient.Transport = NewCustomTransport(nil)
 	return httpClient.StandardClient()
