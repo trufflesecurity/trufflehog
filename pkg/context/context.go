@@ -166,6 +166,9 @@ func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.
 		}
 		f()
 		// Set the error with the stacktrace if the err pointer is non-nil.
-		*ctx.err = fmt.Errorf("%w (%s)", ctx.Err(), string(debug.Stack()))
+		*ctx.err = fmt.Errorf(
+			"%w (canceled at %v\n%s)",
+			ctx.Err(), time.Now(), string(debug.Stack()),
+		)
 	}
 }
