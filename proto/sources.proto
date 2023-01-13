@@ -23,7 +23,7 @@ enum SourceType {
   SOURCE_TYPE_PUBLIC_GIT = 8;
   SOURCE_TYPE_GITLAB = 9;
   SOURCE_TYPE_JIRA = 10;
-  SOURCE_TYPE_NPM_UNAUTHD_PACKAGES = 11;
+  SOURCE_TYPE_NPM = 11;
   SOURCE_TYPE_PYPI_UNAUTHD_PACKAGES = 12;
   SOURCE_TYPE_S3 = 13;
   SOURCE_TYPE_SLACK = 14;
@@ -171,13 +171,17 @@ message JIRA {
   repeated string projects = 5;
 }
 
-message NPMUnauthenticatedPackage {
+message NPM {
   oneof credential {
     credentials.Unauthenticated unauthenticated = 1;
   }
+  repeated string packages = 2;
+  repeated string maintainers = 3;
+  string npm_lock_file_contents = 4;
+  string yarn_lock_file_contents = 5;
 }
 
-message PyPIUnauthenticatedPackage {
+message PyPI {
   oneof credential {
     credentials.Unauthenticated unauthenticated = 1;
   }

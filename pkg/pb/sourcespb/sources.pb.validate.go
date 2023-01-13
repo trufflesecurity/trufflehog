@@ -2093,37 +2093,40 @@ var _ interface {
 	ErrorName() string
 } = JIRAValidationError{}
 
-// Validate checks the field values on NPMUnauthenticatedPackage with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *NPMUnauthenticatedPackage) Validate() error {
+// Validate checks the field values on NPM with the rules defined in the proto
+// definition for this message. If any rules are violated, the first error
+// encountered is returned, or nil if there are no violations.
+func (m *NPM) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on NPMUnauthenticatedPackage with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// NPMUnauthenticatedPackageMultiError, or nil if none found.
-func (m *NPMUnauthenticatedPackage) ValidateAll() error {
+// ValidateAll checks the field values on NPM with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in NPMMultiError, or nil if none found.
+func (m *NPM) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *NPMUnauthenticatedPackage) validate(all bool) error {
+func (m *NPM) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
+	// no validation rules for NpmLockFileContents
+
+	// no validation rules for YarnLockFileContents
+
 	switch m.Credential.(type) {
 
-	case *NPMUnauthenticatedPackage_Unauthenticated:
+	case *NPM_Unauthenticated:
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, NPMUnauthenticatedPackageValidationError{
+					errors = append(errors, NPMValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2131,7 +2134,7 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, NPMUnauthenticatedPackageValidationError{
+					errors = append(errors, NPMValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2140,7 +2143,7 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return NPMUnauthenticatedPackageValidationError{
+				return NPMValidationError{
 					field:  "Unauthenticated",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -2151,32 +2154,31 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return NPMUnauthenticatedPackageMultiError(errors)
+		return NPMMultiError(errors)
 	}
 
 	return nil
 }
 
-// NPMUnauthenticatedPackageMultiError is an error wrapping multiple validation
-// errors returned by NPMUnauthenticatedPackage.ValidateAll() if the
+// NPMMultiError is an error wrapping multiple validation errors returned by
+// NPM.ValidateAll() if the designated constraints aren't met.
+type NPMMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m NPMMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m NPMMultiError) AllErrors() []error { return m }
+
+// NPMValidationError is the validation error returned by NPM.Validate if the
 // designated constraints aren't met.
-type NPMUnauthenticatedPackageMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m NPMUnauthenticatedPackageMultiError) Error() string {
-	var msgs []string
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m NPMUnauthenticatedPackageMultiError) AllErrors() []error { return m }
-
-// NPMUnauthenticatedPackageValidationError is the validation error returned by
-// NPMUnauthenticatedPackage.Validate if the designated constraints aren't met.
-type NPMUnauthenticatedPackageValidationError struct {
+type NPMValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2184,24 +2186,22 @@ type NPMUnauthenticatedPackageValidationError struct {
 }
 
 // Field function returns field value.
-func (e NPMUnauthenticatedPackageValidationError) Field() string { return e.field }
+func (e NPMValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e NPMUnauthenticatedPackageValidationError) Reason() string { return e.reason }
+func (e NPMValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e NPMUnauthenticatedPackageValidationError) Cause() error { return e.cause }
+func (e NPMValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e NPMUnauthenticatedPackageValidationError) Key() bool { return e.key }
+func (e NPMValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e NPMUnauthenticatedPackageValidationError) ErrorName() string {
-	return "NPMUnauthenticatedPackageValidationError"
-}
+func (e NPMValidationError) ErrorName() string { return "NPMValidationError" }
 
 // Error satisfies the builtin error interface
-func (e NPMUnauthenticatedPackageValidationError) Error() string {
+func (e NPMValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2213,14 +2213,14 @@ func (e NPMUnauthenticatedPackageValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sNPMUnauthenticatedPackage.%s: %s%s",
+		"invalid %sNPM.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = NPMUnauthenticatedPackageValidationError{}
+var _ error = NPMValidationError{}
 
 var _ interface {
 	Field() string
@@ -2228,24 +2228,23 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = NPMUnauthenticatedPackageValidationError{}
+} = NPMValidationError{}
 
-// Validate checks the field values on PyPIUnauthenticatedPackage with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *PyPIUnauthenticatedPackage) Validate() error {
+// Validate checks the field values on PyPI with the rules defined in the proto
+// definition for this message. If any rules are violated, the first error
+// encountered is returned, or nil if there are no violations.
+func (m *PyPI) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on PyPIUnauthenticatedPackage with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// PyPIUnauthenticatedPackageMultiError, or nil if none found.
-func (m *PyPIUnauthenticatedPackage) ValidateAll() error {
+// ValidateAll checks the field values on PyPI with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in PyPIMultiError, or nil if none found.
+func (m *PyPI) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
+func (m *PyPI) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -2254,13 +2253,13 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 
 	switch m.Credential.(type) {
 
-	case *PyPIUnauthenticatedPackage_Unauthenticated:
+	case *PyPI_Unauthenticated:
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, PyPIUnauthenticatedPackageValidationError{
+					errors = append(errors, PyPIValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2268,7 +2267,7 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, PyPIUnauthenticatedPackageValidationError{
+					errors = append(errors, PyPIValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2277,7 +2276,7 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return PyPIUnauthenticatedPackageValidationError{
+				return PyPIValidationError{
 					field:  "Unauthenticated",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -2288,19 +2287,18 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return PyPIUnauthenticatedPackageMultiError(errors)
+		return PyPIMultiError(errors)
 	}
 
 	return nil
 }
 
-// PyPIUnauthenticatedPackageMultiError is an error wrapping multiple
-// validation errors returned by PyPIUnauthenticatedPackage.ValidateAll() if
-// the designated constraints aren't met.
-type PyPIUnauthenticatedPackageMultiError []error
+// PyPIMultiError is an error wrapping multiple validation errors returned by
+// PyPI.ValidateAll() if the designated constraints aren't met.
+type PyPIMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m PyPIUnauthenticatedPackageMultiError) Error() string {
+func (m PyPIMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2309,11 +2307,11 @@ func (m PyPIUnauthenticatedPackageMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m PyPIUnauthenticatedPackageMultiError) AllErrors() []error { return m }
+func (m PyPIMultiError) AllErrors() []error { return m }
 
-// PyPIUnauthenticatedPackageValidationError is the validation error returned
-// by PyPIUnauthenticatedPackage.Validate if the designated constraints aren't met.
-type PyPIUnauthenticatedPackageValidationError struct {
+// PyPIValidationError is the validation error returned by PyPI.Validate if the
+// designated constraints aren't met.
+type PyPIValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2321,24 +2319,22 @@ type PyPIUnauthenticatedPackageValidationError struct {
 }
 
 // Field function returns field value.
-func (e PyPIUnauthenticatedPackageValidationError) Field() string { return e.field }
+func (e PyPIValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e PyPIUnauthenticatedPackageValidationError) Reason() string { return e.reason }
+func (e PyPIValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e PyPIUnauthenticatedPackageValidationError) Cause() error { return e.cause }
+func (e PyPIValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e PyPIUnauthenticatedPackageValidationError) Key() bool { return e.key }
+func (e PyPIValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e PyPIUnauthenticatedPackageValidationError) ErrorName() string {
-	return "PyPIUnauthenticatedPackageValidationError"
-}
+func (e PyPIValidationError) ErrorName() string { return "PyPIValidationError" }
 
 // Error satisfies the builtin error interface
-func (e PyPIUnauthenticatedPackageValidationError) Error() string {
+func (e PyPIValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2350,14 +2346,14 @@ func (e PyPIUnauthenticatedPackageValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sPyPIUnauthenticatedPackage.%s: %s%s",
+		"invalid %sPyPI.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = PyPIUnauthenticatedPackageValidationError{}
+var _ error = PyPIValidationError{}
 
 var _ interface {
 	Field() string
@@ -2365,7 +2361,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = PyPIUnauthenticatedPackageValidationError{}
+} = PyPIValidationError{}
 
 // Validate checks the field values on S3 with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
