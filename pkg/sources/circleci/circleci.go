@@ -69,27 +69,27 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(_ context.Context, chunksChan chan *sources.Chunk) error {
-	projects, err := s.projects()
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	projects, err := s.projects(ctx)
 	if err != nil {
 		return err
 	}
 
 	for _, proj := range projects {
-		builds, err := s.buildsForProject(proj)
+		builds, err := s.buildsForProject(ctx, proj)
 		if err != nil {
 			return err
 		}
 
 		for _, bld := range builds {
-			buildSteps, err := s.stepsForBuild(proj, bld)
+			buildSteps, err := s.stepsForBuild(ctx, proj, bld)
 			if err != nil {
 				return err
 			}
 
 			for _, step := range buildSteps {
 				for _, action := range step.Actions {
-					err = s.chunkAction(proj, bld, action, step.Name, chunksChan)
+					err = s.chunkAction(ctx, proj, bld, action, step.Name, chunksChan)
 					if err != nil {
 						return err
 					}
@@ -107,7 +107,7 @@ type project struct {
 	RepoName string `json:"reponame"`
 }
 
-func (s *Source) projects() ([]project, error) {
+func (s *Source) projects(_ context.Context) ([]project, error) {
 	reqURL := fmt.Sprintf("%sprojects", baseURL)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -137,7 +137,7 @@ type build struct {
 	BuildNum int `json:"build_num"`
 }
 
-func (s *Source) buildsForProject(proj project) ([]build, error) {
+func (s *Source) buildsForProject(_ context.Context, proj project) ([]build, error) {
 	reqURL := fmt.Sprintf("%sproject/%s/%s/%s", baseURL, proj.VCS, proj.Username, proj.RepoName)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -169,7 +169,7 @@ type buildStep struct {
 	Actions []action `json:"actions"`
 }
 
-func (s *Source) stepsForBuild(proj project, bld build) ([]buildStep, error) {
+func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]buildStep, error) {
 	reqURL := fmt.Sprintf("%sproject/%s/%s/%s/%d", baseURL, proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -195,7 +195,7 @@ func (s *Source) stepsForBuild(proj project, bld build) ([]buildStep, error) {
 	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkAction(_ context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
 	req, err := http.NewRequest("GET", act.OutputURL, nil)
 	if err != nil {
 		return err
