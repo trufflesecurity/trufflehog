@@ -116,6 +116,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	_ = s.jobPool.Wait()
+	if len(scanErrs) > 0 {
+		log.Debugf("encountered %d errors while scanning; errors: %v", len(scanErrs), scanErrs)
+	}
 
 	return nil
 }
