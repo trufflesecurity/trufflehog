@@ -51,12 +51,12 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/xanzy/go-gitlab v0.77.0
+	github.com/xanzy/go-gitlab v0.78.0
 	go.mongodb.org/mongo-driver v1.11.1
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.5.0
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
-	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783
+	golang.org/x/oauth2 v0.3.0
 	golang.org/x/sync v0.1.0
 	google.golang.org/genproto v0.0.0-20221201164419-0e50fba7f41c
 	google.golang.org/protobuf v1.28.1
@@ -141,7 +141,7 @@ require (
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
-	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af // indirect
+	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.3.0 // indirect
 	google.golang.org/api v0.103.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
