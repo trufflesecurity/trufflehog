@@ -83,6 +83,10 @@ type scanErrors struct {
 	errors []error
 }
 
+func newScanErrors(projects int) *scanErrors {
+	return &scanErrors{errors: make([]error, 0, projects)}
+}
+
 func (s *scanErrors) add(err error) {
 	atomic.AddUint64(&s.count, 1)
 	s.mu.Lock()
@@ -98,7 +102,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	var scanned uint64
-	scanErrs := &scanErrors{}
+	scanErrs := newScanErrors(len(projects))
 
 	for _, proj := range projects {
 		proj := proj
