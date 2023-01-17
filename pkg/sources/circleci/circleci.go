@@ -84,6 +84,7 @@ func (s *Source) Chunks(_ context.Context, chunksChan chan *sources.Chunk) error
 	var scanned uint64
 	var scanErrs []error
 	for _, proj := range projects {
+		proj := proj
 		s.jobPool.Go(func() error {
 			builds, err := s.buildsForProject(proj)
 			if err != nil {
