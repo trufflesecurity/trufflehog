@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/go-errors/errors"
@@ -18,21 +18,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const (
-	baseURL = "https://circleci.com/api/v1.1/"
-)
+const baseURL = "https://circleci.com/api/v1.1/"
 
 type Source struct {
 	name     string
+	token    string
 	sourceId int64
 	jobId    int64
 	verify   bool
 	sources.Progress
-	token  string
 	client *http.Client
 }
 
-// Ensure the Source satisfies the interface at compile time
+// Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
 // Type returns the type of source.
@@ -49,8 +47,8 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
-// Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
+// Init returns an initialized CircleCI source.
+func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -109,7 +107,7 @@ type project struct {
 	RepoName string `json:"reponame"`
 }
 
-func (s *Source) projects(ctx context.Context) ([]project, error) {
+func (s *Source) projects(_ context.Context) ([]project, error) {
 	reqURL := fmt.Sprintf("%sprojects", baseURL)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -139,7 +137,7 @@ type build struct {
 	BuildNum int `json:"build_num"`
 }
 
-func (s *Source) buildsForProject(ctx context.Context, proj project) ([]build, error) {
+func (s *Source) buildsForProject(_ context.Context, proj project) ([]build, error) {
 	reqURL := fmt.Sprintf("%sproject/%s/%s/%s", baseURL, proj.VCS, proj.Username, proj.RepoName)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -171,7 +169,7 @@ type buildStep struct {
 	Actions []action `json:"actions"`
 }
 
-func (s *Source) stepsForBuild(ctx context.Context, proj project, bld build) ([]buildStep, error) {
+func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]buildStep, error) {
 	reqURL := fmt.Sprintf("%sproject/%s/%s/%s/%d", baseURL, proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -197,7 +195,7 @@ func (s *Source) stepsForBuild(ctx context.Context, proj project, bld build) ([]
 	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkAction(_ context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
 	req, err := http.NewRequest("GET", act.OutputURL, nil)
 	if err != nil {
 		return err
@@ -207,7 +205,7 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 		return err
 	}
 	defer res.Body.Close()
-	logOutput, err := ioutil.ReadAll(res.Body)
+	logOutput, err := io.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
@@ -240,10 +238,10 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 }
 
 func removeCircleSha1Line(input []byte) []byte {
-	// Split the input slice into a slice of lines
+	// Split the input slice into a slice of lines.
 	lines := bytes.Split(input, []byte("\n"))
 
-	// Iterate over the lines and add the ones that don't contain "CIRCLE_SHA1=" to the result slice
+	// Iterate over the lines and add the ones that don't contain "CIRCLE_SHA1=" to the result slice.
 	result := make([][]byte, 0, len(lines))
 	for _, line := range lines {
 		if !bytes.Contains(line, []byte("CIRCLE_SHA1=")) {
@@ -251,6 +249,6 @@ func removeCircleSha1Line(input []byte) []byte {
 		}
 	}
 
-	// Join the lines in the result slice and return the resulting slice
+	// Join the lines in the result slice and return the resulting slice.
 	return bytes.Join(result, []byte("\n"))
 }
