@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
 )
 
-// ScanS3 scans CircleCI logs.
+// ScanCircleCI scans CircleCI logs.
 func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 	connection := &sourcespb.CircleCI{
 		Credential: &sourcespb.CircleCI_Token{
