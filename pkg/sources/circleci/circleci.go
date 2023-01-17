@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/go-errors/errors"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -27,6 +30,7 @@ type Source struct {
 	sourceId int64
 	jobId    int64
 	verify   bool
+	jobPool  *errgroup.Group
 	sources.Progress
 	token  string
 	client *http.Client
@@ -49,12 +53,14 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
-// Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
+// Init returns an initialized CircleCI source.
+func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
+	s.jobPool = &errgroup.Group{}
+	s.jobPool.SetLimit(concurrency)
 	s.client = common.RetryableHttpClientTimeout(3)
 
 	var conn sourcespb.CircleCI
@@ -71,34 +77,46 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	projects, err := s.projects(ctx)
+func (s *Source) Chunks(_ context.Context, chunksChan chan *sources.Chunk) error {
+	projects, err := s.projects()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting projects: %w", err)
 	}
 
+	var scanned uint64
+	var scanErrs []error
 	for _, proj := range projects {
-		builds, err := s.buildsForProject(ctx, proj)
-		if err != nil {
-			return err
-		}
-
-		for _, bld := range builds {
-			buildSteps, err := s.stepsForBuild(ctx, proj, bld)
+		s.jobPool.Go(func() error {
+			builds, err := s.buildsForProject(proj)
 			if err != nil {
-				return err
+				scanErrs = append(scanErrs, fmt.Errorf("error getting builds for project %s: %w", proj.RepoName, err))
+				return nil
 			}
 
-			for _, step := range buildSteps {
-				for _, action := range step.Actions {
-					err = s.chunkAction(ctx, proj, bld, action, step.Name, chunksChan)
-					if err != nil {
-						return err
+			for _, bld := range builds {
+				buildSteps, err := s.stepsForBuild(proj, bld)
+				if err != nil {
+					scanErrs = append(scanErrs, fmt.Errorf("error getting steps for build %d: %w", bld.BuildNum, err))
+					return nil
+				}
+
+				for _, step := range buildSteps {
+					for _, action := range step.Actions {
+						if err = s.chunkAction(proj, bld, action, step.Name, chunksChan); err != nil {
+							scanErrs = append(scanErrs, fmt.Errorf("error chunking action %v: %w", action, err))
+							return nil
+						}
 					}
 				}
 			}
-		}
+
+			atomic.AddUint64(&scanned, 1)
+			log.Debugf("scanned %d/%d projects", scanned, len(projects))
+			return nil
+		})
 	}
+
+	_ = s.jobPool.Wait()
 
 	return nil
 }
@@ -109,7 +127,7 @@ type project struct {
 	RepoName string `json:"reponame"`
 }
 
-func (s *Source) projects(ctx context.Context) ([]project, error) {
+func (s *Source) projects() ([]project, error) {
 	reqURL := fmt.Sprintf("%sprojects", baseURL)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -139,7 +157,7 @@ type build struct {
 	BuildNum int `json:"build_num"`
 }
 
-func (s *Source) buildsForProject(ctx context.Context, proj project) ([]build, error) {
+func (s *Source) buildsForProject(proj project) ([]build, error) {
 	reqURL := fmt.Sprintf("%sproject/%s/%s/%s", baseURL, proj.VCS, proj.Username, proj.RepoName)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -171,7 +189,7 @@ type buildStep struct {
 	Actions []action `json:"actions"`
 }
 
-func (s *Source) stepsForBuild(ctx context.Context, proj project, bld build) ([]buildStep, error) {
+func (s *Source) stepsForBuild(proj project, bld build) ([]buildStep, error) {
 	reqURL := fmt.Sprintf("%sproject/%s/%s/%s/%d", baseURL, proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -197,7 +215,7 @@ func (s *Source) stepsForBuild(ctx context.Context, proj project, bld build) ([]
 	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkAction(proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
 	req, err := http.NewRequest("GET", act.OutputURL, nil)
 	if err != nil {
 		return err
