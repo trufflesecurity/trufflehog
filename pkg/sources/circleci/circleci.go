@@ -21,8 +21,8 @@ import (
 const baseURL = "https://circleci.com/api/v1.1/"
 
 type Source struct {
-	name,
-	token string
+	name     string
+	token    string
 	sourceId int64
 	jobId    int64
 	verify   bool

@@ -252,6 +252,7 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context) {
+	s.apiClient = github.NewClient(s.httpClient)
 	if len(s.orgs) > unauthGithubOrgRateLimt {
 		log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
