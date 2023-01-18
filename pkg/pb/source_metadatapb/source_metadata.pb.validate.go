@@ -1297,6 +1297,10 @@ func (m *GoogleDrive) validate(all bool) error {
 
 	// no validation rules for Timestamp
 
+	// no validation rules for Shared
+
+	// no validation rules for LastModifiedBy
+
 	if len(errors) > 0 {
 		return GoogleDriveMultiError(errors)
 	}
