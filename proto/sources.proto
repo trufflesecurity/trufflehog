@@ -117,7 +117,7 @@ message ECR {
 }
 
 message Filesystem{
-  repeated string directories = 1;
+  repeated string paths = 1;
 }
 
 message GCS {
