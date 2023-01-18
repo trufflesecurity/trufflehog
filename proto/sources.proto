@@ -116,8 +116,11 @@ message ECR {
   repeated string registries = 2;
 }
 
-message Filesystem{
-  repeated string paths = 1;
+message Filesystem {
+  // directories is deprecated and can be removed / renamed to paths when
+  // we no longer depend on the name in enterprise configs
+  repeated string directories = 1;
+  repeated string paths = 2;
 }
 
 message GCS {
