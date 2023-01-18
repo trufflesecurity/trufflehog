@@ -70,7 +70,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
-	s.paths = conn.Paths
+	s.paths = append(conn.Paths, conn.Directories...)
 
 	return nil
 }
