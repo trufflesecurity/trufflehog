@@ -197,6 +197,7 @@ message Teams {
   string link = 5;
   string file = 6;
   string email = 7;
+  string location = 8;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-FileInfo
