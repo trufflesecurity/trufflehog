@@ -181,6 +181,30 @@ func TestMultiCommitContextDiff(t *testing.T) {
 	}
 }
 
+func TestMaxDiffSize(t *testing.T) {
+	bigBytes := bytes.Buffer{}
+	bigBytes.WriteString(singleCommitSingleDiff)
+	for i := 0; i <= MaxDiffSize/1024+10; i++ {
+		bigBytes.WriteString("+")
+		for n := 0; n < 1024; n++ {
+			bigBytes.Write([]byte("0"))
+		}
+		bigBytes.WriteString("\n")
+	}
+	bigReader := bytes.NewReader(bigBytes.Bytes())
+
+	commitChan := make(chan Commit)
+	go func() {
+		FromReader(context.TODO(), bigReader, commitChan)
+	}()
+
+	commit := <-commitChan
+	if commit.Diffs[0].Content.Len() > MaxDiffSize+1024 {
+		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), MaxDiffSize+1024)
+	}
+
+}
+
 const singleCommitSingleDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
 Date:   Mon Mar 15 23:27:16 2021 -0700
