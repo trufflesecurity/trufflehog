@@ -20,6 +20,9 @@ import (
 // DateFormat is the standard date format for git.
 const DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
 
+// MaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
+const MaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+
 // Commit contains commit header info and diffs.
 type Commit struct {
 	Hash    string
@@ -222,7 +225,10 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 				}
 			}
 		}
-
+		if currentDiff.Content.Len() > MaxDiffSize {
+			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, MaxDiffSize)
+			break
+		}
 	}
 	if currentDiff != nil && currentDiff.Content.Len() > 0 {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
