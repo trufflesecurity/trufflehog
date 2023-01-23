@@ -10,7 +10,7 @@ replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff 
 
 require (
 	cloud.google.com/go/secretmanager v1.10.0
-	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/TheZeroSlave/zapsentry v1.12.0
 	github.com/aws/aws-sdk-go v1.44.83
 	github.com/bill-rich/disk-buffer-reader v0.1.7
@@ -58,6 +58,7 @@ require (
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
 	golang.org/x/oauth2 v0.3.0
 	golang.org/x/sync v0.1.0
+	golang.org/x/text v0.6.0
 	google.golang.org/genproto v0.0.0-20221201164419-0e50fba7f41c
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -140,7 +141,6 @@ require (
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.3.0 // indirect
 	google.golang.org/api v0.103.0 // indirect
