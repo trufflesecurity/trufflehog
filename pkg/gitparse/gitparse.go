@@ -17,11 +17,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// DateFormat is the standard date format for git.
-const DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
+const (
+	// DateFormat is the standard date format for git.
+	DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
 
-// MaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-const MaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+	// MaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
+	MaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+)
 
 // Commit contains commit header info and diffs.
 type Commit struct {
