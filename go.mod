@@ -20,7 +20,7 @@ require (
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/envoyproxy/protoc-gen-validate v0.9.1
-	github.com/fatih/color v1.13.0
+	github.com/fatih/color v1.14.0
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.17.0
 	github.com/go-errors/errors v1.4.2
@@ -58,6 +58,7 @@ require (
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
 	golang.org/x/oauth2 v0.3.0
 	golang.org/x/sync v0.1.0
+	golang.org/x/text v0.6.0
 	google.golang.org/genproto v0.0.0-20221201164419-0e50fba7f41c
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -115,7 +116,7 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
-	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
@@ -140,7 +141,6 @@ require (
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.3.0 // indirect
 	google.golang.org/api v0.103.0 // indirect
