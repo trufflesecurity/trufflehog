@@ -6,6 +6,7 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -34,7 +35,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 	if c.BaseRef != "" {
 		opts = append(opts, git.ScanOptionBaseHash(c.BaseRef))
 	}
-	if c.HeadRef != "" {
+	if c.HeadRef != "" && !slices.Contains([]string{"main", "master"}, c.HeadRef) {
 		opts = append(opts, git.ScanOptionHeadCommit(c.HeadRef))
 	}
 	scanOptions := git.NewScanOptions(opts...)

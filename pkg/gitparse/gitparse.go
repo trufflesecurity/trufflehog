@@ -78,7 +78,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 func RepoPath(ctx context.Context, source string, head string) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if head != "" {
-		args = append(args, head)
+		args = append(args, fmt.Sprintf("..%s", head))
 	} else {
 		args = append(args, "--all")
 	}
