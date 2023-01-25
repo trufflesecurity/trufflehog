@@ -837,6 +837,9 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 	}
 
 	for _, org := range installs {
+		if org.Account.GetType() != "Organization" {
+			continue
+		}
 		if err := s.addMembersByOrg(ctx, *org.Account.Login); err != nil {
 			return err
 		}
@@ -947,9 +950,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 		s.log.Debugf("Listed orgs for user %s page %d/%d", user, orgOpts.Page, resp.LastPage)
 		for _, org := range orgs {
 			var name string
-			if org.Name != nil {
-				name = *org.Name
-			} else if org.Login != nil {
+			if org.Login != nil {
 				name = *org.Login
 			} else {
 				continue
