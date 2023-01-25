@@ -51,23 +51,23 @@ func newPage1Model() page1Model {
 	// Make list of items.
 	items := []list.Item{
 		// Open source sources.
-		item{"circleci", "Scan circleci."},
-		item{"filesystem", "Scan filesystem."},
-		item{"git", "Scan git."},
-		item{"github", "Scan github."},
-		item{"gitlab", "Scan gitlab."},
-		item{"s3", "Scan s3."},
-		item{"syslog", "Scan syslog."},
+		item{"Git", "Scan git repositories."},
+		item{"GitHub", "Scan Github repositories and/or organizations."},
+		item{"GitLab", "Scan GitLab repositories."},
+		item{"Filesystem", "Scan your filesystem by selecting what directories to scan."},
+		item{"AWS S3", "Scan Amazon S3 buckets."},
+		item{"CircleCI", "Scan CircleCI, a CI/CD platform."},
+		item{"Syslog", "Scan syslog, event data logs."},
 		// Enterprise sources.
-		item{"artifactory", "Enterprise only source."},
-		item{"bitbucket", "Enterprise only source."},
-		item{"buildkite", "Enterprise only source."},
-		item{"confluence", "Enterprise only source."},
-		item{"gerrit", "Enterprise only source."},
-		item{"jenkins", "Enterprise only source."},
-		item{"jira", "Enterprise only source."},
-		item{"slack", "Enterprise only source."},
-		item{"teams", "Enterprise only source."},
+		item{"⭐ Artifactory", "Scan JFrog Artifactory packages. (Enterprise only)"},
+		item{"⭐ BitBucket", "Scan Atlassian's Git-based source code repository hosting service. (Enterprise only)"},
+		item{"⭐ Buildkite", "Scan Buildkite, a CI/CD platform. (Enterprise only)"},
+		item{"⭐ Confluence", "Scan Atlassian's web-based wiki and knowledge base. (Enterprise only)"},
+		item{"⭐ Gerrit", "Scan Gerrit, a code collaboration tool (Enterprise only)"},
+		item{"⭐ Jenkins ", "Scan Jenkins, a CI/CD platform. (Enterprise only)"},
+		item{"⭐ Jira", "Scan Atlassian's issue & project tracking software. (Enterprise only)"},
+		item{"⭐ Slack", "Scan Slack, a messaging and communication platform. (Enterprise only)"},
+		item{"⭐ Microsoft Teams", "Scan Microsoft Teams, a messaging and communication platform. (Enterprise only)"},
 	}
 
 	// Setup list
