@@ -150,6 +150,14 @@ Help with setting up this packaging would be appreciated!
 brew install trufflesecurity/trufflehog/trufflehog
 ```
 
+### 6. MacPorts
+
+```bash
+sudo port install trufflehog
+```
+
+More information [here](https://ports.macports.org/port/trufflehog/)
+
 ## Usage
 
 TruffleHog has a sub-command for each source of data that you may want to scan:
