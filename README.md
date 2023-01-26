@@ -110,7 +110,7 @@ TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
 
 ## What is credential verification?
-For every potential credential that is detected, we've painstakingly implemented programatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
+For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 ## Installation
 
