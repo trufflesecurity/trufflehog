@@ -28,7 +28,7 @@ https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkii
 ![GitHub scanning demo](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
 
 ```bash
-docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
+docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
 ## Examples
@@ -36,7 +36,8 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
 ### Example 1: Scan a repo for only verified secrets
 
 Command:
-```
+
+```bash
 trufflehog git https://github.com/trufflesecurity/test_keys --only-verified
 ```
 
@@ -59,14 +60,15 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 
 ### Example 2: Scan a GitHub Org for only verified secrets
 
-```
+```bash
 trufflehog github --org=trufflesecurity --only-verified
 ```
 
 ### Example 3: Scan a GitHub Repo for only verified keys and get JSON output
 
 Command:
-```
+
+```bash
 trufflehog git https://github.com/trufflesecurity/test_keys --only-verified --json
 ```
 
@@ -77,7 +79,8 @@ Expected output:
 ```
 
 ### Example 4: Scan an S3 bucket for verified keys
-```
+
+```bash
 trufflehog s3 --bucket=<bucket name> --only-verified
 ```
 
@@ -88,8 +91,14 @@ trufflehog s3 --bucket=<bucket name> --only-verified
 + Why is the scan is taking a long time when I scan a GitHub org
   + Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
 + It says a private key was verified, what does that mean?
-  + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)  
+  + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 
+
+### Example 5: Scan a Github Repo using SSH authentication in docker
+
+```bash
+docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
+```
 
 # What's new in v3?
 
@@ -108,7 +117,7 @@ For every potential credential that is detected, we've painstakingly implemented
 Several options:
 
 ### 1. Go
-```
+```bash
 git clone https://github.com/trufflesecurity/trufflehog.git
 
 cd trufflehog; go install
@@ -119,12 +128,12 @@ cd trufflehog; go install
 ### 3. Docker
 
 
-> Note: Apple M1 hardware users should run with `docker run --platform linux/arm64` for better performance.
+> Note: Apple M1 hardware users should run with `docker run --rm --platform linux/arm64` for better performance.
 
 #### **Most users**
 
 ```bash
-docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
 #### **Apple M1 users**
@@ -133,7 +142,7 @@ The `linux/arm64` image is better to run on the M1 than the amd64 image.
 Even better is running the native darwin binary available, but there is no container image for that.
 
 ```bash
-docker run --platform linux/arm64 -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys 
+docker run --rm --platform linux/arm64 -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
 ### 4. Pip (help wanted)
@@ -207,7 +216,7 @@ Exit Codes:
 Try scanning an entire GitHub organization with the following:
 
 ```bash
-docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
+docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
 ### TruffleHog OSS Github Action
@@ -217,9 +226,9 @@ docker run -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=tru
   uses: trufflesecurity/trufflehog@main
   with:
     # Repository path
-    path: 
+    path:
     # Start scanning from here (usually main branch).
-    base: 
+    base:
     # Scan commits until here (usually dev branch).
     head: # optional
     # Extra args to be passed to the trufflehog cli.
@@ -264,7 +273,7 @@ repos:
       description: Detect secrets in your data.
       entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
       # For running trufflehog in docker, use the following entry instead:
-      # entry: bash -c 'docker run -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --only-verified --fail'
+      # entry: bash -c 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --only-verified --fail'
       language: system
       stages: ["commit", "push"]
 ```
@@ -302,7 +311,7 @@ detectors:
 ```
 
 ```
-» trufflehog filesystem --directory /tmp --config config.yaml --only-verified
+$ trufflehog filesystem --directory /tmp --config config.yaml --only-verified
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
 
 Found verified result 🐷🔑
