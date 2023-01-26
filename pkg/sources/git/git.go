@@ -330,7 +330,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return err
 	}
 
-	commitChan, err := gitparse.RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.MergeCommitTarget)
+	commitChan, err := gitparse.RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "")
 	if err != nil {
 		return err
 	}
@@ -589,11 +589,6 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error)
 			if err != nil {
 				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
 			}
-		}
-		// If the commit has more than one parent, it is a merge commit, and the git
-		// log filter cannot be applied.
-		if len(baseCommit.ParentHashes) > 1 {
-			scanOptions.MergeCommitTarget = true
 		}
 	}
 

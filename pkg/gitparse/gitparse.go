@@ -75,9 +75,9 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func RepoPath(ctx context.Context, source string, head string, fullLog bool) (chan Commit, error) {
+func RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
-	if !fullLog {
+	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
 	}
 	if head != "" {
