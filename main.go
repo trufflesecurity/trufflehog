@@ -80,8 +80,8 @@ var (
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Required().Strings()
 	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive = filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()
-	// filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	// filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
 	s3Scan         = cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey      = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
@@ -201,15 +201,14 @@ func run(state overseer.State) {
 		engine.WithFilterUnverified(*filterUnverified),
 	)
 
-	filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
-	if err != nil {
-		logrus.WithError(err).Fatal("could not create filter")
-	}
-
 	var repoPath string
 	var remote bool
 	switch cmd {
 	case gitScan.FullCommand():
+		filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
+		if err != nil {
+			logrus.WithError(err).Fatal("could not create filter")
+		}
 		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
 		if err != nil || repoPath == "" {
 			logrus.WithError(err).Fatal("error preparing git repo for scanning")
@@ -246,7 +245,7 @@ func run(state overseer.State) {
 			c.IncludeRepos = *githubIncludeRepos
 		}
 
-		if err = e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
+		if err := e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
@@ -262,12 +261,18 @@ func run(state overseer.State) {
 			c.Filter = filter
 		}
 
-		if err = e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {
+		if err := e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
+		filter, err := common.FilterFromFiles(*filesystemScanIncludePaths, *filesystemScanExcludePaths)
+		if err != nil {
+			logrus.WithError(err).Fatal("could not create filter")
+		}
+
 		fs := func(c *sources.Config) {
 			c.Directories = *filesystemDirectories
+			c.Filter = filter
 		}
 
 		if err = e.ScanFileSystem(ctx, sources.NewConfig(fs)); err != nil {
@@ -280,7 +285,7 @@ func run(state overseer.State) {
 			c.Buckets = *s3ScanBuckets
 		}
 
-		if err = e.ScanS3(ctx, sources.NewConfig(s3)); err != nil {
+		if err := e.ScanS3(ctx, sources.NewConfig(s3)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
@@ -293,11 +298,11 @@ func run(state overseer.State) {
 			c.Concurrency = *concurrency
 		}
 
-		if err = e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
+		if err := e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
 		}
 	case circleCiScan.FullCommand():
-		if err = e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
+		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan CircleCI.")
 		}
 	}

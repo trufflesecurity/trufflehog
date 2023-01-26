@@ -129,6 +129,13 @@ func TestFilterFromFile(t *testing.T) {
 			pattern:             "test",
 			pass:                false,
 		},
+		"EmptyLinesAreIgnored": {
+			includeFile:         false,
+			excludeFile:         true,
+			excludeFileContents: " \ntest.txt",
+			pattern:             "hello world.txt",
+			pass:                true,
+		},
 	}
 	for name, test := range tests {
 		var includeTestFile, excludeTestFile string
