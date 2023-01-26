@@ -148,7 +148,7 @@ func TestAddMembersByApp(t *testing.T) {
 		Get("/app/installations").
 		Reply(200).
 		JSON([]map[string]interface{}{
-			{"account": map[string]string{"login": "super-secret-org"}},
+			{"account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
 		})
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/members").
@@ -197,14 +197,13 @@ func TestAddOrgsByUser(t *testing.T) {
 		Get("/user/orgs").
 		Reply(200).
 		JSON([]map[string]interface{}{
-			{"name": "sso1"},
 			{"login": "sso2"},
 		})
 
 	s := initTestSource(nil)
 	s.addOrgsByUser(context.TODO(), "super-secret-user")
-	assert.Equal(t, 2, len(s.orgs))
-	assert.Equal(t, []string{"sso1", "sso2"}, s.orgs)
+	assert.Equal(t, 1, len(s.orgs))
+	assert.Equal(t, []string{"sso2"}, s.orgs)
 	assert.True(t, gock.IsDone())
 }
 

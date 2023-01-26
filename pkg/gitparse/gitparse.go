@@ -17,8 +17,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// DateFormat is the standard date format for git.
-const DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
+const (
+	// DateFormat is the standard date format for git.
+	DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
+
+	// MaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
+	MaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+)
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -70,8 +75,11 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func RepoPath(ctx context.Context, source string, head string) (chan Commit, error) {
-	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
+func RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
+	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
+	if abbreviatedLog {
+		args = append(args, "--diff-filter=AM")
+	}
 	if head != "" {
 		args = append(args, head)
 	} else {
@@ -222,7 +230,10 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 				}
 			}
 		}
-
+		if currentDiff.Content.Len() > MaxDiffSize {
+			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, MaxDiffSize)
+			break
+		}
 	}
 	if currentDiff != nil && currentDiff.Content.Len() > 0 {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
