@@ -31,13 +31,13 @@ type listKeyMap struct {
 	toggleHelpMenu key.Binding
 }
 
-type page1Model struct {
+type sourceSelectModel struct {
 	sourcesList  list.Model
 	keys         *listKeyMap
 	delegateKeys *delegateKeyMap
 }
 
-func newPage1Model() page1Model {
+func newSourceSelectModel() sourceSelectModel {
 	var (
 		delegateKeys = newDelegateKeyMap()
 		listKeys     = &listKeyMap{
@@ -82,18 +82,18 @@ func newPage1Model() page1Model {
 	}
 	sourcesList.SetShowStatusBar(false)
 
-	return page1Model{
+	return sourceSelectModel{
 		sourcesList:  sourcesList,
 		keys:         listKeys,
 		delegateKeys: delegateKeys,
 	}
 }
 
-func (m page1Model) Init() tea.Cmd {
+func (m sourceSelectModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m page1Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m sourceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -122,7 +122,7 @@ func (m page1Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m page1Model) View() string {
+func (m sourceSelectModel) View() string {
 	return appStyle.Render(m.sourcesList.View())
 }
 

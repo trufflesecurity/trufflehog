@@ -11,8 +11,8 @@ import (
 type state int
 
 const (
-	showPage0 state = iota
-	showPage1
+	showWizardIntro state = iota
+	showSourceSelect
 )
 
 var (
@@ -20,9 +20,9 @@ var (
 )
 
 type model struct {
-	state state
-	page0 page0Model
-	page1 page1Model
+	state        state
+	wizardIntro  wizardIntroModel
+	sourceSelect sourceSelectModel
 }
 
 func (m model) Init() tea.Cmd {
@@ -33,27 +33,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Always pass WindowSizeMsg to all pages.
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		var model tea.Model
-		model, _ = m.page0.Update(msg)
-		m.page0 = model.(page0Model)
-		model, _ = m.page1.Update(msg)
-		m.page1 = model.(page1Model)
+		model, _ = m.wizardIntro.Update(msg)
+		m.wizardIntro = model.(wizardIntroModel)
+		model, _ = m.sourceSelect.Update(msg)
+		m.sourceSelect = model.(sourceSelectModel)
 		return m, nil
 	}
 
 	var cmd tea.Cmd
 	var model tea.Model
 	switch m.state {
-	case showPage0:
-		model, cmd = m.page0.Update(msg)
-		m.page0 = model.(page0Model)
-		if m.page0.action != "" {
-			m.state = showPage1
+	case showWizardIntro:
+		model, cmd = m.wizardIntro.Update(msg)
+		m.wizardIntro = model.(wizardIntroModel)
+		if m.wizardIntro.action != "" {
+			m.state = showSourceSelect
 		}
 		return m, cmd
 
-	case showPage1:
-		model, cmd = m.page1.Update(msg)
-		m.page1 = model.(page1Model)
+	case showSourceSelect:
+		model, cmd = m.sourceSelect.Update(msg)
+		m.sourceSelect = model.(sourceSelectModel)
 		// Potential logic for changing the state goes here. You change the
 		// state based on how the update affected the section model.
 		return m, cmd
@@ -65,18 +65,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	switch m.state {
-	case showPage0:
-		return m.page0.View()
-	case showPage1:
-		return m.page1.View()
+	case showWizardIntro:
+		return m.wizardIntro.View()
+	case showSourceSelect:
+		return m.sourceSelect.View()
 	default:
-		return m.page0.View()
+		return m.wizardIntro.View()
 	}
 }
 
 func Run() []string {
 	// TODO: Print normal help message.
-	p := tea.NewProgram(model{page1: newPage1Model()})
+	p := tea.NewProgram(model{sourceSelect: newSourceSelectModel()})
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)

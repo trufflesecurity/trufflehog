@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	page0Choices = []string{
+	wizardIntroChoices = []string{
 		"Scan a source using wizard",
 		"Scan a source with config",
 		"View open-source project",
@@ -15,16 +15,16 @@ var (
 	}
 )
 
-type page0Model struct {
+type wizardIntroModel struct {
 	cursor int
 	action string
 }
 
-func (m page0Model) Init() tea.Cmd {
+func (m wizardIntroModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m page0Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m wizardIntroModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -33,19 +33,19 @@ func (m page0Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			// Move to the next state.
-			m.action = page0Choices[m.cursor]
+			m.action = wizardIntroChoices[m.cursor]
 			m.cursor = 0
 
 		case "down", "j":
 			m.cursor++
-			if m.cursor >= len(page0Choices) {
+			if m.cursor >= len(wizardIntroChoices) {
 				m.cursor = 0
 			}
 
 		case "up", "k":
 			m.cursor--
 			if m.cursor < 0 {
-				m.cursor = len(page0Choices) - 1
+				m.cursor = len(wizardIntroChoices) - 1
 			}
 		}
 	}
@@ -53,17 +53,17 @@ func (m page0Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m page0Model) View() string {
+func (m wizardIntroModel) View() string {
 	s := strings.Builder{}
 	s.WriteString("What do you want to do?\n\n")
 
-	for i := 0; i < len(page0Choices); i++ {
+	for i := 0; i < len(wizardIntroChoices); i++ {
 		if m.cursor == i {
 			s.WriteString(" (•) ")
 		} else {
 			s.WriteString(" ( ) ")
 		}
-		s.WriteString(page0Choices[i])
+		s.WriteString(wizardIntroChoices[i])
 		s.WriteString("\n")
 	}
 
