@@ -90,10 +90,10 @@ func newPage1Model() page1Model {
 }
 
 func (m page1Model) Init() tea.Cmd {
-	return tea.EnterAltScreen
+	return nil
 }
 
-func (m page1Model) Update(msg tea.Msg) (page1Model, tea.Cmd) {
+func (m page1Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {

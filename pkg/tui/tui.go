@@ -30,28 +30,30 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		// TODO: This function shouldn't have to know page1.sourcesList needs
-		//       its size set.
-		h, v := appStyle.GetFrameSize()
-		m.page1.sourcesList.SetSize(msg.Width-h, msg.Height-v)
+	// Always pass WindowSizeMsg to all pages.
+	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+		var model tea.Model
+		model, _ = m.page0.Update(msg)
+		m.page0 = model.(page0Model)
+		model, _ = m.page1.Update(msg)
+		m.page1 = model.(page1Model)
+		return m, nil
 	}
 
+	var cmd tea.Cmd
+	var model tea.Model
 	switch m.state {
 	case showPage0:
-		var cmd tea.Cmd
-		m.page0, cmd = m.page0.Update(msg)
+		model, cmd = m.page0.Update(msg)
+		m.page0 = model.(page0Model)
 		if m.page0.action != "" {
 			m.state = showPage1
-			m.page1.Init()
 		}
 		return m, cmd
 
 	case showPage1:
-		var cmd tea.Cmd
-		m.page1, cmd = m.page1.Update(msg)
+		model, cmd = m.page1.Update(msg)
+		m.page1 = model.(page1Model)
 		// Potential logic for changing the state goes here. You change the
 		// state based on how the update affected the section model.
 		return m, cmd

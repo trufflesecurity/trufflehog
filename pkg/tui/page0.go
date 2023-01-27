@@ -24,7 +24,7 @@ func (m page0Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m page0Model) Update(msg tea.Msg) (page0Model, tea.Cmd) {
+func (m page0Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
