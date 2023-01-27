@@ -98,9 +98,6 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 			Raw:          []byte(raw),
 		}
 
-		if isKnownFalsePositive(match) {
-			continue
-		}
 		if !verify {
 			results = append(results, result)
 			continue
@@ -210,17 +207,4 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 	}
 
 	return matches
-}
-
-// This function will check false positives for common test words, but also it
-// will make sure the key appears 'random' enough to be a real key.
-func isKnownFalsePositive(match map[string][]string) bool {
-	for _, values := range match {
-		for _, value := range values {
-			if detectors.IsKnownFalsePositive(value, detectors.DefaultFalsePositives, true) {
-				return true
-			}
-		}
-	}
-	return false
 }
