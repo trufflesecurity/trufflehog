@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var (
@@ -59,11 +60,12 @@ func (m wizardIntroModel) View() string {
 
 	for i := 0; i < len(wizardIntroChoices); i++ {
 		if m.cursor == i {
-			s.WriteString(" (•) ")
+			selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colors["sprout"]))
+			s.WriteString(selectedStyle.Render(" (•) " + wizardIntroChoices[i]))
 		} else {
-			s.WriteString(" ( ) ")
+			s.WriteString(" ( ) " + wizardIntroChoices[i])
 		}
-		s.WriteString(wizardIntroChoices[i])
+
 		s.WriteString("\n")
 	}
 
