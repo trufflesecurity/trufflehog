@@ -54,9 +54,12 @@ func TestSource_Token(t *testing.T) {
 	}
 
 	s := Source{
-		conn:       conn,
-		httpClient: common.SaneHttpClient(),
-		log:        log.WithField("source", "github"),
+		conn:        conn,
+		httpClient:  common.SaneHttpClient(),
+		log:         log.WithField("source", "github"),
+		repoCache:   newRepoCache(),
+		memberCache: map[string]struct{}{},
+		orgCache:    map[string]struct{}{},
 	}
 
 	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
