@@ -380,6 +380,85 @@ func BenchmarkEnumerateWithToken(b *testing.B) {
 	}
 }
 
+func TestEnumerate(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/repos").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/user/orgs").
+		MatchParam("per_page", "100").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
+
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+	})
+
+	_, err := s.enumerate(context.TODO(), "https://api.github.com")
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(s.repoCache))
+	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.True(t, ok)
+	_, ok = s.repoCache["https://github.com/super-secret-gist.git"]
+	assert.True(t, ok)
+	assert.True(t, gock.IsDone())
+}
+
+func setupMocks(b *testing.B) {
+	b.Helper()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/repos").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/user/orgs").
+		MatchParam("per_page", "100").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
+}
+
+func BenchmarkEnumerate(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		s := initTestSource(&sourcespb.GitHub{
+			Credential: &sourcespb.GitHub_Token{
+				Token: "super secret token",
+			},
+		})
+		setupMocks(b)
+
+		b.StartTimer()
+		_, _ = s.enumerate(context.TODO(), "https://api.github.com")
+	}
+}
+
 func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	defer gock.Off()
 

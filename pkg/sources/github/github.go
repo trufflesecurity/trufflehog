@@ -470,6 +470,19 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		apiEndpoint = "https://api.github.com"
 	}
 
+	installationClient, err := s.enumerate(ctx, apiEndpoint)
+	if err != nil {
+		return err
+	}
+
+	for _, err := range s.scan(ctx, installationClient, chunksChan) {
+		log.WithError(err).Error("error scanning repository")
+	}
+
+	return nil
+}
+
+func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
 	var installationClient *github.Client
 	var err error
 
@@ -478,18 +491,17 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		s.enumerateUnauthenticated(ctx)
 	case *sourcespb.GitHub_Token:
 		if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
-			return err
+			return nil, err
 		}
 	case *sourcespb.GitHub_GithubApp:
 		if installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
-			return err
+			return nil, err
 		}
 	default:
 		// TODO: move this error to Init
-		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	// s.normalizeRepos(ctx)
 	s.repos = make([]string, 0, len(s.repoCache))
 	for repo := range s.repoCache {
 		s.repos = append(s.repos, repo)
@@ -497,12 +509,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
-
-	for _, err := range s.scan(ctx, installationClient, chunksChan) {
-		log.WithError(err).Error("error scanning repository")
-	}
-
-	return nil
+	return installationClient, nil
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) []error {
