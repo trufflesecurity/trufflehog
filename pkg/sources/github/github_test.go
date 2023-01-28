@@ -10,11 +10,11 @@ import (
 	"io"
 	"net/http"
 	"reflect"
-	"sort"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v42/github"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -148,6 +148,28 @@ func TestAddGistsByUser(t *testing.T) {
 	assert.True(t, gock.IsDone())
 }
 
+func TestAddMembersByOrg(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/org1/members").
+		Reply(200).
+		JSON([]map[string]string{
+			{"login": "testman1"},
+			{"login": "testman2"},
+		})
+
+	s := initTestSource(nil)
+	err := s.addMembersByOrg(context.TODO(), "org1")
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(s.memberCache))
+	_, ok := s.memberCache["testman1"]
+	assert.True(t, ok)
+	_, ok = s.memberCache["testman2"]
+	assert.True(t, ok)
+	assert.True(t, gock.IsDone())
+}
+
 func TestAddMembersByApp(t *testing.T) {
 	defer gock.Off()
 
@@ -169,8 +191,13 @@ func TestAddMembersByApp(t *testing.T) {
 	s := initTestSource(nil)
 	err := s.addMembersByApp(context.TODO(), github.NewClient(nil))
 	assert.Nil(t, err)
-	assert.Equal(t, 3, len(s.members))
-	assert.Equal(t, []string{"ssm1", "ssm2", "ssm3"}, s.members)
+	assert.Equal(t, 3, len(s.memberCache))
+	_, ok := s.memberCache["ssm1"]
+	assert.True(t, ok)
+	_, ok = s.memberCache["ssm2"]
+	assert.True(t, ok)
+	_, ok = s.memberCache["ssm3"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -182,16 +209,19 @@ func TestAddReposByApp(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"repositories": []map[string]string{
-				{"clone_url": "ssr1"},
-				{"clone_url": "ssr2"},
+				{"clone_url": "https://github/ssr1.git"},
+				{"clone_url": "https://github/ssr2.git"},
 			},
 		})
 
 	s := initTestSource(nil)
 	err := s.addReposByApp(context.TODO())
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(s.repos))
-	assert.Equal(t, []string{"ssr1", "ssr2"}, s.repos)
+	assert.Equal(t, 2, len(s.repoCache))
+	_, ok := s.repoCache["https://github/ssr1.git"]
+	assert.True(t, ok)
+	_, ok = s.repoCache["https://github/ssr2.git"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -209,8 +239,9 @@ func TestAddOrgsByUser(t *testing.T) {
 
 	s := initTestSource(nil)
 	s.addOrgsByUser(context.TODO(), "super-secret-user")
-	assert.Equal(t, 1, len(s.orgs))
-	assert.Equal(t, []string{"sso2"}, s.orgs)
+	assert.Equal(t, 1, len(s.orgCache))
+	_, ok := s.orgCache["sso2"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -221,13 +252,16 @@ func TestNormalizeRepos(t *testing.T) {
 		name     string
 		setup    func()
 		repos    []string
-		expected []string
+		expected map[string]struct{}
+		wantErr  bool
 	}{
 		{
-			name:     "repo url",
-			setup:    func() {},
-			repos:    []string{"https://github.com/super-secret-user/super-secret-repo"},
-			expected: []string{"https://github.com/super-secret-user/super-secret-repo.git"},
+			name:  "repo url",
+			setup: func() {},
+			repos: []string{"https://github.com/super-secret-user/super-secret-repo"},
+			expected: map[string]struct{}{
+				"https://github.com/super-secret-user/super-secret-repo.git": {},
+			},
 		},
 		{
 			name: "username with gists",
@@ -242,9 +276,9 @@ func TestNormalizeRepos(t *testing.T) {
 					JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git"}})
 			},
 			repos: []string{"super-secret-user"},
-			expected: []string{
-				"https://github.com/super-secret-user/super-secret-repo.git",
-				"https://github.com/super-secret-user/super-secret-gist.git",
+			expected: map[string]struct{}{
+				"https://github.com/super-secret-user/super-secret-repo.git": {},
+				"https://github.com/super-secret-user/super-secret-gist.git": {},
 			},
 		},
 		{
@@ -258,13 +292,15 @@ func TestNormalizeRepos(t *testing.T) {
 					Reply(404)
 			},
 			repos:    []string{"not-found"},
-			expected: []string{},
+			expected: map[string]struct{}{},
+			wantErr:  true,
 		},
 		{
 			name:     "unexpected format",
 			setup:    func() {},
 			repos:    []string{"/foo/"},
-			expected: []string{},
+			expected: map[string]struct{}{},
+			wantErr:  true,
 		},
 	}
 
@@ -273,16 +309,21 @@ func TestNormalizeRepos(t *testing.T) {
 			defer gock.Off()
 			tt.setup()
 			s := initTestSource(nil)
-			s.repos = tt.repos
 
-			s.normalizeRepos(context.TODO())
-			assert.Equal(t, len(tt.expected), len(s.repos))
-			// sort and compare
-			sort.Slice(tt.expected, func(i, j int) bool { return tt.expected[i] < tt.expected[j] })
-			sort.Slice(s.repos, func(i, j int) bool { return s.repos[i] < s.repos[j] })
-			assert.Equal(t, tt.expected, s.repos)
+			got, err := s.normalizeRepo(tt.repos[0])
+			if (err != nil) != tt.wantErr {
+				t.Errorf("normalizeRepo() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != "" {
+				for k := range tt.expected {
+					assert.Equal(t, got, k)
+				}
+			}
 
-			assert.True(t, gock.IsDone())
+			if got == "" && !cmp.Equal(s.repoCache, tt.expected) {
+				t.Errorf("normalizeRepo() got = %v, want %v", s.repos, tt.expected)
+			}
 		})
 	}
 }

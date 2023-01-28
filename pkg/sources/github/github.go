@@ -55,6 +55,8 @@ type Source struct {
 	includeRepos,
 	ignoreRepos []string
 	repoCache       map[string]struct{}
+	orgCache        map[string]struct{}
+	memberCache     map[string]struct{}
 	git             *git.Git
 	httpClient      *http.Client
 	log             *log.Entry
@@ -138,6 +140,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.httpClient = common.RetryableHttpClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
 	s.repoCache = make(map[string]struct{})
+	s.orgCache = make(map[string]struct{})
+	s.memberCache = make(map[string]struct{})
 
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -860,10 +864,11 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 }
 
 func (s *Source) addReposByApp(ctx context.Context) error {
-	// Authenticated enumeration of repos
+	// Authenticated enumeration of repos.
 	opts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
+
 	for {
 		someRepos, res, err := s.apiClient.Apps.ListRepos(ctx, opts)
 		if err == nil {
@@ -878,14 +883,23 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 		if res == nil {
 			break
 		}
+
 		s.log.Debugf("Listed repos for app page %d/%d", opts.Page, res.LastPage)
 		for _, r := range someRepos.Repositories {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
-			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
+			repo, err := s.normalizeRepo(r.GetCloneURL())
+			if err != nil {
+				s.log.Warnf("could not normalize repo %s: %v", r.GetCloneURL(), err)
+				continue
+			}
+			if _, ok := s.repoCache[repo]; !ok {
+				s.repoCache[repo] = struct{}{}
+			}
 			s.log.Debugf("Enumerated repo %s", r.GetCloneURL())
 		}
+
 		if res.NextPage == 0 {
 			break
 		}
@@ -934,7 +948,9 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 				continue
 			}
 			s.log.Debugf("adding organization %d for repository enumeration: %s", org.ID, name)
-			common.AddStringSliceItem(name, &s.orgs)
+			if _, ok := s.orgCache[name]; !ok {
+				s.orgCache[name] = struct{}{}
+			}
 		}
 	}
 }
@@ -960,13 +976,12 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 		}
 		s.log.Debugf("Listed orgs for user %s page %d/%d", user, orgOpts.Page, resp.LastPage)
 		for _, org := range orgs {
-			var name string
-			if org.Login != nil {
-				name = *org.Login
-			} else {
+			if org.Login == nil {
 				continue
 			}
-			common.AddStringSliceItem(name, &s.orgs)
+			if _, ok := s.orgCache[*org.Login]; !ok {
+				s.orgCache[*org.Login] = struct{}{}
+			}
 		}
 		if resp.NextPage == 0 {
 			break
@@ -1005,7 +1020,9 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 			if usr == nil || *usr == "" {
 				continue
 			}
-			common.AddStringSliceItem(*usr, &s.members)
+			if _, ok := s.memberCache[*usr]; !ok {
+				s.memberCache[*usr] = struct{}{}
+			}
 		}
 		if res.NextPage == 0 {
 			break
@@ -1018,7 +1035,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 
 func (s *Source) addReposForMembers(ctx context.Context) {
 	log.Infof("Fetching repos from %d members", len(s.members))
-	for _, member := range s.members {
+	for member := range s.memberCache {
 		if err := s.getGistsByUser(ctx, member); err != nil {
 			log.WithError(err).Infof("Unable to fetch gists by user %s", member)
 		}
@@ -1028,42 +1045,20 @@ func (s *Source) addReposForMembers(ctx context.Context) {
 	}
 }
 
-func (s *Source) normalizeRepos(ctx context.Context) {
-	// TODO: Add check/fix for repos that are missing scheme
-	normalizedRepos := map[string]struct{}{}
-	for _, repo := range s.repos {
-		normalized, err := s.normalizeRepo(repo)
-		if err != nil {
-			log.WithError(err).Warnf("Could not normalize repository %s", repo)
-			continue
-		}
-		normalizedRepos[normalized] = struct{}{}
-	}
-
-	// Replace s.repos.
-	s.repos = s.repos[:0]
-	for key := range normalizedRepos {
-		s.repos = append(s.repos, key)
-	}
-}
-
 func (s *Source) normalizeRepo(repo string) (string, error) {
 	// If there's a '/', assume it's a URL and try to normalize it.
 	if strings.ContainsRune(repo, '/') {
 		return giturl.NormalizeGithubRepo(repo)
 	}
+
 	// Otherwise, assume it's a user and enumerate repositories and gists.
-	// if repos, err := s.getReposByUser(context.Background(), repo); err == nil {
-	// 	if len(repos) > 0 {
-	// 		return repos[0], nil
-	// 	}
-	// }
-	// if gists, err := s.getGistsByUser(context.Background(), repo); err == nil {
-	// 	if len(gists) > 0 {
-	// 		return gists[0], nil
-	// 	}
-	// }
-	return "", fmt.Errorf("repo %s not found", repo)
+	if err := s.getReposByUser(context.Background(), repo); err != nil {
+		return "", err
+	}
+	if err := s.getGistsByUser(context.Background(), repo); err != nil {
+		return "", err
+	}
+	return "", nil
 }
 
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
