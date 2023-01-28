@@ -66,17 +66,18 @@ func TestAddReposByOrg(t *testing.T) {
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
 		JSON([]map[string]string{
-			{"clone_url": "super-secret-repo", "name": "super-secret-repo"},
-			{"clone_url": "super-secret-repo2", "full_name": "secret/super-secret-repo2"},
+			{"clone_url": "https://github.com/super-secret-repo.git", "name": "super-secret-repo"},
+			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
 		})
 
 	s := initTestSource(nil)
 	s.ignoreRepos = []string{"secret/super-*-repo2"}
 	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.addRepos(context.TODO(), "super-secret-org", s.getReposByOrg)
+	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(s.repos))
-	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
+	assert.Equal(t, 1, len(s.repoCache))
+	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -87,9 +88,9 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
 		JSON([]map[string]string{
-			{"clone_url": "super-secret-repo", "full_name": "secret/super-secret-repo"},
-			{"clone_url": "super-secret-repo2", "full_name": "secret/super-secret-repo2"},
-			{"clone_url": "super-secret-repo2", "full_name": "secret/not-super-secret-repo"},
+			{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "secret/super-secret-repo"},
+			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
+			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/not-super-secret-repo"},
 		})
 
 	src := &sourcespb.GitHub{
@@ -98,10 +99,13 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 	s := initTestSource(src)
 	s.includeRepos = []string{"secret/super*"}
 	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.addRepos(context.TODO(), "super-secret-org", s.getReposByOrg)
+	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(s.repos))
-	assert.Equal(t, []string{"super-secret-repo", "super-secret-repo2"}, s.repos)
+	assert.Equal(t, 2, len(s.repoCache))
+	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.True(t, ok)
+	_, ok = s.repoCache["https://github.com/super-secret-repo2.git"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -112,16 +116,17 @@ func TestAddReposByUser(t *testing.T) {
 		Get("/users/super-secret-user/repos").
 		Reply(200).
 		JSON([]map[string]string{
-			{"clone_url": "super-secret-repo", "name": "super-secret-repo"},
-			{"clone_url": "super-secret-repo2", "full_name": "secret/super-secret-repo2"},
+			{"clone_url": "https://github.com/super-secret-repo.git", "name": "super-secret-repo"},
+			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
 		})
 
 	s := initTestSource(nil)
 	s.ignoreRepos = []string{"secret/super-secret-repo2"}
-	err := s.addRepos(context.TODO(), "super-secret-user", s.getReposByUser)
+	err := s.getReposByUser(context.TODO(), "super-secret-user")
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(s.repos))
-	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
+	assert.Equal(t, 1, len(s.repoCache))
+	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -131,13 +136,14 @@ func TestAddGistsByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "super-secret-gist"}})
+		JSON([]map[string]string{{"git_pull_url": "https://githug.com/super-secret-gist.git"}})
 
 	s := initTestSource(nil)
-	err := s.addGistsByUser(context.TODO(), "super-secret-user")
+	err := s.getGistsByUser(context.TODO(), "super-secret-user")
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(s.repos))
-	assert.Equal(t, []string{"super-secret-gist"}, s.repos)
+	assert.Equal(t, 1, len(s.repoCache))
+	_, ok := s.repoCache["https://githug.com/super-secret-gist.git"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 

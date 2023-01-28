@@ -54,6 +54,7 @@ type Source struct {
 	members,
 	includeRepos,
 	ignoreRepos []string
+	repoCache       map[string]struct{}
 	git             *git.Git
 	httpClient      *http.Client
 	log             *log.Entry
@@ -136,6 +137,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.httpClient = common.RetryableHttpClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
+	s.repoCache = make(map[string]struct{})
 
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -258,11 +260,12 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 	}
 
 	for _, org := range s.orgs {
-		if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
+		if err := s.getReposByOrg(ctx, org); err != nil {
 			log.WithError(err).Errorf("error fetching repos for org or user: %s", org)
 		}
+
 		// We probably don't need to do this, since getting repos by org makes more sense?
-		if err := s.addRepos(ctx, org, s.getReposByUser); err != nil {
+		if err := s.getReposByUser(ctx, org); err != nil {
 			log.WithError(err).Errorf("error fetching repos for org or user: %s", org)
 		}
 
@@ -325,7 +328,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	if len(s.orgs) > 0 {
 		specificScope = true
 		for _, org := range s.orgs {
-			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
+			if err := s.getReposByOrg(ctx, org); err != nil {
 				log.WithError(err).Errorf("error fetching repos for org: %s", org)
 			}
 
@@ -341,7 +344,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	// If no scope was provided, enumerate them.
 	if !specificScope {
-		if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
+		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
 			log.WithError(err).Error("error fetching repos by user")
 		}
 
@@ -354,16 +357,16 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		}
 
 		for _, org := range s.orgs {
-			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
-				log.WithError(err).Error("error fetching repos by org")
+			if err := s.getReposByOrg(ctx, org); err != nil {
+				log.WithError(err).Errorf("error fetching repos for org: %s", org)
 			}
 
-			if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
+			if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
 				log.WithError(err).Errorf("error fetching repos for user: %s", ghUser.GetLogin())
 			}
 
 			// TODO: Test it actually works to list org gists like this.
-			if err := s.addGistsByUser(ctx, org); err != nil {
+			if err := s.getGistsByUser(ctx, org); err != nil {
 				log.WithError(err).Errorf("error fetching gists by org: %s", org)
 			}
 
@@ -378,8 +381,8 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
-		if err := s.addGistsByUser(ctx, ghUser.GetLogin()); err != nil {
-			log.WithError(err).Errorf("error fetching gists for user %s", ghUser.GetLogin())
+		if err := s.getGistsByUser(ctx, ghUser.GetLogin()); err != nil {
+			log.WithError(err).Errorf("error fetching gists by user: %s", ghUser.GetLogin())
 		}
 	}
 
@@ -447,11 +450,11 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			}
 			log.Infof("Scanning repos from %v organization members.", len(s.members))
 			for _, member := range s.members {
-				if err = s.addGistsByUser(ctx, member); err != nil {
-					log.WithError(err).WithField("member", member).Error("error fetching gists by user")
+				if err := s.getReposByUser(ctx, member); err != nil {
+					log.WithError(err).WithField("member", member).Error("error fetching repos by user")
 				}
-				if err := s.addRepos(ctx, member, s.getReposByUser); err != nil {
-					log.WithError(err).Error("error fetching repos by user")
+				if err := s.getReposByUser(ctx, member); err != nil {
+					log.WithError(err).WithField("member", member).Error("error fetching repos by user")
 				}
 			}
 		}
@@ -486,7 +489,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	s.normalizeRepos(ctx)
+	// s.normalizeRepos(ctx)
+	s.repos = make([]string, 0, len(s.repoCache))
+	for repo := range s.repoCache {
+		s.repos = append(s.repos, repo)
+	}
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
@@ -643,10 +650,9 @@ func handleRateLimit(errIn error, res *github.Response) bool {
 	return true
 }
 
-func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error) {
+func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 	logger := s.log.WithField("org", org)
 
-	var repos []string
 	opts := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{
 			PerPage: defaultPagination,
@@ -663,7 +669,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not list repos for org %s: %w", org, err)
+			return fmt.Errorf("could not list repos for org %s: %w", org, err)
 		}
 		if len(someRepos) == 0 || res == nil {
 			break
@@ -685,31 +691,26 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 					continue
 				}
 			}
-			repos = append(repos, r.GetCloneURL())
+			repo, err := s.normalizeRepo(r.GetCloneURL())
+			if err != nil {
+				logger.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
+				continue
+			}
+			if _, ok := s.repoCache[repo]; !ok {
+				s.repoCache[repo] = struct{}{}
+			}
 		}
 		if res.NextPage == 0 {
 			break
 		}
 		opts.Page = res.NextPage
 	}
-	logger.Debugf("found %d repos (%d forks)", numRepos, numForks)
-	return repos, nil
-}
 
-func (s *Source) addRepos(ctx context.Context, entity string, getRepos func(context.Context, string) ([]string, error)) error {
-	repos, err := getRepos(ctx, entity)
-	if err != nil {
-		return err
-	}
-	// Add the repos to the set of repos.
-	for _, repo := range repos {
-		common.AddStringSliceItem(repo, &s.repos)
-	}
+	logger.Debugf("found %d repos (%d forks)", numRepos, numForks)
 	return nil
 }
 
-func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, error) {
-	var repos []string
+func (s *Source) getReposByUser(ctx context.Context, user string) error {
 	opts := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 50,
@@ -725,7 +726,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not list repos for user %s: %w", user, err)
+			return fmt.Errorf("could not list repos for user %s: %w", user, err)
 		}
 		if res == nil {
 			break
@@ -743,14 +744,23 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
-			repos = append(repos, r.GetCloneURL())
+
+			repo, err := s.normalizeRepo(r.GetCloneURL())
+			if err != nil {
+				s.log.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
+				continue
+			}
+			if _, ok := s.repoCache[repo]; !ok {
+				s.repoCache[repo] = struct{}{}
+			}
 		}
 		if res.NextPage == 0 {
 			break
 		}
 		opts.Page = res.NextPage
 	}
-	return repos, nil
+
+	return nil
 }
 
 func (s *Source) includeRepo(r string) bool {
@@ -787,8 +797,7 @@ func (s *Source) ignoreRepo(r string) bool {
 	return false
 }
 
-func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, error) {
-	var gistURLs []string
+func (s *Source) getGistsByUser(ctx context.Context, user string) error {
 	gistOpts := &github.GistListOptions{}
 	for {
 		gists, res, err := s.apiClient.Gists.List(ctx, user, gistOpts)
@@ -799,28 +808,23 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, err
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not list gists for user %s: %w", user, err)
+			return fmt.Errorf("could not list gists for user %s: %w", user, err)
 		}
 		for _, gist := range gists {
-			gistURLs = append(gistURLs, gist.GetGitPullURL())
+			url, err := s.normalizeRepo(gist.GetGitPullURL())
+			if err != nil {
+				s.log.Warnf("could not normalize gist %s: %v", gist.GetGitPullURL(), err)
+				continue
+			}
+			if _, ok := s.repoCache[url]; !ok {
+				s.repoCache[url] = struct{}{}
+			}
 		}
 		if res == nil || res.NextPage == 0 {
 			break
 		}
 		s.log.Debugf("Listed gists for user %s page %d/%d", user, gistOpts.Page, res.LastPage)
 		gistOpts.Page = res.NextPage
-	}
-	return gistURLs, nil
-}
-
-func (s *Source) addGistsByUser(ctx context.Context, user string) error {
-	gists, err := s.getGistsByUser(ctx, user)
-	if err != nil {
-		return err
-	}
-	// add the gists to the set of repos
-	for _, gist := range gists {
-		common.AddStringSliceItem(gist, &s.repos)
 	}
 	return nil
 }
@@ -1008,10 +1012,10 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 func (s *Source) addReposForMembers(ctx context.Context) {
 	log.Infof("Fetching repos from %d members", len(s.members))
 	for _, member := range s.members {
-		if err := s.addGistsByUser(ctx, member); err != nil {
+		if err := s.getGistsByUser(ctx, member); err != nil {
 			log.WithError(err).Infof("Unable to fetch gists by user %s", member)
 		}
-		if err := s.addRepos(ctx, member, s.getReposByUser); err != nil {
+		if err := s.getReposByUser(ctx, member); err != nil {
 			log.WithError(err).Infof("Unable to fetch repos by user %s", member)
 		}
 	}
@@ -1021,27 +1025,12 @@ func (s *Source) normalizeRepos(ctx context.Context) {
 	// TODO: Add check/fix for repos that are missing scheme
 	normalizedRepos := map[string]struct{}{}
 	for _, repo := range s.repos {
-		// If there's a '/', assume it's a URL and try to normalize it.
-		if strings.ContainsRune(repo, '/') {
-			repoNormalized, err := giturl.NormalizeGithubRepo(repo)
-			if err != nil {
-				log.WithError(err).Warnf("Repo not in expected format: %s", repo)
-				continue
-			}
-			normalizedRepos[repoNormalized] = struct{}{}
+		normalized, err := s.normalizeRepo(repo)
+		if err != nil {
+			log.WithError(err).Warnf("Could not normalize repository %s", repo)
 			continue
 		}
-		// Otherwise, assume it's a user and enumerate repositories and gists.
-		if repos, err := s.getReposByUser(ctx, repo); err == nil {
-			for _, repo := range repos {
-				normalizedRepos[repo] = struct{}{}
-			}
-		}
-		if gists, err := s.getGistsByUser(ctx, repo); err == nil {
-			for _, gist := range gists {
-				normalizedRepos[gist] = struct{}{}
-			}
-		}
+		normalizedRepos[normalized] = struct{}{}
 	}
 
 	// Replace s.repos.
@@ -1049,6 +1038,25 @@ func (s *Source) normalizeRepos(ctx context.Context) {
 	for key := range normalizedRepos {
 		s.repos = append(s.repos, key)
 	}
+}
+
+func (s *Source) normalizeRepo(repo string) (string, error) {
+	// If there's a '/', assume it's a URL and try to normalize it.
+	if strings.ContainsRune(repo, '/') {
+		return giturl.NormalizeGithubRepo(repo)
+	}
+	// Otherwise, assume it's a user and enumerate repositories and gists.
+	// if repos, err := s.getReposByUser(context.Background(), repo); err == nil {
+	// 	if len(repos) > 0 {
+	// 		return repos[0], nil
+	// 	}
+	// }
+	// if gists, err := s.getGistsByUser(context.Background(), repo); err == nil {
+	// 	if len(gists) > 0 {
+	// 		return gists[0], nil
+	// 	}
+	// }
+	return "", fmt.Errorf("repo %s not found", repo)
 }
 
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
