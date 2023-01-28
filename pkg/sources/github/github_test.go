@@ -310,7 +310,7 @@ func TestNormalizeRepos(t *testing.T) {
 			tt.setup()
 			s := initTestSource(nil)
 
-			got, err := s.normalizeRepo(tt.repos[0])
+			got, err := s.normalizeRepo(context.Background(), tt.repos[0])
 			if (err != nil) != tt.wantErr {
 				t.Errorf("normalizeRepo() error = %v, wantErr %v", err, tt.wantErr)
 				return

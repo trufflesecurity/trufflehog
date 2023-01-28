@@ -1,0 +1,15 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/trufflesecurity/trufflehog/v3/pkg/sources/github
+BenchmarkEnumerate-8   	      80	  15406727 ns/op
+BenchmarkEnumerate-8   	      78	  15075601 ns/op
+BenchmarkEnumerate-8   	      82	  15707009 ns/op
+BenchmarkEnumerate-8   	      74	  15333220 ns/op
+BenchmarkEnumerate-8   	      74	  16113460 ns/op
+BenchmarkEnumerate-8   	      80	  15800492 ns/op
+BenchmarkEnumerate-8   	      79	  15037076 ns/op
+BenchmarkEnumerate-8   	      79	  15488258 ns/op
+BenchmarkEnumerate-8   	      81	  14960233 ns/op
+BenchmarkEnumerate-8   	      80	  15192639 ns/op
+PASS
+ok  	github.com/trufflesecurity/trufflehog/v3/pkg/sources/github	13.431s

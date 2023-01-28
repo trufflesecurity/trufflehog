@@ -739,7 +739,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 					continue
 				}
 			}
-			repo, err := s.normalizeRepo(r.GetCloneURL())
+			repo, err := s.normalizeRepo(ctx, r.GetCloneURL())
 			if err != nil {
 				logger.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
 				continue
@@ -791,7 +791,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 				continue
 			}
 
-			repo, err := s.normalizeRepo(r.GetCloneURL())
+			repo, err := s.normalizeRepo(ctx, r.GetCloneURL())
 			if err != nil {
 				s.log.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
 				continue
@@ -855,7 +855,7 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) error {
 			return fmt.Errorf("could not list gists for user %s: %w", user, err)
 		}
 		for _, gist := range gists {
-			url, err := s.normalizeRepo(gist.GetGitPullURL())
+			url, err := s.normalizeRepo(ctx, gist.GetGitPullURL())
 			if err != nil {
 				s.log.Warnf("could not normalize gist %s: %v", gist.GetGitPullURL(), err)
 				continue
@@ -920,7 +920,7 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
-			repo, err := s.normalizeRepo(r.GetCloneURL())
+			repo, err := s.normalizeRepo(ctx, r.GetCloneURL())
 			if err != nil {
 				s.log.Warnf("could not normalize repo %s: %v", r.GetCloneURL(), err)
 				continue
@@ -1074,17 +1074,17 @@ func (s *Source) addReposForMembers(ctx context.Context) {
 	}
 }
 
-func (s *Source) normalizeRepo(repo string) (string, error) {
+func (s *Source) normalizeRepo(ctx context.Context, repo string) (string, error) {
 	// If there's a '/', assume it's a URL and try to normalize it.
 	if strings.ContainsRune(repo, '/') {
 		return giturl.NormalizeGithubRepo(repo)
 	}
 
 	// Otherwise, assume it's a user and enumerate repositories and gists.
-	if err := s.getReposByUser(context.Background(), repo); err != nil {
+	if err := s.getReposByUser(ctx, repo); err != nil {
 		return "", err
 	}
-	if err := s.getGistsByUser(context.Background(), repo); err != nil {
+	if err := s.getGistsByUser(ctx, repo); err != nil {
 		return "", err
 	}
 	return "", nil
