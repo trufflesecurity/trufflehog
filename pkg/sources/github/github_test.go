@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -431,7 +432,7 @@ func setupMocks(b *testing.B) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+		JSON(mockRepos())
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
@@ -443,6 +444,14 @@ func setupMocks(b *testing.B) {
 		Get("/users/super-secret-user/gists").
 		Reply(200).
 		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
+}
+
+func mockRepos() []map[string]string {
+	res := make([]map[string]string, 0, 5000)
+	for i := 0; i < 5000; i++ {
+		res = append(res, map[string]string{"clone_url": fmt.Sprintf("https://githu/super-secret-repo-%d.git", i)})
+	}
+	return res
 }
 
 func BenchmarkEnumerate(b *testing.B) {
