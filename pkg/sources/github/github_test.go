@@ -443,13 +443,21 @@ func setupMocks(b *testing.B) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
+		JSON(mockGists())
 }
 
 func mockRepos() []map[string]string {
 	res := make([]map[string]string, 0, 5000)
 	for i := 0; i < 5000; i++ {
 		res = append(res, map[string]string{"clone_url": fmt.Sprintf("https://githu/super-secret-repo-%d.git", i)})
+	}
+	return res
+}
+
+func mockGists() []map[string]string {
+	res := make([]map[string]string, 0, 100)
+	for i := 0; i < 100; i++ {
+		res = append(res, map[string]string{"git_pull_url": fmt.Sprintf("https://githu/super-secret-gist-%d.git", i)})
 	}
 	return res
 }
