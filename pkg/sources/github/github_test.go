@@ -302,13 +302,14 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
 
 	s := initTestSource(nil)
 	s.orgs = []string{"super-secret-org"}
 	s.enumerateUnauthenticated(context.TODO())
-	assert.Equal(t, 1, len(s.repos))
-	assert.Equal(t, []string{"super-secret-repo"}, s.repos)
+	assert.Equal(t, 1, len(s.repoCache))
+	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -323,19 +324,60 @@ func TestEnumerateWithToken(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/user/orgs").
+		MatchParam("per_page", "100").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
 
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": ""}})
+		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
 
 	s := initTestSource(nil)
 	err := s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(s.repos))
-	assert.Equal(t, []string{"super-secret-repo", ""}, s.repos)
+	assert.Equal(t, 2, len(s.repoCache))
+	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.True(t, ok)
+	_, ok = s.repoCache["https://github.com/super-secret-gist.git"]
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
+}
+
+func BenchmarkEnumerateWithToken(b *testing.B) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/user").
+		Reply(200).
+		JSON(map[string]string{"login": "super-secret-user"})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/repos").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/user/orgs").
+		MatchParam("per_page", "100").
+		Reply(200).
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+
+	gock.New("https://api.github.com").
+		Get("/users/super-secret-user/gists").
+		Reply(200).
+		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
+
+	s := initTestSource(nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
+	}
 }
 
 func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
