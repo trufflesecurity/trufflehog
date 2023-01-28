@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,6 +18,11 @@ var (
 
 	statusMessageStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Dark: colors["sand"], Light: "#13543c"}).
+				Render
+
+	// FIXME: Hon pls help
+	errorStatusMessageStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.AdaptiveColor{Dark: "#ff0000"}).
 				Render
 
 	selectedItemStyle = lipgloss.NewStyle().
@@ -53,11 +60,16 @@ type listKeyMap struct {
 	toggleHelpMenu key.Binding
 }
 
-type sourceSelectModel struct {
-	sourcesList  list.Model
-	keys         *listKeyMap
-	delegateKeys *delegateKeyMap
-}
+type (
+	sourceSelectModel struct {
+		sourcesList  list.Model
+		keys         *listKeyMap
+		delegateKeys *delegateKeyMap
+	}
+	sourceSelectMsg struct {
+		selection string
+	}
+)
 
 func newSourceSelectModel() sourceSelectModel {
 	var (
@@ -100,6 +112,7 @@ func newSourceSelectModel() sourceSelectModel {
 	sourcesList := list.New(items, delegate, 0, 0)
 	sourcesList.Title = "Sources"
 	sourcesList.Styles.Title = titleStyle
+	sourcesList.StatusMessageLifetime = 10 * time.Second
 	// sourcesList.Styles.FilterCursor = filterCursorStyle
 
 	sourcesList.AdditionalFullHelpKeys = func() []key.Binding {
@@ -168,10 +181,12 @@ func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
 
 		if msg, ok := msg.(tea.KeyMsg); ok && key.Matches(msg, keys.choose) {
 			if selectedItem.isEnterprise {
-				return m.NewStatusMessage(statusMessageStyle("You chose an enterprise source, " + selectedItem.title))
+				return m.NewStatusMessage(errorStatusMessageStyle(
+					"That's an enterprise only source. Learn more at trufflesecurity.com",
+				))
 			}
 
-			return m.NewStatusMessage(statusMessageStyle("You chose " + selectedItem.title))
+			return func() tea.Msg { return sourceSelectMsg{selectedItem.title} }
 		}
 
 		return nil

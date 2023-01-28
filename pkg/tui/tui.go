@@ -13,17 +13,20 @@ type state int
 const (
 	showWizardIntro state = iota
 	showSourceSelect
+	showConfigueSource
 )
 
 var (
 	appStyle = lipgloss.NewStyle().Padding(1, 2)
 )
 
-type model struct {
-	state        state
-	wizardIntro  wizardIntroModel
-	sourceSelect sourceSelectModel
-}
+type (
+	model struct {
+		state        state
+		wizardIntro  wizardIntroModel
+		sourceSelect sourceSelectModel
+	}
+)
 
 func (m model) Init() tea.Cmd {
 	return nil
@@ -47,14 +50,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case showSourceSelect:
+		if _, ok := msg.(sourceSelectMsg); ok {
+			// TODO: Get the chosen source from the message.
+			m.state = showConfigueSource
+			return m, nil
+		}
 		m.sourceSelect, cmd = update(m.sourceSelect, msg)
-		// Potential logic for changing the state goes here. You change the
-		// state based on how the update affected the section model.
 		return m, cmd
 
-	default:
-		return m, nil
+	case showConfigueSource:
+
 	}
+	return m, tea.Quit
 }
 
 func update[T tea.Model](m T, msg tea.Msg) (T, tea.Cmd) {
@@ -68,8 +75,10 @@ func (m model) View() string {
 		return m.wizardIntro.View()
 	case showSourceSelect:
 		return m.sourceSelect.View()
+	case showConfigueSource:
+		return "todo"
 	default:
-		return m.wizardIntro.View()
+		return ""
 	}
 }
 
