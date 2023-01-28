@@ -264,24 +264,6 @@ func TestNormalizeRepos(t *testing.T) {
 			},
 		},
 		{
-			name: "username with gists",
-			setup: func() {
-				gock.New("https://api.github.com").
-					Get("/users/super-secret-user/gists").
-					Reply(200).
-					JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-user/super-secret-gist.git"}})
-				gock.New("https://api.github.com").
-					Get("/users/super-secret-user/repos").
-					Reply(200).
-					JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git"}})
-			},
-			repos: []string{"super-secret-user"},
-			expected: map[string]struct{}{
-				"https://github.com/super-secret-user/super-secret-repo.git": {},
-				"https://github.com/super-secret-user/super-secret-gist.git": {},
-			},
-		},
-		{
 			name: "not found",
 			setup: func() {
 				gock.New("https://api.github.com").
@@ -310,7 +292,7 @@ func TestNormalizeRepos(t *testing.T) {
 			tt.setup()
 			s := initTestSource(nil)
 
-			got, err := s.normalizeRepo(context.Background(), tt.repos[0])
+			got, err := s.normalizeRepo(tt.repos[0])
 			if (err != nil) != tt.wantErr {
 				t.Errorf("normalizeRepo() error = %v, wantErr %v", err, tt.wantErr)
 				return
