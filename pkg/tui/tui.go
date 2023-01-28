@@ -32,28 +32,22 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Always pass WindowSizeMsg to all pages.
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
-		var model tea.Model
-		model, _ = m.wizardIntro.Update(msg)
-		m.wizardIntro = model.(wizardIntroModel)
-		model, _ = m.sourceSelect.Update(msg)
-		m.sourceSelect = model.(sourceSelectModel)
+		m.wizardIntro, _ = update(m.wizardIntro, msg)
+		m.sourceSelect, _ = update(m.sourceSelect, msg)
 		return m, nil
 	}
 
 	var cmd tea.Cmd
-	var model tea.Model
 	switch m.state {
 	case showWizardIntro:
-		model, cmd = m.wizardIntro.Update(msg)
-		m.wizardIntro = model.(wizardIntroModel)
+		m.wizardIntro, cmd = update(m.wizardIntro, msg)
 		if m.wizardIntro.action != "" {
 			m.state = showSourceSelect
 		}
 		return m, cmd
 
 	case showSourceSelect:
-		model, cmd = m.sourceSelect.Update(msg)
-		m.sourceSelect = model.(sourceSelectModel)
+		m.sourceSelect, cmd = update(m.sourceSelect, msg)
 		// Potential logic for changing the state goes here. You change the
 		// state based on how the update affected the section model.
 		return m, cmd
@@ -61,6 +55,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+func update[T tea.Model](m T, msg tea.Msg) (T, tea.Cmd) {
+	model, cmd := m.Update(msg)
+	return model.(T), cmd
 }
 
 func (m model) View() string {
