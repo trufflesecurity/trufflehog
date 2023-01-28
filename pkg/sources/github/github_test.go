@@ -488,8 +488,8 @@ func setupMocks(b *testing.B) {
 }
 
 func mockRepos() []map[string]string {
-	res := make([]map[string]string, 0, 5000)
-	for i := 0; i < 5000; i++ {
+	res := make([]map[string]string, 0, 10000)
+	for i := 0; i < 10000; i++ {
 		res = append(res, map[string]string{"clone_url": fmt.Sprintf("https://githu/super-secret-repo-%d.git", i)})
 	}
 	return res
