@@ -76,8 +76,8 @@ func TestAddReposByOrg(t *testing.T) {
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(s.repoCache))
-	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.Equal(t, uint64(1), s.repoCache.len())
+	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -102,10 +102,10 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(s.repoCache))
-	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.Equal(t, uint64(2), s.repoCache.len())
+	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
 	assert.True(t, ok)
-	_, ok = s.repoCache["https://github.com/super-secret-repo2.git"]
+	ok = s.repoCache.exists("https://github.com/super-secret-repo2.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -125,8 +125,8 @@ func TestAddReposByUser(t *testing.T) {
 	s.ignoreRepos = []string{"secret/super-secret-repo2"}
 	err := s.getReposByUser(context.TODO(), "super-secret-user")
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(s.repoCache))
-	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.Equal(t, uint64(1), s.repoCache.len())
+	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -142,8 +142,8 @@ func TestAddGistsByUser(t *testing.T) {
 	s := initTestSource(nil)
 	err := s.getGistsByUser(context.TODO(), "super-secret-user")
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(s.repoCache))
-	_, ok := s.repoCache["https://githug.com/super-secret-gist.git"]
+	assert.Equal(t, uint64(1), s.repoCache.len())
+	ok := s.repoCache.exists("https://githug.com/super-secret-gist.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -217,10 +217,10 @@ func TestAddReposByApp(t *testing.T) {
 	s := initTestSource(nil)
 	err := s.addReposByApp(context.TODO())
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(s.repoCache))
-	_, ok := s.repoCache["https://github/ssr1.git"]
+	assert.Equal(t, uint64(2), s.repoCache.len())
+	ok := s.repoCache.exists("https://github/ssr1.git")
 	assert.True(t, ok)
-	_, ok = s.repoCache["https://github/ssr2.git"]
+	ok = s.repoCache.exists("https://github/ssr2.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -321,7 +321,7 @@ func TestNormalizeRepos(t *testing.T) {
 				}
 			}
 
-			if got == "" && !cmp.Equal(s.repoCache, tt.expected) {
+			if got == "" && !cmp.Equal(s.repoCache.m, tt.expected) {
 				t.Errorf("normalizeRepo() got = %v, want %v", s.repos, tt.expected)
 			}
 		})
@@ -349,8 +349,8 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 	s := initTestSource(nil)
 	s.orgs = []string{"super-secret-org"}
 	s.enumerateUnauthenticated(context.TODO())
-	assert.Equal(t, 1, len(s.repoCache))
-	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.Equal(t, uint64(1), s.repoCache.len())
+	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -382,10 +382,10 @@ func TestEnumerateWithToken(t *testing.T) {
 	s := initTestSource(nil)
 	err := s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(s.repoCache))
-	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.Equal(t, uint64(2), s.repoCache.len())
+	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
 	assert.True(t, ok)
-	_, ok = s.repoCache["https://github.com/super-secret-gist.git"]
+	ok = s.repoCache.exists("https://github.com/super-secret-gist.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -454,10 +454,10 @@ func TestEnumerate(t *testing.T) {
 
 	_, err := s.enumerate(context.TODO(), "https://api.github.com")
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(s.repoCache))
-	_, ok := s.repoCache["https://github.com/super-secret-repo.git"]
+	assert.Equal(t, uint64(2), s.repoCache.len())
+	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
 	assert.True(t, ok)
-	_, ok = s.repoCache["https://github.com/super-secret-gist.git"]
+	ok = s.repoCache.exists("https://github.com/super-secret-gist.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }

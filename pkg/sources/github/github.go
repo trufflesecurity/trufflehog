@@ -42,6 +42,46 @@ const (
 	membersAppPagination    = 500
 )
 
+// repoCache is a thread safe map of enumerated repos.
+type repoCache struct {
+	count uint64
+	mu    sync.Mutex
+	m     map[string]struct{}
+}
+
+func newRepoCache() *repoCache {
+	return &repoCache{m: make(map[string]struct{})}
+}
+
+func (r *repoCache) len() uint64 {
+	return atomic.LoadUint64(&r.count)
+}
+
+func (r *repoCache) add(repo string) {
+	atomic.AddUint64(&r.count, 1)
+	r.mu.Lock()
+	r.m[repo] = struct{}{}
+	r.mu.Unlock()
+}
+
+func (r *repoCache) exists(repo string) bool {
+	r.mu.Lock()
+	_, ok := r.m[repo]
+	r.mu.Unlock()
+	return ok
+}
+
+func (r *repoCache) items() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	repos := make([]string, 0, r.count)
+	for repo := range r.m {
+		repos = append(repos, repo)
+	}
+	return repos
+}
+
 type Source struct {
 	name        string
 	githubUser  string
@@ -54,7 +94,7 @@ type Source struct {
 	members,
 	includeRepos,
 	ignoreRepos []string
-	repoCache       map[string]struct{}
+	repoCache       *repoCache
 	orgCache        map[string]struct{}
 	memberCache     map[string]struct{}
 	git             *git.Git
@@ -139,7 +179,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.httpClient = common.RetryableHttpClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
-	s.repoCache = make(map[string]struct{})
+	s.repoCache = newRepoCache()
 	s.orgCache = make(map[string]struct{})
 	s.memberCache = make(map[string]struct{})
 
@@ -506,10 +546,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	s.repos = make([]string, 0, len(s.repoCache))
-	for repo := range s.repoCache {
-		s.repos = append(s.repos, repo)
-	}
+	s.repos = s.repoCache.items()
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
@@ -707,9 +744,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 				logger.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
 				continue
 			}
-			if _, ok := s.repoCache[repo]; !ok {
-				s.repoCache[repo] = struct{}{}
-			}
+			s.repoCache.add(repo)
 		}
 		if res.NextPage == 0 {
 			break
@@ -761,9 +796,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 				s.log.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
 				continue
 			}
-			if _, ok := s.repoCache[repo]; !ok {
-				s.repoCache[repo] = struct{}{}
-			}
+			s.repoCache.add(repo)
 		}
 		if res.NextPage == 0 {
 			break
@@ -827,9 +860,7 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) error {
 				s.log.Warnf("could not normalize gist %s: %v", gist.GetGitPullURL(), err)
 				continue
 			}
-			if _, ok := s.repoCache[url]; !ok {
-				s.repoCache[url] = struct{}{}
-			}
+			s.repoCache.add(url)
 		}
 		if res == nil || res.NextPage == 0 {
 			break
@@ -894,9 +925,7 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 				s.log.Warnf("could not normalize repo %s: %v", r.GetCloneURL(), err)
 				continue
 			}
-			if _, ok := s.repoCache[repo]; !ok {
-				s.repoCache[repo] = struct{}{}
-			}
+			s.repoCache.add(repo)
 			s.log.Debugf("Enumerated repo %s", r.GetCloneURL())
 		}
 
