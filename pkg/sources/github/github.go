@@ -42,7 +42,7 @@ const (
 	membersAppPagination    = 500
 )
 
-// repoCache is a thread safe map of enumerated repos.
+// repoCache is a thread safe map of repositories.
 type repoCache struct {
 	count uint64
 	mu    sync.Mutex
@@ -759,7 +759,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 func (s *Source) getReposByUser(ctx context.Context, user string) error {
 	opts := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{
-			PerPage: 50,
+			PerPage: defaultPagination,
 		},
 	}
 
