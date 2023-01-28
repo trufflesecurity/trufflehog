@@ -309,11 +309,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return err
 	}
 
-	for _, err := range s.scan(ctx, installationClient, chunksChan) {
-		log.WithError(err).Error("error scanning repository")
-	}
-
-	return nil
+	return s.scan(ctx, installationClient, chunksChan)
 }
 
 func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
@@ -553,7 +549,26 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	return installationClient, nil
 }
 
-func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) []error {
+// scanErrors is used to collect errors encountered while scanning.
+// It ensures that errors are collected in a thread-safe manner.
+type scanErrors struct {
+	count  uint64
+	mu     sync.Mutex
+	errors []error
+}
+
+func newScanErrors(repos int) *scanErrors {
+	return &scanErrors{errors: make([]error, 0, repos)}
+}
+
+func (s *scanErrors) add(err error) {
+	atomic.AddUint64(&s.count, 1)
+	s.mu.Lock()
+	s.errors = append(s.errors, err)
+	s.mu.Unlock()
+}
+
+func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
 	var scanned uint64
 
 	log.Debugf("Found %v total repos to scan", len(s.repos))
@@ -562,7 +577,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
 	s.repos = reposToScan
 
-	var scanErrs []error
+	scanErrs := newScanErrors(len(s.repos))
 	for i, repoURL := range s.repos {
 		i, repoURL := i, repoURL
 		s.jobPool.Go(func() error {
@@ -580,7 +595,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			}(s, repoURL)
 
 			if !strings.HasSuffix(repoURL, ".git") {
-				scanErrs = append(scanErrs, fmt.Errorf("repo %s does not end in .git", repoURL))
+				scanErrs.add(fmt.Errorf("repo %s does not end in .git", repoURL))
 				return nil
 			}
 
@@ -591,7 +606,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
 			if err != nil {
-				scanErrs = append(scanErrs, err)
+				scanErrs.add(err)
 			}
 
 			defer os.RemoveAll(path)
@@ -616,11 +631,12 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	}
 
 	_ = s.jobPool.Wait()
-	if len(scanErrs) == 0 {
-		s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
+	if scanErrs.count > 0 {
+		log.Debugf("encountered %d errors while scanning; errors: %v", scanErrs.count, scanErrs.errors)
 	}
+	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
 
-	return scanErrs
+	return nil
 }
 
 func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClient *github.Client) (string, *gogit.Repository, error) {
