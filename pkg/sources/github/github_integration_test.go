@@ -539,7 +539,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.addGistsByUser(ctx, tt.user)
+				s.getGistsByUser(ctx, tt.user)
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
