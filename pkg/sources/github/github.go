@@ -297,6 +297,52 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 	return
 }
 
+// Chunks emits chunks of bytes over a channel.
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	apiEndpoint := s.conn.Endpoint
+	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
+		apiEndpoint = "https://api.github.com"
+	}
+
+	installationClient, err := s.enumerate(ctx, apiEndpoint)
+	if err != nil {
+		return err
+	}
+
+	for _, err := range s.scan(ctx, installationClient, chunksChan) {
+		log.WithError(err).Error("error scanning repository")
+	}
+
+	return nil
+}
+
+func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
+	var installationClient *github.Client
+	var err error
+
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_Unauthenticated:
+		s.enumerateUnauthenticated(ctx)
+	case *sourcespb.GitHub_Token:
+		if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
+			return nil, err
+		}
+	case *sourcespb.GitHub_GithubApp:
+		if installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
+			return nil, err
+		}
+	default:
+		// TODO: move this error to Init
+		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+	}
+
+	s.repos = s.repoCache.items()
+
+	// We must sort the repos so we can resume later if necessary.
+	sort.Strings(s.repos)
+	return installationClient, nil
+}
+
 func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 	s.apiClient = github.NewClient(s.httpClient)
 	if len(s.orgs) > unauthGithubOrgRateLimt {
@@ -504,52 +550,6 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		}
 	}
 
-	return installationClient, nil
-}
-
-// Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	apiEndpoint := s.conn.Endpoint
-	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
-		apiEndpoint = "https://api.github.com"
-	}
-
-	installationClient, err := s.enumerate(ctx, apiEndpoint)
-	if err != nil {
-		return err
-	}
-
-	for _, err := range s.scan(ctx, installationClient, chunksChan) {
-		log.WithError(err).Error("error scanning repository")
-	}
-
-	return nil
-}
-
-func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
-	var installationClient *github.Client
-	var err error
-
-	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_Unauthenticated:
-		s.enumerateUnauthenticated(ctx)
-	case *sourcespb.GitHub_Token:
-		if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
-			return nil, err
-		}
-	case *sourcespb.GitHub_GithubApp:
-		if installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
-			return nil, err
-		}
-	default:
-		// TODO: move this error to Init
-		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
-	}
-
-	s.repos = s.repoCache.items()
-
-	// We must sort the repos so we can resume later if necessary.
-	sort.Strings(s.repos)
 	return installationClient, nil
 }
 
