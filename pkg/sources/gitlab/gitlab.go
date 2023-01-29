@@ -350,7 +350,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				return nil
 			}
 
-			if len(repo) == 0 {
+			if len(repoURL) == 0 {
 				log.Debugf("Skipping empty repo %s", repoURL)
 				return nil
 			}
