@@ -398,6 +398,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	if scanErrs.Count() > 0 {
 		log.Debugf("encountered %d errors while scanning; errors: %v", scanErrs.Count(), scanErrs)
 	}
+	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Gitlab scan", "")
 
 	return nil
 }

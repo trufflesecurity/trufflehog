@@ -9,7 +9,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/sync/semaphore"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -17,6 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 func TestSource_Scan(t *testing.T) {
@@ -280,9 +281,9 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			wantComplete: true,
 		},
 		{
-			name:    "one valid repo",
-			repos:   []string{"a"},
-			wantErr: true,
+			name:         "one valid repo",
+			repos:        []string{"repo"},
+			wantComplete: true,
 		},
 	}
 
@@ -291,7 +292,8 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			src := &Source{
 				repos: tc.repos,
 			}
-			src.jobSem = semaphore.NewWeighted(1)
+			src.jobPool = &errgroup.Group{}
+			src.scanOptions = &git.ScanOptions{}
 
 			_ = src.scanRepos(context.Background(), nil)
 			if !tc.wantErr {
