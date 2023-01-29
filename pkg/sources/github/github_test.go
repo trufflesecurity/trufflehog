@@ -671,15 +671,19 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 		},
 		{
 			name:         "one valid repo",
-			repos:        []string{"https://github.com/repo1.git"},
+			repos:        []string{"repo2"},
 			wantComplete: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			logger := logrus.New()
+			logger.Out = io.Discard
+
 			src := &Source{
 				repos: tc.repos,
+				log:   logger.WithField("no", "output"),
 			}
 			src.jobPool = &errgroup.Group{}
 
