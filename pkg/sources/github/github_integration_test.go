@@ -562,7 +562,7 @@ func gistsCheckFunc(expected string, minRepos int, s *Source) sources.ChunkFunc 
 			return fmt.Errorf("didn't find enough repos. expected: %d, got :%d", minRepos, len(s.repos))
 		}
 		if expected != "" {
-			for _, repo := range s.repoCache.items() {
+			for _, repo := range s.repoCache.repos() {
 				if repo == expected {
 					return nil
 				}

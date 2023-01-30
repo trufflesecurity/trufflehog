@@ -202,7 +202,7 @@ func (r *repoCache) exists(repo string) bool {
 	return ok
 }
 
-func (r *repoCache) items() []string {
+func (r *repoCache) repos() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -389,7 +389,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	s.repos = s.repoCache.items()
+	s.repos = s.repoCache.repos()
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
