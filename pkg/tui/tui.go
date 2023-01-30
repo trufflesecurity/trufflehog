@@ -13,7 +13,7 @@ type state int
 const (
 	showWizardIntro state = iota
 	showSourceSelect
-	showConfigueSource
+	showSourceConfigure
 )
 
 var (
@@ -22,9 +22,10 @@ var (
 
 type (
 	model struct {
-		state        state
-		wizardIntro  wizardIntroModel
-		sourceSelect sourceSelectModel
+		state           state
+		wizardIntro     wizardIntroModel
+		sourceSelect    sourceSelectModel
+		sourceConfigure sourceConfigureModel
 	}
 )
 
@@ -50,16 +51,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case showSourceSelect:
-		if _, ok := msg.(sourceSelectMsg); ok {
-			// TODO: Get the chosen source from the message.
-			m.state = showConfigueSource
+		if msg, ok := msg.(sourceSelectMsg); ok {
+			m.state = showSourceConfigure
+			m.sourceConfigure.cmd = msg.cmd
 			return m, nil
 		}
 		m.sourceSelect, cmd = update(m.sourceSelect, msg)
 		return m, cmd
 
-	case showConfigueSource:
-
+	case showSourceConfigure:
+		m.sourceConfigure, cmd = update(m.sourceConfigure, msg)
+		return m, cmd
 	}
 	return m, tea.Quit
 }
@@ -75,8 +77,8 @@ func (m model) View() string {
 		return m.wizardIntro.View()
 	case showSourceSelect:
 		return m.sourceSelect.View()
-	case showConfigueSource:
-		return "todo"
+	case showSourceConfigure:
+		return m.sourceConfigure.View()
 	default:
 		return ""
 	}

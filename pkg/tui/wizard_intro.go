@@ -13,6 +13,7 @@ var (
 		"Scan a source with config",
 		"View open-source project",
 		"Inquire about Trufflehog Enterprise",
+		"Quit",
 	}
 )
 
@@ -33,7 +34,9 @@ func (m wizardIntroModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "enter":
-			// Move to the next state.
+			if wizardIntroChoices[m.cursor] == "Quit" {
+				return m, tea.Quit
+			}
 			m.action = wizardIntroChoices[m.cursor]
 			m.cursor = 0
 
