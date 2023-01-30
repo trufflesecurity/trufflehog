@@ -165,11 +165,11 @@ func (r *repoCache) ignoreRepo(s string) bool {
 	for _, exclude := range r.exclude {
 		g, err := glob.Compile(exclude)
 		if err != nil {
-			// s.log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
+			log.Warnf("could not compile ignore repo glob %s", exclude)
 			continue
 		}
 		if g.Match(s) {
-			// s.log.Debugf("ignoring repo %s", r)
+			log.Debugf("ignoring repo %s", s)
 			return true
 		}
 	}
@@ -184,11 +184,11 @@ func (r *repoCache) includeRepo(s string) bool {
 	for _, include := range r.include {
 		g, err := glob.Compile(include)
 		if err != nil {
-			// s.log.WithField("repo", r).Debugf("invalid glob %q: %s", include, err)
+			log.Warnf("could not compile include repo glob %s", include)
 			continue
 		}
 		if g.Match(s) {
-			// s.log.Debugf("including repo %s", r)
+			log.Debugf("including repo %s", s)
 			return true
 		}
 	}
