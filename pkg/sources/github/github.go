@@ -124,7 +124,8 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 	return "", "", errors.New("unhandled credential type for token fetch")
 }
 
-// repoCache is a thread safe map of repositories.
+// repoCache is a thread safe map of repositories that need to be scanned.
+// It also enforces the include and exclude globs.
 type repoCache struct {
 	count uint64
 	mu    sync.Mutex
