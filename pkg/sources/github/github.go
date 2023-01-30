@@ -135,11 +135,11 @@ type repoCache struct {
 	include, exclude []string
 }
 
-func newRepoCache(include, exclude []string) *repoCache {
+func newRepoCache(includeRepos, excludeRepos []string) *repoCache {
 	return &repoCache{
 		m:       make(map[string]struct{}),
-		include: include,
-		exclude: exclude,
+		include: includeRepos,
+		exclude: excludeRepos,
 	}
 }
 
