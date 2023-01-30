@@ -57,7 +57,7 @@ func TestSource_Token(t *testing.T) {
 		conn:        conn,
 		httpClient:  common.SaneHttpClient(),
 		log:         log.WithField("source", "github"),
-		repoCache:   newRepoCache(),
+		repoCache:   newRepoCache(nil, nil),
 		memberCache: map[string]struct{}{},
 		orgCache:    map[string]struct{}{},
 	}

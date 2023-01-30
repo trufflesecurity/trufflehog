@@ -28,6 +28,15 @@ import (
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
+	// if src == nil {
+	// 	src = &sourcespb.GitHub{
+	// 		Credential: &sourcespb.GitHub_Token{
+	// 			Token: "super secret token",
+	// 		},
+	// 		IncludeRepos: nil,
+	// 		IgnoreRepos:  nil,
+	// 	}
+	// }
 	s := &Source{}
 	conn, err := anypb.New(src)
 	if err != nil {
@@ -52,6 +61,8 @@ func TestInit(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
+		// IncludeRepos: nil,
+		// IgnoreRepos:  nil,
 	})
 
 	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1)
@@ -67,12 +78,17 @@ func TestAddReposByOrg(t *testing.T) {
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
 		JSON([]map[string]string{
-			{"clone_url": "https://github.com/super-secret-repo.git", "name": "super-secret-repo"},
+			{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"},
 			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
 		})
 
-	s := initTestSource(nil)
-	s.ignoreRepos = []string{"secret/super-*-repo2"}
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		IncludeRepos: nil,
+		IgnoreRepos:  []string{"secret/super-*-repo2"},
+	})
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
@@ -94,11 +110,13 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/not-super-secret-repo"},
 		})
 
-	src := &sourcespb.GitHub{
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		IncludeRepos:  []string{"secret/super*"},
 		Organizations: []string{"super-secret-org"},
-	}
-	s := initTestSource(src)
-	s.includeRepos = []string{"secret/super*"}
+	})
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
@@ -121,8 +139,12 @@ func TestAddReposByUser(t *testing.T) {
 			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
 		})
 
-	s := initTestSource(nil)
-	s.ignoreRepos = []string{"secret/super-secret-repo2"}
+	s := initTestSource(&sourcespb.GitHub{
+		Credential: &sourcespb.GitHub_Token{
+			Token: "super secret token",
+		},
+		IgnoreRepos: []string{"secret/super-secret-repo2"},
+	})
 	err := s.getReposByUser(context.TODO(), "super-secret-user")
 	assert.Nil(t, err)
 	assert.Equal(t, uint64(1), s.repoCache.len())

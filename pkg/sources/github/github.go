@@ -42,46 +42,6 @@ const (
 	membersAppPagination    = 500
 )
 
-// repoCache is a thread safe map of repositories.
-type repoCache struct {
-	count uint64
-	mu    sync.Mutex
-	m     map[string]struct{}
-}
-
-func newRepoCache() *repoCache {
-	return &repoCache{m: make(map[string]struct{})}
-}
-
-func (r *repoCache) len() uint64 {
-	return atomic.LoadUint64(&r.count)
-}
-
-func (r *repoCache) add(repo string) {
-	atomic.AddUint64(&r.count, 1)
-	r.mu.Lock()
-	r.m[repo] = struct{}{}
-	r.mu.Unlock()
-}
-
-func (r *repoCache) exists(repo string) bool {
-	r.mu.Lock()
-	_, ok := r.m[repo]
-	r.mu.Unlock()
-	return ok
-}
-
-func (r *repoCache) items() []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	repos := make([]string, 0, r.count)
-	for repo := range r.m {
-		repos = append(repos, repo)
-	}
-	return repos
-}
-
 type Source struct {
 	name        string
 	githubUser  string
@@ -91,9 +51,7 @@ type Source struct {
 	verify      bool
 	repos,
 	orgs,
-	members,
-	includeRepos,
-	ignoreRepos []string
+	members []string
 	repoCache       *repoCache
 	orgCache        map[string]struct{}
 	memberCache     map[string]struct{}
@@ -166,6 +124,94 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 	return "", "", errors.New("unhandled credential type for token fetch")
 }
 
+// repoCache is a thread safe map of repositories.
+type repoCache struct {
+	count uint64
+	mu    sync.Mutex
+	m     map[string]struct{}
+
+	// include, exclude are globs to filter the repoCache.
+	include, exclude []string
+}
+
+func newRepoCache(include, exclude []string) *repoCache {
+	return &repoCache{
+		m:       make(map[string]struct{}),
+		include: include,
+		exclude: exclude,
+	}
+}
+
+func (r *repoCache) len() uint64 {
+	return atomic.LoadUint64(&r.count)
+}
+
+func (r *repoCache) add(url, name string) {
+	if r.ignoreRepo(name) {
+		return
+	}
+	if !r.includeRepo(name) {
+		return
+	}
+
+	atomic.AddUint64(&r.count, 1)
+	r.mu.Lock()
+	r.m[url] = struct{}{}
+	r.mu.Unlock()
+}
+
+func (r *repoCache) ignoreRepo(s string) bool {
+	for _, exclude := range r.exclude {
+		g, err := glob.Compile(exclude)
+		if err != nil {
+			// s.log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
+			continue
+		}
+		if g.Match(s) {
+			// s.log.Debugf("ignoring repo %s", r)
+			return true
+		}
+	}
+	return false
+}
+
+func (r *repoCache) includeRepo(s string) bool {
+	if len(r.include) == 0 {
+		return true
+	}
+
+	for _, include := range r.include {
+		g, err := glob.Compile(include)
+		if err != nil {
+			// s.log.WithField("repo", r).Debugf("invalid glob %q: %s", include, err)
+			continue
+		}
+		if g.Match(s) {
+			// s.log.Debugf("including repo %s", r)
+			return true
+		}
+	}
+	return false
+}
+
+func (r *repoCache) exists(repo string) bool {
+	r.mu.Lock()
+	_, ok := r.m[repo]
+	r.mu.Unlock()
+	return ok
+}
+
+func (r *repoCache) items() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	repos := make([]string, 0, r.count)
+	for repo := range r.m {
+		repos = append(repos, repo)
+	}
+	return repos
+}
+
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = log.WithField("source", s.Type()).WithField("name", name)
@@ -179,9 +225,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.httpClient = common.RetryableHttpClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
-	s.repoCache = newRepoCache()
-	s.orgCache = make(map[string]struct{})
-	s.memberCache = make(map[string]struct{})
 
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -190,21 +233,23 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	}
 	s.conn = &conn
 
+	s.repoCache = newRepoCache(s.conn.IncludeRepos, s.conn.IgnoreRepos)
+	s.orgCache = make(map[string]struct{})
+	s.memberCache = make(map[string]struct{})
+
 	s.repos = s.conn.Repositories
 	for _, repo := range s.repos {
 		r, err := s.normalizeRepo(repo)
 		if err != nil {
 			return fmt.Errorf("invalid repository %q: %v", repo, err)
 		}
-		s.repoCache.add(r)
+		s.repoCache.add(r, "")
 	}
 
 	s.orgs = s.conn.Organizations
 	for _, org := range s.orgs {
 		s.orgCache[org] = struct{}{}
 	}
-	s.includeRepos = s.conn.IncludeRepos
-	s.ignoreRepos = s.conn.IgnoreRepos
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -752,26 +797,19 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 
 		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
 		for _, r := range someRepos {
-			if s.ignoreRepo(r.GetFullName()) {
-				continue
-			}
-			if !s.includeRepo(r.GetFullName()) {
-				continue
-			}
-
-			numRepos++
 			if r.GetFork() {
-				numForks++
 				if !s.conn.IncludeForks {
 					continue
 				}
+				numForks++
 			}
 			repo, err := s.normalizeRepo(r.GetCloneURL())
 			if err != nil {
 				logger.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
 				continue
 			}
-			s.repoCache.add(repo)
+			s.repoCache.add(repo, r.GetFullName())
+			numRepos++
 		}
 		if res.NextPage == 0 {
 			break
@@ -807,13 +845,6 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 
 		s.log.Debugf("Listed repos for user %s page %d/%d", user, opts.Page, res.LastPage)
 		for _, r := range someRepos {
-			if s.ignoreRepo(r.GetFullName()) {
-				continue
-			}
-			if !s.includeRepo(r.GetFullName()) {
-				continue
-			}
-
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
@@ -823,7 +854,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 				s.log.Warnf("could not normalize repo %s: %v", r.GetFullName(), err)
 				continue
 			}
-			s.repoCache.add(repo)
+			s.repoCache.add(repo, r.GetFullName())
 		}
 		if res.NextPage == 0 {
 			break
@@ -832,40 +863,6 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 	}
 
 	return nil
-}
-
-func (s *Source) includeRepo(r string) bool {
-	if len(s.includeRepos) == 0 {
-		return true
-	}
-
-	for _, include := range s.includeRepos {
-		g, err := glob.Compile(include)
-		if err != nil {
-			s.log.WithField("repo", r).Debugf("invalid glob %q: %s", include, err)
-			continue
-		}
-		if g.Match(r) {
-			s.log.Debugf("including repo %s", r)
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Source) ignoreRepo(r string) bool {
-	for _, ignore := range s.ignoreRepos {
-		g, err := glob.Compile(ignore)
-		if err != nil {
-			s.log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
-			continue
-		}
-		if g.Match(r) {
-			s.log.Debugf("ignoring repo %s", r)
-			return true
-		}
-	}
-	return false
 }
 
 func (s *Source) getGistsByUser(ctx context.Context, user string) error {
@@ -882,12 +879,12 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) error {
 			return fmt.Errorf("could not list gists for user %s: %w", user, err)
 		}
 		for _, gist := range gists {
-			url, err := s.normalizeRepo(gist.GetGitPullURL())
+			repoURL, err := s.normalizeRepo(gist.GetGitPullURL())
 			if err != nil {
 				s.log.Warnf("could not normalize gist %s: %v", gist.GetGitPullURL(), err)
 				continue
 			}
-			s.repoCache.add(url)
+			s.repoCache.add(repoURL, "")
 		}
 		if res == nil || res.NextPage == 0 {
 			break
@@ -952,7 +949,7 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 				s.log.Warnf("could not normalize repo %s: %v", r.GetCloneURL(), err)
 				continue
 			}
-			s.repoCache.add(repo)
+			s.repoCache.add(repo, r.GetFullName())
 			s.log.Debugf("Enumerated repo %s", r.GetCloneURL())
 		}
 
