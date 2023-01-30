@@ -155,8 +155,8 @@ func (r *repoCache) add(url, name string) {
 		return
 	}
 
-	atomic.AddUint64(&r.count, 1)
 	r.mu.Lock()
+	r.count++
 	r.m[url] = struct{}{}
 	r.mu.Unlock()
 }
