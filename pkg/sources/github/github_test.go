@@ -28,15 +28,6 @@ import (
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
-	// if src == nil {
-	// 	src = &sourcespb.GitHub{
-	// 		Credential: &sourcespb.GitHub_Token{
-	// 			Token: "super secret token",
-	// 		},
-	// 		IncludeRepos: nil,
-	// 		IgnoreRepos:  nil,
-	// 	}
-	// }
 	s := &Source{}
 	conn, err := anypb.New(src)
 	if err != nil {
@@ -61,8 +52,6 @@ func TestInit(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		// IncludeRepos: nil,
-		// IgnoreRepos:  nil,
 	})
 
 	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1)
