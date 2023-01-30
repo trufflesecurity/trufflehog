@@ -558,11 +558,11 @@ func TestSource_paginateGists(t *testing.T) {
 
 func gistsCheckFunc(expected string, minRepos int, s *Source) sources.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
-		if minRepos != 0 && minRepos > len(s.repos) {
+		if minRepos != 0 && uint64(minRepos) > s.repoCache.len() {
 			return fmt.Errorf("didn't find enough repos. expected: %d, got :%d", minRepos, len(s.repos))
 		}
 		if expected != "" {
-			for _, repo := range s.repos {
+			for _, repo := range s.repoCache.items() {
 				if repo == expected {
 					return nil
 				}

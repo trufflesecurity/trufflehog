@@ -191,7 +191,18 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.conn = &conn
 
 	s.repos = s.conn.Repositories
+	for _, repo := range s.repos {
+		r, err := s.normalizeRepo(repo)
+		if err != nil {
+			return fmt.Errorf("invalid repository %q: %v", repo, err)
+		}
+		s.repoCache.add(r)
+	}
+
 	s.orgs = s.conn.Organizations
+	for _, org := range s.orgs {
+		s.orgCache[org] = struct{}{}
+	}
 	s.includeRepos = s.conn.IncludeRepos
 	s.ignoreRepos = s.conn.IgnoreRepos
 
