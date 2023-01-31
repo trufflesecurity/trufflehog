@@ -103,11 +103,7 @@ func BenchmarkChunker(b *testing.B) {
 
 	baseReader := bufio.NewReaderSize(reReader, ChunkSize)
 	_, _ = baseReader.Read(baseChunkOne)
-	peek, _ := baseReader.Peek(PeekSize)
-	baseChunkOne = append(baseChunkOne, peek...)
 	_, _ = baseReader.Read(baseChunkTwo)
-	peek, _ = baseReader.Peek(PeekSize)
-	baseChunkTwo = append(baseChunkTwo, peek...)
 
 	// Reset the reader to the beginning and use ChunkReader.
 	_ = reReader.Reset()
