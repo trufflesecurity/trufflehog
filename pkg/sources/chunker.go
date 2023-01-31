@@ -25,24 +25,21 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 			chunkChan <- originalChunk
 			return
 		}
-		r := bytes.NewReader(originalChunk.Data)
-		reader := bufio.NewReaderSize(bufio.NewReader(r), ChunkSize)
+		reader := bufio.NewReaderSize(bytes.NewReader(originalChunk.Data), ChunkSize)
+		chunkBytes := make([]byte, ChunkSize)
 		for {
-			chunkBytes := make([]byte, ChunkSize)
-			chunk := *originalChunk
 			n, err := reader.Read(chunkBytes)
-			if err != nil && !errors.Is(err, io.EOF) {
+			if n == 0 || errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
 				logrus.WithError(err).Error("Error chunking reader.")
 				break
 			}
 			peekData, _ := reader.Peek(PeekSize)
+			chunk := *originalChunk
 			chunk.Data = append(chunkBytes[:n], peekData...)
-			if n > 0 {
-				chunkChan <- &chunk
-			}
-			if errors.Is(err, io.EOF) {
-				break
-			}
+			chunkChan <- &chunk
 		}
 	}()
 	return chunkChan

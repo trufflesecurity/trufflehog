@@ -72,3 +72,55 @@ func TestChunker(t *testing.T) {
 	}
 
 }
+
+func BenchmarkChunker(b *testing.B) {
+	byteBuffer := bytes.NewBuffer(make([]byte, ChunkSize*9))
+	reReader, err := diskbufferreader.New(byteBuffer)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer reReader.Close()
+
+	baseChunkCount := 0
+
+	// Count chunks from looping using chunk size.
+	for {
+		tmpChunk := make([]byte, ChunkSize)
+		_, err := reReader.Read(tmpChunk)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			b.Fatal(err)
+		}
+		baseChunkCount++
+	}
+	_ = reReader.Reset()
+
+	// Get the first two chunks for comparing later.
+	baseChunkOne := make([]byte, ChunkSize)
+	baseChunkTwo := make([]byte, ChunkSize)
+
+	baseReader := bufio.NewReaderSize(reReader, ChunkSize)
+	_, _ = baseReader.Read(baseChunkOne)
+	peek, _ := baseReader.Peek(PeekSize)
+	baseChunkOne = append(baseChunkOne, peek...)
+	_, _ = baseReader.Read(baseChunkTwo)
+	peek, _ = baseReader.Peek(PeekSize)
+	baseChunkTwo = append(baseChunkTwo, peek...)
+
+	// Reset the reader to the beginning and use ChunkReader.
+	_ = reReader.Reset()
+
+	chunkData, _ := io.ReadAll(reReader)
+	originalChunk := &Chunk{
+		Data: chunkData,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for chunk := range Chunker(originalChunk) {
+			_ = chunk
+		}
+	}
+}
