@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -15,6 +16,12 @@ const (
 	// PeekSize is the size of the peek into the previous chunk.
 	PeekSize = 3 * 1024
 )
+
+var chunkBytesPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, ChunkSize)
+	},
+}
 
 // Chunker takes a chunk and splits it into chunks of ChunkSize.
 func Chunker(originalChunk *Chunk) chan *Chunk {
@@ -27,7 +34,8 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 		}
 		reader := bufio.NewReaderSize(bytes.NewReader(originalChunk.Data), ChunkSize)
 		for {
-			chunkBytes := make([]byte, ChunkSize+PeekSize)
+			chunkBytes := chunkBytesPool.Get().([]byte)
+			defer chunkBytesPool.Put(chunkBytes)
 			n, err := reader.Read(chunkBytes)
 			if n == 0 || errors.Is(err, io.EOF) {
 				break
