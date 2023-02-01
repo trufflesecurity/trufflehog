@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"net"
@@ -99,10 +100,13 @@ func PinnedRetryableHttpClient() *http.Client {
 			RootCAs: PinnedCertPool(),
 		},
 		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}
+			return d.DialContext(ctx, network, addr)
+		},
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
@@ -134,10 +138,13 @@ const DefaultResponseTimeout = 5 * time.Second
 
 var saneTransport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
-	DialContext: (&net.Dialer{
-		Timeout:   2 * time.Second,
-		KeepAlive: 5 * time.Second,
-	}).DialContext,
+	DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		d := net.Dialer{
+			Timeout:   2 * time.Second,
+			KeepAlive: 5 * time.Second,
+		}
+		return d.DialContext(ctx, network, addr)
+	},
 	MaxIdleConns:          5,
 	IdleConnTimeout:       5 * time.Second,
 	TLSHandshakeTimeout:   3 * time.Second,
