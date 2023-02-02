@@ -80,7 +80,7 @@ func TestSource_Chunks(t *testing.T) {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			chunksCh := make(chan *sources.Chunk, 100)
+			chunksCh := make(chan *sources.Chunk)
 			go func() {
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
