@@ -19,8 +19,8 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([A-Za-z0-9_-]{64})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([A-Za-z0-9_-]{65})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([a-f0-9]{64})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b(C[a-f0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
