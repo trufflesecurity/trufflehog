@@ -3,8 +3,12 @@ description: 'Scan Github Actions with TruffleHog'
 author: Truffle Security Co. <support@trufflesec.com>
 
 inputs:
+  version:
+    description: TruffleHog version.
+    required: false
+    default: latest
   path:
-    description: Repository path
+    description: Repository path.
     required: true
   base:
     description: Start scanning from here (usually main branch).
@@ -22,7 +26,7 @@ branding:
   color: "green"
 runs:
   using: "docker"
-  image: "docker://ghcr.io/trufflesecurity/trufflehog:latest"
+  image: "docker://ghcr.io/trufflesecurity/trufflehog:${{ inputs.version }}"
   args:
     - git
     - file://${{ inputs.path }}
