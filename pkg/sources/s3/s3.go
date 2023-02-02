@@ -221,7 +221,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 		s.jobPool.Go(func() error {
 			defer common.RecoverWithExit(ctx)
 
-			if (*obj.Key)[len(*obj.Key)-1:] == "/" {
+			if strings.HasSuffix(*obj.Key, "/") {
 				s.log.V(5).Info("Skipping directory", "object", *obj.Key)
 				return nil
 			}

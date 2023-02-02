@@ -152,10 +152,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	// Get all repos if not specified.
-	if repos == nil {
+	if len(repos) == 0 {
 		projects, err := s.getAllProjects(apiClient)
 		if err != nil {
-			return errors.New(err)
+			return fmt.Errorf("error getting all projects: %v", err)
 		}
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
@@ -170,7 +170,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 			repos = append(repos, prj.HTTPURLToRepo)
 		}
-		if repos == nil {
+		if len(repos) == 0 {
 			return errors.Errorf("unable to discover any repos")
 		}
 	}

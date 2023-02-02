@@ -2,14 +2,12 @@ package sources
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 // ScanErrors is used to collect errors encountered while scanning.
 // It ensures that errors are collected in a thread-safe manner.
 type ScanErrors struct {
-	count  uint64
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	errors []error
 }
 
@@ -20,13 +18,14 @@ func NewScanErrors(projects int) *ScanErrors {
 
 // Add an error to the collection in a thread-safe manner.
 func (s *ScanErrors) Add(err error) {
-	atomic.AddUint64(&s.count, 1)
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.errors = append(s.errors, err)
-	s.mu.Unlock()
 }
 
 // Count returns the number of errors collected.
 func (s *ScanErrors) Count() uint64 {
-	return atomic.LoadUint64(&s.count)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return uint64(len(s.errors))
 }
