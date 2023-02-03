@@ -4,6 +4,7 @@ author: Truffle Security Co. <support@trufflesec.com>
 
 inputs:
   version:
+    type: string
     description: TruffleHog version.
     required: false
     default: 'latest'
