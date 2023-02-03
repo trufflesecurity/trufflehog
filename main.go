@@ -46,6 +46,7 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -354,4 +355,9 @@ func printAverageDetectorTime(e *engine.Engine) {
 		avgDuration := total / time.Duration(len(durations))
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
 	}
+}
+
+func splitVerifierURLs(verifierURLs string) []string {
+	fmt.Println(verifierURLs)
+	return strings.Split(verifierURLs, ",")
 }
