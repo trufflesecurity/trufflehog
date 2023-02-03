@@ -6,7 +6,7 @@ inputs:
   version:
     description: TruffleHog version.
     required: false
-    default: latest
+    default: 'latest'
   path:
     description: Repository path.
     required: true
