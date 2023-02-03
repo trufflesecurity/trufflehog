@@ -38,6 +38,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.wizardIntro, _ = update(m.wizardIntro, msg)
 		m.sourceSelect, _ = update(m.sourceSelect, msg)
+		m.sourceConfigure, _ = update(m.sourceConfigure, msg)
 		return m, nil
 	}
 
@@ -53,7 +54,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case showSourceSelect:
 		if msg, ok := msg.(sourceSelectMsg); ok {
 			m.state = showSourceConfigure
-			m.sourceConfigure.cmd = msg.cmd
+			m.sourceConfigure = newSourceConfigure(msg.cmd)
 			return m, nil
 		}
 		m.sourceSelect, cmd = update(m.sourceSelect, msg)
