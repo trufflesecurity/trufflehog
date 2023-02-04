@@ -17,6 +17,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
+const (
+	// defaultDateFormat is the standard date format for git.
+	defaultDateFormat = "Mon Jan 02 15:04:05 2006 -0700"
+
+	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
+	defaultMaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+
+	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
+	defaultMaxCommitSize = 1 * 1024 * 1024 * 1024 // 1GB
+)
+
 // Commit contains commit header info and diffs.
 type Commit struct {
 	Hash    string
@@ -36,25 +47,25 @@ type Diff struct {
 
 // Parser sets values used in GitParse.
 type Parser struct {
-	MaxDiffSize   int
-	MaxCommitSize int
-	DateFormat    string
+	maxDiffSize   int
+	maxCommitSize int
+	dateFormat    string
 }
 
-// MaxDiffSize sets MaxDiffSize option. Diffs larger than MaxDiffSize will
+// WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
-func MaxDiffSize(MaxDiffSize int) Option {
+func WithMaxDiffSize(maxDiffSize int) Option {
 	return func(parser *Parser) {
-		parser.MaxDiffSize = MaxDiffSize
+		parser.maxDiffSize = maxDiffSize
 	}
 }
 
-// MaxCommitSize sets MaxCommitSize option. Commits larger than MaxCommitSize
+// WithMaxCommitSize sets maxCommitSize option. Commits larger than maxCommitSize
 // will be put in the commit channel and additional diffs will be added to a
 // new commit.
-func MaxCommitSize(MaxCommitSize int) Option {
+func WithMaxCommitSize(maxCommitSize int) Option {
 	return func(parser *Parser) {
-		parser.MaxCommitSize = MaxCommitSize
+		parser.maxCommitSize = maxCommitSize
 	}
 }
 
@@ -64,9 +75,9 @@ type Option func(*Parser)
 // NewParser creates a GitParse config from options and sets defaults.
 func NewParser(options ...Option) *Parser {
 	parser := &Parser{
-		DateFormat:    "Mon Jan 02 15:04:05 2006 -0700",
-		MaxDiffSize:   1 * 1024 * 1024 * 1024, // 1GB
-		MaxCommitSize: 1 * 1024 * 1024 * 1024, // 1GB
+		dateFormat:    defaultDateFormat,
+		maxDiffSize:   defaultMaxDiffSize,
+		maxCommitSize: defaultMaxCommitSize,
 	}
 	for _, option := range options {
 		option(parser)
@@ -210,7 +221,7 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isAuthorLine(line):
 			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
 		case isDateLine(line):
-			date, err := time.Parse(c.DateFormat, strings.TrimSpace(string(line[6:])))
+			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
 			if err != nil {
 				log.WithError(err).Debug("Could not parse date from git stream.")
 			}
@@ -262,8 +273,8 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				}
 			}
 		}
-		if currentDiff.Content.Len() > c.MaxDiffSize {
-			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.MaxDiffSize)
+		if currentDiff.Content.Len() > c.maxDiffSize {
+			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize)
 			break
 		}
 	}

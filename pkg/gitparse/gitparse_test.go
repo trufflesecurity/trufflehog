@@ -88,7 +88,7 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 	r := bytes.NewReader([]byte(singleCommitSingleDiff))
 	commitChan := make(chan Commit)
 	parser := NewParser()
-	date, _ := time.Parse(parser.DateFormat, "Mon Mar 15 23:27:16 2021 -0700")
+	date, _ := time.Parse(parser.dateFormat, "Mon Mar 15 23:27:16 2021 -0700")
 	content := bytes.NewBuffer([]byte(singleCommitSingleDiffDiff))
 	builder := strings.Builder{}
 	builder.Write([]byte(singleCommitSingleDiffMessage))
@@ -128,8 +128,8 @@ func TestMultiCommitContextDiff(t *testing.T) {
 	r := bytes.NewReader([]byte(singleCommitContextDiff))
 	parser := NewParser()
 	commitChan := make(chan Commit)
-	dateOne, _ := time.Parse(parser.DateFormat, "Mon Mar 15 23:27:16 2021 -0700")
-	dateTwo, _ := time.Parse(parser.DateFormat, "Wed Dec 12 18:19:21 2018 -0800")
+	dateOne, _ := time.Parse(parser.dateFormat, "Mon Mar 15 23:27:16 2021 -0700")
+	dateTwo, _ := time.Parse(parser.dateFormat, "Wed Dec 12 18:19:21 2018 -0800")
 	diffOneA := bytes.NewBuffer([]byte(singleCommitContextDiffDiffOneA))
 	diffTwoA := bytes.NewBuffer([]byte(singleCommitContextDiffDiffTwoA))
 	// diffTwoB := bytes.NewBuffer([]byte(singleCommitContextDiffDiffTwoB))
@@ -187,7 +187,7 @@ func TestMaxDiffSize(t *testing.T) {
 	parser := NewParser()
 	bigBytes := bytes.Buffer{}
 	bigBytes.WriteString(singleCommitSingleDiff)
-	for i := 0; i <= parser.MaxDiffSize/1024+10; i++ {
+	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
 		bigBytes.WriteString("+")
 		for n := 0; n < 1024; n++ {
 			bigBytes.Write([]byte("0"))
@@ -202,8 +202,8 @@ func TestMaxDiffSize(t *testing.T) {
 	}()
 
 	commit := <-commitChan
-	if commit.Diffs[0].Content.Len() > parser.MaxDiffSize+1024 {
-		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.MaxDiffSize+1024)
+	if commit.Diffs[0].Content.Len() > parser.maxDiffSize+1024 {
+		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.maxDiffSize+1024)
 	}
 
 }
