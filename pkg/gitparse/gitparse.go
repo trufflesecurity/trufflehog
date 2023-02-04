@@ -18,11 +18,14 @@ import (
 )
 
 const (
-	// DateFormat is the standard date format for git.
-	DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
+	// defaultDateFormat is the standard date format for git.
+	defaultDateFormat = "Mon Jan 02 15:04:05 2006 -0700"
 
-	// MaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-	MaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
+	defaultMaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+
+	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
+	defaultMaxCommitSize = 1 * 1024 * 1024 * 1024 // 1GB
 )
 
 // Commit contains commit header info and diffs.
@@ -40,6 +43,46 @@ type Diff struct {
 	LineStart int
 	Content   bytes.Buffer
 	IsBinary  bool
+}
+
+// Parser sets values used in GitParse.
+type Parser struct {
+	maxDiffSize   int
+	maxCommitSize int
+	dateFormat    string
+}
+
+// WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
+// be truncated.
+func WithMaxDiffSize(maxDiffSize int) Option {
+	return func(parser *Parser) {
+		parser.maxDiffSize = maxDiffSize
+	}
+}
+
+// WithMaxCommitSize sets maxCommitSize option. Commits larger than maxCommitSize
+// will be put in the commit channel and additional diffs will be added to a
+// new commit.
+func WithMaxCommitSize(maxCommitSize int) Option {
+	return func(parser *Parser) {
+		parser.maxCommitSize = maxCommitSize
+	}
+}
+
+// Option is used for adding options to Config.
+type Option func(*Parser)
+
+// NewParser creates a GitParse config from options and sets defaults.
+func NewParser(options ...Option) *Parser {
+	parser := &Parser{
+		dateFormat:    defaultDateFormat,
+		maxDiffSize:   defaultMaxDiffSize,
+		maxCommitSize: defaultMaxCommitSize,
+	}
+	for _, option := range options {
+		option(parser)
+	}
+	return parser
 }
 
 // Equal compares the content of two Commits to determine if they are the same.
@@ -75,7 +118,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -93,11 +136,11 @@ func RepoPath(ctx context.Context, source string, head string, abbreviatedLog bo
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
 	}
 
-	return executeCommand(ctx, cmd)
+	return c.executeCommand(ctx, cmd)
 }
 
 // Unstaged parses the output of the `git diff` command for the `source` path.
-func Unstaged(ctx context.Context, source string) (chan Commit, error) {
+func (c *Parser) Unstaged(ctx context.Context, source string) (chan Commit, error) {
 	args := []string{"-C", source, "diff", "-p", "-U5", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
 
 	cmd := exec.Command("git", args...)
@@ -107,11 +150,11 @@ func Unstaged(ctx context.Context, source string) (chan Commit, error) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
 	}
 
-	return executeCommand(ctx, cmd)
+	return c.executeCommand(ctx, cmd)
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
-func executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
+func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
 	commitChan := make(chan Commit, 64)
 
 	stdOut, err := cmd.StdoutPipe()
@@ -136,7 +179,7 @@ func executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
 	}()
 
 	go func() {
-		FromReader(ctx, stdOut, commitChan)
+		c.fromReader(ctx, stdOut, commitChan)
 		if err := cmd.Wait(); err != nil {
 			log.WithError(err).Debugf("Error waiting for git command to complete.")
 		}
@@ -145,7 +188,7 @@ func executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
 	return commitChan, nil
 }
 
-func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
+func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 	outReader := bufio.NewReader(stdOut)
 	var currentCommit *Commit
 	var currentDiff *Diff
@@ -178,7 +221,7 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 		case isAuthorLine(line):
 			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
 		case isDateLine(line):
-			date, err := time.Parse(DateFormat, strings.TrimSpace(string(line[6:])))
+			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
 			if err != nil {
 				log.WithError(err).Debug("Could not parse date from git stream.")
 			}
@@ -230,8 +273,8 @@ func FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 				}
 			}
 		}
-		if currentDiff.Content.Len() > MaxDiffSize {
-			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, MaxDiffSize)
+		if currentDiff.Content.Len() > c.maxDiffSize {
+			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize)
 			break
 		}
 	}
