@@ -125,7 +125,7 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 }
 
 func TestMultiCommitContextDiff(t *testing.T) {
-	r := bytes.NewReader([]byte(singleCommitContextDiff))
+	r := bytes.NewReader([]byte(multiCommitContextDiff))
 	parser := NewParser()
 	commitChan := make(chan Commit)
 	dateOne, _ := time.Parse(parser.dateFormat, "Mon Mar 15 23:27:16 2021 -0700")
@@ -208,6 +208,26 @@ func TestMaxDiffSize(t *testing.T) {
 
 }
 
+func TestMaxCommitSize(t *testing.T) {
+	parser := NewParser(WithMaxCommitSize(1))
+	commitText := bytes.Buffer{}
+	commitText.WriteString(singleCommitMultiDiff)
+	commitChan := make(chan Commit)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1)*time.Second)
+	defer cancel()
+	go func() {
+		parser.fromReader(ctx, &commitText, commitChan)
+	}()
+	commitCount := 0
+	for range commitChan {
+		commitCount++
+	}
+	if commitCount != 2 {
+		t.Errorf("Commit count does not match. Got: %d, expected: %d", commitCount, 2)
+	}
+
+}
+
 const singleCommitSingleDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
 Date:   Mon Mar 15 23:27:16 2021 -0700
@@ -241,7 +261,7 @@ aws_secret_access_key = Tg0pz8Jii8hkLx4+PnUisM8GmKs3a2DK+9qz/lie
 output = json
 region = us-east-2
 `
-const singleCommitContextDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
+const multiCommitContextDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
 Date:   Mon Mar 15 23:27:16 2021 -0700
 
@@ -270,6 +290,47 @@ Author: Dylan Ayrey <dxa4481@rit.edu>
 Date:   Wed Dec 12 18:19:21 2018 -0800
 
     Update aws again
+
+diff --git a/aws b/aws
+index 239b415..2ee133b 100644
+--- a/aws
++++ b/aws
+@@ -1,5 +1,7 @@
+ blah blaj
+ 
+-this is the secret: AKIA2E0A8F3B244C9986
++this is the secret: [Default]
++Access key Id: AKIAILE3JG6KMS3HZGCA
++Secret Access Key: 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
+ 
+-okay thank you bye
+\ No newline at end of file
++okay thank you bye
+`
+
+const singleCommitMultiDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
+Author: Dustin Decker <humanatcomputer@gmail.com>
+Date:   Mon Mar 15 23:27:16 2021 -0700
+
+    Update aws
+
+diff --git a/aws b/aws
+index 2ee133b..12b4843 100644
+--- a/aws
++++ b/aws
+@@ -1,7 +1,5 @@
+-blah blaj
+-
+-this is the secret: [Default]
+-Access key Id: AKIAILE3JG6KMS3HZGCA
+-Secret Access Key: 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
+-
+-okay thank you bye
++[default]
++aws_access_key_id = AKIAXYZDQCEN4B6JSJQI
++aws_secret_access_key = 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
++output = json
++region = us-east-2
 
 diff --git a/aws b/aws
 index 239b415..2ee133b 100644
