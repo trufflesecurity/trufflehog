@@ -1,122 +1,130 @@
 package tui
 
 import (
-	"strconv"
+	"fmt"
+	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 type sourceConfigureModel struct {
-	cmd *kingpin.CmdModel
-	tbl table.Model
+	cmd         *kingpin.CmdModel
+	inputs      []textinput.Model
+	inputsTitle []string
+	focused     int
+	err         error
 }
 
 func (m sourceConfigureModel) Init() tea.Cmd {
 	return nil
 }
 
+var (
+	labelPrimaryStyle = lipgloss.NewStyle().Foreground(
+		lipgloss.Color(colors["sprout"]))
+)
+
 func (m sourceConfigureModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	var cmds []tea.Cmd = make([]tea.Cmd, len(m.inputs))
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			// TODO: go back?
+		switch msg.Type {
+		case tea.KeyEnter:
+			if m.focused == len(m.inputs)-1 {
+				return m, tea.Quit
+			}
+			m.nextInput()
+		case tea.KeyCtrlC, tea.KeyEsc:
 			return m, tea.Quit
-		case "enter":
-			// TODO: popup to set value
-			return m, tea.Batch(
-				tea.Printf("Let's go to %s!", m.tbl.SelectedRow()[1]),
-			)
+		case tea.KeyShiftTab, tea.KeyCtrlP:
+			m.prevInput()
+		case tea.KeyTab, tea.KeyCtrlN:
+			m.nextInput()
 		}
+		for i := range m.inputs {
+			m.inputs[i].Blur()
+		}
+		m.inputs[m.focused].Focus()
 	}
-	m.tbl, cmd = m.tbl.Update(msg)
-	return m, cmd
+
+	for i := range m.inputs {
+		m.inputs[i], cmds[i] = m.inputs[i].Update(msg)
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m *sourceConfigureModel) nextInput() {
+	m.focused = (m.focused + 1) % len(m.inputs)
+}
+
+func (m *sourceConfigureModel) prevInput() {
+	m.focused--
+	// Wrap around
+	if m.focused < 0 {
+		m.focused = len(m.inputs) - 1
+	}
 }
 
 func (m sourceConfigureModel) View() string {
-	if m.cmd == nil {
-		return "no source selected"
+	var views []string = make([]string, 0, len(m.inputs))
+
+	for i, input := range m.inputs {
+		view := fmt.Sprintf(
+			`%s
+%s`,
+			labelPrimaryStyle.Width(30).Render(m.inputsTitle[i]),
+			input.View(),
+		)
+		views = append(views, view)
 	}
-	return m.tbl.View()
-	// var sb strings.Builder
-	// for _, arg := range m.cmd.Args {
-	// 	if arg.Required {
-	// 		sb.WriteString("*** ")
-	// 	}
-	// 	sb.WriteString(" {" + strings.Join(arg.Default, "|") + "} ")
-	// 	sb.WriteString(" [" + arg.Envar + "] ")
-	// 	sb.WriteString(arg.Name + "    " + arg.Help + "\n")
-	// }
-	// for _, flag := range m.cmd.Flags {
-	// 	if strings.Contains(flag.Name, "help") ||
-	// 		strings.Contains(flag.Name, "completion") ||
-	// 		strings.Contains(flag.Help, "No-op") {
-	// 		continue
-	// 	}
-	// 	if flag.Required {
-	// 		sb.WriteString("*** ")
-	// 	}
-	// 	sb.WriteString(" {" + strings.Join(flag.Default, "|") + "} ")
-	// 	sb.WriteString(" [" + flag.Envar + "] ")
-	// 	sb.WriteString("--" + flag.Name + " " + flag.Help + "\n")
-	// }
-	// return sb.String()
+
+	return strings.Join(views, "\n\n")
 }
 
 func newSourceConfigure(cmd *kingpin.CmdModel) sourceConfigureModel {
-	columns := []table.Column{
-		{Title: "Required", Width: 10},
-		{Title: "Name", Width: 20},
-		{Title: "Description", Width: 30},
-		{Title: "Value", Width: 20},
-	}
+	numInputs := len(cmd.Args) + len(cmd.Flags)
+	var inputs []textinput.Model = make([]textinput.Model, 0, numInputs)
+	var inputsTitle []string = make([]string, 0, numInputs)
 
-	var rows []table.Row
 	for _, arg := range cmd.Args {
-		row := []string{
-			strconv.FormatBool(arg.Required),
-			arg.Name,
-			arg.Help,
-			arg.Value.String(),
+		in := textinput.New()
+		in.Placeholder = arg.Name
+		in.CharLimit = 50
+		in.Width = 30
+		in.Prompt = ""
+
+		inputs = append(inputs, in)
+		if arg.Required {
+			inputsTitle = append(inputsTitle, arg.Name+"*")
+		} else {
+			inputsTitle = append(inputsTitle, arg.Name)
 		}
-		rows = append(rows, row)
 	}
+
 	for _, flag := range cmd.Flags {
-		row := []string{
-			strconv.FormatBool(flag.Required),
-			flag.Name,
-			flag.Help,
-			flag.Value.String(),
+		in := textinput.New()
+		in.Placeholder = flag.Name
+		in.CharLimit = 50
+		in.Width = 30
+		in.Prompt = ""
+
+		inputs = append(inputs, in)
+		if flag.Required {
+			inputsTitle = append(inputsTitle, flag.Name+"*")
+		} else {
+			inputsTitle = append(inputsTitle, flag.Name)
 		}
-		rows = append(rows, row)
 	}
 
-	tbl := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-		// table.WithHeight(7),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	// s.Cell = s.Cell.Width(30)
-	tbl.SetStyles(s)
-
+	inputs[0].Focus()
 	return sourceConfigureModel{
-		cmd: cmd,
-		tbl: tbl,
+		inputs:      inputs,
+		inputsTitle: inputsTitle,
+		focused:     0,
+		err:         nil,
 	}
 }
