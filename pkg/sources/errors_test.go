@@ -16,7 +16,7 @@ func TestNewScanErrors(t *testing.T) {
 			name:     "no projects",
 			projects: 0,
 			want: &ScanErrors{
-				errors: make([]error, 0, 0),
+				errors: make([]error, 0),
 			},
 		},
 		{
