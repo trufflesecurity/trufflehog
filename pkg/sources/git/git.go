@@ -330,7 +330,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return err
 	}
 
-	commitChan, err := gitparse.RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "")
+	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "")
 	if err != nil {
 		return err
 	}
@@ -469,7 +469,7 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 	// get the URL metadata for reporting (may be empty)
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
-	commitChan, err := gitparse.Unstaged(ctx, path)
+	commitChan, err := gitparse.NewParser().Unstaged(ctx, path)
 	if err != nil {
 		return err
 	}
