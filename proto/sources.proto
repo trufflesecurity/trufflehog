@@ -95,6 +95,8 @@ message Confluence {
 
   GetAllSpacesScope spaces_scope = 5;
   bool insecure_skip_verify_tls = 6;
+  repeated string spaces = 7;
+  repeated string ignore_spaces = 8;
 }
 
 message DockerHub {
