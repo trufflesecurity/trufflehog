@@ -518,11 +518,13 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for Email
 
-	// no validation rules for Timestamp
+	// no validation rules for PageCreatedTimestamp
 
 	// no validation rules for Location
 
 	// no validation rules for File
+
+	// no validation rules for VersionCreatedTimestamp
 
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)

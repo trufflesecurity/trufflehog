@@ -50,9 +50,10 @@ message Confluence {
   string version = 3;
   string link = 4;
   string email = 5;
-  string timestamp = 6;
+  string page_created_timestamp = 6;
   string location = 7;
   string file = 8;
+  string version_created_timestamp = 9;
 }
 
 message Dockerhub {
