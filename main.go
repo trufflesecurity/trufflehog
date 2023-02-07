@@ -22,6 +22,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -46,6 +47,9 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan.").Bytes()
+	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
+	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -190,6 +194,16 @@ func run(state overseer.State) {
 			logger.Error(err, "error parsing the provided configuration file")
 			os.Exit(1)
 		}
+	}
+
+	if *archiveMaxSize != 0 {
+		handlers.SetArchiveMaxSize(int(*archiveMaxSize))
+	}
+	if *archiveMaxDepth != 0 {
+		handlers.SetArchiveMaxDepth(*archiveMaxDepth)
+	}
+	if *archiveTimeout != 0 {
+		handlers.SetArchiveMaxTimeout(*archiveTimeout)
 	}
 
 	ctx := context.TODO()
