@@ -197,13 +197,11 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	defer close(commitChan)
 	for {
 		if common.IsDone(ctx) {
-			cleanupParse(currentCommit, currentDiff, commitChan)
-			return
+			break
 		}
 		line, err := outReader.ReadBytes([]byte("\n")[0])
 		if err != nil && len(line) == 0 {
-			cleanupParse(currentCommit, currentDiff, commitChan)
-			return
+			break
 		}
 		switch {
 		case isCommitLine(line):
@@ -296,10 +294,10 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		}
 		if currentDiff.Content.Len() > c.maxDiffSize {
 			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize)
-			cleanupParse(currentCommit, currentDiff, commitChan)
-			return
+			break
 		}
 	}
+	cleanupParse(currentCommit, currentDiff, commitChan)
 }
 
 func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit) {
