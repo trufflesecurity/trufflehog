@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/mholt/archiver/v4"
 	log "github.com/sirupsen/logrus"
@@ -18,26 +19,42 @@ const (
 )
 
 var (
-	maxDepth = 5
+	maxDepth   = 5
+	maxSize    = 250 * 1024 * 1024 // 20MB
+	maxTimeout = time.Duration(30) * time.Second
 )
 
 // Archive is a handler for extracting and decompressing archives.
 type Archive struct {
-	maxSize int
-	size    int
+	size int
 }
 
 // New sets a default maximum size and current size counter.
 func (d *Archive) New() {
-	d.maxSize = 20 * 1024 * 1024 // 20MB
 	d.size = 0
 }
 
+// SetArchiveMaxSize sets the maximum size of the archive.
+func SetArchiveMaxSize(size int) {
+	maxSize = size
+}
+
+// SetArchiveMaxDepth sets the maximum depth of the archive.
+func SetArchiveMaxDepth(depth int) {
+	maxDepth = depth
+}
+
+// SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
+func SetArchiveMaxTimeout(timeout time.Duration) {
+	maxTimeout = timeout
+}
+
 // FromFile extracts the files from an archive.
-func (d *Archive) FromFile(data io.Reader) chan ([]byte) {
-	ctx := context.Background()
+func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]byte) {
 	archiveChan := make(chan ([]byte), 512)
 	go func() {
+		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
+		defer cancel()
 		defer close(archiveChan)
 		err := d.openArchive(ctx, 0, data, archiveChan)
 		if err != nil {
@@ -83,7 +100,7 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 		if err != nil {
 			return err
 		}
-		fileBytes, err := d.ReadToMax(compReader)
+		fileBytes, err := d.ReadToMax(ctx, compReader)
 		if err != nil {
 			return err
 		}
@@ -94,7 +111,7 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 }
 
 // IsFiletype returns true if the provided reader is an archive.
-func (d *Archive) IsFiletype(reader io.Reader) (io.Reader, bool) {
+func (d *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, bool) {
 	format, readerB, err := archiver.Identify("", reader)
 	if err != nil {
 		return readerB, false
@@ -121,7 +138,7 @@ func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Conte
 		if err != nil {
 			return err
 		}
-		fileBytes, err := d.ReadToMax(fReader)
+		fileBytes, err := d.ReadToMax(ctx, fReader)
 		if err != nil {
 			return err
 		}
@@ -136,7 +153,7 @@ func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Conte
 }
 
 // ReadToMax reads up to the max size.
-func (d *Archive) ReadToMax(reader io.Reader) (data []byte, err error) {
+func (d *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte, err error) {
 	// Archiver v4 is in alpha and using an experimental version of
 	// rardecode. There is a bug somewhere with rar decoder format 29
 	// that can lead to a panic. An issue is open in rardecode repo
@@ -153,23 +170,28 @@ func (d *Archive) ReadToMax(reader io.Reader) (data []byte, err error) {
 		}
 	}()
 	fileContent := bytes.Buffer{}
-	log.Tracef("Remaining buffer capacity: %d", d.maxSize-d.size)
-	for i := 0; i <= d.maxSize/512; i++ {
-		fileChunk := make([]byte, 512)
-		bRead, err := reader.Read(fileChunk)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return []byte{}, err
-		}
-		d.size += bRead
-		if len(fileChunk) > 0 {
-			fileContent.Write(fileChunk[0:bRead])
-		}
-		if bRead < 512 {
-			break
-		}
-		if d.size >= d.maxSize && bRead == 512 {
-			log.Debug("Max archive size reached.")
-			break
+	log.Tracef("Remaining buffer capacity: %d", maxSize-d.size)
+	for i := 0; i <= maxSize/512; i++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			fileChunk := make([]byte, 512)
+			bRead, err := reader.Read(fileChunk)
+			if err != nil && !errors.Is(err, io.EOF) {
+				return []byte{}, err
+			}
+			d.size += bRead
+			if len(fileChunk) > 0 {
+				fileContent.Write(fileChunk[0:bRead])
+			}
+			if bRead < 512 {
+				return fileContent.Bytes(), nil
+			}
+			if d.size >= maxSize && bRead == 512 {
+				log.Debug("Max archive size reached.")
+				return fileContent.Bytes(), nil
+			}
 		}
 	}
 	return fileContent.Bytes(), nil

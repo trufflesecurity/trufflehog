@@ -79,7 +79,7 @@ func TestArchiveHandler(t *testing.T) {
 		if err != nil {
 			t.Errorf("error creating reusable reader: %s", err)
 		}
-		archiveChan := archive.FromFile(newReader)
+		archiveChan := archive.FromFile(context.TODO(), newReader)
 
 		count := 0
 		re := regexp.MustCompile(testCase.matchString)
