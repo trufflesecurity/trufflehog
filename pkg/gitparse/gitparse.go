@@ -194,7 +194,11 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	var currentDiff *Diff
 
 	defer common.RecoverWithExit(ctx)
+	defer close(commitChan)
 	for {
+		if common.IsDone(ctx) {
+			break
+		}
 		line, err := outReader.ReadBytes([]byte("\n")[0])
 		if err != nil && len(line) == 0 {
 			break
@@ -233,6 +237,21 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			}
 			if currentDiff != nil && currentDiff.Content.Len() > 0 {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
+				totalSize := 0
+				for _, diff := range currentCommit.Diffs {
+					totalSize += diff.Content.Len()
+				}
+				if totalSize > c.maxCommitSize {
+					commitChan <- *currentCommit
+					currentCommit = &Commit{
+						Hash:    currentCommit.Hash,
+						Author:  currentCommit.Author,
+						Date:    currentCommit.Date,
+						Message: currentCommit.Message,
+						Diffs:   []Diff{},
+					}
+				}
 			}
 			currentDiff = &Diff{}
 		case isModeLine(line):
@@ -278,13 +297,16 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 	}
+	cleanupParse(currentCommit, currentDiff, commitChan)
+}
+
+func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit) {
 	if currentDiff != nil && currentDiff.Content.Len() > 0 {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 	}
 	if currentCommit != nil {
 		commitChan <- *currentCommit
 	}
-	close(commitChan)
 }
 
 // Date:   Tue Aug 10 15:20:40 2021 +0100
