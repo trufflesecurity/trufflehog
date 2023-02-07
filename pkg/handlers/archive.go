@@ -10,6 +10,7 @@ import (
 
 	"github.com/mholt/archiver/v4"
 	log "github.com/sirupsen/logrus"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type ctxKey int
@@ -172,26 +173,24 @@ func (d *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 	fileContent := bytes.Buffer{}
 	log.Tracef("Remaining buffer capacity: %d", maxSize-d.size)
 	for i := 0; i <= maxSize/512; i++ {
-		select {
-		case <-ctx.Done():
+		if common.IsDone(ctx) {
 			return nil, ctx.Err()
-		default:
-			fileChunk := make([]byte, 512)
-			bRead, err := reader.Read(fileChunk)
-			if err != nil && !errors.Is(err, io.EOF) {
-				return []byte{}, err
-			}
-			d.size += bRead
-			if len(fileChunk) > 0 {
-				fileContent.Write(fileChunk[0:bRead])
-			}
-			if bRead < 512 {
-				return fileContent.Bytes(), nil
-			}
-			if d.size >= maxSize && bRead == 512 {
-				log.Debug("Max archive size reached.")
-				return fileContent.Bytes(), nil
-			}
+		}
+		fileChunk := make([]byte, 512)
+		bRead, err := reader.Read(fileChunk)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return []byte{}, err
+		}
+		d.size += bRead
+		if len(fileChunk) > 0 {
+			fileContent.Write(fileChunk[0:bRead])
+		}
+		if bRead < 512 {
+			return fileContent.Bytes(), nil
+		}
+		if d.size >= maxSize && bRead == 512 {
+			log.Debug("Max archive size reached.")
+			return fileContent.Bytes(), nil
 		}
 	}
 	return fileContent.Bytes(), nil
