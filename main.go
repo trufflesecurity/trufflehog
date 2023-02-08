@@ -196,7 +196,7 @@ func run(state overseer.State) {
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
+		engine.WithDetectors(!*noVerification, engine.DefaultDetectors(ctx)...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
 		engine.WithFilterUnverified(*filterUnverified),
 	)

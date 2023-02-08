@@ -99,7 +99,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 
 	if len(e.detectors) == 0 {
 		e.detectors = map[bool][]detectors.Detector{}
-		e.detectors[true] = DefaultDetectors()
+		e.detectors[true] = DefaultDetectors(ctx)
 		e.detectors[false] = []detectors.Detector{}
 	}
 

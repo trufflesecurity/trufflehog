@@ -1,6 +1,9 @@
 package engine
 
 import (
+	"reflect"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -733,8 +736,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 )
 
-func DefaultDetectors() []detectors.Detector {
-	return []detectors.Detector{
+func DefaultDetectors(ctx context.Context) []detectors.Detector {
+	d := []detectors.Detector{
 		&heroku.Scanner{},
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
@@ -1493,4 +1496,13 @@ func DefaultDetectors() []detectors.Detector {
 		ldap.Scanner{},
 		shopify.Scanner{},
 	}
+
+	for i, detector := range d {
+		if reflect.TypeOf(detector).String() == "*github.scanner" {
+			ctx.Logger().V(5).Info("ignoring GitHub API key")
+			d[i] = github.New(github.WithVerifierURLs(nil, true))
+		}
+	}
+
+	return d
 }
