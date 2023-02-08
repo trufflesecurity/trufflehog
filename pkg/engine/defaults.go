@@ -736,8 +736,37 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 )
 
-func DefaultDetectors(ctx context.Context) []detectors.Detector {
-	d := []detectors.Detector{
+// CustomDetectors returns a list of detectors that are enabled by default, but
+// can be overridden by the user.
+func CustomDetectors(ctx context.Context, u map[string][]string) []detectors.Detector {
+	d := DefaultDetectors()
+	if u == nil || len(u) == 0 {
+		return d
+	}
+
+	for i, detector := range d {
+		switch reflect.TypeOf(detector).String() {
+		case "*github.scanner":
+			urls, ok := u["github"]
+			if !ok {
+				ctx.Logger().V(5).Info("ignoring GitHub API key")
+				continue
+			}
+			ctx.Logger().V(5).Info("ignoring GitHub API key")
+			d[i] = github.New(github.WithVerifierURLs(urls, true))
+		case "*gitlab.scanner":
+			// TODO: add support for custom GitLab URLs.
+		default:
+			ctx.Logger().V(5).Info("ignoring custom detector", "type", reflect.TypeOf(detector).String())
+			continue
+		}
+	}
+
+	return d
+}
+
+func DefaultDetectors() []detectors.Detector {
+	return []detectors.Detector{
 		&heroku.Scanner{},
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
@@ -1497,12 +1526,4 @@ func DefaultDetectors(ctx context.Context) []detectors.Detector {
 		shopify.Scanner{},
 	}
 
-	for i, detector := range d {
-		if reflect.TypeOf(detector).String() == "*github.scanner" {
-			ctx.Logger().V(5).Info("ignoring GitHub API key")
-			d[i] = github.New(github.WithVerifierURLs(nil, true))
-		}
-	}
-
-	return d
 }

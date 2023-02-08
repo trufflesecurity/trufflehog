@@ -85,7 +85,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	// Set defaults.
-
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		logrus.Warn("No concurrency specified, defaulting to ", numCPU)
@@ -99,7 +98,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 
 	if len(e.detectors) == 0 {
 		e.detectors = map[bool][]detectors.Detector{}
-		e.detectors[true] = DefaultDetectors(ctx)
+		e.detectors[true] = DefaultDetectors()
 		e.detectors[false] = []detectors.Detector{}
 	}
 
@@ -109,7 +108,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		len(e.detectors[true]),
 		len(e.detectors[false]))
 
-	// start the workers
+	// Start the workers.
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
