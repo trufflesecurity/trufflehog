@@ -338,7 +338,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
 	s.repos = reposToScan
-	scanErrs := sources.NewScanErrors(len(s.repos))
+	scanErrs := sources.NewScanErrors()
 
 	for i, repo := range s.repos {
 		i, repoURL := i, repo
