@@ -37,7 +37,7 @@ func TestNewScanErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := NewScanErrors(tc.projects)
+			got := NewScanErrors()
 
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %+v, want %+v", got, tc.want)
@@ -76,7 +76,7 @@ func TestScanErrorsAdd(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			se := NewScanErrors(tc.wantErr)
+			se := NewScanErrors()
 
 			var wg sync.WaitGroup
 			for i := 0; i < tc.concurrency; i++ {
@@ -127,7 +127,7 @@ func TestScanErrorsCount(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			se := NewScanErrors(tc.wantErrCnt)
+			se := NewScanErrors()
 
 			var wg sync.WaitGroup
 			for i := 0; i < tc.concurrency; i++ {

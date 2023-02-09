@@ -12,8 +12,8 @@ type ScanErrors struct {
 }
 
 // NewScanErrors creates a new thread safe error collector.
-func NewScanErrors(projects int) *ScanErrors {
-	return &ScanErrors{errors: make([]error, 0, projects)}
+func NewScanErrors() *ScanErrors {
+	return &ScanErrors{errors: make([]error, 0)}
 }
 
 // Add an error to the collection in a thread-safe manner.
