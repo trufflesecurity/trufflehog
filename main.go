@@ -208,22 +208,20 @@ func run(state overseer.State) {
 	}
 
 	ctx := context.TODO()
-	var e *engine.Engine
+	var detectorsOption engine.EngineOption
 
 	if len(*detectors) > 0 {
-		e = engine.Start(ctx,
-			engine.WithConcurrency(*concurrency),
-			engine.WithDecoders(decoders.DefaultDecoders()...),
-			engine.WithDetectors(!*noVerification, engine.Detectors(ctx, strings.Split(*detectors, ","))...),
-		)
+		detectorsOption = engine.WithDetectors(!*noVerification, engine.Detectors(ctx, strings.Split(*detectors, ","))...)
 	} else {
-		e = engine.Start(ctx,
-			engine.WithConcurrency(*concurrency),
-			engine.WithDecoders(decoders.DefaultDecoders()...),
-			engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
-			engine.WithDetectors(!*noVerification, conf.Detectors...),
-		)
+		detectorsOption = engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...)
 	}
+
+	e := engine.Start(ctx,
+		engine.WithConcurrency(*concurrency),
+		engine.WithDecoders(decoders.DefaultDecoders()...),
+		engine.WithDetectors(!*noVerification, conf.Detectors...),
+		detectorsOption,
+	)
 
 	var repoPath string
 	var remote bool
