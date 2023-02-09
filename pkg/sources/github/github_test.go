@@ -506,9 +506,9 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			src := &Source{
-				repos: tc.repos,
-			}
+			src := initTestSource(&sourcespb.GitHub{
+				Repositories: tc.repos,
+			})
 			src.jobPool = &errgroup.Group{}
 
 			_ = src.scan(context.Background(), nil, nil)
