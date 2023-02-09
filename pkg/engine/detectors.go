@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"reflect"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -34,9 +33,7 @@ func setDetectors(ctx context.Context, dts []string) map[string]struct{} {
 func filterDetectors(dts []string, configured map[string]struct{}) []detectors.Detector {
 	ds := make([]detectors.Detector, 0, len(dts))
 	for _, d := range DefaultDetectors() {
-		dt := strings.TrimLeft(reflect.TypeOf(d).String(), "*")
-		idx := strings.LastIndex(dt, ".")
-		dt = dt[:idx]
+		dt := strings.ToLower(d.Type().String())
 
 		if _, ok := configured[dt]; ok {
 			ds = append(ds, d)
