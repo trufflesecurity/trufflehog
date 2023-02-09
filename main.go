@@ -71,7 +71,9 @@ var (
 	githubIncludeMembers = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
 	githubIncludeRepos   = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
 	githubExcludeRepos   = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
-
+	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
 	gitlabScanEndpoint     = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
@@ -243,6 +245,10 @@ func run(state overseer.State) {
 			logrus.WithError(err).Fatal("Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
+		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
+		if err != nil {
+			logrus.WithError(err).Fatal("could not create filter")
+		}
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			logrus.Fatal("You must specify at least one organization or repository.")
 		}
@@ -257,6 +263,7 @@ func run(state overseer.State) {
 			c.Concurrency = *concurrency
 			c.ExcludeRepos = *githubExcludeRepos
 			c.IncludeRepos = *githubIncludeRepos
+			c.Filter = filter
 		}
 
 		if err := e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {

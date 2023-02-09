@@ -4,16 +4,25 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
+	gogit "github.com/go-git/go-git/v5"
+	
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
 // ScanGitHub scans Github with the provided options.
 func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
+	logOptions := &gogit.LogOptions{}
+	opts := []git.ScanOption{
+		git.ScanOptionFilter(c.Filter),
+		git.ScanOptionLogOptions(logOptions),
+	}
+	scanOptions := git.NewScanOptions(opts...)
+	
 	source := github.Source{}
 
 	connection := sourcespb.GitHub{
@@ -43,7 +52,8 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 		logrus.WithError(err).Error("failed to initialize github source")
 		return err
 	}
-
+	source.WithScanOptions(scanOptions)
+	
 	e.sourcesWg.Add(1)
 	go func() {
 		defer common.RecoverWithExit(ctx)
