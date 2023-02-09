@@ -23,12 +23,12 @@ func TestDetectors(t *testing.T) {
 			expected: DefaultDetectors(),
 		},
 		{
-			name:     "Valid detector specified, returns valid set",
+			name:     "Valid detector (1) specified, returns valid set",
 			dts:      []string{"AWS"},
 			expected: []detectors.Detector{aws.New()},
 		},
 		{
-			name:     "Valid detectors specified, returns valid set",
+			name:     "Valid detectors (2) specified, returns valid set",
 			dts:      []string{"AWS", "Azure"},
 			expected: []detectors.Detector{aws.New(), &azure.Scanner{}},
 		},
