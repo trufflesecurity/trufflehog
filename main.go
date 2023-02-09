@@ -50,7 +50,7 @@ var (
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan.").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
-	detectors            = cli.Flag("detectors", "Comma separated list of detector names. Names must exist in detectors.proto").String()
+	detectors            = cli.Flag("detectors", "Comma separated list of detector types. Types must exist in detectors.proto").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
