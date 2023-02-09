@@ -8,7 +8,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
-// Detectors only returns a specific set of detectors.
+// Detectors only returns a specific set of detectors if they are specified in the
+// detectors list and are valid. Otherwise, it returns the default set of detectors.
 func Detectors(ctx context.Context, dts []string) []detectors.Detector {
 	configured := setDetectors(ctx, dts)
 
