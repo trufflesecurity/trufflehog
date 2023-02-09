@@ -208,3 +208,7 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 
 	return matches
 }
+
+func (c *customRegexWebhook) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_CustomRegex
+}

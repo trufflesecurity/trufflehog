@@ -101,3 +101,7 @@ func verifyFTP(ctx context.Context, u *url.URL) bool {
 
 	return err == nil
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_FTP
+}
