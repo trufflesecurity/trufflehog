@@ -17,9 +17,9 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v42/github"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -56,7 +56,7 @@ type Source struct {
 	ignoreRepos []string
 	git             *git.Git
 	httpClient      *http.Client
-	log             *log.Entry
+	log             logr.Logger
 	conn            *sourcespb.GitHub
 	jobPool         *errgroup.Group
 	resumeInfoMutex sync.Mutex
@@ -109,7 +109,7 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 		)
 		for {
 			ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
-			if handled := handleRateLimit(err, resp); handled {
+			if handled := s.handleRateLimit(err, resp); handled {
 				continue
 			}
 			if err != nil {
@@ -125,7 +125,7 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
-	s.log = log.WithField("source", s.Type()).WithField("name", name)
+	s.log = aCtx.Logger()
 
 	s.name = name
 	s.sourceID = sourceID
@@ -191,10 +191,11 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 		s.publicMap[repoURL] = visibility
 		s.mu.Unlock()
 	}()
-	log.Debugf("Checking public status for %s", repoURL)
+	logger := s.log.WithValues("repo", repoURL)
+	logger.V(2).Info("Checking public status")
 	u, err := url.Parse(repoURL)
 	if err != nil {
-		log.WithError(err).Errorf("Could not parse repository URL.")
+		logger.Error(err, "Could not parse repository URL.")
 		return
 	}
 
@@ -208,16 +209,16 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 		repoName = strings.TrimSuffix(repoName, ".git")
 		for {
 			gist, resp, err = s.apiClient.Gists.Get(context.TODO(), repoName)
-			if !handleRateLimit(err, resp) {
+			if !s.handleRateLimit(err, resp) {
 				break
 			}
 		}
 		if err != nil || gist == nil {
 			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
-				log.Warn("Unauthenticated scans cannot determine if a repository is private.")
+				logger.Info("Unauthenticated scans cannot determine if a repository is private.")
 				visibility = source_metadatapb.Visibility_private
 			}
-			log.WithError(err).Errorf("Could not get Github repository: %s", repoURL)
+			logger.Error(err, "Could not get Github repository")
 			return
 		}
 		if !(*gist.Public) {
@@ -230,14 +231,14 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 		repoName = strings.TrimSuffix(repoName, ".git")
 		for {
 			repo, resp, err = s.apiClient.Repositories.Get(context.TODO(), owner, repoName)
-			if !handleRateLimit(err, resp) {
+			if !s.handleRateLimit(err, resp) {
 				break
 			}
 		}
 		if err != nil || repo == nil {
-			log.WithError(err).Errorf("Could not get Github repository: %s", repoURL)
+			logger.Error(err, "Could not get Github repository")
 			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
-				log.Warn("Unauthenticated scans cannot determine if a repository is private.")
+				logger.Info("Unauthenticated scans cannot determine if a repository is private.")
 				visibility = source_metadatapb.Visibility_private
 			}
 			return
@@ -246,7 +247,9 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 			visibility = source_metadatapb.Visibility_private
 		}
 	default:
-		log.Errorf("RepoURL (%s) split into unexpected number of parts. Got: %d, expected: 2 or 3", repoURL, len(urlPathParts))
+		logger.Error(fmt.Errorf("unexpected number of parts"), "RepoURL should split into 2 or 3 parts",
+			"got", len(urlPathParts),
+		)
 	}
 	return
 }
@@ -254,20 +257,21 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 	s.apiClient = github.NewClient(s.httpClient)
 	if len(s.orgs) > unauthGithubOrgRateLimt {
-		log.Warn("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
+		s.log.Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
 
 	for _, org := range s.orgs {
+		logger := s.log.WithValues("org", org)
 		if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
-			log.WithError(err).Errorf("error fetching repos for org or user: %s", org)
+			logger.Error(err, "error fetching repos for org or user")
 		}
 		// We probably don't need to do this, since getting repos by org makes more sense?
 		if err := s.addRepos(ctx, org, s.getReposByUser); err != nil {
-			log.WithError(err).Errorf("error fetching repos for org or user: %s", org)
+			logger.Error(err, "error fetching repos for org or user")
 		}
 
 		if s.conn.ScanUsers {
-			log.Warn("Enumerating unauthenticated does not support scanning organization members")
+			logger.Info("Enumerating unauthenticated does not support scanning organization members")
 		}
 	}
 }
@@ -313,7 +317,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	)
 	for {
 		ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
-		if handled := handleRateLimit(err, resp); handled {
+		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil {
@@ -325,14 +329,15 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	if len(s.orgs) > 0 {
 		specificScope = true
 		for _, org := range s.orgs {
+			logger := s.log.WithValues("org", org)
 			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
-				log.WithError(err).Errorf("error fetching repos for org: %s", org)
+				logger.Error(err, "error fetching repos for org")
 			}
 
 			if s.conn.ScanUsers {
 				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
-					log.WithError(err).Infof("Unable to add members by org for org %s", org)
+					logger.Error(err, "Unable to add members by org")
 					continue
 				}
 			}
@@ -342,7 +347,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	// If no scope was provided, enumerate them.
 	if !specificScope {
 		if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
-			log.WithError(err).Error("error fetching repos by user")
+			s.log.Error(err, "error fetching repos by user")
 		}
 
 		if isGHE {
@@ -354,23 +359,24 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		}
 
 		for _, org := range s.orgs {
+			logger := s.log.WithValues("org", org)
 			if err := s.addRepos(ctx, org, s.getReposByOrg); err != nil {
-				log.WithError(err).Error("error fetching repos by org")
+				logger.Error(err, "error fetching repos by org")
 			}
 
 			if err := s.addRepos(ctx, ghUser.GetLogin(), s.getReposByUser); err != nil {
-				log.WithError(err).Errorf("error fetching repos for user: %s", ghUser.GetLogin())
+				logger.Error(err, "error fetching repos for user", "user", ghUser.GetLogin())
 			}
 
 			// TODO: Test it actually works to list org gists like this.
 			if err := s.addGistsByUser(ctx, org); err != nil {
-				log.WithError(err).Errorf("error fetching gists by org: %s", org)
+				logger.Error(err, "error fetching gists by org")
 			}
 
 			if s.conn.ScanUsers {
 				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
-					log.WithError(err).Infof("Unable to add members by org for org %s", org)
+					logger.Error(err, "Unable to add members by org for org")
 					continue
 				}
 			}
@@ -379,12 +385,12 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
 		if err := s.addGistsByUser(ctx, ghUser.GetLogin()); err != nil {
-			log.WithError(err).Errorf("error fetching gists for user %s", ghUser.GetLogin())
+			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
 		}
 	}
 
 	if s.conn.ScanUsers {
-		log.Infof("Adding repos from %d members in %d organizations.", len(s.members), len(s.orgs))
+		s.log.Info("Adding repos", "members", len(s.members), "orgs", len(s.orgs))
 		s.addReposForMembers(ctx)
 		return nil
 	}
@@ -445,13 +451,14 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			if err != nil {
 				return nil, err
 			}
-			log.Infof("Scanning repos from %v organization members.", len(s.members))
+			s.log.Info("Scanning repos", "org_members", len(s.members))
 			for _, member := range s.members {
+				logger := s.log.WithValues("member", member)
 				if err = s.addGistsByUser(ctx, member); err != nil {
-					log.WithError(err).WithField("member", member).Error("error fetching gists by user")
+					logger.Error(err, "error fetching gists by user")
 				}
 				if err := s.addRepos(ctx, member, s.getReposByUser); err != nil {
-					log.WithError(err).Error("error fetching repos by user")
+					logger.Error(err, "error fetching repos by user")
 				}
 			}
 		}
@@ -492,7 +499,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	sort.Strings(s.repos)
 
 	for _, err := range s.scan(ctx, installationClient, chunksChan) {
-		log.WithError(err).Error("error scanning repository")
+		s.log.Error(err, "error scanning repository")
 	}
 
 	return nil
@@ -501,7 +508,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) []error {
 	var scanned uint64
 
-	log.Debugf("Found %v total repos to scan", len(s.repos))
+	s.log.V(2).Info("Found repos to scan", "count", len(s.repos))
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
@@ -529,7 +536,8 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			s.log.WithField("repo", repoURL).Debugf("attempting to clone repo %d/%d", i+1, len(s.repos))
+			logger := s.log.WithValues("repo", repoURL)
+			logger.V(2).Info(fmt.Sprintf("attempting to clone repo %d/%d", i+1, len(s.repos)))
 			var path string
 			var repo *gogit.Repository
 			var err error
@@ -550,11 +558,11 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			)
 
 			if err = s.git.ScanRepo(ctx, repo, path, scanOptions, chunksChan); err != nil {
-				log.WithError(err).Errorf("unable to scan repo, continuing")
+				logger.Error(err, "unable to scan repo, continuing")
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
-			log.Debugf("scanned %d/%d repos", scanned, len(s.repos))
+			logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)))
 
 			return nil
 		})
@@ -610,7 +618,7 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 // handleRateLimit returns true if a rate limit was handled
 // Unauthenticated access to most github endpoints has a rate limit of 60 requests per hour.
 // This will likely only be exhausted if many users/orgs are scanned without auth
-func handleRateLimit(errIn error, res *github.Response) bool {
+func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 	limit, ok := errIn.(*github.RateLimitError)
 	if !ok {
 		return false
@@ -631,20 +639,20 @@ func handleRateLimit(errIn error, res *github.Response) bool {
 			waitTime := int64(resetTime) - time.Now().Unix()
 			if waitTime > 0 {
 				duration := time.Duration(waitTime+1) * time.Second
-				log.WithField("resumeTime", time.Now().Add(duration).String()).Debugf("rate limited")
+				s.log.V(2).Info("rate limited", "resumeTime", time.Now().Add(duration).String())
 				time.Sleep(duration)
 				return true
 			}
 		}
 	}
 
-	log.WithField("retry-after", limit.Message).Debug("handling rate limit (5 minutes retry)")
+	s.log.V(2).Info("handling rate limit (5 minutes retry)", "retry-after", limit.Message)
 	time.Sleep(time.Minute * 5)
 	return true
 }
 
 func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error) {
-	logger := s.log.WithField("org", org)
+	logger := s.log.WithValues("org", org)
 
 	var repos []string
 	opts := &github.RepositoryListByOrgOptions{
@@ -659,7 +667,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 		if err == nil {
 			res.Body.Close()
 		}
-		if handled := handleRateLimit(err, res); handled {
+		if handled := s.handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -669,7 +677,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 			break
 		}
 
-		s.log.Debugf("Listed repos for org %s page %d/%d", org, opts.Page, res.LastPage)
+		logger.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
 			if s.ignoreRepo(r.GetFullName()) {
 				continue
@@ -692,7 +700,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) ([]string, error
 		}
 		opts.Page = res.NextPage
 	}
-	logger.Debugf("found %d repos (%d forks)", numRepos, numForks)
+	logger.V(2).Info("found repos", "total", numRepos, "forks", numForks)
 	return repos, nil
 }
 
@@ -716,12 +724,13 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 		},
 	}
 
+	logger := s.log.WithValues("user", user)
 	for {
 		someRepos, res, err := s.apiClient.Repositories.List(ctx, user, opts)
 		if err == nil {
 			res.Body.Close()
 		}
-		if handled := handleRateLimit(err, res); handled {
+		if handled := s.handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -731,7 +740,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) ([]string, err
 			break
 		}
 
-		s.log.Debugf("Listed repos for user %s page %d/%d", user, opts.Page, res.LastPage)
+		logger.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
 			if s.ignoreRepo(r.GetFullName()) {
 				continue
@@ -758,14 +767,15 @@ func (s *Source) includeRepo(r string) bool {
 		return true
 	}
 
+	logger := s.log.WithValues("repo", r)
 	for _, include := range s.includeRepos {
 		g, err := glob.Compile(include)
 		if err != nil {
-			s.log.WithField("repo", r).Debugf("invalid glob %q: %s", include, err)
+			logger.V(2).Info("invalid glob", "glob", include, "error", err)
 			continue
 		}
 		if g.Match(r) {
-			s.log.Debugf("including repo %s", r)
+			logger.V(2).Info("including repo")
 			return true
 		}
 	}
@@ -773,14 +783,15 @@ func (s *Source) includeRepo(r string) bool {
 }
 
 func (s *Source) ignoreRepo(r string) bool {
+	logger := s.log.WithValues("repo", r)
 	for _, ignore := range s.ignoreRepos {
 		g, err := glob.Compile(ignore)
 		if err != nil {
-			s.log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
+			logger.V(2).Info("invalid glob", "glob", ignore, "error", err)
 			continue
 		}
 		if g.Match(r) {
-			s.log.Debugf("ignoring repo %s", r)
+			logger.V(2).Info("ignoring repo")
 			return true
 		}
 	}
@@ -790,12 +801,13 @@ func (s *Source) ignoreRepo(r string) bool {
 func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, error) {
 	var gistURLs []string
 	gistOpts := &github.GistListOptions{}
+	logger := s.log.WithValues("user", user)
 	for {
 		gists, res, err := s.apiClient.Gists.List(ctx, user, gistOpts)
 		if err == nil {
 			res.Body.Close()
 		}
-		if handled := handleRateLimit(err, res); handled {
+		if handled := s.handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -807,7 +819,7 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) ([]string, err
 		if res == nil || res.NextPage == 0 {
 			break
 		}
-		s.log.Debugf("Listed gists for user %s page %d/%d", user, gistOpts.Page, res.LastPage)
+		logger.V(2).Info("Listed gists", "page", gistOpts.Page, "last_page", res.LastPage)
 		gistOpts.Page = res.NextPage
 	}
 	return gistURLs, nil
@@ -858,7 +870,7 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 		if err == nil {
 			res.Body.Close()
 		}
-		if handled := handleRateLimit(err, res); handled {
+		if handled := s.handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil {
@@ -867,13 +879,13 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 		if res == nil {
 			break
 		}
-		s.log.Debugf("Listed repos for app page %d/%d", opts.Page, res.LastPage)
+		s.log.V(2).Info("Listed repos for app", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos.Repositories {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
 			common.AddStringSliceItem(r.GetCloneURL(), &s.repos)
-			s.log.Debugf("Enumerated repo %s", r.GetCloneURL())
+			s.log.V(2).Info("Enumerated repo", "repo", r.GetCloneURL())
 		}
 		if res.NextPage == 0 {
 			break
@@ -884,7 +896,7 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 }
 
 func (s *Source) addAllVisibleOrgs(ctx context.Context) {
-	s.log.Debug("enumerating all visible organizations on GHE")
+	s.log.V(2).Info("enumerating all visible organizations on GHE")
 	// Enumeration on this endpoint does not use pages it uses a since ID.
 	// The endpoint will return organizations with an ID greater than the given since ID.
 	// Empty org response is our cue to break the enumeration loop.
@@ -899,18 +911,18 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 		if err == nil {
 			resp.Body.Close()
 		}
-		if handled := handleRateLimit(err, resp); handled {
+		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil {
-			log.WithError(err).Errorf("Could not list all organizations")
+			s.log.Error(err, "Could not list all organizations")
 			return
 		}
 		if len(orgs) == 0 {
 			break
 		}
 		lastOrgID := *orgs[len(orgs)-1].ID
-		s.log.Debugf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID)
+		s.log.V(2).Info(fmt.Sprintf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID))
 		orgOpts.Since = lastOrgID
 
 		for _, org := range orgs {
@@ -922,7 +934,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 			} else {
 				continue
 			}
-			s.log.Debugf("adding organization %d for repository enumeration: %s", org.ID, name)
+			s.log.V(2).Info("adding organization for repository enumeration", "id", org.ID, "org", name)
 			common.AddStringSliceItem(name, &s.orgs)
 		}
 	}
@@ -932,22 +944,23 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	orgOpts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
+	logger := s.log.WithValues("user", user)
 	for {
 		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
 		if err == nil {
 			resp.Body.Close()
 		}
-		if handled := handleRateLimit(err, resp); handled {
+		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil {
-			log.WithError(err).Errorf("Could not list organizations for %s", user)
+			logger.Error(err, "Could not list organizations")
 			return
 		}
 		if resp == nil {
 			break
 		}
-		s.log.Debugf("Listed orgs for user %s page %d/%d", user, orgOpts.Page, resp.LastPage)
+		logger.V(2).Info("Listed orgs", "page", orgOpts.Page, "last_page", resp.LastPage)
 		for _, org := range orgs {
 			var name string
 			if org.Login != nil {
@@ -972,23 +985,22 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 		},
 	}
 
+	logger := s.log.WithValues("org", org)
 	for {
 		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
 		if err == nil {
 			defer res.Body.Close()
 		}
-		if handled := handleRateLimit(err, res); handled {
+		if handled := s.handleRateLimit(err, res); handled {
 			continue
 		}
 		if err != nil || len(members) == 0 {
-			errText := "Could not list organization members: account may not have access to list organization members"
-			log.WithError(err).Warnf(errText)
-			return errors.New(errText)
+			return errors.New("Could not list organization members: account may not have access to list organization members")
 		}
 		if res == nil {
 			break
 		}
-		s.log.Debugf("Listed members for org %s page %d/%d", org, opts.Page, res.LastPage)
+		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", res.LastPage)
 		for _, m := range members {
 			usr := m.Login
 			if usr == nil || *usr == "" {
@@ -1006,13 +1018,13 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 }
 
 func (s *Source) addReposForMembers(ctx context.Context) {
-	log.Infof("Fetching repos from %d members", len(s.members))
+	s.log.Info("Fetching repos from members", "members", len(s.members))
 	for _, member := range s.members {
 		if err := s.addGistsByUser(ctx, member); err != nil {
-			log.WithError(err).Infof("Unable to fetch gists by user %s", member)
+			s.log.Info("Unable to fetch gists by user", "user", member, "error", err)
 		}
 		if err := s.addRepos(ctx, member, s.getReposByUser); err != nil {
-			log.WithError(err).Infof("Unable to fetch repos by user %s", member)
+			s.log.Info("Unable to fetch repos by user", "user", member, "error", err)
 		}
 	}
 }
@@ -1025,7 +1037,7 @@ func (s *Source) normalizeRepos(ctx context.Context) {
 		if strings.ContainsRune(repo, '/') {
 			repoNormalized, err := giturl.NormalizeGithubRepo(repo)
 			if err != nil {
-				log.WithError(err).Warnf("Repo not in expected format: %s", repo)
+				s.log.Info("Repo not in expected format", "repo", repo, "error", err)
 				continue
 			}
 			normalizedRepos[repoNormalized] = struct{}{}

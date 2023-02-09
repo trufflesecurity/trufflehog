@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
 	"net/http"
 	"reflect"
 	"sort"
@@ -14,8 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-github/v42/github"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -416,11 +415,9 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 		},
 	}
 
-	logger := logrus.New()
-	logger.Out = io.Discard
 	s := &Source{
 		repos: []string{},
-		log:   logger.WithField("no", "output"),
+		log:   logr.Discard(),
 	}
 
 	for _, tt := range tests {
@@ -468,13 +465,10 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		},
 	}
 
-	logger := logrus.New()
-	logger.Out = io.Discard
-
 	for _, tt := range tests {
 		s := &Source{
 			repos: tt.repos,
-			log:   logger.WithField("no", "output"),
+			log:   logr.Discard(),
 		}
 
 		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
