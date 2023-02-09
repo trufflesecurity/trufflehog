@@ -33,9 +33,7 @@ func setDetectors(ctx context.Context, dts []string) map[string]struct{} {
 func filterDetectors(dts []string, configured map[string]struct{}) []detectors.Detector {
 	ds := make([]detectors.Detector, 0, len(dts))
 	for _, d := range DefaultDetectors() {
-		dt := strings.ToLower(d.Type().String())
-
-		if _, ok := configured[dt]; ok {
+		if _, ok := configured[strings.ToLower(d.Type().String())]; ok {
 			ds = append(ds, d)
 		}
 	}
