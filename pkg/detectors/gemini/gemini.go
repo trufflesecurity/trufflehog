@@ -132,3 +132,7 @@ func constructSignature(payload string, resSecretMatch string) string {
 	signature := hex.EncodeToString(h.Sum(nil))
 	return signature
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Gemini
+}

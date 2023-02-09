@@ -53,3 +53,7 @@ func (d Detector) FromData(ctx context.Context, verify bool, data []byte) (resul
 
 	return results, nil
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_AdafruitIO
+}

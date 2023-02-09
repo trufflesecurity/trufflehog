@@ -92,3 +92,7 @@ type Response struct {
 	Status       int    `json:"Status"`
 	ErrorMessage string `json:"ErrorMessage"`
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Text2Data
+}
