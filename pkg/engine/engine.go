@@ -2,13 +2,13 @@ package engine
 
 import (
 	"bytes"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -88,10 +88,10 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
-		logrus.Warn("No concurrency specified, defaulting to ", numCPU)
+		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
 		e.concurrency = numCPU
 	}
-	logrus.Debugf("running with up to %d workers", e.concurrency)
+	ctx.Logger().V(2).Info("engine started", "workers", e.concurrency)
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
@@ -103,11 +103,12 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		e.detectors[false] = []detectors.Detector{}
 	}
 
-	logrus.Debugf("loaded %d decoders", len(e.decoders))
-	logrus.Debugf("loaded %d detectors total, %d with verification enabled. %d with verification disabled",
-		len(e.detectors[true])+len(e.detectors[false]),
-		len(e.detectors[true]),
-		len(e.detectors[false]))
+	ctx.Logger().V(2).Info("loaded decoders", "count", len(e.decoders))
+	ctx.Logger().V(2).Info("loaded detectors",
+		"total", len(e.detectors[true])+len(e.detectors[false]),
+		"verification_enabled", len(e.detectors[true]),
+		"verification_disabled", len(e.detectors[false]),
+	)
 
 	// start the workers
 	for i := 0; i < e.concurrency; i++ {
@@ -159,17 +160,18 @@ func (e *Engine) BytesScanned() uint64 {
 }
 
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
+	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
 	e.detectorAvgTime.Range(func(k, v interface{}) bool {
 		key, ok := k.(string)
 		if !ok {
-			logrus.Warnf("expected DetectorAvgTime key to be a string")
+			logger.Info("expected DetectorAvgTime key to be a string")
 			return true
 		}
 
 		value, ok := v.([]time.Duration)
 		if !ok {
-			logrus.Warnf("expected DetectorAvgTime value to be []time.Duration")
+			logger.Info("expected DetectorAvgTime value to be []time.Duration")
 			return true
 		}
 		avgTime[key] = value
@@ -190,7 +192,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				case *decoders.Base64:
 					decoderType = detectorspb.DecoderType_BASE64
 				default:
-					logrus.Warnf("unknown decoder type: %T", decoder)
+					ctx.Logger().Info("unknown decoder type", "type", reflect.TypeOf(decoder).String())
 					decoderType = detectorspb.DecoderType_UNKNOWN
 				}
 				decoded := decoder.FromChunk(chunk)
@@ -219,10 +221,10 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							return detector.FromData(ctx, verify, decoded.Data)
 						}()
 						if err != nil {
-							logrus.WithFields(logrus.Fields{
-								"source_type": decoded.SourceType.String(),
-								"metadata":    decoded.SourceMetadata,
-							}).WithError(err).Error("could not scan chunk")
+							ctx.Logger().Error(err, "could not scan chunk",
+								"source_type", decoded.SourceType.String(),
+								"metadata", decoded.SourceMetadata,
+							)
 							continue
 						}
 

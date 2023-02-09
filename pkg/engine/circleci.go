@@ -4,7 +4,6 @@ import (
 	"runtime"
 
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -25,7 +24,7 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal Circle CI connection")
+		ctx.Logger().Error(err, "failed to marshal Circle CI connection")
 		return err
 	}
 
@@ -41,7 +40,7 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 		defer e.sourcesWg.Done()
 		err := circleSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Error("error scanning Circle CI")
+			ctx.Logger().Error(err, "error scanning Circle CI")
 		}
 	}()
 	return nil

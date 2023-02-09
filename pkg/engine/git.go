@@ -5,7 +5,6 @@ import (
 	"runtime"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/sirupsen/logrus"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -61,7 +60,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := gitSource.ScanRepo(ctx, repo, c.RepoPath, scanOptions, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Fatal("could not scan repo")
+			ctx.Logger().Error(err, "could not scan repo")
 		}
 	}()
 	return nil
