@@ -4,7 +4,6 @@ import (
 	"runtime"
 
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -23,7 +22,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal filesystem connection")
+		ctx.Logger().Error(err, "failed to marshal filesystem connection")
 		return err
 	}
 
@@ -39,7 +38,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := fileSystemSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Error("error scanning filesystem")
+			ctx.Logger().Error(err, "error scanning filesystem")
 		}
 	}()
 	return nil

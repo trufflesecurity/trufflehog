@@ -182,7 +182,11 @@ func run(state overseer.State) {
 			}
 		}()
 	}
-	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr))
+	logFormat := log.WithConsoleSink
+	if *jsonOut {
+		logFormat = log.WithJSONSink
+	}
+	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
 	context.SetDefaultLogger(logger)
 	defer func() { _ = sync() }()
 

@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -46,7 +45,7 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
 	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, c.Concurrency)
 	source.InjectConnection(connection)
 	if err != nil {
-		logrus.WithError(err).Error("failed to initialize syslog source")
+		ctx.Logger().Error(err, "failed to initialize syslog source")
 		return err
 	}
 
@@ -56,7 +55,7 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Fatal("could not scan syslog")
+			ctx.Logger().Error(err, "could not scan syslog")
 		}
 	}()
 	return nil
