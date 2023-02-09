@@ -211,11 +211,10 @@ func run(state overseer.State) {
 	var e *engine.Engine
 
 	if len(*detectors) > 0 {
-		dts := strings.Split(*detectors, ",")
 		e = engine.Start(ctx,
 			engine.WithConcurrency(*concurrency),
 			engine.WithDecoders(decoders.DefaultDecoders()...),
-			engine.WithDetectors(!*noVerification, engine.Detectors(ctx, dts)...),
+			engine.WithDetectors(!*noVerification, engine.Detectors(ctx, strings.Split(*detectors, ","))...),
 		)
 	} else {
 		e = engine.Start(ctx,
