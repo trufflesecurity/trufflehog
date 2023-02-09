@@ -97,3 +97,7 @@ type shopifyTokenAccessScopes struct {
 		Handle string `json:"handle"`
 	} `json:"access_scopes"`
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Shopify
+}
