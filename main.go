@@ -50,6 +50,7 @@ var (
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan.").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
+	detectors            = cli.Flag("detectors", "Comma separated list of detector names. Names must exist in detectors.proto").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -207,13 +208,23 @@ func run(state overseer.State) {
 	}
 
 	ctx := context.TODO()
-	e := engine.Start(ctx,
-		engine.WithConcurrency(*concurrency),
-		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
-		engine.WithDetectors(!*noVerification, conf.Detectors...),
-		engine.WithFilterUnverified(*filterUnverified),
-	)
+	var e *engine.Engine
+
+	if len(*detectors) > 0 {
+		dts := strings.Split(*detectors, ",")
+		e = engine.Start(ctx,
+			engine.WithConcurrency(*concurrency),
+			engine.WithDecoders(decoders.DefaultDecoders()...),
+			engine.WithDetectors(!*noVerification, engine.Detectors(ctx, dts)...),
+		)
+	} else {
+		e = engine.Start(ctx,
+			engine.WithConcurrency(*concurrency),
+			engine.WithDecoders(decoders.DefaultDecoders()...),
+			engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
+			engine.WithDetectors(!*noVerification, conf.Detectors...),
+		)
+	}
 
 	var repoPath string
 	var remote bool
