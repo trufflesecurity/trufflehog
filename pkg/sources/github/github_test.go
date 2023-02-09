@@ -280,13 +280,14 @@ func TestNormalizeRepos(t *testing.T) {
 }
 
 func TestHandleRateLimit(t *testing.T) {
-	assert.False(t, handleRateLimit(nil, nil))
+	s := initTestSource(nil)
+	assert.False(t, s.handleRateLimit(nil, nil))
 
 	err := &github.RateLimitError{}
 	res := &github.Response{Response: &http.Response{Header: make(http.Header)}}
 	res.Header.Set("x-ratelimit-remaining", "0")
 	res.Header.Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Unix()+1, 10))
-	assert.True(t, handleRateLimit(err, res))
+	assert.True(t, s.handleRateLimit(err, res))
 }
 
 func TestEnumerateUnauthenticated(t *testing.T) {
