@@ -124,21 +124,21 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
-	s.log = log.WithField("source", s.Type()).WithField("name", name)
+func (s *Source) Init(aCtx context.Context, cfg sources.SourceConfig) error {
+	s.log = log.WithField("source", s.Type()).WithField("name", cfg.Name)
 
-	s.name = name
-	s.sourceID = sourceID
-	s.jobID = jobID
-	s.verify = verify
+	s.name = cfg.Name
+	s.sourceID = cfg.SourceID
+	s.jobID = cfg.JobID
+	s.verify = cfg.Verify
 	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
+	s.jobPool.SetLimit(cfg.Concurrency)
 
 	s.httpClient = common.RetryableHttpClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
+	err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}

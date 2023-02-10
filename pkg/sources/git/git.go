@@ -86,25 +86,25 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, cfg sources.SourceConfig) error {
 
-	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
-	s.verify = verify
+	s.name = cfg.Name
+	s.sourceId = cfg.SourceID
+	s.jobId = cfg.JobID
+	s.verify = cfg.Verify
 
 	var conn sourcespb.Git
-	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+	if err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
 	s.conn = &conn
 
-	if concurrency == 0 {
-		concurrency = runtime.NumCPU()
+	if cfg.Concurrency == 0 {
+		cfg.Concurrency = runtime.NumCPU()
 	}
 
-	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
+	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, cfg.Concurrency,
 		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{

@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
 )
 
@@ -29,7 +30,15 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 	}
 
 	circleSource := circleci.Source{}
-	err = circleSource.Init(ctx, "trufflehog - Circle CI", 0, int64(sourcespb.SourceType_SOURCE_TYPE_CIRCLECI), true, &conn, runtime.NumCPU())
+	cfg := sources.NewSourceConfig(
+		"trufflehog - Circle CI",
+		0,
+		int64(sourcespb.SourceType_SOURCE_TYPE_CIRCLECI),
+		&conn,
+		sources.WithConcurrency(runtime.NumCPU()),
+		sources.WithVerify(true),
+	)
+	err = circleSource.Init(ctx, cfg)
 	if err != nil {
 		return errors.WrapPrefix(err, "failed to init Circle CI source", 0)
 	}

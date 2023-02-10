@@ -58,16 +58,16 @@ func (s *Source) JobID() int64 {
 }
 
 // Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
-	s.log = log.WithField("source", s.Type()).WithField("name", name)
+func (s *Source) Init(aCtx context.Context, cfg sources.SourceConfig) error {
+	s.log = log.WithField("source", s.Type()).WithField("name", cfg.Name)
 
-	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
-	s.verify = verify
+	s.name = cfg.Name
+	s.sourceId = cfg.SourceID
+	s.jobId = cfg.JobID
+	s.verify = cfg.Verify
 
 	var conn sourcespb.Filesystem
-	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+	if err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 

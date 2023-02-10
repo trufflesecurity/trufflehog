@@ -80,7 +80,7 @@ type SourceConfig struct {
 }
 
 // NewSourceConfig creates a new SourceConfig with the provided options.
-func NewSourceConfig(name string, jobID, sourceID int64, connection *anypb.Any, opts ...SourceConfigOption) *SourceConfig {
+func NewSourceConfig(name string, jobID, sourceID int64, connection *anypb.Any, opts ...SourceConfigOption) SourceConfig {
 	c := &SourceConfig{
 		Name:       name,
 		JobID:      jobID,
@@ -91,7 +91,7 @@ func NewSourceConfig(name string, jobID, sourceID int64, connection *anypb.Any, 
 	for _, opt := range opts {
 		opt(c)
 	}
-	return c
+	return *c
 }
 
 // Source defines the interface required to implement a source chunker.
@@ -103,7 +103,7 @@ type Source interface {
 	// JobID returns the initialized job ID used for tracking relationships in the DB.
 	JobID() int64
 	// Init initializes the source.
-	Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error
+	Init(aCtx context.Context, cfg SourceConfig) error
 	// Chunks emits data over a channel that is decoded and scanned for secrets.
 	Chunks(ctx context.Context, chunksChan chan *Chunk) error
 	// GetProgress is the completion progress (percentage) for Scanned Source.

@@ -82,15 +82,15 @@ func (s *Source) InjectConnection(conn *sourcespb.Syslog) {
 }
 
 // Init returns an initialized Syslog source.
-func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, cfg sources.SourceConfig) error {
 
-	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
-	s.verify = verify
+	s.name = cfg.Name
+	s.sourceId = cfg.SourceID
+	s.jobId = cfg.JobID
+	s.verify = cfg.Verify
 
 	var conn sourcespb.Syslog
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
+	err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
