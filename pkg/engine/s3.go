@@ -17,7 +17,7 @@ import (
 )
 
 // ScanS3 scans S3 buckets.
-func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}

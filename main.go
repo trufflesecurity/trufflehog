@@ -235,15 +235,14 @@ func run(state overseer.State) {
 			defer os.RemoveAll(repoPath)
 		}
 
-		g := func(c *sources.Config) {
-			c.RepoPath = repoPath
-			c.HeadRef = *gitScanBranch
-			c.BaseRef = *gitScanSinceCommit
-			c.MaxDepth = *gitScanMaxDepth
-			c.Filter = filter
+		cfg := sources.GitConfig{
+			RepoPath: repoPath,
+			HeadRef:  *gitScanBranch,
+			BaseRef:  *gitScanSinceCommit,
+			MaxDepth: *gitScanMaxDepth,
+			Filter:   filter,
 		}
-
-		if err = e.ScanGit(ctx, sources.NewConfig(g)); err != nil {
+		if err = e.ScanGit(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
@@ -251,19 +250,18 @@ func run(state overseer.State) {
 			logrus.Fatal("You must specify at least one organization or repository.")
 		}
 
-		github := func(c *sources.Config) {
-			c.Endpoint = *githubScanEndpoint
-			c.Repos = *githubScanRepos
-			c.Orgs = *githubScanOrgs
-			c.Token = *githubScanToken
-			c.IncludeForks = *githubIncludeForks
-			c.IncludeMembers = *githubIncludeMembers
-			c.Concurrency = *concurrency
-			c.ExcludeRepos = *githubExcludeRepos
-			c.IncludeRepos = *githubIncludeRepos
+		cfg := sources.GithubConfig{
+			Endpoint:       *githubScanEndpoint,
+			Token:          *githubScanToken,
+			IncludeForks:   *githubIncludeForks,
+			IncludeMembers: *githubIncludeMembers,
+			Concurrency:    *concurrency,
+			ExcludeRepos:   *githubExcludeRepos,
+			IncludeRepos:   *githubIncludeRepos,
+			Repos:          *githubScanRepos,
+			Orgs:           *githubScanOrgs,
 		}
-
-		if err := e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
+		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
@@ -272,14 +270,13 @@ func run(state overseer.State) {
 			logrus.WithError(err).Fatal("could not create filter")
 		}
 
-		gitlab := func(c *sources.Config) {
-			c.Endpoint = *gitlabScanEndpoint
-			c.Token = *gitlabScanToken
-			c.Repos = *gitlabScanRepos
-			c.Filter = filter
+		cfg := sources.GitlabConfig{
+			Endpoint: *gitlabScanEndpoint,
+			Token:    *gitlabScanToken,
+			Repos:    *gitlabScanRepos,
+			Filter:   filter,
 		}
-
-		if err := e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {
+		if err := e.ScanGitLab(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
@@ -288,35 +285,33 @@ func run(state overseer.State) {
 			logrus.WithError(err).Fatal("could not create filter")
 		}
 
-		fs := func(c *sources.Config) {
-			c.Directories = *filesystemDirectories
-			c.Filter = filter
+		cfg := sources.FilesystemConfig{
+			Directories: *filesystemDirectories,
+			Filter:      filter,
 		}
-
-		if err = e.ScanFileSystem(ctx, sources.NewConfig(fs)); err != nil {
+		if err = e.ScanFileSystem(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
-		s3 := func(c *sources.Config) {
-			c.Key = *s3ScanKey
-			c.Secret = *s3ScanSecret
-			c.Buckets = *s3ScanBuckets
+		cfg := sources.S3Config{
+			Key:       *s3ScanKey,
+			Secret:    *s3ScanSecret,
+			Buckets:   *s3ScanBuckets,
+			CloudCred: *s3ScanCloudEnv,
 		}
-
-		if err := e.ScanS3(ctx, sources.NewConfig(s3)); err != nil {
+		if err := e.ScanS3(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
-		syslog := func(c *sources.Config) {
-			c.Address = *syslogAddress
-			c.Protocol = *syslogProtocol
-			c.CertPath = *syslogTLSCert
-			c.KeyPath = *syslogTLSKey
-			c.Format = *syslogFormat
-			c.Concurrency = *concurrency
+		cfg := sources.SyslogConfig{
+			Address:     *syslogAddress,
+			Format:      *syslogFormat,
+			Protocol:    *syslogProtocol,
+			CertPath:    *syslogTLSCert,
+			KeyPath:     *syslogTLSKey,
+			Concurrency: *concurrency,
 		}
-
-		if err := e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
+		if err := e.ScanSyslog(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
 		}
 	case circleCiScan.FullCommand():
