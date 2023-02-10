@@ -48,7 +48,7 @@ func (i item) isEnterprise() bool {
 
 func (i item) Title() string {
 	if i.isEnterprise() {
-		return "🔒 " + i.title
+		return "💸 " + i.title
 	}
 	return i.title
 }
