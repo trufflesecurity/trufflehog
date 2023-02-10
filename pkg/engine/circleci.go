@@ -29,6 +29,10 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 	}
 
 	circleSource := circleci.Source{}
+	ctx = context.WithValues(ctx,
+		"source_type", circleSource.Type().String(),
+		"source_name", "Circle CI",
+	)
 	err = circleSource.Init(ctx, "trufflehog - Circle CI", 0, int64(sourcespb.SourceType_SOURCE_TYPE_CIRCLECI), true, &conn, runtime.NumCPU())
 	if err != nil {
 		return errors.WrapPrefix(err, "failed to init Circle CI source", 0)

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -62,14 +61,11 @@ func TestSource_Chunks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log.SetFormatter(&log.TextFormatter{ForceColors: true})
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 			var cancelOnce sync.Once
 			defer cancelOnce.Do(cancel)
 
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
-
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
 				t.Fatal(err)
