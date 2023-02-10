@@ -54,6 +54,10 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 			}
 		})
 
+	ctx = context.WithValues(ctx,
+		"source_type", sourcespb.SourceType_SOURCE_TYPE_GIT.String(),
+		"name", "trufflehog - git",
+	)
 	e.sourcesWg.Add(1)
 	go func() {
 		defer common.RecoverWithExit(ctx)
