@@ -5,6 +5,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -26,6 +27,71 @@ type Chunk struct {
 	Data []byte
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
+}
+
+// Cache used by Sources to help reduce duplicate data scans.
+type Cache interface {
+	Set(key, value string) error
+	Get(key string) (string, bool)
+	Delete(key string) error
+	Clear() error
+}
+
+// SourceConfigOption is responsible for configuring a SourceConfig.
+type SourceConfigOption func(*SourceConfig)
+
+// WithConcurrency sets the concurrency for the source.
+func WithConcurrency(concurrency int) SourceConfigOption {
+	return func(c *SourceConfig) {
+		c.Concurrency = concurrency
+	}
+}
+
+// WithVerify sets the verify flag for the source.
+func WithVerify(verify bool) SourceConfigOption {
+	return func(c *SourceConfig) {
+		c.Verify = verify
+	}
+}
+
+// WithSimpleCache sets the cache for the source.
+func WithSimpleCache() SourceConfigOption {
+	return func(c *SourceConfig) {
+		c.Cache = cache.Simple()
+	}
+}
+
+// SourceConfig provides a way to configure a Source.
+type SourceConfig struct {
+	// Name is the name of the source.
+	Name string
+	// JobID is the ID of the job that the source is associated with.
+	JobID int64
+	// SourceID is the ID of the source.
+	SourceID int64
+	// Verify specifies whether any secrets in the Chunk should be verified.
+	Verify bool
+	// Connection is the connection information for the source.
+	Connection *anypb.Any
+	// Concurrency is the number of concurrent workers to use for the source.
+	Concurrency int
+	// Cache used by Sources to help reduce duplicate data scans.
+	Cache Cache
+}
+
+// NewSourceConfig creates a new SourceConfig with the provided options.
+func NewSourceConfig(name string, jobID, sourceID int64, connection *anypb.Any, opts ...SourceConfigOption) *SourceConfig {
+	c := &SourceConfig{
+		Name:       name,
+		JobID:      jobID,
+		SourceID:   sourceID,
+		Connection: connection,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // Source defines the interface required to implement a source chunker.
