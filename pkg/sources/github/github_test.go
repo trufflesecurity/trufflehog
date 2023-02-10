@@ -23,6 +23,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
@@ -36,7 +37,15 @@ func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
 
 func initTestSource(src *sourcespb.GitHub) *Source {
 	s, conn := createTestSource(src)
-	if err := s.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1); err != nil {
+	cfg := sources.NewSourceConfig(
+		"test - github",
+		0,
+		1337,
+		conn,
+		sources.WithVerify(false),
+		sources.WithConcurrency(1),
+	)
+	if err := s.Init(context.TODO(), cfg); err != nil {
 		panic(err)
 	}
 	s.apiClient = github.NewClient(s.httpClient)
@@ -52,7 +61,15 @@ func TestInit(t *testing.T) {
 		},
 	})
 
-	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1)
+	cfg := sources.NewSourceConfig(
+		"test - github",
+		0,
+		1337,
+		conn,
+		sources.WithVerify(false),
+		sources.WithConcurrency(1),
+	)
+	err := source.Init(context.TODO(), cfg)
 	assert.Nil(t, err)
 
 	// TODO: test error case

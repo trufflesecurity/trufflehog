@@ -130,7 +130,15 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, tt.init.concurrency)
+			cfg := sources.NewSourceConfig(
+				tt.init.name,
+				0,
+				0,
+				conn,
+				sources.WithVerify(tt.init.verify),
+				sources.WithConcurrency(tt.init.concurrency),
+			)
+			err = s.Init(ctx, cfg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -263,7 +271,15 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			cfg := sources.NewSourceConfig(
+				tt.init.name,
+				0,
+				0,
+				conn,
+				sources.WithVerify(tt.init.verify),
+				sources.WithConcurrency(4),
+			)
+			err = s.Init(ctx, cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -406,7 +422,15 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			cfg := sources.NewSourceConfig(
+				tt.init.name,
+				0,
+				0,
+				conn,
+				sources.WithVerify(tt.init.verify),
+				sources.WithConcurrency(4),
+			)
+			err = s.Init(ctx, cfg)
 			if err != nil {
 				t.Errorf("Source.Init() error = %v", err)
 				return
