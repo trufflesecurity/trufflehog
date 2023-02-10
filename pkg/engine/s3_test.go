@@ -10,12 +10,12 @@ import (
 func TestScanS3(t *testing.T) {
 	tests := []struct {
 		name      string
-		c         sources.Config
+		c         sources.S3Config
 		expectErr bool
 	}{
 		{
 			name: "Test with cloud credentials",
-			c: sources.Config{
+			c: sources.S3Config{
 				CloudCred: true,
 				Buckets:   []string{"bucket1", "bucket2"},
 			},
@@ -23,7 +23,7 @@ func TestScanS3(t *testing.T) {
 		},
 		{
 			name: "Test with basic authentication",
-			c: sources.Config{
+			c: sources.S3Config{
 				CloudCred: false,
 				Key:       "accessKey",
 				Secret:    "secretKey",
@@ -33,7 +33,7 @@ func TestScanS3(t *testing.T) {
 		},
 		{
 			name: "Test with both cloud credentials and basic authentication",
-			c: sources.Config{
+			c: sources.S3Config{
 				CloudCred: true,
 				Key:       "accessKey",
 				Secret:    "secretKey",
@@ -43,7 +43,7 @@ func TestScanS3(t *testing.T) {
 		},
 		{
 			name: "Test with unauthenticated",
-			c: sources.Config{
+			c: sources.S3Config{
 				CloudCred: false,
 				Buckets:   []string{"bucket1", "bucket2"},
 			},

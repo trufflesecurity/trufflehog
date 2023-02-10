@@ -11,12 +11,12 @@ import (
 func TestScanGitLab(t *testing.T) {
 	tests := []struct {
 		name    string
-		c       sources.Config
+		c       sources.GitlabConfig
 		wantErr bool
 	}{
 		{
 			name: "Successful scan with valid token and endpoint",
-			c: sources.Config{
+			c: sources.GitlabConfig{
 				Token:    "valid-token",
 				Endpoint: "https://gitlab.com",
 				Repos:    []string{"repo1", "repo2"},
@@ -24,7 +24,7 @@ func TestScanGitLab(t *testing.T) {
 		},
 		{
 			name: "Failed scan with empty token",
-			c: sources.Config{
+			c: sources.GitlabConfig{
 				Token:    "",
 				Endpoint: "https://gitlab.com",
 				Repos:    []string{"repo1", "repo2"},

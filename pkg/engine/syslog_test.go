@@ -11,12 +11,12 @@ import (
 func TestScanSyslog(t *testing.T) {
 	tests := []struct {
 		name    string
-		c       sources.Config
+		c       sources.SyslogConfig
 		wantErr bool
 	}{
 		{
 			name: "Scan syslog successfully",
-			c: sources.Config{
+			c: sources.SyslogConfig{
 				Protocol:    "tcp",
 				Address:     "127.0.0.1:1514",
 				Format:      "rfc3164",
@@ -26,7 +26,7 @@ func TestScanSyslog(t *testing.T) {
 		},
 		{
 			name: "Scan syslog with invalid cert",
-			c: sources.Config{
+			c: sources.SyslogConfig{
 				CertPath:    "bad",
 				KeyPath:     "valid",
 				Address:     "127.0.0.1:1514",
@@ -37,7 +37,7 @@ func TestScanSyslog(t *testing.T) {
 		},
 		{
 			name: "Scan syslog with invalid keypath",
-			c: sources.Config{
+			c: sources.SyslogConfig{
 				Protocol:    "tcp",
 				KeyPath:     "invalid",
 				CertPath:    "valid",

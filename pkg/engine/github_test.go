@@ -11,12 +11,12 @@ import (
 func TestEngine_ScanGitHub(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  sources.Config
+		config  sources.GithubConfig
 		wantErr bool
 	}{
 		{
 			name: "valid config",
-			config: sources.Config{
+			config: sources.GithubConfig{
 				Endpoint:     "https://api.github.com",
 				Token:        "valid_token",
 				Orgs:         []string{"org1", "org2"},
@@ -26,7 +26,7 @@ func TestEngine_ScanGitHub(t *testing.T) {
 		},
 		{
 			name: "empty endpoint",
-			config: sources.Config{
+			config: sources.GithubConfig{
 				Endpoint: "",
 				Token:    "valid_token",
 				Orgs:     []string{"org1", "org2"},
@@ -34,14 +34,14 @@ func TestEngine_ScanGitHub(t *testing.T) {
 		},
 		{
 			name: "empty token",
-			config: sources.Config{
+			config: sources.GithubConfig{
 				Endpoint: "https://api.github.com",
 				Orgs:     []string{"org1", "org2"},
 			},
 		},
 		{
 			name: "empty orgs",
-			config: sources.Config{
+			config: sources.GithubConfig{
 				Endpoint: "https://api.github.com",
 				Token:    "valid_token",
 				Orgs:     []string{},

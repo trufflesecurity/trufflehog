@@ -11,18 +11,18 @@ import (
 func TestEngine_ScanFileSystem(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  sources.Config
+		config  sources.FilesystemConfig
 		wantErr bool
 	}{
 		{
 			name: "valid config",
-			config: sources.Config{
+			config: sources.FilesystemConfig{
 				Directories: []string{"/tmp"},
 			},
 		},
 		{
 			name: "empty directories",
-			config: sources.Config{
+			config: sources.FilesystemConfig{
 				Directories: []string{},
 			},
 		},
