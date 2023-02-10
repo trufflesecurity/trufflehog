@@ -71,7 +71,15 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 5)
+			cfg := sources.NewSourceConfig(
+				"circleci",
+				0,
+				0,
+				conn,
+				sources.WithVerify(tt.init.verify),
+				sources.WithConcurrency(5),
+			)
+			err = s.Init(ctx, cfg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return

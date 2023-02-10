@@ -75,7 +75,15 @@ func TestSource_Chunks(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			cfg := sources.NewSourceConfig(
+				tt.init.name,
+				0,
+				0,
+				conn,
+				sources.WithVerify(tt.init.verify),
+				sources.WithConcurrency(8),
+			)
+			err = s.Init(ctx, cfg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
