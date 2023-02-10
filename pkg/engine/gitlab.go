@@ -18,7 +18,7 @@ import (
 )
 
 // ScanGitLab scans GitLab with the provided configuration.
-func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),

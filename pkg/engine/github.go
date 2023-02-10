@@ -12,7 +12,7 @@ import (
 )
 
 // ScanGitHub scans Github with the provided options.
-func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	source := github.Source{}
 
 	connection := sourcespb.GitHub{
