@@ -39,7 +39,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 	}
 	ctx = context.WithValues(ctx,
 		"source_type", source.Type().String(),
-		"name", "trufflehog - github",
+		"source_name", "github",
 	)
 	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, c.Concurrency)
 	if err != nil {

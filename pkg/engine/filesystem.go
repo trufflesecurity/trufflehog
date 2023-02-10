@@ -30,7 +30,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 
 	ctx = context.WithValues(ctx,
 		"source_type", fileSystemSource.Type().String(),
-		"name", "trufflehog - filesystem",
+		"source_name", "filesystem",
 	)
 	err = fileSystemSource.Init(ctx, "trufflehog - filesystem", 0, int64(sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM), true, &conn, runtime.NumCPU())
 	if err != nil {

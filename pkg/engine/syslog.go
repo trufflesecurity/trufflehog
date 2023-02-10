@@ -43,8 +43,8 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
 	}
 	source := syslog.Source{}
 	ctx = context.WithValues(ctx,
-		"source_type", source.Type(),
-		"name", "trufflehog - syslog",
+		"source_type", source.Type().String(),
+		"source_name", "syslog",
 	)
 	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, c.Concurrency)
 	source.InjectConnection(connection)

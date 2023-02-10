@@ -47,8 +47,8 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 
 	s3Source := s3.Source{}
 	ctx = context.WithValues(ctx,
-		"source_type", s3Source.Type(),
-		"name", "trufflehog - gitlab",
+		"source_type", s3Source.Type().String(),
+		"source_name", "s3",
 	)
 	err = s3Source.Init(ctx, "trufflehog - s3", 0, int64(sourcespb.SourceType_SOURCE_TYPE_S3), true, &conn, runtime.NumCPU())
 	if err != nil {

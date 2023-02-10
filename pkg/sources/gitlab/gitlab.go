@@ -408,7 +408,7 @@ func (s *Source) ignoreRepo(ctx context.Context, r string) bool {
 	for _, ignore := range s.ignoreRepos {
 		g, err := glob.Compile(ignore)
 		if err != nil {
-			ctx.Logger().V(2).Info("could not compile ignore repo glob", "glob", ignore, "error", err)
+			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", ignore)
 			continue
 		}
 		if g.Match(r) {

@@ -54,8 +54,8 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 
 	gitlabSource := gitlab.Source{}
 	ctx = context.WithValues(ctx,
-		"source_type", gitlabSource.Type(),
-		"name", "trufflehog - gitlab",
+		"source_type", gitlabSource.Type().String(),
+		"source_name", "gitlab",
 	)
 	err = gitlabSource.Init(ctx, "trufflehog - gitlab", 0, int64(sourcespb.SourceType_SOURCE_TYPE_GITLAB), true, &conn, runtime.NumCPU())
 	if err != nil {
