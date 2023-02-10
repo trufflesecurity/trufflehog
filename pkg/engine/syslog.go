@@ -41,8 +41,17 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
+
 	source := syslog.Source{}
-	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, c.Concurrency)
+	cfg := sources.NewSourceConfig(
+		"trufflehog - syslog",
+		0,
+		int64(sourcespb.SourceType_SOURCE_TYPE_SYSLOG),
+		&conn,
+		sources.WithConcurrency(c.Concurrency),
+		sources.WithVerify(true),
+	)
+	err = source.Init(ctx, cfg)
 	source.InjectConnection(connection)
 	if err != nil {
 		ctx.Logger().Error(err, "failed to initialize syslog source")

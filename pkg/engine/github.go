@@ -37,7 +37,16 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 		ctx.Logger().Error(err, "failed to marshal github connection")
 		return err
 	}
-	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, c.Concurrency)
+
+	cfg := sources.NewSourceConfig(
+		"trufflehog - github",
+		0,
+		int64(sourcespb.SourceType_SOURCE_TYPE_GITHUB),
+		&conn,
+		sources.WithConcurrency(c.Concurrency),
+		sources.WithVerify(true),
+	)
+	err = source.Init(ctx, cfg)
 	if err != nil {
 		ctx.Logger().Error(err, "failed to initialize github source")
 		return err

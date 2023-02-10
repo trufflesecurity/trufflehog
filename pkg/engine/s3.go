@@ -46,7 +46,15 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 	}
 
 	s3Source := s3.Source{}
-	err = s3Source.Init(ctx, "trufflehog - s3", 0, int64(sourcespb.SourceType_SOURCE_TYPE_S3), true, &conn, runtime.NumCPU())
+	cfg := sources.NewSourceConfig(
+		"trufflehog - s3",
+		0,
+		int64(sourcespb.SourceType_SOURCE_TYPE_S3),
+		&conn,
+		sources.WithConcurrency(runtime.NumCPU()),
+		sources.WithVerify(true),
+	)
+	err = s3Source.Init(ctx, cfg)
 	if err != nil {
 		return errors.WrapPrefix(err, "failed to init S3 source", 0)
 	}
