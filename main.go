@@ -210,8 +210,14 @@ func run(state overseer.State) {
 	ctx := context.TODO()
 	var detectorsOption engine.EngineOption
 
+	dts, err := engine.Detectors(ctx, strings.Split(*detectors, ","))
+	if err != nil {
+		logger.Error(err, "could not create detectors")
+		os.Exit(1)
+	}
+
 	if len(*detectors) > 0 {
-		detectorsOption = engine.WithDetectors(!*noVerification, engine.Detectors(ctx, strings.Split(*detectors, ","))...)
+		detectorsOption = engine.WithDetectors(!*noVerification, dts...)
 	} else {
 		detectorsOption = engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...)
 	}

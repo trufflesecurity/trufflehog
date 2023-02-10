@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -9,15 +10,18 @@ import (
 
 // Detectors only returns a specific set of detectors if they are specified in the
 // detectors list and are valid. Otherwise, it returns the default set of detectors.
-func Detectors(ctx context.Context, dts []string) []detectors.Detector {
+func Detectors(ctx context.Context, dts []string) ([]detectors.Detector, error) {
 	configured := setDetectors(ctx, dts)
 
 	if len(configured) == 0 {
-		ctx.Logger().Info("no valid detectors specified, using default set")
-		return DefaultDetectors()
+		return nil, fmt.Errorf("no detectors specified")
 	}
 
-	return filterDetectors(dts, configured)
+	ds := filterDetectors(dts, configured)
+	if len(ds) != len(configured) {
+		return nil, fmt.Errorf("1 or more detectors are invalid, please check your detector types")
+	}
+	return ds, nil
 }
 
 func setDetectors(ctx context.Context, dts []string) map[string]struct{} {

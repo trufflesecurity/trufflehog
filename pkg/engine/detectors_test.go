@@ -16,11 +16,12 @@ func TestDetectors(t *testing.T) {
 		name     string
 		dts      []string
 		expected []detectors.Detector
+		wantErr  bool
 	}{
 		{
-			name:     "No detectors specified, returns default set",
-			dts:      []string{},
-			expected: DefaultDetectors(),
+			name:    "No detectors specified, returns default set",
+			dts:     []string{},
+			wantErr: true,
 		},
 		{
 			name:     "Valid detector (1) specified, returns valid set",
@@ -33,14 +34,18 @@ func TestDetectors(t *testing.T) {
 			expected: []detectors.Detector{aws.New(), &azure.Scanner{}},
 		},
 		{
-			name:     "Invalid detector specified, returns only valid set",
-			dts:      []string{"AWS", "InvalidType"},
-			expected: []detectors.Detector{aws.New()},
+			name:    "Invalid detector specified, returns error",
+			dts:     []string{"AWS", "InvalidType"},
+			wantErr: true,
 		},
 	}
 
 	for _, test := range tests {
-		result := Detectors(ctx, test.dts)
+		result, err := Detectors(ctx, test.dts)
+		if err != nil && !test.wantErr {
+			t.Errorf("For detectors %v, expected no error, got %v", test.dts, err)
+		}
+
 		if !reflect.DeepEqual(result, test.expected) {
 			t.Errorf("For detectors %v, expected %v, got %v", test.dts, test.expected, result)
 		}
