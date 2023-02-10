@@ -38,6 +38,10 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 		sources.WithConcurrency(runtime.NumCPU()),
 		sources.WithVerify(true),
 	)
+	ctx = context.WithValues(ctx,
+		"source_type", circleSource.Type().String(),
+		"source_name", "Circle CI",
+	)
 	err = circleSource.Init(ctx, cfg)
 	if err != nil {
 		return errors.WrapPrefix(err, "failed to init Circle CI source", 0)

@@ -51,6 +51,10 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
 		sources.WithConcurrency(c.Concurrency),
 		sources.WithVerify(true),
 	)
+	ctx = context.WithValues(ctx,
+		"source_type", source.Type().String(),
+		"source_name", "syslog",
+	)
 	err = source.Init(ctx, cfg)
 	source.InjectConnection(connection)
 	if err != nil {

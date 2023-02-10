@@ -61,6 +61,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 		sources.WithConcurrency(runtime.NumCPU()),
 		sources.WithVerify(true),
 	)
+	ctx = context.WithValues(ctx,
+		"source_type", gitlabSource.Type().String(),
+		"source_name", "gitlab",
+	)
 	err = gitlabSource.Init(ctx, cfg)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init GitLab source", 0)

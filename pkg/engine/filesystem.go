@@ -35,6 +35,10 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 		sources.WithConcurrency(runtime.NumCPU()),
 		sources.WithVerify(true),
 	)
+	ctx = context.WithValues(ctx,
+		"source_type", fileSystemSource.Type().String(),
+		"source_name", "filesystem",
+	)
 	err = fileSystemSource.Init(ctx, cfg)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init filesystem source", 0)

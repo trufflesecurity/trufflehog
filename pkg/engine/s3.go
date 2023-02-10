@@ -54,6 +54,10 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 		sources.WithConcurrency(runtime.NumCPU()),
 		sources.WithVerify(true),
 	)
+	ctx = context.WithValues(ctx,
+		"source_type", s3Source.Type().String(),
+		"source_name", "s3",
+	)
 	err = s3Source.Init(ctx, cfg)
 	if err != nil {
 		return errors.WrapPrefix(err, "failed to init S3 source", 0)
