@@ -8,13 +8,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
-// DetectorFilter allows for include/exclude dts.
+// DetectorFilter allows for include/exclude detectors.
 type DetectorFilter interface {
 	detectors() []string
 	filter(map[string]struct{}) ([]detectors.Detector, error)
 }
 
-// IncludeDetectorFilter is a detector that only includes the specified dts.
+// IncludeDetectorFilter is a detector that only includes the specified detectors.
 type IncludeDetectorFilter struct {
 	includeDetectors []string
 }
@@ -38,7 +38,7 @@ func (i *IncludeDetectorFilter) filter(include map[string]struct{}) ([]detectors
 	return ds, nil
 }
 
-// ExcludeDetectorFilter is a detector that excludes the specified dts.
+// ExcludeDetectorFilter is a detector that excludes the specified detectors.
 type ExcludeDetectorFilter struct {
 	excludeDetectors []string
 }
@@ -79,8 +79,8 @@ func NewDetectorsConfig(include, exclude string) (DetectorFilter, error) {
 	return &ExcludeDetectorFilter{excludeDetectors: strings.Split(exclude, ",")}, nil
 }
 
-// Detectors only returns a specific set of dts if they are specified in the
-// dts list and are valid. Otherwise, it returns the default set of dts.
+// Detectors only returns a specific set of detectors if they are specified in the
+// detector list and are valid. Otherwise, an error is returned.
 func Detectors(ctx context.Context, dt DetectorFilter) ([]detectors.Detector, error) {
 	configured := setDetectors(ctx, dt.detectors())
 
