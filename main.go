@@ -351,7 +351,7 @@ func run(state overseer.State) {
 		}
 	}
 	logger.V(2).Info("finished scanning",
-		"count", e.ChunksScanned(),
+		"chunks", e.ChunksScanned(),
 		"bytes", e.BytesScanned(),
 	)
 

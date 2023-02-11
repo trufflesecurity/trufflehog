@@ -21,6 +21,7 @@ func FilterEmpty() *Filter {
 	filter, err := FilterFromFiles("", "")
 	if err != nil {
 		context.Background().Logger().Error(err, "could not create empty filter")
+		os.Exit(1)
 	}
 	return filter
 }
