@@ -20,5 +20,5 @@ jobs:
     - name: Smoke
       run: |
         set -e
-        go run . git git@github.com:dustin-decker/secretsandstuff.git
-        go run . github --repo git@github.com:dustin-decker/secretsandstuff.git
+        go run . git https://github.com/dustin-decker/secretsandstuff.git
+        go run . github --repo https://github.com/dustin-decker/secretsandstuff.git
