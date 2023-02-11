@@ -20,10 +20,10 @@ func TestNewDectorsConfig(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:    "No dts specified, returns error",
+			name:    "No dts specified, returns nil",
 			inc:     "",
 			exc:     "",
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name:     "Include dts specified, returns config with include",
@@ -66,7 +66,11 @@ func TestDetectors(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:    "No dts specified, returns default set",
+			name: "No DetectoFilter specified, returns nil",
+			dt:   nil,
+		},
+		{
+			name:    "Empty DetectoFilter specified, returns error",
 			dt:      &IncludeDetectorFilter{},
 			wantErr: true,
 		},
