@@ -66,7 +66,7 @@ func (e *ExcludeDetectorFilter) filter(exclude map[string]struct{}) ([]detectors
 // NewDetectorsConfig creates a new detector filter based on the include/exclude arguments.
 func NewDetectorsConfig(include, exclude string) (DetectorFilter, error) {
 	if len(include) == 0 && len(exclude) == 0 {
-		return nil, fmt.Errorf("no detectors specified")
+		return nil, nil
 	}
 
 	if len(include) > 0 && len(exclude) > 0 {
@@ -83,6 +83,9 @@ func NewDetectorsConfig(include, exclude string) (DetectorFilter, error) {
 // Detectors only returns a specific set of detectors if they are specified in the
 // detector list and are valid. Otherwise, an error is returned.
 func Detectors(ctx context.Context, dt DetectorFilter) ([]detectors.Detector, error) {
+	if dt == nil {
+		return nil, nil
+	}
 	configured := setDetectors(ctx, dt.detectors())
 
 	if len(configured) == 0 {
