@@ -1,0 +1,28 @@
+
+name: Smoke
+
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - main
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: '1.18'
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        ref: ${{ github.head_ref }}
+    - name: Smoke
+      run: |
+        set -e
+        go run . git git@github.com:dustin-decker/secretsandstuff.git
+        go run . github --repo git@github.com:dustin-decker/secretsandstuff.git
