@@ -2,11 +2,7 @@
 name: Smoke
 
 on:
-  push:
-    tags:
-      - v*
-    branches:
-      - main
+  pull_request:
 
 jobs:
   smoke:
