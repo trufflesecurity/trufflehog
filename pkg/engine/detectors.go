@@ -14,7 +14,7 @@ type DetectorFilter interface {
 	filter(map[string]struct{}) ([]detectors.Detector, error)
 }
 
-// IncludeDetectorFilter is a detector that only includes the specified detectors.
+// IncludeDetectorFilter is a detector filter that only includes the specified detectors.
 type IncludeDetectorFilter struct {
 	includeDetectors []string
 }
@@ -38,7 +38,7 @@ func (i *IncludeDetectorFilter) filter(include map[string]struct{}) ([]detectors
 	return ds, nil
 }
 
-// ExcludeDetectorFilter is a detector that excludes the specified detectors.
+// ExcludeDetectorFilter is a detector filter that excludes the specified detectors.
 type ExcludeDetectorFilter struct {
 	excludeDetectors []string
 }
