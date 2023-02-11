@@ -104,7 +104,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	logrus.Debugf("loaded %d decoders", len(e.decoders))
-	logrus.Debugf("loaded %d detectors total, %d with verification enabled. %d with verification disabled",
+	logrus.Debugf("loaded %d dts total, %d with verification enabled. %d with verification disabled",
 		len(e.detectors[true])+len(e.detectors[false]),
 		len(e.detectors[true]),
 		len(e.detectors[false]))

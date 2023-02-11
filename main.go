@@ -50,7 +50,8 @@ var (
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan.").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
-	detectors            = cli.Flag("detectors", "Comma separated list of detector types. Types must exist in detectors.proto").String()
+	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Types must exist in detectors.proto").String()
+	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Types must exist in detectors.proto").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -210,13 +211,18 @@ func run(state overseer.State) {
 	ctx := context.TODO()
 	var detectorsOption engine.EngineOption
 
-	dts, err := engine.Detectors(ctx, strings.Split(*detectors, ","))
+	detectorCfg, err := engine.NewDetectorsConfig(*includeDetectors, *excludeDetectors)
 	if err != nil {
-		logger.Error(err, "could not create detectors")
+		logger.Error(err, "failed to create detectors config")
+		os.Exit(1)
+	}
+	dts, err := engine.Detectors(ctx, detectorCfg)
+	if err != nil {
+		logger.Error(err, "failed to create detectors")
 		os.Exit(1)
 	}
 
-	if len(*detectors) > 0 {
+	if len(dts) > 0 {
 		detectorsOption = engine.WithDetectors(!*noVerification, dts...)
 	} else {
 		detectorsOption = engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...)
