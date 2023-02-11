@@ -37,7 +37,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-retryablehttp v0.7.2
 	github.com/jlaffaye/ftp v0.1.0
-	github.com/joho/godotenv v1.4.0
+	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
 	github.com/lib/pq v1.10.7

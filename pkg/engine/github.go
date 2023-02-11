@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -13,7 +12,7 @@ import (
 )
 
 // ScanGitHub scans Github with the provided options.
-func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	source := github.Source{}
 
 	connection := sourcespb.GitHub{
@@ -35,12 +34,16 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal github connection")
+		ctx.Logger().Error(err, "failed to marshal github connection")
 		return err
 	}
+	ctx = context.WithValues(ctx,
+		"source_type", source.Type().String(),
+		"source_name", "github",
+	)
 	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, c.Concurrency)
 	if err != nil {
-		logrus.WithError(err).Error("failed to initialize github source")
+		ctx.Logger().Error(err, "failed to initialize github source")
 		return err
 	}
 
@@ -50,7 +53,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Fatal("could not scan github")
+			ctx.Logger().Error(err, "could not scan github")
 		}
 	}()
 	return nil
