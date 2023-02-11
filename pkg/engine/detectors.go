@@ -63,6 +63,7 @@ func (e *ExcludeDetectorFilter) filter(exclude map[string]struct{}) ([]detectors
 	return result, nil
 }
 
+// NewDetectorsConfig creates a new detector filter based on the include/exclude arguments.
 func NewDetectorsConfig(include, exclude string) (DetectorFilter, error) {
 	if len(include) == 0 && len(exclude) == 0 {
 		return nil, fmt.Errorf("no detectors specified")
