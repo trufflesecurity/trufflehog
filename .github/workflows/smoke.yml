@@ -1,16 +1,11 @@
 
-name: Scan for secrets
+name: Smoke
 
 on:
-  push:
-    tags:
-      - v*
-    branches:
-      - main
-    pull_request:
+  pull_request:
 
 jobs:
-  test:
+  smoke:
     runs-on: ubuntu-latest
     steps:
     - name: Install Go
@@ -22,10 +17,8 @@ jobs:
       with:
         fetch-depth: 0
         ref: ${{ github.head_ref }}
-    - name: Dogfood
-      uses: ./
-      id: dogfood
-      with:
-        path: ./
-        base: ${{ github.event.repository.default_branch }}
-        head: HEAD
+    - name: Smoke
+      run: |
+        set -e
+        go run . git https://github.com/dustin-decker/secretsandstuff.git
+        go run . github --repo https://github.com/dustin-decker/secretsandstuff.git
