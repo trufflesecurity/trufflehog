@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/felixge/fgprof"
+	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -118,24 +118,26 @@ func init() {
 	cli.Version("trufflehog " + version.BuildVersion)
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
-	if *jsonOut {
-		logrus.SetFormatter(&logrus.JSONFormatter{})
-	}
 	switch {
 	case *trace:
 		log.SetLevel(5)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.Debugf("running version %s", version.BuildVersion)
 	case *debug:
 		log.SetLevel(2)
-		logrus.SetLevel(logrus.DebugLevel)
-		logrus.Debugf("running version %s", version.BuildVersion)
-	default:
-		logrus.SetLevel(logrus.InfoLevel)
 	}
 }
 
 func main() {
+	// setup logger
+	logFormat := log.WithConsoleSink
+	if *jsonOut {
+		logFormat = log.WithJSONSink
+	}
+	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
+	// make it the default logger for contexts
+	context.SetDefaultLogger(logger)
+	defer func() { _ = sync() }()
+	logFatal := logFatalFunc(logger)
+
 	updateCfg := overseer.Config{
 		Program:       run,
 		Debug:         *debug,
@@ -153,14 +155,16 @@ func main() {
 
 	err := overseer.RunErr(updateCfg)
 	if err != nil {
-		logrus.WithError(err).Fatal("error occured with trufflehog updater 🐷")
+		logFatal(err, "error occured with trufflehog updater 🐷")
 	}
 }
 
 func run(state overseer.State) {
-	if *debug {
-		logrus.Debugf("trufflehog %s", version.BuildVersion)
-	}
+	ctx := context.Background()
+	logger := ctx.Logger()
+	logFatal := logFatalFunc(logger)
+
+	logger.V(2).Info(fmt.Sprintf("trufflehog %s", version.BuildVersion))
 
 	if *githubScanToken != "" {
 		// NOTE: this kludge is here to do an authenticated shallow commit
@@ -178,27 +182,19 @@ func run(state overseer.State) {
 			router := mux.NewRouter()
 			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
 			router.PathPrefix("/debug/fgprof").Handler(fgprof.Handler())
-			logrus.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
+			logger.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
 			if err := http.ListenAndServe(":18066", router); err != nil {
-				logrus.Error(err)
+				logger.Error(err, "error serving pprof and fgprof")
 			}
 		}()
 	}
-	logFormat := log.WithConsoleSink
-	if *jsonOut {
-		logFormat = log.WithJSONSink
-	}
-	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
-	context.SetDefaultLogger(logger)
-	defer func() { _ = sync() }()
 
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
 		conf, err = config.Read(*configFilename)
 		if err != nil {
-			logger.Error(err, "error parsing the provided configuration file")
-			os.Exit(1)
+			logFatal(err, "error parsing the provided configuration file")
 		}
 	}
 
@@ -212,7 +208,6 @@ func run(state overseer.State) {
 		handlers.SetArchiveMaxTimeout(*archiveTimeout)
 	}
 
-	ctx := context.TODO()
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
@@ -227,11 +222,11 @@ func run(state overseer.State) {
 	case gitScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
 		if err != nil {
-			logrus.WithError(err).Fatal("could not create filter")
+			logFatal(err, "could not create filter")
 		}
 		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
 		if err != nil || repoPath == "" {
-			logrus.WithError(err).Fatal("error preparing git repo for scanning")
+			logFatal(err, "error preparing git repo for scanning")
 		}
 		if remote {
 			defer os.RemoveAll(repoPath)
@@ -245,7 +240,7 @@ func run(state overseer.State) {
 			Filter:   filter,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan Git.")
+			logFatal(err, "Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
@@ -253,7 +248,7 @@ func run(state overseer.State) {
 			logrus.WithError(err).Fatal("could not create filter")
 		}
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
-			logrus.Fatal("You must specify at least one organization or repository.")
+			logFatal(fmt.Errorf("invalid config"), "You must specify at least one organization or repository.")
 		}
 
 		cfg := sources.GithubConfig{
@@ -269,12 +264,12 @@ func run(state overseer.State) {
 			Filter:         filter,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan Github.")
+			logFatal(err, "Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
-			logrus.WithError(err).Fatal("could not create filter")
+			logFatal(err, "could not create filter")
 		}
 
 		cfg := sources.GitlabConfig{
@@ -284,12 +279,12 @@ func run(state overseer.State) {
 			Filter:   filter,
 		}
 		if err := e.ScanGitLab(ctx, cfg); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan GitLab.")
+			logFatal(err, "Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
 		filter, err := common.FilterFromFiles(*filesystemScanIncludePaths, *filesystemScanExcludePaths)
 		if err != nil {
-			logrus.WithError(err).Fatal("could not create filter")
+			logFatal(err, "could not create filter")
 		}
 
 		cfg := sources.FilesystemConfig{
@@ -297,7 +292,7 @@ func run(state overseer.State) {
 			Filter:      filter,
 		}
 		if err = e.ScanFileSystem(ctx, cfg); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan filesystem")
+			logFatal(err, "Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
@@ -307,7 +302,7 @@ func run(state overseer.State) {
 			CloudCred: *s3ScanCloudEnv,
 		}
 		if err := e.ScanS3(ctx, cfg); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan S3.")
+			logFatal(err, "Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
 		cfg := sources.SyslogConfig{
@@ -319,11 +314,11 @@ func run(state overseer.State) {
 			Concurrency: *concurrency,
 		}
 		if err := e.ScanSyslog(ctx, cfg); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan syslog.")
+			logFatal(err, "Failed to scan syslog.")
 		}
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan CircleCI.")
+			logFatal(err, "Failed to scan CircleCI.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
@@ -342,24 +337,30 @@ func run(state overseer.State) {
 		}
 		foundResults = true
 
+		var err error
 		switch {
 		case *jsonLegacy:
-			output.PrintLegacyJSON(ctx, &r)
+			err = output.PrintLegacyJSON(ctx, &r)
 		case *jsonOut:
-			output.PrintJSON(&r)
+			err = output.PrintJSON(&r)
 		default:
-			output.PrintPlainOutput(&r)
+			err = output.PrintPlainOutput(&r)
+		}
+		if err != nil {
+			logFatal(err, "error printing results")
 		}
 	}
-	logrus.Debugf("scanned %d chunks", e.ChunksScanned())
-	logrus.Debugf("scanned %d bytes", e.BytesScanned())
+	logger.V(2).Info("finished scanning",
+		"count", e.ChunksScanned(),
+		"bytes", e.BytesScanned(),
+	)
 
 	if *printAvgDetectorTime {
 		printAverageDetectorTime(e)
 	}
 
 	if foundResults && *fail {
-		logrus.Debug("exiting with code 183 because results were found")
+		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
 }
@@ -373,5 +374,18 @@ func printAverageDetectorTime(e *engine.Engine) {
 		}
 		avgDuration := total / time.Duration(len(durations))
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
+	}
+}
+
+// logFatalFunc returns a log.Fatal style function. Calling the returned
+// function will terminate the program without cleanup.
+func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+	return func(err error, message string, keyAndVals ...any) {
+		logger.Error(err, message, keyAndVals...)
+		if err != nil {
+			os.Exit(1)
+			return
+		}
+		os.Exit(0)
 	}
 }

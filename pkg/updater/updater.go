@@ -14,8 +14,8 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/jpillora/overseer/fetcher"
-	log "github.com/sirupsen/logrus"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
 
@@ -78,7 +78,7 @@ func (g *OSS) Fetch() (io.Reader, error) {
 		return nil, errors.New("already up to date")
 	}
 
-	log.Debug("fetching trufflehog update")
+	context.Background().Logger().V(2).Info("fetching trufflehog update")
 
 	newBinBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
