@@ -22,7 +22,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.9.1
 	github.com/fatih/color v1.13.0
 	github.com/felixge/fgprof v0.9.3
-	github.com/getsentry/sentry-go v0.17.0
+	github.com/getsentry/sentry-go v0.18.0
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/go-ldap/ldap/v3 v3.4.4
@@ -41,7 +41,6 @@ require (
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
 	github.com/lib/pq v1.10.7
-	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/mholt/archiver/v4 v4.0.0-alpha.7
 	github.com/paulbellamy/ratecounter v0.2.0
@@ -116,6 +115,7 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
