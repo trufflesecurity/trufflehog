@@ -40,10 +40,10 @@ func ParseDetectors(input string) ([]dpb.DetectorType, error) {
 	var output []dpb.DetectorType
 	seenDetector := map[dpb.DetectorType]struct{}{}
 	for _, item := range strings.Split(input, ",") {
+		item = strings.TrimSpace(item)
 		if item == "" {
 			continue
 		}
-		item = strings.TrimSpace(item)
 		detectors, ok := specialGroups[strings.ToLower(item)]
 		if !ok {
 			var err error

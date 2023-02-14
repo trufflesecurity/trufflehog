@@ -21,7 +21,7 @@ func TestDetectorParsing(t *testing.T) {
 		"range preserved":           {"8-9, 7-10", []dpb.DetectorType{8, 9, 7, 10}},
 		"reverse range":             {"9-8", []dpb.DetectorType{9, 8}},
 		"range preserved with all":  {"10-,all", append(allDetectors()[10:], allDetectors()[:10]...)},
-		"empty list item":           {"8,,9", []dpb.DetectorType{8, 9}},
+		"empty list item":           {"8, ,9", []dpb.DetectorType{8, 9}},
 		"invalid end range":         {"0-1337", nil},
 		"invalid name":              {"foo", nil},
 		"negative":                  {"-1", nil},
