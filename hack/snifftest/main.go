@@ -204,7 +204,7 @@ func main() {
 				logger.Info("scanning repo", "repo", r)
 				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
 				if err != nil {
-					logFatal(err)
+					logFatal(err, "error scanning repo")
 				}
 				logger.Info("scanned repo", "repo", r)
 				defer os.RemoveAll(path)
