@@ -245,7 +245,7 @@ func run(state overseer.State) {
 	case githubScan.FullCommand():
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
-			logrus.WithError(err).Fatal("could not create filter")
+			logFatal(err, "could not create filter")
 		}
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			logFatal(fmt.Errorf("invalid config"), "You must specify at least one organization or repository.")
