@@ -21,10 +21,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
@@ -50,6 +52,8 @@ var (
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan.").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
+	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
+	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges.").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -208,11 +212,40 @@ func run(state overseer.State) {
 		handlers.SetArchiveMaxTimeout(*archiveTimeout)
 	}
 
+	// Build include and exclude detector filter sets.
+	var includeDetectorTypes, excludeDetectorTypes map[detectorspb.DetectorType]struct{}
+	{
+		includeList, err := config.ParseDetectors(*includeDetectors)
+		if err != nil {
+			// Exit if there was an error to inform the user of the misconfiguration.
+			logger.Error(err, "invalid detector configuration")
+			os.Exit(1)
+		}
+		excludeList, err := config.ParseDetectors(*excludeDetectors)
+		if err != nil {
+			// Exit if there was an error to inform the user of the misconfiguration.
+			logger.Error(err, "invalid detector configuration")
+			os.Exit(1)
+		}
+		includeDetectorTypes = detectorTypeToSet(includeList)
+		excludeDetectorTypes = detectorTypeToSet(excludeList)
+	}
+	includeFilter := func(d detectors.Detector) bool {
+		_, ok := includeDetectorTypes[d.Type()]
+		return ok
+	}
+	excludeFilter := func(d detectors.Detector) bool {
+		_, ok := excludeDetectorTypes[d.Type()]
+		return !ok
+	}
+
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
+		engine.WithFilterDetectors(includeFilter),
+		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterUnverified(*filterUnverified),
 	)
 
@@ -388,4 +421,12 @@ func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
 		}
 		os.Exit(0)
 	}
+}
+
+func detectorTypeToSet(detectors []detectorspb.DetectorType) map[detectorspb.DetectorType]struct{} {
+	output := make(map[detectorspb.DetectorType]struct{}, len(detectors))
+	for _, d := range detectors {
+		output[d] = struct{}{}
+	}
+	return output
 }

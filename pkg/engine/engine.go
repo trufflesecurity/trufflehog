@@ -73,6 +73,31 @@ func WithFilterUnverified(filter bool) EngineOption {
 	}
 }
 
+// WithFilterDetectors applies a filter to the configured list of detectors. If
+// the filterFunc returns true, the detector will be included for scanning.
+// This option applies to the existing list of detectors configured, so the
+// order this option appears matters. All filtering happens before scanning.
+func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption {
+	return func(e *Engine) {
+		// If no detectors are configured, do nothing.
+		if e.detectors == nil {
+			return
+		}
+		e.detectors[true] = filterDetectors(filterFunc, e.detectors[true])
+		e.detectors[false] = filterDetectors(filterFunc, e.detectors[false])
+	}
+}
+
+func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors.Detector) []detectors.Detector {
+	var output []detectors.Detector
+	for _, detector := range input {
+		if filterFunc(detector) {
+			output = append(output, detector)
+		}
+	}
+	return output
+}
+
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
 		chunks:          make(chan *sources.Chunk),
