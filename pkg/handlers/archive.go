@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/mholt/archiver/v4"
-	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type ctxKey int
@@ -55,6 +55,7 @@ func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]
 	archiveChan := make(chan ([]byte), 512)
 	go func() {
 		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
+		logger := logContext.AddLogger(ctx).Logger()
 		defer cancel()
 		defer close(archiveChan)
 		err := d.openArchive(ctx, 0, data, archiveChan)
@@ -62,7 +63,7 @@ func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]
 			if errors.Is(err, archiver.ErrNoMatch) {
 				return
 			}
-			log.WithError(err).Debug("Error unarchiving chunk.")
+			logger.V(2).Info("Error unarchiving chunk.")
 		}
 	}()
 	return archiveChan
@@ -129,7 +130,8 @@ func (d *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, 
 // extractorHandler is applied to each file in an archiver.Extractor file.
 func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, f archiver.File) error {
-		log.WithField("filename", f.Name()).Trace("Handling extracted file.")
+		logger := logContext.AddLogger(ctx).Logger()
+		logger.V(5).Info("Handling extracted file.", "filename", f.Name())
 		depth := 0
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
@@ -159,19 +161,20 @@ func (d *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 	// rardecode. There is a bug somewhere with rar decoder format 29
 	// that can lead to a panic. An issue is open in rardecode repo
 	// https://github.com/nwaples/rardecode/issues/30.
+	logger := logContext.AddLogger(ctx).Logger()
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Panic occurred when reading archive: %v", r)
 			// Return an error from ReadToMax.
 			if e, ok := r.(error); ok {
 				err = e
 			} else {
 				err = fmt.Errorf("Panic occurred: %v", r)
 			}
+			logger.Error(err, "Panic occurred when reading archive")
 		}
 	}()
 	fileContent := bytes.Buffer{}
-	log.Tracef("Remaining buffer capacity: %d", maxSize-d.size)
+	logger.V(5).Info("Remaining buffer capacity", "bytes", maxSize-d.size)
 	for i := 0; i <= maxSize/512; i++ {
 		if common.IsDone(ctx) {
 			return nil, ctx.Err()
@@ -189,7 +192,7 @@ func (d *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 			return fileContent.Bytes(), nil
 		}
 		if d.size >= maxSize && bRead == 512 {
-			log.Debug("Max archive size reached.")
+			logger.V(2).Info("Max archive size reached.")
 			return fileContent.Bytes(), nil
 		}
 	}

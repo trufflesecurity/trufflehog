@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -174,14 +172,14 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	go func() {
 		scanner := bufio.NewScanner(stdErr)
 		for scanner.Scan() {
-			log.Debug(scanner.Text())
+			ctx.Logger().V(2).Info(scanner.Text())
 		}
 	}()
 
 	go func() {
 		c.fromReader(ctx, stdOut, commitChan)
 		if err := cmd.Wait(); err != nil {
-			log.WithError(err).Debugf("Error waiting for git command to complete.")
+			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
 	}()
 
@@ -227,7 +225,7 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isDateLine(line):
 			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
 			if err != nil {
-				log.WithError(err).Debug("Could not parse date from git stream.")
+				ctx.Logger().V(2).Info("Could not parse date from git stream.", "error", err)
 			}
 			currentCommit.Date = date
 		case isDiffLine(line):
@@ -293,7 +291,9 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			}
 		}
 		if currentDiff.Content.Len() > c.maxDiffSize {
-			log.Debugf("Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize)
+			ctx.Logger().V(2).Info(fmt.Sprintf(
+				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
+			))
 			break
 		}
 	}
@@ -423,9 +423,10 @@ func isLineNumberDiffLine(line []byte) bool {
 
 // Get the b/ file path.
 func pathFromBinaryLine(line []byte) string {
+	logger := context.Background().Logger()
 	sbytes := bytes.Split(line, []byte(" and "))
 	if len(sbytes) != 2 {
-		log.Debugf("Expected binary line to be in 'Binary files a/filaA and b/fileB differ' format. Got: %s", line)
+		logger.V(2).Info("Expected binary line to be in 'Binary files a/filaA and b/fileB differ' format.", "got", line)
 		return ""
 	}
 	bRaw := sbytes[1]

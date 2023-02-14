@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -21,7 +20,7 @@ var (
 	whitePrinter  = color.New(color.FgWhite)
 )
 
-func PrintPlainOutput(r *detectors.ResultWithMetadata) {
+func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),
@@ -32,7 +31,7 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) {
 
 	meta, err := structToMap(out.MetaData.Data)
 	if err != nil {
-		logrus.WithError(err).Fatal("could not marshal result")
+		return fmt.Errorf("could not marshal result: %w", err)
 	}
 
 	printer := greenPrinter
@@ -61,6 +60,7 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) {
 		printer.Printf("%s: %v\n", cases.Title(language.AmericanEnglish).String(k), aggregateData[k])
 	}
 	fmt.Println("")
+	return nil
 }
 
 func structToMap(obj interface{}) (m map[string]map[string]interface{}, err error) {

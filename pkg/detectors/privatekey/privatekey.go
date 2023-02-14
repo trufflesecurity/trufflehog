@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -66,8 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				if data != nil {
 					secret.Verified = true
 				}
-			} else {
-				log.Warn(err)
 			}
 		}
 
