@@ -557,6 +557,9 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
+			s.scanOptions.BaseHash = s.conn.Base
+			s.scanOptions.HeadHash = s.conn.Head
+
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				logger.Error(err, "unable to scan repo, continuing")
 				return nil
