@@ -1,6 +1,7 @@
 package engine
 
 import (
+	gogit "github.com/go-git/go-git/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
@@ -37,6 +39,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		ctx.Logger().Error(err, "failed to marshal github connection")
 		return err
 	}
+
 	ctx = context.WithValues(ctx,
 		"source_type", source.Type().String(),
 		"source_name", "github",
@@ -46,6 +49,14 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		ctx.Logger().Error(err, "failed to initialize github source")
 		return err
 	}
+
+	logOptions := &gogit.LogOptions{}
+	opts := []git.ScanOption{
+		git.ScanOptionFilter(c.Filter),
+		git.ScanOptionLogOptions(logOptions),
+	}
+	scanOptions := git.NewScanOptions(opts...)
+	source.WithScanOptions(scanOptions)
 
 	e.sourcesWg.Add(1)
 	go func() {

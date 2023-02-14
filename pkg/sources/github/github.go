@@ -55,6 +55,7 @@ type Source struct {
 	includeRepos,
 	ignoreRepos []string
 	git             *git.Git
+	scanOptions     *git.ScanOptions
 	httpClient      *http.Client
 	log             logr.Logger
 	conn            *sourcespb.GitHub
@@ -65,6 +66,10 @@ type Source struct {
 	mu              sync.Mutex
 	publicMap       map[string]source_metadatapb.Visibility
 	sources.Progress
+}
+
+func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
+	s.scanOptions = scanOptions
 }
 
 // Ensure the Source satisfies the interface at compile time
@@ -551,13 +556,11 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			if err != nil {
 				return nil
 			}
-			// Base and head will only exist from incoming webhooks.
-			scanOptions := git.NewScanOptions(
-				git.ScanOptionBaseHash(s.conn.Base),
-				git.ScanOptionHeadCommit(s.conn.Head),
-			)
 
-			if err = s.git.ScanRepo(ctx, repo, path, scanOptions, chunksChan); err != nil {
+			s.scanOptions.BaseHash = s.conn.Base
+			s.scanOptions.HeadHash = s.conn.Head
+
+			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				logger.Error(err, "unable to scan repo, continuing")
 				return nil
 			}
