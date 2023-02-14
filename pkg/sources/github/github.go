@@ -519,6 +519,11 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
 	s.repos = reposToScan
 
+	// Setup scan options if it wasn't provided.
+	if s.scanOptions == nil {
+		s.scanOptions = &git.ScanOptions{}
+	}
+
 	var scanErrs []error
 	for i, repoURL := range s.repos {
 		i, repoURL := i, repoURL
