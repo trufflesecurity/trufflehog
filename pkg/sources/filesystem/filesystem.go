@@ -126,6 +126,9 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 		if !fileStat.Mode().IsRegular() {
 			return nil
 		}
+		if s.filter != nil && !s.filter.Pass(fullPath) {
+			return nil
+		}
 
 		if err = s.scanFile(ctx, fullPath, chunksChan); err != nil {
 			ctx.Logger().Info("error scanning file", "path", fullPath, "error", err)
