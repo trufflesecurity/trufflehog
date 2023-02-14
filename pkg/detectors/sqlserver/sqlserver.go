@@ -81,3 +81,7 @@ var ping = func(config msdsn.Config) (bool, error) {
 
 	return true, nil
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_SQLServer
+}

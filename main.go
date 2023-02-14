@@ -62,18 +62,18 @@ var (
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
-	githubScan           = cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint   = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos      = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs       = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken      = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
-	githubIncludeForks   = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-	githubIncludeRepos   = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubExcludeRepos   = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
+	githubScan             = cli.Command("github", "Find credentials in GitHub repositories.")
+	githubScanEndpoint     = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos        = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs         = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken        = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubIncludeForks     = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers   = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
+	githubIncludeRepos     = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubExcludeRepos     = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	
+
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
 	gitlabScanEndpoint     = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
@@ -184,7 +184,11 @@ func run(state overseer.State) {
 			}
 		}()
 	}
-	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr))
+	logFormat := log.WithConsoleSink
+	if *jsonOut {
+		logFormat = log.WithJSONSink
+	}
+	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
 	context.SetDefaultLogger(logger)
 	defer func() { _ = sync() }()
 
@@ -233,15 +237,14 @@ func run(state overseer.State) {
 			defer os.RemoveAll(repoPath)
 		}
 
-		g := func(c *sources.Config) {
-			c.RepoPath = repoPath
-			c.HeadRef = *gitScanBranch
-			c.BaseRef = *gitScanSinceCommit
-			c.MaxDepth = *gitScanMaxDepth
-			c.Filter = filter
+		cfg := sources.GitConfig{
+			RepoPath: repoPath,
+			HeadRef:  *gitScanBranch,
+			BaseRef:  *gitScanSinceCommit,
+			MaxDepth: *gitScanMaxDepth,
+			Filter:   filter,
 		}
-
-		if err = e.ScanGit(ctx, sources.NewConfig(g)); err != nil {
+		if err = e.ScanGit(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
@@ -253,20 +256,19 @@ func run(state overseer.State) {
 			logrus.Fatal("You must specify at least one organization or repository.")
 		}
 
-		github := func(c *sources.Config) {
-			c.Endpoint = *githubScanEndpoint
-			c.Repos = *githubScanRepos
-			c.Orgs = *githubScanOrgs
-			c.Token = *githubScanToken
-			c.IncludeForks = *githubIncludeForks
-			c.IncludeMembers = *githubIncludeMembers
-			c.Concurrency = *concurrency
-			c.ExcludeRepos = *githubExcludeRepos
-			c.IncludeRepos = *githubIncludeRepos
-			c.Filter = filter
+		cfg := sources.GithubConfig{
+			Endpoint:       *githubScanEndpoint,
+			Token:          *githubScanToken,
+			IncludeForks:   *githubIncludeForks,
+			IncludeMembers: *githubIncludeMembers,
+			Concurrency:    *concurrency,
+			ExcludeRepos:   *githubExcludeRepos,
+			IncludeRepos:   *githubIncludeRepos,
+			Repos:          *githubScanRepos,
+			Orgs:           *githubScanOrgs,
+			Filter:         filter,
 		}
-
-		if err := e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
+		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
@@ -275,14 +277,13 @@ func run(state overseer.State) {
 			logrus.WithError(err).Fatal("could not create filter")
 		}
 
-		gitlab := func(c *sources.Config) {
-			c.Endpoint = *gitlabScanEndpoint
-			c.Token = *gitlabScanToken
-			c.Repos = *gitlabScanRepos
-			c.Filter = filter
+		cfg := sources.GitlabConfig{
+			Endpoint: *gitlabScanEndpoint,
+			Token:    *gitlabScanToken,
+			Repos:    *gitlabScanRepos,
+			Filter:   filter,
 		}
-
-		if err := e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {
+		if err := e.ScanGitLab(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
@@ -291,35 +292,33 @@ func run(state overseer.State) {
 			logrus.WithError(err).Fatal("could not create filter")
 		}
 
-		fs := func(c *sources.Config) {
-			c.Directories = *filesystemDirectories
-			c.Filter = filter
+		cfg := sources.FilesystemConfig{
+			Directories: *filesystemDirectories,
+			Filter:      filter,
 		}
-
-		if err = e.ScanFileSystem(ctx, sources.NewConfig(fs)); err != nil {
+		if err = e.ScanFileSystem(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
-		s3 := func(c *sources.Config) {
-			c.Key = *s3ScanKey
-			c.Secret = *s3ScanSecret
-			c.Buckets = *s3ScanBuckets
+		cfg := sources.S3Config{
+			Key:       *s3ScanKey,
+			Secret:    *s3ScanSecret,
+			Buckets:   *s3ScanBuckets,
+			CloudCred: *s3ScanCloudEnv,
 		}
-
-		if err := e.ScanS3(ctx, sources.NewConfig(s3)); err != nil {
+		if err := e.ScanS3(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
-		syslog := func(c *sources.Config) {
-			c.Address = *syslogAddress
-			c.Protocol = *syslogProtocol
-			c.CertPath = *syslogTLSCert
-			c.KeyPath = *syslogTLSKey
-			c.Format = *syslogFormat
-			c.Concurrency = *concurrency
+		cfg := sources.SyslogConfig{
+			Address:     *syslogAddress,
+			Format:      *syslogFormat,
+			Protocol:    *syslogProtocol,
+			CertPath:    *syslogTLSCert,
+			KeyPath:     *syslogTLSKey,
+			Concurrency: *concurrency,
 		}
-
-		if err := e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
+		if err := e.ScanSyslog(ctx, cfg); err != nil {
 			logrus.WithError(err).Fatal("Failed to scan syslog.")
 		}
 	case circleCiScan.FullCommand():

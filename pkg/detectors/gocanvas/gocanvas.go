@@ -104,3 +104,7 @@ type Response struct {
 		ErrorCode int `xml:"ErrorCode"`
 	} `xml:"Error"`
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_GoCanvas
+}

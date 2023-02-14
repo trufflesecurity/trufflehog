@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -19,7 +18,7 @@ import (
 )
 
 // ScanGitLab scans GitLab with the provided configuration.
-func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
@@ -49,11 +48,15 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal gitlab connection")
+		ctx.Logger().Error(err, "failed to marshal gitlab connection")
 		return err
 	}
 
 	gitlabSource := gitlab.Source{}
+	ctx = context.WithValues(ctx,
+		"source_type", gitlabSource.Type().String(),
+		"source_name", "gitlab",
+	)
 	err = gitlabSource.Init(ctx, "trufflehog - gitlab", 0, int64(sourcespb.SourceType_SOURCE_TYPE_GITLAB), true, &conn, runtime.NumCPU())
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init GitLab source", 0)
@@ -66,7 +69,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := gitlabSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Error("error scanning GitLab")
+			ctx.Logger().Error(err, "error scanning GitLab")
 		}
 	}()
 	return nil

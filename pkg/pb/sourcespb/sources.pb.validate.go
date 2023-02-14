@@ -705,6 +705,10 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for InsecureSkipVerifyTls
 
+	// no validation rules for IncludeAttachments
+
+	// no validation rules for SkipHistory
+
 	switch m.Credential.(type) {
 
 	case *Confluence_Unauthenticated:

@@ -144,3 +144,7 @@ type DriftwoodResult struct {
 		Username string `json:"Username"`
 	} `json:"GitHubSSHResults"`
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_PrivateKey
+}

@@ -134,3 +134,7 @@ func hmacBytes(toSign, secret []byte) []byte {
 	_authSignature.Write(toSign)
 	return _authSignature.Sum(nil)
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_PusherChannelKey
+}

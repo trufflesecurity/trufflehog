@@ -131,3 +131,7 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 	macsum := mac.Sum(nil)
 	return base64.StdEncoding.EncodeToString(macsum)
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_KuCoin
+}
