@@ -129,10 +129,7 @@ func asDetectorType(input string) (dpb.DetectorType, error) {
 		return dt, nil
 	}
 	// Check if it's a detector ID.
-	if i, err := strconv.Atoi(input); err == nil {
-		if i > int(maxDetectorType) {
-			return 0, fmt.Errorf("invalid detector ID: %s", input)
-		}
+	if i, err := strconv.ParseInt(input, 10, 32); err == nil {
 		dt := dpb.DetectorType(i)
 		if _, ok := validDetectors[dt]; !ok {
 			return 0, fmt.Errorf("invalid detector ID: %s", input)
