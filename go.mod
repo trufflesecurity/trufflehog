@@ -56,7 +56,7 @@ require (
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
 	golang.org/x/oauth2 v0.4.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/text v0.6.0
+	golang.org/x/text v0.7.0
 	google.golang.org/genproto v0.0.0-20221201164419-0e50fba7f41c
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
