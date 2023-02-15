@@ -47,7 +47,7 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
-	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan.").Bytes()
+	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Bytes)").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 
