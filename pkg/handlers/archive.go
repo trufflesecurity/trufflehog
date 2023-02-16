@@ -71,7 +71,7 @@ func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []b
 }
 
 // openArchive takes a reader and extracts the contents up to the maximum depth.
-func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan ([]byte)) error {
+func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
 	if depth >= maxDepth {
 		return fmt.Errorf("max archive depth reached")
 	}
@@ -110,7 +110,7 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 		newReader := bytes.NewReader(fileBytes)
 		return d.openArchive(ctx, depth+1, newReader, archiveChan)
 	}
-	return fmt.Errorf("Unknown archive type: %s", format.Name())
+	return fmt.Errorf("unknown archive type: %s", format.Name())
 }
 
 // IsFiletype returns true if the provided reader is an archive.
