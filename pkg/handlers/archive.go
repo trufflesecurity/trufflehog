@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mholt/archiver/v4"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -51,8 +52,8 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 }
 
 // FromFile extracts the files from an archive.
-func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]byte) {
-	archiveChan := make(chan ([]byte), 512)
+func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []byte {
+	archiveChan := make(chan []byte, 512)
 	go func() {
 		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
 		logger := logContext.AddLogger(ctx).Logger()
@@ -113,7 +114,7 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 }
 
 // IsFiletype returns true if the provided reader is an archive.
-func (d *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, bool) {
+func (d *Archive) IsFiletype(_ context.Context, reader io.Reader) (io.Reader, bool) {
 	format, readerB, err := archiver.Identify("", reader)
 	if err != nil {
 		return readerB, false
@@ -128,7 +129,7 @@ func (d *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, 
 }
 
 // extractorHandler is applied to each file in an archiver.Extractor file.
-func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Context, archiver.File) error {
+func (d *Archive) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, f archiver.File) error {
 		logger := logContext.AddLogger(ctx).Logger()
 		logger.V(5).Info("Handling extracted file.", "filename", f.Name())
@@ -168,7 +169,7 @@ func (d *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 			if e, ok := r.(error); ok {
 				err = e
 			} else {
-				err = fmt.Errorf("Panic occurred: %v", r)
+				err = fmt.Errorf("panic occurred: %v", r)
 			}
 			logger.Error(err, "Panic occurred when reading archive")
 		}

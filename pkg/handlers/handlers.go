@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -14,12 +15,12 @@ func DefaultHandlers() []Handler {
 }
 
 type Handler interface {
-	FromFile(context.Context, io.Reader) chan ([]byte)
+	FromFile(context.Context, io.Reader) chan []byte
 	IsFiletype(context.Context, io.Reader) (io.Reader, bool)
 	New()
 }
 
-func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan (*sources.Chunk)) bool {
+func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
 	// Find a handler for this file.
 	var handler Handler
 	for _, h := range DefaultHandlers() {
@@ -36,23 +37,14 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 
 	// Process the file and read all []byte chunks from handlerChan.
 	handlerChan := handler.FromFile(ctx, file)
-	for {
-		select {
-		case data, open := <-handlerChan:
-			if !open {
-				// We finished reading everything from handlerChan.
-				return true
-			}
-			chunk := *chunkSkel
-			chunk.Data = data
-			// Send data on chunksChan.
-			select {
-			case chunksChan <- &chunk:
-			case <-ctx.Done():
-				return false
-			}
-		case <-ctx.Done():
+	for data := range handlerChan {
+		chunk := *chunkSkel
+		chunk.Data = data
+
+		if common.IsDone(ctx) {
 			return false
 		}
+		chunksChan <- &chunk
 	}
+	return true
 }
