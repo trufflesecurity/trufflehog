@@ -421,14 +421,14 @@ func isLineNumberDiffLine(line []byte) bool {
 	return false
 }
 
-// Get the b/ file path.
+// Get the b/ file path. Ignoring the edge case of files having `and /b` in the name for simplicity.
 func pathFromBinaryLine(line []byte) string {
 	logger := context.Background().Logger()
-	sbytes := bytes.Split(line, []byte(" and "))
+	sbytes := bytes.Split(line, []byte(" and b/"))
 	if len(sbytes) != 2 {
-		logger.V(2).Info("Expected binary line to be in 'Binary files a/filaA and b/fileB differ' format.", "got", line)
+		logger.V(2).Info("Expected binary line to be in 'Binary files a/fileA and b/fileB differ' format.", "got", line)
 		return ""
 	}
 	bRaw := sbytes[1]
-	return string(bRaw[2 : len(bRaw)-7]) // drop the "b/" and " differ"
+	return string(bRaw[:len(bRaw)-7]) // drop the "b/" and " differ"
 }
