@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"reflect"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
@@ -733,6 +731,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodebase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 // CustomDetectors returns a list of detectors that are enabled by default, but
@@ -744,8 +743,8 @@ func CustomDetectors(ctx context.Context, u map[string][]string) []detectors.Det
 	}
 
 	for i, detector := range d {
-		switch reflect.TypeOf(detector).String() {
-		case "*github.scanner":
+		switch detector.Type() {
+		case detectorspb.DetectorType_Github:
 			urls, ok := u["github"]
 			if !ok {
 				ctx.Logger().V(5).Info("ignoring GitHub API key")
@@ -753,10 +752,19 @@ func CustomDetectors(ctx context.Context, u map[string][]string) []detectors.Det
 			}
 			ctx.Logger().V(5).Info("ignoring GitHub API key")
 			d[i] = github.New(github.WithVerifierURLs(urls, true))
-		case "*gitlab.scanner":
-			// TODO: add support for custom GitLab URLs.
+		case detectorspb.DetectorType_Gitlab:
+			urls, ok := u["gitlab"]
+			if !ok {
+				ctx.Logger().V(5).Info("ignoring GitHub API key")
+				continue
+			}
+			ctx.Logger().V(5).Info("ignoring Gitlab API key")
+			d[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(urls, true))
+			d[i] = gitlab.New(gitlab.WithVerifierURLs(urls, true))
+		case detectorspb.DetectorType_JiraToken:
+			// TODO(ahrav): Double check that we need to do this.
 		default:
-			ctx.Logger().V(5).Info("ignoring custom detector", "type", reflect.TypeOf(detector).String())
+			ctx.Logger().V(5).Info("ignoring custom detector", "type", detector.Type())
 			continue
 		}
 	}
