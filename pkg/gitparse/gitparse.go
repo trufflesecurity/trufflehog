@@ -115,6 +115,37 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 
 }
 
+func (c *Parser) BeepBoop(commitHash string) (chan Commit, error) {
+	dummy := make(chan Commit)
+
+	cocmd := exec.Command("git", "checkout", commitHash)
+	cocmd.Dir = "/home/hrich/go/src/github.com/trufflesecurity/thog"
+	cocmd.Run()
+
+	go func() {
+		defer close(dummy)
+		args := []string{"-C", "/home/hrich/go/src/github.com/trufflesecurity/thog", "log", "-p", "-U5", "-2", "--date=format:%a %b %d %H:%M:%S %Y %z"}
+		cmd := exec.Command("git", args...)
+
+		commitChan, err := c.executeCommand(context.Background(), cmd)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		for commit := range commitChan {
+			if commit.Hash == commitHash {
+				continue
+			}
+			coolchan, _ := c.BeepBoop(commit.Hash)
+			for commit2 := range coolchan {
+				dummy <- commit2
+			}
+		}
+	}()
+	return dummy, nil
+
+}
+
 // RepoPath parses the output of the `git log` command for the `source` path.
 func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
