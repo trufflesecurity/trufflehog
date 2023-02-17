@@ -738,7 +738,7 @@ import (
 // can be overridden by the user.
 func CustomDetectors(ctx context.Context, u map[string][]string) []detectors.Detector {
 	d := DefaultDetectors()
-	if u == nil || len(u) == 0 {
+	if len(u) == 0 {
 		return d
 	}
 
