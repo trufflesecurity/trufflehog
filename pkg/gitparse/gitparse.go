@@ -257,7 +257,7 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isIndexLine(line):
 			// NoOp
 		case isPlusFileLine(line):
-			currentDiff.PathB = strings.TrimRight(string(line[6:]), "\n")
+			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
 		case isMinusFileLine(line):
 			// NoOp
 		case isPlusDiffLine(line):
