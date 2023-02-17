@@ -149,3 +149,7 @@ func verifyURL(ctx context.Context, u *url.URL) bool {
 
 	return false
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_URI
+}

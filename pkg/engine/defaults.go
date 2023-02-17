@@ -408,7 +408,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mongodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monkeylearn"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerck"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moosend"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mrticktock"
@@ -779,9 +778,7 @@ func DefaultDetectors() []detectors.Detector {
 		&mailchimp.Scanner{},
 		&okta.Scanner{},
 		&onelogin.Scanner{},
-		&heroku.Scanner{},
 		&dropbox.Scanner{},
-		&linearapi.Scanner{},
 		&stripe.Scanner{},
 		&square.Scanner{},
 		&squareapp.Scanner{},
@@ -1305,7 +1302,6 @@ func DefaultDetectors() []detectors.Detector {
 		teamworkdesk.Scanner{},
 		tallyfy.Scanner{},
 		apimatic.Scanner{},
-		moonclerck.Scanner{},
 		boostnote.Scanner{},
 		freshbooks.Scanner{},
 		cashboard.Scanner{},

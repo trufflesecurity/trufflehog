@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/go-errors/errors"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -82,7 +81,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	var scanned uint64
-	scanErrs := sources.NewScanErrors(len(projects))
+	scanErrs := sources.NewScanErrors()
 
 	for _, proj := range projects {
 		proj := proj
@@ -111,14 +110,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 
 			atomic.AddUint64(&scanned, 1)
-			log.Debugf("scanned %d/%d projects", scanned, len(projects))
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", scanned, len(projects)))
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		log.Debugf("encountered %d errors while scanning; errors: %v", scanErrs.Count(), scanErrs)
+		ctx.Logger().V(2).Info("encountered errors while scanning", "count", scanErrs.Count(), "errors", scanErrs)
 	}
 
 	return nil

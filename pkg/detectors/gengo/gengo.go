@@ -119,3 +119,7 @@ func getGengoSignature(timeStamp string, secret string) string {
 	macsum := mac.Sum(nil)
 	return hex.EncodeToString(macsum)
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Gengo
+}

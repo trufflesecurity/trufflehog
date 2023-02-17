@@ -125,13 +125,14 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// TODO: refactor to remove duplicate code
+	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.Git_BasicAuth:
 		user := cred.BasicAuth.Username
 		token := cred.BasicAuth.Password
 
 		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+			s.SetProgressComplete(i, totalRepos, fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -144,12 +145,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
 			}(repoURI)
 			if err != nil {
-				return err
+				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
+				continue
 			}
 		}
 	case *sourcespb.Git_Unauthenticated:
 		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+			s.SetProgressComplete(i, totalRepos, fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -162,12 +164,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
 			}(repoURI)
 			if err != nil {
-				return err
+				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
+				continue
 			}
 		}
 	case *sourcespb.Git_SshAuth:
 		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", repoURI), "")
+			s.SetProgressComplete(i, totalRepos, fmt.Sprintf("Repo: %s", repoURI), "")
 			if len(repoURI) == 0 {
 				continue
 			}
@@ -180,24 +183,26 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
 			}(repoURI)
 			if err != nil {
-				return err
+				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
+				continue
 			}
 		}
 	default:
 		return errors.New("invalid connection type for git source")
 	}
 
-	for i, u := range s.conn.Directories {
-		s.SetProgressComplete(i, len(s.conn.Repositories), fmt.Sprintf("Repo: %s", u), "")
+	for i, gitDir := range s.conn.Directories {
+		s.SetProgressComplete(len(s.conn.Repositories)+i, totalRepos, fmt.Sprintf("Repo: %s", gitDir), "")
 
-		if len(u) == 0 {
+		if len(gitDir) == 0 {
 			continue
 		}
-		if !strings.HasSuffix(u, "git") {
+		if !strings.HasSuffix(gitDir, "git") {
 			// try paths instead of url
-			repo, err := RepoFromPath(u)
+			repo, err := RepoFromPath(gitDir)
 			if err != nil {
-				return err
+				ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+				continue
 			}
 
 			err = func(repoPath string) error {
@@ -206,16 +211,20 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				}
 
 				return s.git.ScanRepo(ctx, repo, repoPath, NewScanOptions(), chunksChan)
-			}(u)
+			}(gitDir)
 			if err != nil {
-				return err
+				ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+				continue
 			}
 		}
 
 	}
 
-	ctx.Logger().V(1).Info("Git source finished scanning", "repo-count", len(s.conn.Repositories))
-	s.SetProgressComplete(len(s.conn.Repositories), len(s.conn.Repositories), fmt.Sprintf("Completed scanning source %s", s.name), "")
+	ctx.Logger().V(1).Info("Git source finished scanning", "repo-count", totalRepos)
+	s.SetProgressComplete(
+		totalRepos, totalRepos,
+		fmt.Sprintf("Completed scanning source %s", s.name), "",
+	)
 	return nil
 }
 
@@ -330,7 +339,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return err
 	}
 
-	commitChan, err := gitparse.RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "")
+	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "")
 	if err != nil {
 		return err
 	}
@@ -469,7 +478,7 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 	// get the URL metadata for reporting (may be empty)
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
-	commitChan, err := gitparse.Unstaged(ctx, path)
+	commitChan, err := gitparse.NewParser().Unstaged(ctx, path)
 	if err != nil {
 		return err
 	}

@@ -94,3 +94,7 @@ func verifyRedis(ctx context.Context, u *url.URL) bool {
 
 	return false
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Redis
+}

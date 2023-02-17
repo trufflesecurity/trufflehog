@@ -142,3 +142,7 @@ func getCexIOPassphrase(apiSecret string, apiKey string, nonce string, userId st
 	macsum := mac.Sum(nil)
 	return strings.ToUpper(hex.EncodeToString(macsum))
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_CexIO
+}

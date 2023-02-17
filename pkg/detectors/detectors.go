@@ -21,6 +21,8 @@ type Detector interface {
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.
 	// Use unique identifiers that are part of the secret if you can, or the provider name.
 	Keywords() []string
+	// Type returns the DetectorType number from detectors.proto for the given detector.
+	Type() detectorspb.DetectorType
 }
 
 type Result struct {

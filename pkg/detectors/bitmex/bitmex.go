@@ -109,3 +109,7 @@ func getBitmexSignature(timeStamp string, secret string, action string, path str
 	macsum := mac.Sum(nil)
 	return hex.EncodeToString(macsum)
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Bitmex
+}
