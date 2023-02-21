@@ -20,8 +20,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "key", "automate", "local"}) + `\b([0-9a-zA-Z]{20})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "user", "automate", "local"}) + `\b([a-zA-Z\d]{3,18})[._-]?([a-zA-Z\d]){6}\b`)
+	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "key", "automate", "local"}) + `\b([0-9a-zA-Z_]{20})\b`)
+	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "user", "automate", "local"}) + `\b([a-zA-Z\d]{3,18}[._-]+[a-zA-Z\d]{6})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -67,11 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
