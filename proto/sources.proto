@@ -40,6 +40,7 @@ enum SourceType {
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
+  SOURCE_TYPE_GOOGLE_DRIVE = 28;
 }
 
 message LocalSource {
@@ -162,6 +163,12 @@ message GitHub {
   string base = 10;
   repeated string ignoreRepos = 11;
   repeated string includeRepos = 12;
+}
+
+message GoogleDrive {
+  oneof credential {
+    string refresh_token = 1;
+  }
 }
 
 message JIRA {
