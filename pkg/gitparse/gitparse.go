@@ -241,14 +241,17 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					totalSize += diff.Content.Len()
 				}
 				if totalSize > c.maxCommitSize {
+					oldCommit := currentCommit
 					commitChan <- *currentCommit
 					currentCommit = &Commit{
 						Hash:    currentCommit.Hash,
 						Author:  currentCommit.Author,
 						Date:    currentCommit.Date,
-						Message: currentCommit.Message,
+						Message: strings.Builder{},
 						Diffs:   []Diff{},
 					}
+					// Message needs to be recreated here otherwise writing to it again will result in a panic.
+					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
 			currentDiff = &Diff{}
