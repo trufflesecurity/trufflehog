@@ -250,6 +250,7 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 						Message: strings.Builder{},
 						Diffs:   []Diff{},
 					}
+					// Message needs to be recreated here otherwise writing to it again will result in a panic.
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
