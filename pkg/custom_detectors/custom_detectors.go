@@ -90,8 +90,7 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	for _, match := range matches {
 		match := match
 		g.Go(func() error {
-			err := c.createResults(ctx, match, verify, resultsCh)
-			return err
+			return c.createResults(ctx, match, verify, resultsCh)
 		})
 	}
 
