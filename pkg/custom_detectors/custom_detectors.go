@@ -83,65 +83,75 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	matches := permutateMatches(regexMatches)
 
 	// Create result object and test for verification.
+	resultsCh := make(chan detectors.Result, maxTotalMatches)
 	for _, match := range matches {
-		if common.IsDone(ctx) {
-			// TODO: Log we're possibly leaving out results.
-			return results, nil
-		}
-		var raw string
-		for _, values := range match {
-			// values[0] contains the entire regex match.
-			raw += values[0]
-		}
-		result := detectors.Result{
-			DetectorType: detectorspb.DetectorType_CustomRegex,
-			Raw:          []byte(raw),
-		}
-
-		if !verify {
-			results = append(results, result)
-			continue
-		}
-		// Verify via webhook.
-		jsonBody, err := json.Marshal(map[string]map[string][]string{
-			c.GetName(): match,
-		})
-		if err != nil {
-			continue
-		}
-		// Try each config until we successfully verify.
-		for _, verifyConfig := range c.GetVerify() {
-			if common.IsDone(ctx) {
-				// TODO: Log we're possibly leaving out results.
-				return results, nil
-			}
-			req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
-			if err != nil {
-				continue
-			}
-			for _, header := range verifyConfig.GetHeaders() {
-				key, value, found := strings.Cut(header, ":")
-				if !found {
-					// Should be unreachable due to validation.
-					continue
-				}
-				req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
-			}
-			res, err := httpClient.Do(req)
-			if err != nil {
-				continue
-			}
-			// TODO: Read response body.
-			res.Body.Close()
-			if res.StatusCode == http.StatusOK {
-				result.Verified = true
-				break
-			}
-		}
-		results = append(results, result)
+		c.renameMe(ctx, match, verify, resultsCh)
 	}
 
 	return results, nil
+}
+
+func (c *customRegexWebhook) renameMe(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
+	if common.IsDone(ctx) {
+		// TODO: Log we're possibly leaving out results.
+		return ctx.Err()
+	}
+	var raw string
+	for _, values := range match {
+		// values[0] contains the entire regex match.
+		raw += values[0]
+	}
+	result := detectors.Result{
+		DetectorType: detectorspb.DetectorType_CustomRegex,
+		Raw:          []byte(raw),
+	}
+
+	if !verify {
+		// TODO: make non-blocking
+		results <- result
+		return nil
+	}
+	// Verify via webhook.
+	jsonBody, err := json.Marshal(map[string]map[string][]string{
+		c.GetName(): match,
+	})
+	if err != nil {
+		// This should never happen, but if it does, return nil to not
+		// disrupt other verification.
+		return nil
+	}
+	// Try each config until we successfully verify.
+	for _, verifyConfig := range c.GetVerify() {
+		if common.IsDone(ctx) {
+			// TODO: Log we're possibly leaving out results.
+			return ctx.Err()
+		}
+		req, err := http.NewRequestWithContext(ctx, "POST", verifyConfig.GetEndpoint(), bytes.NewReader(jsonBody))
+		if err != nil {
+			continue
+		}
+		for _, header := range verifyConfig.GetHeaders() {
+			key, value, found := strings.Cut(header, ":")
+			if !found {
+				// Should be unreachable due to validation.
+				continue
+			}
+			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
+		}
+		res, err := httpClient.Do(req)
+		if err != nil {
+			continue
+		}
+		// TODO: Read response body.
+		res.Body.Close()
+		if res.StatusCode == http.StatusOK {
+			result.Verified = true
+			break
+		}
+	}
+	// TODO: make non-blocking
+	results <- result
+	return nil
 }
 
 func (c *customRegexWebhook) Keywords() []string {
