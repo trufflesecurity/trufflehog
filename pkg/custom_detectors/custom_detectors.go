@@ -12,6 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"golang.org/x/sync/errgroup"
 )
 
 // The maximum number of matches from one chunk. This const is used when
@@ -82,16 +83,31 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	// ]
 	matches := permutateMatches(regexMatches)
 
+	g := new(errgroup.Group)
+
 	// Create result object and test for verification.
 	resultsCh := make(chan detectors.Result, maxTotalMatches)
 	for _, match := range matches {
-		c.renameMe(ctx, match, verify, resultsCh)
+		match := match
+		g.Go(func() error {
+			err := c.createResults(ctx, match, verify, resultsCh)
+			return err
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	close(resultsCh)
+
+	for result := range resultsCh {
+		results = append(results, result)
 	}
 
 	return results, nil
 }
 
-func (c *customRegexWebhook) renameMe(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
+func (c *customRegexWebhook) createResults(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
 	if common.IsDone(ctx) {
 		// TODO: Log we're possibly leaving out results.
 		return ctx.Err()
@@ -107,9 +123,12 @@ func (c *customRegexWebhook) renameMe(ctx context.Context, match map[string][]st
 	}
 
 	if !verify {
-		// TODO: make non-blocking
-		results <- result
-		return nil
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case results <- result:
+			return nil
+		}
 	}
 	// Verify via webhook.
 	jsonBody, err := json.Marshal(map[string]map[string][]string{
@@ -149,9 +168,13 @@ func (c *customRegexWebhook) renameMe(ctx context.Context, match map[string][]st
 			break
 		}
 	}
-	// TODO: make non-blocking
-	results <- result
-	return nil
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case results <- result:
+		return nil
+	}
 }
 
 func (c *customRegexWebhook) Keywords() []string {
