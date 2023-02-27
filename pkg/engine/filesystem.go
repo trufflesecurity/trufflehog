@@ -17,7 +17,7 @@ import (
 // ScanFileSystem scans a given file system.
 func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig) error {
 	connection := &sourcespb.Filesystem{
-		Directories: c.Directories,
+		Paths: c.Paths,
 	}
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})

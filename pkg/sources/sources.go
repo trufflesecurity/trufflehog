@@ -96,8 +96,8 @@ type GitlabConfig struct {
 
 // FilesystemConfig defines the optional configuration for a filesystem source.
 type FilesystemConfig struct {
-	// Directories is the list of directories to scan.
-	Directories []string
+	// Paths is the list of files and directories to scan.
+	Paths []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 }
