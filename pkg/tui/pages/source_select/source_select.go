@@ -1,4 +1,4 @@
-package tui
+package source_select
 
 import (
 	"time"
@@ -7,6 +7,8 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -14,11 +16,11 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFFDF5")).
-			Background(lipgloss.Color(colors["bronze"])).
+			Background(lipgloss.Color(styles.Colors["bronze"])).
 			Padding(0, 1)
 
 	statusMessageStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Dark: colors["sand"], Light: "#13543c"}).
+				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sand"], Light: "#13543c"}).
 				Render
 
 	// FIXME: Hon pls help
@@ -28,12 +30,12 @@ var (
 
 	selectedItemStyle = lipgloss.NewStyle().
 				Border(lipgloss.NormalBorder(), false, false, false, true).
-				BorderForeground(lipgloss.AdaptiveColor{Dark: colors["sprout"], Light: colors["bronze"]}).
-				Foreground(lipgloss.AdaptiveColor{Dark: colors["sprout"], Light: colors["fern"]}).
+				BorderForeground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["bronze"]}).
+				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["fern"]}).
 				Padding(0, 0, 0, 1)
 
 	selectedDescription = selectedItemStyle.Copy().
-				Foreground(lipgloss.AdaptiveColor{Dark: colors["sprout"], Light: colors["sprout"]})
+				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["sprout"]})
 )
 
 type item struct {
@@ -66,7 +68,8 @@ type listKeyMap struct {
 }
 
 type (
-	sourceSelectModel struct {
+	SourceSelect struct {
+		common.Common
 		sourcesList  list.Model
 		keys         *listKeyMap
 		delegateKeys *delegateKeyMap
@@ -77,7 +80,7 @@ type (
 	}
 )
 
-func newSourceSelectModel() sourceSelectModel {
+func New(c common.Common) *SourceSelect {
 	var (
 		delegateKeys = newDelegateKeyMap()
 		listKeys     = &listKeyMap{
@@ -128,23 +131,24 @@ func newSourceSelectModel() sourceSelectModel {
 	}
 	sourcesList.SetShowStatusBar(false)
 
-	return sourceSelectModel{
+	return &SourceSelect{
+		Common:       c,
 		sourcesList:  sourcesList,
 		keys:         listKeys,
 		delegateKeys: delegateKeys,
 	}
 }
 
-func (m sourceSelectModel) Init() tea.Cmd {
+func (m *SourceSelect) Init() tea.Cmd {
 	return nil
 }
 
-func (m sourceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *SourceSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		h, v := appStyle.GetFrameSize()
+		h, v := styles.AppStyle.GetFrameSize()
 		m.sourcesList.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
@@ -168,8 +172,18 @@ func (m sourceSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m sourceSelectModel) View() string {
-	return appStyle.Render(m.sourcesList.View())
+func (m *SourceSelect) View() string {
+	return styles.AppStyle.Render(m.sourcesList.View())
+}
+
+func (m *SourceSelect) ShortHelp() []key.Binding {
+	// TODO: actually return something
+	return nil
+}
+
+func (m *SourceSelect) FullHelp() [][]key.Binding {
+	// TODO: actually return something
+	return nil
 }
 
 func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {

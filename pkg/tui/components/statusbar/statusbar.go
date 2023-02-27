@@ -3,8 +3,8 @@ package statusbar
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/soft-serve/ui/common"
 	"github.com/muesli/reflow/truncate"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 )
 
 // StatusBarMsg is a message sent to the status bar.

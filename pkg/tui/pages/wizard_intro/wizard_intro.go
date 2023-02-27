@@ -1,10 +1,13 @@
-package tui
+package wizard_intro
 
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 var (
@@ -17,16 +20,21 @@ var (
 	}
 )
 
-type wizardIntroModel struct {
+type WizardIntro struct {
+	common.Common
 	cursor int
 	action string
 }
 
-func (m wizardIntroModel) Init() tea.Cmd {
+func New(c common.Common) *WizardIntro {
+	return &WizardIntro{Common: c}
+}
+
+func (m *WizardIntro) Init() tea.Cmd {
 	return nil
 }
 
-func (m wizardIntroModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *WizardIntro) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -57,13 +65,13 @@ func (m wizardIntroModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m wizardIntroModel) View() string {
+func (m *WizardIntro) View() string {
 	s := strings.Builder{}
 	s.WriteString("What do you want to do?\n\n")
 
 	for i := 0; i < len(wizardIntroChoices); i++ {
 		if m.cursor == i {
-			selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colors["sprout"]))
+			selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.Colors["sprout"]))
 			s.WriteString(selectedStyle.Render(" (•) " + wizardIntroChoices[i]))
 		} else {
 			s.WriteString(" ( ) " + wizardIntroChoices[i])
@@ -72,5 +80,15 @@ func (m wizardIntroModel) View() string {
 		s.WriteString("\n")
 	}
 
-	return appStyle.Render(s.String())
+	return styles.AppStyle.Render(s.String())
+}
+
+func (m *WizardIntro) ShortHelp() []key.Binding {
+	// TODO: actually return something
+	return nil
+}
+
+func (m *WizardIntro) FullHelp() [][]key.Binding {
+	// TODO: actually return something
+	return nil
 }

@@ -2,9 +2,9 @@ package common
 
 import (
 	"github.com/aymanbagabas/go-osc52"
-	"github.com/charmbracelet/soft-serve/ui/keymap"
-	"github.com/charmbracelet/soft-serve/ui/styles"
 	zone "github.com/lrstanley/bubblezone"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 // Common is a struct all components should embed.

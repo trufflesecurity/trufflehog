@@ -5,7 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/soft-serve/ui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 )
 
 // ToggleFooterMsg is a message sent to show/hide the footer.

@@ -4,7 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/soft-serve/ui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 )
 
 // Selector is a list of items that can be selected.

@@ -3,7 +3,7 @@ package viewport
 import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/soft-serve/ui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 )
 
 // Viewport represents a viewport component.
