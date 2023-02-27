@@ -53,7 +53,7 @@ var (
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
-	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges.").String()
+	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -218,13 +218,13 @@ func run(state overseer.State) {
 		includeList, err := config.ParseDetectors(*includeDetectors)
 		if err != nil {
 			// Exit if there was an error to inform the user of the misconfiguration.
-			logger.Error(err, "invalid detector configuration")
+			logger.Error(err, "invalid include list detector configuration")
 			os.Exit(1)
 		}
 		excludeList, err := config.ParseDetectors(*excludeDetectors)
 		if err != nil {
 			// Exit if there was an error to inform the user of the misconfiguration.
-			logger.Error(err, "invalid detector configuration")
+			logger.Error(err, "invalid exclude list detector configuration")
 			os.Exit(1)
 		}
 		includeDetectorTypes = detectorTypeToSet(includeList)
