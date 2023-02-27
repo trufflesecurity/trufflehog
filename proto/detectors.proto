@@ -912,6 +912,7 @@ enum DetectorType {
   Shopify = 902;
   RabbitMQ = 903;
   CustomRegex = 904;
+  PyMySQL = 905;
 }
 
 message Result {
