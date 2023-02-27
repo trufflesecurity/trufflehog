@@ -84,7 +84,7 @@ var (
 
 	filesystemScan  = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemPaths = filesystemScan.Arg("path", "Path to file or directory to scan.").Strings()
-	// --directory is deprecated in favor of arguments.
+	// DEPRECATED: --directory is deprecated in favor of arguments.
 	filesystemDirectories = filesystemScan.Flag("directory", "Path to directory to scan. You can repeat this flag.").Strings()
 	// TODO: Add more filesystem scan options. Currently only supports scanning a list of directories.
 	// filesystemScanRecursive = filesystemScan.Flag("recursive", "Scan recursively.").Short('r').Bool()

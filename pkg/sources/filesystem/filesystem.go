@@ -91,7 +91,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		cleanPath := filepath.Clean(path)
 		fileInfo, err := os.Stat(cleanPath)
 		if err != nil {
-			logger.Error(err, "unable to scan path")
+			logger.Error(err, "unable to get file info")
 			continue
 		}
 

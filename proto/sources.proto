@@ -117,8 +117,8 @@ message ECR {
 }
 
 message Filesystem {
-  // directories is deprecated and can be removed / renamed to paths when
-  // we no longer depend on the name in enterprise configs
+  // DEPRECATED: directories is deprecated and can be removed / renamed to
+  // paths when we no longer depend on the name in enterprise configs.
   repeated string directories = 1;
   repeated string paths = 2;
 }
