@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/felixge/fgprof"
+	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,6 +22,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -46,6 +47,9 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)").Bytes()
+	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
+	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -58,15 +62,17 @@ var (
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
-	githubScan           = cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint   = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos      = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs       = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken      = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
-	githubIncludeForks   = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-	githubIncludeRepos   = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubExcludeRepos   = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
+	githubScan             = cli.Command("github", "Find credentials in GitHub repositories.")
+	githubScanEndpoint     = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos        = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs         = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken        = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubIncludeForks     = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers   = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
+	githubIncludeRepos     = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubExcludeRepos     = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
+	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -112,24 +118,26 @@ func init() {
 	cli.Version("trufflehog " + version.BuildVersion)
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
-	if *jsonOut {
-		logrus.SetFormatter(&logrus.JSONFormatter{})
-	}
 	switch {
 	case *trace:
 		log.SetLevel(5)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.Debugf("running version %s", version.BuildVersion)
 	case *debug:
 		log.SetLevel(2)
-		logrus.SetLevel(logrus.DebugLevel)
-		logrus.Debugf("running version %s", version.BuildVersion)
-	default:
-		logrus.SetLevel(logrus.InfoLevel)
 	}
 }
 
 func main() {
+	// setup logger
+	logFormat := log.WithConsoleSink
+	if *jsonOut {
+		logFormat = log.WithJSONSink
+	}
+	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
+	// make it the default logger for contexts
+	context.SetDefaultLogger(logger)
+	defer func() { _ = sync() }()
+	logFatal := logFatalFunc(logger)
+
 	updateCfg := overseer.Config{
 		Program:       run,
 		Debug:         *debug,
@@ -147,14 +155,16 @@ func main() {
 
 	err := overseer.RunErr(updateCfg)
 	if err != nil {
-		logrus.WithError(err).Fatal("error occured with trufflehog updater 🐷")
+		logFatal(err, "error occured with trufflehog updater 🐷")
 	}
 }
 
 func run(state overseer.State) {
-	if *debug {
-		logrus.Debugf("trufflehog %s", version.BuildVersion)
-	}
+	ctx := context.Background()
+	logger := ctx.Logger()
+	logFatal := logFatalFunc(logger)
+
+	logger.V(2).Info(fmt.Sprintf("trufflehog %s", version.BuildVersion))
 
 	if *githubScanToken != "" {
 		// NOTE: this kludge is here to do an authenticated shallow commit
@@ -172,27 +182,32 @@ func run(state overseer.State) {
 			router := mux.NewRouter()
 			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
 			router.PathPrefix("/debug/fgprof").Handler(fgprof.Handler())
-			logrus.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
+			logger.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
 			if err := http.ListenAndServe(":18066", router); err != nil {
-				logrus.Error(err)
+				logger.Error(err, "error serving pprof and fgprof")
 			}
 		}()
 	}
-	logger, sync := log.New("trufflehog", log.WithConsoleSink(os.Stderr))
-	context.SetDefaultLogger(logger)
-	defer func() { _ = sync() }()
 
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
 		conf, err = config.Read(*configFilename)
 		if err != nil {
-			logger.Error(err, "error parsing the provided configuration file")
-			os.Exit(1)
+			logFatal(err, "error parsing the provided configuration file")
 		}
 	}
 
-	ctx := context.TODO()
+	if *archiveMaxSize != 0 {
+		handlers.SetArchiveMaxSize(int(*archiveMaxSize))
+	}
+	if *archiveMaxDepth != 0 {
+		handlers.SetArchiveMaxDepth(*archiveMaxDepth)
+	}
+	if *archiveTimeout != 0 {
+		handlers.SetArchiveMaxTimeout(*archiveTimeout)
+	}
+
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
@@ -207,103 +222,103 @@ func run(state overseer.State) {
 	case gitScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
 		if err != nil {
-			logrus.WithError(err).Fatal("could not create filter")
+			logFatal(err, "could not create filter")
 		}
 		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
 		if err != nil || repoPath == "" {
-			logrus.WithError(err).Fatal("error preparing git repo for scanning")
+			logFatal(err, "error preparing git repo for scanning")
 		}
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
 
-		g := func(c *sources.Config) {
-			c.RepoPath = repoPath
-			c.HeadRef = *gitScanBranch
-			c.BaseRef = *gitScanSinceCommit
-			c.MaxDepth = *gitScanMaxDepth
-			c.Filter = filter
+		cfg := sources.GitConfig{
+			RepoPath: repoPath,
+			HeadRef:  *gitScanBranch,
+			BaseRef:  *gitScanSinceCommit,
+			MaxDepth: *gitScanMaxDepth,
+			Filter:   filter,
 		}
-
-		if err = e.ScanGit(ctx, sources.NewConfig(g)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan Git.")
+		if err = e.ScanGit(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Git.")
 		}
 	case githubScan.FullCommand():
+		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
+		if err != nil {
+			logFatal(err, "could not create filter")
+		}
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
-			logrus.Fatal("You must specify at least one organization or repository.")
+			logFatal(fmt.Errorf("invalid config"), "You must specify at least one organization or repository.")
 		}
 
-		github := func(c *sources.Config) {
-			c.Endpoint = *githubScanEndpoint
-			c.Repos = *githubScanRepos
-			c.Orgs = *githubScanOrgs
-			c.Token = *githubScanToken
-			c.IncludeForks = *githubIncludeForks
-			c.IncludeMembers = *githubIncludeMembers
-			c.Concurrency = *concurrency
-			c.ExcludeRepos = *githubExcludeRepos
-			c.IncludeRepos = *githubIncludeRepos
+		cfg := sources.GithubConfig{
+			Endpoint:       *githubScanEndpoint,
+			Token:          *githubScanToken,
+			IncludeForks:   *githubIncludeForks,
+			IncludeMembers: *githubIncludeMembers,
+			Concurrency:    *concurrency,
+			ExcludeRepos:   *githubExcludeRepos,
+			IncludeRepos:   *githubIncludeRepos,
+			Repos:          *githubScanRepos,
+			Orgs:           *githubScanOrgs,
+			Filter:         filter,
 		}
-
-		if err := e.ScanGitHub(ctx, sources.NewConfig(github)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan Github.")
+		if err := e.ScanGitHub(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
-			logrus.WithError(err).Fatal("could not create filter")
+			logFatal(err, "could not create filter")
 		}
 
-		gitlab := func(c *sources.Config) {
-			c.Endpoint = *gitlabScanEndpoint
-			c.Token = *gitlabScanToken
-			c.Repos = *gitlabScanRepos
-			c.Filter = filter
+		cfg := sources.GitlabConfig{
+			Endpoint: *gitlabScanEndpoint,
+			Token:    *gitlabScanToken,
+			Repos:    *gitlabScanRepos,
+			Filter:   filter,
 		}
-
-		if err := e.ScanGitLab(ctx, sources.NewConfig(gitlab)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan GitLab.")
+		if err := e.ScanGitLab(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
 		filter, err := common.FilterFromFiles(*filesystemScanIncludePaths, *filesystemScanExcludePaths)
 		if err != nil {
-			logrus.WithError(err).Fatal("could not create filter")
+			logFatal(err, "could not create filter")
 		}
 
-		fs := func(c *sources.Config) {
-			c.Directories = *filesystemDirectories
-			c.Filter = filter
+		cfg := sources.FilesystemConfig{
+			Directories: *filesystemDirectories,
+			Filter:      filter,
 		}
-
-		if err = e.ScanFileSystem(ctx, sources.NewConfig(fs)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan filesystem")
+		if err = e.ScanFileSystem(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan filesystem")
 		}
 	case s3Scan.FullCommand():
-		s3 := func(c *sources.Config) {
-			c.Key = *s3ScanKey
-			c.Secret = *s3ScanSecret
-			c.Buckets = *s3ScanBuckets
+		cfg := sources.S3Config{
+			Key:       *s3ScanKey,
+			Secret:    *s3ScanSecret,
+			Buckets:   *s3ScanBuckets,
+			CloudCred: *s3ScanCloudEnv,
 		}
-
-		if err := e.ScanS3(ctx, sources.NewConfig(s3)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan S3.")
+		if err := e.ScanS3(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan S3.")
 		}
 	case syslogScan.FullCommand():
-		syslog := func(c *sources.Config) {
-			c.Address = *syslogAddress
-			c.Protocol = *syslogProtocol
-			c.CertPath = *syslogTLSCert
-			c.KeyPath = *syslogTLSKey
-			c.Format = *syslogFormat
-			c.Concurrency = *concurrency
+		cfg := sources.SyslogConfig{
+			Address:     *syslogAddress,
+			Format:      *syslogFormat,
+			Protocol:    *syslogProtocol,
+			CertPath:    *syslogTLSCert,
+			KeyPath:     *syslogTLSKey,
+			Concurrency: *concurrency,
 		}
-
-		if err := e.ScanSyslog(ctx, sources.NewConfig(syslog)); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan syslog.")
+		if err := e.ScanSyslog(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan syslog.")
 		}
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
-			logrus.WithError(err).Fatal("Failed to scan CircleCI.")
+			logFatal(err, "Failed to scan CircleCI.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
@@ -322,24 +337,30 @@ func run(state overseer.State) {
 		}
 		foundResults = true
 
+		var err error
 		switch {
 		case *jsonLegacy:
-			output.PrintLegacyJSON(ctx, &r)
+			err = output.PrintLegacyJSON(ctx, &r)
 		case *jsonOut:
-			output.PrintJSON(&r)
+			err = output.PrintJSON(&r)
 		default:
-			output.PrintPlainOutput(&r)
+			err = output.PrintPlainOutput(&r)
+		}
+		if err != nil {
+			logFatal(err, "error printing results")
 		}
 	}
-	logrus.Debugf("scanned %d chunks", e.ChunksScanned())
-	logrus.Debugf("scanned %d bytes", e.BytesScanned())
+	logger.V(2).Info("finished scanning",
+		"chunks", e.ChunksScanned(),
+		"bytes", e.BytesScanned(),
+	)
 
 	if *printAvgDetectorTime {
 		printAverageDetectorTime(e)
 	}
 
 	if foundResults && *fail {
-		logrus.Debug("exiting with code 183 because results were found")
+		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
 }
@@ -353,5 +374,18 @@ func printAverageDetectorTime(e *engine.Engine) {
 		}
 		avgDuration := total / time.Duration(len(durations))
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
+	}
+}
+
+// logFatalFunc returns a log.Fatal style function. Calling the returned
+// function will terminate the program without cleanup.
+func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+	return func(err error, message string, keyAndVals ...any) {
+		logger.Error(err, message, keyAndVals...)
+		if err != nil {
+			os.Exit(1)
+			return
+		}
+		os.Exit(0)
 	}
 }

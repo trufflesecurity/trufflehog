@@ -5,7 +5,6 @@ import (
 	"runtime"
 
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -18,7 +17,7 @@ import (
 )
 
 // ScanS3 scans S3 buckets.
-func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}
@@ -42,11 +41,15 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal S3 connection")
+		ctx.Logger().Error(err, "failed to marshal S3 connection")
 		return err
 	}
 
 	s3Source := s3.Source{}
+	ctx = context.WithValues(ctx,
+		"source_type", s3Source.Type().String(),
+		"source_name", "s3",
+	)
 	err = s3Source.Init(ctx, "trufflehog - s3", 0, int64(sourcespb.SourceType_SOURCE_TYPE_S3), true, &conn, runtime.NumCPU())
 	if err != nil {
 		return errors.WrapPrefix(err, "failed to init S3 source", 0)
@@ -58,7 +61,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := s3Source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Error("error scanning S3")
+			ctx.Logger().Error(err, "error scanning S3")
 		}
 	}()
 	return nil

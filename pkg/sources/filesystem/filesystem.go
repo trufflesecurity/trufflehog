@@ -9,7 +9,7 @@ import (
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -35,7 +35,7 @@ type Source struct {
 	jobId    int64
 	verify   bool
 	paths    []string
-	log      *log.Entry
+	log      logr.Logger
 	filter   *common.Filter
 	sources.Progress
 }
@@ -59,7 +59,7 @@ func (s *Source) JobID() int64 {
 
 // Init returns an initialized Filesystem source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
-	s.log = log.WithField("source", s.Type()).WithField("name", name)
+	s.log = aCtx.Logger()
 
 	s.name = name
 	s.sourceId = sourceId
@@ -98,10 +98,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 
 			path := filepath.Join(cleanPath, relativePath)
+			logger := ctx.Logger().WithValues("file", path)
 
 			fileStat, err := os.Stat(path)
 			if err != nil {
-				log.WithError(err).Warnf("unable to stat file: %s", path)
+				logger.Error(err, "unable to stat file")
 				return nil
 			}
 			if !fileStat.Mode().IsRegular() {
@@ -114,15 +115,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 			inputFile, err := os.Open(path)
 			if err != nil {
-				log.Warn(err)
+				logger.V(2).Info("error opening file", "error", err)
 				return nil
 			}
 			defer inputFile.Close()
-			log.WithField("file_path", path).Trace("scanning file")
+			logger.V(5).Info("scanning file")
 
 			reReader, err := diskbufferreader.New(inputFile)
 			if err != nil {
-				log.WithError(err).Error("Could not create re-readable reader.")
+				logger.Error(err, "Could not create re-readable reader.")
 			}
 			defer reReader.Close()
 

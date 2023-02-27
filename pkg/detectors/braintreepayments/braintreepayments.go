@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader(`{"query": "query { ping }"}`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://payments.sandbox.braintree-api.com/graphql", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://payments.braintree-api.com/graphql", payload)
 				if err != nil {
 					continue
 				}
@@ -92,4 +92,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_BraintreePayments
 }

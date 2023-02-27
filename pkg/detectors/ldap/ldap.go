@@ -142,3 +142,7 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 
 	return false
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_LDAP
+}

@@ -87,7 +87,8 @@ func TestBinaryPathParse(t *testing.T) {
 func TestSingleCommitSingleDiff(t *testing.T) {
 	r := bytes.NewReader([]byte(singleCommitSingleDiff))
 	commitChan := make(chan Commit)
-	date, _ := time.Parse(DateFormat, "Mon Mar 15 23:27:16 2021 -0700")
+	parser := NewParser()
+	date, _ := time.Parse(parser.dateFormat, "Mon Mar 15 23:27:16 2021 -0700")
 	content := bytes.NewBuffer([]byte(singleCommitSingleDiffDiff))
 	builder := strings.Builder{}
 	builder.Write([]byte(singleCommitSingleDiffMessage))
@@ -108,7 +109,7 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		FromReader(context.TODO(), r, commitChan)
+		parser.fromReader(context.TODO(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -124,10 +125,11 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 }
 
 func TestMultiCommitContextDiff(t *testing.T) {
-	r := bytes.NewReader([]byte(singleCommitContextDiff))
+	r := bytes.NewReader([]byte(multiCommitContextDiff))
+	parser := NewParser()
 	commitChan := make(chan Commit)
-	dateOne, _ := time.Parse(DateFormat, "Mon Mar 15 23:27:16 2021 -0700")
-	dateTwo, _ := time.Parse(DateFormat, "Wed Dec 12 18:19:21 2018 -0800")
+	dateOne, _ := time.Parse(parser.dateFormat, "Mon Mar 15 23:27:16 2021 -0700")
+	dateTwo, _ := time.Parse(parser.dateFormat, "Wed Dec 12 18:19:21 2018 -0800")
 	diffOneA := bytes.NewBuffer([]byte(singleCommitContextDiffDiffOneA))
 	diffTwoA := bytes.NewBuffer([]byte(singleCommitContextDiffDiffTwoA))
 	// diffTwoB := bytes.NewBuffer([]byte(singleCommitContextDiffDiffTwoB))
@@ -166,7 +168,7 @@ func TestMultiCommitContextDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		FromReader(context.TODO(), r, commitChan)
+		NewParser().fromReader(context.TODO(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -182,9 +184,10 @@ func TestMultiCommitContextDiff(t *testing.T) {
 }
 
 func TestMaxDiffSize(t *testing.T) {
+	parser := NewParser()
 	bigBytes := bytes.Buffer{}
 	bigBytes.WriteString(singleCommitSingleDiff)
-	for i := 0; i <= MaxDiffSize/1024+10; i++ {
+	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
 		bigBytes.WriteString("+")
 		for n := 0; n < 1024; n++ {
 			bigBytes.Write([]byte("0"))
@@ -195,12 +198,32 @@ func TestMaxDiffSize(t *testing.T) {
 
 	commitChan := make(chan Commit)
 	go func() {
-		FromReader(context.TODO(), bigReader, commitChan)
+		parser.fromReader(context.TODO(), bigReader, commitChan)
 	}()
 
 	commit := <-commitChan
-	if commit.Diffs[0].Content.Len() > MaxDiffSize+1024 {
-		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), MaxDiffSize+1024)
+	if commit.Diffs[0].Content.Len() > parser.maxDiffSize+1024 {
+		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.maxDiffSize+1024)
+	}
+
+}
+
+func TestMaxCommitSize(t *testing.T) {
+	parser := NewParser(WithMaxCommitSize(1))
+	commitText := bytes.Buffer{}
+	commitText.WriteString(singleCommitMultiDiff)
+	commitChan := make(chan Commit)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1)*time.Second)
+	defer cancel()
+	go func() {
+		parser.fromReader(ctx, &commitText, commitChan)
+	}()
+	commitCount := 0
+	for range commitChan {
+		commitCount++
+	}
+	if commitCount != 2 {
+		t.Errorf("Commit count does not match. Got: %d, expected: %d", commitCount, 2)
 	}
 
 }
@@ -238,7 +261,7 @@ aws_secret_access_key = Tg0pz8Jii8hkLx4+PnUisM8GmKs3a2DK+9qz/lie
 output = json
 region = us-east-2
 `
-const singleCommitContextDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
+const multiCommitContextDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
 Date:   Mon Mar 15 23:27:16 2021 -0700
 
@@ -267,6 +290,47 @@ Author: Dylan Ayrey <dxa4481@rit.edu>
 Date:   Wed Dec 12 18:19:21 2018 -0800
 
     Update aws again
+
+diff --git a/aws b/aws
+index 239b415..2ee133b 100644
+--- a/aws
++++ b/aws
+@@ -1,5 +1,7 @@
+ blah blaj
+ 
+-this is the secret: AKIA2E0A8F3B244C9986
++this is the secret: [Default]
++Access key Id: AKIAILE3JG6KMS3HZGCA
++Secret Access Key: 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
+ 
+-okay thank you bye
+\ No newline at end of file
++okay thank you bye
+`
+
+const singleCommitMultiDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
+Author: Dustin Decker <humanatcomputer@gmail.com>
+Date:   Mon Mar 15 23:27:16 2021 -0700
+
+    Update aws
+
+diff --git a/aws b/aws
+index 2ee133b..12b4843 100644
+--- a/aws
++++ b/aws
+@@ -1,7 +1,5 @@
+-blah blaj
+-
+-this is the secret: [Default]
+-Access key Id: AKIAILE3JG6KMS3HZGCA
+-Secret Access Key: 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
+-
+-okay thank you bye
++[default]
++aws_access_key_id = AKIAXYZDQCEN4B6JSJQI
++aws_secret_access_key = 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
++output = json
++region = us-east-2
 
 diff --git a/aws b/aws
 index 239b415..2ee133b 100644

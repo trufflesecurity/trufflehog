@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"sync/atomic"
 
 	"github.com/go-errors/errors"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -75,25 +73,6 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 	return nil
 }
 
-// scanErrors is used to collect errors encountered while scanning.
-// It ensures that errors are collected in a thread-safe manner.
-type scanErrors struct {
-	count  uint64
-	mu     sync.Mutex
-	errors []error
-}
-
-func newScanErrors(projects int) *scanErrors {
-	return &scanErrors{errors: make([]error, 0, projects)}
-}
-
-func (s *scanErrors) add(err error) {
-	atomic.AddUint64(&s.count, 1)
-	s.mu.Lock()
-	s.errors = append(s.errors, err)
-	s.mu.Unlock()
-}
-
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	projects, err := s.projects(ctx)
@@ -102,28 +81,28 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	var scanned uint64
-	scanErrs := newScanErrors(len(projects))
+	scanErrs := sources.NewScanErrors()
 
 	for _, proj := range projects {
 		proj := proj
 		s.jobPool.Go(func() error {
 			builds, err := s.buildsForProject(ctx, proj)
 			if err != nil {
-				scanErrs.add(fmt.Errorf("error getting builds for project %s: %w", proj.RepoName, err))
+				scanErrs.Add(fmt.Errorf("error getting builds for project %s: %w", proj.RepoName, err))
 				return nil
 			}
 
 			for _, bld := range builds {
 				buildSteps, err := s.stepsForBuild(ctx, proj, bld)
 				if err != nil {
-					scanErrs.add(fmt.Errorf("error getting steps for build %d: %w", bld.BuildNum, err))
+					scanErrs.Add(fmt.Errorf("error getting steps for build %d: %w", bld.BuildNum, err))
 					return nil
 				}
 
 				for _, step := range buildSteps {
 					for _, action := range step.Actions {
 						if err = s.chunkAction(ctx, proj, bld, action, step.Name, chunksChan); err != nil {
-							scanErrs.add(fmt.Errorf("error chunking action %v: %w", action, err))
+							scanErrs.Add(fmt.Errorf("error chunking action %v: %w", action, err))
 							return nil
 						}
 					}
@@ -131,14 +110,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 
 			atomic.AddUint64(&scanned, 1)
-			log.Debugf("scanned %d/%d projects", scanned, len(projects))
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", scanned, len(projects)))
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
-	if scanErrs.count > 0 {
-		log.Debugf("encountered %d errors while scanning; errors: %v", scanErrs.count, scanErrs)
+	if scanErrs.Count() > 0 {
+		ctx.Logger().V(2).Info("encountered errors while scanning", "count", scanErrs.Count(), "errors", scanErrs)
 	}
 
 	return nil

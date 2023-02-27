@@ -109,3 +109,7 @@ func getPoloniexSignature(secret string, payload string) string {
 	macsum := mac.Sum(nil)
 	return hex.EncodeToString(macsum)
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Poloniex
+}
