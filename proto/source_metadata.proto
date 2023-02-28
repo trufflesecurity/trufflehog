@@ -111,6 +111,15 @@ message Gitlab {
   int64 line = 7;
 }
 
+message GoogleDrive {
+  string file = 1;
+  string link = 2;
+  string email = 3;
+  string timestamp = 4;
+  bool shared = 5;
+  string last_modified_by = 6;
+}
+
 message GCS {
   string bucket = 1;
   string file = 2;

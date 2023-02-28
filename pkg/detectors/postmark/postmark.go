@@ -2,7 +2,6 @@ package postmark
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -53,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-Postmark-Server-Token", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("X-Postmark-Server-Token", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Postmark
 }

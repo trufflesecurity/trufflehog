@@ -100,6 +100,12 @@ trufflehog s3 --bucket=<bucket name> --only-verified
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
+### Example 6: Scan individual files or directories
+
+```bash
+trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
+```
+
 # What's new in v3?
 
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
@@ -167,10 +173,10 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - github
 - gitlab
 - S3
-- filesystem
+- filesystem (files and directories)
 - syslog
 - circleci
-- file and stdin (coming soon)
+- stdin (coming soon)
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -311,7 +317,7 @@ detectors:
 ```
 
 ```
-$ trufflehog filesystem --directory /tmp --config config.yaml --only-verified
+$ trufflehog filesystem /tmp --config config.yaml --only-verified
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
 
 Found verified result 🐷🔑

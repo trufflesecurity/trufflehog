@@ -2,14 +2,12 @@ package gitlab
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/sync/semaphore"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -17,14 +15,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.SetLevel(log.DebugLevel)
-	log.SetFormatter(&log.TextFormatter{ForceColors: true})
 	secret, err := common.GetTestSecret(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
@@ -141,7 +138,6 @@ func TestSource_Scan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -199,7 +195,6 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 		},
 	}
 
-	log.SetOutput(io.Discard)
 	s := &Source{repos: []string{}}
 
 	for _, tt := range tests {
@@ -247,8 +242,6 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		},
 	}
 
-	log.SetOutput(io.Discard)
-
 	for _, tt := range tests {
 		s := &Source{
 			repos: tt.repos,
@@ -280,9 +273,9 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			wantComplete: true,
 		},
 		{
-			name:    "one valid repo",
-			repos:   []string{"a"},
-			wantErr: true,
+			name:         "one valid repo",
+			repos:        []string{"repo"},
+			wantComplete: true,
 		},
 	}
 
@@ -291,7 +284,8 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			src := &Source{
 				repos: tc.repos,
 			}
-			src.jobSem = semaphore.NewWeighted(1)
+			src.jobPool = &errgroup.Group{}
+			src.scanOptions = &git.ScanOptions{}
 
 			_ = src.scanRepos(context.Background(), nil)
 			if !tc.wantErr {

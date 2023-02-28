@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -125,7 +124,6 @@ func TestSource_Scan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -139,7 +137,7 @@ func TestSource_Scan(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
-				s.Chunks(ctx, chunksCh)
+				assert.NoError(t, s.Chunks(ctx, chunksCh))
 			}()
 			gotChunk := <-chunksCh
 			gotChunk.Data = nil
@@ -260,7 +258,6 @@ func TestSource_Chunks_Integration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -403,7 +400,6 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {

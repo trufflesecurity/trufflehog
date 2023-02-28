@@ -104,3 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Github
+}

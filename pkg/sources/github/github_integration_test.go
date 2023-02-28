@@ -9,9 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/mattn/go-colorable"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -25,7 +24,6 @@ import (
 )
 
 func TestSource_Token(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
 
@@ -56,7 +54,7 @@ func TestSource_Token(t *testing.T) {
 	s := Source{
 		conn:        conn,
 		httpClient:  common.SaneHttpClient(),
-		log:         log.WithField("source", "github"),
+		log:         logr.Discard(),
 		repoCache:   newRepoCache(nil, nil),
 		memberCache: map[string]struct{}{},
 		orgCache:    map[string]struct{}{},
@@ -374,15 +372,9 @@ func TestSource_Scan(t *testing.T) {
 		},
 	}
 
-	for i, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log.Debugf("Beginning test %d: %s", i, tt.name)
 			s := Source{}
-
-			log.SetLevel(log.DebugLevel)
-			// uncomment for windows Testing
-			log.SetFormatter(&log.TextFormatter{ForceColors: true})
-			log.SetOutput(colorable.NewColorableStdout())
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -524,11 +516,6 @@ func TestSource_paginateGists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-
-			log.SetLevel(log.DebugLevel)
-			// uncomment for windows Testing
-			log.SetFormatter(&log.TextFormatter{ForceColors: true})
-			log.SetOutput(colorable.NewColorableStdout())
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {

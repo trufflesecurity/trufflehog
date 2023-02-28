@@ -4,7 +4,6 @@ import (
 	"runtime"
 
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -16,18 +15,23 @@ import (
 )
 
 // ScanFileSystem scans a given file system.
-func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig) error {
 	connection := &sourcespb.Filesystem{
-		Directories: c.Directories,
+		Paths: c.Paths,
 	}
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal filesystem connection")
+		ctx.Logger().Error(err, "failed to marshal filesystem connection")
 		return err
 	}
 
 	fileSystemSource := filesystem.Source{}
+
+	ctx = context.WithValues(ctx,
+		"source_type", fileSystemSource.Type().String(),
+		"source_name", "filesystem",
+	)
 	err = fileSystemSource.Init(ctx, "trufflehog - filesystem", 0, int64(sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM), true, &conn, runtime.NumCPU())
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init filesystem source", 0)
@@ -39,7 +43,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.Config) error {
 		defer e.sourcesWg.Done()
 		err := fileSystemSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Error("error scanning filesystem")
+			ctx.Logger().Error(err, "error scanning filesystem")
 		}
 	}()
 	return nil

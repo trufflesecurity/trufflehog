@@ -16,7 +16,6 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client    = common.SaneHttpClient()
 	verifyURL = "https://api.rechargeapps.com/token_information"
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_RechargePayments
 }

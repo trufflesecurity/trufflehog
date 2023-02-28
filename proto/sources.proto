@@ -40,6 +40,7 @@ enum SourceType {
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
+  SOURCE_TYPE_GOOGLE_DRIVE = 28;
 }
 
 message LocalSource {
@@ -95,6 +96,10 @@ message Confluence {
 
   GetAllSpacesScope spaces_scope = 5;
   bool insecure_skip_verify_tls = 6;
+  repeated string spaces = 7;
+  repeated string ignore_spaces = 8;
+  bool include_attachments = 9;
+  bool skip_history = 10;
 }
 
 message DockerHub {
@@ -111,8 +116,11 @@ message ECR {
   repeated string registries = 2;
 }
 
-message Filesystem{
+message Filesystem {
+  // DEPRECATED: directories is deprecated and can be removed / renamed to
+  // paths when we no longer depend on the name in enterprise configs.
   repeated string directories = 1;
+  repeated string paths = 2;
 }
 
 message GCS {
@@ -158,6 +166,12 @@ message GitHub {
   string base = 10;
   repeated string ignoreRepos = 11;
   repeated string includeRepos = 12;
+}
+
+message GoogleDrive {
+  oneof credential {
+    string refresh_token = 1;
+  }
 }
 
 message JIRA {

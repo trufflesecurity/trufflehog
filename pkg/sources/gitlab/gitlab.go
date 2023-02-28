@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -21,10 +23,8 @@ import (
 	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
-	log "github.com/sirupsen/logrus"
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/exp/slices"
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -45,8 +45,8 @@ type Source struct {
 	scanOptions     *git.ScanOptions
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
-	jobSem          *semaphore.Weighted
 	sources.Progress
+	jobPool *errgroup.Group
 }
 
 // Ensure the Source satisfies the interface at compile time.
@@ -68,12 +68,12 @@ func (s *Source) JobID() int64 {
 
 // Init returns an initialized Gitlab source.
 func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
-
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
-	s.jobSem = semaphore.NewWeighted(int64(concurrency))
+	s.jobPool = &errgroup.Group{}
+	s.jobPool.SetLimit(concurrency)
 
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -131,6 +131,55 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 	return nil
 }
 
+// Chunks emits chunks of bytes over a channel.
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	// Start client.
+	apiClient, err := s.newClient()
+	if err != nil {
+		return errors.New(err)
+	}
+	// Get repo within target.
+	repos, errs := s.getRepos()
+	for _, repoErr := range errs {
+		ctx.Logger().Info("error getting repo", "error", repoErr)
+	}
+
+	// End early if we had errors getting specified repos but none were validated.
+	if len(errs) > 0 && len(repos) == 0 {
+		return errors.New("All specified repos had validation issues, ending scan")
+	}
+
+	// Get all repos if not specified.
+	if len(repos) == 0 {
+		projects, err := s.getAllProjects(ctx, apiClient)
+		if err != nil {
+			return fmt.Errorf("error getting all projects: %v", err)
+		}
+		// Turn projects into URLs for Git cloner.
+		for _, prj := range projects {
+			if s.ignoreRepo(ctx, prj.PathWithNamespace) {
+				continue
+			}
+
+			// Ensure the urls are valid before adding them to the repo list.
+			_, err := url.Parse(prj.HTTPURLToRepo)
+			if err != nil {
+				fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
+			}
+			repos = append(repos, prj.HTTPURLToRepo)
+		}
+		if len(repos) == 0 {
+			return errors.Errorf("unable to discover any repos")
+		}
+	}
+
+	s.repos = repos
+	// We must sort the repos so we can resume later if necessary.
+	slices.Sort(s.repos)
+
+	return s.scanRepos(ctx, chunksChan)
+}
+
 func (s *Source) newClient() (*gitlab.Client, error) {
 	// Initialize a new api instance.
 	switch s.authMethod {
@@ -166,7 +215,21 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	}
 }
 
-func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, error) {
+func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
+	user, resp, err := apiClient.Users.CurrentUser()
+	if err != nil {
+		return false
+	}
+	if resp.StatusCode != 200 {
+		return false
+	}
+	if user != nil {
+		return true
+	}
+	return false
+}
+
+func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) ([]*gitlab.Project, error) {
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 
@@ -224,7 +287,10 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
 			if err != nil {
-				log.WithError(err).WithField("group", group.FullPath).Warn("received error on listing group projects, you probably don't have permissions to do that")
+				ctx.Logger().Info("received error on listing group projects, you probably don't have permissions to do that",
+					"group", group.FullPath,
+					"error", err,
+				)
 				break
 			}
 			for _, prj := range grpPrjs {
@@ -240,7 +306,7 @@ func (s *Source) getAllProjects(apiClient *gitlab.Client) ([]*gitlab.Project, er
 	for _, project := range projects {
 		projectNamesWithNamespace = append(projectNamesWithNamespace, project.NameWithNamespace)
 	}
-	log.WithField("projects", strings.Join(projectNamesWithNamespace, ", ")).Debugf("Enumerated %d GitLab projects", len(projects))
+	ctx.Logger().V(2).Info("Enumerated GitLab projects", "count", len(projects), "projects", projectNamesWithNamespace)
 
 	var projectList []*gitlab.Project
 	for _, project := range projects {
@@ -268,31 +334,26 @@ func (s *Source) getRepos() ([]string, []error) {
 	return validRepos, errs
 }
 
-func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) []error {
-	wg := sync.WaitGroup{}
-	var errs []error
-	var errsMut sync.Mutex
-
+func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
 	s.repos = reposToScan
+	scanErrs := sources.NewScanErrors()
 
 	for i, repo := range s.repos {
-		if common.IsDone(ctx) {
-			// We are returning nil instead of the scanErrors slice here because
-			// we don't want to mark this scan as errored if we cancelled it.
-			return nil
-		}
-		if err := s.jobSem.Acquire(ctx, 1); err != nil {
-			log.WithError(err).Debug("could not acquire semaphore")
-			continue
-		}
-		wg.Add(1)
-		go func(ctx context.Context, repoURL string, i int) {
-			defer s.jobSem.Release(1)
-			defer wg.Done()
+		i, repoURL := i, repo
+		s.jobPool.Go(func() error {
+			logger := ctx.Logger().WithValues("repo", repoURL)
+			if common.IsDone(ctx) {
+				// We are returning nil instead of the scanErrors slice here because
+				// we don't want to mark this scan as errored if we cancelled it.
+				logger.V(2).Info("Skipping repo because context was cancelled")
+				return nil
+			}
+
 			if len(repoURL) == 0 {
-				return
+				logger.V(2).Info("Skipping empty repo")
+				return nil
 			}
 
 			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
@@ -319,115 +380,41 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 			defer os.RemoveAll(path)
 			if err != nil {
-				errsMut.Lock()
-				errs = append(errs, err)
-				errsMut.Unlock()
-				return
-			}
-			log.Debugf("Starting to scan repo %d/%d: %s", i+1, len(s.repos), repoURL)
-			err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
-			if err != nil {
-				errsMut.Lock()
-				errs = append(errs, err)
-				errsMut.Unlock()
-				return
-			}
-			log.Debugf("Completed scanning repo %d/%d: %s", i+1, len(s.repos), repoURL)
-		}(ctx, repo, i)
-	}
-	wg.Wait()
-	if len(errs) == 0 {
-		s.SetProgressComplete(len(s.repos), len(s.repos), fmt.Sprintf("Completed scanning source %s", s.name), "")
-	}
-
-	return errs
-}
-
-func (s *Source) ignoreRepo(r string) bool {
-	for _, ignore := range s.ignoreRepos {
-		g, err := glob.Compile(ignore)
-		if err != nil {
-			log.WithError(err).Errorf("could not compile ignore repo glob %s", ignore)
-			continue
-		}
-		if g.Match(r) {
-			log.Debugf("Ignoring repo %s", r)
-			return true
-		}
-	}
-	return false
-}
-
-// Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	// Start client.
-	apiClient, err := s.newClient()
-	if err != nil {
-		return errors.New(err)
-	}
-	// Get repo within target.
-	repos, errs := s.getRepos()
-	for _, repoErr := range errs {
-		log.WithError(repoErr).Warn("error getting repo")
-	}
-
-	// End early if we had errors getting specified repos but none were validated.
-	if len(errs) > 0 && len(repos) == 0 {
-		return errors.New("All specified repos had validation issues, ending scan")
-	}
-
-	// Get all repos if not specified.
-	if repos == nil {
-		projects, err := s.getAllProjects(apiClient)
-		if err != nil {
-			return errors.New(err)
-		}
-		// Turn projects into URLs for Git cloner.
-		for _, prj := range projects {
-			if s.ignoreRepo(prj.PathWithNamespace) {
-				continue
+				scanErrs.Add(err)
+				return nil
 			}
 
-			// Ensure the urls are valid before adding them to the repo list.
-			_, err := url.Parse(prj.HTTPURLToRepo)
-			if err != nil {
-				fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
+			logger.V(2).Info(fmt.Sprintf("Starting to scan repo %d/%d", i+1, len(s.repos)))
+			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
+				scanErrs.Add(err)
+				return nil
 			}
-			repos = append(repos, prj.HTTPURLToRepo)
-		}
-		if repos == nil {
-			return errors.Errorf("unable to discover any repos")
-		}
+
+			logger.V(2).Info(fmt.Sprintf("Completed scanning repo %d/%d", i+1, len(s.repos)))
+			return nil
+		})
 	}
 
-	s.repos = repos
-	// We must sort the repos so we can resume later if necessary.
-	slices.Sort(s.repos)
-
-	errs = s.scanRepos(ctx, chunksChan)
-	for _, err := range errs {
-		log.WithError(err).WithFields(
-			log.Fields{
-				"source_name": s.name,
-				"source_type": s.Type(),
-				"repos":       repos,
-			},
-		).Error("error scanning repo")
+	_ = s.jobPool.Wait()
+	if scanErrs.Count() > 0 {
+		ctx.Logger().V(2).Info("encountered errors while scanning", "count", scanErrs.Count(), "errors", scanErrs)
 	}
+	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Gitlab scan", "")
 
 	return nil
 }
 
-func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
-	user, resp, err := apiClient.Users.CurrentUser()
-	if err != nil {
-		return false
-	}
-	if resp.StatusCode != 200 {
-		return false
-	}
-	if user != nil {
-		return true
+func (s *Source) ignoreRepo(ctx context.Context, r string) bool {
+	for _, ignore := range s.ignoreRepos {
+		g, err := glob.Compile(ignore)
+		if err != nil {
+			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", ignore)
+			continue
+		}
+		if g.Match(r) {
+			ctx.Logger().V(2).Info("Ignoring repo", "repo", r)
+			return true
+		}
 	}
 	return false
 }
