@@ -190,6 +190,7 @@ Flags:
       --help                     Show context-sensitive help (also try --help-long and --help-man).
       --debug                    Run in debug mode.
       --trace                    Run in trace mode.
+      --profile                  Enables profiling and sets a pprof and fgprof server on :18066.
   -j, --json                     Output in JSON format.
       --json-legacy              Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
       --concurrency=10           Number of concurrent workers.

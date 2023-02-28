@@ -38,6 +38,7 @@ var (
 	cmd              string
 	debug            = cli.Flag("debug", "Run in debug mode.").Bool()
 	trace            = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile          = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
 	jsonOut          = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy       = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	concurrency      = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
@@ -183,7 +184,7 @@ func run(state overseer.State) {
 		*concurrency = 1
 	}
 
-	if *debug {
+	if *profile {
 		go func() {
 			router := mux.NewRouter()
 			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
