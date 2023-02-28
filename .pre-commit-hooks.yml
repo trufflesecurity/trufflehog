@@ -1,0 +1,6 @@
+- id: trufflehog
+  name: TruffleHog
+  description: Detect secrets in your data with TruffleHog.
+  entry: trufflehog git file://. --since-commit HEAD --only-verified --fail
+  language: golang
+  pass_filenames: false
