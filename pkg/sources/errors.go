@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -28,4 +29,8 @@ func (s *ScanErrors) Count() uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return uint64(len(s.errors))
+}
+
+func (s *ScanErrors) String() string {
+	return fmt.Sprintf("%v", s.errors)
 }
