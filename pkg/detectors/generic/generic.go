@@ -44,8 +44,7 @@ func New() Scanner {
 }
 
 type Scanner struct {
-	programmingBookWords []string
-	excludeMatchers      []*regexp.Regexp
+	excludeMatchers []*regexp.Regexp
 }
 
 // Ensure the Scanner satisfies the interface at compile time.

@@ -2,7 +2,6 @@ package clockify
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -53,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("content-type", "application/json")
-			req.Header.Add("X-Api-Key", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("X-Api-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

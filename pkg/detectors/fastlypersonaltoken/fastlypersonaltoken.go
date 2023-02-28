@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Fastly-Key", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("Fastly-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
