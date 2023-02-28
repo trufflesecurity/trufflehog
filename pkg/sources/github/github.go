@@ -475,14 +475,15 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	if len(s.orgs) > 0 {
 		specificScope = true
 		for _, org := range s.orgs {
+			logger := s.log.WithValues("org", org)
 			if err := s.getReposByOrg(ctx, org); err != nil {
-				s.log.Error(err, "error fetching repos for org")
+				logger.Error(err, "error fetching repos for org")
 			}
 
 			if s.conn.ScanUsers {
 				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
-					s.log.Error(err, "Unable to add members by org")
+					logger.Error(err, "Unable to add members by org")
 					continue
 				}
 			}
@@ -515,7 +516,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 			// TODO: Test it actually works to list org gists like this.
 			if err := s.getGistsByUser(ctx, org); err != nil {
-				s.log.Error(err, "error fetching gists by org")
+				logger.Error(err, "error fetching gists by org")
 			}
 
 			if s.conn.ScanUsers {
