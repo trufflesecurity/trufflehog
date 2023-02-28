@@ -44,8 +44,6 @@ func New() Scanner {
 }
 
 type Scanner struct {
-	wordList             []string
-	badList              []string
 	programmingBookWords []string
 	excludeMatchers      []*regexp.Regexp
 }

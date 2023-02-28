@@ -173,7 +173,9 @@ func main() {
 		}
 
 		for _, repo := range strings.Split(*scanCmdRepo, ",") {
-			sem.Acquire(ctx, 1)
+			if err := sem.Acquire(ctx, 1); err != nil {
+				logFatal(err, "timed out waiting for semaphore")
+			}
 			wgChunkers.Add(1)
 			go func(r string) {
 				defer sem.Release(1)
