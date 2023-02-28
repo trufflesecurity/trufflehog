@@ -2,7 +2,6 @@ package keenio
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -61,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("Authorization", fmt.Sprintf("%s", resMatch))
+				req.Header.Add("Authorization", resMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

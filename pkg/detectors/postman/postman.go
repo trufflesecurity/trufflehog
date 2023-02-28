@@ -2,7 +2,6 @@ package postman
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -52,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("x-api-key", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("x-api-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

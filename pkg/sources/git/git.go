@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -257,7 +256,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 	if err := gitCmdCheck(); err != nil {
 		return "", nil, err
 	}
-	clonePath, err := ioutil.TempDir(os.TempDir(), "trufflehog")
+	clonePath, err := os.MkdirTemp(os.TempDir(), "trufflehog")
 	if err != nil {
 		return "", nil, err
 	}
