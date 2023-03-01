@@ -44,7 +44,7 @@ func TestOpenAI_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a github secret %s within", oaiUnverified)),
+				data:   []byte(fmt.Sprintf("You can find an OpenAI secret %s within", oaiUnverified)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -57,11 +57,11 @@ func TestOpenAI_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Found, unverified ghp future length 255",
+			name: "Found, verified OpenAI token sk-",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a github secret %s within", oaiVerified)),
+				data:   []byte(fmt.Sprintf("You can find an OpenAI secret %s within", oaiVerified)),
 				verify: true,
 			},
 			want: []detectors.Result{
