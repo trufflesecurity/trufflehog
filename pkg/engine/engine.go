@@ -233,7 +233,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
 
-			// init chunk keyword map
 			chunk.Keywords = make(map[string]bool)
 
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))

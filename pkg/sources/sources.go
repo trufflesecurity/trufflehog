@@ -26,7 +26,7 @@ type Chunk struct {
 	Data []byte
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
-
+	// Keywords found within the chunk's Data.
 	Keywords map[string]bool
 }
 
