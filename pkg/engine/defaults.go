@@ -442,6 +442,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onwaterio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opengraphr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
@@ -1166,6 +1167,7 @@ func DefaultDetectors() []detectors.Detector {
 		signupgenius.Scanner{},
 		streak.Scanner{},
 		route4me.Scanner{},
+		openai.Scanner{},
 		opencagedata.Scanner{},
 		positionstack.Scanner{},
 		upcdatabase.Scanner{},
