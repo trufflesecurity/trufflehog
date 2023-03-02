@@ -14,8 +14,11 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (s Scanner) Version() int { return 1 }
 
 var (
 	// Oauth token
@@ -38,7 +41,7 @@ type userRes struct {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"github","gh","pat"}
+	return []string{"github", "gh", "pat"}
 }
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.

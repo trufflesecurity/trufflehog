@@ -14,8 +14,11 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (s Scanner) Version() int { return 1 }
 
 var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b((?:glpat|)[a-zA-Z0-9\-=_]{20,22})\b`)
