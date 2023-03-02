@@ -57,7 +57,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	s.sourceId = sourceID
 	s.jobId = id
 	s.concurrency = concurrency
-	s.jobPool = &errgroup.Group{}
+	s.jobPool = new(errgroup.Group)
 	s.jobPool.SetLimit(concurrency)
 
 	var conn sourcespb.GCS
