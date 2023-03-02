@@ -2,12 +2,15 @@ package gcs
 
 import (
 	"fmt"
+	"runtime"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var defaultConcurrency = runtime.NumCPU()
 
 type object struct{}
 
@@ -22,7 +25,8 @@ type gcsManager struct {
 
 	// resumeFrom is the name of the last object that was processed.
 	// This works because GCS returns objects in lexicographical order.
-	resumeFrom string
+	resumeFrom  string
+	concurrency int
 
 	includeBuckets,
 	excludeBuckets,
@@ -120,17 +124,34 @@ func withExcludeObjects(objects []string) gcsManagerOption {
 	}
 }
 
+// withConcurrency sets the number of concurrent workers that will be used
+// to process objects.
+// If not set, or set to a negative number the default value is runtime.NumCPU().
+func withConcurrency(concurrency int) gcsManagerOption {
+	return func(m *gcsManager) error {
+		if concurrency <= 0 {
+			m.concurrency = defaultConcurrency
+		} else {
+			m.concurrency = concurrency
+		}
+		return nil
+	}
+}
+
 func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, error) {
 	if projectID == "" {
 		return nil, fmt.Errorf("project ID is required")
 	}
 
 	gcs := &gcsManager{
-		projectID: projectID,
+		projectID:   projectID,
+		concurrency: defaultConcurrency,
 	}
 
 	for _, opt := range opts {
-		opt(gcs)
+		if err := opt(gcs); err != nil {
+			return nil, fmt.Errorf("failed to apply option: %w", err)
+		}
 	}
 
 	return gcs, nil

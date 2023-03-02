@@ -149,6 +149,32 @@ func TestNewGcsManager(t *testing.T) {
 				includeObjects: map[string]struct{}{"object1": {}, "object2": {}},
 			},
 		},
+		{
+			name:   "new gcs manager, with concurrency",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withConcurrency(10)},
+			want: &gcsManager{
+				projectID:   testProjectID,
+				concurrency: 10,
+			},
+		},
+		{
+			name:   "new gcs manager, default concurrency",
+			projID: testProjectID,
+			want: &gcsManager{
+				projectID:   testProjectID,
+				concurrency: defaultConcurrency,
+			},
+		},
+		{
+			name:   "new gcs manager, with negative concurrency",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withConcurrency(-1)},
+			want: &gcsManager{
+				projectID:   testProjectID,
+				concurrency: defaultConcurrency,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
