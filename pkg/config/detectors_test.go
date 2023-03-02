@@ -25,6 +25,13 @@ func TestDetectorParsing(t *testing.T) {
 		"invalid end range":         {"0-1337", nil},
 		"invalid name":              {"foo", nil},
 		"negative":                  {"-1", nil},
+		"github.v1":                 {"github.v1", []DetectorID{{ID: dpb.DetectorType_Github, Version: 1}}},
+		"gitlab.v100":               {"gitlab.v100", []DetectorID{{ID: dpb.DetectorType_Gitlab, Version: 100}}},
+		"range with versions":       {"github.v2 - gitlab.v1", nil},
+		"invalid version no v":      {"gitlab.2", nil},
+		"invalid version no number": {"gitlab.github", nil},
+		"capital V is fine":         {"GiTlAb.V2", []DetectorID{{ID: dpb.DetectorType_Gitlab, Version: 2}}},
+		"id number with version":    {"8.v2", []DetectorID{{ID: 8, Version: 2}}},
 	}
 
 	for name, tt := range tests {

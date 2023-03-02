@@ -83,9 +83,9 @@ func allDetectors() []DetectorID {
 // are allowed.
 func asRange(input string) ([]DetectorID, error) {
 	// Check if it's a single detector type.
-	dt, err := asDetectorType(input)
+	dt, err := asDetectorID(input)
 	if err == nil {
-		return []DetectorID{{ID: dt}}, nil
+		return []DetectorID{dt}, nil
 	}
 
 	// Check if it's a range; if not return the error from above.
@@ -96,50 +96,77 @@ func asRange(input string) ([]DetectorID, error) {
 	start, end = strings.TrimSpace(start), strings.TrimSpace(end)
 
 	// Convert the range start and end to a DetectorType.
-	dtStart, err := asDetectorType(start)
+	dtStart, err := asDetectorID(start)
 	if err != nil {
 		return nil, err
 	}
-	dtEnd, err := asDetectorType(end)
+	dtEnd, err := asDetectorID(end)
 	// If end is empty it's an unbounded range.
 	if err != nil && end != "" {
 		return nil, err
 	}
 	if end == "" {
-		dtEnd = maxDetectorType
+		dtEnd.ID = maxDetectorType
+	}
+
+	// Ensure these ranges don't have versions.
+	if dtEnd.Version != 0 || dtStart.Version != 0 {
+		return nil, fmt.Errorf("versions within ranges are not supported: %s", input)
 	}
 
 	step := dpb.DetectorType(1)
-	if dtStart > dtEnd {
+	if dtStart.ID > dtEnd.ID {
 		step = -1
 	}
 	var output []DetectorID
-	for dt := dtStart; dt != dtEnd; dt += step {
+	for dt := dtStart.ID; dt != dtEnd.ID; dt += step {
 		if _, ok := validDetectors[dt]; !ok {
 			continue
 		}
 		output = append(output, DetectorID{ID: dt})
 	}
-	return append(output, DetectorID{ID: dtEnd}), nil
+	return append(output, dtEnd), nil
 }
 
-// asDetectorType converts the case-insensitive input into a detector type.
+// asDetectorID converts the case-insensitive input into a DetectorID.
 // Name or ID may be used.
-func asDetectorType(input string) (dpb.DetectorType, error) {
+func asDetectorID(input string) (DetectorID, error) {
 	if input == "" {
-		return 0, fmt.Errorf("empty detector")
+		return DetectorID{}, fmt.Errorf("empty detector")
 	}
+	var detectorID DetectorID
+	// Separate the version if there is one.
+	if detector, version, hasVersion := strings.Cut(input, "."); hasVersion {
+		parsedVersion, err := parseVersion(version)
+		if err != nil {
+			return DetectorID{}, fmt.Errorf("invalid version for input: %q error: %w", input, err)
+		}
+		detectorID.Version = parsedVersion
+		// Because there was a version, the detector type input is the part before the '.'
+		input = detector
+	}
+
 	// Check if it's a named detector.
 	if dt, ok := detectorTypeValue[strings.ToLower(input)]; ok {
-		return dt, nil
+		detectorID.ID = dt
+		return detectorID, nil
 	}
 	// Check if it's a detector ID.
 	if i, err := strconv.ParseInt(input, 10, 32); err == nil {
 		dt := dpb.DetectorType(i)
 		if _, ok := validDetectors[dt]; !ok {
-			return 0, fmt.Errorf("invalid detector ID: %s", input)
+			return DetectorID{}, fmt.Errorf("invalid detector ID: %s", input)
 		}
-		return dt, nil
+		detectorID.ID = dt
+		return detectorID, nil
 	}
-	return 0, fmt.Errorf("unrecognized detector type: %s", input)
+	return DetectorID{}, fmt.Errorf("unrecognized detector type: %s", input)
+}
+
+func parseVersion(v string) (int, error) {
+	if !strings.HasPrefix(strings.ToLower(v), "v") {
+		return 0, fmt.Errorf("version must start with 'v'")
+	}
+	version := strings.TrimLeft(v, "vV")
+	return strconv.Atoi(version)
 }
