@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"cloud.google.com/go/storage"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -27,6 +28,7 @@ type gcsManager struct {
 	// This works because GCS returns objects in lexicographical order.
 	resumeFrom  string
 	concurrency int
+	workerPool  *errgroup.Group
 
 	includeBuckets,
 	excludeBuckets,
@@ -153,6 +155,12 @@ func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, err
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
+	configureWorkers(gcs)
 
 	return gcs, nil
+}
+
+func configureWorkers(gcs *gcsManager) {
+	gcs.workerPool = new(errgroup.Group)
+	gcs.workerPool.SetLimit(gcs.concurrency)
 }
