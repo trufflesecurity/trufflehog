@@ -68,6 +68,17 @@ func ParseDetectors(input string) ([]DetectorID, error) {
 	return output, nil
 }
 
+func (id DetectorID) String() string {
+	name := dpb.DetectorType_name[int32(id.ID)]
+	if name == "" {
+		name = "<invalid ID>"
+	}
+	if id.Version == 0 {
+		return name
+	}
+	return fmt.Sprintf("%s.v%d", name, id.Version)
+}
+
 // allDetectors reutrns an ordered slice of all detector types.
 func allDetectors() []DetectorID {
 	all := make([]DetectorID, 0, len(dpb.DetectorType_name))
