@@ -15,11 +15,12 @@ import (
 
 // ScanGCS scans GCS with the provided options.
 func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
-	if c.ApiKey == "" {
-		return fmt.Errorf("api key is required")
+	if c.ApiKey == "" || c.ProjectID == "" {
+		return fmt.Errorf("api key and project ID are required")
 	}
 
 	connection := sourcespb.GCS{
+		ProjectId:      c.ProjectID,
 		IncludeBuckets: c.IncludeBuckets,
 		ExcludeBuckets: c.ExcludeBuckets,
 		IncludeObjects: c.IncludeObjects,

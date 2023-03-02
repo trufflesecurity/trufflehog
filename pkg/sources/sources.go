@@ -47,7 +47,9 @@ type Source interface {
 // GCSConfig defines the optional configuration for a GCS source.
 type GCSConfig struct {
 	// ApiKey is the API key to use to authenticate with the source.
-	ApiKey string
+	ApiKey,
+	// ProjectID is the project ID to use to authenticate with the source.
+	ProjectID string
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency int
 	// IncludeBuckets is a list of buckets to include in the scan.
