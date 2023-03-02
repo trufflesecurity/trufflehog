@@ -1242,10 +1242,15 @@ func (m *GCS) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for ProjectId
+
 	switch m.Credential.(type) {
 
 	case *GCS_JsonSa:
 		// no validation rules for JsonSa
+
+	case *GCS_ApiKey:
+		// no validation rules for ApiKey
 
 	}
 
