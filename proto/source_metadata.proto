@@ -122,9 +122,12 @@ message GoogleDrive {
 
 message GCS {
   string bucket = 1;
-  string file = 2;
+  string filename = 2;
   string link = 3;
   string email = 4;
+  string created_at = 5;
+  string updated_at = 6;
+  string acl = 7;
 }
 
 message Jira {
