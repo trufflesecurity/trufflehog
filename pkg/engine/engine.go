@@ -117,7 +117,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	// Set defaults.
-
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
@@ -135,21 +134,20 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		e.detectors[false] = []detectors.Detector{}
 	}
 
-	// build prefilter
+	// build ahocorasick prefilter for efficient string matching
+	// on keywords
 	for _, d := range e.detectors[false] {
 		e.keywords = append(e.keywords, d.Keywords()...)
 	}
 	for _, d := range e.detectors[true] {
 		e.keywords = append(e.keywords, d.Keywords()...)
 	}
-
 	builder := ahocorasick.NewAhoCorasickBuilder(ahocorasick.Opts{
 		AsciiCaseInsensitive: true,
 		MatchOnlyWholeWords:  false,
 		MatchKind:            ahocorasick.LeftMostLongestMatch,
 		DFA:                  true,
 	})
-
 	e.prefilter = builder.Build(e.keywords)
 
 	ctx.Logger().V(2).Info("loaded decoders", "count", len(e.decoders))
@@ -232,9 +230,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
-
-			chunk.Keywords = make(map[string]bool)
-
+			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
@@ -256,14 +252,14 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				matches := e.prefilter.FindAll(dataLower)
 
 				for _, m := range matches {
-					chunk.Keywords[dataLower[m.Start():m.End()]] = true
+					matchedKeywords[dataLower[m.Start():m.End()]] = struct{}{}
 				}
 
 				for verify, detectorsSet := range e.detectors {
 					for _, detector := range detectorsSet {
 						chunkContainsKeyword := false
 						for _, kw := range detector.Keywords() {
-							if _, ok := chunk.Keywords[strings.ToLower(kw)]; ok {
+							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
 								chunkContainsKeyword = true
 							}
 						}
