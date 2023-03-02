@@ -41,8 +41,6 @@ type Engine struct {
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words (keywords from the rules in the config)
 	prefilter ahocorasick.AhoCorasick
-
-	keywords []string
 }
 
 type EngineOption func(*Engine)
@@ -136,11 +134,12 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 
 	// build ahocorasick prefilter for efficient string matching
 	// on keywords
+	keywords := []string{}
 	for _, d := range e.detectors[false] {
-		e.keywords = append(e.keywords, d.Keywords()...)
+		keywords = append(keywords, d.Keywords()...)
 	}
 	for _, d := range e.detectors[true] {
-		e.keywords = append(e.keywords, d.Keywords()...)
+		keywords = append(keywords, d.Keywords()...)
 	}
 	builder := ahocorasick.NewAhoCorasickBuilder(ahocorasick.Opts{
 		AsciiCaseInsensitive: true,
@@ -148,7 +147,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		MatchKind:            ahocorasick.LeftMostLongestMatch,
 		DFA:                  true,
 	})
-	e.prefilter = builder.Build(e.keywords)
+	e.prefilter = builder.Build(keywords)
 
 	ctx.Logger().V(2).Info("loaded decoders", "count", len(e.decoders))
 	ctx.Logger().V(2).Info("loaded detectors",
