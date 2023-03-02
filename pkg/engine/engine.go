@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -36,6 +37,10 @@ type Engine struct {
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
 	filterUnverified bool
+
+	// prefilter is a ahocorasick struct used for doing efficient string
+	// matching given a set of words (keywords from the rules in the config)
+	prefilter ahocorasick.AhoCorasick
 }
 
 type EngineOption func(*Engine)
@@ -110,7 +115,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	// Set defaults.
-
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
@@ -127,6 +131,23 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		e.detectors[true] = DefaultDetectors()
 		e.detectors[false] = []detectors.Detector{}
 	}
+
+	// build ahocorasick prefilter for efficient string matching
+	// on keywords
+	keywords := []string{}
+	for _, d := range e.detectors[false] {
+		keywords = append(keywords, d.Keywords()...)
+	}
+	for _, d := range e.detectors[true] {
+		keywords = append(keywords, d.Keywords()...)
+	}
+	builder := ahocorasick.NewAhoCorasickBuilder(ahocorasick.Opts{
+		AsciiCaseInsensitive: true,
+		MatchOnlyWholeWords:  false,
+		MatchKind:            ahocorasick.LeftMostLongestMatch,
+		DFA:                  true,
+	})
+	e.prefilter = builder.Build(keywords)
 
 	ctx.Logger().V(2).Info("loaded decoders", "count", len(e.decoders))
 	ctx.Logger().V(2).Info("loaded detectors",
@@ -208,6 +229,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
+			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
@@ -224,20 +246,28 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				if decoded == nil {
 					continue
 				}
+
 				dataLower := strings.ToLower(string(decoded.Data))
+				matches := e.prefilter.FindAll(dataLower)
+
+				for _, m := range matches {
+					matchedKeywords[dataLower[m.Start():m.End()]] = struct{}{}
+				}
+
 				for verify, detectorsSet := range e.detectors {
 					for _, detector := range detectorsSet {
-						start := time.Now()
-						foundKeyword := false
+						chunkContainsKeyword := false
 						for _, kw := range detector.Keywords() {
-							if strings.Contains(dataLower, strings.ToLower(kw)) {
-								foundKeyword = true
-								break
+							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
+								chunkContainsKeyword = true
 							}
 						}
-						if !foundKeyword {
+
+						if !chunkContainsKeyword {
 							continue
 						}
+
+						start := time.Now()
 
 						results, err := func() ([]detectors.Result, error) {
 							ctx, cancel := context.WithTimeout(ctx, time.Second*10)
