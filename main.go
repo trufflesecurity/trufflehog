@@ -216,30 +216,52 @@ func run(state overseer.State) {
 	}
 
 	// Build include and exclude detector filter sets.
-	var includeDetectorTypes, excludeDetectorTypes map[detectorspb.DetectorType]struct{}
+	var includeDetectorTypes, excludeDetectorTypes map[detectorspb.DetectorType]config.DetectorID
 	{
 		includeList, err := config.ParseDetectors(*includeDetectors)
 		if err != nil {
 			// Exit if there was an error to inform the user of the misconfiguration.
-			logger.Error(err, "invalid include list detector configuration")
-			os.Exit(1)
+			logFatal(err, "invalid include list detector configuration")
 		}
 		excludeList, err := config.ParseDetectors(*excludeDetectors)
 		if err != nil {
 			// Exit if there was an error to inform the user of the misconfiguration.
-			logger.Error(err, "invalid exclude list detector configuration")
-			os.Exit(1)
+			logFatal(err, "invalid exclude list detector configuration")
 		}
-		includeDetectorTypes = detectorTypeToSet(includeList)
-		excludeDetectorTypes = detectorTypeToSet(excludeList)
+		includeDetectorTypes = detectorTypeToMap(includeList)
+		excludeDetectorTypes = detectorTypeToMap(excludeList)
 	}
 	includeFilter := func(d detectors.Detector) bool {
-		_, ok := includeDetectorTypes[d.Type()]
-		return ok
+		id, ok := includeDetectorTypes[d.Type()]
+		if id.Version == 0 {
+			return ok
+		}
+		versionD, ok := d.(detectors.Versioner)
+		if !ok {
+			// Error: version provided but not a detectors.Versioner
+			logFatal(
+				fmt.Errorf("version provided but detector does not have a version"),
+				"invalid include list detector configuration",
+				"detector", id,
+			)
+		}
+		return versionD.Version() == id.Version
 	}
 	excludeFilter := func(d detectors.Detector) bool {
-		_, ok := excludeDetectorTypes[d.Type()]
-		return !ok
+		id, ok := excludeDetectorTypes[d.Type()]
+		if id.Version == 0 {
+			return !ok
+		}
+		versionD, ok := d.(detectors.Versioner)
+		if !ok {
+			// Error: version provided but not a detectors.Versioner
+			logFatal(
+				fmt.Errorf("version provided but detector does not have a version"),
+				"invalid exclude list detector configuration",
+				"detector", id,
+			)
+		}
+		return versionD.Version() != id.Version
 	}
 
 	e := engine.Start(ctx,
@@ -431,10 +453,10 @@ func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
 	}
 }
 
-func detectorTypeToSet(detectors []detectorspb.DetectorType) map[detectorspb.DetectorType]struct{} {
-	output := make(map[detectorspb.DetectorType]struct{}, len(detectors))
+func detectorTypeToMap(detectors []config.DetectorID) map[detectorspb.DetectorType]config.DetectorID {
+	output := make(map[detectorspb.DetectorType]config.DetectorID, len(detectors))
 	for _, d := range detectors {
-		output[d] = struct{}{}
+		output[d.ID] = d
 	}
 	return output
 }

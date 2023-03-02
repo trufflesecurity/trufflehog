@@ -14,8 +14,11 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (s Scanner) Version() int { return 1 }
 
 var (
 	client = common.SaneHttpClient()
@@ -34,7 +37,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-  	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
