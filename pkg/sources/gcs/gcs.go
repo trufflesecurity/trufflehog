@@ -72,6 +72,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		withExcludeBuckets(conn.GetExcludeBuckets()),
 		withIncludeObjects(conn.GetIncludeObjects()),
 		withExcludeObjects(conn.GetExcludeObjects()),
+		withConcurrency(concurrency),
 	)
 	if err != nil {
 		return fmt.Errorf("error creating GCS manager: %w", err)
