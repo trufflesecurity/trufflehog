@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
@@ -22,52 +23,41 @@ var (
 
 type WizardIntro struct {
 	common.Common
-	cursor int
-	action string
+	cursor   int
+	action   string
+	selector *selector.Selector
 }
 
-func New(c common.Common) *WizardIntro {
-	return &WizardIntro{Common: c}
+func New(cmn common.Common) *WizardIntro {
+	sel := selector.New(cmn,
+		[]selector.IdentifiableItem{},
+		ItemDelegate{&cmn})
+
+	return &WizardIntro{Common: cmn, selector: sel}
 }
 
 func (m *WizardIntro) Init() tea.Cmd {
+	m.selector.Select(0)
 	return nil
 }
 
 func (m *WizardIntro) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q", "esc":
-			return m, tea.Quit
+	cmds := make([]tea.Cmd, 0)
 
-		case "enter":
-			if wizardIntroChoices[m.cursor] == "Quit" {
-				return m, tea.Quit
-			}
-			m.action = wizardIntroChoices[m.cursor]
-			m.cursor = 0
-
-		case "down", "j":
-			m.cursor++
-			if m.cursor >= len(wizardIntroChoices) {
-				m.cursor = 0
-			}
-
-		case "up", "k":
-			m.cursor--
-			if m.cursor < 0 {
-				m.cursor = len(wizardIntroChoices) - 1
-			}
-		}
+	s, cmd := m.selector.Update(msg)
+	m.selector = s.(*selector.Selector)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 func (m *WizardIntro) View() string {
 	s := strings.Builder{}
 	s.WriteString("What do you want to do?\n\n")
+
+	return m.selector.View()
 
 	for i := 0; i < len(wizardIntroChoices); i++ {
 		if m.cursor == i {
@@ -84,8 +74,12 @@ func (m *WizardIntro) View() string {
 }
 
 func (m *WizardIntro) ShortHelp() []key.Binding {
-	// TODO: actually return something
-	return nil
+	kb := make([]key.Binding, 0)
+	kb = append(kb,
+		m.Common.KeyMap.UpDown,
+		m.Common.KeyMap.Section,
+	)
+	return kb
 }
 
 func (m *WizardIntro) FullHelp() [][]key.Binding {
