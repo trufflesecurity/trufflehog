@@ -67,7 +67,6 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	}
 
 	gcsMgr, err := newGCSManager(conn.ProjectId,
-		withAPIKey(aCtx, conn.GetApiKey()),
 		withIncludeBuckets(conn.GetIncludeBuckets()),
 		withExcludeBuckets(conn.GetExcludeBuckets()),
 		withIncludeObjects(conn.GetIncludeObjects()),

@@ -71,7 +71,10 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, with include buckets",
 			projID: testProjectID,
-			opts:   []gcsManagerOption{withIncludeBuckets([]string{bucket1, bucket2})},
+			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
+				withIncludeBuckets([]string{bucket1, bucket2}),
+			},
 			want: &gcsManager{
 				projectID:      testProjectID,
 				includeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
@@ -91,7 +94,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, with exclude buckets",
 			projID: testProjectID,
-			opts:   []gcsManagerOption{withExcludeBuckets([]string{bucket1, bucket2})},
+			opts:   []gcsManagerOption{withExcludeBuckets([]string{bucket1, bucket2}), withAPIKey(ctx, testAPIKey)},
 			want: &gcsManager{
 				projectID:      testProjectID,
 				excludeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
@@ -112,6 +115,7 @@ func TestNewGcsManager(t *testing.T) {
 			name:   "new gcs manager, with include and exclude buckets",
 			projID: testProjectID,
 			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
 				withIncludeBuckets([]string{bucket1, bucket2}),
 				withExcludeBuckets([]string{"bucket3", "bucket4"}),
 			},
@@ -125,6 +129,7 @@ func TestNewGcsManager(t *testing.T) {
 			name:   "new gcs manager, with include and exclude buckets and api key",
 			projID: testProjectID,
 			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
 				withIncludeBuckets([]string{bucket1, bucket2}),
 				withExcludeBuckets([]string{"bucket3", "bucket4"}),
 				withAPIKey(ctx, testAPIKey),
@@ -138,7 +143,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, with include objects, no bucket",
 			projID: testProjectID,
-			opts:   []gcsManagerOption{withIncludeObjects([]string{"object1", "object2"})},
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withIncludeObjects([]string{"object1", "object2"})},
 			want: &gcsManager{
 				projectID:      testProjectID,
 				includeObjects: map[string]struct{}{object1: {}, object2: {}},
@@ -149,6 +154,7 @@ func TestNewGcsManager(t *testing.T) {
 			name:   "new gcs manager, with include objects, include buckets",
 			projID: testProjectID,
 			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
 				withIncludeObjects([]string{"object1", "object2"}),
 				withIncludeBuckets([]string{bucket1, bucket2}),
 			},
@@ -177,7 +183,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, with exclude objects",
 			projID: testProjectID,
-			opts:   []gcsManagerOption{withExcludeObjects([]string{"object1", "object2"})},
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withExcludeObjects([]string{"object1", "object2"})},
 			want: &gcsManager{
 				projectID:      testProjectID,
 				excludeObjects: map[string]struct{}{object1: {}, object2: {}},
@@ -198,6 +204,7 @@ func TestNewGcsManager(t *testing.T) {
 			name:   "new gcs manager, with include and exclude objects",
 			projID: testProjectID,
 			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
 				withIncludeObjects([]string{"object1", "object2"}),
 				withExcludeObjects([]string{"object3", "object4"}),
 			},
@@ -210,7 +217,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, with concurrency",
 			projID: testProjectID,
-			opts:   []gcsManagerOption{withConcurrency(10)},
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withConcurrency(10)},
 			want: &gcsManager{
 				projectID:   testProjectID,
 				concurrency: 10,
@@ -219,6 +226,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, default concurrency",
 			projID: testProjectID,
+			opts:   []gcsManagerOption{withDefaultADC(ctx)},
 			want: &gcsManager{
 				projectID:   testProjectID,
 				concurrency: defaultConcurrency,
@@ -227,7 +235,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, with negative concurrency",
 			projID: testProjectID,
-			opts:   []gcsManagerOption{withConcurrency(-1)},
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withConcurrency(-1)},
 			want: &gcsManager{
 				projectID:   testProjectID,
 				concurrency: defaultConcurrency,
@@ -245,6 +253,11 @@ func TestNewGcsManager(t *testing.T) {
 
 			if err != nil {
 				return
+			}
+
+			// The client should never be nil.
+			if got.client == nil {
+				t.Errorf("newGCSManager() client should not be nil")
 			}
 
 			if !cmp.Equal(got, tc.want, cmp.AllowUnexported(gcsManager{}), cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool")) {
