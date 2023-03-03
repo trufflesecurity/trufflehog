@@ -313,6 +313,8 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-ch
 			}),
 			storage.WithPolicy(storage.RetryAlways),
 		)
+		// TODO (ahrav): Look to extend gcsManager to allow for exact buckets/objects
+		// in include/filters. This will increae performance substantially
 		// If include objects are indicated, then we only need to scan for the
 		// objects that are in the include bucket.
 		// This is an optimization to avoid scanning the entire bucket.
