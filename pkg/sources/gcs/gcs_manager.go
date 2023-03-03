@@ -280,6 +280,7 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]string, error) {
 	for {
 		bkt, err := bkts.Next()
 		if errors.Is(err, iterator.Done) {
+			ctx.Logger().V(5).Info("finished listing buckets", "num_buckets", len(bucketNames))
 			break
 		}
 		if err != nil {
@@ -347,6 +348,7 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandl
 	for {
 		obj, err := objs.Next()
 		if errors.Is(err, iterator.Done) {
+			ctx.Logger().V(5).Info("finished listing objects in bucket")
 			break
 		}
 		if !g.shouldIncludeObject(ctx, obj.Name) || g.shouldExcludeObject(ctx, obj.Name) {
