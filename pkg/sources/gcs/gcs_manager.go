@@ -105,9 +105,8 @@ func withJSONServiceAccount(ctx context.Context, jsonServiceAccount []byte) gcsM
 
 // withDefaultADC uses the default application credentials when creating a new GCS client.
 func withDefaultADC(ctx context.Context) gcsManagerOption {
-	client, err := storage.NewClient(ctx, option.WithScopes(storage.ScopeReadOnly))
-
 	return func(m *gcsManager) error {
+		client, err := defaultADC(ctx)
 		if err != nil {
 			return err
 		}
@@ -115,6 +114,14 @@ func withDefaultADC(ctx context.Context) gcsManagerOption {
 		m.client = client
 		return nil
 	}
+}
+
+func defaultADC(ctx context.Context) (*storage.Client, error) {
+	client, err := storage.NewClient(ctx, option.WithScopes(storage.ScopeReadOnly))
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 // withIncludeBuckets sets the buckets that should be included in the scan.
@@ -218,6 +225,16 @@ func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, err
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
+
+	// If no client was provided, use the default application credentials.
+	// A client is required to perform any operations.
+	if gcs.client == nil {
+		c, err := defaultADC(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		gcs.client = c
+	}
 	configureWorkers(gcs)
 
 	return gcs, nil
@@ -230,22 +247,6 @@ func configureWorkers(gcs *gcsManager) {
 
 func (g *gcsManager) listObjects(ctx context.Context) (chan object, error) {
 	ch := make(chan object, 100) // TODO (ahrav): Determine optimal buffer size.
-
-	// var (
-	// 	bucketNames []string
-	// 	err         error
-	// )
-	// if len(g.includeBuckets) > 0 {
-	// 	// Handle include buckets.
-	// 	for bucket := range g.includeBuckets {
-	// 		bucketNames = append(bucketNames, bucket)
-	// 	}
-	// } else {
-	// 	// Get all the buckets in the project.
-	// 	if bucketNames, err = g.listBuckets(ctx); err != nil {
-	// 		return nil, fmt.Errorf("failed to list buckets: %w", err)
-	// 	}
-	// }
 
 	// Get all the buckets in the project.
 	bucketNames, err := g.listBuckets(ctx)
