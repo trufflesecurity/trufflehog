@@ -473,7 +473,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 					bucket:      testBucket,
 					contentType: "text/plain",
 					size:        12,
-					link:        "https://storage.googleapis.com/download/storage/v1/b/test-bkt-th/o/moar2.txt?generation=1677871000000000&alt=media",
+					link:        "https://storage.googleapis.com/download/storage/v1/b/test-bkt-th/o/moar2.txt?generation=1677871000378542&alt=media",
 					acl:         []string{},
 				},
 			},
@@ -507,7 +507,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 				}()
 				res := make([]object, 0, len(tc.want))
 				for obj := range got {
-					res = append(res, obj)
+					res = append(res, obj.(object))
 				}
 
 				if len(res) != len(tc.want) {
@@ -524,7 +524,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 				sort.Slice(tc.want, func(i, j int) bool { return tc.want[i].name < tc.want[j].name })
 
 				// Test the objects are equal.
-				if diff := cmp.Diff(res, tc.want, cmp.AllowUnexported(object{}), cmpopts.IgnoreFields(object{}, "reader", "createdAt", "updatedAt")); diff != "" {
+				if diff := cmp.Diff(res, tc.want, cmp.AllowUnexported(object{}), cmpopts.IgnoreFields(object{}, "Reader", "createdAt", "updatedAt")); diff != "" {
 					t.Errorf("gcsManager.listObjects() mismatch (-want +got):\n%s", diff)
 				}
 			}()
