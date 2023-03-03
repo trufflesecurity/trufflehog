@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -26,6 +27,7 @@ type Source struct {
 	gcsManager objectManager
 	jobPool    *errgroup.Group
 	log        logr.Logger
+	chunksCh   chan *sources.Chunk
 	sources.Progress
 }
 
@@ -83,9 +85,54 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	_, err := s.gcsManager.listObjects(ctx)
+	objectCh, err := s.gcsManager.listObjects(ctx)
 	if err != nil {
 		return fmt.Errorf("error listing objects: %w", err)
+	}
+
+	s.chunksCh = chunksChan
+
+	for obj := range objectCh {
+		o, ok := obj.(object)
+		if !ok {
+			return fmt.Errorf("error casting object to GCS object")
+		}
+
+		if err := s.processObject(ctx, o); err != nil {
+			ctx.Logger().V(2).Info("error processing object", "error", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) processObject(ctx context.Context, o object) error {
+	meta := &source_metadatapb.MetaData{
+		Data: &source_metadatapb.MetaData_Gcs{
+			Gcs: &source_metadatapb.GCS{
+				Bucket:   o.bucket,
+				Filename: o.name,
+				Link:     o.link,
+				Email:    o.owner,
+				// Acl: o.acl,
+				CreatedAt: o.createdAt.String(),
+				UpdatedAt: o.updatedAt.String(),
+			},
+		},
+	}
+
+	chunk := &sources.Chunk{
+		SourceName:     s.name,
+		SourceType:     s.Type(),
+		SourceID:       s.sourceId,
+		Verify:         s.verify,
+		SourceMetadata: meta,
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case s.chunksCh <- chunk:
 	}
 
 	return nil

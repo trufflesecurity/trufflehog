@@ -2,8 +2,6 @@ package gcs
 
 import (
 	aCtx "context"
-	"encoding"
-	"encoding/json"
 	"fmt"
 	"io"
 	"runtime"
@@ -26,13 +24,13 @@ var defaultConcurrency = runtime.NumCPU()
 // BinaryReader allows for reading the object's content,
 // as well as marshaling the object to a binary format,
 // which can then be used to populate a protobuf message.
-type BinaryReader interface {
-	encoding.BinaryMarshaler
-	io.Reader
-}
+// type BinaryReader interface {
+// 	encoding.BinaryMarshaler
+// 	io.Reader
+// }
 
 type objectManager interface {
-	listObjects(context.Context) (chan BinaryReader, error)
+	listObjects(context.Context) (chan io.Reader, error)
 }
 
 // bucketManager is a simplified *storage.Client wrapper.
@@ -255,12 +253,8 @@ type object struct {
 	io.Reader
 }
 
-func (o object) MarshalBinary() (data []byte, err error) {
-	return json.Marshal(o)
-}
-
-func (g *gcsManager) listObjects(ctx context.Context) (chan BinaryReader, error) {
-	ch := make(chan BinaryReader, 100) // TODO (ahrav): Determine optimal buffer size.
+func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
+	ch := make(chan io.Reader, 100) // TODO (ahrav): Determine optimal buffer size.
 
 	// Get all the buckets in the project.
 	bucketNames, err := g.listBuckets(ctx)
@@ -311,8 +305,8 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]string, error) {
 	return bucketNames, nil
 }
 
-func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-chan BinaryReader {
-	ch := make(chan BinaryReader, 100)
+func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-chan io.Reader {
+	ch := make(chan io.Reader, 100)
 
 	go func() {
 		defer close(ch)
@@ -344,7 +338,7 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-ch
 	return ch
 }
 
-func (g *gcsManager) includeBucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan BinaryReader) {
+func (g *gcsManager) includeBucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan io.Reader) {
 	for o := range g.includeObjects {
 		obj := bkt.Object(o)
 
@@ -357,7 +351,7 @@ func (g *gcsManager) includeBucketObjects(ctx context.Context, bkt *storage.Buck
 	}
 }
 
-func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan BinaryReader) {
+func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan io.Reader) {
 	objs := bkt.Objects(ctx, nil)
 	for {
 		obj, err := objs.Next()
