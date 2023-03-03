@@ -83,5 +83,10 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	_, err := s.gcsManager.listObjects(ctx)
+	if err != nil {
+		return fmt.Errorf("error listing objects: %w", err)
+	}
+
 	return nil
 }
