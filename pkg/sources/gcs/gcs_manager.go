@@ -10,6 +10,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/gobwas/glob"
+	"github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
@@ -26,6 +27,7 @@ type object struct {
 	bucket      string
 	contentType string
 	owner       string
+	link        string
 	// acl represents an ACLEntities.
 	// https://pkg.go.dev/cloud.google.com/go/storage#ACLEntity
 	acl       []string
@@ -90,6 +92,20 @@ func withAPIKey(ctx context.Context, apiKey string) gcsManagerOption {
 // withJSONServiceAccount uses the provided JSON service account when creating a new GCS client.
 func withJSONServiceAccount(ctx context.Context, jsonServiceAccount []byte) gcsManagerOption {
 	client, err := storage.NewClient(ctx, option.WithCredentialsJSON(jsonServiceAccount), option.WithScopes(storage.ScopeReadOnly))
+
+	return func(m *gcsManager) error {
+		if err != nil {
+			return err
+		}
+
+		m.client = client
+		return nil
+	}
+}
+
+// withDefaultADC uses the default application credentials when creating a new GCS client.
+func withDefaultADC(ctx context.Context) gcsManagerOption {
+	client, err := storage.NewClient(ctx, option.WithScopes(storage.ScopeReadOnly))
 
 	return func(m *gcsManager) error {
 		if err != nil {
@@ -215,20 +231,26 @@ func configureWorkers(gcs *gcsManager) {
 func (g *gcsManager) listObjects(ctx context.Context) (chan object, error) {
 	ch := make(chan object, 100) // TODO (ahrav): Determine optimal buffer size.
 
-	var (
-		bucketNames []string
-		err         error
-	)
-	if len(g.includeBuckets) > 0 {
-		// Handle include buckets.
-		for bucket := range g.includeBuckets {
-			bucketNames = append(bucketNames, bucket)
-		}
-	} else {
-		// Get all the buckets in the project.
-		if bucketNames, err = g.listBuckets(ctx); err != nil {
-			return nil, fmt.Errorf("failed to list buckets: %w", err)
-		}
+	// var (
+	// 	bucketNames []string
+	// 	err         error
+	// )
+	// if len(g.includeBuckets) > 0 {
+	// 	// Handle include buckets.
+	// 	for bucket := range g.includeBuckets {
+	// 		bucketNames = append(bucketNames, bucket)
+	// 	}
+	// } else {
+	// 	// Get all the buckets in the project.
+	// 	if bucketNames, err = g.listBuckets(ctx); err != nil {
+	// 		return nil, fmt.Errorf("failed to list buckets: %w", err)
+	// 	}
+	// }
+
+	// Get all the buckets in the project.
+	bucketNames, err := g.listBuckets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
 
 	for _, bucket := range bucketNames {
@@ -259,33 +281,18 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]string, error) {
 		if errors.Is(err, iterator.Done) {
 			break
 		}
-		if g.shouldExcludeBucket(ctx, bkt.Name) {
-			continue
-		}
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve bucket: %w", err)
 		}
+
+		if !g.shouldIncludeBucket(ctx, bkt.Name) || g.shouldExcludeBucket(ctx, bkt.Name) {
+			continue
+		}
+
 		bucketNames = append(bucketNames, bkt.Name)
 	}
 
 	return bucketNames, nil
-}
-
-func (g *gcsManager) shouldExcludeBucket(ctx context.Context, bkt string) bool {
-	for bucket := range g.excludeBuckets {
-		g, err := glob.Compile(bucket)
-		if err != nil {
-			ctx.Logger().V(1).Info("failed to compile glob", "glob", bucket, "error", err)
-			continue
-		}
-
-		if g.Match(bkt) {
-			ctx.Logger().V(3).Info("skipping bucket", "bucket", bkt, "glob", bucket)
-			return true
-		}
-	}
-	return false
 }
 
 func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-chan object {
@@ -297,14 +304,21 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-ch
 		logger := ctx.Logger().WithValues("bucket", bktName)
 		logger.V(5).Info("listing object(s) in bucket")
 
-		bkt := g.client.Bucket(bktName)
-		// If include objects are includes and the bucket is in the include
-		// buckets, then we only need to scan for the objects that are in the
-		// include bucket.
-		if _, ok := g.includeBuckets[bktName]; ok && len(g.includeObjects) > 0 {
-			g.includeBucketObjects(ctx, bkt, ch)
-			return
-		}
+		bkt := g.client.Bucket(bktName).Retryer(
+			storage.WithBackoff(gax.Backoff{
+				Initial:    2 * time.Second,
+				Max:        30 * time.Second,
+				Multiplier: 1.5,
+			}),
+			storage.WithPolicy(storage.RetryAlways),
+		)
+		// If include objects are indicated, then we only need to scan for the
+		// objects that are in the include bucket.
+		// This is an optimization to avoid scanning the entire bucket.
+		// if len(g.includeObjects) > 0 {
+		// 	g.includeBucketObjects(ctx, bkt, ch)
+		// 	return
+		// }
 
 		g.bucketObjects(ctx, bkt, ch)
 	}()
@@ -332,7 +346,7 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandl
 		if errors.Is(err, iterator.Done) {
 			break
 		}
-		if g.shouldExcludeObject(ctx, obj.Name) {
+		if !g.shouldIncludeObject(ctx, obj.Name) || g.shouldExcludeObject(ctx, obj.Name) {
 			continue
 		}
 
@@ -367,6 +381,7 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 		bucket:      attrs.Bucket,
 		contentType: attrs.ContentType,
 		owner:       attrs.Owner,
+		link:        attrs.MediaLink,
 		createdAt:   attrs.Created,
 		updatedAt:   attrs.Updated,
 		acl:         objectACLs(attrs.ACL),
@@ -377,20 +392,52 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 	return &object, nil
 }
 
+func (g *gcsManager) shouldIncludeBucket(ctx context.Context, bkt string) bool {
+	if len(g.includeBuckets) == 0 {
+		return true
+	}
+	return shouldProcess(ctx, bkt, g.includeBuckets, globMatches)
+}
+
+func (g *gcsManager) shouldExcludeBucket(ctx context.Context, bkt string) bool {
+	return shouldProcess(ctx, bkt, g.excludeBuckets, globMatches)
+}
+
+func (g *gcsManager) shouldIncludeObject(ctx context.Context, obj string) bool {
+	if len(g.includeObjects) == 0 {
+		return true
+	}
+	return shouldProcess(ctx, obj, g.includeObjects, globMatches)
+}
+
 func (g *gcsManager) shouldExcludeObject(ctx context.Context, obj string) bool {
-	for object := range g.excludeObjects {
-		g, err := glob.Compile(object)
+	return shouldProcess(ctx, obj, g.excludeObjects, globMatches)
+}
+
+type globMatcherFn func(string, glob.Glob) bool
+
+func shouldProcess(ctx context.Context, s string, matchers map[string]struct{}, matcherFn globMatcherFn) bool {
+	if len(matchers) == 0 {
+		return false
+	}
+
+	for m := range matchers {
+		g, err := glob.Compile(m)
 		if err != nil {
-			ctx.Logger().V(1).Info("failed to compile glob", "glob", object, "error", err)
+			ctx.Logger().V(1).Info("failed to compile glob", "glob", m, "error", err)
 			continue
 		}
 
-		if g.Match(obj) {
-			ctx.Logger().V(3).Info("skipping object", "object", obj, "glob", object)
+		if matcherFn(s, g) {
 			return true
 		}
 	}
+
 	return false
+}
+
+func globMatches(s string, g glob.Glob) bool {
+	return g.Match(s)
 }
 
 func objectACLs(acl []storage.ACLRule) []string {
