@@ -47,10 +47,19 @@ type mockObjectManager struct {
 	wantErr bool
 }
 
-type mockReader struct{}
+type mockReader struct {
+	offset int
+	data   []byte
+}
 
-func (m *mockReader) Read(_ []byte) (n int, err error) {
-	return 0, nil
+func (m *mockReader) Read(p []byte) (n int, err error) {
+	if m.offset >= len(m.data) {
+		return 0, io.EOF
+	}
+
+	n = copy(p, m.data[m.offset:])
+	m.offset += n
+	return
 }
 
 func (m *mockObjectManager) listObjects(context.Context) (chan io.Reader, error) {
@@ -79,7 +88,7 @@ func createTestObject(id int) object {
 		link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
 		acl:         []string{"authenticatedUsers"},
 		size:        42,
-		Reader:      &mockReader{},
+		Reader:      &mockReader{data: []byte(fmt.Sprintf("hello world %d", id))},
 	}
 }
 
@@ -89,6 +98,7 @@ func createTestSourceChunk(id int) *sources.Chunk {
 		SourceType: sourcespb.SourceType_SOURCE_TYPE_GCS,
 		SourceID:   0,
 		Verify:     true,
+		Data:       []byte(fmt.Sprintf("hello world %d", id)),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Gcs{
 				Gcs: &source_metadatapb.GCS{
@@ -133,6 +143,8 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 			t, res[count].SourceMetadata.Data.(*source_metadatapb.MetaData_Gcs).Gcs.Filename,
 			ch.SourceMetadata.Data.(*source_metadatapb.MetaData_Gcs).Gcs.Filename,
 		)
+		// Check the data is the same.
+		assert.Equal(t, res[count].Data, ch.Data)
 		count++
 	}
 	assert.Equal(t, 5, count)
