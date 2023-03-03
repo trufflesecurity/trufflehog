@@ -2,6 +2,7 @@ package gcs
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
@@ -89,9 +90,23 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	if err != nil {
 		return fmt.Errorf("error listing objects: %w", err)
 	}
-
 	s.chunksCh = chunksChan
 
+	// Setup workers to process objects.
+	s.jobPool.Go(func() error {
+		if err := s.processObjects(ctx, objectCh); err != nil {
+			ctx.Logger().V(1).Info("GCS source error processing objects", "name", s.name, "error", err)
+		}
+		return nil
+	})
+
+	_ = s.jobPool.Wait()
+	ctx.Logger().Info("GCS source finished processing", "name", s.name)
+
+	return nil
+}
+
+func (s *Source) processObjects(ctx context.Context, objectCh chan io.Reader) error {
 	for obj := range objectCh {
 		o, ok := obj.(object)
 		if !ok {
@@ -99,7 +114,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		}
 
 		if err := s.processObject(ctx, o); err != nil {
-			ctx.Logger().V(2).Info("error processing object", "error", err)
+			return fmt.Errorf("error processing object: %w", err)
 		}
 	}
 
