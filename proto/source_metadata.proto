@@ -127,7 +127,8 @@ message GCS {
   string email = 4;
   string created_at = 5;
   string updated_at = 6;
-  string acl = 7;
+  repeated string acls = 7;
+  string content_type = 8;
 }
 
 message Jira {
