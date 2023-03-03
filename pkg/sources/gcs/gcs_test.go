@@ -77,9 +77,9 @@ func createTestObject(id int) object {
 		contentType: "plain/text",
 		owner:       "testman@test.com",
 		link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
-		// acl:         []string{"authenticatedUsers"},
-		size:   42,
-		Reader: &mockReader{},
+		acl:         []string{"authenticatedUsers"},
+		size:        42,
+		Reader:      &mockReader{},
 	}
 }
 
@@ -92,13 +92,12 @@ func createTestSourceChunk(id int) *sources.Chunk {
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Gcs{
 				Gcs: &source_metadatapb.GCS{
-					Filename: fmt.Sprintf("object%d", id),
-					Bucket:   testBucket,
-					// ContentType: "plain/text",
-					Email: "testman@test.com",
-					Link:  fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
-					// Acl:         []string{"authenticatedUsers"},
-					// Size:        42,
+					Filename:    fmt.Sprintf("object%d", id),
+					Bucket:      testBucket,
+					ContentType: "plain/text",
+					Email:       "testman@test.com",
+					Link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
+					Acls:        []string{"authenticatedUsers"},
 				},
 			},
 		},

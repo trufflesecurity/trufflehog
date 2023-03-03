@@ -125,13 +125,14 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 	meta := &source_metadatapb.MetaData{
 		Data: &source_metadatapb.MetaData_Gcs{
 			Gcs: &source_metadatapb.GCS{
-				Bucket:   o.bucket,
-				Filename: o.name,
-				Link:     o.link,
-				Email:    o.owner,
-				// Acl: o.acl,
-				CreatedAt: o.createdAt.String(),
-				UpdatedAt: o.updatedAt.String(),
+				Bucket:      o.bucket,
+				Filename:    o.name,
+				Link:        o.link,
+				Email:       o.owner,
+				ContentType: o.contentType,
+				Acls:        o.acl,
+				CreatedAt:   o.createdAt.String(),
+				UpdatedAt:   o.updatedAt.String(),
 			},
 		},
 	}
