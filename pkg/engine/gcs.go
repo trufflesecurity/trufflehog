@@ -15,8 +15,8 @@ import (
 
 // ScanGCS scans GCS with the provided options.
 func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
-	if c.ApiKey == "" || c.ProjectID == "" {
-		return fmt.Errorf("api key and project ID are required")
+	if c.ProjectID == "" {
+		return fmt.Errorf("project ID is required")
 	}
 
 	connection := sourcespb.GCS{
