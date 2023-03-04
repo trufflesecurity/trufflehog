@@ -39,9 +39,6 @@ type bucketManager interface {
 type gcsManager struct {
 	projectID string
 
-	// resumeFrom is the name of the last object that was processed.
-	// This works because GCS returns objects in lexicographical order.
-	resumeFrom  string
 	concurrency int
 	workerPool  *errgroup.Group
 
@@ -328,19 +325,6 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-ch
 	}()
 
 	return ch
-}
-
-func (g *gcsManager) includeBucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan io.Reader) {
-	for o := range g.includeObjects {
-		obj := bkt.Object(o)
-
-		o, err := g.constructObject(ctx, obj)
-		if err != nil {
-			ctx.Logger().V(1).Info("failed to create object", "object-name", o, "error", err)
-			continue
-		}
-		ch <- *o
-	}
 }
 
 func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan io.Reader) {
