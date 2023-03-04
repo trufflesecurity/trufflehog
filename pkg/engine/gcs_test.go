@@ -23,9 +23,9 @@ func TestScanGCS(t *testing.T) {
 		{
 			name: "missing API key",
 			gcsConfig: sources.GCSConfig{
-				ApiKey: "",
+				ApiKey:    "",
+				ProjectID: "test-project",
 			},
-			wantErr: true,
 		},
 		{
 			name: "missing project ID",

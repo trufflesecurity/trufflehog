@@ -102,6 +102,9 @@ var (
 	s3ScanCloudEnv = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
 	s3ScanBuckets  = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 
+	gcsScan      = cli.Command("gcs", "Find credentials in GCS buckets.")
+	gcsProjectID = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
+
 	syslogScan     = cli.Command("syslog", "Scan syslog")
 	syslogAddress  = syslogScan.Flag("address", "Address and port to listen on for syslog. Example: 127.0.0.1:514").String()
 	syslogProtocol = syslogScan.Flag("protocol", "Protocol to listen on. udp or tcp").String()
@@ -360,6 +363,13 @@ func run(state overseer.State) {
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logFatal(err, "Failed to scan CircleCI.")
+		}
+	case gcsScan.FullCommand():
+		cfg := sources.GCSConfig{
+			ProjectID: *gcsProjectID,
+		}
+		if err := e.ScanGCS(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan GCS.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -120,7 +119,6 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 
 	source := &Source{
 		gcsManager: &mockObjectManager{},
-		jobPool:    new(errgroup.Group),
 		chunksCh:   chunksCh,
 	}
 

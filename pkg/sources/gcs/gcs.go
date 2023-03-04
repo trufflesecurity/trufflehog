@@ -3,12 +3,11 @@ package gcs
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
-	"github.com/go-logr/logr"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/go-errors/errors"
+	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -28,7 +27,6 @@ type Source struct {
 	verify      bool
 
 	gcsManager objectManager
-	jobPool    *errgroup.Group
 	log        logr.Logger
 	chunksCh   chan *sources.Chunk
 	sources.Progress
@@ -62,8 +60,6 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	s.sourceId = sourceID
 	s.jobId = id
 	s.concurrency = concurrency
-	s.jobPool = new(errgroup.Group)
-	s.jobPool.SetLimit(concurrency)
 
 	var conn sourcespb.GCS
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -93,31 +89,25 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 	s.chunksCh = chunksChan
 
-	// Setup workers to process objects.
-	s.jobPool.Go(func() error {
-		if err := s.processObjects(ctx, objectCh); err != nil {
-			ctx.Logger().V(1).Info("GCS source error processing objects", "name", s.name, "error", err)
-		}
-		return nil
-	})
-
-	_ = s.jobPool.Wait()
-	ctx.Logger().Info("GCS source finished processing", "name", s.name)
-
-	return nil
-}
-
-func (s *Source) processObjects(ctx context.Context, objectCh <-chan io.Reader) error {
+	var wg sync.WaitGroup
 	for obj := range objectCh {
+		obj := obj
 		o, ok := obj.(object)
 		if !ok {
-			return fmt.Errorf("error casting object to GCS object")
+			ctx.Logger().Error(errors.New("error casting object to GCS object"), "name", s.name)
+			continue
 		}
 
-		if err := s.processObject(ctx, o); err != nil {
-			return fmt.Errorf("error processing object: %w", err)
-		}
+		wg.Add(1)
+		go func(obj object) {
+			defer wg.Done()
+
+			if err := s.processObject(ctx, o); err != nil {
+				ctx.Logger().V(1).Info("GCS source error processing objects", "name", s.name, "error", err)
+			}
+		}(o)
 	}
+	ctx.Logger().Info("GCS source finished processing", "name", s.name)
 
 	return nil
 }
