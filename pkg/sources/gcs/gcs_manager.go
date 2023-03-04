@@ -16,6 +16,7 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -379,6 +380,10 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 	object.Reader = rc
 
 	return &object, nil
+}
+
+func isObjectTypeValid(name string) bool {
+	return !common.SkipFile(name)
 }
 
 func (g *gcsManager) shouldIncludeBucket(ctx context.Context, bkt string) bool {

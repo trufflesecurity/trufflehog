@@ -530,3 +530,34 @@ func TestGCSManagerListObjects(t *testing.T) {
 		})
 	}
 }
+
+func Test_isObjectTypeValid(t *testing.T) {
+	testCases := []struct {
+		name    string
+		objName string
+		want    bool
+	}{
+		{
+			name:    "valid object type, text",
+			objName: "aws1.txt",
+			want:    true,
+		},
+		{
+			name:    "valid object type, zip",
+			objName: "aws1.zip",
+			want:    true,
+		},
+		{
+			name:    "invalid object type",
+			objName: "video.mp4",
+			want:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotBool := isObjectTypeValid(tc.objName)
+			assert.Equal(t, tc.want, gotBool)
+		})
+	}
+}
