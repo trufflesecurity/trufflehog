@@ -107,6 +107,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 		}(o)
 	}
+	wg.Wait()
+
 	ctx.Logger().Info("GCS source finished processing", "name", s.name)
 
 	return nil
