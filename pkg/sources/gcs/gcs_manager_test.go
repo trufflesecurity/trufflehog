@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -236,6 +237,46 @@ func TestNewGcsManager(t *testing.T) {
 			want: &gcsManager{
 				projectID:   testProjectID,
 				concurrency: defaultConcurrency,
+			},
+		},
+		{
+			name:   "new gcs manager, with valid max object size",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withMaxObjectSize(10)},
+			want: &gcsManager{
+				projectID:     testProjectID,
+				concurrency:   defaultConcurrency,
+				maxObjectSize: 10,
+			},
+		},
+		{
+			name:   "new gcs manager, with negative max object size",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withMaxObjectSize(-1)},
+			want: &gcsManager{
+				projectID:     testProjectID,
+				concurrency:   defaultConcurrency,
+				maxObjectSize: defaultMaxObjectSize,
+			},
+		},
+		{
+			name:   "new gcs manager, max object size above limit",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withMaxObjectSize(int64(2 * common.GB))},
+			want: &gcsManager{
+				projectID:     testProjectID,
+				concurrency:   defaultConcurrency,
+				maxObjectSize: defaultMaxObjectSize,
+			},
+		},
+		{
+			name:   "new gcs manager, with max object size 0",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withDefaultADC(ctx), withMaxObjectSize(0)},
+			want: &gcsManager{
+				projectID:     testProjectID,
+				concurrency:   defaultConcurrency,
+				maxObjectSize: defaultMaxObjectSize,
 			},
 		},
 	}
@@ -554,10 +595,63 @@ func Test_isObjectTypeValid(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotBool := isObjectTypeValid(tc.objName)
-			assert.Equal(t, tc.want, gotBool)
+			got := isObjectTypeValid(ctx, tc.objName)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func Test_isObjectSizeValid(t *testing.T) {
+	testCases := []struct {
+		name    string
+		objSize int64
+		want    bool
+	}{
+		{
+			name:    "valid object size, 150 bytes",
+			objSize: 150,
+			want:    true,
+		},
+		{
+			name:    "valid object size, 1 MB",
+			objSize: int64(1 * common.MB),
+			want:    true,
+		},
+		{
+			name:    "valid object size, 100 MB",
+			objSize: int64(100 * common.MB),
+			want:    true,
+		},
+		{
+			name:    "valid object size, 1 GB",
+			objSize: int64(1 * common.GB),
+			want:    true,
+		},
+		{
+			name:    "invalid object size, 2 GB",
+			objSize: int64(2 * common.GB),
+			want:    false,
+		},
+		{
+			name:    "invalid object size, empty object",
+			objSize: 0,
+			want:    false,
+		},
+		{
+			name:    "invalid object size, negative object size",
+			objSize: -1,
+			want:    false,
+		},
+	}
+
+	ctx := context.Background()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isObjectSizeValid(ctx, tc.objSize)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

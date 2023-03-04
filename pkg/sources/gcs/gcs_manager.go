@@ -20,7 +20,14 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-var defaultConcurrency = runtime.NumCPU()
+const (
+	defaultMaxObjectSize = 500 * 1024 * 1024      // 500MB
+	maxObjectSizeLimit   = 1 * 1024 * 1024 * 1024 // 1GB
+)
+
+var (
+	defaultConcurrency = runtime.NumCPU()
+)
 
 type objectManager interface {
 	listObjects(context.Context) (chan io.Reader, error)
@@ -43,8 +50,9 @@ type gcsManager struct {
 	concurrency int
 	workerPool  *errgroup.Group
 
-	numBuckets uint32
-	numObjects uint64
+	maxObjectSize int64
+	numBuckets    uint32
+	numObjects    uint64
 
 	includeBuckets,
 	excludeBuckets,
@@ -187,6 +195,21 @@ func withConcurrency(concurrency int) gcsManagerOption {
 		} else {
 			m.concurrency = concurrency
 		}
+		return nil
+	}
+}
+
+// withMaxObjectSize sets the maximum size of objects that will be scanned.
+// If not set, set to a negative number, or set larger than 1GB,
+// the default value of 500MB will be used.
+func withMaxObjectSize(maxObjectSize int64) gcsManagerOption {
+	return func(m *gcsManager) error {
+		if maxObjectSize <= 0 || maxObjectSize > maxObjectSizeLimit {
+			m.maxObjectSize = defaultMaxObjectSize
+		} else {
+			m.maxObjectSize = maxObjectSize
+		}
+
 		return nil
 	}
 }
@@ -350,40 +373,58 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandl
 			ctx.Logger().V(1).Info("failed to create object", "object-name", obj.Name, "error", err)
 			continue
 		}
-		ch <- *o
+		ch <- o
 	}
 }
 
-func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHandle) (*object, error) {
+func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHandle) (object, error) {
+	o := object{}
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve object attributes: %w", err)
+		return o, fmt.Errorf("failed to retrieve object attributes: %w", err)
 	}
 
-	atomic.AddUint64(&g.numObjects, 1)
+	if !isObjectTypeValid(ctx, attrs.Name) || !isObjectSizeValid(ctx, attrs.Size) {
+		return o, fmt.Errorf("object is not valid")
+	}
+
 	rc, err := obj.NewReader(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve object reader: %w", err)
+		return o, fmt.Errorf("failed to retrieve object reader: %w", err)
 	}
 
-	object := object{
-		name:        attrs.Name,
-		bucket:      attrs.Bucket,
-		contentType: attrs.ContentType,
-		owner:       attrs.Owner,
-		link:        attrs.MediaLink,
-		createdAt:   attrs.Created,
-		updatedAt:   attrs.Updated,
-		acl:         objectACLs(attrs.ACL),
-		size:        attrs.Size,
-	}
-	object.Reader = rc
+	o.name = attrs.Name
+	o.bucket = attrs.Bucket
+	o.contentType = attrs.ContentType
+	o.owner = attrs.Owner
+	o.link = attrs.MediaLink
+	o.createdAt = attrs.Created
+	o.updatedAt = attrs.Updated
+	o.acl = objectACLs(attrs.ACL)
+	o.size = attrs.Size
+	o.Reader = rc
 
-	return &object, nil
+	atomic.AddUint64(&g.numObjects, 1)
+
+	return o, nil
 }
 
-func isObjectTypeValid(name string) bool {
-	return !common.SkipFile(name)
+func isObjectTypeValid(ctx context.Context, name string) bool {
+	isValid := !common.SkipFile(name)
+	if !isValid {
+		ctx.Logger().V(2).Info("object type is invalid", "object-name", name)
+		return false
+	}
+	return true
+}
+
+func isObjectSizeValid(ctx context.Context, size int64) bool {
+	isValid := size > 0 && size <= maxObjectSizeLimit
+	if !isValid {
+		ctx.Logger().V(2).Info("object size is invalid", "object-size", size)
+		return false
+	}
+	return true
 }
 
 func (g *gcsManager) shouldIncludeBucket(ctx context.Context, bkt string) bool {
