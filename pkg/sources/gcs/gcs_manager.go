@@ -21,14 +21,6 @@ import (
 
 var defaultConcurrency = runtime.NumCPU()
 
-// BinaryReader allows for reading the object's content,
-// as well as marshaling the object to a binary format,
-// which can then be used to populate a protobuf message.
-// type BinaryReader interface {
-// 	encoding.BinaryMarshaler
-// 	io.Reader
-// }
-
 type objectManager interface {
 	listObjects(context.Context) (chan io.Reader, error)
 }
