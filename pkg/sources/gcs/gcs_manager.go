@@ -220,8 +220,9 @@ func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, err
 	}
 
 	gcs := &gcsManager{
-		projectID:   projectID,
-		concurrency: defaultConcurrency,
+		projectID:     projectID,
+		concurrency:   defaultConcurrency,
+		maxObjectSize: defaultMaxObjectSize,
 	}
 
 	for _, opt := range opts {
@@ -384,7 +385,7 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 		return o, fmt.Errorf("failed to retrieve object attributes: %w", err)
 	}
 
-	if !isObjectTypeValid(ctx, attrs.Name) || !isObjectSizeValid(ctx, attrs.Size) {
+	if !isObjectTypeValid(ctx, attrs.Name) || !g.isObjectSizeValid(ctx, attrs.Size) {
 		return o, fmt.Errorf("object is not valid")
 	}
 
@@ -418,8 +419,8 @@ func isObjectTypeValid(ctx context.Context, name string) bool {
 	return true
 }
 
-func isObjectSizeValid(ctx context.Context, size int64) bool {
-	isValid := size > 0 && size <= maxObjectSizeLimit
+func (g *gcsManager) isObjectSizeValid(ctx context.Context, size int64) bool {
+	isValid := size > 0 && size <= g.maxObjectSize
 	if !isValid {
 		ctx.Logger().V(2).Info("object size is invalid", "object-size", size)
 		return false

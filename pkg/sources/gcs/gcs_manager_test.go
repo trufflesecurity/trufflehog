@@ -38,7 +38,7 @@ func TestNewGcsManager(t *testing.T) {
 		{
 			name:   "new gcs manager, no options",
 			projID: testProjectID,
-			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency},
+			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
 		},
 		{
 			name:    "new gcs manager, no project id",
@@ -49,7 +49,7 @@ func TestNewGcsManager(t *testing.T) {
 			name:   "new gcs manager, with api key",
 			projID: testProjectID,
 			opts:   []gcsManagerOption{withAPIKey(ctx, testAPIKey)},
-			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency},
+			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
 		},
 		{
 			name:   "new gcs manager, with json service account",
@@ -58,13 +58,13 @@ func TestNewGcsManager(t *testing.T) {
 				"type": "service_account",
 				"project_id": "test-project"}`,
 			))},
-			want: &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency},
+			want: &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
 		},
 		{
 			name:   "new gcs manager, with default ADC account",
 			projID: testProjectID,
 			opts:   []gcsManagerOption{withDefaultADC(ctx)},
-			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency},
+			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
 		},
 		{
 			name:   "new gcs manager, with include buckets",
@@ -77,6 +77,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				includeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -87,6 +88,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				includeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -97,6 +99,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				excludeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -107,6 +110,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				excludeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -121,6 +125,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				includeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -136,6 +141,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				includeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -146,6 +152,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				includeObjects: map[string]struct{}{object1: {}, object2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -161,6 +168,7 @@ func TestNewGcsManager(t *testing.T) {
 				includeObjects: map[string]struct{}{object1: {}, object2: {}},
 				includeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -176,6 +184,7 @@ func TestNewGcsManager(t *testing.T) {
 				includeObjects: map[string]struct{}{object1: {}, object2: {}},
 				includeBuckets: map[string]struct{}{bucket1: {}, bucket2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -186,6 +195,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				excludeObjects: map[string]struct{}{object1: {}, object2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -196,6 +206,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				excludeObjects: map[string]struct{}{object1: {}, object2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -210,6 +221,7 @@ func TestNewGcsManager(t *testing.T) {
 				projectID:      testProjectID,
 				includeObjects: map[string]struct{}{object1: {}, object2: {}},
 				concurrency:    defaultConcurrency,
+				maxObjectSize:  defaultMaxObjectSize,
 			},
 		},
 		{
@@ -217,8 +229,9 @@ func TestNewGcsManager(t *testing.T) {
 			projID: testProjectID,
 			opts:   []gcsManagerOption{withDefaultADC(ctx), withConcurrency(10)},
 			want: &gcsManager{
-				projectID:   testProjectID,
-				concurrency: 10,
+				projectID:     testProjectID,
+				concurrency:   10,
+				maxObjectSize: defaultMaxObjectSize,
 			},
 		},
 		{
@@ -226,8 +239,9 @@ func TestNewGcsManager(t *testing.T) {
 			projID: testProjectID,
 			opts:   []gcsManagerOption{withDefaultADC(ctx)},
 			want: &gcsManager{
-				projectID:   testProjectID,
-				concurrency: defaultConcurrency,
+				projectID:     testProjectID,
+				concurrency:   defaultConcurrency,
+				maxObjectSize: defaultMaxObjectSize,
 			},
 		},
 		{
@@ -235,8 +249,9 @@ func TestNewGcsManager(t *testing.T) {
 			projID: testProjectID,
 			opts:   []gcsManagerOption{withDefaultADC(ctx), withConcurrency(-1)},
 			want: &gcsManager{
-				projectID:   testProjectID,
-				concurrency: defaultConcurrency,
+				projectID:     testProjectID,
+				concurrency:   defaultConcurrency,
+				maxObjectSize: defaultMaxObjectSize,
 			},
 		},
 		{
@@ -649,8 +664,9 @@ func Test_isObjectSizeValid(t *testing.T) {
 
 	ctx := context.Background()
 	for _, tc := range testCases {
+		g := &gcsManager{}
 		t.Run(tc.name, func(t *testing.T) {
-			got := isObjectSizeValid(ctx, tc.objSize)
+			got := g.isObjectSizeValid(ctx, tc.objSize)
 			assert.Equal(t, tc.want, got)
 		})
 	}
