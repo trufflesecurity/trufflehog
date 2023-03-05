@@ -46,10 +46,16 @@ type Source interface {
 
 // GCSConfig defines the optional configuration for a GCS source.
 type GCSConfig struct {
+	// WithADC is a flag to indicate whether to use application default credentials.
+	WithADC,
+	// WithoutAuth is a flag to indicate whether to use authentication.
+	WithoutAuth bool
 	// ApiKey is the API key to use to authenticate with the source.
 	ApiKey,
 	// ProjectID is the project ID to use to authenticate with the source.
-	ProjectID string
+	ProjectID,
+	// ServiceAccount is the service account to use to authenticate with the source.
+	ServiceAccount string
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency int
 	// IncludeBuckets is a list of buckets to include in the scan.

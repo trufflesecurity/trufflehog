@@ -67,7 +67,6 @@ type gcsManagerOption func(*gcsManager) error
 // This can ONLY be used for public buckets.
 func withAPIKey(ctx context.Context, apiKey string) gcsManagerOption {
 	client, err := storage.NewClient(ctx, option.WithAPIKey(apiKey), option.WithScopes(storage.ScopeReadOnly))
-
 	return func(m *gcsManager) error {
 		if err != nil {
 			return err
@@ -81,7 +80,6 @@ func withAPIKey(ctx context.Context, apiKey string) gcsManagerOption {
 // withJSONServiceAccount uses the provided JSON service account when creating a new GCS client.
 func withJSONServiceAccount(ctx context.Context, jsonServiceAccount []byte) gcsManagerOption {
 	client, err := storage.NewClient(ctx, option.WithCredentialsJSON(jsonServiceAccount), option.WithScopes(storage.ScopeReadOnly))
-
 	return func(m *gcsManager) error {
 		if err != nil {
 			return err
@@ -100,6 +98,19 @@ func withDefaultADC(ctx context.Context) gcsManagerOption {
 			return err
 		}
 
+		m.client = client
+		return nil
+	}
+}
+
+// withoutAuthentication uses an unauthenticated client when creating a new GCS client.
+// This can ONLY be used for public buckets.
+func withoutAuthentication() gcsManagerOption {
+	client, err := storage.NewClient(aCtx.Background(), option.WithoutAuthentication(), option.WithScopes(storage.ScopeReadOnly))
+	return func(m *gcsManager) error {
+		if err != nil {
+			return err
+		}
 		m.client = client
 		return nil
 	}

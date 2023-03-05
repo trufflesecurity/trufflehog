@@ -951,12 +951,14 @@ type GCS struct {
 	// Types that are assignable to Credential:
 	//	*GCS_JsonSa
 	//	*GCS_ApiKey
+	//	*GCS_Unauthenticated
+	//	*GCS_Adc
 	Credential     isGCS_Credential `protobuf_oneof:"credential"`
-	ProjectId      string           `protobuf:"bytes,3,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	IncludeBuckets []string         `protobuf:"bytes,4,rep,name=include_buckets,json=includeBuckets,proto3" json:"include_buckets,omitempty"`
-	ExcludeBuckets []string         `protobuf:"bytes,5,rep,name=exclude_buckets,json=excludeBuckets,proto3" json:"exclude_buckets,omitempty"`
-	IncludeObjects []string         `protobuf:"bytes,6,rep,name=include_objects,json=includeObjects,proto3" json:"include_objects,omitempty"`
-	ExcludeObjects []string         `protobuf:"bytes,7,rep,name=exclude_objects,json=excludeObjects,proto3" json:"exclude_objects,omitempty"`
+	ProjectId      string           `protobuf:"bytes,5,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	IncludeBuckets []string         `protobuf:"bytes,6,rep,name=include_buckets,json=includeBuckets,proto3" json:"include_buckets,omitempty"`
+	ExcludeBuckets []string         `protobuf:"bytes,7,rep,name=exclude_buckets,json=excludeBuckets,proto3" json:"exclude_buckets,omitempty"`
+	IncludeObjects []string         `protobuf:"bytes,8,rep,name=include_objects,json=includeObjects,proto3" json:"include_objects,omitempty"`
+	ExcludeObjects []string         `protobuf:"bytes,9,rep,name=exclude_objects,json=excludeObjects,proto3" json:"exclude_objects,omitempty"`
 }
 
 func (x *GCS) Reset() {
@@ -1012,6 +1014,20 @@ func (x *GCS) GetApiKey() string {
 	return ""
 }
 
+func (x *GCS) GetUnauthenticated() *credentialspb.Unauthenticated {
+	if x, ok := x.GetCredential().(*GCS_Unauthenticated); ok {
+		return x.Unauthenticated
+	}
+	return nil
+}
+
+func (x *GCS) GetAdc() *credentialspb.ADC {
+	if x, ok := x.GetCredential().(*GCS_Adc); ok {
+		return x.Adc
+	}
+	return nil
+}
+
 func (x *GCS) GetProjectId() string {
 	if x != nil {
 		return x.ProjectId
@@ -1059,9 +1075,21 @@ type GCS_ApiKey struct {
 	ApiKey string `protobuf:"bytes,2,opt,name=api_key,json=apiKey,proto3,oneof"`
 }
 
+type GCS_Unauthenticated struct {
+	Unauthenticated *credentialspb.Unauthenticated `protobuf:"bytes,3,opt,name=unauthenticated,proto3,oneof"`
+}
+
+type GCS_Adc struct {
+	Adc *credentialspb.ADC `protobuf:"bytes,4,opt,name=adc,proto3,oneof"`
+}
+
 func (*GCS_JsonSa) isGCS_Credential() {}
 
 func (*GCS_ApiKey) isGCS_Credential() {}
+
+func (*GCS_Unauthenticated) isGCS_Credential() {}
+
+func (*GCS_Adc) isGCS_Credential() {}
 
 type Git struct {
 	state         protoimpl.MessageState
@@ -2837,22 +2865,29 @@ var file_sources_proto_rawDesc = []byte{
 	0x73, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x12, 0x20, 0x0a, 0x0b, 0x64, 0x69, 0x72, 0x65, 0x63, 0x74,
 	0x6f, 0x72, 0x69, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0b, 0x64, 0x69, 0x72,
 	0x65, 0x63, 0x74, 0x6f, 0x72, 0x69, 0x65, 0x73, 0x12, 0x14, 0x0a, 0x05, 0x70, 0x61, 0x74, 0x68,
-	0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x70, 0x61, 0x74, 0x68, 0x73, 0x22, 0x8c,
+	0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x70, 0x61, 0x74, 0x68, 0x73, 0x22, 0xfc,
 	0x02, 0x0a, 0x03, 0x47, 0x43, 0x53, 0x12, 0x19, 0x0a, 0x07, 0x6a, 0x73, 0x6f, 0x6e, 0x5f, 0x73,
 	0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x06, 0x6a, 0x73, 0x6f, 0x6e, 0x53,
 	0x61, 0x12, 0x19, 0x0a, 0x07, 0x61, 0x70, 0x69, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x09, 0x48, 0x00, 0x52, 0x06, 0x61, 0x70, 0x69, 0x4b, 0x65, 0x79, 0x12, 0x1d, 0x0a, 0x0a,
-	0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09,
+	0x28, 0x09, 0x48, 0x00, 0x52, 0x06, 0x61, 0x70, 0x69, 0x4b, 0x65, 0x79, 0x12, 0x48, 0x0a, 0x0f,
+	0x75, 0x6e, 0x61, 0x75, 0x74, 0x68, 0x65, 0x6e, 0x74, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1c, 0x2e, 0x63, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69,
+	0x61, 0x6c, 0x73, 0x2e, 0x55, 0x6e, 0x61, 0x75, 0x74, 0x68, 0x65, 0x6e, 0x74, 0x69, 0x63, 0x61,
+	0x74, 0x65, 0x64, 0x48, 0x00, 0x52, 0x0f, 0x75, 0x6e, 0x61, 0x75, 0x74, 0x68, 0x65, 0x6e, 0x74,
+	0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x12, 0x24, 0x0a, 0x03, 0x61, 0x64, 0x63, 0x18, 0x04, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x63, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c,
+	0x73, 0x2e, 0x41, 0x44, 0x43, 0x48, 0x00, 0x52, 0x03, 0x61, 0x64, 0x63, 0x12, 0x1d, 0x0a, 0x0a,
+	0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x09, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x49, 0x64, 0x12, 0x27, 0x0a, 0x0f, 0x69,
-	0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x5f, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x04,
+	0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x5f, 0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x06,
 	0x20, 0x03, 0x28, 0x09, 0x52, 0x0e, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x42, 0x75, 0x63,
 	0x6b, 0x65, 0x74, 0x73, 0x12, 0x27, 0x0a, 0x0f, 0x65, 0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x5f,
-	0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x05, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0e, 0x65,
+	0x62, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x18, 0x07, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0e, 0x65,
 	0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x42, 0x75, 0x63, 0x6b, 0x65, 0x74, 0x73, 0x12, 0x27, 0x0a,
 	0x0f, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x5f, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73,
-	0x18, 0x06, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0e, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x4f,
+	0x18, 0x08, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0e, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x4f,
 	0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x12, 0x27, 0x0a, 0x0f, 0x65, 0x78, 0x63, 0x6c, 0x75, 0x64,
-	0x65, 0x5f, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x18, 0x07, 0x20, 0x03, 0x28, 0x09, 0x52,
+	0x65, 0x5f, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x18, 0x09, 0x20, 0x03, 0x28, 0x09, 0x52,
 	0x0e, 0x65, 0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x42,
 	0x0c, 0x0a, 0x0a, 0x63, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x22, 0x8f, 0x02,
 	0x0a, 0x03, 0x47, 0x69, 0x74, 0x12, 0x37, 0x0a, 0x0a, 0x62, 0x61, 0x73, 0x69, 0x63, 0x5f, 0x61,
@@ -3175,13 +3210,14 @@ var file_sources_proto_goTypes = []interface{}{
 	(*credentialspb.Unauthenticated)(nil),   // 32: credentials.Unauthenticated
 	(*credentialspb.Oauth2)(nil),            // 33: credentials.Oauth2
 	(*credentialspb.KeySecret)(nil),         // 34: credentials.KeySecret
-	(*credentialspb.SSHAuth)(nil),           // 35: credentials.SSHAuth
-	(*credentialspb.GitHubApp)(nil),         // 36: credentials.GitHubApp
-	(*credentialspb.CloudEnvironment)(nil),  // 37: credentials.CloudEnvironment
-	(*credentialspb.SlackTokens)(nil),       // 38: credentials.SlackTokens
-	(*credentialspb.Header)(nil),            // 39: credentials.Header
-	(*credentialspb.ClientCredentials)(nil), // 40: credentials.ClientCredentials
-	(*timestamppb.Timestamp)(nil),           // 41: google.protobuf.Timestamp
+	(*credentialspb.ADC)(nil),               // 35: credentials.ADC
+	(*credentialspb.SSHAuth)(nil),           // 36: credentials.SSHAuth
+	(*credentialspb.GitHubApp)(nil),         // 37: credentials.GitHubApp
+	(*credentialspb.CloudEnvironment)(nil),  // 38: credentials.CloudEnvironment
+	(*credentialspb.SlackTokens)(nil),       // 39: credentials.SlackTokens
+	(*credentialspb.Header)(nil),            // 40: credentials.Header
+	(*credentialspb.ClientCredentials)(nil), // 41: credentials.ClientCredentials
+	(*timestamppb.Timestamp)(nil),           // 42: google.protobuf.Timestamp
 }
 var file_sources_proto_depIdxs = []int32{
 	29, // 0: sources.LocalSource.scan_interval:type_name -> google.protobuf.Duration
@@ -3195,36 +3231,38 @@ var file_sources_proto_depIdxs = []int32{
 	1,  // 8: sources.Confluence.spaces_scope:type_name -> sources.Confluence.GetAllSpacesScope
 	32, // 9: sources.DockerHub.unauthenticated:type_name -> credentials.Unauthenticated
 	34, // 10: sources.ECR.access_key:type_name -> credentials.KeySecret
-	31, // 11: sources.Git.basic_auth:type_name -> credentials.BasicAuth
-	32, // 12: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
-	35, // 13: sources.Git.ssh_auth:type_name -> credentials.SSHAuth
-	33, // 14: sources.GitLab.oauth:type_name -> credentials.Oauth2
-	31, // 15: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
-	36, // 16: sources.GitHub.github_app:type_name -> credentials.GitHubApp
-	32, // 17: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
-	31, // 18: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
-	32, // 19: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
-	33, // 20: sources.JIRA.oauth:type_name -> credentials.Oauth2
-	32, // 21: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	32, // 22: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	34, // 23: sources.S3.access_key:type_name -> credentials.KeySecret
-	32, // 24: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
-	37, // 25: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
-	38, // 26: sources.Slack.tokens:type_name -> credentials.SlackTokens
-	31, // 27: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
-	32, // 28: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
-	31, // 29: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
-	39, // 30: sources.Jenkins.header:type_name -> credentials.Header
-	40, // 31: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
-	31, // 32: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
-	32, // 33: sources.PublicEventMonitoring.unauthenticated:type_name -> credentials.Unauthenticated
-	41, // 34: sources.PublicEventMonitoring.since:type_name -> google.protobuf.Timestamp
-	38, // 35: sources.SlackRealtime.tokens:type_name -> credentials.SlackTokens
-	36, // [36:36] is the sub-list for method output_type
-	36, // [36:36] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	32, // 11: sources.GCS.unauthenticated:type_name -> credentials.Unauthenticated
+	35, // 12: sources.GCS.adc:type_name -> credentials.ADC
+	31, // 13: sources.Git.basic_auth:type_name -> credentials.BasicAuth
+	32, // 14: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
+	36, // 15: sources.Git.ssh_auth:type_name -> credentials.SSHAuth
+	33, // 16: sources.GitLab.oauth:type_name -> credentials.Oauth2
+	31, // 17: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
+	37, // 18: sources.GitHub.github_app:type_name -> credentials.GitHubApp
+	32, // 19: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
+	31, // 20: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
+	32, // 21: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
+	33, // 22: sources.JIRA.oauth:type_name -> credentials.Oauth2
+	32, // 23: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	32, // 24: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	34, // 25: sources.S3.access_key:type_name -> credentials.KeySecret
+	32, // 26: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
+	38, // 27: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
+	39, // 28: sources.Slack.tokens:type_name -> credentials.SlackTokens
+	31, // 29: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
+	32, // 30: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
+	31, // 31: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
+	40, // 32: sources.Jenkins.header:type_name -> credentials.Header
+	41, // 33: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
+	31, // 34: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
+	32, // 35: sources.PublicEventMonitoring.unauthenticated:type_name -> credentials.Unauthenticated
+	42, // 36: sources.PublicEventMonitoring.since:type_name -> google.protobuf.Timestamp
+	39, // 37: sources.SlackRealtime.tokens:type_name -> credentials.SlackTokens
+	38, // [38:38] is the sub-list for method output_type
+	38, // [38:38] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_sources_proto_init() }
@@ -3586,6 +3624,8 @@ func file_sources_proto_init() {
 	file_sources_proto_msgTypes[8].OneofWrappers = []interface{}{
 		(*GCS_JsonSa)(nil),
 		(*GCS_ApiKey)(nil),
+		(*GCS_Unauthenticated)(nil),
+		(*GCS_Adc)(nil),
 	}
 	file_sources_proto_msgTypes[9].OneofWrappers = []interface{}{
 		(*Git_BasicAuth)(nil),

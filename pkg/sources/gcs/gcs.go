@@ -3,6 +3,7 @@ package gcs
 import (
 	"fmt"
 	"io"
+	"os"
 	"sync"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -67,7 +68,28 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
+	var gcsManagerAuthOption gcsManagerOption
+
+	switch conn.Credential.(type) {
+	case *sourcespb.GCS_ApiKey:
+		gcsManagerAuthOption = withAPIKey(aCtx, conn.GetApiKey())
+	case *sourcespb.GCS_JsonSa:
+		b, err := os.ReadFile(conn.GetJsonSa())
+		if err != nil {
+			return fmt.Errorf("error reading GCS JSON Service Account file: %w", err)
+		}
+		gcsManagerAuthOption = withJSONServiceAccount(aCtx, b)
+	case *sourcespb.GCS_Adc:
+		gcsManagerAuthOption = withDefaultADC(aCtx)
+	case *sourcespb.GCS_Unauthenticated:
+		gcsManagerAuthOption = withoutAuthentication()
+	default:
+		return fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
+
+	}
+
 	s.gcsManager, err = newGCSManager(conn.ProjectId,
+		gcsManagerAuthOption,
 		withIncludeBuckets(conn.GetIncludeBuckets()),
 		withExcludeBuckets(conn.GetExcludeBuckets()),
 		withIncludeObjects(conn.GetIncludeObjects()),

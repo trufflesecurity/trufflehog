@@ -19,19 +19,21 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 		return fmt.Errorf("project ID is required")
 	}
 
-	connection := sourcespb.GCS{
+	connection := &sourcespb.GCS{
 		ProjectId:      c.ProjectID,
 		IncludeBuckets: c.IncludeBuckets,
 		ExcludeBuckets: c.ExcludeBuckets,
 		IncludeObjects: c.IncludeObjects,
 		ExcludeObjects: c.ExcludeObjects,
 	}
-	connection.Credential = &sourcespb.GCS_ApiKey{
-		ApiKey: c.ApiKey,
+
+	// Make sure only one auth method is selected.
+	if ok := isAuthValid(ctx, c, connection); !ok {
+		return fmt.Errorf("multiple auth methods selected, please select only one")
 	}
 
 	var conn anypb.Any
-	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
+	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to marshal GCS connection: %w", err)
 	}
@@ -54,4 +56,44 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 		}
 	}()
 	return nil
+}
+
+func isAuthValid(ctx context.Context, c sources.GCSConfig, connection *sourcespb.GCS) bool {
+	var isAuthSelected bool
+
+	if c.WithoutAuth {
+		isAuthSelected = true
+		connection.Credential = &sourcespb.GCS_Unauthenticated{}
+	}
+	if c.WithADC {
+		if isAuthSelected {
+			return false
+		}
+		isAuthSelected = true
+		connection.Credential = &sourcespb.GCS_Adc{}
+	}
+	if c.ServiceAccount != "" {
+		if isAuthSelected {
+			return false
+		}
+		isAuthSelected = true
+		connection.Credential = &sourcespb.GCS_JsonSa{
+			JsonSa: c.ServiceAccount,
+		}
+	}
+	if c.ApiKey != "" {
+		if isAuthSelected {
+			return false
+		}
+		isAuthSelected = true
+		connection.Credential = &sourcespb.GCS_ApiKey{
+			ApiKey: c.ApiKey,
+		}
+	}
+	if !isAuthSelected {
+		ctx.Logger().Info("no auth method selected, using unauthenticated")
+		connection.Credential = &sourcespb.GCS_Unauthenticated{}
+	}
+
+	return true
 }

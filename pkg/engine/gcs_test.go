@@ -16,15 +16,11 @@ func TestScanGCS(t *testing.T) {
 		{
 			name: "scanned GCS",
 			gcsConfig: sources.GCSConfig{
-				ApiKey:    "abc123",
-				ProjectID: "test-project",
-			},
-		},
-		{
-			name: "missing API key",
-			gcsConfig: sources.GCSConfig{
-				ApiKey:    "",
-				ProjectID: "test-project",
+				ApiKey:         "abc123",
+				ProjectID:      "test-project",
+				WithADC:        false,
+				WithoutAuth:    false,
+				ServiceAccount: "",
 			},
 		},
 		{
@@ -34,15 +30,37 @@ func TestScanGCS(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "multiple selected auth methods",
+			gcsConfig: sources.GCSConfig{
+				ApiKey:         "abc123",
+				ProjectID:      "test-project",
+				WithADC:        true,
+				WithoutAuth:    false,
+				ServiceAccount: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "no auth method selected",
+			gcsConfig: sources.GCSConfig{
+				ProjectID: "test-project",
+			},
+		},
 	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			e := &Engine{}
 			err := e.ScanGCS(context.Background(), test.gcsConfig)
 			if err != nil && !test.wantErr {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, nil)
+				return
 			}
 
+			if err == nil && test.wantErr {
+				t.Errorf("ScanGCS() got: %v, want: %v", err, "error")
+			}
 		})
 	}
 }

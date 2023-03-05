@@ -46,6 +46,12 @@ func TestNewGcsManager(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:   "new gcs manager, without auth",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withoutAuthentication()},
+			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
+		},
+		{
 			name:   "new gcs manager, with api key",
 			projID: testProjectID,
 			opts:   []gcsManagerOption{withAPIKey(ctx, testAPIKey)},
