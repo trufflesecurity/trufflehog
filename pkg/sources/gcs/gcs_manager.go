@@ -381,15 +381,12 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]bucket, error) {
 		if _, ok := g.buckets[bkt.Name]; ok {
 			continue
 		}
-
 		if !g.shouldIncludeBucket(ctx, bkt.Name) || g.shouldExcludeBucket(ctx, bkt.Name) {
 			continue
 		}
-
 		buckets = append(buckets, bucket{name: bkt.Name})
 
 	}
-
 	return buckets, nil
 }
 
@@ -427,7 +424,6 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan i
 			errCh <- fmt.Errorf("failed to list bucket objects: %w", err)
 		}
 	}()
-
 	return ch, errCh
 }
 
@@ -460,7 +456,6 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- i
 		bkt.numObjects++
 		ch <- o
 	}
-
 	return nil
 }
 
@@ -579,7 +574,6 @@ func shouldProcess(ctx context.Context, s string, matchers map[string]struct{}, 
 			return true
 		}
 	}
-
 	return false
 }
 
