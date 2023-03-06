@@ -509,6 +509,14 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 	return o, nil
 }
 
+func objectACLs(acl []storage.ACLRule) []string {
+	acls := make([]string, 0, len(acl))
+	for _, rule := range acl {
+		acls = append(acls, string(rule.Entity))
+	}
+	return acls
+}
+
 func isObjectTypeValid(ctx context.Context, name string) bool {
 	isValid := !common.SkipFile(name)
 	if !isValid {
@@ -572,12 +580,4 @@ func shouldProcess(ctx context.Context, s string, matchers map[string]struct{}, 
 
 func globMatches(s string, g glob.Glob) bool {
 	return g.Match(s)
-}
-
-func objectACLs(acl []storage.ACLRule) []string {
-	acls := make([]string, 0, len(acl))
-	for _, rule := range acl {
-		acls = append(acls, string(rule.Entity))
-	}
-	return acls
 }
