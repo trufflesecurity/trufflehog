@@ -59,7 +59,21 @@ type gcsManager struct {
 	excludeBuckets,
 	includeObjects,
 	excludeObjects map[string]struct{}
-	client bucketManager
+	buckets map[string]bucket
+	client  bucketManager
+}
+
+// bucket is a simplified *storage.BucketHandle wrapper.
+// It also provides a mechanism for resuming an interrupted iteration.
+// This reduces the number of objects that need to be re-processed.
+type bucket struct {
+	name       string
+	numObjects uint64
+	// startOffset is the name of the object to resume from. (inclusive)
+	// This works because GCS objects are sorted lexicographically.
+	// If this is empty, the iteration will start from the beginning.
+	startOffset string
+	*storage.BucketHandle
 }
 
 type gcsManagerOption func(*gcsManager) error
@@ -226,6 +240,22 @@ func withMaxObjectSize(maxObjectSize int64) gcsManagerOption {
 	}
 }
 
+// withBucketOffsets sets the offset for each bucket.
+// This is used to resume listing objects for a bucket.
+func withBucketOffsets(offsets map[string]string) gcsManagerOption {
+	bkts := make(map[string]bucket, len(offsets))
+	for bkt, val := range offsets {
+		bkts[bkt] = bucket{
+			startOffset: val,
+			name:        bkt,
+		}
+	}
+	return func(m *gcsManager) error {
+		m.buckets = bkts
+		return nil
+	}
+}
+
 func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, error) {
 	if projectID == "" {
 		return nil, fmt.Errorf("project ID is required")
@@ -283,18 +313,28 @@ func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
 	ch := make(chan io.Reader, 100) // TODO (ahrav): Determine optimal buffer size.
 
 	// Get all the buckets in the project.
-	bucketNames, err := g.listBuckets(ctx)
+	buckets, err := g.listBuckets(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
 
+	// TODO (ahrav): This can be optimized if we set the buckets from within
+	// the listBuckets method. This way seems a little more clear as to the intent.
+
+	// Update the gcsManager with all the buckets to list objects from.
+	// This is in addition to any buckets that were provided via the
+	// withBucketOffsets option.
+	for _, b := range buckets {
+		g.buckets[b.name] = b
+	}
+
 	gcsErrs := sources.NewScanErrors()
 
-	for _, bucket := range bucketNames {
+	for _, bucket := range g.buckets {
 		g.numBuckets++
 		bucket := bucket
 		g.workerPool.Go(func() error {
-			objCh, errCh := g.listBucketObjects(ctx, bucket)
+			objCh, errCh := g.listBucketObjects(ctx, &bucket)
 			for {
 				select {
 				case obj, ok := <-objCh:
@@ -321,41 +361,48 @@ func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
 	return ch, nil
 }
 
-func (g *gcsManager) listBuckets(ctx context.Context) ([]string, error) {
-	var bucketNames []string
+func (g *gcsManager) listBuckets(ctx context.Context) ([]bucket, error) {
+	var buckets []bucket
 
 	bkts := g.client.Buckets(ctx, g.projectID)
 	for {
 		bkt, err := bkts.Next()
 		if errors.Is(err, iterator.Done) {
-			ctx.Logger().V(5).Info("finished listing buckets", "num_buckets", len(bucketNames))
+			ctx.Logger().V(5).Info("finished listing buckets", "num_buckets", len(buckets))
 			break
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve bucket: %w", err)
 		}
 
+		// If the bucket is already in the map, skip it, it's already accounted for.
+		// This is used to resume listing objects for a bucket.
+		if _, ok := g.buckets[bkt.Name]; ok {
+			continue
+		}
+
 		if !g.shouldIncludeBucket(ctx, bkt.Name) || g.shouldExcludeBucket(ctx, bkt.Name) {
 			continue
 		}
 
-		bucketNames = append(bucketNames, bkt.Name)
+		buckets = append(buckets, bucket{name: bkt.Name})
+
 	}
 
-	return bucketNames, nil
+	return buckets, nil
 }
 
-func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) (chan io.Reader, chan error) {
+func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan io.Reader, chan error) {
 	ch := make(chan io.Reader, 100)
 	errCh := make(chan error, 1)
 
 	go func() {
 		defer close(ch)
 
-		logger := ctx.Logger().WithValues("bucket", bktName)
+		logger := ctx.Logger().WithValues("bucket", bkt.name)
 		logger.V(5).Info("listing object(s) in bucket")
 
-		bkt := g.client.Bucket(bktName).Retryer(
+		b := g.client.Bucket(bkt.name).Retryer(
 			storage.WithBackoff(gax.Backoff{
 				Initial:    2 * time.Second,
 				Max:        30 * time.Second,
@@ -363,6 +410,8 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) (cha
 			}),
 			storage.WithPolicy(storage.RetryAlways),
 		)
+		bkt.BucketHandle = b
+
 		// TODO (ahrav): Look to extend gcsManager to allow for exact buckets/objects
 		// in include/filters. This will increae performance substantially
 		// If include objects are indicated, then we only need to scan for the
@@ -381,24 +430,13 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) (cha
 	return ch, errCh
 }
 
-func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan<- io.Reader) error {
-	// Setting the attribute selection is a performance optimization.
-	// https://pkg.go.dev/cloud.google.com/go/storage#Query.SetAttrSelection
-	q := new(storage.Query)
-	err := q.SetAttrSelection([]string{
-		"Name",
-		"ContentType",
-		"Owner",
-		"Size",
-		"Updated",
-		"Created",
-		"ACL",
-	})
+func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- io.Reader) error {
+	q, err := setObjectQuery(bkt)
 	if err != nil {
-		return fmt.Errorf("failed to set attribute selection: %w", err)
+		return fmt.Errorf("failed to set object query: %w", err)
 	}
 
-	objs := bkt.Objects(ctx, nil)
+	objs := bkt.Objects(ctx, q)
 	for {
 		obj, err := objs.Next()
 		if errors.Is(err, iterator.Done) {
@@ -418,10 +456,36 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandl
 			ctx.Logger().V(1).Info("failed to create object", "object-name", obj.Name, "error", err)
 			continue
 		}
+		bkt.numObjects++
 		ch <- o
 	}
 
 	return nil
+}
+
+func setObjectQuery(bkt *bucket) (*storage.Query, error) {
+	// Setting the attribute selection is a performance optimization.
+	// https://pkg.go.dev/cloud.google.com/go/storage#Query.SetAttrSelection
+	q := new(storage.Query)
+	err := q.SetAttrSelection([]string{
+		"Name",
+		"ContentType",
+		"Owner",
+		"Size",
+		"Updated",
+		"Created",
+		"ACL",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set attribute selection: %w", err)
+	}
+
+	// If a start offset is provided, then we need to set it on the query.
+	// This will begin listing objects from the start offset.
+	if bkt.startOffset != "" {
+		q.StartOffset = bkt.startOffset
+	}
+	return q, nil
 }
 
 func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHandle) (object, error) {

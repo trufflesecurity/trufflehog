@@ -73,6 +73,23 @@ func TestNewGcsManager(t *testing.T) {
 			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
 		},
 		{
+			name:   "new gcs manager, with bucket offsets",
+			projID: testProjectID,
+			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
+				withBucketOffsets(map[string]string{testBucket: "moar.txt", testBucket2: "moar2.txt"}),
+			},
+			want: &gcsManager{
+				projectID:     testProjectID,
+				concurrency:   defaultConcurrency,
+				maxObjectSize: defaultMaxObjectSize,
+				buckets: map[string]bucket{
+					testBucket:  {name: testBucket, startOffset: "moar.txt"},
+					testBucket2: {name: testBucket2, startOffset: "moar2.txt"},
+				},
+			},
+		},
+		{
 			name:   "new gcs manager, with include buckets",
 			projID: testProjectID,
 			opts: []gcsManagerOption{
@@ -319,8 +336,8 @@ func TestNewGcsManager(t *testing.T) {
 				t.Errorf("newGCSManager() client should not be nil")
 			}
 
-			if !cmp.Equal(got, tc.want, cmp.AllowUnexported(gcsManager{}), cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool")) {
-				t.Errorf("newGCSManager(%v, %v) got: %v, %v, want: %v, %v", tc.projID, tc.opts, got, err, tc.want, nil)
+			if diff := cmp.Diff(got, tc.want, cmp.AllowUnexported(gcsManager{}, bucket{}), cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool")); diff != "" {
+				t.Errorf("newGCSManager(%v, %v) got: %v, want: %v, diff: %v", tc.projID, tc.opts, got, tc.want, diff)
 			}
 		})
 	}
@@ -525,6 +542,93 @@ func TestGCSManagerListObjects(t *testing.T) {
 				withDefaultADC(ctx),
 				withIncludeBuckets([]string{testBucket}),
 				withExcludeObjects([]string{"aws1.txt"}),
+			},
+			want: []object{
+				{
+					name:        "moar2.txt",
+					bucket:      testBucket,
+					contentType: "text/plain",
+					size:        12,
+					link:        "https://storage.googleapis.com/download/storage/v1/b/test-bkt-th/o/moar2.txt?generation=1677871000378542&alt=media",
+					acl:         []string{},
+				},
+			},
+			wantNumBkt: 1,
+			wantNumObj: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mgr, err := newGCSManager(tc.projectID, tc.opts...)
+			assert.Nil(t, err)
+
+			got, err := mgr.listObjects(ctx)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("GCSManager.ListObjects() error = %v, wantErr %v", err, tc.wantErr)
+				return
+			}
+
+			// If we expect an error, we're done.
+			// Short-circuit the rest of the test.
+			if err != nil {
+				return
+			}
+
+			doneCh := make(chan struct{})
+			defer close(doneCh)
+			go func() {
+				defer func() {
+					doneCh <- struct{}{}
+				}()
+				res := make([]object, 0, len(tc.want))
+				for obj := range got {
+					res = append(res, obj.(object))
+				}
+
+				if len(res) != len(tc.want) {
+					t.Errorf("gcsManager.listObjects() got: %v, want: %v", res, tc.want)
+				}
+
+				// Test the bucket and object counts.
+				assert.Equal(t, tc.wantNumBkt, mgr.numBuckets)
+				assert.Equal(t, tc.wantNumObj, mgr.numObjects)
+
+				// Sort the objects by name to make the test deterministic.
+				// This is necessary because we list bucket objects concurrently.
+				sort.Slice(res, func(i, j int) bool { return res[i].name < res[j].name })
+				sort.Slice(tc.want, func(i, j int) bool { return tc.want[i].name < tc.want[j].name })
+
+				// Test the objects are equal.
+				if diff := cmp.Diff(res, tc.want, cmp.AllowUnexported(object{}), cmpopts.IgnoreFields(object{}, "Reader", "createdAt", "updatedAt")); diff != "" {
+					t.Errorf("gcsManager.listObjects() mismatch (-want +got):\n%s", diff)
+				}
+			}()
+
+			<-doneCh
+		})
+	}
+}
+
+func TestGCSManagerListObjects_Resuming(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name       string
+		projectID  string
+		opts       []gcsManagerOption
+		want       []object
+		wantNumBkt uint32
+		wantNumObj uint64
+		wantErr    bool
+	}{
+		{
+			name:      "list objects, testBucket, resume from moar2.txt",
+			projectID: testProjectID,
+			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
+				withIncludeBuckets([]string{testBucket}),
+				withBucketOffsets(map[string]string{testBucket: "moar2.txt"}),
 			},
 			want: []object{
 				{
