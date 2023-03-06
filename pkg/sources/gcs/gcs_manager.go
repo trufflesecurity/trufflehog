@@ -18,6 +18,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 const (
@@ -287,19 +288,33 @@ func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
 
+	gcsErrs := sources.NewScanErrors()
+
 	for _, bucket := range bucketNames {
 		g.numBuckets++
 		bucket := bucket
 		g.workerPool.Go(func() error {
-			for obj := range g.listBucketObjects(ctx, bucket) {
-				ch <- obj
+			objCh, errCh := g.listBucketObjects(ctx, bucket)
+			for {
+				select {
+				case obj, ok := <-objCh:
+					if !ok {
+						return nil
+					}
+					ch <- obj
+				case err := <-errCh:
+					gcsErrs.Add(err)
+					return nil
+				}
 			}
-			return nil
 		})
 	}
 
 	go func() {
 		_ = g.workerPool.Wait()
+		if gcsErrs.Count() > 0 {
+			ctx.Logger().V(2).Info("encountered gcsErrs while scanning GCS buckets", "error-count", gcsErrs.Count(), "gcsErrs", gcsErrs.String())
+		}
 		close(ch)
 	}()
 
@@ -330,8 +345,9 @@ func (g *gcsManager) listBuckets(ctx context.Context) ([]string, error) {
 	return bucketNames, nil
 }
 
-func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-chan io.Reader {
+func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) (chan io.Reader, chan error) {
 	ch := make(chan io.Reader, 100)
+	errCh := make(chan error, 1)
 
 	go func() {
 		defer close(ch)
@@ -357,13 +373,31 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bktName string) <-ch
 		// 	return
 		// }
 
-		g.bucketObjects(ctx, bkt, ch)
+		if err := g.bucketObjects(ctx, bkt, ch); err != nil {
+			errCh <- fmt.Errorf("failed to list bucket objects: %w", err)
+		}
 	}()
 
-	return ch
+	return ch, errCh
 }
 
-func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan io.Reader) {
+func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandle, ch chan<- io.Reader) error {
+	// Setting the attribute selection is a performance optimization.
+	// https://pkg.go.dev/cloud.google.com/go/storage#Query.SetAttrSelection
+	q := new(storage.Query)
+	err := q.SetAttrSelection([]string{
+		"Name",
+		"ContentType",
+		"Owner",
+		"Size",
+		"Updated",
+		"Created",
+		"ACL",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set attribute selection: %w", err)
+	}
+
 	objs := bkt.Objects(ctx, nil)
 	for {
 		obj, err := objs.Next()
@@ -376,8 +410,7 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandl
 		}
 
 		if err != nil {
-			ctx.Logger().Error(err, "failed to get iterator object")
-			return
+			return fmt.Errorf("failed to retrieve iterator: %w", err)
 		}
 
 		o, err := g.constructObject(ctx, bkt.Object(obj.Name))
@@ -387,6 +420,8 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *storage.BucketHandl
 		}
 		ch <- o
 	}
+
+	return nil
 }
 
 func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHandle) (object, error) {
