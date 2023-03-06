@@ -162,6 +162,11 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		return fmt.Errorf("error reading object data: %w", err)
 	}
 
+	// If data is nil, it means that the file was handled by a handler.
+	if data == nil {
+		return nil
+	}
+
 	chunkSkel.Data = data
 
 	select {
