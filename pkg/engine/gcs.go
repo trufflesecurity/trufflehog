@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gcs"
 )
 
-// ScanGCS scans GCS with the provided options.
+// ScanGCS with the provided options.
 func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 	if c.ProjectID == "" {
 		return fmt.Errorf("project ID is required")
