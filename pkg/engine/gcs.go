@@ -28,7 +28,7 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 	}
 
 	// Make sure only one auth method is selected.
-	if ok := isAuthValid(ctx, c, connection); !ok {
+	if !isAuthValid(ctx, c, connection) {
 		return fmt.Errorf("multiple auth methods selected, please select only one")
 	}
 
