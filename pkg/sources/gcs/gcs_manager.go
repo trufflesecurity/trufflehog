@@ -261,6 +261,7 @@ func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, err
 		return nil, fmt.Errorf("project ID is required")
 	}
 
+	// Default values for the manager.
 	gcs := &gcsManager{
 		projectID:     projectID,
 		concurrency:   defaultConcurrency,
