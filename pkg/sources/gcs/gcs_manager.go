@@ -446,7 +446,7 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- i
 			ctx.Logger().V(1).Info("failed to create object", "object-name", obj.Name, "error", err)
 			continue
 		}
-		bkt.numObjects++
+		bkt.numObjects++ // atomic add NOT needed, object listing is sequential.
 		ch <- o
 	}
 	return nil
