@@ -6,6 +6,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -44,6 +46,85 @@ func TestSourceInit(t *testing.T) {
 	err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
 	assert.Nil(t, err)
 	assert.NotNil(t, source.gcsManager)
+}
+
+func TestSourceInit_Conn(t *testing.T) {
+	testCases := []struct {
+		name    string
+		conn    *sourcespb.GCS
+		want    *gcsManager
+		wantErr bool
+	}{
+		{
+			name:    "nil conn",
+			wantErr: true,
+		},
+		{
+			name: "valid conn, bare config",
+			conn: &sourcespb.GCS{
+				ProjectId:  testProjectID,
+				Credential: &sourcespb.GCS_Adc{},
+			},
+			want: &gcsManager{
+				projectID: testProjectID,
+			},
+		},
+		{
+			name: "valid conn, include and exclude buckets",
+			conn: &sourcespb.GCS{
+				ProjectId:  testProjectID,
+				Credential: &sourcespb.GCS_Adc{},
+				IncludeBuckets: []string{
+					"bucket1",
+				},
+				ExcludeBuckets: []string{
+					perfTestBucketGlob,
+				},
+			},
+			want: &gcsManager{
+				projectID:      testProjectID,
+				includeBuckets: map[string]struct{}{"bucket1": {}},
+			},
+		},
+		{
+			name: "valid conn, include and exclude objects",
+			conn: &sourcespb.GCS{
+				ProjectId:  testProjectID,
+				Credential: &sourcespb.GCS_Adc{},
+				IncludeObjects: []string{
+					"object1",
+				},
+				ExcludeObjects: []string{
+					"object2",
+				},
+			},
+			want: &gcsManager{
+				projectID:      testProjectID,
+				includeObjects: map[string]struct{}{"object1": {}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			source, conn := createTestSource(tc.conn)
+
+			err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
+			if err != nil && !tc.wantErr {
+				t.Errorf("source.Init() got: %v, want: %v", err, nil)
+				return
+			}
+
+			if !tc.wantErr {
+				if diff := cmp.Diff(tc.want, source.gcsManager,
+					cmp.AllowUnexported(gcsManager{}),
+					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize"),
+				); diff != "" {
+					t.Errorf("source.Init() diff: (-want +got)\n%s", diff)
+				}
+			}
+		})
+	}
 }
 
 type mockObjectManager struct {

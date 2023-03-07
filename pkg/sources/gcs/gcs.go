@@ -88,16 +88,39 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 
 	}
 
-	s.gcsManager, err = newGCSManager(conn.ProjectId,
-		gcsManagerAuthOption,
-		withIncludeBuckets(conn.GetIncludeBuckets()),
-		withExcludeBuckets(conn.GetExcludeBuckets()),
-		withIncludeObjects(conn.GetIncludeObjects()),
-		withExcludeObjects(conn.GetExcludeObjects()),
-		withConcurrency(concurrency),
-	)
+	gcsManagerOpts := []gcsManagerOption{withConcurrency(concurrency)}
+	gcsManagerOpts = append(gcsManagerOpts, gcsManagerAuthOption)
+	if setGCSManagerBucketOptions(&conn) != nil {
+		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(&conn))
+	}
+	if setGCSManagerObjectOptions(&conn) != nil {
+		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerObjectOptions(&conn))
+	}
+
+	s.gcsManager, err = newGCSManager(conn.ProjectId, gcsManagerOpts...)
 	if err != nil {
 		return fmt.Errorf("error creating GCS manager: %w", err)
+	}
+
+	return nil
+}
+
+func setGCSManagerBucketOptions(conn *sourcespb.GCS) gcsManagerOption {
+	return setGCSManagerOptions(conn.GetIncludeBuckets(), conn.GetExcludeBuckets(), withIncludeBuckets, withExcludeBuckets)
+}
+
+func setGCSManagerObjectOptions(conn *sourcespb.GCS) gcsManagerOption {
+	return setGCSManagerOptions(conn.GetIncludeObjects(), conn.GetExcludeObjects(), withIncludeObjects, withExcludeObjects)
+}
+
+func setGCSManagerOptions(include, exclude []string, includerFn, excluderFn func(vals []string) gcsManagerOption) gcsManagerOption {
+	// Only allow one of include/exclude to be set.
+	// If both are set, include takes precedence.
+	if len(include) > 0 {
+		return includerFn(include)
+	}
+	if len(exclude) > 0 {
+		return excluderFn(exclude)
 	}
 
 	return nil
