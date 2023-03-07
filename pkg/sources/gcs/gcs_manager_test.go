@@ -13,16 +13,18 @@ import (
 )
 
 const (
-	testProjectID = "trufflehog-testing"
-	testAPIKey    = "somekeys"
-	testBucket    = "test-bkt-th"
-	testBucket2   = "test-bkt-th2"
-	testBucket3   = "test-bkt-th3"
-	testBucket4   = "test-bkt-th4"
-	bucket1       = "bucket1"
-	bucket2       = "bucket2"
-	object1       = "object1"
-	object2       = "object2"
+	testProjectID        = "trufflehog-testing"
+	testAPIKey           = "somekeys"
+	testBucket           = "test-bkt-th"
+	testBucket2          = "test-bkt-th2"
+	testBucket3          = "test-bkt-th3"
+	testBucket4          = "test-bkt-th4"
+	perfTestBucketPrefix = "perf-test-bkt-th"
+	perfTestBucketGlob   = "perf-test-bkt-th*"
+	bucket1              = "bucket1"
+	bucket2              = "bucket2"
+	object1              = "object1"
+	object2              = "object2"
 )
 
 func TestNewGcsManager(t *testing.T) {
@@ -365,7 +367,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 		{
 			name:      "list objects, all buckets, with objects",
 			projectID: testProjectID,
-			opts:      []gcsManagerOption{withDefaultADC(ctx)},
+			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{perfTestBucketGlob})},
 			want: []object{
 				{
 					name:        "aws1.txt",
@@ -439,7 +441,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 		{
 			name:      "list objects, exclude buckets, with objects",
 			projectID: testProjectID,
-			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{testBucket, testBucket2})},
+			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{testBucket, testBucket2, perfTestBucketGlob})},
 			want: []object{
 				{
 					name:        "moar.txt",
@@ -464,7 +466,11 @@ func TestGCSManagerListObjects(t *testing.T) {
 		{
 			name:      "list objects, with exclude objects",
 			projectID: testProjectID,
-			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeObjects([]string{"aws1.txt", "moar2.txt"})},
+			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
+				withExcludeObjects([]string{"aws1.txt", "moar2.txt"}),
+				withExcludeBuckets([]string{perfTestBucketGlob}),
+			},
 			want: []object{
 				{
 					name:        "aws3.txt",
@@ -521,6 +527,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 			opts: []gcsManagerOption{
 				withDefaultADC(ctx),
 				withIncludeObjects([]string{"aws1.txt"}),
+				withExcludeBuckets([]string{perfTestBucketGlob}),
 			},
 			want: []object{
 				{
@@ -542,6 +549,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 				withDefaultADC(ctx),
 				withIncludeBuckets([]string{testBucket}),
 				withExcludeObjects([]string{"aws1.txt"}),
+				withExcludeBuckets([]string{perfTestBucketGlob}),
 			},
 			want: []object{
 				{

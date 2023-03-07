@@ -266,6 +266,7 @@ func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, err
 		projectID:     projectID,
 		concurrency:   defaultConcurrency,
 		maxObjectSize: defaultMaxObjectSize,
+		buckets:       make(map[string]bucket),
 	}
 
 	for _, opt := range opts {
