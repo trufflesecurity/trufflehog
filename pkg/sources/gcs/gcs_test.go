@@ -29,6 +29,9 @@ func TestSourceInit(t *testing.T) {
 		IncludeBuckets: []string{
 			"bucket1",
 		},
+		ExcludeBuckets: []string{
+			perfTestBucketGlob,
+		},
 		ExcludeObjects: []string{
 			"object1",
 		},

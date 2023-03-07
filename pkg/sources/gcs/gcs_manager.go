@@ -330,34 +330,35 @@ func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
 		g.buckets[b.name] = b
 	}
 
-	gcsErrs := sources.NewScanErrors()
-
-	for _, bucket := range g.buckets {
-		g.numBuckets++
-		bucket := bucket
-		g.workerPool.Go(func() error {
-			objCh, errCh := g.listBucketObjects(ctx, &bucket)
-			for {
-				select {
-				case obj, ok := <-objCh:
-					if !ok {
+	go func() {
+		gcsErrs := sources.NewScanErrors()
+		for _, bucket := range g.buckets {
+			g.numBuckets++
+			bucket := bucket
+			g.workerPool.Go(func() error {
+				objCh, errCh := g.listBucketObjects(ctx, &bucket)
+				for {
+					select {
+					case obj, ok := <-objCh:
+						if !ok {
+							return nil
+						}
+						ch <- obj
+					case err := <-errCh:
+						gcsErrs.Add(err)
 						return nil
 					}
-					ch <- obj
-				case err := <-errCh:
-					gcsErrs.Add(err)
-					return nil
 				}
-			}
-		})
-	}
-
-	go func() {
-		_ = g.workerPool.Wait()
-		if gcsErrs.Count() > 0 {
-			ctx.Logger().V(2).Info("encountered gcsErrs while scanning GCS buckets", "error-count", gcsErrs.Count(), "gcsErrs", gcsErrs.String())
+			})
 		}
-		close(ch)
+
+		go func() {
+			_ = g.workerPool.Wait()
+			if gcsErrs.Count() > 0 {
+				ctx.Logger().V(2).Info("encountered gcsErrs while scanning GCS buckets", "error-count", gcsErrs.Count(), "gcsErrs", gcsErrs.String())
+			}
+			close(ch)
+		}()
 	}()
 
 	return ch, nil
