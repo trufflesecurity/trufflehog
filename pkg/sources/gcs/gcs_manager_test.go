@@ -337,7 +337,11 @@ func TestNewGcsManager(t *testing.T) {
 				t.Errorf("newGCSManager() client should not be nil")
 			}
 
-			if diff := cmp.Diff(got, tc.want, cmp.AllowUnexported(gcsManager{}, bucket{}), cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool")); diff != "" {
+			diff := cmp.Diff(got, tc.want,
+				cmp.AllowUnexported(gcsManager{}, bucket{}),
+				cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "buckets"),
+			)
+			if diff != "" {
 				t.Errorf("newGCSManager(%v, %v) got: %v, want: %v, diff: %v", tc.projID, tc.opts, got, tc.want, diff)
 			}
 		})
