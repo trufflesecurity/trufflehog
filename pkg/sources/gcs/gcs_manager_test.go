@@ -13,18 +13,17 @@ import (
 )
 
 const (
-	testProjectID        = "trufflehog-testing"
-	testAPIKey           = "somekeys"
-	testBucket           = "test-bkt-th"
-	testBucket2          = "test-bkt-th2"
-	testBucket3          = "test-bkt-th3"
-	testBucket4          = "test-bkt-th4"
-	perfTestBucketPrefix = "perf-test-bkt-th"
-	perfTestBucketGlob   = "perf-test-bkt-th*"
-	bucket1              = "bucket1"
-	bucket2              = "bucket2"
-	object1              = "object1"
-	object2              = "object2"
+	testProjectID      = "trufflehog-testing"
+	testAPIKey         = "somekeys"
+	testBucket         = "test-bkt-th"
+	testBucket2        = "test-bkt-th2"
+	testBucket3        = "test-bkt-th3"
+	testBucket4        = "test-bkt-th4"
+	perfTestBucketGlob = "perf-test-bkt-th*"
+	bucket1            = "bucket1"
+	bucket2            = "bucket2"
+	object1            = "object1"
+	object2            = "object2"
 )
 
 func TestNewGcsManager(t *testing.T) {

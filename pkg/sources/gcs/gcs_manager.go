@@ -352,13 +352,11 @@ func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
 			})
 		}
 
-		go func() {
-			_ = g.workerPool.Wait()
-			if gcsErrs.Count() > 0 {
-				ctx.Logger().V(2).Info("encountered gcsErrs while scanning GCS buckets", "error-count", gcsErrs.Count(), "gcsErrs", gcsErrs.String())
-			}
-			close(ch)
-		}()
+		_ = g.workerPool.Wait()
+		if gcsErrs.Count() > 0 {
+			ctx.Logger().V(2).Info("encountered gcsErrs while scanning GCS buckets", "error-count", gcsErrs.Count(), "gcsErrs", gcsErrs.String())
+		}
+		close(ch)
 	}()
 
 	return ch, nil
