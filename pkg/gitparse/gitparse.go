@@ -117,10 +117,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
-	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
-	if abbreviatedLog {
-		args = append(args, "--diff-filter=AM")
-	}
+	args := []string{"-C", source, "log", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if head != "" {
 		args = append(args, head)
 	} else {
@@ -134,7 +131,7 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
 	}
 
-	return c.executeCommand(ctx, cmd)
+	return c.executeCommand(ctx, source, cmd)
 }
 
 // Unstaged parses the output of the `git diff` command for the `source` path.
@@ -149,11 +146,11 @@ func (c *Parser) Unstaged(ctx context.Context, source string) (chan Commit, erro
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
 	}
 
-	return c.executeCommand(ctx, cmd)
+	return c.executeCommand(ctx, source, cmd)
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
-func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
+func (c *Parser) executeCommand(ctx context.Context, source string, cmd *exec.Cmd) (chan Commit, error) {
 	commitChan := make(chan Commit, 64)
 
 	stdOut, err := cmd.StdoutPipe()
@@ -178,7 +175,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	}()
 
 	go func() {
-		c.fromReader(ctx, stdOut, commitChan)
+		c.fromReader(ctx, source, stdOut, commitChan)
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
@@ -187,11 +184,12 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	return commitChan, nil
 }
 
-func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
+func (c *Parser) fromReader(ctx context.Context, source string, stdOut io.Reader, commitChan chan Commit) {
 	outReader := bufio.NewReader(stdOut)
 	var currentCommit *Commit
 	var currentDiff *Diff
 
+	lastCommit := ""
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
 	for {
@@ -202,6 +200,143 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		if err != nil && len(line) == 0 {
 			break
 		}
+		// for i := 0; i < len(line); i++ {
+		// 	b := make([]byte, 1)
+		// 	n, err := stdOut.Read(b)
+		// 	if errors.Is(err, io.EOF) || n == 0 {
+		// 		return
+		// 	}
+		// 	line[i] = b[0]
+		// 	if b[0] == byte('\n') {
+		// 		line = line[:0]
+		// 		break
+		// 	}
+		// }
+
+		switch {
+		case isCommitLine(line):
+			// If there is a currentDiff, add it to currentCommit.
+			if currentDiff != nil && currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			}
+			// If there is a currentCommit, send it to the channel.
+			if currentCommit != nil {
+				args := []string{"-C", source, "diff", "--date=format:%a %b %d %H:%M:%S %Y %z", currentCommit.Hash}
+				if lastCommit != "" {
+					args = append(args, lastCommit)
+				}
+				lastCommit = currentCommit.Hash
+
+				cmd := exec.Command("git", args...)
+
+				absPath, err := filepath.Abs(source)
+				if err == nil {
+					cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+				}
+
+				// stdnOut, err := cmd.StdoutPipe()
+				// if err != nil {
+				// 	return
+				// }
+				err = cmd.Start()
+				if err != nil {
+					return
+				}
+
+				_ = cmd.Wait()
+				//c.funkReader(ctx, stdnOut, commitChan, currentCommit)
+			}
+			// Create a new currentDiff and currentCommit
+			currentDiff = &Diff{}
+			currentCommit = &Commit{
+				Message: strings.Builder{},
+			}
+			// Check that the commit line contains a hash and set it.
+			if len(line) >= 47 {
+				currentCommit.Hash = string(line[7:47])
+			}
+		case isAuthorLine(line):
+			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
+		case isDateLine(line):
+			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
+			if err != nil {
+				ctx.Logger().V(2).Info("Could not parse date from git stream.", "error", err)
+			}
+			currentCommit.Date = date
+		case isModeLine(line):
+			// NoOp
+		case isIndexLine(line):
+			// NoOp
+		case isPlusFileLine(line):
+			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
+		case isMinusFileLine(line):
+			// NoOp
+		case isPlusDiffLine(line):
+			currentDiff.Content.Write(line[1:])
+		case isMinusDiffLine(line):
+			// NoOp. We only care about additions.
+		case isMessageLine(line):
+			currentCommit.Message.Write(line[4:])
+		case isContextDiffLine(line):
+			currentDiff.Content.Write([]byte("\n"))
+		case isBinaryLine(line):
+			currentDiff.IsBinary = true
+			currentDiff.PathB = pathFromBinaryLine(line)
+		case isLineNumberDiffLine(line):
+			if currentDiff != nil && currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			}
+			newDiff := &Diff{
+				PathB: currentDiff.PathB,
+			}
+
+			currentDiff = newDiff
+
+			words := bytes.Split(line, []byte(" "))
+			if len(words) >= 3 {
+				startSlice := bytes.Split(words[2], []byte(","))
+				lineStart, err := strconv.Atoi(string(startSlice[0]))
+				if err == nil {
+					currentDiff.LineStart = lineStart
+				}
+			}
+		}
+		if currentDiff.Content.Len() > c.maxDiffSize {
+			ctx.Logger().V(2).Info(fmt.Sprintf(
+				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
+			))
+			break
+		}
+	}
+	cleanupParse(currentCommit, currentDiff, commitChan)
+}
+
+func (c *Parser) funkReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit, currentCommit *Commit) {
+	outReader := bufio.NewReader(stdOut)
+	var currentDiff *Diff
+
+	defer common.RecoverWithExit(ctx)
+	for {
+		if common.IsDone(ctx) {
+			break
+		}
+		line, err := outReader.ReadBytes([]byte("\n")[0])
+		if err != nil && len(line) == 0 {
+			break
+		}
+		// for i := 0; i < len(line); i++ {
+		// 	b := make([]byte, 1)
+		// 	n, err := stdOut.Read(b)
+		// 	if errors.Is(err, io.EOF) || n == 0 {
+		// 		return
+		// 	}
+		// 	line[i] = b[0]
+		// 	if b[0] == byte('\n') {
+		// 		line = line[:0]
+		// 		break
+		// 	}
+		// }
+
 		switch {
 		case isCommitLine(line):
 			// If there is a currentDiff, add it to currentCommit.
