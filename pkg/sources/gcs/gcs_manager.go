@@ -144,6 +144,9 @@ func defaultADC(ctx context.Context) (*storage.Client, error) {
 // take precedence.
 func withIncludeBuckets(buckets []string) gcsManagerOption {
 	return func(m *gcsManager) error {
+		if len(buckets) == 0 {
+			return nil
+		}
 		if m.excludeBuckets != nil {
 			m.excludeBuckets = nil
 		}
@@ -161,6 +164,9 @@ func withIncludeBuckets(buckets []string) gcsManagerOption {
 // take precedence.
 func withExcludeBuckets(buckets []string) gcsManagerOption {
 	return func(m *gcsManager) error {
+		if len(buckets) == 0 {
+			return nil
+		}
 		if m.includeBuckets != nil {
 			return nil
 		}
@@ -182,6 +188,9 @@ func withExcludeBuckets(buckets []string) gcsManagerOption {
 // option will take precedence.
 func withIncludeObjects(objects []string) gcsManagerOption {
 	return func(m *gcsManager) error {
+		if len(objects) == 0 {
+			return nil
+		}
 		if m.excludeObjects != nil {
 			m.excludeObjects = nil
 		}
@@ -199,6 +208,9 @@ func withIncludeObjects(objects []string) gcsManagerOption {
 // take precedence.
 func withExcludeObjects(objects []string) gcsManagerOption {
 	return func(m *gcsManager) error {
+		if len(objects) == 0 {
+			return nil
+		}
 		if m.includeObjects != nil {
 			return nil
 		}

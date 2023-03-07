@@ -20,7 +20,11 @@ import (
 func TestChunks(t *testing.T) {
 	ctx := context.Background()
 
-	source, conn := createTestSource(&sourcespb.GCS{ProjectId: testProjectID})
+	source, conn := createTestSource(&sourcespb.GCS{
+		ProjectId:      testProjectID,
+		Credential:     &sourcespb.GCS_Adc{},
+		ExcludeBuckets: []string{perfTestBucketGlob},
+	})
 
 	err := source.Init(ctx, "test", 1, 1, true, conn, 8)
 	assert.Nil(t, err)
