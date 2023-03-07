@@ -113,7 +113,7 @@ func setGCSManagerObjectOptions(conn *sourcespb.GCS) gcsManagerOption {
 	return setGCSManagerOptions(conn.GetIncludeObjects(), conn.GetExcludeObjects(), withIncludeObjects, withExcludeObjects)
 }
 
-func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func(vals []string) gcsManagerOption) gcsManagerOption {
+func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([]string) gcsManagerOption) gcsManagerOption {
 	// Only allow one of include/exclude to be set.
 	// If both are set, include takes precedence.
 	if len(include) > 0 {
