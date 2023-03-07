@@ -3,6 +3,7 @@ package gcs
 import (
 	"fmt"
 	"io"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -131,29 +132,39 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		assert.Nil(t, err)
 	}()
 
-	res := make([]*sources.Chunk, 0, 5)
+	want := make([]*sources.Chunk, 0, 5)
 	for i := 0; i < 5; i++ {
-		res = append(res, createTestSourceChunk(i))
+		want = append(want, createTestSourceChunk(i))
+	}
+
+	count := 0
+	got := make([]*sources.Chunk, 0, 5)
+	for ch := range chunksCh {
+		got = append(got, ch)
+		count++
 	}
 
 	// Ensure we get 5 objects back.
-	count := 0
-
-	for ch := range chunksCh {
-		assert.Equal(
-			t, res[count].SourceMetadata.Data.(*source_metadatapb.MetaData_Gcs).Gcs.Filename,
-			ch.SourceMetadata.Data.(*source_metadatapb.MetaData_Gcs).Gcs.Filename,
-		)
-		// Check the data is the same.
-		assert.Equal(t, res[count].Data, ch.Data)
-		count++
-	}
 	assert.Equal(t, 5, count)
+
+	// Sort the results to ensure deterministic ordering.
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].SourceMetadata.GetGcs().Filename < want[j].SourceMetadata.GetGcs().Filename
+	})
+	sort.Slice(got, func(i, j int) bool {
+		return got[i].SourceMetadata.GetGcs().Filename < got[j].SourceMetadata.GetGcs().Filename
+	})
+
+	for _, c := range got {
+		assert.Equal(t, c.SourceMetadata.GetGcs().Filename, c.SourceMetadata.GetGcs().Filename)
+		assert.Equal(t, c.Data, c.Data)
+	}
+
 }
 
 func TestSourceChunks_ListObjects_Error(t *testing.T) {
 	ctx := context.Background()
-	source := &Source{gcsManager: &mockObjectManager{}}
+	source := &Source{gcsManager: &mockObjectManager{wantErr: true}}
 
 	chunksCh := make(chan *sources.Chunk, 1)
 
