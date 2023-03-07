@@ -785,7 +785,9 @@ func Test_isObjectSizeValid(t *testing.T) {
 
 	ctx := context.Background()
 	for _, tc := range testCases {
-		g := &gcsManager{}
+		g := &gcsManager{
+			maxObjectSize: maxObjectSizeLimit,
+		}
 		t.Run(tc.name, func(t *testing.T) {
 			got := g.isObjectSizeValid(ctx, tc.objSize)
 			assert.Equal(t, tc.want, got)
