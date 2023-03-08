@@ -109,7 +109,7 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ### Example 7: Scan GCS buckets for verified secrets.
 
 ```bash
-trufflehog gcs --projec-id=<project ID> --cloud-environment --only-verified
+trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
 # What's new in v3?
