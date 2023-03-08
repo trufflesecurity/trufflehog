@@ -65,7 +65,7 @@ func isAuthValid(ctx context.Context, c sources.GCSConfig, connection *sourcespb
 		isAuthSelected = true
 		connection.Credential = &sourcespb.GCS_Unauthenticated{}
 	}
-	if c.WithADC {
+	if c.CloudCred {
 		if isAuthSelected {
 			return false
 		}

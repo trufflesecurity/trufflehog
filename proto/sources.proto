@@ -129,7 +129,7 @@ message GCS {
     string json_sa = 1;
     string api_key = 2;
     credentials.Unauthenticated unauthenticated = 3;
-    credentials.ADC adc = 4;
+    credentials.CloudEnvironment adc = 4;
   }
   string project_id = 5;
   repeated string include_buckets = 6;

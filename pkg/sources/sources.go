@@ -46,8 +46,9 @@ type Source interface {
 
 // GCSConfig defines the optional configuration for a GCS source.
 type GCSConfig struct {
-	// WithADC is a flag to indicate whether to use application default credentials.
-	WithADC,
+	// CloudCred determines whether to use cloud credentials.
+	// This can NOT be used with a secret.
+	CloudCred,
 	// WithoutAuth is a flag to indicate whether to use authentication.
 	WithoutAuth bool
 	// ApiKey is the API key to use to authenticate with the source.

@@ -104,7 +104,7 @@ var (
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
 	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
-	gcsADC            = gcsScan.Flag("adc", "Use Application Default Credentials to authenticate.").Bool()
+	gcsCloudEnv       = gcsScan.Flag("cloud-environment", "Use Application Default Credentials, IAM credentials to authenticate.").Bool()
 	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
 	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
 	gcsAPIKey         = gcsScan.Flag("api-key", "GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.").Envar("GOOGLE_API_KEY").String()
@@ -397,7 +397,7 @@ func run(state overseer.State) {
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{
 			ProjectID:      *gcsProjectID,
-			WithADC:        *gcsADC,
+			CloudCred:      *gcsCloudEnv,
 			ServiceAccount: *gcsServiceAccount,
 			WithoutAuth:    *gcsWithoutAuth,
 			ApiKey:         *gcsAPIKey,
