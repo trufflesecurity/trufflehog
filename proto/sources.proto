@@ -41,6 +41,7 @@ enum SourceType {
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
   SOURCE_TYPE_GOOGLE_DRIVE = 28;
+
 }
 
 message LocalSource {
@@ -126,8 +127,15 @@ message Filesystem {
 message GCS {
   oneof credential {
     string json_sa = 1;
+    string api_key = 2;
+    credentials.Unauthenticated unauthenticated = 3;
+    credentials.CloudEnvironment adc = 4;
   }
-  repeated string buckets = 2;
+  string project_id = 5;
+  repeated string include_buckets = 6;
+  repeated string exclude_buckets = 7;
+  repeated string include_objects = 8;
+  repeated string exclude_objects = 9;
 }
 
 message Git {

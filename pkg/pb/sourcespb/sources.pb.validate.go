@@ -1242,10 +1242,77 @@ func (m *GCS) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for ProjectId
+
 	switch m.Credential.(type) {
 
 	case *GCS_JsonSa:
 		// no validation rules for JsonSa
+
+	case *GCS_ApiKey:
+		// no validation rules for ApiKey
+
+	case *GCS_Unauthenticated:
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GCSValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GCSValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GCSValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GCS_Adc:
+
+		if all {
+			switch v := interface{}(m.GetAdc()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GCSValidationError{
+						field:  "Adc",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GCSValidationError{
+						field:  "Adc",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAdc()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GCSValidationError{
+					field:  "Adc",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
 
 	}
 

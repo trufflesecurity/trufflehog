@@ -1401,11 +1401,17 @@ func (m *GCS) validate(all bool) error {
 
 	// no validation rules for Bucket
 
-	// no validation rules for File
+	// no validation rules for Filename
 
 	// no validation rules for Link
 
 	// no validation rules for Email
+
+	// no validation rules for CreatedAt
+
+	// no validation rules for UpdatedAt
+
+	// no validation rules for ContentType
 
 	if len(errors) > 0 {
 		return GCSMultiError(errors)

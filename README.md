@@ -106,6 +106,12 @@ docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest 
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
+### Example 7: Scan GCS buckets for verified secrets.
+
+```bash
+trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
+```
+
 # What's new in v3?
 
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
@@ -176,6 +182,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - filesystem (files and directories)
 - syslog
 - circleci
+- GCS (Google Cloud Storage)
 - stdin (coming soon)
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:

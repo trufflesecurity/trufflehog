@@ -102,6 +102,17 @@ var (
 	s3ScanCloudEnv = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
 	s3ScanBuckets  = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 
+	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
+	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
+	gcsCloudEnv       = gcsScan.Flag("cloud-environment", "Use Application Default Credentials, IAM credentials to authenticate.").Bool()
+	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
+	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
+	gcsAPIKey         = gcsScan.Flag("api-key", "GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.").Envar("GOOGLE_API_KEY").String()
+	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. You can repeat this flag. Globs are supported").Short('i').Strings()
+	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. You can repeat this flag. Globs are supported").Short('x').Strings()
+	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. You can repeat this flag. Globs are supported").Short('I').Strings()
+	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. You can repeat this flag. Globs are supported").Short('X').Strings()
+
 	syslogScan     = cli.Command("syslog", "Scan syslog")
 	syslogAddress  = syslogScan.Flag("address", "Address and port to listen on for syslog. Example: 127.0.0.1:514").String()
 	syslogProtocol = syslogScan.Flag("protocol", "Protocol to listen on. udp or tcp").String()
@@ -382,6 +393,22 @@ func run(state overseer.State) {
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logFatal(err, "Failed to scan CircleCI.")
+		}
+	case gcsScan.FullCommand():
+		cfg := sources.GCSConfig{
+			ProjectID:      *gcsProjectID,
+			CloudCred:      *gcsCloudEnv,
+			ServiceAccount: *gcsServiceAccount,
+			WithoutAuth:    *gcsWithoutAuth,
+			ApiKey:         *gcsAPIKey,
+			IncludeBuckets: *gcsIncludeBuckets,
+			ExcludeBuckets: *gcsExcludeBuckets,
+			IncludeObjects: *gcsIncludeObjects,
+			ExcludeObjects: *gcsExcludeObjects,
+			Concurrency:    *concurrency,
+		}
+		if err := e.ScanGCS(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan GCS.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
