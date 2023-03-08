@@ -96,8 +96,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerObjectOptions(&conn))
 	}
 
-	s.gcsManager, err = newGCSManager(conn.ProjectId, gcsManagerOpts...)
-	if err != nil {
+	if s.gcsManager, err = newGCSManager(conn.ProjectId, gcsManagerOpts...); err != nil {
 		return fmt.Errorf("error creating GCS manager: %w", err)
 	}
 
