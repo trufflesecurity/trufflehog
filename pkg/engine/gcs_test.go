@@ -18,7 +18,7 @@ func TestScanGCS(t *testing.T) {
 			gcsConfig: sources.GCSConfig{
 				ApiKey:         "abc123",
 				ProjectID:      "test-project",
-				WithADC:        false,
+				CloudCred:      false,
 				WithoutAuth:    false,
 				ServiceAccount: "",
 			},
@@ -35,7 +35,7 @@ func TestScanGCS(t *testing.T) {
 			gcsConfig: sources.GCSConfig{
 				ApiKey:         "abc123",
 				ProjectID:      "test-project",
-				WithADC:        true,
+				CloudCred:      true,
 				WithoutAuth:    false,
 				ServiceAccount: "",
 			},
