@@ -88,8 +88,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 
 	}
 
-	gcsManagerOpts := []gcsManagerOption{withConcurrency(concurrency)}
-	gcsManagerOpts = append(gcsManagerOpts, gcsManagerAuthOption)
+	gcsManagerOpts := []gcsManagerOption{withConcurrency(concurrency), gcsManagerAuthOption}
 	if setGCSManagerBucketOptions(&conn) != nil {
 		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(&conn))
 	}
