@@ -84,16 +84,6 @@ Expected output:
 trufflehog s3 --bucket=<bucket name> --only-verified
 ```
 
-### FAQ
-
-+ All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
-  + That means no secrets were detected
-+ Why is the scan is taking a long time when I scan a GitHub org
-  + Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
-+ It says a private key was verified, what does that mean?
-  + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
-
-
 ### Example 5: Scan a Github Repo using SSH authentication in docker
 
 ```bash
@@ -111,6 +101,16 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
+
+### FAQ
+
++ All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
+  + That means no secrets were detected
++ Why is the scan is taking a long time when I scan a GitHub org
+  + Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
++ It says a private key was verified, what does that mean?
+  + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
+
 
 # What's new in v3?
 
