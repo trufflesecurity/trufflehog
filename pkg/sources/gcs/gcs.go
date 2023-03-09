@@ -1,9 +1,11 @@
 package gcs
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -88,7 +90,16 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 
 	}
 
-	gcsManagerOpts := []gcsManagerOption{withConcurrency(concurrency), gcsManagerAuthOption}
+	resume, err := setResumeBucketOffset(s.Progress.EncodedResumeInfo)
+	if err != nil {
+		return fmt.Errorf("error setting resume info: %w", err)
+	}
+
+	gcsManagerOpts := []gcsManagerOption{
+		withConcurrency(concurrency),
+		withBucketOffsets(resume),
+		gcsManagerAuthOption,
+	}
 	if setGCSManagerBucketOptions(&conn) != nil {
 		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(&conn))
 	}
@@ -124,6 +135,48 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
+func setResumeBucketOffset(s string) (map[string]string, error) {
+	var resumeInfo map[string]objectsProgress
+	if s != "" {
+		if err := json.Unmarshal([]byte(s), &resumeInfo); err != nil {
+			return nil, fmt.Errorf("error unmarshalling resume info: %w", err)
+		}
+	}
+
+	return calcBktOffset(resumeInfo)
+}
+
+type objectsProgress struct {
+	// Processing are the objects that were not fully processed.
+	Processing map[string]struct{}
+	// Processed is the last object that was fully processed.
+	Processed string
+}
+
+// In order to calculate the bucket offset, we need to know the last object
+// that was processed for each bucket, as well as any objects that were processing.
+// If there were no objects processing, we can just use the last object that was processed.
+// If there were objects processing, we need to find the first object (lexicographically)
+// that was processing, as that is the next object that needs to be processed.
+func calcBktOffset(resumeInfo map[string]objectsProgress) (map[string]string, error) {
+	bucketOffset := make(map[string]string, len(resumeInfo))
+	for k, v := range resumeInfo {
+		if len(v.Processing) == 0 {
+			bucketOffset[k] = v.Processed
+			continue
+		}
+
+		processing := make([]string, 0, len(v.Processing))
+		for k := range v.Processing {
+			processing = append(processing, k)
+		}
+		sort.Strings(processing)
+		bucketOffset[k] = processing[0]
+	}
+
+	return bucketOffset, nil
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	objectCh, err := s.gcsManager.listObjects(ctx)
@@ -147,7 +200,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 			if err := s.processObject(ctx, o); err != nil {
 				ctx.Logger().V(1).Info("GCS source error processing objects", "name", s.name, "error", err)
+				return
 			}
+			s.updateProgress(ctx, o)
 		}(o)
 	}
 	wg.Wait()
@@ -222,4 +277,8 @@ func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Ch
 	}
 
 	return data, nil
+}
+
+func (s *Source) updateProgress(ctx context.Context, o object) {
+
 }

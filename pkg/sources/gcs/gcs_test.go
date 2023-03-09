@@ -1,6 +1,7 @@
 package gcs
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -123,6 +124,61 @@ func TestSourceInit_Conn(t *testing.T) {
 					t.Errorf("source.Init() diff: (-want +got)\n%s", diff)
 				}
 			}
+		})
+	}
+}
+
+func TestSourceInit_Progress(t *testing.T) {
+	type objectsProgress struct {
+		Processing map[string]struct{}
+		Processed  string
+	}
+
+	complete := map[string]objectsProgress{testBucket: {Processed: object2}}
+	completeEncodeResumeInfo, err := json.Marshal(complete)
+	assert.Nil(t, err)
+
+	processing := map[string]objectsProgress{
+		testBucket: {
+			Processed:  object2,
+			Processing: map[string]struct{}{object1: {}},
+		},
+	}
+	processingEncodeResumeInfo, err := json.Marshal(processing)
+
+	testCases := []struct {
+		name              string
+		conn              *sourcespb.GCS
+		encodeResumeInfo  string
+		gcsManagerBuckets map[string]bucket
+	}{
+		{
+			name:              "no progress",
+			conn:              &sourcespb.GCS{ProjectId: testProjectID, Credential: &sourcespb.GCS_Adc{}},
+			gcsManagerBuckets: map[string]bucket{},
+		},
+		{
+			name:              "progress set, no processing objects in any buckets",
+			conn:              &sourcespb.GCS{ProjectId: testProjectID, Credential: &sourcespb.GCS_Adc{}},
+			encodeResumeInfo:  string(completeEncodeResumeInfo),
+			gcsManagerBuckets: map[string]bucket{testBucket: {name: testBucket, startOffset: object2}},
+		},
+		{
+			name:              "progress set, processing objects in some buckets",
+			conn:              &sourcespb.GCS{ProjectId: testProjectID, Credential: &sourcespb.GCS_Adc{}},
+			encodeResumeInfo:  string(processingEncodeResumeInfo),
+			gcsManagerBuckets: map[string]bucket{testBucket: {name: testBucket, startOffset: object1}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			source, conn := createTestSource(tc.conn)
+			source.Progress.EncodedResumeInfo = tc.encodeResumeInfo
+
+			err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
+			assert.Nil(t, err)
+			assert.Equal(t, tc.gcsManagerBuckets, source.gcsManager.(*gcsManager).buckets)
 		})
 	}
 }
@@ -252,4 +308,42 @@ func TestSourceChunks_ListObjects_Error(t *testing.T) {
 	defer close(chunksCh)
 	err := source.Chunks(ctx, chunksCh)
 	assert.True(t, err != nil)
+}
+
+func TestSourceChunks_ProgressSet(t *testing.T) {
+	ctx := context.Background()
+	chunksCh := make(chan *sources.Chunk, 1)
+
+	source := &Source{
+		gcsManager: &mockObjectManager{},
+		chunksCh:   chunksCh,
+	}
+
+	go func() {
+		defer close(chunksCh)
+		err := source.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	want := make([]*sources.Chunk, 0, 5)
+	for i := 0; i < 5; i++ {
+		want = append(want, createTestSourceChunk(i))
+	}
+
+	count := 0
+	got := make([]*sources.Chunk, 0, 5)
+	for ch := range chunksCh {
+		got = append(got, ch)
+		count++
+	}
+
+	// Ensure we get 5 objects back.
+	assert.Equal(t, 5, count)
+
+	// Test that the resume progress is set.
+	resume := map[string]string{testBucket: "object4"}
+	b, err := json.Marshal(resume)
+	assert.Nil(t, err)
+
+	assert.Equal(t, string(b), source.Progress.EncodedResumeInfo)
 }
