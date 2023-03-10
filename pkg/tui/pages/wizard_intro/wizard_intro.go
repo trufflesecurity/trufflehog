@@ -11,26 +11,20 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
-var (
-	wizardIntroChoices = []string{
-		"Scan a source using wizard",
-		"Scan a source with config",
-		"View open-source project",
-		"Inquire about Trufflehog Enterprise",
-		"Quit",
-	}
-)
-
 type WizardIntro struct {
 	common.Common
-	cursor   int
-	action   string
 	selector *selector.Selector
 }
 
 func New(cmn common.Common) *WizardIntro {
 	sel := selector.New(cmn,
-		[]selector.IdentifiableItem{},
+		[]selector.IdentifiableItem{
+			Item{"Scan a source using wizard"},
+			Item{"Scan a source with config"},
+			Item{"View open-source project"},
+			Item{"Inquire about Trufflehog Enterprise"},
+			Item{"Quit"},
+		},
 		ItemDelegate{&cmn})
 
 	return &WizardIntro{Common: cmn, selector: sel}
@@ -57,16 +51,15 @@ func (m *WizardIntro) View() string {
 	s := strings.Builder{}
 	s.WriteString("What do you want to do?\n\n")
 
-	return m.selector.View()
-
-	for i := 0; i < len(wizardIntroChoices); i++ {
-		if m.cursor == i {
+	for i, selectorItem := range m.selector.Items() {
+		// Cast the interface to the concrete Item struct.
+		item := selectorItem.(Item)
+		if m.selector.Index() == i {
 			selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.Colors["sprout"]))
-			s.WriteString(selectedStyle.Render(" (•) " + wizardIntroChoices[i]))
+			s.WriteString(selectedStyle.Render(" (•) " + item.cmd))
 		} else {
-			s.WriteString(" ( ) " + wizardIntroChoices[i])
+			s.WriteString(" ( ) " + item.cmd)
 		}
-
 		s.WriteString("\n")
 	}
 
