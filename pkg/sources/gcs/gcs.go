@@ -146,26 +146,14 @@ func newResumeInfo() *resumeInfo {
 	return &resumeInfo{bucketObjects: make(map[string]*objectsProgress)}
 }
 
-func (r *resumeInfo) setProcessStatus(obj object, fn func(string, string, *resumeInfo)) map[string]*objectsProgress {
+type progressStateFn func(string, string, *resumeInfo)
+
+func (r *resumeInfo) setProcessStatus(obj object, fn progressStateFn) map[string]*objectsProgress {
 	r.createBucketObject(obj.bucket)
 	fn(obj.bucket, obj.name, r)
 
 	return r.bucketObjects
 }
-
-// func (r *resumeInfo) setProcessing(obj object) map[string]*objectsProgress {
-// 	r.createBucketObject(obj.bucket)
-// 	r.setProcessingBucketObject(obj.bucket, obj.name)
-//
-// 	return r.bucketObjects
-// }
-//
-// func (r *resumeInfo) setProcessed(obj object) map[string]*objectsProgress {
-// 	r.createBucketObject(obj.bucket)
-// 	r.setProcessedBucketObject(obj.bucket, obj.name)
-//
-// 	return r.bucketObjects
-// }
 
 func (r *resumeInfo) createBucketObject(bucket string) {
 	if !r.doesBucketExist(bucket) {
