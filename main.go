@@ -108,10 +108,10 @@ var (
 	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
 	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
 	gcsAPIKey         = gcsScan.Flag("api-key", "GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.").Envar("GOOGLE_API_KEY").String()
-	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. You can repeat this flag. Globs are supported").Short('i').Strings()
-	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. You can repeat this flag. Globs are supported").Short('x').Strings()
-	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. You can repeat this flag. Globs are supported").Short('I').Strings()
-	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. You can repeat this flag. Globs are supported").Short('X').Strings()
+	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma seperated list of buckets. Globs are supported").String()
+	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. Comma separated list of buckets.  Globs are supported").String()
+	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. Comma separated list of objects. Globs are supported").String()
+	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. Comma separated list of objects. Globs are supported").String()
 	gcsMaxObjectSize  = gcsScan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. Max size is 64MB. eg. 100B, 128KB, 2MB").Default("10MB").Bytes()
 
 	syslogScan     = cli.Command("syslog", "Scan syslog")
@@ -402,10 +402,10 @@ func run(state overseer.State) {
 			ServiceAccount: *gcsServiceAccount,
 			WithoutAuth:    *gcsWithoutAuth,
 			ApiKey:         *gcsAPIKey,
-			IncludeBuckets: *gcsIncludeBuckets,
-			ExcludeBuckets: *gcsExcludeBuckets,
-			IncludeObjects: *gcsIncludeObjects,
-			ExcludeObjects: *gcsExcludeObjects,
+			IncludeBuckets: cliFlagToSlice(*gcsIncludeBuckets),
+			ExcludeBuckets: cliFlagToSlice(*gcsExcludeBuckets),
+			IncludeObjects: cliFlagToSlice(*gcsIncludeObjects),
+			ExcludeObjects: cliFlagToSlice(*gcsExcludeObjects),
 			Concurrency:    int64(*concurrency),
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
@@ -455,6 +455,14 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
+}
+
+func cliFlagToSlice(s string) []string {
+	res := strings.Split(s, ",")
+	if len(res) == 1 && res[0] == "" {
+		res = nil
+	}
+	return res
 }
 
 func printAverageDetectorTime(e *engine.Engine) {
