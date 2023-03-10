@@ -453,12 +453,16 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- i
 			ctx.Logger().V(5).Info("finished listing objects in bucket")
 			break
 		}
-		if !g.shouldIncludeObject(ctx, obj.Name) || g.shouldExcludeObject(ctx, obj.Name) {
+		if err != nil {
+			return fmt.Errorf("failed to retrieve object iterator: %w", err)
+		}
+		if obj == nil {
+			ctx.Logger().V(5).Info("object is nil")
 			continue
 		}
 
-		if err != nil {
-			return fmt.Errorf("failed to retrieve iterator: %w", err)
+		if !g.shouldIncludeObject(ctx, obj.Name) || g.shouldExcludeObject(ctx, obj.Name) {
+			continue
 		}
 
 		o, err := g.constructObject(ctx, bkt.Object(obj.Name))
