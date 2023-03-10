@@ -109,8 +109,11 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case common.ErrorMsg:
 		return ui, nil
 	case selector.SelectMsg:
-		switch msg.IdentifiableItem.(type) {
-		// case selection.Item:
+		switch item := msg.IdentifiableItem.(type) {
+		case wizard_intro.Item:
+			if item == wizard_intro.Quit {
+				cmds = append(cmds, tea.Quit)
+			}
 		}
 	}
 	if ui.state == loadedState {

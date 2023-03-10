@@ -11,6 +11,30 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
+const (
+	ScanSourceWithWizard Item = iota
+	ScanSourceWithConfig
+	ViewOSSProject
+	EnterpriseInquire
+	Quit
+)
+
+func (w Item) String() string {
+	switch w {
+	case ScanSourceWithWizard:
+		return "Scan a source using wizard"
+	case ScanSourceWithConfig:
+		return "Scan a source with config"
+	case ViewOSSProject:
+		return "View open-source project"
+	case EnterpriseInquire:
+		return "Inquire about Trufflehog Enterprise"
+	case Quit:
+		return "Quit"
+	}
+	panic("unreachable")
+}
+
 type WizardIntro struct {
 	common.Common
 	selector *selector.Selector
@@ -19,11 +43,11 @@ type WizardIntro struct {
 func New(cmn common.Common) *WizardIntro {
 	sel := selector.New(cmn,
 		[]selector.IdentifiableItem{
-			Item{"Scan a source using wizard"},
-			Item{"Scan a source with config"},
-			Item{"View open-source project"},
-			Item{"Inquire about Trufflehog Enterprise"},
-			Item{"Quit"},
+			ScanSourceWithWizard,
+			ScanSourceWithConfig,
+			ViewOSSProject,
+			EnterpriseInquire,
+			Quit,
 		},
 		ItemDelegate{&cmn})
 
@@ -56,9 +80,9 @@ func (m *WizardIntro) View() string {
 		item := selectorItem.(Item)
 		if m.selector.Index() == i {
 			selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.Colors["sprout"]))
-			s.WriteString(selectedStyle.Render(" (•) " + item.cmd))
+			s.WriteString(selectedStyle.Render(" (•) " + item.Title()))
 		} else {
-			s.WriteString(" ( ) " + item.cmd)
+			s.WriteString(" ( ) " + item.Title())
 		}
 		s.WriteString("\n")
 	}
