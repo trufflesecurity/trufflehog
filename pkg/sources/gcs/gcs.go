@@ -149,9 +149,6 @@ func newResumeInfo() *resumeInfo {
 type progressStateFn func(string, string, *resumeInfo)
 
 func (r *resumeInfo) setProcessStatus(obj object, fn progressStateFn) map[string]*objectsProgress {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.createBucketObject(obj.bucket)
 	fn(obj.bucket, obj.name, r)
 
@@ -274,6 +271,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func (s *Source) startProcessing(ctx context.Context, resume *resumeInfo, o object) error {
+	resume.mu.Lock()
+	defer resume.mu.Unlock()
+
 	p := resume.setProcessStatus(o, setProcessingBucketObject)
 	msg := fmt.Sprintf("GCS source beginning to process object %s in bucket %s", o.name, o.bucket)
 	ctx.Logger().V(5).Info(msg)
@@ -288,6 +288,9 @@ func (s *Source) startProcessing(ctx context.Context, resume *resumeInfo, o obje
 }
 
 func (s *Source) endProcessing(ctx context.Context, resume *resumeInfo, o object) error {
+	resume.mu.Lock()
+	defer resume.mu.Unlock()
+
 	p := resume.setProcessStatus(o, setProcessedBucketObject)
 	msg := fmt.Sprintf("GCS source finished processing object %s in bucket %s", o.name, o.bucket)
 	ctx.Logger().V(5).Info(msg)
