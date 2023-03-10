@@ -140,7 +140,9 @@ type S3Config struct {
 	// Key is any key to use to authenticate with the source.
 	Key,
 	// Secret is any secret to use to authenticate with the source.
-	Secret string
+	Secret,
+	// Temporary session token associated with a temporary access key id and secret key.
+	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
 }

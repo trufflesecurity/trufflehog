@@ -99,11 +99,12 @@ var (
 	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
-	s3Scan         = cli.Command("s3", "Find credentials in S3 buckets.")
-	s3ScanKey      = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
-	s3ScanSecret   = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
-	s3ScanCloudEnv = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
-	s3ScanBuckets  = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
+	s3Scan             = cli.Command("s3", "Find credentials in S3 buckets.")
+	s3ScanKey          = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
+	s3ScanSecret       = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
+	s3ScanSessionToken = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
+	s3ScanCloudEnv     = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
+	s3ScanBuckets      = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
 	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
@@ -382,10 +383,11 @@ func run(state overseer.State) {
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
-			Key:       *s3ScanKey,
-			Secret:    *s3ScanSecret,
-			Buckets:   *s3ScanBuckets,
-			CloudCred: *s3ScanCloudEnv,
+			Key:          *s3ScanKey,
+			Secret:       *s3ScanSecret,
+			SessionToken: *s3ScanSessionToken,
+			Buckets:      *s3ScanBuckets,
+			CloudCred:    *s3ScanCloudEnv,
 		}
 		if err := e.ScanS3(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan S3.")
