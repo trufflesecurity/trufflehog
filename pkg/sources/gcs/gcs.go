@@ -149,6 +149,9 @@ func newResumeInfo() *resumeInfo {
 type progressStateFn func(string, string, *resumeInfo)
 
 func (r *resumeInfo) setProcessStatus(obj object, fn progressStateFn) map[string]*objectsProgress {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.createBucketObject(obj.bucket)
 	fn(obj.bucket, obj.name, r)
 
@@ -156,37 +159,22 @@ func (r *resumeInfo) setProcessStatus(obj object, fn progressStateFn) map[string
 }
 
 func (r *resumeInfo) createBucketObject(bucket string) {
-	if !r.doesBucketExist(bucket) {
-		r.newBucketObjects(bucket)
+	if r.doesBucketExist(bucket) {
+		return
 	}
+	r.bucketObjects[bucket] = newObjectsProgress()
 }
 
 func (r *resumeInfo) doesBucketExist(bucket string) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	_, ok := r.bucketObjects[bucket]
 	return ok
 }
 
-func (r *resumeInfo) newBucketObjects(bucket string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.bucketObjects[bucket] = newObjectsProgress()
-}
-
 func setProcessingBucketObject(bucket, obj string, r *resumeInfo) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.bucketObjects[bucket].Processing[obj] = struct{}{}
 }
 
 func setProcessedBucketObject(bucket, obj string, r *resumeInfo) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	delete(r.bucketObjects[bucket].Processing, obj)
 
 	// If the object is not greater (lexicographically) than the last processed object, we can skip it.
