@@ -98,6 +98,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	gcsManagerOpts := []gcsManagerOption{
 		withConcurrency(concurrency),
 		withBucketOffsets(resume),
+		withMaxObjectSize(conn.MaxObjectSize),
 		gcsManagerAuthOption,
 	}
 	if setGCSManagerBucketOptions(&conn) != nil {

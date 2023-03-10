@@ -17,6 +17,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const publicBucket = "public-trufflehog-test-bucket"
+
 func TestChunks(t *testing.T) {
 	ctx := context.Background()
 
@@ -38,6 +40,65 @@ func TestChunks(t *testing.T) {
 	}()
 
 	want := createTestChunks()
+
+	got := make([]*sources.Chunk, 0, len(want))
+	for chunk := range chunksCh {
+		got = append(got, chunk)
+	}
+	sort.Slice(got, func(i, j int) bool {
+		return got[i].SourceMetadata.GetGcs().Filename < got[j].SourceMetadata.GetGcs().Filename
+	})
+
+	assert.Equal(t, len(want), len(got))
+
+	for i, chunk := range got {
+		if diff := cmp.Diff(want[i].SourceMetadata.GetGcs(), chunk.SourceMetadata.GetGcs(),
+			cmpopts.IgnoreFields(source_metadatapb.GCS{}, "state", "sizeCache", "unknownFields", "CreatedAt", "UpdatedAt"),
+		); diff != "" {
+			t.Errorf("chunk mismatch (-want +got):\n%s", diff)
+		}
+	}
+}
+
+func TestChunks_PublicBucket(t *testing.T) {
+	ctx := context.Background()
+
+	source, conn := createTestSource(&sourcespb.GCS{
+		Credential:     &sourcespb.GCS_Unauthenticated{},
+		IncludeBuckets: []string{publicBucket},
+	})
+
+	err := source.Init(ctx, "test", 1, 1, true, conn, 8)
+	assert.Nil(t, err)
+
+	chunksCh := make(chan *sources.Chunk, 1)
+
+	go func() {
+		defer close(chunksCh)
+		err := source.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	want := []*sources.Chunk{
+		{
+			SourceName: "test",
+			SourceType: sourcespb.SourceType_SOURCE_TYPE_GCS,
+			SourceID:   0,
+			Verify:     true,
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Gcs{
+					Gcs: &source_metadatapb.GCS{
+						Filename:    "aws1.txt",
+						Bucket:      publicBucket,
+						ContentType: "text/plain",
+						Email:       "",
+						Link:        "https://storage.googleapis.com/download/storage/v1/b/public-trufflehog-test-bucket/o/aws1.txt?generation=1678334408999764&alt=media",
+						Acls:        []string{},
+					},
+				},
+			},
+		},
+	}
 
 	got := make([]*sources.Chunk, 0, len(want))
 	for chunk := range chunksCh {

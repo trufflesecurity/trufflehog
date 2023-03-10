@@ -103,7 +103,7 @@ var (
 	s3ScanBuckets  = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
-	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
+	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used w/ unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
 	gcsCloudEnv       = gcsScan.Flag("cloud-environment", "Use Application Default Credentials, IAM credentials to authenticate.").Bool()
 	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
 	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
@@ -112,6 +112,7 @@ var (
 	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. You can repeat this flag. Globs are supported").Short('x').Strings()
 	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. You can repeat this flag. Globs are supported").Short('I').Strings()
 	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. You can repeat this flag. Globs are supported").Short('X').Strings()
+	gcsMaxObjectSize  = gcsScan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. Max size is 64MB. eg. 100B, 128KB, 2MB").Default("10MB").Bytes()
 
 	syslogScan     = cli.Command("syslog", "Scan syslog")
 	syslogAddress  = syslogScan.Flag("address", "Address and port to listen on for syslog. Example: 127.0.0.1:514").String()
@@ -405,7 +406,8 @@ func run(state overseer.State) {
 			ExcludeBuckets: *gcsExcludeBuckets,
 			IncludeObjects: *gcsIncludeObjects,
 			ExcludeObjects: *gcsExcludeObjects,
-			Concurrency:    *concurrency,
+			Concurrency:    int64(*concurrency),
+			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
 		if err := e.ScanGCS(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan GCS.")

@@ -15,8 +15,15 @@ import (
 
 // ScanGCS with the provided options.
 func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
-	if c.ProjectID == "" {
+	// Project ID is required if using any authenticated access.
+	if c.ProjectID == "" && !c.WithoutAuth {
 		return fmt.Errorf("project ID is required")
+	}
+
+	// If using unauthenticated access, the project ID is not used.
+	if c.ProjectID != "" && c.WithoutAuth {
+		c.ProjectID = ""
+		ctx.Logger().Info("project ID is not used when using unauthenticated access, ignoring provided project ID")
 	}
 
 	connection := &sourcespb.GCS{
@@ -43,7 +50,7 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 		"source_type", source.Type().String(),
 		"source_name", "gcs",
 	)
-	if err = source.Init(ctx, "trufflehog - GCS", 0, 0, true, &conn, c.Concurrency); err != nil {
+	if err = source.Init(ctx, "trufflehog - GCS", 0, 0, true, &conn, int(c.Concurrency)); err != nil {
 		return fmt.Errorf("failed to initialize GCS source: %w", err)
 	}
 

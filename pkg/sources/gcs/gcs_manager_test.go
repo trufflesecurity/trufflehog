@@ -48,9 +48,13 @@ func TestNewGcsManager(t *testing.T) {
 		},
 		{
 			name:   "new gcs manager, without auth",
-			projID: testProjectID,
+			projID: "",
 			opts:   []gcsManagerOption{withoutAuthentication()},
-			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
+			want: &gcsManager{
+				concurrency:   defaultConcurrency,
+				maxObjectSize: defaultMaxObjectSize,
+				withoutAuth:   true,
+			},
 		},
 		{
 			name:   "new gcs manager, with api key",
@@ -757,14 +761,14 @@ func Test_isObjectSizeValid(t *testing.T) {
 			want:    true,
 		},
 		{
-			name:    "valid object size, 100 MB",
-			objSize: int64(100 * common.MB),
+			name:    "valid object size, 49 MB",
+			objSize: int64(49 * common.MB),
 			want:    true,
 		},
 		{
-			name:    "valid object size, 1 GB",
+			name:    "invalid object size, 1 GB",
 			objSize: int64(1 * common.GB),
-			want:    true,
+			want:    false,
 		},
 		{
 			name:    "invalid object size, 2 GB",

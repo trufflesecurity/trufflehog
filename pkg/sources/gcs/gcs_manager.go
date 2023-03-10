@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	defaultMaxObjectSize = 500 * 1024 * 1024      // 500MB
-	maxObjectSizeLimit   = 1 * 1024 * 1024 * 1024 // 1GB
+	defaultMaxObjectSize = 10 * 1024 * 1024 // 10MB
+	maxObjectSizeLimit   = 50 * 1024 * 1024 // 50MB
 )
 
 var (
@@ -46,7 +46,8 @@ type bucketManager interface {
 // gcsManager serves as simple facade for interacting with GCS.
 // It's main purpose is to retrieve objects from GCS.
 type gcsManager struct {
-	projectID string
+	projectID   string
+	withoutAuth bool
 
 	concurrency int
 	workerPool  *errgroup.Group
@@ -107,8 +108,8 @@ func withJSONServiceAccount(ctx context.Context, jsonServiceAccount []byte) gcsM
 
 // withDefaultADC uses the default application credentials when creating a new GCS client.
 func withDefaultADC(ctx context.Context) gcsManagerOption {
+	client, err := defaultADC(ctx)
 	return func(m *gcsManager) error {
-		client, err := defaultADC(ctx)
 		if err != nil {
 			return err
 		}
@@ -127,6 +128,7 @@ func withoutAuthentication() gcsManagerOption {
 			return err
 		}
 		m.client = client
+		m.withoutAuth = true
 		return nil
 	}
 }
@@ -269,10 +271,6 @@ func withBucketOffsets(offsets map[string]string) gcsManagerOption {
 }
 
 func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, error) {
-	if projectID == "" {
-		return nil, fmt.Errorf("project ID is required")
-	}
-
 	// Default values for the manager.
 	gcs := &gcsManager{
 		projectID:     projectID,
@@ -285,6 +283,10 @@ func newGCSManager(projectID string, opts ...gcsManagerOption) (*gcsManager, err
 		if err := opt(gcs); err != nil {
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
+	}
+
+	if projectID == "" && !gcs.withoutAuth {
+		return nil, fmt.Errorf("project ID is required, when using authentication")
 	}
 
 	// If no client was provided, use the default application credentials.
@@ -376,6 +378,12 @@ func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
 
 func (g *gcsManager) listBuckets(ctx context.Context) ([]bucket, error) {
 	var buckets []bucket
+	if g.withoutAuth {
+		for name := range g.includeBuckets {
+			buckets = append(buckets, bucket{name: name})
+		}
+		return buckets, nil
+	}
 
 	bkts := g.client.Buckets(ctx, g.projectID)
 	for {

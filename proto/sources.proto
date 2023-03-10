@@ -136,6 +136,7 @@ message GCS {
   repeated string exclude_buckets = 7;
   repeated string include_objects = 8;
   repeated string exclude_objects = 9;
+  int64 max_object_size = 10;
 }
 
 message Git {

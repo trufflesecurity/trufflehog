@@ -57,8 +57,10 @@ type GCSConfig struct {
 	ProjectID,
 	// ServiceAccount is the service account to use to authenticate with the source.
 	ServiceAccount string
+	// MaxObjectSize is the maximum object size to scan.
+	MaxObjectSize,
 	// Concurrency is the number of concurrent workers to use to scan the source.
-	Concurrency int
+	Concurrency int64
 	// IncludeBuckets is a list of buckets to include in the scan.
 	IncludeBuckets,
 	// ExcludeBuckets is a list of buckets to exclude from the scan.
