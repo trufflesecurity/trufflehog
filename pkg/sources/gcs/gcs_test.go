@@ -340,8 +340,14 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	// Ensure we get 5 objects back.
 	assert.Equal(t, 5, count)
 
+	processing := map[string]struct{}{"object0": {}, "object1": {}, "object2": {}, "object3": {}, "object4": {}}
+	for i := 0; i < 5; i++ {
+		delete(processing, fmt.Sprintf("object%d", i))
+	}
+
 	// Test that the resume progress is set.
-	resume := map[string]string{testBucket: "object4"}
+	// The processed values should be the greatest object name lexicographically.
+	resume := map[string]objectsProgress{testBucket: {Processed: "object4", Processing: processing}}
 	b, err := json.Marshal(resume)
 	assert.Nil(t, err)
 

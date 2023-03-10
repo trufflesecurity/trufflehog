@@ -136,15 +136,77 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
-func setResumeBucketOffset(s string) (map[string]string, error) {
-	var resumeInfo map[string]objectsProgress
-	if s != "" {
-		if err := json.Unmarshal([]byte(s), &resumeInfo); err != nil {
-			return nil, fmt.Errorf("error unmarshalling resume info: %w", err)
-		}
-	}
+type resumeInfo struct {
+	mu sync.RWMutex
+	// bucketObjects tracks processing and processed objects for each bucket.
+	bucketObjects map[string]*objectsProgress
+}
 
-	return calcBktOffset(resumeInfo)
+func newResumeInfo() *resumeInfo {
+	return &resumeInfo{bucketObjects: make(map[string]*objectsProgress)}
+}
+
+func (r *resumeInfo) setProcessStatus(obj object, fn func(string, string, *resumeInfo)) map[string]*objectsProgress {
+	r.createBucketObject(obj.bucket)
+	fn(obj.bucket, obj.name, r)
+
+	return r.bucketObjects
+}
+
+// func (r *resumeInfo) setProcessing(obj object) map[string]*objectsProgress {
+// 	r.createBucketObject(obj.bucket)
+// 	r.setProcessingBucketObject(obj.bucket, obj.name)
+//
+// 	return r.bucketObjects
+// }
+//
+// func (r *resumeInfo) setProcessed(obj object) map[string]*objectsProgress {
+// 	r.createBucketObject(obj.bucket)
+// 	r.setProcessedBucketObject(obj.bucket, obj.name)
+//
+// 	return r.bucketObjects
+// }
+
+func (r *resumeInfo) createBucketObject(bucket string) {
+	if !r.doesBucketExist(bucket) {
+		r.newBucketObjects(bucket)
+	}
+}
+
+func (r *resumeInfo) doesBucketExist(bucket string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	_, ok := r.bucketObjects[bucket]
+	return ok
+}
+
+func (r *resumeInfo) newBucketObjects(bucket string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.bucketObjects[bucket] = newObjectsProgress()
+}
+
+func setProcessingBucketObject(bucket, obj string, r *resumeInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.bucketObjects[bucket].Processing[obj] = struct{}{}
+}
+
+func setProcessedBucketObject(bucket, obj string, r *resumeInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	delete(r.bucketObjects[bucket].Processing, obj)
+
+	// If the object is not greater (lexicographically) than the last processed object, we can skip it.
+	// This ensures we keep the greatest object name as the last processed object.
+	if obj < r.bucketObjects[bucket].Processed {
+		return
+	}
+	r.bucketObjects[bucket].Processed = obj
 }
 
 type objectsProgress struct {
@@ -154,12 +216,27 @@ type objectsProgress struct {
 	Processed string
 }
 
+func newObjectsProgress() *objectsProgress {
+	return &objectsProgress{Processing: map[string]struct{}{}}
+}
+
+func setResumeBucketOffset(s string) (map[string]string, error) {
+	resumeInfo := resumeInfo{}
+	if s != "" {
+		if err := json.Unmarshal([]byte(s), &resumeInfo.bucketObjects); err != nil {
+			return nil, fmt.Errorf("error unmarshalling resume info: %w", err)
+		}
+	}
+
+	return calcBktOffset(resumeInfo.bucketObjects)
+}
+
 // In order to calculate the bucket offset, we need to know the last object
 // that was processed for each bucket, as well as any objects that were processing.
 // If there were no objects processing, we can just use the last object that was processed.
 // If there were objects processing, we need to find the first object (lexicographically)
 // that was processing, as that is the next object that needs to be processed.
-func calcBktOffset(resumeInfo map[string]objectsProgress) (map[string]string, error) {
+func calcBktOffset(resumeInfo map[string]*objectsProgress) (map[string]string, error) {
 	bucketOffset := make(map[string]string, len(resumeInfo))
 	for k, v := range resumeInfo {
 		if len(v.Processing) == 0 {
@@ -186,6 +263,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 	s.chunksCh = chunksChan
 
+	resume := newResumeInfo()
+
 	var wg sync.WaitGroup
 	for obj := range objectCh {
 		obj := obj
@@ -195,20 +274,54 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
+		if err := s.startProcessing(ctx, resume, o); err != nil {
+			ctx.Logger().V(1).Info("GCS source error starting to process objects", "error", err)
+			continue
+		}
 		wg.Add(1)
-		go func(obj object) {
+		go func(obj object, resume *resumeInfo) {
 			defer wg.Done()
 
 			if err := s.processObject(ctx, o); err != nil {
-				ctx.Logger().V(1).Info("GCS source error processing objects", "name", s.name, "error", err)
+				ctx.Logger().V(1).Info("error setting start resume progress", "name", o.name, "error", err)
 				return
 			}
-			s.updateProgress(ctx, o)
-		}(o)
+			if err := s.endProcessing(ctx, resume, o); err != nil {
+				ctx.Logger().V(1).Info("error setting end resume progress", "name", o.name, "error", err)
+			}
+		}(o, resume)
 	}
 	wg.Wait()
 
 	ctx.Logger().Info("GCS source finished processing", "name", s.name)
+	return nil
+}
+
+func (s *Source) startProcessing(ctx context.Context, resume *resumeInfo, o object) error {
+	p := resume.setProcessStatus(o, setProcessingBucketObject)
+	msg := fmt.Sprintf("GCS source beginning to process object %s in bucket %s", o.name, o.bucket)
+	ctx.Logger().V(5).Info(msg)
+
+	b, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("error marshalling resume info for object %s in bucket %s: %w", o.name, o.bucket, err)
+	}
+	s.SetProgressComplete(0, 0, msg, string(b))
+
+	return nil
+}
+
+func (s *Source) endProcessing(ctx context.Context, resume *resumeInfo, o object) error {
+	p := resume.setProcessStatus(o, setProcessedBucketObject)
+	msg := fmt.Sprintf("GCS source finished processing object %s in bucket %s", o.name, o.bucket)
+	ctx.Logger().V(5).Info(msg)
+
+	b, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("error marshalling resume info for object %s in bucket %s: %w", o.name, o.bucket, err)
+	}
+	s.SetProgressComplete(0, 0, msg, string(b))
+
 	return nil
 }
 
@@ -278,8 +391,4 @@ func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Ch
 	}
 
 	return data, nil
-}
-
-func (s *Source) updateProgress(ctx context.Context, o object) {
-
 }
