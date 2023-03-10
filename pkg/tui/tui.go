@@ -10,8 +10,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/contact_enterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_select"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/view_oss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/wizard_intro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
@@ -22,6 +24,8 @@ const (
 	wizardIntroPage page = iota
 	sourceSelectPage
 	sourceConfigurePage
+	viewOSSProjectPage
+	contactEnterprisePage
 )
 
 type sessionState int
@@ -44,7 +48,7 @@ type TUI struct {
 func New(c common.Common) *TUI {
 	ui := &TUI{
 		common:     c,
-		pages:      make([]common.Component, 3),
+		pages:      make([]common.Component, 5),
 		activePage: wizardIntroPage,
 		state:      startState,
 	}
@@ -66,12 +70,16 @@ func (ui *TUI) Init() tea.Cmd {
 	ui.pages[wizardIntroPage] = wizard_intro.New(ui.common)
 	ui.pages[sourceSelectPage] = source_select.New(ui.common)
 	ui.pages[sourceConfigurePage] = source_configure.New(ui.common)
+	ui.pages[viewOSSProjectPage] = view_oss.New(ui.common)
+	ui.pages[contactEnterprisePage] = contact_enterprise.New(ui.common)
 	ui.SetSize(ui.common.Width, ui.common.Height)
 	cmds := make([]tea.Cmd, 0)
 	cmds = append(cmds,
 		ui.pages[wizardIntroPage].Init(),
 		ui.pages[sourceSelectPage].Init(),
 		ui.pages[sourceConfigurePage].Init(),
+		ui.pages[viewOSSProjectPage].Init(),
+		ui.pages[contactEnterprisePage].Init(),
 	)
 	ui.state = loadedState
 	ui.SetSize(ui.common.Width, ui.common.Height)
@@ -111,11 +119,17 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case selector.SelectMsg:
 		switch item := msg.IdentifiableItem.(type) {
 		case wizard_intro.Item:
-			if item == wizard_intro.Quit {
+			switch item {
+			case wizard_intro.Quit:
 				cmds = append(cmds, tea.Quit)
+			case wizard_intro.ViewOSSProject:
+				ui.activePage = viewOSSProjectPage
+			case wizard_intro.EnterpriseInquire:
+				ui.activePage = contactEnterprisePage
 			}
 		}
 	}
+
 	if ui.state == loadedState {
 		m, cmd := ui.pages[ui.activePage].Update(msg)
 		ui.pages[ui.activePage] = m.(common.Component)
@@ -123,6 +137,7 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 	}
+
 	// This fixes determining the height margin of the footer.
 	// ui.SetSize(ui.common.Width, ui.common.Height)
 	return ui, tea.Batch(cmds...)
