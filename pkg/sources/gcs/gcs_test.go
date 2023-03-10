@@ -145,6 +145,7 @@ func TestSourceInit_Progress(t *testing.T) {
 		},
 	}
 	processingEncodeResumeInfo, err := json.Marshal(processing)
+	assert.Nil(t, err)
 
 	testCases := []struct {
 		name              string
@@ -330,15 +331,13 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 		want = append(want, createTestSourceChunk(i))
 	}
 
-	count := 0
 	got := make([]*sources.Chunk, 0, 5)
 	for ch := range chunksCh {
 		got = append(got, ch)
-		count++
 	}
 
 	// Ensure we get 5 objects back.
-	assert.Equal(t, 5, count)
+	assert.Equal(t, len(want), len(got))
 
 	processing := map[string]struct{}{"object0": {}, "object1": {}, "object2": {}, "object3": {}, "object4": {}}
 	for i := 0; i < 5; i++ {
