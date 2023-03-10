@@ -17,8 +17,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const publicBucket = "public-trufflehog-test-bucket"
-
 func TestChunks(t *testing.T) {
 	ctx := context.Background()
 
