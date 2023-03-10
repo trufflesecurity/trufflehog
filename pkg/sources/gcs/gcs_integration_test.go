@@ -23,7 +23,7 @@ func TestChunks(t *testing.T) {
 	source, conn := createTestSource(&sourcespb.GCS{
 		ProjectId:      testProjectID,
 		Credential:     &sourcespb.GCS_Adc{},
-		ExcludeBuckets: []string{perfTestBucketGlob},
+		ExcludeBuckets: []string{perfTestBucketGlob, "public-trufflehog-test-bucket"},
 	})
 
 	err := source.Init(ctx, "test", 1, 1, true, conn, 8)
