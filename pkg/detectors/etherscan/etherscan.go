@@ -1,4 +1,4 @@
-package mesibo
+package etherscan
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 )
 
 type Scanner struct{}
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
@@ -20,16 +21,16 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"mesibo"}) + `\b([0-9A-Za-z]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"etherscan"}) + `\b([0-9A-Z]{34})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"mesibo"}
+	return []string{"etherscan"}
 }
 
-// FromData will find and optionally verify Mesibo secrets in a given set of bytes.
+// FromData will find and optionally verify Etherscan secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -42,12 +43,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Mesibo,
+			DetectorType: detectorspb.DetectorType_Etherscan,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.mesibo.com/api.php?op=useradd&token="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.etherscan.io/api?module=account&action=balance&address=0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae&tag=latest&apikey="+resMatch, nil)
 			if err != nil {
 				continue
 			}
@@ -60,14 +61,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "AUTHFAIL") {
+				if !strings.Contains(body, "NOTOK") {
 					s1.Verified = true
 				} else {
+					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}
-
 			}
 		}
 
@@ -78,5 +79,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Mesibo
+	return detectorspb.DetectorType_Etherscan
 }
