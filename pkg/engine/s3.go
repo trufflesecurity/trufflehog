@@ -23,7 +23,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	}
 	if c.CloudCred {
 		if len(c.Key) > 0 || len(c.Secret) > 0 || len(c.SessionToken) > 0 {
-			return fmt.Errorf("cannot use cloud credentials and basic auth together")
+			return fmt.Errorf("cannot use cloud environment and static credentials together")
 		}
 		connection.Credential = &sourcespb.S3_CloudEnvironment{}
 	}
