@@ -44,7 +44,12 @@ func TestSourceInit(t *testing.T) {
 		},
 	})
 
-	err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
+	// Set the EncodeResumeInfo to prevent enumeration.
+	b, err := json.Marshal(map[string]objectsProgress{"other": {}})
+	assert.Nil(t, err)
+	source.Progress.EncodedResumeInfo = string(b)
+
+	err = source.Init(context.Background(), "test", 1, 1, true, conn, 8)
 	assert.Nil(t, err)
 	assert.NotNil(t, source.gcsManager)
 }
@@ -65,9 +70,14 @@ func TestSourceInit_Conn(t *testing.T) {
 			conn: &sourcespb.GCS{
 				ProjectId:  testProjectID,
 				Credential: &sourcespb.GCS_Adc{},
+				ExcludeBuckets: []string{
+					perfTestBucketGlob,
+				},
 			},
 			want: &gcsManager{
-				projectID: testProjectID,
+				projectID:      testProjectID,
+				excludeBuckets: map[string]struct{}{perfTestBucketGlob: {}},
+				hasEnumerated:  true,
 			},
 		},
 		{
@@ -85,6 +95,7 @@ func TestSourceInit_Conn(t *testing.T) {
 			want: &gcsManager{
 				projectID:      testProjectID,
 				includeBuckets: map[string]struct{}{"bucket1": {}},
+				hasEnumerated:  true,
 			},
 		},
 		{
@@ -98,10 +109,15 @@ func TestSourceInit_Conn(t *testing.T) {
 				ExcludeObjects: []string{
 					"object2",
 				},
+				ExcludeBuckets: []string{
+					perfTestBucketGlob,
+				},
 			},
 			want: &gcsManager{
 				projectID:      testProjectID,
 				includeObjects: map[string]struct{}{"object1": {}},
+				excludeBuckets: map[string]struct{}{perfTestBucketGlob: {}},
+				hasEnumerated:  true,
 			},
 		},
 	}
@@ -109,8 +125,12 @@ func TestSourceInit_Conn(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			source, conn := createTestSource(tc.conn)
+			// Set the EncodeResumeInfo to prevent enumeration.
+			b, err := json.Marshal(map[string]objectsProgress{"other": {}})
+			assert.Nil(t, err)
+			source.Progress.EncodedResumeInfo = string(b)
 
-			err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
+			err = source.Init(context.Background(), "test", 1, 1, true, conn, 8)
 			if err != nil && !tc.wantErr {
 				t.Errorf("source.Init() got: %v, want: %v", err, nil)
 				return
@@ -119,7 +139,7 @@ func TestSourceInit_Conn(t *testing.T) {
 			if !tc.wantErr {
 				if diff := cmp.Diff(tc.want, source.gcsManager,
 					cmp.AllowUnexported(gcsManager{}),
-					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize"),
+					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize", "statistics"),
 				); diff != "" {
 					t.Errorf("source.Init() diff: (-want +got)\n%s", diff)
 				}
@@ -129,19 +149,22 @@ func TestSourceInit_Conn(t *testing.T) {
 }
 
 func TestSourceInit_Progress(t *testing.T) {
-	type objectsProgress struct {
-		Processing map[string]struct{}
-		Processed  string
-	}
-
-	complete := map[string]objectsProgress{testBucket: {Processed: object2}}
+	complete := map[string]objectsProgress{testBucket: {
+		Processed:         object2,
+		IsBucketProcessed: true,
+		ProcessedCnt:      1,
+		TotalCnt:          1,
+	}}
 	completeEncodeResumeInfo, err := json.Marshal(complete)
 	assert.Nil(t, err)
 
 	processing := map[string]objectsProgress{
 		testBucket: {
-			Processed:  object2,
-			Processing: map[string]struct{}{object1: {}},
+			IsBucketProcessed: false,
+			ProcessedCnt:      1,
+			Processed:         object2,
+			Processing:        map[string]struct{}{object1: {}},
+			TotalCnt:          2,
 		},
 	}
 	processingEncodeResumeInfo, err := json.Marshal(processing)
@@ -155,20 +178,20 @@ func TestSourceInit_Progress(t *testing.T) {
 	}{
 		{
 			name:              "no progress",
-			conn:              &sourcespb.GCS{ProjectId: testProjectID, Credential: &sourcespb.GCS_Adc{}},
+			conn:              &sourcespb.GCS{ProjectId: testProjectID, Credential: &sourcespb.GCS_Adc{}, ExcludeBuckets: []string{perfTestBucketGlob}},
 			gcsManagerBuckets: map[string]bucket{},
 		},
 		{
 			name:              "progress set, no processing objects in any buckets",
 			conn:              &sourcespb.GCS{ProjectId: testProjectID, Credential: &sourcespb.GCS_Adc{}},
 			encodeResumeInfo:  string(completeEncodeResumeInfo),
-			gcsManagerBuckets: map[string]bucket{testBucket: {name: testBucket, startOffset: object2}},
+			gcsManagerBuckets: map[string]bucket{testBucket: {name: testBucket, startOffset: "", shouldInclude: false}},
 		},
 		{
 			name:              "progress set, processing objects in some buckets",
 			conn:              &sourcespb.GCS{ProjectId: testProjectID, Credential: &sourcespb.GCS_Adc{}},
 			encodeResumeInfo:  string(processingEncodeResumeInfo),
-			gcsManagerBuckets: map[string]bucket{testBucket: {name: testBucket, startOffset: object1}},
+			gcsManagerBuckets: map[string]bucket{testBucket: {name: testBucket, startOffset: object1, shouldInclude: true}},
 		},
 	}
 
@@ -186,6 +209,18 @@ func TestSourceInit_Progress(t *testing.T) {
 
 type mockObjectManager struct {
 	wantErr bool
+}
+
+func (m *mockObjectManager) stats(_ context.Context) (*stats, error) {
+	if m.wantErr {
+		return nil, fmt.Errorf("some error")
+	}
+
+	return &stats{
+		numObjects:    5,
+		numBuckets:    1,
+		bucketObjects: map[string]uint64{testBucket: 5},
+	}, nil
 }
 
 type mockReader struct {
@@ -264,6 +299,9 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		chunksCh:   chunksCh,
 	}
 
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
+
 	go func() {
 		defer close(chunksCh)
 		err := source.Chunks(ctx, chunksCh)
@@ -300,6 +338,24 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 
 }
 
+func TestSourceInit_Enumerate(t *testing.T) {
+	ctx := context.Background()
+	source := &Source{gcsManager: &mockObjectManager{}}
+
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
+
+	// Ensure the stats are set.
+	assert.Equal(t, uint64(5), source.stats.numObjects)
+	assert.Equal(t, uint32(1), source.stats.numBuckets)
+	assert.Equal(t, uint64(5), source.stats.bucketObjects[testBucket])
+	// Ensure progress is initialized correctly.
+	p := map[string]*objectsProgress{testBucket: {TotalCnt: 5, Processing: map[string]struct{}{}}}
+	b, err := json.Marshal(p)
+	assert.Nil(t, err)
+	assert.Equal(t, string(b), source.Progress.EncodedResumeInfo)
+}
+
 func TestSourceChunks_ListObjects_Error(t *testing.T) {
 	ctx := context.Background()
 	source := &Source{gcsManager: &mockObjectManager{wantErr: true}}
@@ -319,6 +375,8 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 		gcsManager: &mockObjectManager{},
 		chunksCh:   chunksCh,
 	}
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
 
 	go func() {
 		defer close(chunksCh)
@@ -346,7 +404,15 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 
 	// Test that the resume progress is set.
 	// The processed values should be the greatest object name lexicographically.
-	resume := map[string]objectsProgress{testBucket: {Processed: "object4", Processing: processing}}
+	resume := map[string]objectsProgress{
+		testBucket: {
+			Processed:         "object4",
+			Processing:        processing,
+			IsBucketProcessed: true,
+			ProcessedCnt:      5,
+			TotalCnt:          5,
+		},
+	}
 	b, err := json.Marshal(resume)
 	assert.Nil(t, err)
 

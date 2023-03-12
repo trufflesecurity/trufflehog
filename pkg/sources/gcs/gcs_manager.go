@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +33,7 @@ var (
 
 type objectManager interface {
 	listObjects(context.Context) (chan io.Reader, error)
+	stats(ctx context.Context) (*stats, error)
 }
 
 // bucketManager is a simplified *storage.Client wrapper.
@@ -46,8 +48,9 @@ type bucketManager interface {
 // gcsManager serves as simple facade for interacting with GCS.
 // It's main purpose is to retrieve objects from GCS.
 type gcsManager struct {
-	projectID   string
-	withoutAuth bool
+	projectID string
+	withoutAuth,
+	hasEnumerated bool
 
 	concurrency int
 	workerPool  *errgroup.Group
@@ -60,21 +63,58 @@ type gcsManager struct {
 	excludeBuckets,
 	includeObjects,
 	excludeObjects map[string]struct{}
-	buckets map[string]bucket
-	client  bucketManager
+
+	buckets    map[string]bucket
+	statistics *stats
+
+	client bucketManager
 }
 
 // bucket is a simplified *storage.BucketHandle wrapper.
 // It also provides a mechanism for resuming an interrupted iteration.
 // This reduces the number of objects that need to be re-processed.
 type bucket struct {
-	name       string
-	numObjects uint64
+	shouldInclude bool
+	name          string
 	// startOffset is the name of the object to resume from. (inclusive)
 	// This works because GCS objects are sorted lexicographically.
 	// If this is empty, the iteration will start from the beginning.
 	startOffset string
 	*storage.BucketHandle
+}
+
+// offsetInfo is used to resume an interrupted iteration.
+type offsetInfo struct {
+	isBucketProcessed   bool
+	lastProcessedObject string
+}
+
+// stats is used to collect information about buckets and objects.
+// This will be collected during the initial scan.
+type stats struct {
+	numBuckets    uint32
+	numObjects    uint64
+	mu            sync.RWMutex
+	bucketObjects map[string]uint64
+}
+
+func newStats(numBkts int) *stats {
+	return &stats{
+		numBuckets:    uint32(numBkts),
+		bucketObjects: make(map[string]uint64, numBkts),
+	}
+}
+
+func (s *stats) incObjects() {
+	s.mu.Lock()
+	s.numObjects++
+	s.mu.Unlock()
+}
+
+func (s *stats) setBucketCnt(bkt string, cnt uint64) {
+	s.mu.Lock()
+	s.bucketObjects[bkt] = cnt
+	s.mu.Unlock()
 }
 
 type gcsManagerOption func(*gcsManager) error
@@ -256,15 +296,17 @@ func withMaxObjectSize(maxObjectSize int64) gcsManagerOption {
 
 // withBucketOffsets sets the offset for each bucket.
 // This is used to resume listing objects for a bucket.
-func withBucketOffsets(offsets map[string]string) gcsManagerOption {
+func withBucketOffsets(offsets map[string]offsetInfo) gcsManagerOption {
 	bkts := make(map[string]bucket, len(offsets))
-	for bkt, val := range offsets {
+	for bkt, offst := range offsets {
 		bkts[bkt] = bucket{
-			startOffset: val,
-			name:        bkt,
+			shouldInclude: !offst.isBucketProcessed,
+			name:          bkt,
+			startOffset:   offst.lastProcessedObject,
 		}
 	}
 	return func(m *gcsManager) error {
+		m.hasEnumerated = len(offsets) > 0 // offset means we are resuming.
 		m.buckets = bkts
 		return nil
 	}
@@ -323,6 +365,70 @@ type object struct {
 	updatedAt time.Time
 
 	io.Reader
+}
+
+func (g *gcsManager) stats(ctx context.Context) (*stats, error) {
+	// Get all the buckets in the project.
+	buckets, err := g.listBuckets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list buckets: %w", err)
+	}
+
+	return g.enumerate(ctx, buckets)
+}
+
+func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*stats, error) {
+	logger := ctx.Logger().WithValues("phase", "enumeration")
+
+	logger.V(5).Info("enumerating buckets", "numBuckets", len(bkts))
+	stats := newStats(len(bkts))
+
+	for _, bkt := range bkts {
+		bkt := bkt
+		g.workerPool.Go(func() error {
+			// List all the objects in the bucket and calculate a stats.
+			g.setupBktHandle(&bkt)
+
+			q, err := setObjectQuery(&bkt)
+			if err != nil {
+				logger.Error(err, "failed to set object query", "bucket", bkt.name)
+				return nil
+			}
+
+			var count uint64
+			objs := bkt.Objects(ctx, q)
+			for {
+				obj, err := objs.Next()
+				if errors.Is(err, iterator.Done) {
+					logger.V(5).Info("finished listing objects in bucket")
+					break
+				}
+				if err != nil {
+					logger.V(1).Info("failed to list objects", "bucket", bkt.name, "error", err)
+					return nil
+				}
+				if obj == nil {
+					logger.V(5).Info("object is nil")
+					continue
+				}
+
+				if !g.shouldIncludeObject(ctx, obj.Name) || g.shouldExcludeObject(ctx, obj.Name) {
+					continue
+				}
+				count++
+				stats.incObjects()
+			}
+
+			stats.setBucketCnt(bkt.name, count)
+			return nil
+		})
+	}
+
+	_ = g.workerPool.Wait()
+	g.statistics = stats
+	logger.V(5).Info("finished enumerating buckets", "num-objects", stats.numObjects, "num-buckets", stats.numBuckets)
+
+	return stats, nil
 }
 
 func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
@@ -420,15 +526,7 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan i
 		logger := ctx.Logger().WithValues("bucket", bkt.name)
 		logger.V(5).Info("listing object(s) in bucket")
 
-		b := g.client.Bucket(bkt.name).Retryer(
-			storage.WithBackoff(gax.Backoff{
-				Initial:    2 * time.Second,
-				Max:        30 * time.Second,
-				Multiplier: 1.5,
-			}),
-			storage.WithPolicy(storage.RetryAlways),
-		)
-		bkt.BucketHandle = b
+		g.setupBktHandle(bkt)
 
 		// TODO (ahrav): Look to extend gcsManager to allow for exact buckets/objects
 		// include filters. This will increase performance substantially
@@ -438,6 +536,18 @@ func (g *gcsManager) listBucketObjects(ctx context.Context, bkt *bucket) (chan i
 		}
 	}()
 	return ch, errCh
+}
+
+func (g *gcsManager) setupBktHandle(bkt *bucket) {
+	b := g.client.Bucket(bkt.name).Retryer(
+		storage.WithBackoff(gax.Backoff{
+			Initial:    2 * time.Second,
+			Max:        30 * time.Second,
+			Multiplier: 1.5,
+		}),
+		storage.WithPolicy(storage.RetryAlways),
+	)
+	bkt.BucketHandle = b
 }
 
 func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- io.Reader) error {
@@ -470,7 +580,6 @@ func (g *gcsManager) bucketObjects(ctx context.Context, bkt *bucket, ch chan<- i
 			ctx.Logger().V(1).Info("failed to create object", "object-name", obj.Name, "error", err)
 			continue
 		}
-		bkt.numObjects++ // atomic add NOT needed, object listing is sequential.
 		ch <- o
 	}
 	return nil

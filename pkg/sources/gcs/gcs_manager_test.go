@@ -1,8 +1,10 @@
 package gcs
 
 import (
+	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -83,15 +85,18 @@ func TestNewGcsManager(t *testing.T) {
 			projID: testProjectID,
 			opts: []gcsManagerOption{
 				withDefaultADC(ctx),
-				withBucketOffsets(map[string]string{testBucket: "moar.txt", testBucket2: "moar2.txt"}),
+				withBucketOffsets(map[string]offsetInfo{
+					testBucket:  {lastProcessedObject: "moar1.txt", isBucketProcessed: false},
+					testBucket2: {lastProcessedObject: "", isBucketProcessed: true}}),
 			},
 			want: &gcsManager{
 				projectID:     testProjectID,
+				hasEnumerated: true,
 				concurrency:   defaultConcurrency,
 				maxObjectSize: defaultMaxObjectSize,
 				buckets: map[string]bucket{
-					testBucket:  {name: testBucket, startOffset: "moar.txt"},
-					testBucket2: {name: testBucket2, startOffset: "moar2.txt"},
+					testBucket:  {name: testBucket, startOffset: "moar.txt", shouldInclude: true},
+					testBucket2: {name: testBucket2, startOffset: "", shouldInclude: false},
 				},
 			},
 		},
@@ -336,7 +341,6 @@ func TestNewGcsManager(t *testing.T) {
 			if err != nil {
 				return
 			}
-
 			// The client should never be nil.
 			if got.client == nil {
 				t.Errorf("newGCSManager() client should not be nil")
@@ -351,6 +355,91 @@ func TestNewGcsManager(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGCSManagerStats(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name      string
+		projectID string
+		opts      []gcsManagerOption
+		wantStats *stats
+	}{
+		{
+			name:      "enumerate, all buckets, with objects",
+			projectID: testProjectID,
+			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{perfTestBucketGlob, publicBucket})},
+			wantStats: &stats{
+				numBuckets:    4,
+				numObjects:    5,
+				bucketObjects: map[string]uint64{testBucket: 2, testBucket2: 1, testBucket3: 1, testBucket4: 1},
+			},
+		},
+		{
+			name:      "list objects, with exclude objects",
+			projectID: testProjectID,
+			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
+				withExcludeObjects([]string{"aws1.txt", "moar2.txt"}),
+				withExcludeBuckets([]string{perfTestBucketGlob, publicBucket}),
+			},
+			wantStats: &stats{
+				numBuckets:    4,
+				numObjects:    3,
+				bucketObjects: map[string]uint64{testBucket: 0, testBucket2: 1, testBucket3: 1, testBucket4: 1},
+			},
+		},
+		{
+			name:      "list objects, with include objects",
+			projectID: testProjectID,
+			opts: []gcsManagerOption{
+				withDefaultADC(ctx),
+				withIncludeObjects([]string{"aws1.txt"}),
+				withExcludeBuckets([]string{perfTestBucketGlob, publicBucket}),
+			},
+			wantStats: &stats{
+				numBuckets:    4,
+				numObjects:    1,
+				bucketObjects: map[string]uint64{testBucket: 1, testBucket2: 0, testBucket3: 0, testBucket4: 0},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gm, err := newGCSManager(tc.projectID, tc.opts...)
+			if err != nil {
+				t.Fatalf("newGCSManager() error = %v", err)
+			}
+
+			got, err := gm.stats(ctx)
+			if err != nil {
+				t.Errorf("stats() error = %v", err)
+			}
+
+			if diff := cmp.Diff(got, tc.wantStats, cmp.AllowUnexported(stats{}), cmpopts.IgnoreFields(stats{}, "mu")); diff != "" {
+				t.Errorf("stats() got: %v, want: %v, diff: %v", got, tc.wantStats, diff)
+			}
+		})
+	}
+}
+
+func TestGCSManagerStats_Time(t *testing.T) {
+	ctx := context.Background()
+
+	opts := []gcsManagerOption{withDefaultADC(ctx)}
+	gm, err := newGCSManager(testProjectID, opts...)
+	if err != nil {
+		t.Fatalf("newGCSManager() error = %v", err)
+	}
+
+	start := time.Now()
+	var stats *stats
+	stats, _ = gm.stats(ctx)
+	end := time.Since(start).Seconds()
+
+	fmt.Printf("Time taken to get %d objects: %f seconds\n", stats.numObjects, end)
 }
 
 func TestGCSManagerListObjects(t *testing.T) {
@@ -644,7 +733,7 @@ func TestGCSManagerListObjects_Resuming(t *testing.T) {
 			opts: []gcsManagerOption{
 				withDefaultADC(ctx),
 				withIncludeBuckets([]string{testBucket}),
-				withBucketOffsets(map[string]string{testBucket: "moar2.txt"}),
+				withBucketOffsets(map[string]offsetInfo{testBucket: {lastProcessedObject: "moar2.txt"}}),
 			},
 			want: []object{
 				{
