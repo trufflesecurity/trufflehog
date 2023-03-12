@@ -33,7 +33,7 @@ var (
 
 type objectManager interface {
 	listObjects(context.Context) (chan io.Reader, error)
-	stats(ctx context.Context) (*stats, error)
+	attributes(ctx context.Context) (*attributes, error)
 }
 
 // bucketManager is a simplified *storage.Client wrapper.
@@ -64,8 +64,8 @@ type gcsManager struct {
 	includeObjects,
 	excludeObjects map[string]struct{}
 
-	buckets    map[string]bucket
-	statistics *stats
+	buckets map[string]bucket
+	attr    *attributes
 
 	client bucketManager
 }
@@ -89,29 +89,29 @@ type offsetInfo struct {
 	lastProcessedObject string
 }
 
-// stats is used to collect information about buckets and objects.
+// attributes contains metadata about the GCS source.
 // This will be collected during the initial scan.
-type stats struct {
+type attributes struct {
 	numBuckets    uint32
 	numObjects    uint64
 	mu            sync.RWMutex
 	bucketObjects map[string]uint64
 }
 
-func newStats(numBkts int) *stats {
-	return &stats{
+func newStats(numBkts int) *attributes {
+	return &attributes{
 		numBuckets:    uint32(numBkts),
 		bucketObjects: make(map[string]uint64, numBkts),
 	}
 }
 
-func (s *stats) incObjects() {
+func (s *attributes) incObjects() {
 	s.mu.Lock()
 	s.numObjects++
 	s.mu.Unlock()
 }
 
-func (s *stats) setBucketCnt(bkt string, cnt uint64) {
+func (s *attributes) setBucketCnt(bkt string, cnt uint64) {
 	s.mu.Lock()
 	s.bucketObjects[bkt] = cnt
 	s.mu.Unlock()
@@ -367,7 +367,7 @@ type object struct {
 	io.Reader
 }
 
-func (g *gcsManager) stats(ctx context.Context) (*stats, error) {
+func (g *gcsManager) attributes(ctx context.Context) (*attributes, error) {
 	// Get all the buckets in the project.
 	buckets, err := g.listBuckets(ctx)
 	if err != nil {
@@ -377,7 +377,7 @@ func (g *gcsManager) stats(ctx context.Context) (*stats, error) {
 	return g.enumerate(ctx, buckets)
 }
 
-func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*stats, error) {
+func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes, error) {
 	logger := ctx.Logger().WithValues("phase", "enumeration")
 
 	logger.V(5).Info("enumerating buckets", "numBuckets", len(bkts))
@@ -386,7 +386,7 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*stats, erro
 	for _, bkt := range bkts {
 		bkt := bkt
 		g.workerPool.Go(func() error {
-			// List all the objects in the bucket and calculate a stats.
+			// List all the objects in the bucket and calculate a attributes.
 			g.setupBktHandle(&bkt)
 
 			q, err := setObjectQuery(&bkt)
@@ -425,7 +425,7 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*stats, erro
 	}
 
 	_ = g.workerPool.Wait()
-	g.statistics = stats
+	g.attr = stats
 	logger.V(5).Info("finished enumerating buckets", "num-objects", stats.numObjects, "num-buckets", stats.numBuckets)
 
 	return stats, nil

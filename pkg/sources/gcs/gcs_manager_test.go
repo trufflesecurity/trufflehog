@@ -364,13 +364,13 @@ func TestGCSManagerStats(t *testing.T) {
 		name      string
 		projectID string
 		opts      []gcsManagerOption
-		wantStats *stats
+		wantStats *attributes
 	}{
 		{
 			name:      "enumerate, all buckets, with objects",
 			projectID: testProjectID,
 			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{perfTestBucketGlob, publicBucket})},
-			wantStats: &stats{
+			wantStats: &attributes{
 				numBuckets:    4,
 				numObjects:    5,
 				bucketObjects: map[string]uint64{testBucket: 2, testBucket2: 1, testBucket3: 1, testBucket4: 1},
@@ -384,7 +384,7 @@ func TestGCSManagerStats(t *testing.T) {
 				withExcludeObjects([]string{"aws1.txt", "moar2.txt"}),
 				withExcludeBuckets([]string{perfTestBucketGlob, publicBucket}),
 			},
-			wantStats: &stats{
+			wantStats: &attributes{
 				numBuckets:    4,
 				numObjects:    3,
 				bucketObjects: map[string]uint64{testBucket: 0, testBucket2: 1, testBucket3: 1, testBucket4: 1},
@@ -398,7 +398,7 @@ func TestGCSManagerStats(t *testing.T) {
 				withIncludeObjects([]string{"aws1.txt"}),
 				withExcludeBuckets([]string{perfTestBucketGlob, publicBucket}),
 			},
-			wantStats: &stats{
+			wantStats: &attributes{
 				numBuckets:    4,
 				numObjects:    1,
 				bucketObjects: map[string]uint64{testBucket: 1, testBucket2: 0, testBucket3: 0, testBucket4: 0},
@@ -413,13 +413,13 @@ func TestGCSManagerStats(t *testing.T) {
 				t.Fatalf("newGCSManager() error = %v", err)
 			}
 
-			got, err := gm.stats(ctx)
+			got, err := gm.attributes(ctx)
 			if err != nil {
-				t.Errorf("stats() error = %v", err)
+				t.Errorf("attributes() error = %v", err)
 			}
 
-			if diff := cmp.Diff(got, tc.wantStats, cmp.AllowUnexported(stats{}), cmpopts.IgnoreFields(stats{}, "mu")); diff != "" {
-				t.Errorf("stats() got: %v, want: %v, diff: %v", got, tc.wantStats, diff)
+			if diff := cmp.Diff(got, tc.wantStats, cmp.AllowUnexported(attributes{}), cmpopts.IgnoreFields(attributes{}, "mu")); diff != "" {
+				t.Errorf("attributes() got: %v, want: %v, diff: %v", got, tc.wantStats, diff)
 			}
 		})
 	}
@@ -435,8 +435,8 @@ func TestGCSManagerStats_Time(t *testing.T) {
 	}
 
 	start := time.Now()
-	var stats *stats
-	stats, _ = gm.stats(ctx)
+	var stats *attributes
+	stats, _ = gm.attributes(ctx)
 	end := time.Since(start).Seconds()
 
 	fmt.Printf("Time taken to get %d objects: %f seconds\n", stats.numObjects, end)

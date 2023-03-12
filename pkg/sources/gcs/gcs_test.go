@@ -139,7 +139,7 @@ func TestSourceInit_Conn(t *testing.T) {
 			if !tc.wantErr {
 				if diff := cmp.Diff(tc.want, source.gcsManager,
 					cmp.AllowUnexported(gcsManager{}),
-					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize", "statistics"),
+					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize", "attr"),
 				); diff != "" {
 					t.Errorf("source.Init() diff: (-want +got)\n%s", diff)
 				}
@@ -211,12 +211,12 @@ type mockObjectManager struct {
 	wantErr bool
 }
 
-func (m *mockObjectManager) stats(_ context.Context) (*stats, error) {
+func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
 	if m.wantErr {
 		return nil, fmt.Errorf("some error")
 	}
 
-	return &stats{
+	return &attributes{
 		numObjects:    5,
 		numBuckets:    1,
 		bucketObjects: map[string]uint64{testBucket: 5},
@@ -345,7 +345,7 @@ func TestSourceInit_Enumerate(t *testing.T) {
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
 
-	// Ensure the stats are set.
+	// Ensure the attributes are set.
 	assert.Equal(t, uint64(5), source.stats.numObjects)
 	assert.Equal(t, uint32(1), source.stats.numBuckets)
 	assert.Equal(t, uint64(5), source.stats.bucketObjects[testBucket])
@@ -417,4 +417,6 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, string(b), source.Progress.EncodedResumeInfo)
+	assert.Equal(t, int32(5), source.Progress.SectionsCompleted)
+	assert.Equal(t, int64(100), source.Progress.PercentComplete)
 }
