@@ -200,7 +200,6 @@ type progressStateFn func(string, string, *progressInfo)
 
 func (p *progressInfo) setProcessStatus(obj object, fn progressStateFn) {
 	fn(obj.bucket, obj.name, p)
-	return
 }
 
 func setProcessingBucketObject(bucket, obj string, progress *progressInfo) {
