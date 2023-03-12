@@ -310,9 +310,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 	s.chunksCh = chunksChan
 
-	resume, err := newProgressInfo(s)
+	progress, err := newProgressInfo(s)
 	if err != nil {
-		return fmt.Errorf("error constructing resume info: %w", err)
+		return fmt.Errorf("error constructing progress info: %w", err)
 	}
 
 	var wg sync.WaitGroup
@@ -324,7 +324,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if err := s.startProcessing(ctx, resume, o); err != nil {
+		if err := s.startProcessing(ctx, progress, o); err != nil {
 			ctx.Logger().V(1).Info("GCS source error starting to process objects", "error", err)
 			continue
 		}
@@ -333,13 +333,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			defer wg.Done()
 
 			if err := s.processObject(ctx, o); err != nil {
-				ctx.Logger().V(1).Info("error setting start resume progress", "name", o.name, "error", err)
+				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
 			if err := s.endProcessing(ctx, resume, o); err != nil {
-				ctx.Logger().V(1).Info("error setting end resume progress", "name", o.name, "error", err)
+				ctx.Logger().V(1).Info("error setting end progress progress", "name", o.name, "error", err)
 			}
-		}(o, resume)
+		}(o, progress)
 	}
 	wg.Wait()
 
