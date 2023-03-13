@@ -370,7 +370,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 		{
 			name:      "list objects, all buckets, with objects",
 			projectID: testProjectID,
-			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{perfTestBucketGlob})},
+			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{perfTestBucketGlob, "public-trufflehog-test-bucket"})},
 			want: []object{
 				{
 					name:        "aws1.txt",
@@ -444,7 +444,8 @@ func TestGCSManagerListObjects(t *testing.T) {
 		{
 			name:      "list objects, exclude buckets, with objects",
 			projectID: testProjectID,
-			opts:      []gcsManagerOption{withDefaultADC(ctx), withExcludeBuckets([]string{testBucket, testBucket2, perfTestBucketGlob})},
+			opts: []gcsManagerOption{withDefaultADC(ctx),
+				withExcludeBuckets([]string{testBucket, testBucket2, perfTestBucketGlob, "public-trufflehog-test-bucket"})},
 			want: []object{
 				{
 					name:        "moar.txt",
@@ -472,7 +473,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 			opts: []gcsManagerOption{
 				withDefaultADC(ctx),
 				withExcludeObjects([]string{"aws1.txt", "moar2.txt"}),
-				withExcludeBuckets([]string{perfTestBucketGlob}),
+				withExcludeBuckets([]string{perfTestBucketGlob, "public-trufflehog-test-bucket"}),
 			},
 			want: []object{
 				{
@@ -530,7 +531,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 			opts: []gcsManagerOption{
 				withDefaultADC(ctx),
 				withIncludeObjects([]string{"aws1.txt"}),
-				withExcludeBuckets([]string{perfTestBucketGlob}),
+				withExcludeBuckets([]string{perfTestBucketGlob, "public-trufflehog-test-bucket"}),
 			},
 			want: []object{
 				{
@@ -552,7 +553,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 				withDefaultADC(ctx),
 				withIncludeBuckets([]string{testBucket}),
 				withExcludeObjects([]string{"aws1.txt"}),
-				withExcludeBuckets([]string{perfTestBucketGlob}),
+				withExcludeBuckets([]string{perfTestBucketGlob, "public-trufflehog-test-bucket"}),
 			},
 			want: []object{
 				{
