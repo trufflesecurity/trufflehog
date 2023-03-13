@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package blocknative
+package bscscan
 
 import (
 	"context"
@@ -16,15 +16,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestBlocknative_FromChunk(t *testing.T) {
+func TestBscscan_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BLOCKNATIVE")
-	inactiveSecret := testSecrets.MustGetField("BLOCKNATIVE_INACTIVE")
+	secret := testSecrets.MustGetField("BSCSCAN")
+	inactiveSecret := testSecrets.MustGetField("BSCSCAN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +43,12 @@ func TestBlocknative_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a blocknative secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a bscscan secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BlockNative,
+					DetectorType: detectorspb.DetectorType_BscScan,
 					Verified:     true,
 				},
 			},
@@ -59,12 +59,12 @@ func TestBlocknative_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a blocknative secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a bscscan secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BlockNative,
+					DetectorType: detectorspb.DetectorType_BscScan,
 					Verified:     false,
 				},
 			},
@@ -87,7 +87,7 @@ func TestBlocknative_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Blocknative.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Bscscan.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +97,7 @@ func TestBlocknative_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Blocknative.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Bscscan.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

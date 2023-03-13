@@ -917,6 +917,7 @@ enum DetectorType {
   Alchemy = 907;
   BlockNative = 908;
   Moralis = 909;
+  BscScan = 910;
 }
 
 message Result {

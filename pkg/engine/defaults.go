@@ -735,7 +735,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moralis"
-
+        "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
 )
 
 func DefaultDetectors() []detectors.Detector {
@@ -1499,5 +1499,6 @@ func DefaultDetectors() []detectors.Detector {
 		alchemy.Scanner{},
 		blocknative.Scanner{},
 		moralis.Scanner{},
+		bscscan.Scanner{},
 	}
 }
