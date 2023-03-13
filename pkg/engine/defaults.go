@@ -736,31 +736,31 @@ import (
 
 // CustomDetectors returns a list of detectors that are enabled by default, but
 // can be overridden by the user.
-func CustomDetectors(ctx context.Context, u map[string][]string) []detectors.Detector {
-	d := DefaultDetectors()
-	if len(u) == 0 {
-		return d
+func CustomDetectors(ctx context.Context, urls map[string][]string) []detectors.Detector {
+	defaultDetectors := DefaultDetectors()
+	if len(urls) == 0 {
+		return defaultDetectors
 	}
 
-	for i, detector := range d {
+	for i, detector := range defaultDetectors {
 		switch detector.Type() {
 		case detectorspb.DetectorType_Github:
-			urls, ok := u["github"]
+			githubUrls, ok := urls["github"]
 			if !ok {
-				ctx.Logger().V(2).Info("ignoring GitHub urls: %v", u)
+				ctx.Logger().V(2).Info("ignoring GitHub urls: %v", urls)
 				continue
 			}
-			ctx.Logger().V(2).Info("ignoring GitHub urls: %v", u)
-			d[i] = github.New(github.WithVerifierURLs(urls, true))
+			ctx.Logger().V(2).Info("ignoring GitHub urls: %v", urls)
+			defaultDetectors[i] = github.New(github.WithVerifierURLs(githubUrls, true))
 		case detectorspb.DetectorType_Gitlab:
-			urls, ok := u["gitlab"]
+			gitlabUrls, ok := urls["gitlab"]
 			if !ok {
-				ctx.Logger().V(2).Info("ignoring GitLab urls: %v", u)
+				ctx.Logger().V(2).Info("ignoring GitLab urls: %v", urls)
 				continue
 			}
-			ctx.Logger().V(2).Info("ignoring GitLab urls: %v", u)
-			d[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(urls, true))
-			d[i] = gitlab.New(gitlab.WithVerifierURLs(urls, true))
+			ctx.Logger().V(2).Info("ignoring GitLab urls: %v", urls)
+			defaultDetectors[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(gitlabUrls, true))
+			defaultDetectors[i] = gitlab.New(gitlab.WithVerifierURLs(gitlabUrls, true))
 		case detectorspb.DetectorType_JiraToken:
 			// TODO(ahrav): Double check that we need to do this.
 		default:
@@ -768,8 +768,7 @@ func CustomDetectors(ctx context.Context, u map[string][]string) []detectors.Det
 			continue
 		}
 	}
-
-	return d
+	return defaultDetectors
 }
 
 func DefaultDetectors() []detectors.Detector {
