@@ -61,7 +61,7 @@ require (
 	golang.org/x/sync v0.1.0
 	golang.org/x/text v0.8.0
 	google.golang.org/api v0.111.0
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.29.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/h2non/gock.v1 v1.1.2
 	sigs.k8s.io/yaml v1.3.0
