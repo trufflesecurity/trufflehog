@@ -384,7 +384,12 @@ func printAverageDetectorTime(e *engine.Engine) {
 func splitVerifierURLs(verifierURLs map[string]string) map[string][]string {
 	verifiers := make(map[string][]string, len(verifierURLs))
 	for k, v := range verifierURLs {
-		verifiers[k] = strings.Split(v, ",")
+		key := strings.ToLower(k)
+		sliceOfValues := strings.Split(v, ",")
+		for i, s := range sliceOfValues {
+			sliceOfValues[i] = strings.ToLower(strings.TrimSpace(s))
+		}
+		verifiers[key] = sliceOfValues
 	}
 	return verifiers
 }
