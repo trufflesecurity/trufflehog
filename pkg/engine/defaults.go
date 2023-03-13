@@ -747,18 +747,18 @@ func CustomDetectors(ctx context.Context, urls map[string][]string) []detectors.
 		case detectorspb.DetectorType_Github:
 			githubUrls, ok := urls["github"]
 			if !ok {
-				ctx.Logger().V(2).Info("ignoring GitHub urls: %v", urls)
+				ctx.Logger().V(2).Info("no GitHub urls to ignore")
 				continue
 			}
-			ctx.Logger().V(2).Info("ignoring GitHub urls: %v", urls)
+			ctx.Logger().V(2).Info("ignoring GitHub urls: %v", githubUrls)
 			defaultDetectors[i] = github.New(github.WithVerifierURLs(githubUrls, true))
 		case detectorspb.DetectorType_Gitlab:
 			gitlabUrls, ok := urls["gitlab"]
 			if !ok {
-				ctx.Logger().V(2).Info("ignoring GitLab urls: %v", urls)
+				ctx.Logger().V(2).Info("no GitLab urls to ignore")
 				continue
 			}
-			ctx.Logger().V(2).Info("ignoring GitLab urls: %v", urls)
+			ctx.Logger().V(2).Info("ignoring GitLab urls: %v", gitlabUrls)
 			defaultDetectors[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(gitlabUrls, true))
 			defaultDetectors[i] = gitlab.New(gitlab.WithVerifierURLs(gitlabUrls, true))
 		case detectorspb.DetectorType_JiraToken:
