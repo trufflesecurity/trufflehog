@@ -37,10 +37,8 @@ func WithVerifierURLs(urls []string, includeDefault bool) func(*Scanner) {
 	return func(s *Scanner) {
 		if includeDefault {
 			urls = append(urls, defaultURL)
-			s.verifierURLs = append(s.verifierURLs, urls...)
-		} else {
-			s.verifierURLs = append(s.verifierURLs, urls...)
 		}
+		s.verifierURLs = append(s.verifierURLs, urls...)
 	}
 }
 
