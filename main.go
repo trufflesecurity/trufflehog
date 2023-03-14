@@ -108,10 +108,10 @@ var (
 	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
 	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
 	gcsAPIKey         = gcsScan.Flag("api-key", "GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.").Envar("GOOGLE_API_KEY").String()
-	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma seperated list of buckets. Globs are supported").String()
-	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. Comma separated list of buckets.  Globs are supported").String()
-	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. Comma separated list of objects. Globs are supported").String()
-	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. Comma separated list of objects. Globs are supported").String()
+	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma seperated list of buckets. You can repeat this flag. Globs are supported").Short('I').Strings()
+	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. Comma separated list of buckets. Globs are supported").Short('X').Strings()
+	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. Comma separated list of objects. you can repeat this flag. Globs are supported").Short('i').Strings()
+	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. Comma separated list of objects. You can repeat this flag. Globs are supported").Short('x').Strings()
 	gcsMaxObjectSize  = gcsScan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. Max size is 64MB. eg. 100B, 128KB, 2MB").Default("10MB").Bytes()
 
 	syslogScan     = cli.Command("syslog", "Scan syslog")
@@ -457,12 +457,12 @@ func run(state overseer.State) {
 	}
 }
 
-func commaSeperatedToSlice(s string) []string {
-	res := strings.Split(strings.TrimSpace(s), ",")
-	if len(res) == 1 && res[0] == "" {
-		res = nil
+func commaSeperatedToSlice(s []string) []string {
+	var result []string
+	for _, item := range s {
+		result = append(result, strings.Split(strings.TrimSpace(item), ",")...)
 	}
-	return res
+	return result
 }
 
 func printAverageDetectorTime(e *engine.Engine) {
