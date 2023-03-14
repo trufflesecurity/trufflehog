@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api-cloud.browserstack.com/app-automate/espresso/v2/apps", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api-cloud.browserstack.com/automate/plan.json", nil)
 				if err != nil {
 					continue
 				}
