@@ -378,7 +378,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.String()
+			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
@@ -520,7 +520,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.String()
+			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
