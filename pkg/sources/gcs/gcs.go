@@ -33,7 +33,9 @@ type Source struct {
 	stats      *attributes
 	log        logr.Logger
 	chunksCh   chan *sources.Chunk
-	sources.Progress
+
+	mu               sync.Mutex
+	sources.Progress // not safe for concurrent access.
 }
 
 // Ensure the Source satisfies the interface at compile time.
@@ -144,8 +146,6 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 }
 
 type progressInfo struct {
-	mu sync.RWMutex
-
 	processedBucketCnt,
 	totalBucketsCnt,
 	processedObjectsCnt,
@@ -155,6 +155,8 @@ type progressInfo struct {
 	bucketObjects map[string]*objectsProgress
 }
 
+// objectsProgress keeps track of the progress of processing objects in a bucket.
+// It is marshalled/unmarshalled to/from a string as part of the Source's Progress.
 type objectsProgress struct {
 	// IsBuckedProcessed is true if all objects in the bucket have been processed.
 	IsBucketProcessed bool
@@ -173,15 +175,15 @@ func newObjectsProgress(cnt int) *objectsProgress {
 }
 
 // newProgressInfo constructs a progressInfo from the Source's Progress information.
-func newProgressInfo(s *Source) (*progressInfo, error) {
-	totalObjCnt := s.Progress.SectionsRemaining
-	processedObjCnt := s.Progress.SectionsCompleted
+func newProgressInfo(ctx context.Context, s *sources.Progress) (*progressInfo, error) {
+	totalObjCnt := s.SectionsRemaining
+	processedObjCnt := s.SectionsCompleted
 	info := &progressInfo{
 		totalObjectsCnt:     int(totalObjCnt),
 		processedObjectsCnt: int(processedObjCnt),
 	}
 
-	encodeResume := s.Progress.EncodedResumeInfo
+	encodeResume := s.EncodedResumeInfo
 	if encodeResume == "" {
 		info.bucketObjects = make(map[string]*objectsProgress)
 		return info, nil
@@ -189,7 +191,8 @@ func newProgressInfo(s *Source) (*progressInfo, error) {
 
 	var m map[string]*objectsProgress
 	if err := json.Unmarshal([]byte(encodeResume), &m); err != nil {
-		return nil, fmt.Errorf("error unmarshalling resume info: %w", err)
+		ctx.Logger().V(1).Info("error unmarshalling progress info", "error", err)
+		return info, nil
 	}
 	info.bucketObjects = m
 
@@ -310,7 +313,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 	s.chunksCh = chunksChan
 
-	progress, err := newProgressInfo(s)
+	progress, err := newProgressInfo(ctx, &s.Progress)
 	if err != nil {
 		return fmt.Errorf("error constructing progress info: %w", err)
 	}
@@ -348,16 +351,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func (s *Source) startProcessing(ctx context.Context, progress *progressInfo, o object) error {
-	progress.mu.Lock()
-	defer progress.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	progress.setProcessStatus(o, setProcessingBucketObject)
 	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source beginning to process object %s in bucket %s", o.name, o.bucket))
 }
 
 func (s *Source) endProcessing(ctx context.Context, progress *progressInfo, o object) error {
-	progress.mu.Lock()
-	defer progress.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	progress.setProcessStatus(o, setProcessedBucketObject)
 	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source finished processing object %s in bucket %s", o.name, o.bucket))

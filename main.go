@@ -103,7 +103,7 @@ var (
 	s3ScanBuckets  = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
-	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used w/ unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
+	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
 	gcsCloudEnv       = gcsScan.Flag("cloud-environment", "Use Application Default Credentials, IAM credentials to authenticate.").Bool()
 	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
 	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
@@ -402,10 +402,10 @@ func run(state overseer.State) {
 			ServiceAccount: *gcsServiceAccount,
 			WithoutAuth:    *gcsWithoutAuth,
 			ApiKey:         *gcsAPIKey,
-			IncludeBuckets: cliFlagToSlice(*gcsIncludeBuckets),
-			ExcludeBuckets: cliFlagToSlice(*gcsExcludeBuckets),
-			IncludeObjects: cliFlagToSlice(*gcsIncludeObjects),
-			ExcludeObjects: cliFlagToSlice(*gcsExcludeObjects),
+			IncludeBuckets: commaSeperatedToSlice(*gcsIncludeBuckets),
+			ExcludeBuckets: commaSeperatedToSlice(*gcsExcludeBuckets),
+			IncludeObjects: commaSeperatedToSlice(*gcsIncludeObjects),
+			ExcludeObjects: commaSeperatedToSlice(*gcsExcludeObjects),
 			Concurrency:    int64(*concurrency),
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
@@ -457,8 +457,8 @@ func run(state overseer.State) {
 	}
 }
 
-func cliFlagToSlice(s string) []string {
-	res := strings.Split(s, ",")
+func commaSeperatedToSlice(s string) []string {
+	res := strings.Split(strings.TrimSpace(s), ",")
 	if len(res) == 1 && res[0] == "" {
 		res = nil
 	}
