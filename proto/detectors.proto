@@ -918,6 +918,7 @@ enum DetectorType {
   BlockNative = 908;
   Moralis = 909;
   BscScan = 910;
+  CoinMarketCap = 911;
 }
 
 message Result {

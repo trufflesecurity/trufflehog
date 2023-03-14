@@ -736,6 +736,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moralis"
         "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinmarketcap"
 )
 
 func DefaultDetectors() []detectors.Detector {
@@ -1500,5 +1501,6 @@ func DefaultDetectors() []detectors.Detector {
 		blocknative.Scanner{},
 		moralis.Scanner{},
 		bscscan.Scanner{},
+		coinmarketcap.Scanner{},
 	}
 }
