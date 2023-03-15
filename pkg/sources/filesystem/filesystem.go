@@ -70,8 +70,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
-
-	s.paths = conn.Directories
+	s.paths = append(conn.Paths, conn.Directories...)
 
 	return nil
 }
@@ -83,100 +82,122 @@ func (s *Source) WithFilter(filter *common.Filter) {
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	for i, path := range s.paths {
+		logger := ctx.Logger().WithValues("path", path)
+		if common.IsDone(ctx) {
+			return nil
+		}
 		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path), "")
 
 		cleanPath := filepath.Clean(path)
-		done := false
-		go func() {
-			<-ctx.Done()
-			done = true
-		}()
+		fileInfo, err := os.Stat(cleanPath)
+		if err != nil {
+			logger.Error(err, "unable to get file info")
+			continue
+		}
 
-		err := fs.WalkDir(os.DirFS(cleanPath), ".", func(relativePath string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-
-			path := filepath.Join(cleanPath, relativePath)
-			logger := ctx.Logger().WithValues("file", path)
-
-			fileStat, err := os.Stat(path)
-			if err != nil {
-				logger.Error(err, "unable to stat file")
-				return nil
-			}
-			if !fileStat.Mode().IsRegular() {
-				return nil
-			}
-
-			if s.filter != nil && !s.filter.Pass(path) {
-				return nil
-			}
-
-			inputFile, err := os.Open(path)
-			if err != nil {
-				logger.V(2).Info("error opening file", "error", err)
-				return nil
-			}
-			defer inputFile.Close()
-			logger.V(5).Info("scanning file")
-
-			reReader, err := diskbufferreader.New(inputFile)
-			if err != nil {
-				logger.Error(err, "Could not create re-readable reader.")
-			}
-			defer reReader.Close()
-
-			chunkSkel := &sources.Chunk{
-				SourceType: s.Type(),
-				SourceName: s.name,
-				SourceID:   s.SourceID(),
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Filesystem{
-						Filesystem: &source_metadatapb.Filesystem{
-							File: sanitizer.UTF8(path),
-						},
-					},
-				},
-				Verify: s.verify,
-			}
-			if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
-				return nil
-			}
-
-			if err := reReader.Reset(); err != nil {
-				return err
-			}
-			reReader.Stop()
-			data, err := io.ReadAll(reReader)
-			if err != nil {
-				return err
-			}
-			chunksChan <- &sources.Chunk{
-				SourceType: s.Type(),
-				SourceName: s.name,
-				SourceID:   s.SourceID(),
-				Data:       data,
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Filesystem{
-						Filesystem: &source_metadatapb.Filesystem{
-							File: sanitizer.UTF8(path),
-						},
-					},
-				},
-				Verify: s.verify,
-			}
-			return nil
-		})
+		if fileInfo.IsDir() {
+			err = s.scanDir(ctx, cleanPath, chunksChan)
+		} else {
+			err = s.scanFile(ctx, cleanPath, chunksChan)
+		}
 
 		if err != nil && err != io.EOF {
-			return errors.New(err)
+			logger.Info("error scanning filesystem", "error", err)
 		}
+	}
+	return nil
+}
 
-		if done {
+func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
+	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		fullPath := filepath.Join(path, relativePath)
+
+		// Skip over non-regular files. We do this check here to suppress noisy
+		// logs for trying to scan directories and other non-regular files in
+		// our traversal.
+		fileStat, err := os.Stat(fullPath)
+		if err != nil {
+			ctx.Logger().Info("unable to stat file", "path", fullPath, "error", err)
+			return nil
+		}
+		if !fileStat.Mode().IsRegular() {
+			return nil
+		}
+		if s.filter != nil && !s.filter.Pass(fullPath) {
 			return nil
 		}
 
+		if err = s.scanFile(ctx, fullPath, chunksChan); err != nil {
+			ctx.Logger().Info("error scanning file", "path", fullPath, "error", err)
+		}
+		return nil
+	})
+}
+
+func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
+	logger := ctx.Logger().WithValues("path", path)
+	fileStat, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("unable to stat file: %w", err)
+	}
+	if !fileStat.Mode().IsRegular() {
+		return fmt.Errorf("not a regular file")
+	}
+
+	inputFile, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("unable to open file: %w", err)
+	}
+	defer inputFile.Close()
+	logger.V(3).Info("scanning file")
+
+	reReader, err := diskbufferreader.New(inputFile)
+	if err != nil {
+		return fmt.Errorf("could not create re-readable reader: %w", err)
+	}
+	defer reReader.Close()
+
+	chunkSkel := &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Filesystem{
+				Filesystem: &source_metadatapb.Filesystem{
+					File: sanitizer.UTF8(path),
+				},
+			},
+		},
+		Verify: s.verify,
+	}
+	if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
+		return nil
+	}
+
+	if err := reReader.Reset(); err != nil {
+		return err
+	}
+	reReader.Stop()
+	data, err := io.ReadAll(reReader)
+	if err != nil {
+		return fmt.Errorf("unable to read file: %w", err)
+	}
+	chunksChan <- &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		Data:       data,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Filesystem{
+				Filesystem: &source_metadatapb.Filesystem{
+					File: sanitizer.UTF8(path),
+				},
+			},
+		},
+		Verify: s.verify,
 	}
 	return nil
 }

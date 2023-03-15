@@ -84,6 +84,24 @@ Expected output:
 trufflehog s3 --bucket=<bucket name> --only-verified
 ```
 
+### Example 5: Scan a Github Repo using SSH authentication in docker
+
+```bash
+docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
+```
+
+### Example 6: Scan individual files or directories
+
+```bash
+trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
+```
+
+### Example 7: Scan GCS buckets for verified secrets.
+
+```bash
+trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
+```
+
 ### FAQ
 
 + All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -93,12 +111,6 @@ trufflehog s3 --bucket=<bucket name> --only-verified
 + It says a private key was verified, what does that mean?
   + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 
-
-### Example 5: Scan a Github Repo using SSH authentication in docker
-
-```bash
-docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
-```
 
 # What's new in v3?
 
@@ -167,10 +179,11 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - github
 - gitlab
 - S3
-- filesystem
+- filesystem (files and directories)
 - syslog
 - circleci
-- file and stdin (coming soon)
+- GCS (Google Cloud Storage)
+- stdin (coming soon)
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -184,6 +197,7 @@ Flags:
       --help                     Show context-sensitive help (also try --help-long and --help-man).
       --debug                    Run in debug mode.
       --trace                    Run in trace mode.
+      --profile                  Enables profiling and sets a pprof and fgprof server on :18066.
   -j, --json                     Output in JSON format.
       --json-legacy              Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
       --concurrency=10           Number of concurrent workers.
@@ -311,7 +325,7 @@ detectors:
 ```
 
 ```
-$ trufflehog filesystem --directory /tmp --config config.yaml --only-verified
+$ trufflehog filesystem /tmp --config config.yaml --only-verified
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
 
 Found verified result 🐷🔑

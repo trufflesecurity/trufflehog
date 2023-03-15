@@ -139,7 +139,8 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 
 // Unstaged parses the output of the `git diff` command for the `source` path.
 func (c *Parser) Unstaged(ctx context.Context, source string) (chan Commit, error) {
-	args := []string{"-C", source, "diff", "-p", "-U5", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
+	// Provide the --cached flag to diff to get the diff of the staged changes.
+	args := []string{"-C", source, "diff", "-p", "-U5", "--cached", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
 
 	cmd := exec.Command("git", args...)
 
@@ -241,14 +242,17 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					totalSize += diff.Content.Len()
 				}
 				if totalSize > c.maxCommitSize {
+					oldCommit := currentCommit
 					commitChan <- *currentCommit
 					currentCommit = &Commit{
 						Hash:    currentCommit.Hash,
 						Author:  currentCommit.Author,
 						Date:    currentCommit.Date,
-						Message: currentCommit.Message,
+						Message: strings.Builder{},
 						Diffs:   []Diff{},
 					}
+					// Message needs to be recreated here otherwise writing to it again will result in a panic.
+					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
 			currentDiff = &Diff{}

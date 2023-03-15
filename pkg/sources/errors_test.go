@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -145,5 +146,14 @@ func TestScanErrorsCount(t *testing.T) {
 				t.Errorf("got %d, want %d", se.Count(), tc.wantErrCnt)
 			}
 		})
+	}
+}
+
+func TestScanErrorsString(t *testing.T) {
+	se := NewScanErrors()
+	se.Add(nil)
+	want := "[<nil>]"
+	if got := fmt.Sprintf("%v", se); got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

@@ -33,7 +33,7 @@ func TestSource_Scan(t *testing.T) {
 			init: init{
 				name: "this repo",
 				connection: &sourcespb.Filesystem{
-					Directories: []string{"."},
+					Paths: []string{"."},
 				},
 				verify: true,
 			},

@@ -137,7 +137,7 @@ func TestSource_Scan(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
-				s.Chunks(ctx, chunksCh)
+				assert.NoError(t, s.Chunks(ctx, chunksCh))
 			}()
 			gotChunk := <-chunksCh
 			gotChunk.Data = nil

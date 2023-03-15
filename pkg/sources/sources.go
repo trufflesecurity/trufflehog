@@ -44,6 +44,31 @@ type Source interface {
 	GetProgress() *Progress
 }
 
+// GCSConfig defines the optional configuration for a GCS source.
+type GCSConfig struct {
+	// CloudCred determines whether to use cloud credentials.
+	// This can NOT be used with a secret.
+	CloudCred,
+	// WithoutAuth is a flag to indicate whether to use authentication.
+	WithoutAuth bool
+	// ApiKey is the API key to use to authenticate with the source.
+	ApiKey,
+	// ProjectID is the project ID to use to authenticate with the source.
+	ProjectID,
+	// ServiceAccount is the service account to use to authenticate with the source.
+	ServiceAccount string
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency int
+	// IncludeBuckets is a list of buckets to include in the scan.
+	IncludeBuckets,
+	// ExcludeBuckets is a list of buckets to exclude from the scan.
+	ExcludeBuckets,
+	// IncludeObjects is a list of objects to include in the scan.
+	IncludeObjects,
+	// ExcludeObjects is a list of objects to exclude from the scan.
+	ExcludeObjects []string
+}
+
 // GitConfig defines the optional configuration for a git source.
 type GitConfig struct {
 	// RepoPath is the path to the repository to scan.
@@ -96,8 +121,8 @@ type GitlabConfig struct {
 
 // FilesystemConfig defines the optional configuration for a filesystem source.
 type FilesystemConfig struct {
-	// Directories is the list of directories to scan.
-	Directories []string
+	// Paths is the list of files and directories to scan.
+	Paths []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 }

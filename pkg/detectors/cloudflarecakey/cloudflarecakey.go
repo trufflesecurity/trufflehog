@@ -66,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				}
-			} else {
 			}
 		}
 

@@ -42,8 +42,11 @@ func WithVerifierURLs(urls []string, includeDefault bool) func(*Scanner) {
 	}
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (*Scanner) Version() int { return 2 }
 
 var (
 	keyPat = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
