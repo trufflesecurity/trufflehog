@@ -94,9 +94,8 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
+	// Ignore any errors and collect as many of the results as we can.
+	_ = g.Wait()
 	close(resultsCh)
 
 	for result := range resultsCh {
