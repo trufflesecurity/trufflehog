@@ -77,8 +77,8 @@ func isAuthValid(ctx context.Context, c sources.GCSConfig, connection *sourcespb
 			return false
 		}
 		isAuthSelected = true
-		connection.Credential = &sourcespb.GCS_JsonSa{
-			JsonSa: c.ServiceAccount,
+		connection.Credential = &sourcespb.GCS_ServiceAccountFile{
+			ServiceAccountFile: c.ServiceAccount,
 		}
 	}
 	if c.ApiKey != "" {
