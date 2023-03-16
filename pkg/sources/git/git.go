@@ -295,7 +295,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, errors.New("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "error", err)
+		logger.V(1).Info("git clone failed", "output", output, "error", err)
 		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
@@ -378,7 +378,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.String()
+			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
@@ -520,7 +520,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.String()
+			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
