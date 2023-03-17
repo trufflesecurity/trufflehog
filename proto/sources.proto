@@ -126,10 +126,11 @@ message Filesystem {
 
 message GCS {
   oneof credential {
-    string json_sa = 1;
+    string json_service_account = 1;
     string api_key = 2;
     credentials.Unauthenticated unauthenticated = 3;
     credentials.CloudEnvironment adc = 4;
+    string service_account_file = 11;
   }
   string project_id = 5;
   repeated string include_buckets = 6;

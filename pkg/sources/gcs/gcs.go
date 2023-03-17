@@ -78,12 +78,14 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	switch conn.Credential.(type) {
 	case *sourcespb.GCS_ApiKey:
 		gcsManagerAuthOption = withAPIKey(aCtx, conn.GetApiKey())
-	case *sourcespb.GCS_JsonSa:
-		b, err := os.ReadFile(conn.GetJsonSa())
+	case *sourcespb.GCS_ServiceAccountFile:
+		b, err := os.ReadFile(conn.GetServiceAccountFile())
 		if err != nil {
 			return fmt.Errorf("error reading GCS JSON Service Account file: %w", err)
 		}
 		gcsManagerAuthOption = withJSONServiceAccount(aCtx, b)
+	case *sourcespb.GCS_JsonServiceAccount:
+		gcsManagerAuthOption = withJSONServiceAccount(aCtx, []byte(conn.GetJsonServiceAccount()))
 	case *sourcespb.GCS_Adc:
 		gcsManagerAuthOption = withDefaultADC(aCtx)
 	case *sourcespb.GCS_Unauthenticated:
