@@ -260,6 +260,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						for _, kw := range detector.Keywords() {
 							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
 								chunkContainsKeyword = true
+								break
 							}
 						}
 

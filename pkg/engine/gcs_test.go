@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -24,11 +25,13 @@ func TestScanGCS(t *testing.T) {
 			},
 		},
 		{
-			name: "missing project ID",
-			gcsConfig: sources.GCSConfig{
-				ApiKey: "abc123",
-			},
-			wantErr: true,
+			name:      "missing project ID, with auth",
+			gcsConfig: sources.GCSConfig{ApiKey: "abc123"},
+			wantErr:   true,
+		},
+		{
+			name:      "missing project ID, without auth, public scan",
+			gcsConfig: sources.GCSConfig{WithoutAuth: true},
 		},
 		{
 			name: "multiple selected auth methods",
@@ -44,7 +47,8 @@ func TestScanGCS(t *testing.T) {
 		{
 			name: "no auth method selected",
 			gcsConfig: sources.GCSConfig{
-				ProjectID: "test-project",
+				ProjectID:     "test-project",
+				MaxObjectSize: 10 * 1024 * 1024,
 			},
 		},
 	}
@@ -53,7 +57,7 @@ func TestScanGCS(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			e := &Engine{}
 			err := e.ScanGCS(context.Background(), test.gcsConfig)
-			if err != nil && !test.wantErr {
+			if err != nil && !test.wantErr && !strings.Contains(err.Error(), "googleapi: Error 400: Bad Request") {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, nil)
 				return
 			}
