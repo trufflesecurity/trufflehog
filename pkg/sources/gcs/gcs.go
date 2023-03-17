@@ -1,9 +1,11 @@
 package gcs
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -28,9 +30,12 @@ type Source struct {
 	verify      bool
 
 	gcsManager objectManager
+	stats      *attributes
 	log        logr.Logger
 	chunksCh   chan *sources.Chunk
-	sources.Progress
+
+	mu               sync.Mutex
+	sources.Progress // not safe for concurrent access.
 }
 
 // Ensure the Source satisfies the interface at compile time.
@@ -73,12 +78,14 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	switch conn.Credential.(type) {
 	case *sourcespb.GCS_ApiKey:
 		gcsManagerAuthOption = withAPIKey(aCtx, conn.GetApiKey())
-	case *sourcespb.GCS_JsonSa:
-		b, err := os.ReadFile(conn.GetJsonSa())
+	case *sourcespb.GCS_ServiceAccountFile:
+		b, err := os.ReadFile(conn.GetServiceAccountFile())
 		if err != nil {
 			return fmt.Errorf("error reading GCS JSON Service Account file: %w", err)
 		}
 		gcsManagerAuthOption = withJSONServiceAccount(aCtx, b)
+	case *sourcespb.GCS_JsonServiceAccount:
+		gcsManagerAuthOption = withJSONServiceAccount(aCtx, []byte(conn.GetJsonServiceAccount()))
 	case *sourcespb.GCS_Adc:
 		gcsManagerAuthOption = withDefaultADC(aCtx)
 	case *sourcespb.GCS_Unauthenticated:
@@ -88,7 +95,17 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 
 	}
 
-	gcsManagerOpts := []gcsManagerOption{withConcurrency(concurrency), gcsManagerAuthOption}
+	resume, err := setResumeBucketOffset(s.Progress.EncodedResumeInfo)
+	if err != nil {
+		return fmt.Errorf("error setting resume info: %w", err)
+	}
+
+	gcsManagerOpts := []gcsManagerOption{
+		withConcurrency(concurrency),
+		withBucketOffsets(resume),
+		withMaxObjectSize(conn.MaxObjectSize),
+		gcsManagerAuthOption,
+	}
 	if setGCSManagerBucketOptions(&conn) != nil {
 		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(&conn))
 	}
@@ -100,7 +117,13 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return fmt.Errorf("error creating GCS manager: %w", err)
 	}
 
-	return nil
+	if len(resume) > 0 {
+		s.log.V(2).Info("resuming from previous run")
+		return nil
+	}
+
+	s.log.V(2).Info("new run, enumerating buckets and objects")
+	return s.enumerate(aCtx)
 }
 
 func setGCSManagerBucketOptions(conn *sourcespb.GCS) gcsManagerOption {
@@ -124,6 +147,166 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
+type progressInfo struct {
+	processedBucketCnt,
+	totalBucketsCnt,
+	processedObjectsCnt,
+	totalObjectsCnt int
+
+	// bucketObjects tracks processing and processed objects for each bucket.
+	bucketObjects map[string]*objectsProgress
+}
+
+// objectsProgress keeps track of the progress of processing objects in a bucket.
+// It is marshalled/unmarshalled to/from a string as part of the Source's Progress.
+type objectsProgress struct {
+	// IsBuckedProcessed is true if all objects in the bucket have been processed.
+	IsBucketProcessed bool
+	// ProcessedCnt is the number of objects that have been processed.
+	ProcessedCnt,
+	// TotalCnt is the total number of objects in the bucket.
+	TotalCnt int
+	// Processed is the last object that was fully processed.
+	Processed string
+	// Processing are the objects that were not fully processed.
+	Processing map[string]struct{}
+}
+
+func newObjectsProgress(cnt int) *objectsProgress {
+	return &objectsProgress{TotalCnt: cnt, Processing: map[string]struct{}{}}
+}
+
+// newProgressInfo constructs a progressInfo from the Source's Progress information.
+func newProgressInfo(ctx context.Context, s *sources.Progress) (*progressInfo, error) {
+	totalObjCnt := s.SectionsRemaining
+	processedObjCnt := s.SectionsCompleted
+	info := &progressInfo{
+		totalObjectsCnt:     int(totalObjCnt),
+		processedObjectsCnt: int(processedObjCnt),
+	}
+
+	encodeResume := s.EncodedResumeInfo
+	if encodeResume == "" {
+		info.bucketObjects = make(map[string]*objectsProgress)
+		return info, nil
+	}
+
+	var m map[string]*objectsProgress
+	if err := json.Unmarshal([]byte(encodeResume), &m); err != nil {
+		ctx.Logger().V(1).Info("error unmarshalling progress info", "error", err)
+		return info, nil
+	}
+	info.bucketObjects = m
+
+	return info, nil
+}
+
+type progressStateFn func(string, string, *progressInfo)
+
+func (p *progressInfo) setProcessStatus(obj object, fn progressStateFn) {
+	fn(obj.bucket, obj.name, p)
+}
+
+func setProcessingBucketObject(bucket, obj string, progress *progressInfo) {
+	progress.processing(bucket, obj)
+}
+
+func (p *progressInfo) processing(bkt, obj string) {
+	p.bucketObjects[bkt].Processing[obj] = struct{}{}
+}
+
+func setProcessedBucketObject(bucket, obj string, progress *progressInfo) {
+	progress.processed(bucket, obj)
+}
+
+func (p *progressInfo) processed(bkt, obj string) {
+	// Remove the object from the processing list and increment the processed count.
+	delete(p.bucketObjects[bkt].Processing, obj)
+
+	p.bucketObjects[bkt].ProcessedCnt++
+	// If all objects in the bucket have been processed, mark the bucket as processed.
+	if p.bucketObjects[bkt].ProcessedCnt == p.bucketObjects[bkt].TotalCnt {
+		p.bucketObjects[bkt].IsBucketProcessed = true
+		p.processedBucketCnt++
+	}
+	p.processedObjectsCnt++
+
+	// If the object is not greater (lexicographically) than the last processed object, we can skip it.
+	// This ensures we keep the greatest object name as the last processed object.
+	if obj < p.bucketObjects[bkt].Processed {
+		return
+	}
+	p.bucketObjects[bkt].Processed = obj
+}
+
+func setResumeBucketOffset(s string) (map[string]offsetInfo, error) {
+	resumeInfo := progressInfo{}
+	if s != "" {
+		if err := json.Unmarshal([]byte(s), &resumeInfo.bucketObjects); err != nil {
+			return nil, fmt.Errorf("error unmarshalling resume info: %w", err)
+		}
+	}
+
+	return calcBktOffset(resumeInfo.bucketObjects)
+}
+
+// In order to calculate the bucket offset, we need to know the last object
+// that was processed for each bucket, as well as any objects that were processing.
+// If the bucket was fully processed, we don't need to set an offset.
+// If there were no objects processing, we can just use the last object that was processed.
+// If there were objects processing, we need to find the first object (lexicographically)
+// that was processing, as that is the next object that needs to be processed.
+func calcBktOffset(resumeInfo map[string]*objectsProgress) (map[string]offsetInfo, error) {
+	bucketOffset := make(map[string]offsetInfo, len(resumeInfo))
+	for objName, progress := range resumeInfo {
+		info := offsetInfo{}
+		if progress.IsBucketProcessed {
+			info.isBucketProcessed = true
+			bucketOffset[objName] = info
+			continue
+		}
+		if len(progress.Processing) == 0 {
+			info.lastProcessedObject = progress.Processed
+			bucketOffset[objName] = info
+			continue
+		}
+
+		processing := make([]string, 0, len(progress.Processing))
+		for k := range progress.Processing {
+			processing = append(processing, k)
+		}
+		sort.Strings(processing)
+		info.lastProcessedObject = processing[0]
+		bucketOffset[objName] = info
+	}
+
+	return bucketOffset, nil
+}
+
+// enumerate all the objects and buckets in the source and use the results to
+// set the progress information. This will be used track progression of the scan,
+// and to resume the scan if it is interrupted.
+func (s *Source) enumerate(ctx context.Context) error {
+	stats, err := s.gcsManager.attributes(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting attributes during enumeration: %w", err)
+	}
+	s.stats = stats
+
+	info := progressInfo{
+		totalBucketsCnt: int(s.stats.numBuckets),
+		totalObjectsCnt: int(s.stats.numObjects),
+	}
+
+	progress := make(map[string]*objectsProgress, len(s.stats.bucketObjects))
+	for k, v := range s.stats.bucketObjects {
+		progress[k] = newObjectsProgress(int(v))
+	}
+	info.bucketObjects = progress
+
+	return s.setProgress(ctx, &info, fmt.Sprintf("enumerated %d buckets, %d objects", s.stats.numBuckets, s.stats.numObjects))
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	objectCh, err := s.gcsManager.listObjects(ctx)
@@ -131,6 +314,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return fmt.Errorf("error listing objects: %w", err)
 	}
 	s.chunksCh = chunksChan
+
+	progress, err := newProgressInfo(ctx, &s.Progress)
+	if err != nil {
+		return fmt.Errorf("error constructing progress info: %w", err)
+	}
 
 	var wg sync.WaitGroup
 	for obj := range objectCh {
@@ -141,18 +329,54 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
+		if err := s.startProcessing(ctx, progress, o); err != nil {
+			ctx.Logger().V(1).Info("GCS source error starting to process objects", "error", err)
+			continue
+		}
 		wg.Add(1)
-		go func(obj object) {
+		go func(obj object, resume *progressInfo) {
 			defer wg.Done()
 
 			if err := s.processObject(ctx, o); err != nil {
-				ctx.Logger().V(1).Info("GCS source error processing objects", "name", s.name, "error", err)
+				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
+				return
 			}
-		}(o)
+			if err := s.endProcessing(ctx, resume, o); err != nil {
+				ctx.Logger().V(1).Info("error setting end progress progress", "name", o.name, "error", err)
+			}
+		}(o, progress)
 	}
 	wg.Wait()
 
 	ctx.Logger().Info("GCS source finished processing", "name", s.name)
+	return nil
+}
+
+func (s *Source) startProcessing(ctx context.Context, progress *progressInfo, o object) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	progress.setProcessStatus(o, setProcessingBucketObject)
+	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source beginning to process object %s in bucket %s", o.name, o.bucket))
+}
+
+func (s *Source) endProcessing(ctx context.Context, progress *progressInfo, o object) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	progress.setProcessStatus(o, setProcessedBucketObject)
+	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source finished processing object %s in bucket %s", o.name, o.bucket))
+}
+
+func (s *Source) setProgress(ctx context.Context, progress *progressInfo, msg string) error {
+	ctx.Logger().V(5).Info(msg)
+
+	b, err := json.Marshal(progress.bucketObjects)
+	if err != nil {
+		return fmt.Errorf("error marshalling resume info: %w", err)
+	}
+	s.SetProgressComplete(progress.processedObjectsCnt, progress.totalObjectsCnt, msg, string(b))
+
 	return nil
 }
 
