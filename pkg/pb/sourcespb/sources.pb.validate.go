@@ -1244,10 +1244,12 @@ func (m *GCS) validate(all bool) error {
 
 	// no validation rules for ProjectId
 
+	// no validation rules for MaxObjectSize
+
 	switch m.Credential.(type) {
 
-	case *GCS_JsonSa:
-		// no validation rules for JsonSa
+	case *GCS_JsonServiceAccount:
+		// no validation rules for JsonServiceAccount
 
 	case *GCS_ApiKey:
 		// no validation rules for ApiKey
@@ -1313,6 +1315,9 @@ func (m *GCS) validate(all bool) error {
 				}
 			}
 		}
+
+	case *GCS_ServiceAccountFile:
+		// no validation rules for ServiceAccountFile
 
 	}
 
