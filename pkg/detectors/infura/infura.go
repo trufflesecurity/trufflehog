@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if !strings.Contains(body, "invalid project id") {
+				if strings.Contains(body, `"result"`) {
 					s1.Verified = true
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
