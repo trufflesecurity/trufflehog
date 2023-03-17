@@ -173,7 +173,7 @@ type objectsProgress struct {
 }
 
 func newObjectsProgress(cnt int) *objectsProgress {
-	return &objectsProgress{TotalCnt: cnt, Processing: map[string]struct{}{}}
+	return &objectsProgress{TotalCnt: cnt}
 }
 
 // newProgressInfo constructs a progressInfo from the Source's Progress information.
@@ -201,15 +201,15 @@ func newProgressInfo(ctx context.Context, s *sources.Progress) (*progressInfo, e
 	return info, nil
 }
 
-type progressStateFn func(string, string, *progressInfo, uint64)
+type progressStateFn func(string, string, *progressInfo)
 
-func (p *progressInfo) setProcessStatus(obj object, fn progressStateFn, cnt uint64) {
-	fn(obj.bucket, obj.name, p, cnt)
+func (p *progressInfo) setProcessStatus(obj object, fn progressStateFn) {
+	fn(obj.bucket, obj.name, p)
 }
 
-func setProcessingBucketObject(bucket, obj string, progress *progressInfo, cnt uint64) {
-	if _, ok := progress.bucketObjects[bucket]; !ok {
-		progress.bucketObjects[bucket] = newObjectsProgress(int(cnt))
+func setProcessingBucketObject(bucket, obj string, progress *progressInfo) {
+	if progress.bucketObjects[bucket].Processing == nil {
+		progress.bucketObjects[bucket].Processing = make(map[string]struct{})
 	}
 	progress.processing(bucket, obj)
 }
@@ -218,7 +218,7 @@ func (p *progressInfo) processing(bkt, obj string) {
 	p.bucketObjects[bkt].Processing[obj] = struct{}{}
 }
 
-func setProcessedBucketObject(bucket, obj string, progress *progressInfo, _ uint64) {
+func setProcessedBucketObject(bucket, obj string, progress *progressInfo) {
 	progress.processed(bucket, obj)
 }
 
@@ -302,6 +302,9 @@ func (s *Source) enumerate(ctx context.Context) error {
 	}
 
 	progress := make(map[string]*objectsProgress, len(s.stats.bucketObjects))
+	for k, v := range s.stats.bucketObjects {
+		progress[k] = newObjectsProgress(int(v))
+	}
 	info.bucketObjects = progress
 
 	return s.setProgress(ctx, &info, fmt.Sprintf("enumerated %d buckets, %d objects", s.stats.numBuckets, s.stats.numObjects))
@@ -356,7 +359,7 @@ func (s *Source) startProcessing(ctx context.Context, progress *progressInfo, o 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	progress.setProcessStatus(o, setProcessingBucketObject, s.stats.bucketObjects[o.bucket])
+	progress.setProcessStatus(o, setProcessingBucketObject)
 	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source beginning to process object %s in bucket %s", o.name, o.bucket))
 }
 
@@ -364,7 +367,7 @@ func (s *Source) endProcessing(ctx context.Context, progress *progressInfo, o ob
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	progress.setProcessStatus(o, setProcessedBucketObject, s.stats.bucketObjects[o.bucket])
+	progress.setProcessStatus(o, setProcessedBucketObject)
 	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source finished processing object %s in bucket %s", o.name, o.bucket))
 }
 
