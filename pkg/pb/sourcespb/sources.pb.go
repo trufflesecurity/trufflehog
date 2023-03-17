@@ -963,6 +963,7 @@ type GCS struct {
 	ExcludeBuckets []string         `protobuf:"bytes,7,rep,name=exclude_buckets,json=excludeBuckets,proto3" json:"exclude_buckets,omitempty"`
 	IncludeObjects []string         `protobuf:"bytes,8,rep,name=include_objects,json=includeObjects,proto3" json:"include_objects,omitempty"`
 	ExcludeObjects []string         `protobuf:"bytes,9,rep,name=exclude_objects,json=excludeObjects,proto3" json:"exclude_objects,omitempty"`
+	MaxObjectSize  int64            `protobuf:"varint,10,opt,name=max_object_size,json=maxObjectSize,proto3" json:"max_object_size,omitempty"`
 }
 
 func (x *GCS) Reset() {
@@ -1072,6 +1073,13 @@ func (x *GCS) GetExcludeObjects() []string {
 		return x.ExcludeObjects
 	}
 	return nil
+}
+
+func (x *GCS) GetMaxObjectSize() int64 {
+	if x != nil {
+		return x.MaxObjectSize
+	}
+	return 0
 }
 
 type isGCS_Credential interface {
