@@ -731,6 +731,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodebase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/infura"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moralis"
+        "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinmarketcap"
 )
 
 func DefaultDetectors() []detectors.Detector {
@@ -1490,5 +1497,12 @@ func DefaultDetectors() []detectors.Detector {
 		ftp.Scanner{},
 		ldap.Scanner{},
 		shopify.Scanner{},
+		etherscan.Scanner{},
+		infura.Scanner{},
+		alchemy.Scanner{},
+		blocknative.Scanner{},
+		moralis.Scanner{},
+		bscscan.Scanner{},
+		coinmarketcap.Scanner{},
 	}
 }
