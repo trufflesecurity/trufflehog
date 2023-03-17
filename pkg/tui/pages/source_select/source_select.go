@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -19,49 +20,20 @@ var (
 			Background(lipgloss.Color(styles.Colors["bronze"])).
 			Padding(0, 1)
 
-	statusMessageStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sand"], Light: "#13543c"}).
-				Render
-
 	// FIXME: Hon pls help
 	errorStatusMessageStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Dark: "#ff0000"}).
 				Render
 
-	selectedItemStyle = lipgloss.NewStyle().
+	selectedSourceItemStyle = lipgloss.NewStyle().
 				Border(lipgloss.NormalBorder(), false, false, false, true).
 				BorderForeground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["bronze"]}).
 				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["fern"]}).
 				Padding(0, 0, 0, 1)
 
-	selectedDescription = selectedItemStyle.Copy().
+	selectedDescription = selectedSourceItemStyle.Copy().
 				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["sprout"]})
 )
-
-type item struct {
-	title       string
-	description string
-	cmd         *kingpin.CmdModel
-}
-
-func (i item) isEnterprise() bool {
-	return i.cmd == nil
-}
-
-func (i item) Title() string {
-	if i.isEnterprise() {
-		return "💸 " + i.title
-	}
-	return i.title
-}
-func (i item) Description() string {
-	if i.isEnterprise() {
-		return i.description + " (Enterprise only)"
-	}
-	return i.description
-}
-
-func (i item) FilterValue() string { return i.title + i.description }
 
 type listKeyMap struct {
 	toggleHelpMenu key.Binding
@@ -73,6 +45,7 @@ type (
 		sourcesList  list.Model
 		keys         *listKeyMap
 		delegateKeys *delegateKeyMap
+		selector     *selector.Selector
 	}
 	sourceSelectMsg struct {
 		selection string
@@ -91,51 +64,53 @@ func New(c common.Common) *SourceSelect {
 		}
 	)
 
-	// Make list of items.
-	items := []list.Item{
+	// Make list of SourceItems.
+	SourceItems := []list.Item{
 		// Open source sources.
-		item{"Git", "Scan git repositories.", nil},
-		item{"GitHub", "Scan GitHub repositories and/or organizations.", nil},
-		item{"GitLab", "Scan GitLab repositories.", nil},
-		item{"Filesystem", "Scan your filesystem by selecting what directories to scan.", nil},
-		item{"AWS S3", "Scan Amazon S3 buckets.", nil},
-		item{"CircleCI", "Scan CircleCI, a CI/CD platform.", nil},
-		item{"Syslog", "Scan syslog, event data logs.", nil},
+		SourceItem{"Git", "Scan git repositories.", nil},
+		SourceItem{"GitHub", "Scan GitHub repositories and/or organizations.", nil},
+		SourceItem{"GitLab", "Scan GitLab repositories.", nil},
+		SourceItem{"Filesystem", "Scan your filesystem by selecting what directories to scan.", nil},
+		SourceItem{"AWS S3", "Scan Amazon S3 buckets.", nil},
+		SourceItem{"CircleCI", "Scan CircleCI, a CI/CD platform.", nil},
+		SourceItem{"Syslog", "Scan syslog, event data logs.", nil},
 		// Enterprise sources.
-		item{"Artifactory", "Scan JFrog Artifactory packages.", nil},
-		item{"BitBucket", "Scan Atlassian's Git-based source code repository hosting service.", nil},
-		item{"Buildkite", "Scan Buildkite, a CI/CD platform.", nil},
-		item{"Confluence", "Scan Atlassian's web-based wiki and knowledge base.", nil},
-		item{"Gerrit", "Scan Gerrit, a code collaboration tool", nil},
-		item{"Jenkins ", "Scan Jenkins, a CI/CD platform.", nil},
-		item{"Jira", "Scan Atlassian's issue & project tracking software.", nil},
-		item{"Slack", "Scan Slack, a messaging and communication platform.", nil},
-		item{"Microsoft Teams", "Scan Microsoft Teams, a messaging and communication platform.", nil},
+		SourceItem{"Artifactory", "Scan JFrog Artifactory packages.", nil},
+		SourceItem{"BitBucket", "Scan Atlassian's Git-based source code repository hosting service.", nil},
+		SourceItem{"Buildkite", "Scan Buildkite, a CI/CD platform.", nil},
+		SourceItem{"Confluence", "Scan Atlassian's web-based wiki and knowledge base.", nil},
+		SourceItem{"Gerrit", "Scan Gerrit, a code collaboration tool", nil},
+		SourceItem{"Jenkins ", "Scan Jenkins, a CI/CD platform.", nil},
+		SourceItem{"Jira", "Scan Atlassian's issue & project tracking software.", nil},
+		SourceItem{"Slack", "Scan Slack, a messaging and communication platform.", nil},
+		SourceItem{"Microsoft Teams", "Scan Microsoft Teams, a messaging and communication platform.", nil},
 	}
 
 	// Setup list
-	delegate := newItemDelegate(delegateKeys)
-	delegate.Styles.SelectedTitle = selectedItemStyle
+	delegate := newSourceItemDelegate(delegateKeys)
+	delegate.Styles.SelectedTitle = selectedSourceItemStyle
 	delegate.Styles.SelectedDesc = selectedDescription
 
-	sourcesList := list.New(items, delegate, 0, 0)
+	sourcesList := list.New(SourceItems, delegate, 0, 0)
 	sourcesList.Title = "Sources"
 	sourcesList.Styles.Title = titleStyle
 	sourcesList.StatusMessageLifetime = 10 * time.Second
-	// sourcesList.Styles.FilterCursor = filterCursorStyle
 
 	sourcesList.AdditionalFullHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			listKeys.toggleHelpMenu,
 		}
 	}
+
 	sourcesList.SetShowStatusBar(false)
+	sel := selector.New(c, []selector.IdentifiableItem{}, delegate)
 
 	return &SourceSelect{
 		Common:       c,
 		sourcesList:  sourcesList,
 		keys:         listKeys,
 		delegateKeys: delegateKeys,
+		selector:     sel,
 	}
 }
 
@@ -169,6 +144,12 @@ func (m *SourceSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.sourcesList = newListModel
 	cmds = append(cmds, cmd)
 
+	if m.selector != nil {
+		sel, cmd := m.selector.Update(msg)
+		m.selector = sel.(*selector.Selector)
+		cmds = append(cmds, cmd)
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -186,23 +167,25 @@ func (m *SourceSelect) FullHelp() [][]key.Binding {
 	return nil
 }
 
-func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
+func newSourceItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		selectedItem, ok := m.SelectedItem().(item)
+		selectedSourceItem, ok := m.SelectedItem().(SourceItem)
 		if !ok {
 			return nil
 		}
 
 		if msg, ok := msg.(tea.KeyMsg); ok && key.Matches(msg, keys.choose) {
-			if selectedItem.isEnterprise() {
+			if selectedSourceItem.isEnterprise() {
 				return m.NewStatusMessage(errorStatusMessageStyle(
 					"That's an enterprise only source. Learn more at trufflesecurity.com",
 				))
 			}
-			// TODO: can we set state without using a tea.Cmd?
-			return func() tea.Msg { return sourceSelectMsg{selectedItem.title, selectedItem.cmd} }
+
+			return func() tea.Msg {
+				return selector.SelectMsg{IdentifiableItem: selectedSourceItem}
+			}
 		}
 		return nil
 	}

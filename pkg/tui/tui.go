@@ -126,8 +126,17 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ui.activePage = viewOSSProjectPage
 			case wizard_intro.EnterpriseInquire:
 				ui.activePage = contactEnterprisePage
+			case wizard_intro.ScanSourceWithWizard:
+				ui.activePage = sourceSelectPage
+			}
+		// case source_select.SourceItem:
+		// 	ui.activePage = sourceConfigurePage
+		default:
+			if item != nil {
+				fmt.Printf("Select message: %s\n", item.ID())
 			}
 		}
+
 	}
 
 	if ui.state == loadedState {
