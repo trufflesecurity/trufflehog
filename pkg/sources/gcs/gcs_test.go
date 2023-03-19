@@ -280,14 +280,6 @@ func TestSourceInit_Enumerate(t *testing.T) {
 	assert.Equal(t, uint64(5), source.stats.numObjects)
 	assert.Equal(t, uint32(1), source.stats.numBuckets)
 	assert.Equal(t, uint64(5), source.stats.bucketObjects[testBucket])
-<<<<<<< Updated upstream
-	// Ensure progress is initialized correctly.
-	p := map[string]*objectsProgress{testBucket: {TotalCnt: 5, Processing: map[string]struct{}{}}}
-	b, err := json.Marshal(p)
-	assert.Nil(t, err)
-	assert.Equal(t, string(b), source.Progress.EncodedResumeInfo)
-=======
->>>>>>> Stashed changes
 }
 
 func TestSourceChunks_ListObjects_Error(t *testing.T) {
