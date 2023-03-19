@@ -1,12 +1,11 @@
 package gcs
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"sync"
+	"sync/atomic"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
@@ -14,6 +13,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -21,22 +22,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// Source represents a GCS source.
-type Source struct {
-	name        string
-	jobId       int64
-	sourceId    int64
-	concurrency int
-	verify      bool
-
-	gcsManager objectManager
-	stats      *attributes
-	log        logr.Logger
-	chunksCh   chan *sources.Chunk
-
-	mu               sync.Mutex
-	sources.Progress // not safe for concurrent access.
-}
+const defaultCacheThreshold = 0.01
 
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -57,6 +43,71 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
+// Source represents a GCS source.
+type Source struct {
+	name        string
+	jobId       int64
+	sourceId    int64
+	concurrency int
+	verify      bool
+
+	gcsManager objectManager
+	stats      *attributes
+	log        logr.Logger
+	chunksCh   chan *sources.Chunk
+
+	processedObjects int32
+	cacheMgr         *cacheManager
+
+	sources.Progress
+}
+
+// cacheManager handles all cache operations with some additional bookkeeping.
+// The threshold value is the percentage of objects that must be processed
+// before the cache is persisted.
+type cacheManager struct {
+	shouldCache bool
+	threshold   int
+	cache       cache.Cache
+	progress    *sources.Progress
+}
+
+// newCacheManager creates the cache manager with the given threshold.
+func newCacheManager(threshold int, cache cache.Cache, p *sources.Progress) *cacheManager {
+	// If the threshold is <= 1, there is not benefit to caching.
+	shouldCache := threshold > 1
+	return &cacheManager{
+		shouldCache: shouldCache,
+		threshold:   threshold,
+		cache:       cache,
+		progress:    p,
+	}
+}
+
+func (c *cacheManager) exists(key string) bool {
+	_, ok := c.cache.Get(key)
+	return ok
+}
+
+func (c *cacheManager) set(key string) {
+	c.cache.Set(key, true)
+}
+
+func (c *cacheManager) shouldPersist() (bool, string) {
+	if !c.shouldCache {
+		return false, ""
+	}
+
+	if c.cache.Count()%c.threshold != 0 {
+		return false, ""
+	}
+	return true, c.cache.Contents()
+}
+
+func (c *cacheManager) flush() {
+	c.cache.Clear()
+}
+
 // Init returns an initialized GCS source.
 func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
@@ -73,6 +124,36 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
+	gcsManager, err := configureGCSManager(aCtx, &conn, concurrency)
+	if err != nil {
+		return err
+	}
+	s.gcsManager = gcsManager
+
+	s.log.V(2).Info("enumerating buckets and objects")
+	if err := s.enumerate(aCtx); err != nil {
+		return fmt.Errorf("error enumerating buckets and objects: %w", err)
+	}
+
+	var c cache.Cache
+	if s.Progress.EncodedResumeInfo != "" {
+		c = memory.NewWithData(aCtx, s.Progress.EncodedResumeInfo)
+	} else {
+		c = memory.New()
+	}
+
+	// Set the threshold to 1% of the total number of objects.
+	thresh := int(float64(s.stats.numObjects) * defaultCacheThreshold)
+	s.cacheMgr = newCacheManager(thresh, c, &s.Progress)
+
+	return nil
+}
+
+func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency int) (*gcsManager, error) {
+	if conn == nil {
+		return nil, fmt.Errorf("GCS connection is nil, cannot configure GCS manager")
+	}
+
 	var gcsManagerAuthOption gcsManagerOption
 
 	switch conn.Credential.(type) {
@@ -81,7 +162,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	case *sourcespb.GCS_ServiceAccountFile:
 		b, err := os.ReadFile(conn.GetServiceAccountFile())
 		if err != nil {
-			return fmt.Errorf("error reading GCS JSON Service Account file: %w", err)
+			return nil, fmt.Errorf("error reading GCS JSON Service Account file: %w", err)
 		}
 		gcsManagerAuthOption = withJSONServiceAccount(aCtx, b)
 	case *sourcespb.GCS_JsonServiceAccount:
@@ -91,39 +172,28 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	case *sourcespb.GCS_Unauthenticated:
 		gcsManagerAuthOption = withoutAuthentication()
 	default:
-		return fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
+		return nil, fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
 
-	}
-
-	resume, err := setResumeBucketOffset(s.Progress.EncodedResumeInfo)
-	if err != nil {
-		return fmt.Errorf("error setting resume info: %w", err)
 	}
 
 	gcsManagerOpts := []gcsManagerOption{
 		withConcurrency(concurrency),
-		withBucketOffsets(resume),
 		withMaxObjectSize(conn.MaxObjectSize),
 		gcsManagerAuthOption,
 	}
-	if setGCSManagerBucketOptions(&conn) != nil {
-		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(&conn))
+	if setGCSManagerBucketOptions(conn) != nil {
+		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(conn))
 	}
-	if setGCSManagerObjectOptions(&conn) != nil {
-		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerObjectOptions(&conn))
-	}
-
-	if s.gcsManager, err = newGCSManager(conn.ProjectId, gcsManagerOpts...); err != nil {
-		return fmt.Errorf("error creating GCS manager: %w", err)
+	if setGCSManagerObjectOptions(conn) != nil {
+		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerObjectOptions(conn))
 	}
 
-	if len(resume) > 0 {
-		s.log.V(2).Info("resuming from previous run")
-		return nil
+	gcsManager, err := newGCSManager(conn.ProjectId, gcsManagerOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating GCS manager: %w", err)
 	}
 
-	s.log.V(2).Info("new run, enumerating buckets and objects")
-	return s.enumerate(aCtx)
+	return gcsManager, nil
 }
 
 func setGCSManagerBucketOptions(conn *sourcespb.GCS) gcsManagerOption {
@@ -147,6 +217,7 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
+<<<<<<< Updated upstream
 type progressInfo struct {
 	processedBucketCnt,
 	totalBucketsCnt,
@@ -283,6 +354,8 @@ func calcBktOffset(resumeInfo map[string]*objectsProgress) (map[string]offsetInf
 	return bucketOffset, nil
 }
 
+=======
+>>>>>>> Stashed changes
 // enumerate all the objects and buckets in the source and use the results to
 // set the progress information. This will be used track progression of the scan,
 // and to resume the scan if it is interrupted.
@@ -293,18 +366,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 	}
 	s.stats = stats
 
-	info := progressInfo{
-		totalBucketsCnt: int(s.stats.numBuckets),
-		totalObjectsCnt: int(s.stats.numObjects),
-	}
-
-	progress := make(map[string]*objectsProgress, len(s.stats.bucketObjects))
-	for k, v := range s.stats.bucketObjects {
-		progress[k] = newObjectsProgress(int(v))
-	}
-	info.bucketObjects = progress
-
-	return s.setProgress(ctx, &info, fmt.Sprintf("enumerated %d buckets, %d objects", s.stats.numBuckets, s.stats.numObjects))
+	return nil
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -314,11 +376,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return fmt.Errorf("error listing objects: %w", err)
 	}
 	s.chunksCh = chunksChan
-
-	progress, err := newProgressInfo(ctx, &s.Progress)
-	if err != nil {
-		return fmt.Errorf("error constructing progress info: %w", err)
-	}
+	s.Progress.Message = "starting to process objects..."
 
 	var wg sync.WaitGroup
 	for obj := range objectCh {
@@ -329,55 +387,50 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if err := s.startProcessing(ctx, progress, o); err != nil {
-			ctx.Logger().V(1).Info("GCS source error starting to process objects", "error", err)
+		if s.cacheMgr.exists(o.name) {
+			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
+
 		wg.Add(1)
-		go func(obj object, resume *progressInfo) {
+		go func(obj object) {
 			defer wg.Done()
 
 			if err := s.processObject(ctx, o); err != nil {
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			if err := s.endProcessing(ctx, resume, o); err != nil {
-				ctx.Logger().V(1).Info("error setting end progress progress", "name", o.name, "error", err)
-			}
-		}(o, progress)
+			s.setProgress(ctx, o.name)
+		}(o)
 	}
 	wg.Wait()
 
-	ctx.Logger().Info("GCS source finished processing", "name", s.name)
+	s.completeProgress(ctx)
 	return nil
 }
 
-func (s *Source) startProcessing(ctx context.Context, progress *progressInfo, o object) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Source) setProgress(ctx context.Context, objName string) {
+	atomic.AddInt32(&s.processedObjects, 1)
+	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
 
-	progress.setProcessStatus(o, setProcessingBucketObject)
-	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source beginning to process object %s in bucket %s", o.name, o.bucket))
-}
-
-func (s *Source) endProcessing(ctx context.Context, progress *progressInfo, o object) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	progress.setProcessStatus(o, setProcessedBucketObject)
-	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source finished processing object %s in bucket %s", o.name, o.bucket))
-}
-
-func (s *Source) setProgress(ctx context.Context, progress *progressInfo, msg string) error {
-	ctx.Logger().V(5).Info(msg)
-
-	b, err := json.Marshal(progress.bucketObjects)
-	if err != nil {
-		return fmt.Errorf("error marshalling resume info: %w", err)
+	s.cacheMgr.set(objName)
+	if ok, val := s.cacheMgr.shouldPersist(); ok {
+		s.SetProgressComplete(int(s.processedObjects), int(s.stats.numObjects), fmt.Sprintf("object %s processed", objName), val)
+		return
 	}
-	s.SetProgressComplete(progress.processedObjectsCnt, progress.totalObjectsCnt, msg, string(b))
+	processed := atomic.LoadInt32(&s.processedObjects)
+	s.Progress.SectionsCompleted = processed
+	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
+	s.Progress.PercentComplete = int64(float64(processed) / float64(s.stats.numObjects) * 100)
 
-	return nil
+	return
+}
+
+func (s *Source) completeProgress(ctx context.Context) {
+	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
+	ctx.Logger().Info(msg)
+	s.Progress.Message = msg
+	s.cacheMgr.flush()
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {
