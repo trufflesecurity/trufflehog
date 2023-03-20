@@ -32,7 +32,7 @@ func TestSourceInit(t *testing.T) {
 	source, conn := createTestSource(&sourcespb.GCS{
 		ProjectId: testProjectID,
 		IncludeBuckets: []string{
-			"bucket1",
+			publicBucket,
 		},
 		ExcludeBuckets: []string{
 			perfTestBucketGlob,
@@ -40,9 +40,7 @@ func TestSourceInit(t *testing.T) {
 		ExcludeObjects: []string{
 			"object1",
 		},
-		Credential: &sourcespb.GCS_ApiKey{
-			ApiKey: testAPIKey,
-		},
+		Credential: &sourcespb.GCS_Unauthenticated{},
 	})
 
 	err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
