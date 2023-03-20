@@ -23,10 +23,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const (
-	defaultCacheThreshold = 0.01
-	delimiter             = "|"
-)
+const defaultCacheThreshold = 0.01
 
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -140,7 +137,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 
 	var c cache.Cache
 	if s.Progress.EncodedResumeInfo != "" {
-		c = memory.NewWithData(aCtx, decodeProgress(s.Progress.EncodedResumeInfo))
+		c = memory.NewWithData(aCtx, strings.Split(s.Progress.EncodedResumeInfo, ","))
 	} else {
 		c = memory.New()
 	}
@@ -150,15 +147,6 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	s.cacheMgr = newCacheManager(thresh, c, &s.Progress)
 
 	return nil
-}
-
-func decodeProgress(p string) []string {
-	parts := strings.Split(p, delimiter)
-	names := make([]string, 0, len(parts))
-	for _, part := range parts {
-		names = append(names, strings.Trim(part, "\""))
-	}
-	return names
 }
 
 func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency int) (*gcsManager, error) {

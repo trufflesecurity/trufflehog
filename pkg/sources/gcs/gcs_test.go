@@ -1,8 +1,6 @@
 package gcs
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"sort"
@@ -346,25 +344,4 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	assert.Equal(t, int64(100), source.Progress.PercentComplete)
 	assert.Equal(t, 0, source.cacheMgr.cache.Count())
 	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", 5), source.Progress.Message)
-}
-
-func TestDecodeProgress(t *testing.T) {
-	progress := []string{"object0", "object1", "object2", "object3", "object4", "foo|bar", "baz,baz"}
-	var hashes []string
-	for _, p := range progress {
-		hashes = append(hashes, computeMD5Hash(p))
-	}
-	encode := strings.Join(hashes, delimiter)
-	want := []string{"18cb296143950052124d6241bd35128a", "5b78f9689b9aab1ebc0f3c1df916dd97", "eab335168ec3434a69540a26507eaa44", "a3653853fb23c463c8647d8bd29221bb", "9f9a5200b6561b465941e10f6a5bc14c", "b94ec51ac89f41713b6049651982a862", "78dcc744247d0eb9cbcc709a6f7a1a5e"}
-
-	if got := decodeProgress(encode); !cmp.Equal(got, want) {
-		t.Errorf("decodeProgress(%q) got %v, want %v", progress, got, want)
-	}
-
-}
-
-func computeMD5Hash(s string) string {
-	h := md5.New()
-	h.Write([]byte(s))
-	return hex.EncodeToString(h.Sum(nil))
 }
