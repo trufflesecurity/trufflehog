@@ -7,11 +7,11 @@ type Cache interface {
 	Set(string, bool)
 	// Get returns the value for the given key and a boolean indicating if the key was found.
 	Get(string) (string, bool)
-	// Delete removes the given key from the cache.
+	// Delete the given key from the cache.
 	Delete(string)
-	// Clear removes all key/value pairs from the cache.
+	// Clear all key/value pairs from the cache.
 	Clear()
-	// Count returns the number of key/value pairs in the cache.
+	// Count the number of key/value pairs in the cache.
 	Count() int
 	// Contents returns all keys in the cache encoded as a string.
 	Contents() string
