@@ -357,6 +357,7 @@ type object struct {
 	contentType string
 	owner       string
 	link        string
+	md5         string
 	// acl represents an ACLEntities.
 	// https://pkg.go.dev/cloud.google.com/go/storage#ACLEntity
 	acl       []string
@@ -631,6 +632,7 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 	o.contentType = attrs.ContentType
 	o.owner = attrs.Owner
 	o.link = attrs.MediaLink
+	o.md5 = string(attrs.MD5)
 	o.createdAt = attrs.Created
 	o.updatedAt = attrs.Updated
 	o.acl = objectACLs(attrs.ACL)
