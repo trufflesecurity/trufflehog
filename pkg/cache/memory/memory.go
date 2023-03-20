@@ -15,7 +15,7 @@ const (
 	defaultExpiration  = cache.DefaultExpiration
 )
 
-// Cache is a wrapper around the Ristretto in-memory cache.
+// Cache is a wrapper around the go-cache library.
 type Cache struct {
 	c *cache.Cache
 }
