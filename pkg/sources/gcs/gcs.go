@@ -67,6 +67,9 @@ type Source struct {
 // The threshold value is the percentage of objects that must be processed
 // before the cache is persisted.
 type cacheManager struct {
+	// shouldCache is true if the threshold is > 1.
+	// This ensures that only jobs with a large number of objects will
+	// benefit from caching.
 	shouldCache bool
 	threshold   int
 	cache       cache.Cache
@@ -283,8 +286,6 @@ func (s *Source) setProgress(ctx context.Context, objName string) {
 	s.Progress.SectionsCompleted = processed
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
 	s.Progress.PercentComplete = int64(float64(processed) / float64(s.stats.numObjects) * 100)
-
-	return
 }
 
 func (s *Source) completeProgress(ctx context.Context) {
