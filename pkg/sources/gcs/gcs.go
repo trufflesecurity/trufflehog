@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -14,8 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -23,8 +20,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const defaultCacheThreshold = 0.01
+<<<<<<< Updated upstream
+=======
+const defaultCachePersistIncrememt = 2500
 
+>>>>>>> Stashed changes
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
@@ -58,56 +58,39 @@ type Source struct {
 	chunksCh   chan *sources.Chunk
 
 	processedObjects int32
-	cacheMgr         *cacheManager
+<<<<<<< Updated upstream
+=======
+	cache            *persistableCache
+>>>>>>> Stashed changes
 
 	sources.Progress
 }
 
-// cacheManager handles all cache operations with some additional bookkeeping.
+<<<<<<< Updated upstream
+=======
+// persistableCache handles all cache operations with some additional bookkeeping.
 // The threshold value is the percentage of objects that must be processed
 // before the cache is persisted.
-type cacheManager struct {
-	shouldCache bool
-	threshold   int
-	cache       cache.Cache
-	progress    *sources.Progress
+type persistableCache struct {
+	persistIncrement int
+	cache.Cache
 }
 
-// newCacheManager creates the cache manager with the given threshold.
-func newCacheManager(threshold int, cache cache.Cache, p *sources.Progress) *cacheManager {
-	// If the threshold is <= 1, there is not benefit to caching.
-	shouldCache := threshold > 1
-	return &cacheManager{
-		shouldCache: shouldCache,
-		threshold:   threshold,
-		cache:       cache,
-		progress:    p,
+func newPersistableCache(increment int, cache cache.Cache) *persistableCache {
+	return &persistableCache{
+		persistIncrement: increment,
+		Cache:            cache,
 	}
 }
 
-func (c *cacheManager) exists(key string) bool {
-	return c.cache.Exists(key)
-}
-
-func (c *cacheManager) set(key string) {
-	c.cache.Set(key, key)
-}
-
-func (c *cacheManager) shouldPersist() (bool, string) {
-	if !c.shouldCache {
+func (c *persistableCache) shouldPersist() (bool, string) {
+	if c.Count()%c.persistIncrement != 0 {
 		return false, ""
 	}
-
-	if c.cache.Count()%c.threshold != 0 {
-		return false, ""
-	}
-	return true, c.cache.Contents()
+	return true, c.Contents()
 }
 
-func (c *cacheManager) flush() {
-	c.cache.Clear()
-}
-
+>>>>>>> Stashed changes
 // Init returns an initialized GCS source.
 func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
@@ -135,6 +118,8 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return fmt.Errorf("error enumerating buckets and objects: %w", err)
 	}
 
+<<<<<<< Updated upstream
+=======
 	var c cache.Cache
 	if s.Progress.EncodedResumeInfo != "" {
 		c = memory.NewWithData(aCtx, strings.Split(s.Progress.EncodedResumeInfo, ","))
@@ -142,10 +127,10 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		c = memory.New()
 	}
 
-	// Set the threshold to 1% of the total number of objects.
-	thresh := int(float64(s.stats.numObjects) * defaultCacheThreshold)
-	s.cacheMgr = newCacheManager(thresh, c, &s.Progress)
+	// TODO (ahrav): Make this configurable via conn.
+	s.cache = newPersistableCache(defaultCachePersistIncrememt, c)
 
+>>>>>>> Stashed changes
 	return nil
 }
 
@@ -248,11 +233,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if s.cacheMgr.exists(o.name) {
+<<<<<<< Updated upstream
+=======
+		if s.cache.Exists(o.name) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
 
+>>>>>>> Stashed changes
 		wg.Add(1)
 		go func(obj object) {
 			defer wg.Done()
@@ -273,9 +261,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 func (s *Source) setProgress(ctx context.Context, objName string) {
 	atomic.AddInt32(&s.processedObjects, 1)
 	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
+<<<<<<< Updated upstream
+=======
 
-	s.cacheMgr.set(objName)
-	if ok, val := s.cacheMgr.shouldPersist(); ok {
+	s.cache.Set(objName, objName)
+	if ok, val := s.cache.shouldPersist(); ok {
 		s.SetProgressComplete(int(s.processedObjects), int(s.stats.numObjects), fmt.Sprintf("object %s processed", objName), val)
 		return
 	}
@@ -283,15 +273,17 @@ func (s *Source) setProgress(ctx context.Context, objName string) {
 	s.Progress.SectionsCompleted = processed
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
 	s.Progress.PercentComplete = int64(float64(processed) / float64(s.stats.numObjects) * 100)
-
-	return
+>>>>>>> Stashed changes
 }
 
 func (s *Source) completeProgress(ctx context.Context) {
 	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
 	ctx.Logger().Info(msg)
+<<<<<<< Updated upstream
+=======
 	s.Progress.Message = msg
-	s.cacheMgr.flush()
+	s.cache.Clear()
+>>>>>>> Stashed changes
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {
