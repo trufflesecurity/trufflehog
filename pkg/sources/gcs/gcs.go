@@ -85,12 +85,11 @@ func newCacheManager(threshold int, cache cache.Cache, p *sources.Progress) *cac
 }
 
 func (c *cacheManager) exists(key string) bool {
-	_, ok := c.cache.Get(key)
-	return ok
+	return c.cache.Exists(key)
 }
 
 func (c *cacheManager) set(key string) {
-	c.cache.Set(key, true)
+	c.cache.Set(key, key)
 }
 
 func (c *cacheManager) shouldPersist() (bool, string) {
