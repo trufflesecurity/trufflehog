@@ -31,7 +31,7 @@ func NewWithData(ctx context.Context, s string) *Cache {
 	data := strings.Split(s, ",")
 	ctx.Logger().V(3).Info("Loading cache", "num-items", len(data))
 
-	var items map[string]cache.Item
+	items := make(map[string]cache.Item, len(data))
 	for _, d := range data {
 		items[d] = cache.Item{Object: d, Expiration: int64(defaultExpiration)}
 	}
