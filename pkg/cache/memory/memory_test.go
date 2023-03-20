@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestCache(t *testing.T) {
@@ -44,6 +46,29 @@ func TestCache(t *testing.T) {
 		c.Set(k, true)
 	}
 
+	items := c.Contents()
+	sort.Strings(keys)
+	res := strings.Split(items, ",")
+	sort.Strings(res)
+
+	if len(keys) != len(res) {
+		t.Fatalf("Unexpected length of items: %d", len(res))
+	}
+	if !cmp.Equal(keys, res) {
+		t.Fatalf("Unexpected items: %v", res)
+	}
+}
+
+func TestCache_NewWithData(t *testing.T) {
+	c := NewWithData(logContext.Background(), "key1,key2,key3")
+
+	// Test the count.
+	if c.Count() != 3 {
+		t.Fatalf("Unexpected count: %d", c.Count())
+	}
+
+	// Test contents.
+	keys := []string{"key1", "key2", "key3"}
 	items := c.Contents()
 	sort.Strings(keys)
 	res := strings.Split(items, ",")
