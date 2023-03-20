@@ -40,7 +40,7 @@ func NewWithData(ctx context.Context, data ...string) *Cache {
 }
 
 // Set adds a key-value pair to the cache.
-func (c *Cache) Set(key string, value bool) {
+func (c *Cache) Set(key, value string) {
 	c.c.Set(key, value, defaultExpiration)
 }
 
@@ -51,6 +51,12 @@ func (c *Cache) Get(key string) (string, bool) {
 		return "", ok
 	}
 	return res.(string), ok
+}
+
+// Exists returns true if the given key exists in the cache.
+func (c *Cache) Exists(key string) bool {
+	_, ok := c.c.Get(key)
+	return ok
 }
 
 // Delete removes the key-value pair from the cache.

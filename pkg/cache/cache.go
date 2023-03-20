@@ -4,9 +4,11 @@ package cache
 // Cache is used to store key/value pairs.
 type Cache interface {
 	// Set stores the given key/value pair.
-	Set(string, bool)
+	Set(string, string)
 	// Get returns the value for the given key and a boolean indicating if the key was found.
 	Get(string) (string, bool)
+	// Exists returns true if the given key exists in the cache.
+	Exists(string) bool
 	// Delete the given key from the cache.
 	Delete(string)
 	// Clear all key/value pairs from the cache.

@@ -15,10 +15,15 @@ func TestCache(t *testing.T) {
 	c := New()
 
 	// Test set and get.
-	c.Set("key1", true)
+	c.Set("key1", "key1")
 	v, ok := c.Get("key1")
-	if !ok {
+	if !ok || v != "key1" {
 		t.Fatalf("Unexpected value for key1: %v, %v", v, ok)
+	}
+
+	// Test exists.
+	if !c.Exists("key1") {
+		t.Fatalf("Expected key1 to exist")
 	}
 
 	// Test the count.
@@ -29,12 +34,12 @@ func TestCache(t *testing.T) {
 	// Test delete.
 	c.Delete("key1")
 	v, ok = c.Get("key1")
-	if ok {
+	if ok || v != "" {
 		t.Fatalf("Unexpected value for key1 after delete: %v, %v", v, ok)
 	}
 
 	// Test clear.
-	c.Set("key10", true)
+	c.Set("key10", "key10")
 	c.Clear()
 	v, ok = c.Get("key10")
 	if ok || v != "" {
@@ -44,7 +49,7 @@ func TestCache(t *testing.T) {
 	// Test contents.
 	keys := []string{"key1", "key2", "key3"}
 	for _, k := range keys {
-		c.Set(k, true)
+		c.Set(k, k)
 	}
 
 	items := c.Contents()
@@ -90,7 +95,7 @@ func setupBenchmarks(b *testing.B) *Cache {
 
 	for i := 0; i < 500_000; i++ {
 		key := fmt.Sprintf("key%d", i)
-		c.Set(key, true)
+		c.Set(key, key)
 	}
 
 	return c
@@ -101,7 +106,7 @@ func BenchmarkSet(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("key%d", i)
-		c.Set(key, true)
+		c.Set(key, key)
 	}
 }
 
