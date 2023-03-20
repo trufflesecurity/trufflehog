@@ -10,7 +10,7 @@ replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff 
 
 require (
 	cloud.google.com/go/secretmanager v1.10.0
-	cloud.google.com/go/storage v1.29.0
+	cloud.google.com/go/storage v1.30.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/TheZeroSlave/zapsentry v1.14.0
 	github.com/aws/aws-sdk-go v1.44.83
@@ -55,7 +55,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/xanzy/go-gitlab v0.81.0
-	go.mongodb.org/mongo-driver v1.11.2
+	go.mongodb.org/mongo-driver v1.11.3
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.7.0
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
