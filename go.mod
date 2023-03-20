@@ -45,6 +45,7 @@ require (
 	github.com/lib/pq v1.10.7
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/mholt/archiver/v4 v4.0.0-alpha.7
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20211021192214-5ab2d9280aa9
 	github.com/pkg/errors v0.9.1
