@@ -27,7 +27,7 @@ func New() *Cache {
 }
 
 // NewWithData constructs a new in-memory cache with existing data.
-func NewWithData(ctx context.Context, data ...string) *Cache {
+func NewWithData(ctx context.Context, data []string) *Cache {
 	ctx.Logger().V(3).Info("Loading cache", "num-items", len(data))
 
 	items := make(map[string]cache.Item, len(data))
