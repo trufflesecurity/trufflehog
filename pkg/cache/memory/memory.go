@@ -27,8 +27,7 @@ func New() *Cache {
 }
 
 // NewWithData constructs a new in-memory cache with existing data.
-func NewWithData(ctx context.Context, s string) *Cache {
-	data := strings.Split(s, ",")
+func NewWithData(ctx context.Context, data ...string) *Cache {
 	ctx.Logger().V(3).Info("Loading cache", "num-items", len(data))
 
 	items := make(map[string]cache.Item, len(data))
@@ -47,8 +46,11 @@ func (c *Cache) Set(key string, value bool) {
 
 // Get returns the value for the given key.
 func (c *Cache) Get(key string) (string, bool) {
-	_, ok := c.c.Get(key)
-	return "", ok
+	res, ok := c.c.Get(key)
+	if !ok {
+		return "", ok
+	}
+	return res.(string), ok
 }
 
 // Delete removes the key-value pair from the cache.

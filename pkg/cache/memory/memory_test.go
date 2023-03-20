@@ -34,6 +34,7 @@ func TestCache(t *testing.T) {
 	}
 
 	// Test clear.
+	c.Set("key10", true)
 	c.Clear()
 	v, ok = c.Get("key10")
 	if ok || v != "" {
