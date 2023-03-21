@@ -385,6 +385,10 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 	logger.V(5).Info("enumerating buckets", "numBuckets", len(bkts))
 	stats := newStats(len(bkts))
 
+	defer func(start time.Time) {
+		logger.V(5).Info("finished enumerating buckets", "duration-seconds", fmt.Sprintf("%.1f", time.Since(start).Seconds()), "num-buckets", len(bkts), "num-objects", stats.numObjects)
+	}(time.Now())
+
 	for _, bkt := range bkts {
 		bkt := bkt
 		g.workerPool.Go(func() error {
@@ -428,7 +432,6 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 
 	_ = g.workerPool.Wait()
 	g.attr = stats
-	logger.V(5).Info("finished enumerating buckets", "num-objects", stats.numObjects, "num-buckets", stats.numBuckets)
 
 	return stats, nil
 }
