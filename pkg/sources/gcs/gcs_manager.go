@@ -383,10 +383,9 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 	logger.V(5).Info("enumerating buckets", "numBuckets", len(bkts))
 	stats := newStats(len(bkts))
 
-	now := time.Now()
 	defer func(start time.Time) {
 		logger.V(5).Info("finished enumerating buckets", "duration-seconds", fmt.Sprintf("%.1f", time.Since(start).Seconds()), "num-buckets", len(bkts), "num-objects", stats.numObjects)
-	}(now)
+	}(time.Now())
 
 	for _, bkt := range bkts {
 		bkt := bkt
