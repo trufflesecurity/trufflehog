@@ -17,7 +17,7 @@ jobs:
       id-token: 'write'
     steps:
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: '1.18'
     - name: Checkout code
@@ -36,7 +36,7 @@ jobs:
       id-token: 'write'
     steps:
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: '1.18'
     - name: Checkout code
