@@ -17,12 +17,15 @@ inputs:
     default: ''
     description: Extra args to be passed to the trufflehog cli.
     required: false
+outputs:
+  results:
+    description: 'Trufflehog scan results'
 branding:
   icon: "shield"
   color: "green"
 runs:
   using: "docker"
-  image: "docker://ghcr.io/trufflesecurity/trufflehog:latest"
+  image: "Dockerfile"
   args:
     - git
     - file://${{ inputs.path }}
@@ -32,4 +35,5 @@ runs:
     - ${{ inputs.head }}
     - --fail
     - --no-update
+    - --github-actions
     - ${{ inputs.extra_args }}
