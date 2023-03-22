@@ -190,6 +190,7 @@ func createTestObject(id int) object {
 		link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
 		acl:         []string{"authenticatedUsers"},
 		size:        42,
+		md5:         fmt.Sprintf("md5hash%d", id),
 		Reader:      &mockReader{data: []byte(fmt.Sprintf("hello world %d", id))},
 	}
 }
@@ -326,14 +327,14 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	// Ensure we get 5 objects back.
 	assert.Equal(t, len(want), len(got))
 
-	processing := map[string]struct{}{"object0": {}, "object1": {}, "object2": {}, "object3": {}, "object4": {}}
+	processing := map[string]struct{}{"md5hash0": {}, "md5hash1": {}, "md5hash2": {}, "md5hash3": {}, "md5hash4": {}}
 	for i := 0; i < 5; i++ {
 		delete(processing, fmt.Sprintf("object%d", i))
 	}
 
 	// Test that the resume progress is set.
 	// The processed values should be the greatest object name lexicographically.
-	progress := "object0,object1,object2,object3,object4"
+	progress := "md5hash0,md5hash1,md5hash2,md5hash3,md5hash4"
 	objs := strings.Split(progress, ",")
 
 	encodeResume := strings.Split(source.Progress.EncodedResumeInfo, ",")
