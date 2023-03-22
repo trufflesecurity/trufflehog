@@ -302,7 +302,10 @@ func run(state overseer.State) {
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
-		excludedGlobs := strings.Split(*gitScanExcludeGlobs, ",")
+		excludedGlobs := []string{}
+		if *gitScanExcludeGlobs != "" {
+			excludedGlobs = strings.Split(*gitScanExcludeGlobs, ",")
+		}
 
 		cfg := sources.GitConfig{
 			RepoPath:     repoPath,
