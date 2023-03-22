@@ -237,7 +237,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			s.setProgress(ctx, o.name)
+			s.setProgress(ctx, o.name, o.md5)
 		}(o)
 	}
 	wg.Wait()
@@ -246,9 +246,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	return nil
 }
 
-func (s *Source) setProgress(ctx context.Context, objName string) {
+func (s *Source) setProgress(ctx context.Context, objName, md5 string) {
 	atomic.AddInt32(&s.processedObjects, 1)
-	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
+	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName, "md5", md5)
 
 	s.cache.Set(objName, objName)
 	if ok, val := s.cache.shouldPersist(); ok {
