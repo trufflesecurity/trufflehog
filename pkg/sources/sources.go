@@ -83,6 +83,8 @@ type GitConfig struct {
 	MaxDepth int
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+	// ExcludedGlobs
+	ExcludeGlobs []string
 }
 
 // GithubConfig defines the optional configuration for a github source.
