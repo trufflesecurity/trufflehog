@@ -251,7 +251,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if s.cacheMgr.exists(o.name) {
+		if s.cacheMgr.exists(o.md5) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
@@ -264,7 +264,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			s.setProgress(ctx, o.name)
+			s.setProgress(ctx, o.name, o.md5)
 		}(o)
 	}
 	wg.Wait()
@@ -273,11 +273,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	return nil
 }
 
-func (s *Source) setProgress(ctx context.Context, objName string) {
+func (s *Source) setProgress(ctx context.Context, objName, md5 string) {
 	atomic.AddInt32(&s.processedObjects, 1)
-	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
+	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName, "md5", md5)
 
-	s.cacheMgr.set(objName)
+	s.cacheMgr.set(md5)
 	if ok, val := s.cacheMgr.shouldPersist(); ok {
 		s.SetProgressComplete(int(s.processedObjects), int(s.stats.numObjects), fmt.Sprintf("object %s processed", objName), val)
 		return
