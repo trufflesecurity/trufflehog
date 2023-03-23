@@ -27,7 +27,7 @@ runs:
   using: "docker"
   image: "Dockerfile"
   env:
-    DOCKER_BUILDKIT='1 docker build'
+    DOCKER_BUILDKIT: '1 docker build'
   args:
     - git
     - file://${{ inputs.path }}
