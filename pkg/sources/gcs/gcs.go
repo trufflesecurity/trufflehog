@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
@@ -51,8 +50,6 @@ type Source struct {
 	stats      *attributes
 	log        logr.Logger
 	chunksCh   chan *sources.Chunk
-
-	processedObjects int32
 
 	sources.Progress
 }
@@ -175,7 +172,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return fmt.Errorf("error listing objects: %w", err)
 	}
 	s.chunksCh = chunksChan
-	s.Progress.Message = "starting to process objects..."
 
 	var wg sync.WaitGroup
 	for obj := range objectCh {
@@ -194,23 +190,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			s.setProgress(ctx, o.name)
 		}(o)
 	}
 	wg.Wait()
 
-	s.completeProgress(ctx)
 	return nil
-}
-
-func (s *Source) setProgress(ctx context.Context, objName string) {
-	atomic.AddInt32(&s.processedObjects, 1)
-	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
-}
-
-func (s *Source) completeProgress(ctx context.Context) {
-	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
-	ctx.Logger().Info(msg)
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {
