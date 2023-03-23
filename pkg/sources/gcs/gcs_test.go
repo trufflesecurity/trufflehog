@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -222,11 +224,8 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		gcsManager: &mockObjectManager{},
 		chunksCh:   chunksCh,
 	}
-<<<<<<< Updated upstream
-=======
 	cache := memory.New()
 	source.cache = newPersistableCache(5, cache)
->>>>>>> Stashed changes
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -290,8 +289,6 @@ func TestSourceChunks_ListObjects_Error(t *testing.T) {
 	err := source.Chunks(ctx, chunksCh)
 	assert.True(t, err != nil)
 }
-<<<<<<< Updated upstream
-=======
 
 func TestSourceChunks_ProgressSet(t *testing.T) {
 	ctx := context.Background()
@@ -346,4 +343,3 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	assert.Equal(t, 0, source.cache.Count())
 	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", 5), source.Progress.Message)
 }
->>>>>>> Stashed changes
