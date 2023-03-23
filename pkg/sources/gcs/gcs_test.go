@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -224,9 +222,6 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		gcsManager: &mockObjectManager{},
 		chunksCh:   chunksCh,
 	}
-	cache := memory.New()
-	cacheMgr := newCacheManager(5, cache, &source.Progress)
-	source.cacheMgr = cacheMgr
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -289,59 +284,4 @@ func TestSourceChunks_ListObjects_Error(t *testing.T) {
 	defer close(chunksCh)
 	err := source.Chunks(ctx, chunksCh)
 	assert.True(t, err != nil)
-}
-
-func TestSourceChunks_ProgressSet(t *testing.T) {
-	ctx := context.Background()
-	chunksCh := make(chan *sources.Chunk, 1)
-	source := &Source{
-		gcsManager: &mockObjectManager{},
-		chunksCh:   chunksCh,
-		Progress:   sources.Progress{},
-	}
-
-	cache := memory.New()
-	cacheMgr := newCacheManager(5, cache, &source.Progress)
-	source.cacheMgr = cacheMgr
-
-	err := source.enumerate(ctx)
-	assert.Nil(t, err)
-
-	go func() {
-		defer close(chunksCh)
-		err := source.Chunks(ctx, chunksCh)
-		assert.Nil(t, err)
-	}()
-
-	want := make([]*sources.Chunk, 0, 5)
-	for i := 0; i < 5; i++ {
-		want = append(want, createTestSourceChunk(i))
-	}
-
-	got := make([]*sources.Chunk, 0, 5)
-	for ch := range chunksCh {
-		got = append(got, ch)
-	}
-
-	// Ensure we get 5 objects back.
-	assert.Equal(t, len(want), len(got))
-
-	processing := map[string]struct{}{"object0": {}, "object1": {}, "object2": {}, "object3": {}, "object4": {}}
-	for i := 0; i < 5; i++ {
-		delete(processing, fmt.Sprintf("object%d", i))
-	}
-
-	// Test that the resume progress is set.
-	// The processed values should be the greatest object name lexicographically.
-	progress := "object0,object1,object2,object3,object4"
-	objs := strings.Split(progress, ",")
-
-	encodeResume := strings.Split(source.Progress.EncodedResumeInfo, ",")
-	sort.Strings(encodeResume)
-
-	assert.Equal(t, objs, encodeResume)
-	assert.Equal(t, int32(5), source.Progress.SectionsCompleted)
-	assert.Equal(t, int64(100), source.Progress.PercentComplete)
-	assert.Equal(t, 0, source.cacheMgr.cache.Count())
-	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", 5), source.Progress.Message)
 }
