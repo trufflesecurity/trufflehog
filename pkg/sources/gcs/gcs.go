@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -13,6 +14,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -20,11 +23,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-<<<<<<< Updated upstream
-=======
 const defaultCachePersistIncrememt = 2500
 
->>>>>>> Stashed changes
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
@@ -58,16 +58,11 @@ type Source struct {
 	chunksCh   chan *sources.Chunk
 
 	processedObjects int32
-<<<<<<< Updated upstream
-=======
 	cache            *persistableCache
->>>>>>> Stashed changes
 
 	sources.Progress
 }
 
-<<<<<<< Updated upstream
-=======
 // persistableCache handles all cache operations with some additional bookkeeping.
 // The threshold value is the percentage of objects that must be processed
 // before the cache is persisted.
@@ -90,7 +85,6 @@ func (c *persistableCache) shouldPersist() (bool, string) {
 	return true, c.Contents()
 }
 
->>>>>>> Stashed changes
 // Init returns an initialized GCS source.
 func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
@@ -118,8 +112,6 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return fmt.Errorf("error enumerating buckets and objects: %w", err)
 	}
 
-<<<<<<< Updated upstream
-=======
 	var c cache.Cache
 	if s.Progress.EncodedResumeInfo != "" {
 		c = memory.NewWithData(aCtx, strings.Split(s.Progress.EncodedResumeInfo, ","))
@@ -130,7 +122,6 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	// TODO (ahrav): Make this configurable via conn.
 	s.cache = newPersistableCache(defaultCachePersistIncrememt, c)
 
->>>>>>> Stashed changes
 	return nil
 }
 
@@ -233,14 +224,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-<<<<<<< Updated upstream
-=======
 		if s.cache.Exists(o.name) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
 
->>>>>>> Stashed changes
 		wg.Add(1)
 		go func(obj object) {
 			defer wg.Done()
@@ -261,8 +249,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 func (s *Source) setProgress(ctx context.Context, objName string) {
 	atomic.AddInt32(&s.processedObjects, 1)
 	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
-<<<<<<< Updated upstream
-=======
 
 	s.cache.Set(objName, objName)
 	if ok, val := s.cache.shouldPersist(); ok {
@@ -273,17 +259,13 @@ func (s *Source) setProgress(ctx context.Context, objName string) {
 	s.Progress.SectionsCompleted = processed
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
 	s.Progress.PercentComplete = int64(float64(processed) / float64(s.stats.numObjects) * 100)
->>>>>>> Stashed changes
 }
 
 func (s *Source) completeProgress(ctx context.Context) {
 	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
 	ctx.Logger().Info(msg)
-<<<<<<< Updated upstream
-=======
 	s.Progress.Message = msg
 	s.cache.Clear()
->>>>>>> Stashed changes
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {
