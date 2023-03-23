@@ -126,10 +126,8 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	} else {
 		args = append(args, "--all")
 	}
-	if len(excludedGlobs) != 0 {
-		for _, glob := range excludedGlobs {
-			args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
-		}
+	for _, glob := range excludedGlobs {
+		args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
 	}
 
 	cmd := exec.Command("git", args...)
