@@ -224,7 +224,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if s.cache.Exists(o.name) {
+		if s.cache.Exists(o.md5) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
@@ -250,7 +250,7 @@ func (s *Source) setProgress(ctx context.Context, objName, md5 string) {
 	atomic.AddInt32(&s.processedObjects, 1)
 	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName, "md5", md5)
 
-	s.cache.Set(objName, objName)
+	s.cache.Set(md5, md5)
 	if ok, val := s.cache.shouldPersist(); ok {
 		s.SetProgressComplete(int(s.processedObjects), int(s.stats.numObjects), fmt.Sprintf("object %s processed", objName), val)
 		return
