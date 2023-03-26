@@ -15,15 +15,12 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
-
-const defaultCachePersistIncrememt = 2500
 
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -58,31 +55,9 @@ type Source struct {
 	chunksCh   chan *sources.Chunk
 
 	processedObjects int32
-	cache            *persistableCache
+	cache            cache.Cache
 
 	sources.Progress
-}
-
-// persistableCache handles all cache operations with some additional bookkeeping.
-// The threshold value is the percentage of objects that must be processed
-// before the cache is persisted.
-type persistableCache struct {
-	persistIncrement int
-	cache.Cache
-}
-
-func newPersistableCache(increment int, cache cache.Cache) *persistableCache {
-	return &persistableCache{
-		persistIncrement: increment,
-		Cache:            cache,
-	}
-}
-
-func (c *persistableCache) shouldPersist() (bool, string) {
-	if c.Count()%c.persistIncrement != 0 {
-		return false, ""
-	}
-	return true, c.Contents()
 }
 
 // Init returns an initialized GCS source.
@@ -112,15 +87,10 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return fmt.Errorf("error enumerating buckets and objects: %w", err)
 	}
 
-	var c cache.Cache
-	if s.Progress.EncodedResumeInfo != "" {
-		c = memory.NewWithData(aCtx, strings.Split(s.Progress.EncodedResumeInfo, ","))
-	} else {
-		c = memory.New()
+	// For runs that aren't associated with a job, we don't need progress or a cache.
+	if id != 0 {
+		s.cache = configureCache(aCtx, &s.Progress)
 	}
-
-	// TODO (ahrav): Make this configurable via conn.
-	s.cache = newPersistableCache(defaultCachePersistIncrememt, c)
 
 	return nil
 }
@@ -193,6 +163,15 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
+func configureCache(ctx context.Context, p *sources.Progress) cache.Cache {
+	if p.EncodedResumeInfo != "" {
+		ctx.Logger().V(3).Info("creating storage service with existing progress")
+		return newPersistableCache(p, withMemoryLoadedPersistableCache(strings.Split(p.EncodedResumeInfo, ",")))
+	}
+
+	return newPersistableCache(p, withMemoryPersistableCache())
+}
+
 // enumerate all the objects and buckets in the source and use the results to
 // set the progress information. This will be used track progression of the scan,
 // and to resume the scan if it is interrupted.
@@ -224,7 +203,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if s.cache.Exists(o.md5) {
+		if s.cache != nil && s.cache.Exists(o.md5) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
@@ -237,7 +216,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			s.setProgress(ctx, o.name, o.md5)
+			if s.cache != nil {
+				s.setProgress(ctx, o.name, o.md5)
+			}
 		}(o)
 	}
 	wg.Wait()
@@ -251,10 +232,6 @@ func (s *Source) setProgress(ctx context.Context, objName, md5 string) {
 	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName, "md5", md5)
 
 	s.cache.Set(md5, md5)
-	if ok, val := s.cache.shouldPersist(); ok {
-		s.SetProgressComplete(int(s.processedObjects), int(s.stats.numObjects), fmt.Sprintf("object %s processed", objName), val)
-		return
-	}
 	processed := atomic.LoadInt32(&s.processedObjects)
 	s.Progress.SectionsCompleted = processed
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -43,9 +42,40 @@ func TestSourceInit(t *testing.T) {
 		Credential: &sourcespb.GCS_Unauthenticated{},
 	})
 
-	err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
-	assert.Nil(t, err)
-	assert.NotNil(t, source.gcsManager)
+	testCases := []struct {
+		name      string
+		jobID     int64
+		conn      *anypb.Any
+		source    *Source
+		wantGCS   bool
+		wantCache bool
+	}{
+		{
+			name:      "Non-cacheable GCS source init",
+			jobID:     0,
+			conn:      conn,
+			source:    source,
+			wantGCS:   true,
+			wantCache: false,
+		},
+		{
+			name:      "Cacheable GCS source init",
+			jobID:     1,
+			conn:      conn,
+			source:    source,
+			wantGCS:   true,
+			wantCache: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.source.Init(context.Background(), "test", tc.jobID, 1, true, tc.conn, 8)
+			assert.Nil(t, err)
+			assert.Equal(t, tc.wantGCS, tc.source.gcsManager != nil)
+			assert.Equal(t, tc.wantCache, tc.source.cache != nil)
+		})
+	}
 }
 
 func TestConfigureGCSManager(t *testing.T) {
@@ -224,9 +254,9 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 	source := &Source{
 		gcsManager: &mockObjectManager{},
 		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
 	}
-	cache := memory.New()
-	source.cache = newPersistableCache(5, cache)
+	source.cache = newPersistableCache(&source.Progress, withMemoryPersistableCache())
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -300,8 +330,7 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 		Progress:   sources.Progress{},
 	}
 
-	cache := memory.New()
-	source.cache = newPersistableCache(5, cache)
+	source.cache = newPersistableCache(&source.Progress, withMemoryPersistableCache(), withCustomIncrement(5))
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
