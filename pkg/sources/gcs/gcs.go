@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
@@ -59,23 +58,35 @@ type Source struct {
 	chunksCh   chan *sources.Chunk
 
 	processedObjects int32
-	cache            *persistableCache
+	cache            cache.Cache
 
-	sources.Progress
+	mu               sync.Mutex
+	sources.Progress // progress is not thread safe
 }
 
-// persistableCache handles all cache operations with some additional bookkeeping.
-// The threshold value is the percentage of objects that must be processed
-// before the cache is persisted.
+// persistableCache is a wrapper around cache.Cache that allows
+// for the persistence of the cache contents in the Progress of the source
+// at given increments.
 type persistableCache struct {
 	persistIncrement int
 	cache.Cache
+	*sources.Progress
 }
 
-func newPersistableCache(increment int, cache cache.Cache) *persistableCache {
+func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) *persistableCache {
 	return &persistableCache{
 		persistIncrement: increment,
 		Cache:            cache,
+		Progress:         p,
+	}
+}
+
+// Set overrides the cache Set method of the cache to enable the persistence
+// of the cache contents the Progress of the source at given increments.
+func (c *persistableCache) Set(key, val string) {
+	c.Cache.Set(key, val)
+	if ok, contents := c.shouldPersist(); ok {
+		c.Progress.EncodedResumeInfo = contents
 	}
 }
 
@@ -121,7 +132,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	}
 
 	// TODO (ahrav): Make this configurable via conn.
-	s.cache = newPersistableCache(defaultCachePersistIncrememt, c)
+	s.cache = newPersistableCache(defaultCachePersistIncrememt, c, &s.Progress)
 
 	return nil
 }
@@ -195,6 +206,7 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 }
 
 // enumerate all the objects and buckets in the source.
+// This will be used to calculate progress.
 func (s *Source) enumerate(ctx context.Context) error {
 	stats, err := s.gcsManager.attributes(ctx)
 	if err != nil {
@@ -246,18 +258,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func (s *Source) setProgress(ctx context.Context, objName string) {
-	atomic.AddInt32(&s.processedObjects, 1)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
+	s.processedObjects++
 
 	s.cache.Set(objName, objName)
-	if ok, val := s.cache.shouldPersist(); ok {
-		s.SetProgressComplete(int(s.processedObjects), int(s.stats.numObjects), fmt.Sprintf("object %s processed", objName), val)
-		return
-	}
-	processed := atomic.LoadInt32(&s.processedObjects)
-	s.Progress.SectionsCompleted = processed
+	s.Progress.SectionsCompleted = s.processedObjects
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
-	s.Progress.PercentComplete = int64(float64(processed) / float64(s.stats.numObjects) * 100)
+	s.Progress.PercentComplete = int64(float64(s.processedObjects) / float64(s.stats.numObjects) * 100)
 }
 
 func (s *Source) completeProgress(ctx context.Context) {

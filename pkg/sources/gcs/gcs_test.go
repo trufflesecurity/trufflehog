@@ -226,9 +226,10 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 	source := &Source{
 		gcsManager: &mockObjectManager{},
 		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
 	}
 	cache := memory.New()
-	source.cache = newPersistableCache(5, cache)
+	source.cache = newPersistableCache(5, cache, &source.Progress)
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -304,7 +305,7 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	}
 
 	cache := memory.New()
-	source.cache = newPersistableCache(5, cache)
+	source.cache = newPersistableCache(5, cache, &source.Progress)
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
