@@ -1,4 +1,4 @@
-FROM --platform='linux/amd64' golang:bullseye as builder
+FROM --platform=${BUILDPLATFORM} golang:bullseye as builder
 
 WORKDIR /build
 COPY . . 
