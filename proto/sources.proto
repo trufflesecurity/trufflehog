@@ -131,6 +131,7 @@ message GCS {
     credentials.Unauthenticated unauthenticated = 3;
     credentials.CloudEnvironment adc = 4;
     string service_account_file = 11;
+    credentials.Oauth2 oauth = 12;
   }
   string project_id = 5;
   repeated string include_buckets = 6;
