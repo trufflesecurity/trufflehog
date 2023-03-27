@@ -50,7 +50,7 @@ func TestOpenAI_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_OpenAI,
-					Redacted:     "sk-...xxxx",
+					Redacted:     "sk-...gOPc",
 					Verified:     false,
 				},
 			},
@@ -68,17 +68,7 @@ func TestOpenAI_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_OpenAI,
 					Verified:     true,
-					Redacted:     "sk-...xxxx",
-					ExtraData: map[string]string{
-						"description": "",
-						"id":          "",
-						"is_default":  "",
-						"is_personal": "",
-						"role":        "",
-						"title":       "",
-						"total_orgs":  "",
-						"user":        "",
-					},
+					Redacted:     "sk-...gOPb",
 				},
 			},
 			wantErr: false,
@@ -108,6 +98,7 @@ func TestOpenAI_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("OpenAI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

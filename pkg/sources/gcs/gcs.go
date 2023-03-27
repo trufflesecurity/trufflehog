@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -193,9 +194,7 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
-// enumerate all the objects and buckets in the source and use the results to
-// set the progress information. This will be used track progression of the scan,
-// and to resume the scan if it is interrupted.
+// enumerate all the objects and buckets in the source.
 func (s *Source) enumerate(ctx context.Context) error {
 	stats, err := s.gcsManager.attributes(ctx)
 	if err != nil {
@@ -283,7 +282,7 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 					Email:       o.owner,
 					ContentType: o.contentType,
 					Acls:        o.acl,
-					CreatedAt:   o.createdAt.String(),
+					CreatedAt:   strconv.FormatInt(o.createdAt.Unix(), 10), // Unix time as string
 					UpdatedAt:   o.updatedAt.String(),
 				},
 			},
