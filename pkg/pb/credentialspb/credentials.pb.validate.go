@@ -783,6 +783,8 @@ func (m *Oauth2) validate(all bool) error {
 
 	// no validation rules for ClientSecret
 
+	// no validation rules for AccessToken
+
 	if len(errors) > 0 {
 		return Oauth2MultiError(errors)
 	}
