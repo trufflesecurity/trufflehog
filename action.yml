@@ -35,5 +35,4 @@ runs:
     - ${{ inputs.head }}
     - --fail
     - --no-update
-    - --github-actions
     - ${{ inputs.extra_args }}
