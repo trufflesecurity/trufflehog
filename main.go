@@ -477,7 +477,7 @@ func splitVerifierURLs(verifierURLs map[string]string) map[string][]string {
 		key := strings.ToLower(k)
 		sliceOfValues := strings.Split(v, ",")
 		for i, s := range sliceOfValues {
-			sliceOfValues[i] = strings.ToLower(strings.TrimSpace(s))
+			sliceOfValues[i] = strings.TrimSpace(s)
 		}
 		verifiers[key] = sliceOfValues
 	}
