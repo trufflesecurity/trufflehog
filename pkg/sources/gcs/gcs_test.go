@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -265,6 +266,7 @@ func createTestObject(id int) object {
 		acl:         []string{"authenticatedUsers"},
 		size:        42,
 		Reader:      &mockReader{data: []byte(fmt.Sprintf("hello world %d", id))},
+		createdAt:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -284,6 +286,7 @@ func createTestSourceChunk(id int) *sources.Chunk {
 					Email:       "testman@test.com",
 					Link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
 					Acls:        []string{"authenticatedUsers"},
+					CreatedAt:   "1577836800",
 				},
 			},
 		},
@@ -331,9 +334,10 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		return got[i].SourceMetadata.GetGcs().Filename < got[j].SourceMetadata.GetGcs().Filename
 	})
 
-	for _, c := range got {
-		assert.Equal(t, c.SourceMetadata.GetGcs().Filename, c.SourceMetadata.GetGcs().Filename)
-		assert.Equal(t, c.Data, c.Data)
+	for i, c := range got {
+		assert.Equal(t, want[i].SourceMetadata.GetGcs().Filename, c.SourceMetadata.GetGcs().Filename)
+		assert.Equal(t, want[i].Data, c.Data)
+		assert.Equal(t, want[i].SourceMetadata.GetGcs().CreatedAt, c.SourceMetadata.GetGcs().CreatedAt)
 	}
 
 }
