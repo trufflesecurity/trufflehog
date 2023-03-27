@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -210,7 +211,7 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 					Email:       o.owner,
 					ContentType: o.contentType,
 					Acls:        o.acl,
-					CreatedAt:   o.createdAt.String(),
+					CreatedAt:   strconv.FormatInt(o.createdAt.Unix(), 10), // Unix time as string
 					UpdatedAt:   o.updatedAt.String(),
 				},
 			},
