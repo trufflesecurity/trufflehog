@@ -60,7 +60,7 @@ var (
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
 	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	gitScanExcludeGlobs = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan.").String()
+	gitScanExcludeGlobs = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
 	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
 	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
