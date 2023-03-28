@@ -23,7 +23,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const defaultCachePersistIncrememt = 2500
+const defaultCachePersistIncrement = 2500
 
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -132,7 +132,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	}
 
 	// TODO (ahrav): Make this configurable via conn.
-	s.cache = newPersistableCache(defaultCachePersistIncrememt, c, &s.Progress)
+	s.cache = newPersistableCache(defaultCachePersistIncrement, c, &s.Progress)
 
 	return nil
 }

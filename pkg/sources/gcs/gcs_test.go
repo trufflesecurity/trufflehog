@@ -135,7 +135,9 @@ func TestConfigureGCSManager(t *testing.T) {
 }
 
 type mockObjectManager struct {
-	wantErr bool
+	// numObjects is the number of objects to return in the listObjects call.
+	numObjects int
+	wantErr    bool
 }
 
 func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
@@ -144,7 +146,7 @@ func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
 	}
 
 	return &attributes{
-		numObjects:    5,
+		numObjects:    uint64(m.numObjects),
 		numBuckets:    1,
 		bucketObjects: map[string]uint64{testBucket: 5},
 	}, nil
@@ -174,7 +176,7 @@ func (m *mockObjectManager) listObjects(context.Context) (chan io.Reader, error)
 	go func() {
 		defer close(ch)
 		// Add 5 objects to the channel.
-		for i := 0; i < 5; i++ {
+		for i := 0; i < m.numObjects; i++ {
 			ch <- createTestObject(i)
 		}
 	}()
@@ -224,7 +226,7 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 	chunksCh := make(chan *sources.Chunk, 1)
 
 	source := &Source{
-		gcsManager: &mockObjectManager{},
+		gcsManager: &mockObjectManager{numObjects: 5},
 		chunksCh:   chunksCh,
 		Progress:   sources.Progress{},
 	}
@@ -273,7 +275,7 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 
 func TestSourceInit_Enumerate(t *testing.T) {
 	ctx := context.Background()
-	source := &Source{gcsManager: &mockObjectManager{}}
+	source := &Source{gcsManager: &mockObjectManager{numObjects: 5}}
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -299,7 +301,7 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	ctx := context.Background()
 	chunksCh := make(chan *sources.Chunk, 1)
 	source := &Source{
-		gcsManager: &mockObjectManager{},
+		gcsManager: &mockObjectManager{numObjects: 5},
 		chunksCh:   chunksCh,
 		Progress:   sources.Progress{},
 	}
@@ -329,13 +331,7 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	// Ensure we get 5 objects back.
 	assert.Equal(t, len(want), len(got))
 
-	processing := map[string]struct{}{"object0": {}, "object1": {}, "object2": {}, "object3": {}, "object4": {}}
-	for i := 0; i < 5; i++ {
-		delete(processing, fmt.Sprintf("object%d", i))
-	}
-
 	// Test that the resume progress is set.
-	// The processed values should be the greatest object name lexicographically.
 	progress := "object0,object1,object2,object3,object4"
 	objs := strings.Split(progress, ",")
 
@@ -347,4 +343,52 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	assert.Equal(t, int64(100), source.Progress.PercentComplete)
 	assert.Equal(t, 0, source.cache.Count())
 	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", 5), source.Progress.Message)
+}
+
+func TestSource_CachePersistence(t *testing.T) {
+	ctx := context.Background()
+
+	cacheIncrement := 5
+	wantObjCnt := 4 // ensure we have less objects than the cache increment
+	mockObjManager := &mockObjectManager{numObjects: wantObjCnt}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	source := &Source{
+		gcsManager: mockObjManager,
+		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
+	}
+
+	cache := memory.New()
+	source.cache = newPersistableCache(cacheIncrement, cache, &source.Progress)
+
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
+
+	go func() {
+		defer close(chunksCh)
+		err := source.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	want := make([]*sources.Chunk, 0, wantObjCnt)
+	for i := 0; i < wantObjCnt; i++ {
+		want = append(want, createTestSourceChunk(i))
+	}
+
+	got := make([]*sources.Chunk, 0, wantObjCnt)
+	for ch := range chunksCh {
+		got = append(got, ch)
+	}
+
+	// Ensure we get 4 objects back.
+	assert.Equal(t, len(want), len(got))
+
+	// Test that the resume progress is empty.
+	// The cache should not have been persisted.
+	assert.Equal(t, "", source.Progress.EncodedResumeInfo)
+	assert.Equal(t, int32(wantObjCnt), source.Progress.SectionsCompleted)
+	assert.Equal(t, int64(100), source.Progress.PercentComplete)
+	assert.Equal(t, 0, source.cache.Count())
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", wantObjCnt), source.Progress.Message)
 }
