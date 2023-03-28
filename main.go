@@ -34,18 +34,19 @@ import (
 )
 
 var (
-	cli              = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd              string
-	debug            = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace            = cli.Flag("trace", "Run in trace mode.").Bool()
-	profile          = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
-	jsonOut          = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy       = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	concurrency      = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification   = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified     = cli.Flag("only-verified", "Only output verified results.").Bool()
-	filterUnverified = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	configFilename   = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd                 string
+	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
+	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
@@ -441,6 +442,8 @@ func run(state overseer.State) {
 			err = output.PrintLegacyJSON(ctx, &r)
 		case *jsonOut:
 			err = output.PrintJSON(&r)
+		case *gitHubActionsFormat:
+			err = output.PrintGitHubActionsOutput(&r)
 		default:
 			err = output.PrintPlainOutput(&r)
 		}

@@ -17,6 +17,9 @@ inputs:
     default: ''
     description: Extra args to be passed to the trufflehog cli.
     required: false
+outputs:
+  results:
+    description: 'Trufflehog scan results'
 branding:
   icon: "shield"
   color: "green"
