@@ -743,6 +743,7 @@ func CustomDetectors(ctx context.Context, urls map[string][]string) []detectors.
 	}
 
 	for i, detector := range defaultDetectors {
+
 		switch detector.Type() {
 		case detectorspb.DetectorType_Github:
 			githubUrls, ok := urls["github"]
@@ -751,7 +752,18 @@ func CustomDetectors(ctx context.Context, urls map[string][]string) []detectors.
 				continue
 			}
 			ctx.Logger().V(2).Info("ignoring GitHub urls: %v", githubUrls)
-			defaultDetectors[i] = github.New(github.WithVerifierURLs(githubUrls, true))
+
+			versioner, ok := detector.(detectors.Versioner)
+			if !ok {
+				ctx.Logger().V(2).Info("Failed to get version for GitHub detector")
+			}
+			switch versioner.Version() {
+			case 1:
+				defaultDetectors[i] = github_old.New(github_old.WithVerifierURLs(githubUrls, true))
+			default:
+				defaultDetectors[i] = github.New(github.WithVerifierURLs(githubUrls, true))
+			}
+
 		case detectorspb.DetectorType_Gitlab:
 			gitlabUrls, ok := urls["gitlab"]
 			if !ok {
@@ -759,8 +771,18 @@ func CustomDetectors(ctx context.Context, urls map[string][]string) []detectors.
 				continue
 			}
 			ctx.Logger().V(2).Info("ignoring GitLab urls: %v", gitlabUrls)
-			defaultDetectors[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(gitlabUrls, true))
-			defaultDetectors[i] = gitlab.New(gitlab.WithVerifierURLs(gitlabUrls, true))
+
+			versioner, ok := detector.(detectors.Versioner)
+			if !ok {
+				ctx.Logger().V(2).Info("Failed to get version for Gitlab detector")
+			}
+			switch versioner.Version() {
+			case 1:
+				defaultDetectors[i] = gitlab.New(gitlab.WithVerifierURLs(gitlabUrls, true))
+			default:
+				defaultDetectors[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(gitlabUrls, true))
+			}
+
 		case detectorspb.DetectorType_JiraToken:
 			// TODO(ahrav): Double check that we need to do this.
 		default:
