@@ -51,6 +51,7 @@ var (
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
@@ -219,6 +220,8 @@ func run(state overseer.State) {
 		}
 	}
 
+	urls := splitVerifierURLs(*verifiers)
+
 	if *archiveMaxSize != 0 {
 		handlers.SetArchiveMaxSize(int(*archiveMaxSize))
 	}
@@ -282,6 +285,7 @@ func run(state overseer.State) {
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
+		engine.WithDetectors(!*noVerification, engine.CustomDetectors(ctx, urls)...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
 		engine.WithFilterDetectors(includeFilter),
 		engine.WithFilterDetectors(excludeFilter),
@@ -490,6 +494,19 @@ func printAverageDetectorTime(e *engine.Engine) {
 		avgDuration := total / time.Duration(len(durations))
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
 	}
+}
+
+func splitVerifierURLs(verifierURLs map[string]string) map[string][]string {
+	verifiers := make(map[string][]string, len(verifierURLs))
+	for k, v := range verifierURLs {
+		key := strings.ToLower(k)
+		sliceOfValues := strings.Split(v, ",")
+		for i, s := range sliceOfValues {
+			sliceOfValues[i] = strings.TrimSpace(s)
+		}
+		verifiers[key] = sliceOfValues
+	}
+	return verifiers
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
