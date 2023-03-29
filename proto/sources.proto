@@ -126,16 +126,19 @@ message Filesystem {
 
 message GCS {
   oneof credential {
-    string json_sa = 1;
+    string json_service_account = 1;
     string api_key = 2;
     credentials.Unauthenticated unauthenticated = 3;
     credentials.CloudEnvironment adc = 4;
+    string service_account_file = 11;
+    credentials.Oauth2 oauth = 12;
   }
   string project_id = 5;
   repeated string include_buckets = 6;
   repeated string exclude_buckets = 7;
   repeated string include_objects = 8;
   repeated string exclude_objects = 9;
+  int64 max_object_size = 10;
 }
 
 message Git {

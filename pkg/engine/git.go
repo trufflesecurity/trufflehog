@@ -36,6 +36,9 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	if c.HeadRef != "" {
 		opts = append(opts, git.ScanOptionHeadCommit(c.HeadRef))
 	}
+	if c.ExcludeGlobs != nil {
+		opts = append(opts, git.ScanOptionExcludeGlobs(c.ExcludeGlobs))
+	}
 	scanOptions := git.NewScanOptions(opts...)
 
 	gitSource := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "trufflehog - git", true, runtime.NumCPU(),

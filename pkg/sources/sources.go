@@ -57,6 +57,8 @@ type GCSConfig struct {
 	ProjectID,
 	// ServiceAccount is the service account to use to authenticate with the source.
 	ServiceAccount string
+	// MaxObjectSize is the maximum object size to scan.
+	MaxObjectSize int64
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency int
 	// IncludeBuckets is a list of buckets to include in the scan.
@@ -81,6 +83,9 @@ type GitConfig struct {
 	MaxDepth int
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+	// ExcludeGlobs is a list of globs to exclude from the scan.
+	// This differs from the Filter exclusions as ExcludeGlobs is applied at the `git log -p` level
+	ExcludeGlobs []string
 }
 
 // GithubConfig defines the optional configuration for a github source.

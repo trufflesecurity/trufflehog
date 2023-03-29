@@ -5,6 +5,7 @@ import (
 	"io"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -30,7 +31,7 @@ func TestSourceInit(t *testing.T) {
 	source, conn := createTestSource(&sourcespb.GCS{
 		ProjectId: testProjectID,
 		IncludeBuckets: []string{
-			"bucket1",
+			publicBucket,
 		},
 		ExcludeBuckets: []string{
 			perfTestBucketGlob,
@@ -38,9 +39,7 @@ func TestSourceInit(t *testing.T) {
 		ExcludeObjects: []string{
 			"object1",
 		},
-		Credential: &sourcespb.GCS_ApiKey{
-			ApiKey: testAPIKey,
-		},
+		Credential: &sourcespb.GCS_Unauthenticated{},
 	})
 
 	err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
@@ -48,7 +47,7 @@ func TestSourceInit(t *testing.T) {
 	assert.NotNil(t, source.gcsManager)
 }
 
-func TestSourceInit_Conn(t *testing.T) {
+func TestConfigureGCSManager(t *testing.T) {
 	testCases := []struct {
 		name    string
 		conn    *sourcespb.GCS
@@ -64,9 +63,13 @@ func TestSourceInit_Conn(t *testing.T) {
 			conn: &sourcespb.GCS{
 				ProjectId:  testProjectID,
 				Credential: &sourcespb.GCS_Adc{},
+				ExcludeBuckets: []string{
+					perfTestBucketGlob,
+				},
 			},
 			want: &gcsManager{
-				projectID: testProjectID,
+				projectID:      testProjectID,
+				excludeBuckets: map[string]struct{}{perfTestBucketGlob: {}},
 			},
 		},
 		{
@@ -97,28 +100,30 @@ func TestSourceInit_Conn(t *testing.T) {
 				ExcludeObjects: []string{
 					"object2",
 				},
+				ExcludeBuckets: []string{
+					perfTestBucketGlob,
+				},
 			},
 			want: &gcsManager{
 				projectID:      testProjectID,
 				includeObjects: map[string]struct{}{"object1": {}},
+				excludeBuckets: map[string]struct{}{perfTestBucketGlob: {}},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			source, conn := createTestSource(tc.conn)
-
-			err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
+			ctx := context.Background()
+			got, err := configureGCSManager(ctx, tc.conn, 8)
 			if err != nil && !tc.wantErr {
-				t.Errorf("source.Init() got: %v, want: %v", err, nil)
-				return
+				t.Errorf("source.configureGCSManager() error = %v", err)
 			}
 
 			if !tc.wantErr {
-				if diff := cmp.Diff(tc.want, source.gcsManager,
+				if diff := cmp.Diff(tc.want, got,
 					cmp.AllowUnexported(gcsManager{}),
-					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize"),
+					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize", "attr"),
 				); diff != "" {
 					t.Errorf("source.Init() diff: (-want +got)\n%s", diff)
 				}
@@ -129,6 +134,18 @@ func TestSourceInit_Conn(t *testing.T) {
 
 type mockObjectManager struct {
 	wantErr bool
+}
+
+func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
+	if m.wantErr {
+		return nil, fmt.Errorf("some error")
+	}
+
+	return &attributes{
+		numObjects:    5,
+		numBuckets:    1,
+		bucketObjects: map[string]uint64{testBucket: 5},
+	}, nil
 }
 
 type mockReader struct {
@@ -173,6 +190,7 @@ func createTestObject(id int) object {
 		acl:         []string{"authenticatedUsers"},
 		size:        42,
 		Reader:      &mockReader{data: []byte(fmt.Sprintf("hello world %d", id))},
+		createdAt:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -192,6 +210,7 @@ func createTestSourceChunk(id int) *sources.Chunk {
 					Email:       "testman@test.com",
 					Link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
 					Acls:        []string{"authenticatedUsers"},
+					CreatedAt:   "1577836800",
 				},
 			},
 		},
@@ -206,6 +225,9 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		gcsManager: &mockObjectManager{},
 		chunksCh:   chunksCh,
 	}
+
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
 
 	go func() {
 		defer close(chunksCh)
@@ -236,11 +258,25 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		return got[i].SourceMetadata.GetGcs().Filename < got[j].SourceMetadata.GetGcs().Filename
 	})
 
-	for _, c := range got {
-		assert.Equal(t, c.SourceMetadata.GetGcs().Filename, c.SourceMetadata.GetGcs().Filename)
-		assert.Equal(t, c.Data, c.Data)
+	for i, c := range got {
+		assert.Equal(t, want[i].SourceMetadata.GetGcs().Filename, c.SourceMetadata.GetGcs().Filename)
+		assert.Equal(t, want[i].Data, c.Data)
+		assert.Equal(t, want[i].SourceMetadata.GetGcs().CreatedAt, c.SourceMetadata.GetGcs().CreatedAt)
 	}
 
+}
+
+func TestSourceInit_Enumerate(t *testing.T) {
+	ctx := context.Background()
+	source := &Source{gcsManager: &mockObjectManager{}}
+
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
+
+	// Ensure the attributes are set.
+	assert.Equal(t, uint64(5), source.stats.numObjects)
+	assert.Equal(t, uint32(1), source.stats.numBuckets)
+	assert.Equal(t, uint64(5), source.stats.bucketObjects[testBucket])
 }
 
 func TestSourceChunks_ListObjects_Error(t *testing.T) {
