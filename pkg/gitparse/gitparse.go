@@ -116,7 +116,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -126,9 +126,11 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	} else {
 		args = append(args, "--all")
 	}
+	for _, glob := range excludedGlobs {
+		args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
+	}
 
 	cmd := exec.Command("git", args...)
-
 	absPath, err := filepath.Abs(source)
 	if err == nil {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
