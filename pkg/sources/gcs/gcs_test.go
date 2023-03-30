@@ -3,6 +3,7 @@ package gcs
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"sort"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -126,6 +128,74 @@ func TestConfigureGCSManager(t *testing.T) {
 					cmpopts.IgnoreFields(gcsManager{}, "client", "workerPool", "concurrency", "buckets", "maxObjectSize", "attr"),
 				); diff != "" {
 					t.Errorf("source.Init() diff: (-want +got)\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestSourceOauth2Client(t *testing.T) {
+	testCases := []struct {
+		name    string
+		creds   *credentialspb.Oauth2
+		want    *http.Client
+		wantErr bool
+	}{
+		{
+			name: "valid creds",
+			creds: &credentialspb.Oauth2{
+				RefreshToken: "some-refresh-token",
+				ClientId:     "some-client-id",
+				AccessToken:  "some-access-token",
+			},
+			want: &http.Client{},
+		},
+		{
+			name:    "invalid creds, nil creds",
+			wantErr: true,
+		},
+		{
+			name: "invalid creds, empty refresh token",
+			creds: &credentialspb.Oauth2{
+				RefreshToken: "",
+				AccessToken:  "some-access-token",
+				ClientId:     "some-client-id",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid creds, empty client id",
+			creds: &credentialspb.Oauth2{
+				RefreshToken: "some-refresh-token",
+				AccessToken:  "some-access-token",
+				ClientId:     "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid creds, empty access token",
+			creds: &credentialspb.Oauth2{
+				AccessToken:  "",
+				RefreshToken: "some-refresh-token",
+				ClientId:     "some-client-id",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			got, err := oauth2Client(ctx, tc.creds)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("source.oauth2Client() error = %v", err)
+			}
+
+			if !tc.wantErr {
+				if diff := cmp.Diff(tc.want, got,
+					cmpopts.IgnoreFields(http.Client{}, "Transport"),
+				); diff != "" {
+					t.Errorf("source.oauth2Client() diff: (-want +got)\n%s", diff)
 				}
 			}
 		})

@@ -3,18 +3,23 @@ package gcs
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
 
+	"cloud.google.com/go/storage"
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -107,6 +112,12 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 		gcsManagerAuthOption = withDefaultADC(aCtx)
 	case *sourcespb.GCS_Unauthenticated:
 		gcsManagerAuthOption = withoutAuthentication()
+	case *sourcespb.GCS_Oauth:
+		client, err := oauth2Client(aCtx, conn.GetOauth())
+		if err != nil {
+			return nil, fmt.Errorf("error creating oauth2 client: %w", err)
+		}
+		gcsManagerAuthOption = withHTTPClient(aCtx, client)
 	default:
 		return nil, fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
 
@@ -130,6 +141,31 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 	}
 
 	return gcsManager, nil
+}
+
+func oauth2Client(ctx context.Context, creds *credentialspb.Oauth2) (*http.Client, error) {
+	if creds == nil {
+		return nil, fmt.Errorf("oauth2 credentials are required")
+	}
+	if creds.GetClientId() == "" || creds.GetRefreshToken() == "" || creds.GetAccessToken() == "" {
+		return nil, fmt.Errorf("oauth2 credentials are incomplete, client_id, refresh_token, and access_token are required")
+	}
+
+	conf := &oauth2.Config{
+		ClientID: creds.GetClientId(),
+		Scopes:   []string{storage.ScopeReadOnly},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  endpoints.Google.AuthURL,
+			TokenURL: endpoints.Google.TokenURL,
+		},
+	}
+
+	tok := &oauth2.Token{
+		AccessToken:  creds.GetAccessToken(),
+		RefreshToken: creds.GetRefreshToken(),
+	}
+
+	return conf.Client(ctx, tok), nil
 }
 
 func setGCSManagerBucketOptions(conn *sourcespb.GCS) gcsManagerOption {
