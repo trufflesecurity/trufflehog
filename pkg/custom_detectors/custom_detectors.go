@@ -117,6 +117,7 @@ func (c *customRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 	result := detectors.Result{
 		DetectorType: detectorspb.DetectorType_CustomRegex,
+		DetectorName: c.GetName(),
 		Raw:          []byte(raw),
 	}
 
