@@ -113,11 +113,11 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 	case *sourcespb.GCS_Unauthenticated:
 		gcsManagerAuthOption = withoutAuthentication()
 	case *sourcespb.GCS_Oauth:
-		oauth2Client, err := oauth2Client(aCtx, conn.GetOauth())
+		client, err := oauth2Client(aCtx, conn.GetOauth())
 		if err != nil {
 			return nil, fmt.Errorf("error creating oauth2 client: %w", err)
 		}
-		gcsManagerAuthOption = withHTTPClient(aCtx, oauth2Client)
+		gcsManagerAuthOption = withHTTPClient(aCtx, client)
 	default:
 		return nil, fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
 
