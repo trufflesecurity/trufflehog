@@ -257,6 +257,7 @@ message Teams {
   oneof credential {
     string token = 2;
     credentials.ClientCredentials authenticated = 3;
+    credentials.Oauth2 oauth = 7;
   }
   repeated string channels = 4;
   repeated string ignoreList = 5;
