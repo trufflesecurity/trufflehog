@@ -43,7 +43,7 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --or
 
 # :rocket: Quick Start
 
-## Example 1: Scan a repo for only verified secrets
+## 1: Scan a repo for only verified secrets
 
 Command:
 
@@ -68,13 +68,13 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 ...
 ```
 
-## Example 2: Scan a GitHub Org for only verified secrets
+## 2: Scan a GitHub Org for only verified secrets
 
 ```bash
 trufflehog github --org=trufflesecurity --only-verified
 ```
 
-## Example 3: Scan a GitHub Repo for only verified keys and get JSON output
+## 3: Scan a GitHub Repo for only verified keys and get JSON output
 
 Command:
 
@@ -88,25 +88,25 @@ Expected output:
 ...
 ```
 
-## Example 4: Scan an S3 bucket for verified keys
+## 4: Scan an S3 bucket for verified keys
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --only-verified
 ```
 
-## Example 5: Scan a Github Repo using SSH authentication in docker
+## 5: Scan a Github Repo using SSH authentication in docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
-## Example 6: Scan individual files or directories
+## 6: Scan individual files or directories
 
 ```bash
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## Example 7: Scan GCS buckets for verified secrets.
+## 7: Scan GCS buckets for verified secrets.
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
