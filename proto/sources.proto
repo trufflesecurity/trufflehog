@@ -213,6 +213,7 @@ message S3 {
     credentials.KeySecret access_key = 1;
     credentials.Unauthenticated unauthenticated = 2;
     credentials.CloudEnvironment cloud_environment = 4;
+    credentials.AWSSessionTokenSecret session_token = 5;
   }
   repeated string buckets = 3;
 }

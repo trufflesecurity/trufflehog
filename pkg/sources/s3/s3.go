@@ -88,6 +88,8 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 	cfg.Region = aws.String(region)
 
 	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.S3_SessionToken:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
 	case *sourcespb.S3_AccessKey:
 		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
 	case *sourcespb.S3_Unauthenticated:
@@ -121,7 +123,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	var bucketsToScan []string
 
 	switch s.conn.GetCredential().(type) {
-	case *sourcespb.S3_AccessKey, *sourcespb.S3_CloudEnvironment:
+	case *sourcespb.S3_AccessKey, *sourcespb.S3_SessionToken, *sourcespb.S3_CloudEnvironment:
 		if len(s.conn.Buckets) == 0 {
 			res, err := client.ListBuckets(&s3.ListBucketsInput{})
 			if err != nil {
