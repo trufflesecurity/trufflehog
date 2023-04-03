@@ -180,7 +180,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	}()
 
 	go func() {
-		c.fromReader(ctx, stdOut, commitChan)
+		c.FromReader(ctx, stdOut, commitChan)
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
@@ -189,7 +189,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	return commitChan, nil
 }
 
-func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
+func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 	outReader := bufio.NewReader(stdOut)
 	var currentCommit *Commit
 	var currentDiff *Diff
