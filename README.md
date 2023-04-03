@@ -17,6 +17,16 @@
 
 ---
 
+# :mag_right: _Now Scanning_
+
+<div align="center">
+
+<img src="assets/scanning_logos.svg">
+
+**...and more**
+
+</div>
+
 # :loudspeaker: Join Our Community
 Have questions? Feedback? Jump in slack and hang out with us
 
@@ -102,7 +112,7 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
-### FAQ
+# FAQ
 
 + All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
   + That means no secrets were detected
@@ -117,8 +127,9 @@ trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
 - We've **added over 700 credential detectors that support active verification against their respective APIs**.
-- We've also added native **support for scanning GitHub, GitLab, filesystems, S3, and Circle CI**.
+- We've also added native **support for scanning GitHub, GitLab, filesystems, S3, GCS and Circle CI**.
 - **Instantly verify private keys** against millions of github users and **billions** of TLS certificates using our [Driftwood](https://trufflesecurity.com/blog/driftwood) technology.
+- Scan binaries and other file formats
 
 
 ## What is credential verification?
@@ -126,6 +137,7 @@ For every potential credential that is detected, we've painstakingly implemented
 
 # Installation
 
+Several options available for you:
 ```bash
 # MacOS users
 brew install trufflesecurity/trufflehog/trufflehog
@@ -135,6 +147,9 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --re
 
 # Docker for M1 and M2 Mac
 docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+
+# Binary releases
+Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
 
 # Compile from source
 git clone https://github.com/trufflesecurity/trufflehog.git
