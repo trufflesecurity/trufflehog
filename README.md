@@ -17,13 +17,13 @@
 
 ---
 
-## Join The Slack
+# :loudspeaker: Join Our Community
 Have questions? Feedback? Jump in slack and hang out with us
 
 https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ
 
 
-## Demo
+# :tv: Demo
 
 ![GitHub scanning demo](https://storage.googleapis.com/truffle-demos/non-interactive.svg)
 
@@ -31,9 +31,9 @@ https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkii
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
-## Examples
+# :rocket: Quick Start
 
-### Example 1: Scan a repo for only verified secrets
+## Example 1: Scan a repo for only verified secrets
 
 Command:
 
@@ -58,13 +58,13 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 ...
 ```
 
-### Example 2: Scan a GitHub Org for only verified secrets
+## Example 2: Scan a GitHub Org for only verified secrets
 
 ```bash
 trufflehog github --org=trufflesecurity --only-verified
 ```
 
-### Example 3: Scan a GitHub Repo for only verified keys and get JSON output
+## Example 3: Scan a GitHub Repo for only verified keys and get JSON output
 
 Command:
 
@@ -78,25 +78,25 @@ Expected output:
 ...
 ```
 
-### Example 4: Scan an S3 bucket for verified keys
+## Example 4: Scan an S3 bucket for verified keys
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --only-verified
 ```
 
-### Example 5: Scan a Github Repo using SSH authentication in docker
+## Example 5: Scan a Github Repo using SSH authentication in docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
-### Example 6: Scan individual files or directories
+## Example 6: Scan individual files or directories
 
 ```bash
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-### Example 7: Scan GCS buckets for verified secrets.
+## Example 7: Scan GCS buckets for verified secrets.
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
@@ -124,51 +124,21 @@ TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 ## What is credential verification?
 For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
-## Installation
-
-Several options:
-
-### 1. Go
-```bash
-git clone https://github.com/trufflesecurity/trufflehog.git
-
-cd trufflehog; go install
-```
-
-### 2. [Release binaries](https://github.com/trufflesecurity/trufflehog/releases)
-
-### 3. Docker
-
-
-> Note: Apple M1 hardware users should run with `docker run --rm --platform linux/arm64` for better performance.
-
-#### **Most users**
+# Installation
 
 ```bash
-docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
-```
-
-#### **Apple M1 users**
-
-The `linux/arm64` image is better to run on the M1 than the amd64 image.
-Even better is running the native darwin binary available, but there is no container image for that.
-
-```bash
-docker run --rm --platform linux/arm64 -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
-```
-
-### 4. Pip (help wanted)
-
-It's possible to distribute binaries in pip wheels.
-
-Here is an example of a [project that does it](https://github.com/Yelp/dumb-init).
-
-Help with setting up this packaging would be appreciated!
-
-### 5. Brew
-
-```bash
+# MacOS users
 brew install trufflesecurity/trufflehog/trufflehog
+
+# Docker
+docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+
+# Docker for M1 and M2 Mac
+docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+
+# Compile from source
+git clone https://github.com/trufflesecurity/trufflehog.git
+cd trufflehog; go install
 ```
 
 ## Usage
@@ -233,10 +203,10 @@ Try scanning an entire GitHub organization with the following:
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
-### TruffleHog OSS Github Action
+### TruffleHog Github Action
 
 ```yaml
-- name: TruffleHog OSS
+- name: TruffleHog
   uses: trufflesecurity/trufflehog@main
   with:
     # Repository path
@@ -254,7 +224,7 @@ any results are found.
 
 For example, to scan the contents of pull requests you could use the following workflow:
 ```yaml
-name: Leaked Secrets Scan
+name: TruffleHog Secrets Scan
 on: [pull_request]
 jobs:
   TruffleHog:
@@ -385,12 +355,7 @@ with HTTPServer(('', 8000), Verifier) as server:
         pass
 ```
 
-## Use as a library
-
-Currently, trufflehog is in heavy development and no guarantees can be made on
-the stability of the public APIs at this time.
-
-## Contributors
+## :heart: Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
 
@@ -400,11 +365,16 @@ This project exists thanks to all the people who contribute. [[Contribute](CONTR
 </a>
 
 
-## Contributing
+## :computer: Contributing
 
 Contributions are very welcome! Please see our [contribution guidelines first](CONTRIBUTING.md).
 
 We no longer accept contributions to TruffleHog v2, but that code is available in the `v2` branch.
+
+## Use as a library
+
+Currently, trufflehog is in heavy development and no guarantees can be made on
+the stability of the public APIs at this time.
 
 ### Adding new secret detectors
 
