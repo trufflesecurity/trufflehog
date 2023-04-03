@@ -157,7 +157,7 @@ TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 ## What is credential verification?
 For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
-## :memo: Usage
+# :memo: Usage
 
 TruffleHog has a sub-command for each source of data that you may want to scan:
 
@@ -251,7 +251,7 @@ jobs:
           extra_args: --debug --only-verified
 ```
 
-### Precommit Hook
+# Precommit Hook
 
 Trufflehog can be used in a precommit hook to prevent credentials from leaking before they ever leave your computer.
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
@@ -270,7 +270,7 @@ repos:
       stages: ["commit", "push"]
 ```
 
-## Regex Detector (alpha)
+# Regex Detector (alpha)
 
 Trufflehog supports detection and verification of custom regular expressions.
 For detection, at least one **regular expression** and **keyword** is required.
@@ -284,7 +284,7 @@ status code, the secret is considered verified.
 
 **NB:** This feature is alpha and subject to change.
 
-### Regex Detector Example
+## Regex Detector Example
 
 ```yaml
 # config.yaml
@@ -313,7 +313,7 @@ Raw result: hogs are cool
 File: /tmp/hog-facts.txt
 ```
 
-#### Verification Server Example (Python)
+## Verification Server Example (Python)
 
 Unless you run a verification server, secrets found by the custom regex
 detector will be unverified. Here is an example Python implementation of a
@@ -363,7 +363,7 @@ with HTTPServer(('', 8000), Verifier) as server:
         pass
 ```
 
-## :heart: Contributors
+# :heart: Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
 
@@ -373,27 +373,28 @@ This project exists thanks to all the people who contribute. [[Contribute](CONTR
 </a>
 
 
-## :computer: Contributing
+# :computer: Contributing
 
 Contributions are very welcome! Please see our [contribution guidelines first](CONTRIBUTING.md).
 
 We no longer accept contributions to TruffleHog v2, but that code is available in the `v2` branch.
 
-## Use as a library
 
-Currently, trufflehog is in heavy development and no guarantees can be made on
-the stability of the public APIs at this time.
-
-### Adding new secret detectors
+## Adding new secret detectors
 
 We have published some [documentation and tooling to get started on adding new secret detectors](hack/docs/Adding_Detectors_external.md). Let's improve detection together!
 
-## License Change
+
+# Use as a library
+
+Currently, trufflehog is in heavy development and no guarantees can be made on
+the stability of the public APIs at this time.
+# License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
 
 
-## :money_with_wings: Enterprise product
+# :money_with_wings: Enterprise product
 
 Are you interested in continously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
 
