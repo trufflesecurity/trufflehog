@@ -40,7 +40,7 @@ func (s Scanner) Keywords() []string {
 func randString(n int) string {
 	const alphanum = "0123456789abcdefghijklmnopqrstuvwxyz"
 	var bytes = make([]byte, n)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	for i, b := range bytes {
 		bytes[i] = alphanum[b%byte(len(alphanum))]
 	}
