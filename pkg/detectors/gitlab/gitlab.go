@@ -12,7 +12,34 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+const defaultURL = "https://gitlab.com"
+
+type Scanner struct {
+	verifierURLs []string
+}
+
+// New creates a new Scanner with the given options.
+func New(opts ...func(*Scanner)) *Scanner {
+	scanner := &Scanner{
+		verifierURLs: make([]string, 0),
+	}
+	for _, opt := range opts {
+		opt(scanner)
+	}
+
+	return scanner
+}
+
+// WithVerifierURLs adds the given URLs to the list of URLs to check for
+// verification of secrets.
+func WithVerifierURLs(urls []string, includeDefault bool) func(*Scanner) {
+	return func(s *Scanner) {
+		if includeDefault {
+			urls = append(urls, defaultURL)
+		}
+		s.verifierURLs = append(s.verifierURLs, urls...)
+	}
+}
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -56,24 +83,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// they all grant access to different parts of the API. I couldn't find an endpoint that every
 			// one of these scopes has access to, so we just check an example endpoint for each scope. If any
 			// of them contain data, we know we have a valid key, but if they all fail, we don't
-			baseURL := "https://gitlab.com/api/v4"
 
 			client := common.SaneHttpClient()
-			// test `read_user` scope
-			req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/user", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				res.Body.Close() // The request body is unused.
+			for _, baseURL := range s.verifierURLs {
+				// test `read_user` scope
+				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
+				if err != nil {
+					continue
+				}
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+				res, err := client.Do(req)
+				if err == nil {
+					res.Body.Close() // The request body is unused.
 
-				// 200 means good key and has `read_user` scope
-				// 403 means good key but not the right scope
-				// 401 is bad key
-				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					secret.Verified = true
+					// 200 means good key and has `read_user` scope
+					// 403 means good key but not the right scope
+					// 401 is bad key
+					if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
+						secret.Verified = true
+					}
 				}
 			}
 		}

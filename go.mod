@@ -1,6 +1,6 @@
 module github.com/trufflesecurity/trufflehog/v3
 
-go 1.18
+go 1.20
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
@@ -10,9 +10,9 @@ replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff 
 
 require (
 	cloud.google.com/go/secretmanager v1.10.0
-	cloud.google.com/go/storage v1.30.0
+	cloud.google.com/go/storage v1.30.1
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
-	github.com/TheZeroSlave/zapsentry v1.14.0
+	github.com/TheZeroSlave/zapsentry v1.15.0
 	github.com/aws/aws-sdk-go v1.44.83
 	github.com/bill-rich/disk-buffer-reader v0.1.7
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
@@ -20,14 +20,14 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.2.0
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/denisenkom/go-mssqldb v0.12.3
-	github.com/envoyproxy/protoc-gen-validate v0.9.1
+	github.com/envoyproxy/protoc-gen-validate v0.10.1
 	github.com/fatih/color v1.15.0
 	github.com/felixge/fgprof v0.9.3
-	github.com/getsentry/sentry-go v0.19.0
+	github.com/getsentry/sentry-go v0.20.0
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/go-ldap/ldap/v3 v3.4.4
-	github.com/go-logr/logr v1.2.3
+	github.com/go-logr/logr v1.2.4
 	github.com/go-logr/zapr v1.2.3
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.7.0
@@ -49,7 +49,7 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20211021192214-5ab2d9280aa9
 	github.com/pkg/errors v0.9.1
-	github.com/rabbitmq/amqp091-go v1.7.0
+	github.com/rabbitmq/amqp091-go v1.8.0
 	github.com/sergi/go-diff v1.3.1
 	github.com/stretchr/testify v1.8.2
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
@@ -61,7 +61,7 @@ require (
 	golang.org/x/oauth2 v0.6.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/text v0.8.0
-	google.golang.org/api v0.111.0
+	google.golang.org/api v0.114.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/h2non/gock.v1 v1.1.2
@@ -86,7 +86,7 @@ require (
 	github.com/acomagu/bufpipe v1.0.4 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
-	github.com/andybalholm/brotli v1.0.4 // indirect
+	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/cloudflare/circl v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -117,7 +117,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jpillora/s3 v1.1.4 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/klauspost/compress v1.15.11 // indirect
+	github.com/klauspost/compress v1.16.0 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
@@ -142,14 +142,14 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.6.0 // indirect
+	golang.org/x/tools v0.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230303212802-e74f57abe488 // indirect
+	google.golang.org/genproto v0.0.0-20230320184635-7606e756e683 // indirect
 	google.golang.org/grpc v1.53.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

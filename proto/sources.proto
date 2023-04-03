@@ -131,6 +131,7 @@ message GCS {
     credentials.Unauthenticated unauthenticated = 3;
     credentials.CloudEnvironment adc = 4;
     string service_account_file = 11;
+    credentials.Oauth2 oauth = 12;
   }
   string project_id = 5;
   repeated string include_buckets = 6;
@@ -256,6 +257,7 @@ message Teams {
   oneof credential {
     string token = 2;
     credentials.ClientCredentials authenticated = 3;
+    credentials.Oauth2 oauth = 7;
   }
   repeated string channels = 4;
   repeated string ignoreList = 5;

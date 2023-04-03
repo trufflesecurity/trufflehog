@@ -1,42 +1,29 @@
 package gcs
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
-	"sort"
+	"strconv"
 	"sync"
 
+	"cloud.google.com/go/storage"
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
-
-// Source represents a GCS source.
-type Source struct {
-	name        string
-	jobId       int64
-	sourceId    int64
-	concurrency int
-	verify      bool
-
-	gcsManager objectManager
-	stats      *attributes
-	log        logr.Logger
-	chunksCh   chan *sources.Chunk
-
-	mu               sync.Mutex
-	sources.Progress // not safe for concurrent access.
-}
 
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -57,6 +44,22 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
+// Source represents a GCS source.
+type Source struct {
+	name        string
+	jobId       int64
+	sourceId    int64
+	concurrency int
+	verify      bool
+
+	gcsManager objectManager
+	stats      *attributes
+	log        logr.Logger
+	chunksCh   chan *sources.Chunk
+
+	sources.Progress
+}
+
 // Init returns an initialized GCS source.
 func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
@@ -73,6 +76,25 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
+	gcsManager, err := configureGCSManager(aCtx, &conn, concurrency)
+	if err != nil {
+		return err
+	}
+	s.gcsManager = gcsManager
+
+	s.log.V(2).Info("enumerating buckets and objects")
+	if err := s.enumerate(aCtx); err != nil {
+		return fmt.Errorf("error enumerating buckets and objects: %w", err)
+	}
+
+	return nil
+}
+
+func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency int) (*gcsManager, error) {
+	if conn == nil {
+		return nil, fmt.Errorf("GCS connection is nil, cannot configure GCS manager")
+	}
+
 	var gcsManagerAuthOption gcsManagerOption
 
 	switch conn.Credential.(type) {
@@ -81,7 +103,7 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	case *sourcespb.GCS_ServiceAccountFile:
 		b, err := os.ReadFile(conn.GetServiceAccountFile())
 		if err != nil {
-			return fmt.Errorf("error reading GCS JSON Service Account file: %w", err)
+			return nil, fmt.Errorf("error reading GCS JSON Service Account file: %w", err)
 		}
 		gcsManagerAuthOption = withJSONServiceAccount(aCtx, b)
 	case *sourcespb.GCS_JsonServiceAccount:
@@ -90,40 +112,60 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		gcsManagerAuthOption = withDefaultADC(aCtx)
 	case *sourcespb.GCS_Unauthenticated:
 		gcsManagerAuthOption = withoutAuthentication()
+	case *sourcespb.GCS_Oauth:
+		client, err := oauth2Client(aCtx, conn.GetOauth())
+		if err != nil {
+			return nil, fmt.Errorf("error creating oauth2 client: %w", err)
+		}
+		gcsManagerAuthOption = withHTTPClient(aCtx, client)
 	default:
-		return fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
+		return nil, fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
 
-	}
-
-	resume, err := setResumeBucketOffset(s.Progress.EncodedResumeInfo)
-	if err != nil {
-		return fmt.Errorf("error setting resume info: %w", err)
 	}
 
 	gcsManagerOpts := []gcsManagerOption{
 		withConcurrency(concurrency),
-		withBucketOffsets(resume),
 		withMaxObjectSize(conn.MaxObjectSize),
 		gcsManagerAuthOption,
 	}
-	if setGCSManagerBucketOptions(&conn) != nil {
-		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(&conn))
+	if setGCSManagerBucketOptions(conn) != nil {
+		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerBucketOptions(conn))
 	}
-	if setGCSManagerObjectOptions(&conn) != nil {
-		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerObjectOptions(&conn))
-	}
-
-	if s.gcsManager, err = newGCSManager(conn.ProjectId, gcsManagerOpts...); err != nil {
-		return fmt.Errorf("error creating GCS manager: %w", err)
+	if setGCSManagerObjectOptions(conn) != nil {
+		gcsManagerOpts = append(gcsManagerOpts, setGCSManagerObjectOptions(conn))
 	}
 
-	if len(resume) > 0 {
-		s.log.V(2).Info("resuming from previous run")
-		return nil
+	gcsManager, err := newGCSManager(conn.ProjectId, gcsManagerOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating GCS manager: %w", err)
 	}
 
-	s.log.V(2).Info("new run, enumerating buckets and objects")
-	return s.enumerate(aCtx)
+	return gcsManager, nil
+}
+
+func oauth2Client(ctx context.Context, creds *credentialspb.Oauth2) (*http.Client, error) {
+	if creds == nil {
+		return nil, fmt.Errorf("oauth2 credentials are required")
+	}
+	if creds.GetClientId() == "" || creds.GetRefreshToken() == "" || creds.GetAccessToken() == "" {
+		return nil, fmt.Errorf("oauth2 credentials are incomplete, client_id, refresh_token, and access_token are required")
+	}
+
+	conf := &oauth2.Config{
+		ClientID: creds.GetClientId(),
+		Scopes:   []string{storage.ScopeReadOnly},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  endpoints.Google.AuthURL,
+			TokenURL: endpoints.Google.TokenURL,
+		},
+	}
+
+	tok := &oauth2.Token{
+		AccessToken:  creds.GetAccessToken(),
+		RefreshToken: creds.GetRefreshToken(),
+	}
+
+	return conf.Client(ctx, tok), nil
 }
 
 func setGCSManagerBucketOptions(conn *sourcespb.GCS) gcsManagerOption {
@@ -147,145 +189,7 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
-type progressInfo struct {
-	processedBucketCnt,
-	totalBucketsCnt,
-	processedObjectsCnt,
-	totalObjectsCnt int
-
-	// bucketObjects tracks processing and processed objects for each bucket.
-	bucketObjects map[string]*objectsProgress
-}
-
-// objectsProgress keeps track of the progress of processing objects in a bucket.
-// It is marshalled/unmarshalled to/from a string as part of the Source's Progress.
-type objectsProgress struct {
-	// IsBuckedProcessed is true if all objects in the bucket have been processed.
-	IsBucketProcessed bool
-	// ProcessedCnt is the number of objects that have been processed.
-	ProcessedCnt,
-	// TotalCnt is the total number of objects in the bucket.
-	TotalCnt int
-	// Processed is the last object that was fully processed.
-	Processed string
-	// Processing are the objects that were not fully processed.
-	Processing map[string]struct{}
-}
-
-func newObjectsProgress(cnt int) *objectsProgress {
-	return &objectsProgress{TotalCnt: cnt, Processing: map[string]struct{}{}}
-}
-
-// newProgressInfo constructs a progressInfo from the Source's Progress information.
-func newProgressInfo(ctx context.Context, s *sources.Progress) (*progressInfo, error) {
-	totalObjCnt := s.SectionsRemaining
-	processedObjCnt := s.SectionsCompleted
-	info := &progressInfo{
-		totalObjectsCnt:     int(totalObjCnt),
-		processedObjectsCnt: int(processedObjCnt),
-	}
-
-	encodeResume := s.EncodedResumeInfo
-	if encodeResume == "" {
-		info.bucketObjects = make(map[string]*objectsProgress)
-		return info, nil
-	}
-
-	var m map[string]*objectsProgress
-	if err := json.Unmarshal([]byte(encodeResume), &m); err != nil {
-		ctx.Logger().V(1).Info("error unmarshalling progress info", "error", err)
-		return info, nil
-	}
-	info.bucketObjects = m
-
-	return info, nil
-}
-
-type progressStateFn func(string, string, *progressInfo)
-
-func (p *progressInfo) setProcessStatus(obj object, fn progressStateFn) {
-	fn(obj.bucket, obj.name, p)
-}
-
-func setProcessingBucketObject(bucket, obj string, progress *progressInfo) {
-	progress.processing(bucket, obj)
-}
-
-func (p *progressInfo) processing(bkt, obj string) {
-	p.bucketObjects[bkt].Processing[obj] = struct{}{}
-}
-
-func setProcessedBucketObject(bucket, obj string, progress *progressInfo) {
-	progress.processed(bucket, obj)
-}
-
-func (p *progressInfo) processed(bkt, obj string) {
-	// Remove the object from the processing list and increment the processed count.
-	delete(p.bucketObjects[bkt].Processing, obj)
-
-	p.bucketObjects[bkt].ProcessedCnt++
-	// If all objects in the bucket have been processed, mark the bucket as processed.
-	if p.bucketObjects[bkt].ProcessedCnt == p.bucketObjects[bkt].TotalCnt {
-		p.bucketObjects[bkt].IsBucketProcessed = true
-		p.processedBucketCnt++
-	}
-	p.processedObjectsCnt++
-
-	// If the object is not greater (lexicographically) than the last processed object, we can skip it.
-	// This ensures we keep the greatest object name as the last processed object.
-	if obj < p.bucketObjects[bkt].Processed {
-		return
-	}
-	p.bucketObjects[bkt].Processed = obj
-}
-
-func setResumeBucketOffset(s string) (map[string]offsetInfo, error) {
-	resumeInfo := progressInfo{}
-	if s != "" {
-		if err := json.Unmarshal([]byte(s), &resumeInfo.bucketObjects); err != nil {
-			return nil, fmt.Errorf("error unmarshalling resume info: %w", err)
-		}
-	}
-
-	return calcBktOffset(resumeInfo.bucketObjects)
-}
-
-// In order to calculate the bucket offset, we need to know the last object
-// that was processed for each bucket, as well as any objects that were processing.
-// If the bucket was fully processed, we don't need to set an offset.
-// If there were no objects processing, we can just use the last object that was processed.
-// If there were objects processing, we need to find the first object (lexicographically)
-// that was processing, as that is the next object that needs to be processed.
-func calcBktOffset(resumeInfo map[string]*objectsProgress) (map[string]offsetInfo, error) {
-	bucketOffset := make(map[string]offsetInfo, len(resumeInfo))
-	for objName, progress := range resumeInfo {
-		info := offsetInfo{}
-		if progress.IsBucketProcessed {
-			info.isBucketProcessed = true
-			bucketOffset[objName] = info
-			continue
-		}
-		if len(progress.Processing) == 0 {
-			info.lastProcessedObject = progress.Processed
-			bucketOffset[objName] = info
-			continue
-		}
-
-		processing := make([]string, 0, len(progress.Processing))
-		for k := range progress.Processing {
-			processing = append(processing, k)
-		}
-		sort.Strings(processing)
-		info.lastProcessedObject = processing[0]
-		bucketOffset[objName] = info
-	}
-
-	return bucketOffset, nil
-}
-
-// enumerate all the objects and buckets in the source and use the results to
-// set the progress information. This will be used track progression of the scan,
-// and to resume the scan if it is interrupted.
+// enumerate all the objects and buckets in the source.
 func (s *Source) enumerate(ctx context.Context) error {
 	stats, err := s.gcsManager.attributes(ctx)
 	if err != nil {
@@ -293,18 +197,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 	}
 	s.stats = stats
 
-	info := progressInfo{
-		totalBucketsCnt: int(s.stats.numBuckets),
-		totalObjectsCnt: int(s.stats.numObjects),
-	}
-
-	progress := make(map[string]*objectsProgress, len(s.stats.bucketObjects))
-	for k, v := range s.stats.bucketObjects {
-		progress[k] = newObjectsProgress(int(v))
-	}
-	info.bucketObjects = progress
-
-	return s.setProgress(ctx, &info, fmt.Sprintf("enumerated %d buckets, %d objects", s.stats.numBuckets, s.stats.numObjects))
+	return nil
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -315,11 +208,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 	s.chunksCh = chunksChan
 
-	progress, err := newProgressInfo(ctx, &s.Progress)
-	if err != nil {
-		return fmt.Errorf("error constructing progress info: %w", err)
-	}
-
 	var wg sync.WaitGroup
 	for obj := range objectCh {
 		obj := obj
@@ -329,53 +217,17 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if err := s.startProcessing(ctx, progress, o); err != nil {
-			ctx.Logger().V(1).Info("GCS source error starting to process objects", "error", err)
-			continue
-		}
 		wg.Add(1)
-		go func(obj object, resume *progressInfo) {
+		go func(obj object) {
 			defer wg.Done()
 
 			if err := s.processObject(ctx, o); err != nil {
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			if err := s.endProcessing(ctx, resume, o); err != nil {
-				ctx.Logger().V(1).Info("error setting end progress progress", "name", o.name, "error", err)
-			}
-		}(o, progress)
+		}(o)
 	}
 	wg.Wait()
-
-	ctx.Logger().Info("GCS source finished processing", "name", s.name)
-	return nil
-}
-
-func (s *Source) startProcessing(ctx context.Context, progress *progressInfo, o object) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	progress.setProcessStatus(o, setProcessingBucketObject)
-	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source beginning to process object %s in bucket %s", o.name, o.bucket))
-}
-
-func (s *Source) endProcessing(ctx context.Context, progress *progressInfo, o object) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	progress.setProcessStatus(o, setProcessedBucketObject)
-	return s.setProgress(ctx, progress, fmt.Sprintf("GCS source finished processing object %s in bucket %s", o.name, o.bucket))
-}
-
-func (s *Source) setProgress(ctx context.Context, progress *progressInfo, msg string) error {
-	ctx.Logger().V(5).Info(msg)
-
-	b, err := json.Marshal(progress.bucketObjects)
-	if err != nil {
-		return fmt.Errorf("error marshalling resume info: %w", err)
-	}
-	s.SetProgressComplete(progress.processedObjectsCnt, progress.totalObjectsCnt, msg, string(b))
 
 	return nil
 }
@@ -395,7 +247,7 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 					Email:       o.owner,
 					ContentType: o.contentType,
 					Acls:        o.acl,
-					CreatedAt:   o.createdAt.String(),
+					CreatedAt:   strconv.FormatInt(o.createdAt.Unix(), 10), // Unix time as string
 					UpdatedAt:   o.updatedAt.String(),
 				},
 			},

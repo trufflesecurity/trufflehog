@@ -34,22 +34,24 @@ import (
 )
 
 var (
-	cli              = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd              string
-	debug            = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace            = cli.Flag("trace", "Run in trace mode.").Bool()
-	profile          = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
-	jsonOut          = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy       = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	concurrency      = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification   = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified     = cli.Flag("only-verified", "Only output verified results.").Bool()
-	filterUnverified = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	configFilename   = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd                 string
+	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
+	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
@@ -60,6 +62,7 @@ var (
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
 	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitScanExcludeGlobs = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
 	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
 	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
@@ -217,6 +220,8 @@ func run(state overseer.State) {
 		}
 	}
 
+	urls := splitVerifierURLs(*verifiers)
+
 	if *archiveMaxSize != 0 {
 		handlers.SetArchiveMaxSize(int(*archiveMaxSize))
 	}
@@ -280,6 +285,7 @@ func run(state overseer.State) {
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
+		engine.WithDetectors(!*noVerification, engine.CustomDetectors(ctx, urls)...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
 		engine.WithFilterDetectors(includeFilter),
 		engine.WithFilterDetectors(excludeFilter),
@@ -301,13 +307,18 @@ func run(state overseer.State) {
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
+		excludedGlobs := []string{}
+		if *gitScanExcludeGlobs != "" {
+			excludedGlobs = strings.Split(*gitScanExcludeGlobs, ",")
+		}
 
 		cfg := sources.GitConfig{
-			RepoPath: repoPath,
-			HeadRef:  *gitScanBranch,
-			BaseRef:  *gitScanSinceCommit,
-			MaxDepth: *gitScanMaxDepth,
-			Filter:   filter,
+			RepoPath:     repoPath,
+			HeadRef:      *gitScanBranch,
+			BaseRef:      *gitScanSinceCommit,
+			MaxDepth:     *gitScanMaxDepth,
+			Filter:       filter,
+			ExcludeGlobs: excludedGlobs,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Git.")
@@ -435,6 +446,8 @@ func run(state overseer.State) {
 			err = output.PrintLegacyJSON(ctx, &r)
 		case *jsonOut:
 			err = output.PrintJSON(&r)
+		case *gitHubActionsFormat:
+			err = output.PrintGitHubActionsOutput(&r)
 		default:
 			err = output.PrintPlainOutput(&r)
 		}
@@ -481,6 +494,19 @@ func printAverageDetectorTime(e *engine.Engine) {
 		avgDuration := total / time.Duration(len(durations))
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
 	}
+}
+
+func splitVerifierURLs(verifierURLs map[string]string) map[string][]string {
+	verifiers := make(map[string][]string, len(verifierURLs))
+	for k, v := range verifierURLs {
+		key := strings.ToLower(k)
+		sliceOfValues := strings.Split(v, ",")
+		for i, s := range sliceOfValues {
+			sliceOfValues[i] = strings.TrimSpace(s)
+		}
+		verifiers[key] = sliceOfValues
+	}
+	return verifiers
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned

@@ -156,7 +156,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		"verification_disabled", len(e.detectors[false]),
 	)
 
-	// start the workers
+	// Start the workers.
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
