@@ -40,7 +40,7 @@ enum SourceType {
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
-  SOURCE_TYPE_SHAREPOINT = 28;
+  SOURCE_TYPE_SHAREPOINT = 29;
 }
 
 message LocalSource {
@@ -277,7 +277,8 @@ message Sharepoint {
   oneof credential {
     string token = 2;
     credentials.ClientCredentials authenticated = 3;
+    credentials.Oauth2 oauth = 4;
   }
-  string site_url = 4;
+  string site_url = 5;
 
 }
