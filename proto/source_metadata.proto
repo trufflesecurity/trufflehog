@@ -231,6 +231,7 @@ message SharePoint {
   string title = 4;
   int64 views = 5;
   string docid = 6;
+  string email = 7;
 }
 
 message MetaData {

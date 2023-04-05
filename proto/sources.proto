@@ -275,10 +275,8 @@ message SlackRealtime {
 message Sharepoint {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
-    string token = 2;
-    credentials.ClientCredentials authenticated = 3;
-    credentials.Oauth2 oauth = 4;
+    string refresh_token = 2;
   }
-  string site_url = 5;
+  string site_url = 3;
 
 }
