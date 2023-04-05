@@ -225,7 +225,7 @@ message PublicEventMonitoring {
 }
 
 message SharePoint {
-  string path = 1;
+  string link = 1;
   string timestamp = 2;
   string author = 3;
   string title = 4;
