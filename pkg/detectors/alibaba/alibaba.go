@@ -3,9 +3,9 @@ package alibaba
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -38,10 +38,9 @@ func (s Scanner) Keywords() []string {
 }
 
 func randString(n int) string {
-	rand.Seed(time.Now().UnixNano())
 	const alphanum = "0123456789abcdefghijklmnopqrstuvwxyz"
 	var bytes = make([]byte, n)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	for i, b := range bytes {
 		bytes[i] = alphanum[b%byte(len(alphanum))]
 	}

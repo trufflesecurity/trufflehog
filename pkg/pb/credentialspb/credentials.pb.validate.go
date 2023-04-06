@@ -965,6 +965,114 @@ var _ interface {
 	ErrorName() string
 } = KeySecretValidationError{}
 
+// Validate checks the field values on AWSSessionTokenSecret with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AWSSessionTokenSecret) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AWSSessionTokenSecret with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AWSSessionTokenSecretMultiError, or nil if none found.
+func (m *AWSSessionTokenSecret) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AWSSessionTokenSecret) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Key
+
+	// no validation rules for Secret
+
+	// no validation rules for SessionToken
+
+	if len(errors) > 0 {
+		return AWSSessionTokenSecretMultiError(errors)
+	}
+
+	return nil
+}
+
+// AWSSessionTokenSecretMultiError is an error wrapping multiple validation
+// errors returned by AWSSessionTokenSecret.ValidateAll() if the designated
+// constraints aren't met.
+type AWSSessionTokenSecretMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AWSSessionTokenSecretMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AWSSessionTokenSecretMultiError) AllErrors() []error { return m }
+
+// AWSSessionTokenSecretValidationError is the validation error returned by
+// AWSSessionTokenSecret.Validate if the designated constraints aren't met.
+type AWSSessionTokenSecretValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AWSSessionTokenSecretValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AWSSessionTokenSecretValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AWSSessionTokenSecretValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AWSSessionTokenSecretValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AWSSessionTokenSecretValidationError) ErrorName() string {
+	return "AWSSessionTokenSecretValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AWSSessionTokenSecretValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAWSSessionTokenSecret.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AWSSessionTokenSecretValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AWSSessionTokenSecretValidationError{}
+
 // Validate checks the field values on AWS with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.

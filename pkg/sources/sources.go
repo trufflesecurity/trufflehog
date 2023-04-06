@@ -83,6 +83,9 @@ type GitConfig struct {
 	MaxDepth int
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+	// ExcludeGlobs is a list of globs to exclude from the scan.
+	// This differs from the Filter exclusions as ExcludeGlobs is applied at the `git log -p` level
+	ExcludeGlobs []string
 }
 
 // GithubConfig defines the optional configuration for a github source.
@@ -137,7 +140,9 @@ type S3Config struct {
 	// Key is any key to use to authenticate with the source.
 	Key,
 	// Secret is any secret to use to authenticate with the source.
-	Secret string
+	Secret,
+	// Temporary session token associated with a temporary access key id and secret key.
+	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
 }

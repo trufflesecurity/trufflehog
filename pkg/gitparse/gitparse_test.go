@@ -109,7 +109,7 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		parser.fromReader(context.TODO(), r, commitChan)
+		parser.FromReader(context.TODO(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -168,7 +168,7 @@ func TestMultiCommitContextDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		NewParser().fromReader(context.TODO(), r, commitChan)
+		NewParser().FromReader(context.TODO(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -198,7 +198,7 @@ func TestMaxDiffSize(t *testing.T) {
 
 	commitChan := make(chan Commit)
 	go func() {
-		parser.fromReader(context.TODO(), bigReader, commitChan)
+		parser.FromReader(context.TODO(), bigReader, commitChan)
 	}()
 
 	commit := <-commitChan
@@ -216,7 +216,7 @@ func TestMaxCommitSize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1)*time.Second)
 	defer cancel()
 	go func() {
-		parser.fromReader(ctx, &commitText, commitChan)
+		parser.FromReader(ctx, &commitText, commitChan)
 	}()
 	commitCount := 0
 	for range commitChan {
