@@ -224,6 +224,15 @@ message PublicEventMonitoring {
   }
 }
 
+message SharePoint {
+  string path = 1;
+  string timestamp = 2;
+  string author = 3;
+  string title = 4;
+  int64 views = 5;
+  string docid = 6;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -250,5 +259,6 @@ message MetaData {
     Artifactory artifactory = 22;
     Syslog syslog = 23;
     PublicEventMonitoring publicEventMonitoring = 24;
+    SharePoint sharepoint = 25;
   }
 }

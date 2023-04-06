@@ -40,6 +40,7 @@ enum SourceType {
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
+  SOURCE_TYPE_SHAREPOINT = 28;
 }
 
 message LocalSource {
@@ -269,4 +270,14 @@ message SlackRealtime {
   oneof credential {
     credentials.SlackTokens tokens = 1;
   }
+}
+
+message Sharepoint {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+    credentials.ClientCredentials authenticated = 3;
+  }
+  string site_url = 4;
+
 }
