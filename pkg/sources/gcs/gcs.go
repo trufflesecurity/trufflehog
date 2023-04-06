@@ -62,9 +62,6 @@ type Source struct {
 	log        logr.Logger
 	chunksCh   chan *sources.Chunk
 
-	processedObjects int32
-	cache            cache.Cache
-
 	mu               sync.Mutex
 	sources.Progress // progress is not thread safe
 }
@@ -128,16 +125,6 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 	if err := s.enumerate(aCtx); err != nil {
 		return fmt.Errorf("error enumerating buckets and objects: %w", err)
 	}
-
-	var c cache.Cache
-	if s.Progress.EncodedResumeInfo != "" {
-		c = memory.NewWithData(aCtx, strings.Split(s.Progress.EncodedResumeInfo, ","))
-	} else {
-		c = memory.New()
-	}
-
-	// TODO (ahrav): Make this configurable via conn.
-	s.cache = newPersistableCache(defaultCachePersistIncrement, c, &s.Progress)
 
 	return nil
 }
@@ -255,6 +242,8 @@ func (s *Source) enumerate(ctx context.Context) error {
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	persistableCache := s.setupCache(ctx)
+
 	objectCh, err := s.gcsManager.listObjects(ctx)
 	if err != nil {
 		return fmt.Errorf("error listing objects: %w", err)
@@ -271,7 +260,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if s.cache.Exists(o.name) {
+		if persistableCache.Exists(o.name) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
@@ -284,7 +273,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			s.setProgress(ctx, o.name)
+			s.setProgress(ctx, o.name, persistableCache)
 		}(o)
 	}
 	wg.Wait()
@@ -293,24 +282,35 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	return nil
 }
 
-func (s *Source) setProgress(ctx context.Context, objName string) {
+func (s *Source) setupCache(ctx context.Context) *persistableCache {
+	var c cache.Cache
+	if s.Progress.EncodedResumeInfo != "" {
+		c = memory.NewWithData(ctx, strings.Split(s.Progress.EncodedResumeInfo, ","))
+	} else {
+		c = memory.New()
+	}
+
+	// TODO (ahrav): Make this configurable via conn.
+	persistCache := newPersistableCache(defaultCachePersistIncrement, c, &s.Progress)
+	return persistCache
+}
+
+func (s *Source) setProgress(ctx context.Context, objName string, cache cache.Cache) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
-	s.processedObjects++
+	s.SectionsCompleted++
 
-	s.cache.Set(objName, objName)
-	s.Progress.SectionsCompleted = s.processedObjects
+	cache.Set(objName, objName)
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
-	s.Progress.PercentComplete = int64(float64(s.processedObjects) / float64(s.stats.numObjects) * 100)
+	s.Progress.PercentComplete = int64(float64(s.SectionsCompleted) / float64(s.stats.numObjects) * 100)
 }
 
 func (s *Source) completeProgress(ctx context.Context) {
 	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
 	ctx.Logger().Info(msg)
 	s.Progress.Message = msg
-	s.cache.Clear()
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {

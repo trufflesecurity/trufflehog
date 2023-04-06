@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -300,8 +300,6 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		chunksCh:   chunksCh,
 		Progress:   sources.Progress{},
 	}
-	cache := memory.New()
-	source.cache = newPersistableCache(5, cache, &source.Progress)
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -371,13 +369,10 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	ctx := context.Background()
 	chunksCh := make(chan *sources.Chunk, 1)
 	source := &Source{
-		gcsManager: &mockObjectManager{numObjects: 5},
+		gcsManager: &mockObjectManager{numObjects: defaultCachePersistIncrement},
 		chunksCh:   chunksCh,
 		Progress:   sources.Progress{},
 	}
-
-	cache := memory.New()
-	source.cache = newPersistableCache(5, cache, &source.Progress)
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -388,37 +383,45 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 		assert.Nil(t, err)
 	}()
 
-	want := make([]*sources.Chunk, 0, 5)
-	for i := 0; i < 5; i++ {
+	want := make([]*sources.Chunk, 0, defaultCachePersistIncrement)
+	for i := 0; i < defaultCachePersistIncrement; i++ {
 		want = append(want, createTestSourceChunk(i))
 	}
 
-	got := make([]*sources.Chunk, 0, 5)
+	got := make([]*sources.Chunk, 0, defaultCachePersistIncrement)
 	for ch := range chunksCh {
 		got = append(got, ch)
 	}
 
-	// Ensure we get 5 objects back.
+	// Ensure we get 2500 objects back.
 	assert.Equal(t, len(want), len(got))
 
 	// Test that the resume progress is set.
-	progress := "object0,object1,object2,object3,object4"
-	objs := strings.Split(progress, ",")
+	var progress strings.Builder
+	for i := range got {
+		progress.WriteString(fmt.Sprintf("object%d", i))
+		// Add a comma if not the last element.
+		if i != len(got)-1 {
+			progress.WriteString(",")
+		}
+	}
 
 	encodeResume := strings.Split(source.Progress.EncodedResumeInfo, ",")
-	sort.Strings(encodeResume)
+	sort.Slice(encodeResume, func(i, j int) bool {
+		numI, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[i], "object"))
+		numJ, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[j], "object"))
+		return numI < numJ
+	})
 
-	assert.Equal(t, objs, encodeResume)
-	assert.Equal(t, int32(5), source.Progress.SectionsCompleted)
+	assert.Equal(t, progress.String(), strings.Join(encodeResume, ","))
+	assert.Equal(t, int32(defaultCachePersistIncrement), source.Progress.SectionsCompleted)
 	assert.Equal(t, int64(100), source.Progress.PercentComplete)
-	assert.Equal(t, 0, source.cache.Count())
-	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", 5), source.Progress.Message)
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", defaultCachePersistIncrement), source.Progress.Message)
 }
 
 func TestSource_CachePersistence(t *testing.T) {
 	ctx := context.Background()
 
-	cacheIncrement := 5
 	wantObjCnt := 4 // ensure we have less objects than the cache increment
 	mockObjManager := &mockObjectManager{numObjects: wantObjCnt}
 
@@ -428,9 +431,6 @@ func TestSource_CachePersistence(t *testing.T) {
 		chunksCh:   chunksCh,
 		Progress:   sources.Progress{},
 	}
-
-	cache := memory.New()
-	source.cache = newPersistableCache(cacheIncrement, cache, &source.Progress)
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -459,6 +459,5 @@ func TestSource_CachePersistence(t *testing.T) {
 	assert.Equal(t, "", source.Progress.EncodedResumeInfo)
 	assert.Equal(t, int32(wantObjCnt), source.Progress.SectionsCompleted)
 	assert.Equal(t, int64(100), source.Progress.PercentComplete)
-	assert.Equal(t, 0, source.cache.Count())
 	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", wantObjCnt), source.Progress.Message)
 }
