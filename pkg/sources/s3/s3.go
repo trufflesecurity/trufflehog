@@ -16,7 +16,7 @@ import (
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	"golang.org/x/sync/semaphore"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -39,6 +39,7 @@ type Source struct {
 	sources.Progress
 	errorCount *sync.Map
 	conn       *sourcespb.S3
+	jobPool    *errgroup.Group
 }
 
 // Ensure the Source satisfies the interface at compile time
@@ -68,6 +69,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.concurrency = concurrency
 	s.errorCount = &sync.Map{}
 	s.log = aCtx.Logger()
+	s.jobPool = &errgroup.Group{}
+	s.jobPool.SetLimit(concurrency)
 
 	var conn sourcespb.S3
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -85,6 +88,8 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 	cfg.Region = aws.String(region)
 
 	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.S3_SessionToken:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
 	case *sourcespb.S3_AccessKey:
 		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
 	case *sourcespb.S3_Unauthenticated:
@@ -118,7 +123,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	var bucketsToScan []string
 
 	switch s.conn.GetCredential().(type) {
-	case *sourcespb.S3_AccessKey, *sourcespb.S3_CloudEnvironment:
+	case *sourcespb.S3_AccessKey, *sourcespb.S3_SessionToken, *sourcespb.S3_CloudEnvironment:
 		if len(s.conn.Buckets) == 0 {
 			res, err := client.ListBuckets(&s3.ListBucketsInput{})
 			if err != nil {
@@ -181,9 +186,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 // pageChunker emits chunks onto the given channel from a page
 func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan *sources.Chunk, bucket string, page *s3.ListObjectsV2Output, errorCount *sync.Map, pageNumber int, objectCount *uint64) {
-	sem := semaphore.NewWeighted(int64(s.concurrency))
-	var wg sync.WaitGroup
 	for _, obj := range page.Contents {
+		obj := obj
 		if common.IsDone(ctx) {
 			return
 		}
@@ -216,19 +220,12 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			return
 		}
 
-		err := sem.Acquire(ctx, 1)
-		if err != nil {
-			s.log.Error(err, "could not acquire semaphore")
-			continue
-		}
-		wg.Add(1)
-		go func(ctx context.Context, wg *sync.WaitGroup, sem *semaphore.Weighted, obj *s3.Object) {
+		s.jobPool.Go(func() error {
 			defer common.RecoverWithExit(ctx)
-			defer sem.Release(1)
-			defer wg.Done()
 
-			if (*obj.Key)[len(*obj.Key)-1:] == "/" {
-				return
+			if strings.HasSuffix(*obj.Key, "/") {
+				s.log.V(5).Info("Skipping directory", "object", *obj.Key)
+				return nil
 			}
 
 			path := strings.Split(*obj.Key, "/")
@@ -240,7 +237,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			}
 			if nErr.(int) > 3 {
 				s.log.V(2).Info("Skipped due to excessive errors", "object", *obj.Key)
-				return
+				return nil
 			}
 
 			// files break with spaces, must replace with +
@@ -262,7 +259,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				}
 				if nErr.(int) > 3 {
 					s.log.V(3).Info("Skipped due to excessive errors", "object", *obj.Key)
-					return
+					return nil
 				}
 				nErr = nErr.(int) + 1
 				errorCount.Store(prefix, nErr)
@@ -270,14 +267,14 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				if nErr.(int) > 3 {
 					s.log.V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
 				}
-				return
+				return nil
 			}
 
 			defer res.Body.Close()
 			reader, err := diskbufferreader.New(res.Body)
 			if err != nil {
 				s.log.Error(err, "Could not create reader.")
-				return
+				return nil
 			}
 			defer reader.Close()
 
@@ -306,7 +303,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
 				atomic.AddUint64(objectCount, 1)
 				s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
-				return
+				return nil
 			}
 
 			if err := reader.Reset(); err != nil {
@@ -318,7 +315,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			chunkData, err := io.ReadAll(reader)
 			if err != nil {
 				s.log.Error(err, "Could not read file data.")
-				return
+				return nil
 			}
 			atomic.AddUint64(objectCount, 1)
 			s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
@@ -332,9 +329,12 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			if nErr.(int) > 0 {
 				errorCount.Store(prefix, 0)
 			}
-		}(ctx, &wg, sem, obj)
+
+			return nil
+		})
 	}
-	wg.Wait()
+
+	_ = s.jobPool.Wait()
 }
 
 // S3 links currently have the general format of:

@@ -86,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				s1.Verified = isValid
 				// If there is a valid one, we need to stop iterating now and return the valid result
-				if isValid == true {
+				if isValid {
 					break
 				}
 			}
@@ -100,4 +100,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Bitfinex
 }

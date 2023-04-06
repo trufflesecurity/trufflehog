@@ -4,15 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
-func PrintJSON(r *detectors.ResultWithMetadata) {
+func PrintJSON(r *detectors.ResultWithMetadata) error {
 	v := &struct {
 		// SourceMetadata contains source-specific contextual information.
 		SourceMetadata *source_metadatapb.MetaData
@@ -52,7 +50,8 @@ func PrintJSON(r *detectors.ResultWithMetadata) {
 	}
 	out, err := json.Marshal(v)
 	if err != nil {
-		logrus.WithError(err).Fatal("could not marshal result")
+		return fmt.Errorf("could not marshal result: %w", err)
 	}
 	fmt.Println(string(out))
+	return nil
 }

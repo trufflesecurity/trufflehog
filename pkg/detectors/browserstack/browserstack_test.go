@@ -51,6 +51,7 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_BrowserStack,
 					Verified:     true,
+					RawV2:        []byte(fmt.Sprintf("%s%s", secret, secretUser)),
 				},
 			},
 			wantErr: false,
@@ -67,6 +68,7 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_BrowserStack,
 					Verified:     false,
+					RawV2:        []byte(fmt.Sprintf("%s%s", inactiveSecret, secretUser)),
 				},
 			},
 			wantErr: false,

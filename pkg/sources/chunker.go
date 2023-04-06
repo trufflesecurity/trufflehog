@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -32,7 +30,6 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 			chunk := *originalChunk
 			n, err := reader.Read(chunkBytes)
 			if err != nil && !errors.Is(err, io.EOF) {
-				logrus.WithError(err).Error("Error chunking reader.")
 				break
 			}
 			peekData, _ := reader.Peek(PeekSize)

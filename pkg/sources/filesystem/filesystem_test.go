@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -34,7 +33,7 @@ func TestSource_Scan(t *testing.T) {
 			init: init{
 				name: "this repo",
 				connection: &sourcespb.Filesystem{
-					Directories: []string{"."},
+					Paths: []string{"."},
 				},
 				verify: true,
 			},
@@ -51,8 +50,6 @@ func TestSource_Scan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
-			log.SetFormatter(&log.TextFormatter{ForceColors: true})
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {

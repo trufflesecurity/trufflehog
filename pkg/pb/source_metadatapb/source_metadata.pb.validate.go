@@ -522,6 +522,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for Location
 
+	// no validation rules for File
+
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}
@@ -1265,6 +1267,117 @@ var _ interface {
 	ErrorName() string
 } = GitlabValidationError{}
 
+// Validate checks the field values on GoogleDrive with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *GoogleDrive) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GoogleDrive with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in GoogleDriveMultiError, or
+// nil if none found.
+func (m *GoogleDrive) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GoogleDrive) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for File
+
+	// no validation rules for Link
+
+	// no validation rules for Email
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Shared
+
+	// no validation rules for LastModifiedBy
+
+	if len(errors) > 0 {
+		return GoogleDriveMultiError(errors)
+	}
+
+	return nil
+}
+
+// GoogleDriveMultiError is an error wrapping multiple validation errors
+// returned by GoogleDrive.ValidateAll() if the designated constraints aren't met.
+type GoogleDriveMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GoogleDriveMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GoogleDriveMultiError) AllErrors() []error { return m }
+
+// GoogleDriveValidationError is the validation error returned by
+// GoogleDrive.Validate if the designated constraints aren't met.
+type GoogleDriveValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GoogleDriveValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GoogleDriveValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GoogleDriveValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GoogleDriveValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GoogleDriveValidationError) ErrorName() string { return "GoogleDriveValidationError" }
+
+// Error satisfies the builtin error interface
+func (e GoogleDriveValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGoogleDrive.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GoogleDriveValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GoogleDriveValidationError{}
+
 // Validate checks the field values on GCS with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.
@@ -1288,11 +1401,17 @@ func (m *GCS) validate(all bool) error {
 
 	// no validation rules for Bucket
 
-	// no validation rules for File
+	// no validation rules for Filename
 
 	// no validation rules for Link
 
 	// no validation rules for Email
+
+	// no validation rules for CreatedAt
+
+	// no validation rules for UpdatedAt
+
+	// no validation rules for ContentType
 
 	if len(errors) > 0 {
 		return GCSMultiError(errors)
@@ -2272,6 +2391,8 @@ func (m *Teams) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Location
+
 	if len(errors) > 0 {
 		return TeamsMultiError(errors)
 	}
@@ -2729,7 +2850,7 @@ func (m *SharePoint) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Path
+	// no validation rules for Link
 
 	// no validation rules for Timestamp
 
@@ -2740,6 +2861,8 @@ func (m *SharePoint) validate(all bool) error {
 	// no validation rules for Views
 
 	// no validation rules for Docid
+
+	// no validation rules for Email
 
 	if len(errors) > 0 {
 		return SharePointMultiError(errors)

@@ -912,6 +912,13 @@ enum DetectorType {
   Shopify = 902;
   RabbitMQ = 903;
   CustomRegex = 904;
+  Etherscan = 905;
+  Infura = 906;
+  Alchemy = 907;
+  BlockNative = 908;
+  Moralis = 909;
+  BscScan = 910;
+  CoinMarketCap = 911;
 }
 
 message Result {

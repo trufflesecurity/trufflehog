@@ -2,6 +2,7 @@ package custom_detectors
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -22,6 +23,11 @@ func ValidateKeywords(keywords []string) error {
 func ValidateRegex(regex map[string]string) error {
 	if len(regex) == 0 {
 		return fmt.Errorf("no regex")
+	}
+	for name, reg := range regex {
+		if _, err := regexp.Compile(reg); err != nil {
+			return fmt.Errorf("regex '%s': %w", name, err)
+		}
 	}
 	return nil
 }

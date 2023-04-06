@@ -40,7 +40,9 @@ enum SourceType {
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
+  SOURCE_TYPE_GOOGLE_DRIVE = 28;
   SOURCE_TYPE_SHAREPOINT = 29;
+  SOURCE_TYPE_GCS_UNAUTHED = 30;
 }
 
 message LocalSource {
@@ -112,15 +114,28 @@ message ECR {
   repeated string registries = 2;
 }
 
-message Filesystem{
+message Filesystem {
+  // DEPRECATED: directories is deprecated and can be removed / renamed to
+  // paths when we no longer depend on the name in enterprise configs.
   repeated string directories = 1;
+  repeated string paths = 2;
 }
 
 message GCS {
   oneof credential {
-    string json_sa = 1;
+    string json_service_account = 1;
+    string api_key = 2;
+    credentials.Unauthenticated unauthenticated = 3;
+    credentials.CloudEnvironment adc = 4;
+    string service_account_file = 11;
+    credentials.Oauth2 oauth = 12;
   }
-  repeated string buckets = 2;
+  string project_id = 5;
+  repeated string include_buckets = 6;
+  repeated string exclude_buckets = 7;
+  repeated string include_objects = 8;
+  repeated string exclude_objects = 9;
+  int64 max_object_size = 10;
 }
 
 message Git {
@@ -159,6 +174,12 @@ message GitHub {
   string base = 10;
   repeated string ignoreRepos = 11;
   repeated string includeRepos = 12;
+}
+
+message GoogleDrive {
+  oneof credential {
+    string refresh_token = 1;
+  }
 }
 
 message JIRA {
@@ -233,6 +254,7 @@ message Teams {
   oneof credential {
     string token = 2;
     credentials.ClientCredentials authenticated = 3;
+    credentials.Oauth2 oauth = 7;
   }
   repeated string channels = 4;
   repeated string ignoreList = 5;

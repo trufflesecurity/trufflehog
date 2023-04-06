@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
 	"net/http"
 	"reflect"
 	"sort"
@@ -14,8 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-github/v42/github"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -148,7 +147,7 @@ func TestAddMembersByApp(t *testing.T) {
 		Get("/app/installations").
 		Reply(200).
 		JSON([]map[string]interface{}{
-			{"account": map[string]string{"login": "super-secret-org"}},
+			{"account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
 		})
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/members").
@@ -197,14 +196,13 @@ func TestAddOrgsByUser(t *testing.T) {
 		Get("/user/orgs").
 		Reply(200).
 		JSON([]map[string]interface{}{
-			{"name": "sso1"},
 			{"login": "sso2"},
 		})
 
 	s := initTestSource(nil)
 	s.addOrgsByUser(context.TODO(), "super-secret-user")
-	assert.Equal(t, 2, len(s.orgs))
-	assert.Equal(t, []string{"sso1", "sso2"}, s.orgs)
+	assert.Equal(t, 1, len(s.orgs))
+	assert.Equal(t, []string{"sso2"}, s.orgs)
 	assert.True(t, gock.IsDone())
 }
 
@@ -282,13 +280,14 @@ func TestNormalizeRepos(t *testing.T) {
 }
 
 func TestHandleRateLimit(t *testing.T) {
-	assert.False(t, handleRateLimit(nil, nil))
+	s := initTestSource(nil)
+	assert.False(t, s.handleRateLimit(nil, nil))
 
 	err := &github.RateLimitError{}
 	res := &github.Response{Response: &http.Response{Header: make(http.Header)}}
 	res.Header.Set("x-ratelimit-remaining", "0")
 	res.Header.Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Unix()+1, 10))
-	assert.True(t, handleRateLimit(err, res))
+	assert.True(t, s.handleRateLimit(err, res))
 }
 
 func TestEnumerateUnauthenticated(t *testing.T) {
@@ -417,11 +416,9 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 		},
 	}
 
-	logger := logrus.New()
-	logger.Out = io.Discard
 	s := &Source{
 		repos: []string{},
-		log:   logger.WithField("no", "output"),
+		log:   logr.Discard(),
 	}
 
 	for _, tt := range tests {
@@ -469,13 +466,10 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		},
 	}
 
-	logger := logrus.New()
-	logger.Out = io.Discard
-
 	for _, tt := range tests {
 		s := &Source{
 			repos: tt.repos,
-			log:   logger.WithField("no", "output"),
+			log:   logr.Discard(),
 		}
 
 		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
@@ -512,9 +506,9 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			src := &Source{
-				repos: tc.repos,
-			}
+			src := initTestSource(&sourcespb.GitHub{
+				Repositories: tc.repos,
+			})
 			src.jobPool = &errgroup.Group{}
 
 			_ = src.scan(context.Background(), nil, nil)

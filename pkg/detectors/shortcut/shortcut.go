@@ -65,18 +65,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if strings.Contains(body, "app_url") {
 					s1.Verified = true
-				} else {
-					// if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-					// 	continue
-					// }
 				}
-
 			}
-
 		}
-
 		results = append(results, s1)
 	}
-
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Shortcut
 }

@@ -14,8 +14,8 @@ func DefaultHandlers() []Handler {
 }
 
 type Handler interface {
-	FromFile(io.Reader) chan ([]byte)
-	IsFiletype(io.Reader) (io.Reader, bool)
+	FromFile(context.Context, io.Reader) chan ([]byte)
+	IsFiletype(context.Context, io.Reader) (io.Reader, bool)
 	New()
 }
 
@@ -25,7 +25,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 	for _, h := range DefaultHandlers() {
 		h.New()
 		var isType bool
-		if file, isType = h.IsFiletype(file); isType {
+		if file, isType = h.IsFiletype(ctx, file); isType {
 			handler = h
 			break
 		}
@@ -35,7 +35,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 	}
 
 	// Process the file and read all []byte chunks from handlerChan.
-	handlerChan := handler.FromFile(file)
+	handlerChan := handler.FromFile(ctx, file)
 	for {
 		select {
 		case data, open := <-handlerChan:

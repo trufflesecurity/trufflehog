@@ -2,7 +2,6 @@ package tatumio
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -53,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("Accept", "application/vnd.tatumio+json; version=3")
-			req.Header.Add("x-api-key", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("x-api-key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_TatumIO
 }

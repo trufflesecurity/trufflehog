@@ -2,13 +2,15 @@ package engine
 
 import (
 	"bytes"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -35,6 +37,10 @@ type Engine struct {
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
 	filterUnverified bool
+
+	// prefilter is a ahocorasick struct used for doing efficient string
+	// matching given a set of words (keywords from the rules in the config)
+	prefilter ahocorasick.AhoCorasick
 }
 
 type EngineOption func(*Engine)
@@ -72,6 +78,31 @@ func WithFilterUnverified(filter bool) EngineOption {
 	}
 }
 
+// WithFilterDetectors applies a filter to the configured list of detectors. If
+// the filterFunc returns true, the detector will be included for scanning.
+// This option applies to the existing list of detectors configured, so the
+// order this option appears matters. All filtering happens before scanning.
+func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption {
+	return func(e *Engine) {
+		// If no detectors are configured, do nothing.
+		if e.detectors == nil {
+			return
+		}
+		e.detectors[true] = filterDetectors(filterFunc, e.detectors[true])
+		e.detectors[false] = filterDetectors(filterFunc, e.detectors[false])
+	}
+}
+
+func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors.Detector) []detectors.Detector {
+	var output []detectors.Detector
+	for _, detector := range input {
+		if filterFunc(detector) {
+			output = append(output, detector)
+		}
+	}
+	return output
+}
+
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
 		chunks:          make(chan *sources.Chunk),
@@ -84,13 +115,12 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	// Set defaults.
-
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
-		logrus.Warn("No concurrency specified, defaulting to ", numCPU)
+		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
 		e.concurrency = numCPU
 	}
-	logrus.Debugf("running with up to %d workers", e.concurrency)
+	ctx.Logger().V(2).Info("engine started", "workers", e.concurrency)
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
@@ -102,13 +132,31 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		e.detectors[false] = []detectors.Detector{}
 	}
 
-	logrus.Debugf("loaded %d decoders", len(e.decoders))
-	logrus.Debugf("loaded %d detectors total, %d with verification enabled. %d with verification disabled",
-		len(e.detectors[true])+len(e.detectors[false]),
-		len(e.detectors[true]),
-		len(e.detectors[false]))
+	// build ahocorasick prefilter for efficient string matching
+	// on keywords
+	keywords := []string{}
+	for _, d := range e.detectors[false] {
+		keywords = append(keywords, d.Keywords()...)
+	}
+	for _, d := range e.detectors[true] {
+		keywords = append(keywords, d.Keywords()...)
+	}
+	builder := ahocorasick.NewAhoCorasickBuilder(ahocorasick.Opts{
+		AsciiCaseInsensitive: true,
+		MatchOnlyWholeWords:  false,
+		MatchKind:            ahocorasick.LeftMostLongestMatch,
+		DFA:                  true,
+	})
+	e.prefilter = builder.Build(keywords)
 
-	// start the workers
+	ctx.Logger().V(2).Info("loaded decoders", "count", len(e.decoders))
+	ctx.Logger().V(2).Info("loaded detectors",
+		"total", len(e.detectors[true])+len(e.detectors[false]),
+		"verification_enabled", len(e.detectors[true]),
+		"verification_disabled", len(e.detectors[false]),
+	)
+
+	// Start the workers.
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
@@ -158,17 +206,18 @@ func (e *Engine) BytesScanned() uint64 {
 }
 
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
+	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
 	e.detectorAvgTime.Range(func(k, v interface{}) bool {
 		key, ok := k.(string)
 		if !ok {
-			logrus.Warnf("expected DetectorAvgTime key to be a string")
+			logger.Info("expected DetectorAvgTime key to be a string")
 			return true
 		}
 
 		value, ok := v.([]time.Duration)
 		if !ok {
-			logrus.Warnf("expected DetectorAvgTime value to be []time.Duration")
+			logger.Info("expected DetectorAvgTime value to be []time.Duration")
 			return true
 		}
 		avgTime[key] = value
@@ -180,8 +229,8 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
+			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
-			fragStart, mdLine := FragmentFirstLine(chunk)
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
@@ -190,27 +239,36 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				case *decoders.Base64:
 					decoderType = detectorspb.DecoderType_BASE64
 				default:
-					logrus.Warnf("unknown decoder type: %T", decoder)
+					ctx.Logger().Info("unknown decoder type", "type", reflect.TypeOf(decoder).String())
 					decoderType = detectorspb.DecoderType_UNKNOWN
 				}
 				decoded := decoder.FromChunk(chunk)
 				if decoded == nil {
 					continue
 				}
+
 				dataLower := strings.ToLower(string(decoded.Data))
+				matches := e.prefilter.FindAll(dataLower)
+
+				for _, m := range matches {
+					matchedKeywords[dataLower[m.Start():m.End()]] = struct{}{}
+				}
+
 				for verify, detectorsSet := range e.detectors {
 					for _, detector := range detectorsSet {
-						start := time.Now()
-						foundKeyword := false
+						chunkContainsKeyword := false
 						for _, kw := range detector.Keywords() {
-							if strings.Contains(dataLower, strings.ToLower(kw)) {
-								foundKeyword = true
+							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
+								chunkContainsKeyword = true
 								break
 							}
 						}
-						if !foundKeyword {
+
+						if !chunkContainsKeyword {
 							continue
 						}
+
+						start := time.Now()
 
 						results, err := func() ([]detectors.Result, error) {
 							ctx, cancel := context.WithTimeout(ctx, time.Second*10)
@@ -219,10 +277,10 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							return detector.FromData(ctx, verify, decoded.Data)
 						}()
 						if err != nil {
-							logrus.WithFields(logrus.Fields{
-								"source_type": decoded.SourceType.String(),
-								"metadata":    decoded.SourceMetadata,
-							}).WithError(err).Error("could not scan chunk")
+							ctx.Logger().Error(err, "could not scan chunk",
+								"source_type", decoded.SourceType.String(),
+								"metadata", decoded.SourceMetadata,
+							)
 							continue
 						}
 
@@ -230,9 +288,19 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							results = detectors.CleanResults(results)
 						}
 						for _, result := range results {
-							SetResultLineNumber(chunk, &result, fragStart, mdLine)
+							resultChunk := chunk
+							if SupportsLineNumbers(chunk.SourceType) {
+								copyChunk := *chunk
+								copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
+								if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
+									copyChunk.SourceMetadata = copyMetaData
+								}
+								fragStart, mdLine := FragmentFirstLine(&copyChunk)
+								SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
+								resultChunk = &copyChunk
+							}
 							result.DecoderType = decoderType
-							e.results <- detectors.CopyMetadata(chunk, result)
+							e.results <- detectors.CopyMetadata(resultChunk, result)
 
 						}
 						if len(results) > 0 {
@@ -271,7 +339,8 @@ func gitSources() []sourcespb.SourceType {
 	}
 }
 
-func isGitSource(sourceType sourcespb.SourceType) bool {
+// SupportsLineNumbers determines if a line number can be found for a source type.
+func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	for _, i := range gitSources() {
 		if i == sourceType {
 			return true
@@ -314,8 +383,6 @@ func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 
 // SetResultLineNumber sets the line number in the provided result.
 func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) {
-	if isGitSource(chunk.SourceType) {
-		offset := FragmentLineOffset(chunk, result)
-		*mdLine = fragStart + offset
-	}
+	offset := FragmentLineOffset(chunk, result)
+	*mdLine = fragStart + offset
 }

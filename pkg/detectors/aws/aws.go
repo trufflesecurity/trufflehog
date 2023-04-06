@@ -249,3 +249,7 @@ type identityRes struct {
 		} `json:"ResponseMetadata"`
 	} `json:"GetCallerIdentityResponse"`
 }
+
+func (s scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_AWS
+}
