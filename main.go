@@ -159,7 +159,7 @@ func main() {
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 	defer func() { _ = sync() }()
-	logFatal := logFatalFunc(logger)
+	//logFatal := logFatalFunc(logger)
 
 	updateCfg := overseer.Config{
 		Program:       run,
@@ -176,10 +176,13 @@ func main() {
 		updateCfg.Fetcher = nil
 	}
 
-	err := overseer.RunErr(updateCfg)
-	if err != nil {
-		logFatal(err, "error occured with trufflehog updater 🐷")
-	}
+	run(overseer.DisabledState)
+
+	//err := overseer.RunErr(updateCfg)
+	//
+	//if err != nil {
+	//	logFatal(err, "error occured with trufflehog updater 🐷")
+	//}
 }
 
 func run(state overseer.State) {

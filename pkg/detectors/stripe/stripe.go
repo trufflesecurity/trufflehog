@@ -2,8 +2,11 @@ package stripe
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"net/http"
+	"net/url"
 	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -29,6 +32,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Stripe secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	var verifyError error
 
 	dataStr := string(data)
 
@@ -55,7 +59,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match))
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
-			if err == nil {
+
+			if err != nil {
+				urlErr := &url.Error{
+					URL: req.URL.Host,
+					Op:  req.Method,
+					Err: errors.New("stripe verification error"),
+				}
+				verifyError = errors.Join(pkg.ErrVerify, urlErr)
+			} else {
 				res.Body.Close() // The request body is unused.
 
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
@@ -71,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
