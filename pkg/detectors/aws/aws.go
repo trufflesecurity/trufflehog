@@ -6,8 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -91,6 +94,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
+	var verifyError error
+
 	for _, idMatch := range idMatches {
 		if len(idMatch) != 2 {
 			continue
@@ -172,7 +177,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.URL.RawQuery = params.Encode()
 
 				res, err := client.Do(req)
-				if err == nil {
+				if err != nil {
+					urlErr := &url.Error{
+						URL: endpoint,
+						Op:  method,
+						Err: errors.New("aws verification error"),
+					}
+					verifyError = errors.Join(pkg.ErrVerify, urlErr)
+				} else {
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						identityInfo := identityRes{}
@@ -207,7 +219,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-	return awsCustomCleanResults(results), nil
+	return awsCustomCleanResults(results), verifyError
 }
 
 func awsCustomCleanResults(results []detectors.Result) []detectors.Result {

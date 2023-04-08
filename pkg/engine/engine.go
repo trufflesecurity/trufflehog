@@ -2,6 +2,8 @@ package engine
 
 import (
 	"bytes"
+	"errors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"reflect"
 	"runtime"
 	"strings"
@@ -277,11 +279,17 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							return detector.FromData(ctx, verify, decoded.Data)
 						}()
 						if err != nil {
-							ctx.Logger().Error(err, "could not scan chunk",
-								"source_type", decoded.SourceType.String(),
-								"metadata", decoded.SourceMetadata,
-							)
-							continue
+							if errors.Is(err, pkg.ErrVerify) {
+								ctx.Logger().Error(err, "could not verify",
+									"source_type", decoded.SourceType.String(),
+								)
+							} else {
+								ctx.Logger().Error(err, "could not scan chunk",
+									"source_type", decoded.SourceType.String(),
+									"metadata", decoded.SourceMetadata,
+								)
+								continue
+							}
 						}
 
 						if e.filterUnverified {
