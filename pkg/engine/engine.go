@@ -280,9 +280,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						}()
 						if err != nil {
 							if errors.Is(err, pkg.ErrVerify) {
-								ctx.Logger().Error(err, "could not verify",
-									"source_type", decoded.SourceType.String(),
-								)
+								ctx.Logger().Error(err, "could not verify")
 							} else {
 								ctx.Logger().Error(err, "could not scan chunk",
 									"source_type", decoded.SourceType.String(),
