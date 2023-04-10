@@ -41,7 +41,6 @@ enum SourceType {
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
   SOURCE_TYPE_GOOGLE_DRIVE = 28;
-  SOURCE_TYPE_SHAREPOINT = 29;
   SOURCE_TYPE_GCS_UNAUTHED = 30;
 }
 
@@ -297,13 +296,4 @@ message SlackRealtime {
   oneof credential {
     credentials.SlackTokens tokens = 1;
   }
-}
-
-message Sharepoint {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
-  oneof credential {
-    string refresh_token = 2;
-  }
-  string site_url = 3;
-
 }
