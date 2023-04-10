@@ -2,8 +2,13 @@ package abuseipdb
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"io"
 	"net/http"
+	"net/url"
+
 	// "log"
 	"regexp"
 	"strings"
@@ -35,6 +40,8 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
+	var verifyError error
+
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
@@ -55,7 +62,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.Header.Add("Key", resMatch)
 			res, err := client.Do(req)
-			if err == nil {
+			if err != nil {
+				urlErr := &url.Error{
+					URL: req.URL.Host,
+					Op:  req.Method,
+					Err: errors.Unwrap(err),
+				}
+				verifyError = fmt.Errorf("%w: %s", pkg.ErrVerify, urlErr)
+			} else {
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err == nil {
 					bodyString := string(bodyBytes)
@@ -81,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

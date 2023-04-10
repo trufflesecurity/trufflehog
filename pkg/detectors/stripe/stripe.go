@@ -64,9 +64,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				urlErr := &url.Error{
 					URL: req.URL.Host,
 					Op:  req.Method,
-					Err: errors.New("stripe verification error"),
+					Err: errors.Unwrap(err),
 				}
-				verifyError = errors.Join(pkg.ErrVerify, urlErr)
+				verifyError = fmt.Errorf("%w: %s", pkg.ErrVerify, urlErr)
 			} else {
 				res.Body.Close() // The request body is unused.
 
