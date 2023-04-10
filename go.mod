@@ -56,7 +56,7 @@ require (
 	github.com/xanzy/go-gitlab v0.81.0
 	go.mongodb.org/mongo-driver v1.11.3
 	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.7.0
+	golang.org/x/crypto v0.8.0
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
 	golang.org/x/oauth2 v0.7.0
 	golang.org/x/sync v0.1.0
