@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,7 +205,9 @@ func TestSourceOauth2Client(t *testing.T) {
 }
 
 type mockObjectManager struct {
-	wantErr bool
+	// numObjects is the number of objects to return in the listObjects call.
+	numObjects int
+	wantErr    bool
 }
 
 func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
@@ -212,7 +216,7 @@ func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
 	}
 
 	return &attributes{
-		numObjects:    5,
+		numObjects:    uint64(m.numObjects),
 		numBuckets:    1,
 		bucketObjects: map[string]uint64{testBucket: 5},
 	}, nil
@@ -242,7 +246,7 @@ func (m *mockObjectManager) listObjects(context.Context) (chan io.Reader, error)
 	go func() {
 		defer close(ch)
 		// Add 5 objects to the channel.
-		for i := 0; i < 5; i++ {
+		for i := 0; i < m.numObjects; i++ {
 			ch <- createTestObject(i)
 		}
 	}()
@@ -292,8 +296,9 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 	chunksCh := make(chan *sources.Chunk, 1)
 
 	source := &Source{
-		gcsManager: &mockObjectManager{},
+		gcsManager: &mockObjectManager{numObjects: 5},
 		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
 	}
 
 	err := source.enumerate(ctx)
@@ -338,7 +343,7 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 
 func TestSourceInit_Enumerate(t *testing.T) {
 	ctx := context.Background()
-	source := &Source{gcsManager: &mockObjectManager{}}
+	source := &Source{gcsManager: &mockObjectManager{numObjects: 5}}
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -358,4 +363,101 @@ func TestSourceChunks_ListObjects_Error(t *testing.T) {
 	defer close(chunksCh)
 	err := source.Chunks(ctx, chunksCh)
 	assert.True(t, err != nil)
+}
+
+func TestSourceChunks_ProgressSet(t *testing.T) {
+	ctx := context.Background()
+	chunksCh := make(chan *sources.Chunk, 1)
+	source := &Source{
+		gcsManager: &mockObjectManager{numObjects: defaultCachePersistIncrement},
+		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
+	}
+
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
+
+	go func() {
+		defer close(chunksCh)
+		err := source.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	want := make([]*sources.Chunk, 0, defaultCachePersistIncrement)
+	for i := 0; i < defaultCachePersistIncrement; i++ {
+		want = append(want, createTestSourceChunk(i))
+	}
+
+	got := make([]*sources.Chunk, 0, defaultCachePersistIncrement)
+	for ch := range chunksCh {
+		got = append(got, ch)
+	}
+
+	// Ensure we get 2500 objects back.
+	assert.Equal(t, len(want), len(got))
+
+	// Test that the resume progress is set.
+	var progress strings.Builder
+	for i := range got {
+		progress.WriteString(fmt.Sprintf("object%d", i))
+		// Add a comma if not the last element.
+		if i != len(got)-1 {
+			progress.WriteString(",")
+		}
+	}
+
+	encodeResume := strings.Split(source.Progress.EncodedResumeInfo, ",")
+	sort.Slice(encodeResume, func(i, j int) bool {
+		numI, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[i], "object"))
+		numJ, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[j], "object"))
+		return numI < numJ
+	})
+
+	assert.Equal(t, progress.String(), strings.Join(encodeResume, ","))
+	assert.Equal(t, int32(defaultCachePersistIncrement), source.Progress.SectionsCompleted)
+	assert.Equal(t, int64(100), source.Progress.PercentComplete)
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", defaultCachePersistIncrement), source.Progress.Message)
+}
+
+func TestSource_CachePersistence(t *testing.T) {
+	ctx := context.Background()
+
+	wantObjCnt := 4 // ensure we have less objects than the cache increment
+	mockObjManager := &mockObjectManager{numObjects: wantObjCnt}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	source := &Source{
+		gcsManager: mockObjManager,
+		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
+	}
+
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
+
+	go func() {
+		defer close(chunksCh)
+		err := source.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	want := make([]*sources.Chunk, 0, wantObjCnt)
+	for i := 0; i < wantObjCnt; i++ {
+		want = append(want, createTestSourceChunk(i))
+	}
+
+	got := make([]*sources.Chunk, 0, wantObjCnt)
+	for ch := range chunksCh {
+		got = append(got, ch)
+	}
+
+	// Ensure we get 4 objects back.
+	assert.Equal(t, len(want), len(got))
+
+	// Test that the resume progress is empty.
+	// The cache should not have been persisted.
+	assert.Equal(t, "", source.Progress.EncodedResumeInfo)
+	assert.Equal(t, int32(wantObjCnt), source.Progress.SectionsCompleted)
+	assert.Equal(t, int64(100), source.Progress.PercentComplete)
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", wantObjCnt), source.Progress.Message)
 }
