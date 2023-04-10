@@ -179,11 +179,11 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err != nil {
 					urlErr := &url.Error{
-						URL: endpoint,
-						Op:  method,
-						Err: errors.New("aws verification error"),
+						URL: req.URL.Host,
+						Op:  req.Method,
+						Err: errors.Unwrap(err),
 					}
-					verifyError = errors.Join(pkg.ErrVerify, urlErr)
+					verifyError = fmt.Errorf("%w: %s", pkg.ErrVerify, urlErr)
 				} else {
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
