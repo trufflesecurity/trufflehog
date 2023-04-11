@@ -273,7 +273,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			s.setProgress(ctx, o.name, persistableCache)
+			s.setProgress(ctx, o.md5, persistableCache)
 		}(o)
 	}
 	wg.Wait()
@@ -295,14 +295,14 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	return persistCache
 }
 
-func (s *Source) setProgress(ctx context.Context, objName string, cache cache.Cache) {
+func (s *Source) setProgress(ctx context.Context, md5 string, cache cache.Cache) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
+	ctx.Logger().V(5).Info("setting progress for object", "object-name", md5)
 	s.SectionsCompleted++
 
-	cache.Set(objName, objName)
+	cache.Set(md5, md5)
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
 	s.Progress.PercentComplete = int64(float64(s.SectionsCompleted) / float64(s.stats.numObjects) * 100)
 }
