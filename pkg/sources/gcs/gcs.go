@@ -3,14 +3,18 @@ package gcs
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 
+	"cloud.google.com/go/storage"
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -18,12 +22,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const defaultCachePersistIncrememt = 2500
+const defaultCachePersistIncrement = 2500
 
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -57,24 +62,33 @@ type Source struct {
 	log        logr.Logger
 	chunksCh   chan *sources.Chunk
 
-	processedObjects int32
-	cache            *persistableCache
-
-	sources.Progress
+	mu               sync.Mutex
+	sources.Progress // progress is not thread safe
 }
 
-// persistableCache handles all cache operations with some additional bookkeeping.
-// The threshold value is the percentage of objects that must be processed
-// before the cache is persisted.
+// persistableCache is a wrapper around cache.Cache that allows
+// for the persistence of the cache contents in the Progress of the source
+// at given increments.
 type persistableCache struct {
 	persistIncrement int
 	cache.Cache
+	*sources.Progress
 }
 
-func newPersistableCache(increment int, cache cache.Cache) *persistableCache {
+func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) *persistableCache {
 	return &persistableCache{
 		persistIncrement: increment,
 		Cache:            cache,
+		Progress:         p,
+	}
+}
+
+// Set overrides the cache Set method of the cache to enable the persistence
+// of the cache contents the Progress of the source at given increments.
+func (c *persistableCache) Set(key, val string) {
+	c.Cache.Set(key, val)
+	if ok, contents := c.shouldPersist(); ok {
+		c.Progress.EncodedResumeInfo = contents
 	}
 }
 
@@ -112,16 +126,6 @@ func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int6
 		return fmt.Errorf("error enumerating buckets and objects: %w", err)
 	}
 
-	var c cache.Cache
-	if s.Progress.EncodedResumeInfo != "" {
-		c = memory.NewWithData(aCtx, strings.Split(s.Progress.EncodedResumeInfo, ","))
-	} else {
-		c = memory.New()
-	}
-
-	// TODO (ahrav): Make this configurable via conn.
-	s.cache = newPersistableCache(defaultCachePersistIncrememt, c)
-
 	return nil
 }
 
@@ -147,6 +151,12 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 		gcsManagerAuthOption = withDefaultADC(aCtx)
 	case *sourcespb.GCS_Unauthenticated:
 		gcsManagerAuthOption = withoutAuthentication()
+	case *sourcespb.GCS_Oauth:
+		client, err := oauth2Client(aCtx, conn.GetOauth())
+		if err != nil {
+			return nil, fmt.Errorf("error creating oauth2 client: %w", err)
+		}
+		gcsManagerAuthOption = withHTTPClient(aCtx, client)
 	default:
 		return nil, fmt.Errorf("unknown GCS authentication type: %T", conn.Credential)
 
@@ -172,6 +182,31 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 	return gcsManager, nil
 }
 
+func oauth2Client(ctx context.Context, creds *credentialspb.Oauth2) (*http.Client, error) {
+	if creds == nil {
+		return nil, fmt.Errorf("oauth2 credentials are required")
+	}
+	if creds.GetClientId() == "" || creds.GetRefreshToken() == "" || creds.GetAccessToken() == "" {
+		return nil, fmt.Errorf("oauth2 credentials are incomplete, client_id, refresh_token, and access_token are required")
+	}
+
+	conf := &oauth2.Config{
+		ClientID: creds.GetClientId(),
+		Scopes:   []string{storage.ScopeReadOnly},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  endpoints.Google.AuthURL,
+			TokenURL: endpoints.Google.TokenURL,
+		},
+	}
+
+	tok := &oauth2.Token{
+		AccessToken:  creds.GetAccessToken(),
+		RefreshToken: creds.GetRefreshToken(),
+	}
+
+	return conf.Client(ctx, tok), nil
+}
+
 func setGCSManagerBucketOptions(conn *sourcespb.GCS) gcsManagerOption {
 	return setGCSManagerOptions(conn.GetIncludeBuckets(), conn.GetExcludeBuckets(), withIncludeBuckets, withExcludeBuckets)
 }
@@ -193,9 +228,8 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 	return nil
 }
 
-// enumerate all the objects and buckets in the source and use the results to
-// set the progress information. This will be used track progression of the scan,
-// and to resume the scan if it is interrupted.
+// enumerate all the objects and buckets in the source.
+// This will be used to calculate progress.
 func (s *Source) enumerate(ctx context.Context) error {
 	stats, err := s.gcsManager.attributes(ctx)
 	if err != nil {
@@ -208,6 +242,8 @@ func (s *Source) enumerate(ctx context.Context) error {
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	persistableCache := s.setupCache(ctx)
+
 	objectCh, err := s.gcsManager.listObjects(ctx)
 	if err != nil {
 		return fmt.Errorf("error listing objects: %w", err)
@@ -224,7 +260,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if s.cache.Exists(o.md5) {
+		if persistableCache.Exists(o.name) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
@@ -237,7 +273,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				ctx.Logger().V(1).Info("error setting start progress progress", "name", o.name, "error", err)
 				return
 			}
-			s.setProgress(ctx, o.name, o.md5)
+			s.setProgress(ctx, o.name, persistableCache)
 		}(o)
 	}
 	wg.Wait()
@@ -246,26 +282,35 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	return nil
 }
 
-func (s *Source) setProgress(ctx context.Context, objName, md5 string) {
-	atomic.AddInt32(&s.processedObjects, 1)
-	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName, "md5", md5)
-
-	s.cache.Set(md5, md5)
-	if ok, val := s.cache.shouldPersist(); ok {
-		s.SetProgressComplete(int(s.processedObjects), int(s.stats.numObjects), fmt.Sprintf("object %s processed", objName), val)
-		return
+func (s *Source) setupCache(ctx context.Context) *persistableCache {
+	var c cache.Cache
+	if s.Progress.EncodedResumeInfo != "" {
+		c = memory.NewWithData(ctx, strings.Split(s.Progress.EncodedResumeInfo, ","))
+	} else {
+		c = memory.New()
 	}
-	processed := atomic.LoadInt32(&s.processedObjects)
-	s.Progress.SectionsCompleted = processed
+
+	// TODO (ahrav): Make this configurable via conn.
+	persistCache := newPersistableCache(defaultCachePersistIncrement, c, &s.Progress)
+	return persistCache
+}
+
+func (s *Source) setProgress(ctx context.Context, objName string, cache cache.Cache) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ctx.Logger().V(5).Info("setting progress for object", "object-name", objName)
+	s.SectionsCompleted++
+
+	cache.Set(objName, objName)
 	s.Progress.SectionsRemaining = int32(s.stats.numObjects)
-	s.Progress.PercentComplete = int64(float64(processed) / float64(s.stats.numObjects) * 100)
+	s.Progress.PercentComplete = int64(float64(s.SectionsCompleted) / float64(s.stats.numObjects) * 100)
 }
 
 func (s *Source) completeProgress(ctx context.Context) {
 	msg := fmt.Sprintf("GCS source finished processing %d objects", s.stats.numObjects)
 	ctx.Logger().Info(msg)
 	s.Progress.Message = msg
-	s.cache.Clear()
 }
 
 func (s *Source) processObject(ctx context.Context, o object) error {
@@ -283,7 +328,7 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 					Email:       o.owner,
 					ContentType: o.contentType,
 					Acls:        o.acl,
-					CreatedAt:   o.createdAt.String(),
+					CreatedAt:   strconv.FormatInt(o.createdAt.Unix(), 10), // Unix time as string
 					UpdatedAt:   o.updatedAt.String(),
 				},
 			},

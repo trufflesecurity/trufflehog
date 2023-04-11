@@ -2,6 +2,7 @@ package gcs
 
 import (
 	"fmt"
+	"net/http"
 	"sort"
 	"testing"
 	"time"
@@ -327,6 +328,12 @@ func TestNewGcsManager(t *testing.T) {
 				concurrency:   defaultConcurrency,
 				maxObjectSize: defaultMaxObjectSize,
 			},
+		},
+		{
+			name:   "new gcs manager, with HTTP client",
+			projID: testProjectID,
+			opts:   []gcsManagerOption{withHTTPClient(ctx, &http.Client{})},
+			want:   &gcsManager{projectID: testProjectID, concurrency: defaultConcurrency, maxObjectSize: defaultMaxObjectSize},
 		},
 	}
 

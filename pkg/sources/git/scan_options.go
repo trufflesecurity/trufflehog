@@ -6,11 +6,12 @@ import (
 )
 
 type ScanOptions struct {
-	Filter     *common.Filter
-	BaseHash   string // When scanning a git.Log, this is the oldest/first commit.
-	HeadHash   string
-	MaxDepth   int64
-	LogOptions *git.LogOptions
+	Filter       *common.Filter
+	BaseHash     string // When scanning a git.Log, this is the oldest/first commit.
+	HeadHash     string
+	MaxDepth     int64
+	ExcludeGlobs []string
+	LogOptions   *git.LogOptions
 }
 
 type ScanOption func(*ScanOptions)
@@ -36,6 +37,12 @@ func ScanOptionHeadCommit(hash string) ScanOption {
 func ScanOptionMaxDepth(maxDepth int64) ScanOption {
 	return func(scanOptions *ScanOptions) {
 		scanOptions.MaxDepth = maxDepth
+	}
+}
+
+func ScanOptionExcludeGlobs(globs []string) ScanOption {
+	return func(scanOptions *ScanOptions) {
+		scanOptions.ExcludeGlobs = globs
 	}
 }
 

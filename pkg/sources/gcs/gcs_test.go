@@ -3,17 +3,20 @@ package gcs
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -133,8 +136,78 @@ func TestConfigureGCSManager(t *testing.T) {
 	}
 }
 
+func TestSourceOauth2Client(t *testing.T) {
+	testCases := []struct {
+		name    string
+		creds   *credentialspb.Oauth2
+		want    *http.Client
+		wantErr bool
+	}{
+		{
+			name: "valid creds",
+			creds: &credentialspb.Oauth2{
+				RefreshToken: "some-refresh-token",
+				ClientId:     "some-client-id",
+				AccessToken:  "some-access-token",
+			},
+			want: &http.Client{},
+		},
+		{
+			name:    "invalid creds, nil creds",
+			wantErr: true,
+		},
+		{
+			name: "invalid creds, empty refresh token",
+			creds: &credentialspb.Oauth2{
+				RefreshToken: "",
+				AccessToken:  "some-access-token",
+				ClientId:     "some-client-id",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid creds, empty client id",
+			creds: &credentialspb.Oauth2{
+				RefreshToken: "some-refresh-token",
+				AccessToken:  "some-access-token",
+				ClientId:     "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid creds, empty access token",
+			creds: &credentialspb.Oauth2{
+				AccessToken:  "",
+				RefreshToken: "some-refresh-token",
+				ClientId:     "some-client-id",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			got, err := oauth2Client(ctx, tc.creds)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("source.oauth2Client() error = %v", err)
+			}
+
+			if !tc.wantErr {
+				if diff := cmp.Diff(tc.want, got,
+					cmpopts.IgnoreFields(http.Client{}, "Transport"),
+				); diff != "" {
+					t.Errorf("source.oauth2Client() diff: (-want +got)\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
 type mockObjectManager struct {
-	wantErr bool
+	// numObjects is the number of objects to return in the listObjects call.
+	numObjects int
+	wantErr    bool
 }
 
 func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
@@ -143,7 +216,7 @@ func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
 	}
 
 	return &attributes{
-		numObjects:    5,
+		numObjects:    uint64(m.numObjects),
 		numBuckets:    1,
 		bucketObjects: map[string]uint64{testBucket: 5},
 	}, nil
@@ -173,7 +246,7 @@ func (m *mockObjectManager) listObjects(context.Context) (chan io.Reader, error)
 	go func() {
 		defer close(ch)
 		// Add 5 objects to the channel.
-		for i := 0; i < 5; i++ {
+		for i := 0; i < m.numObjects; i++ {
 			ch <- createTestObject(i)
 		}
 	}()
@@ -192,6 +265,7 @@ func createTestObject(id int) object {
 		size:        42,
 		md5:         fmt.Sprintf("md5hash%d", id),
 		Reader:      &mockReader{data: []byte(fmt.Sprintf("hello world %d", id))},
+		createdAt:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -211,6 +285,7 @@ func createTestSourceChunk(id int) *sources.Chunk {
 					Email:       "testman@test.com",
 					Link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
 					Acls:        []string{"authenticatedUsers"},
+					CreatedAt:   "1577836800",
 				},
 			},
 		},
@@ -222,11 +297,10 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 	chunksCh := make(chan *sources.Chunk, 1)
 
 	source := &Source{
-		gcsManager: &mockObjectManager{},
+		gcsManager: &mockObjectManager{numObjects: 5},
 		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
 	}
-	cache := memory.New()
-	source.cache = newPersistableCache(5, cache)
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -260,16 +334,17 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 		return got[i].SourceMetadata.GetGcs().Filename < got[j].SourceMetadata.GetGcs().Filename
 	})
 
-	for _, c := range got {
-		assert.Equal(t, c.SourceMetadata.GetGcs().Filename, c.SourceMetadata.GetGcs().Filename)
-		assert.Equal(t, c.Data, c.Data)
+	for i, c := range got {
+		assert.Equal(t, want[i].SourceMetadata.GetGcs().Filename, c.SourceMetadata.GetGcs().Filename)
+		assert.Equal(t, want[i].Data, c.Data)
+		assert.Equal(t, want[i].SourceMetadata.GetGcs().CreatedAt, c.SourceMetadata.GetGcs().CreatedAt)
 	}
 
 }
 
 func TestSourceInit_Enumerate(t *testing.T) {
 	ctx := context.Background()
-	source := &Source{gcsManager: &mockObjectManager{}}
+	source := &Source{gcsManager: &mockObjectManager{numObjects: 5}}
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -295,13 +370,10 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	ctx := context.Background()
 	chunksCh := make(chan *sources.Chunk, 1)
 	source := &Source{
-		gcsManager: &mockObjectManager{},
+		gcsManager: &mockObjectManager{numObjects: defaultCachePersistIncrement},
 		chunksCh:   chunksCh,
 		Progress:   sources.Progress{},
 	}
-
-	cache := memory.New()
-	source.cache = newPersistableCache(5, cache)
 
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
@@ -312,35 +384,81 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 		assert.Nil(t, err)
 	}()
 
-	want := make([]*sources.Chunk, 0, 5)
-	for i := 0; i < 5; i++ {
+	want := make([]*sources.Chunk, 0, defaultCachePersistIncrement)
+	for i := 0; i < defaultCachePersistIncrement; i++ {
 		want = append(want, createTestSourceChunk(i))
 	}
 
-	got := make([]*sources.Chunk, 0, 5)
+	got := make([]*sources.Chunk, 0, defaultCachePersistIncrement)
 	for ch := range chunksCh {
 		got = append(got, ch)
 	}
 
-	// Ensure we get 5 objects back.
+	// Ensure we get 2500 objects back.
 	assert.Equal(t, len(want), len(got))
 
-	processing := map[string]struct{}{"md5hash0": {}, "md5hash1": {}, "md5hash2": {}, "md5hash3": {}, "md5hash4": {}}
-	for i := 0; i < 5; i++ {
-		delete(processing, fmt.Sprintf("object%d", i))
+	// Test that the resume progress is set.
+	var progress strings.Builder
+	for i := range got {
+		progress.WriteString(fmt.Sprintf("object%d", i))
+		// Add a comma if not the last element.
+		if i != len(got)-1 {
+			progress.WriteString(",")
+		}
 	}
 
-	// Test that the resume progress is set.
-	// The processed values should be the greatest object name lexicographically.
-	progress := "md5hash0,md5hash1,md5hash2,md5hash3,md5hash4"
-	objs := strings.Split(progress, ",")
-
 	encodeResume := strings.Split(source.Progress.EncodedResumeInfo, ",")
-	sort.Strings(encodeResume)
+	sort.Slice(encodeResume, func(i, j int) bool {
+		numI, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[i], "object"))
+		numJ, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[j], "object"))
+		return numI < numJ
+	})
 
-	assert.Equal(t, objs, encodeResume)
-	assert.Equal(t, int32(5), source.Progress.SectionsCompleted)
+	assert.Equal(t, progress.String(), strings.Join(encodeResume, ","))
+	assert.Equal(t, int32(defaultCachePersistIncrement), source.Progress.SectionsCompleted)
 	assert.Equal(t, int64(100), source.Progress.PercentComplete)
-	assert.Equal(t, 0, source.cache.Count())
-	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", 5), source.Progress.Message)
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", defaultCachePersistIncrement), source.Progress.Message)
+}
+
+func TestSource_CachePersistence(t *testing.T) {
+	ctx := context.Background()
+
+	wantObjCnt := 4 // ensure we have less objects than the cache increment
+	mockObjManager := &mockObjectManager{numObjects: wantObjCnt}
+
+	chunksCh := make(chan *sources.Chunk, 1)
+	source := &Source{
+		gcsManager: mockObjManager,
+		chunksCh:   chunksCh,
+		Progress:   sources.Progress{},
+	}
+
+	err := source.enumerate(ctx)
+	assert.Nil(t, err)
+
+	go func() {
+		defer close(chunksCh)
+		err := source.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	want := make([]*sources.Chunk, 0, wantObjCnt)
+	for i := 0; i < wantObjCnt; i++ {
+		want = append(want, createTestSourceChunk(i))
+	}
+
+	got := make([]*sources.Chunk, 0, wantObjCnt)
+	for ch := range chunksCh {
+		got = append(got, ch)
+	}
+
+	// Ensure we get 4 objects back.
+	assert.Equal(t, len(want), len(got))
+
+	// Test that the resume progress is empty.
+	// The cache should not have been persisted.
+	assert.Equal(t, "", source.Progress.EncodedResumeInfo)
+	assert.Equal(t, int32(wantObjCnt), source.Progress.SectionsCompleted)
+	assert.Equal(t, int64(100), source.Progress.PercentComplete)
+	assert.Equal(t, fmt.Sprintf("GCS source finished processing %d objects", wantObjCnt), source.Progress.Message)
 }

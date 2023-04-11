@@ -2,7 +2,6 @@ package coinmarketcap
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,13 +20,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"coinmarketcap","CMC"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"coinmarketcap", "CMC"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"coinmarketcap","CMC"}
+	return []string{"coinmarketcap", "CMC"}
 }
 
 // FromData will find and optionally verify Coinmarketcap secrets in a given set of bytes.
@@ -53,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("Accept", "application/json")
-			req.Header.Add("X-CMC_PRO_API_KEY", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("X-CMC_PRO_API_KEY", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

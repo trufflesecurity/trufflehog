@@ -41,6 +41,7 @@ enum SourceType {
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
   SOURCE_TYPE_GOOGLE_DRIVE = 28;
+  SOURCE_TYPE_SHAREPOINT = 29;
   SOURCE_TYPE_GCS_UNAUTHED = 30;
 }
 
@@ -131,6 +132,7 @@ message GCS {
     credentials.Unauthenticated unauthenticated = 3;
     credentials.CloudEnvironment adc = 4;
     string service_account_file = 11;
+    credentials.Oauth2 oauth = 12;
   }
   string project_id = 5;
   repeated string include_buckets = 6;
@@ -212,6 +214,7 @@ message S3 {
     credentials.KeySecret access_key = 1;
     credentials.Unauthenticated unauthenticated = 2;
     credentials.CloudEnvironment cloud_environment = 4;
+    credentials.AWSSessionTokenSecret session_token = 5;
   }
   repeated string buckets = 3;
 }
@@ -256,6 +259,7 @@ message Teams {
   oneof credential {
     string token = 2;
     credentials.ClientCredentials authenticated = 3;
+    credentials.Oauth2 oauth = 7;
   }
   repeated string channels = 4;
   repeated string ignoreList = 5;
@@ -293,4 +297,13 @@ message SlackRealtime {
   oneof credential {
     credentials.SlackTokens tokens = 1;
   }
+}
+
+message Sharepoint {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string refresh_token = 2;
+  }
+  string site_url = 3;
+
 }

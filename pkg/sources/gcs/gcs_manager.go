@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -119,6 +120,19 @@ func (s *attributes) setBucketCnt(bkt string, cnt uint64) {
 }
 
 type gcsManagerOption func(*gcsManager) error
+
+// withHTTPClient uses the provided HTTP client when creating a new GCS client.
+func withHTTPClient(ctx context.Context, httpClient *http.Client) gcsManagerOption {
+	client, err := storage.NewClient(ctx, option.WithHTTPClient(httpClient), option.WithScopes(storage.ScopeReadOnly))
+	return func(m *gcsManager) error {
+		if err != nil {
+			return err
+		}
+
+		m.client = client
+		return nil
+	}
+}
 
 // withAPIKey uses the provided API key when creating a new GCS client.
 // This can ONLY be used for public buckets.
