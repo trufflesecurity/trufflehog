@@ -263,6 +263,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isModeLine(line):
 			// NoOp
 		case isIndexLine(line):
+			recentlyPassedAuthor = false
 			// NoOp
 		case isPlusFileLine(line):
 			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
@@ -276,7 +277,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if recentlyPassedAuthor {
 				currentCommit.Message.Write(line[4:])
 			}
-			recentlyPassedAuthor = false
 		case isContextDiffLine(line):
 			currentDiff.Content.Write([]byte("\n"))
 		case isBinaryLine(line):
