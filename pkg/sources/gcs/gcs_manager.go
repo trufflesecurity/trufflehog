@@ -650,7 +650,7 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 	o.contentType = attrs.ContentType
 	o.owner = attrs.Owner
 	o.link = attrs.MediaLink
-	o.md5 = base64.StdEncoding.EncodeToString(attrs.MD5[:])
+	o.md5 = base64.StdEncoding.EncodeToString(attrs.MD5)
 	o.createdAt = attrs.Created
 	o.updatedAt = attrs.Updated
 	o.acl = objectACLs(attrs.ACL)
