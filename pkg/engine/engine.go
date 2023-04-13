@@ -247,10 +247,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				// dataLower := strings.ToLower(string(decoded.Data))
-				matches := e.prefilter.FindAll(string(decoded.Data))
-
-				for _, m := range matches {
+				// build a map of all keywords that were matched in the chunk
+				for _, m := range e.prefilter.FindAll(string(decoded.Data)) {
 					matchedKeywords[strings.ToLower(string(decoded.Data[m.Start():m.End()]))] = struct{}{}
 				}
 
