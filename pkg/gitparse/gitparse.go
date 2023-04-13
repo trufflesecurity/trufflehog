@@ -193,6 +193,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	outReader := bufio.NewReader(stdOut)
 	var currentCommit *Commit
 	var currentDiff *Diff
+	var recentlyPassedAuthor bool
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -225,6 +226,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			}
 		case isAuthorLine(line):
 			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
+			recentlyPassedAuthor = true
 		case isDateLine(line):
 			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
 			if err != nil {
@@ -261,6 +263,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isModeLine(line):
 			// NoOp
 		case isIndexLine(line):
+			recentlyPassedAuthor = false
 			// NoOp
 		case isPlusFileLine(line):
 			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
@@ -271,7 +274,9 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isMinusDiffLine(line):
 			// NoOp. We only care about additions.
 		case isMessageLine(line):
-			currentCommit.Message.Write(line[4:])
+			if recentlyPassedAuthor {
+				currentCommit.Message.Write(line[4:])
+			}
 		case isContextDiffLine(line):
 			currentDiff.Content.Write([]byte("\n"))
 		case isBinaryLine(line):
