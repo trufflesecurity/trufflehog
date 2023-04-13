@@ -247,11 +247,11 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				dataLower := strings.ToLower(string(decoded.Data))
-				matches := e.prefilter.FindAll(dataLower)
+				// dataLower := strings.ToLower(string(decoded.Data))
+				matches := e.prefilter.FindAll(string(decoded.Data))
 
 				for _, m := range matches {
-					matchedKeywords[dataLower[m.Start():m.End()]] = struct{}{}
+					matchedKeywords[strings.ToLower(string(decoded.Data[m.Start():m.End()]))] = struct{}{}
 				}
 
 				for verify, detectorsSet := range e.detectors {
