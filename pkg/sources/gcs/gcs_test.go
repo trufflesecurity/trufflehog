@@ -263,6 +263,7 @@ func createTestObject(id int) object {
 		link:        fmt.Sprintf("https://storage.googleapis.com/%s/%s", testBucket, fmt.Sprintf("object%d", id)),
 		acl:         []string{"authenticatedUsers"},
 		size:        42,
+		md5:         fmt.Sprintf("md5hash%d", id),
 		Reader:      &mockReader{data: []byte(fmt.Sprintf("hello world %d", id))},
 		createdAt:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
@@ -399,7 +400,7 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 	// Test that the resume progress is set.
 	var progress strings.Builder
 	for i := range got {
-		progress.WriteString(fmt.Sprintf("object%d", i))
+		progress.WriteString(fmt.Sprintf("md5hash%d", i))
 		// Add a comma if not the last element.
 		if i != len(got)-1 {
 			progress.WriteString(",")
@@ -408,8 +409,8 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 
 	encodeResume := strings.Split(source.Progress.EncodedResumeInfo, ",")
 	sort.Slice(encodeResume, func(i, j int) bool {
-		numI, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[i], "object"))
-		numJ, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[j], "object"))
+		numI, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[i], "md5hash"))
+		numJ, _ := strconv.Atoi(strings.TrimPrefix(encodeResume[j], "md5hash"))
 		return numI < numJ
 	})
 
