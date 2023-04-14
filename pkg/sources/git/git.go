@@ -295,7 +295,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, errors.New("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", output, "error", err)
+		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
 		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
