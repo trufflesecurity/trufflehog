@@ -260,7 +260,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if persistableCache.Exists(o.name) {
+		if persistableCache.Exists(o.md5) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}
