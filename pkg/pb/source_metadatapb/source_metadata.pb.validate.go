@@ -2393,6 +2393,8 @@ func (m *Teams) validate(all bool) error {
 
 	// no validation rules for Location
 
+	// no validation rules for TeamName
+
 	if len(errors) > 0 {
 		return TeamsMultiError(errors)
 	}

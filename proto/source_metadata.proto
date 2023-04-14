@@ -212,6 +212,7 @@ message Teams {
   string file = 6;
   string email = 7;
   string location = 8;
+  string team_name = 9;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-FileInfo
