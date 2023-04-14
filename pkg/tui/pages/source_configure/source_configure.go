@@ -1,140 +1,77 @@
 package source_configure
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/tabs"
 )
+
+type SetSourceMsg struct {
+	Source string
+}
+
+type tab int
+
+const (
+	configTab tab = iota
+	truffleConfigTab
+	runTab
+)
+
+func (t tab) String() string {
+	return []string{
+		"1. Configuration",
+		"2. Truffle Configuration",
+		"3. Run",
+	}[t]
+}
 
 type SourceConfigure struct {
 	common.Common
-	cmd         *kingpin.CmdModel
-	inputs      []textinput.Model
-	inputsTitle []string
-	focused     int
-	err         error
+	activeTab       tab
+	tabs            *tabs.Tabs
+	configTabSource string
 }
 
 func (m SourceConfigure) Init() tea.Cmd {
-	return nil
+	return m.tabs.Init()
 }
-
-var (
-	labelPrimaryStyle = lipgloss.NewStyle().Foreground(
-		lipgloss.Color(styles.Colors["sprout"]))
-)
 
 func New(c common.Common) *SourceConfigure {
+	tb := tabs.New(c, []string{configTab.String(), truffleConfigTab.String(), runTab.String()})
 	return &SourceConfigure{
-		Common:      c,
-		cmd:         nil,
-		inputs:      nil,
-		inputsTitle: nil,
-		focused:     0,
-		err:         nil,
+		tabs:   tb,
+		Common: c,
 	}
-}
-
-func (m *SourceConfigure) SetCmd(cmd *kingpin.CmdModel) {
-	numInputs := len(cmd.Args) + len(cmd.Flags)
-	var inputs []textinput.Model = make([]textinput.Model, 0, numInputs)
-	var inputsTitle []string = make([]string, 0, numInputs)
-
-	for _, arg := range cmd.Args {
-		in := textinput.New()
-		in.Placeholder = arg.Name
-		in.CharLimit = 50
-		in.Width = 30
-		in.Prompt = ""
-
-		inputs = append(inputs, in)
-		if arg.Required {
-			inputsTitle = append(inputsTitle, arg.Name+"*")
-		} else {
-			inputsTitle = append(inputsTitle, arg.Name)
-		}
-	}
-
-	for _, flag := range cmd.Flags {
-		in := textinput.New()
-		in.Placeholder = flag.Name
-		in.CharLimit = 50
-		in.Width = 30
-		in.Prompt = ""
-
-		inputs = append(inputs, in)
-		if flag.Required {
-			inputsTitle = append(inputsTitle, flag.Name+"*")
-		} else {
-			inputsTitle = append(inputsTitle, flag.Name)
-		}
-	}
-	inputs[0].Focus()
 }
 
 func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd = make([]tea.Cmd, len(m.inputs))
+	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tabs.SelectTabMsg:
+		m.activeTab = tab(msg)
+		t, cmd := m.tabs.Update(msg)
+		m.tabs = t.(*tabs.Tabs)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
-			if m.focused == len(m.inputs)-1 {
-				return m, tea.Quit
-			}
-			m.nextInput()
-		case tea.KeyCtrlC, tea.KeyEsc:
-			return m, tea.Quit
-		case tea.KeyShiftTab, tea.KeyCtrlP:
-			m.prevInput()
-		case tea.KeyTab, tea.KeyCtrlN:
-			m.nextInput()
+		t, cmd := m.tabs.Update(msg)
+		m.tabs = t.(*tabs.Tabs)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
-		for i := range m.inputs {
-			m.inputs[i].Blur()
-		}
-		m.inputs[m.focused].Focus()
+	case SetSourceMsg:
+		m.configTabSource = msg.Source
 	}
 
-	for i := range m.inputs {
-		m.inputs[i], cmds[i] = m.inputs[i].Update(msg)
-	}
 	return m, tea.Batch(cmds...)
 }
 
-func (m *SourceConfigure) nextInput() {
-	m.focused = (m.focused + 1) % len(m.inputs)
-}
-
-func (m *SourceConfigure) prevInput() {
-	m.focused--
-	// Wrap around
-	if m.focused < 0 {
-		m.focused = len(m.inputs) - 1
-	}
-}
-
 func (m *SourceConfigure) View() string {
-	var views []string = make([]string, 0, len(m.inputs))
-
-	for i, input := range m.inputs {
-		view := fmt.Sprintf(
-			`%s
-%s`,
-			labelPrimaryStyle.Width(30).Render(m.inputsTitle[i]),
-			input.View(),
-		)
-		views = append(views, view)
-	}
-
-	return strings.Join(views, "\n\n")
+	return m.tabs.View()
 }
 
 func (m *SourceConfigure) ShortHelp() []key.Binding {
@@ -145,48 +82,4 @@ func (m *SourceConfigure) ShortHelp() []key.Binding {
 func (m *SourceConfigure) FullHelp() [][]key.Binding {
 	// TODO: actually return something
 	return nil
-}
-
-func newSourceConfigure(cmd *kingpin.CmdModel) *SourceConfigure {
-	numInputs := len(cmd.Args) + len(cmd.Flags)
-	var inputs []textinput.Model = make([]textinput.Model, 0, numInputs)
-	var inputsTitle []string = make([]string, 0, numInputs)
-
-	for _, arg := range cmd.Args {
-		in := textinput.New()
-		in.Placeholder = arg.Name
-		in.CharLimit = 50
-		in.Width = 30
-		in.Prompt = ""
-
-		inputs = append(inputs, in)
-		if arg.Required {
-			inputsTitle = append(inputsTitle, arg.Name+"*")
-		} else {
-			inputsTitle = append(inputsTitle, arg.Name)
-		}
-	}
-
-	for _, flag := range cmd.Flags {
-		in := textinput.New()
-		in.Placeholder = flag.Name
-		in.CharLimit = 50
-		in.Width = 30
-		in.Prompt = ""
-
-		inputs = append(inputs, in)
-		if flag.Required {
-			inputsTitle = append(inputsTitle, flag.Name+"*")
-		} else {
-			inputsTitle = append(inputsTitle, flag.Name)
-		}
-	}
-
-	inputs[0].Focus()
-	return &SourceConfigure{
-		inputs:      inputs,
-		inputsTitle: inputsTitle,
-		focused:     0,
-		err:         nil,
-	}
 }

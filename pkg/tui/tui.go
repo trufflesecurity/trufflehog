@@ -106,6 +106,7 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, ui.common.KeyMap.Back):
 			case key.Matches(msg, ui.common.KeyMap.Help):
 			case key.Matches(msg, ui.common.KeyMap.Quit):
+				return ui, tea.Quit
 			case ui.activePage > 0 && key.Matches(msg, ui.common.KeyMap.Back):
 				ui.activePage -= 1
 			}
@@ -129,12 +130,11 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case wizard_intro.ScanSourceWithWizard:
 				ui.activePage = sourceSelectPage
 			}
-		// case source_select.SourceItem:
-		// 	ui.activePage = sourceConfigurePage
-		default:
-			if item != nil {
-				fmt.Printf("Select message: %s\n", item.ID())
-			}
+		case source_select.SourceItem:
+			ui.activePage = sourceConfigurePage
+			cmds = append(cmds, func() tea.Msg {
+				return source_configure.SetSourceMsg{Source: item.ID()}
+			})
 		}
 
 	}
