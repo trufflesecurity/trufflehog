@@ -33,6 +33,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Bscscan secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
+	var verifyError error
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -55,27 +56,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-                                bodyBytes, err := io.ReadAll(res.Body)
-                                if err != nil {
-                                        continue
-                                }
-                                body := string(bodyBytes)
+				bodyBytes, err := io.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
+				body := string(bodyBytes)
 
-                                if !strings.Contains(body, "NOTOK") {
-                                        s1.Verified = true
-                                } else {
-                                        // This function will check false positives for common test words, but also it will make sur>
-                                        if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-                                                continue
-                                        }
-                                }
-                        }
-                }
+				if !strings.Contains(body, "NOTOK") {
+					s1.Verified = true
+				} else {
+					// This function will check false positives for common test words, but also it will make sur>
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						continue
+					}
+				}
+			}
+		}
 
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

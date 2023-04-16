@@ -69,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

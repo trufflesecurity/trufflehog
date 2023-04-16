@@ -32,8 +32,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Square secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
-	// Surprisingly there are still a lot of false positives! So, also doing substring check for square.
+	var verifyError error // Surprisingly there are still a lot of false positives! So, also doing substring check for square.
 	if !strings.Contains(strings.ToLower(dataStr), "square") {
 		return
 	}
@@ -85,7 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

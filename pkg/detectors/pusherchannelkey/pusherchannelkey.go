@@ -46,7 +46,7 @@ const (
 // FromData will find and optionally verify PusherChannelKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	appMatches := appIdPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
@@ -127,7 +127,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return results, nil
+	return results, verifyError
 }
 func hmacBytes(toSign, secret []byte) []byte {
 	_authSignature := hmac.New(sha256.New, secret)
