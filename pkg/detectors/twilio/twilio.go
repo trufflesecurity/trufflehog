@@ -32,7 +32,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Twilio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	identifierMatches := identifierPat.FindAllString(dataStr, -1)
 
 	if len(identifierMatches) == 0 {
@@ -87,7 +87,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

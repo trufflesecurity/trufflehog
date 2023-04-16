@@ -34,7 +34,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Strava secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -90,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return results, nil
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

@@ -88,13 +88,11 @@ func GetHMAC(key []byte, data []byte) []byte {
 }
 
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
-func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
-
-	var verifyError error
 
 	for _, idMatch := range idMatches {
 		if len(idMatch) != 2 {

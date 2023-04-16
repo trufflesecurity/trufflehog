@@ -42,6 +42,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Gengo secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
+	var verifyError error
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
@@ -105,7 +106,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return results, nil
+	return results, verifyError
 }
 
 type Response struct {

@@ -35,7 +35,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify SquareApp secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	matches := keyPat.FindAllString(dataStr, -1)
 	secMatches := secPat.FindAllString(dataStr, -1)
 	for _, match := range matches {
@@ -91,7 +91,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			results = append(results, s)
 		}
 	}
-	return
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

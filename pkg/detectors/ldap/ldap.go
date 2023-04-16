@@ -44,8 +44,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Ldap secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
-	// Check for matches in the URI + username + password format
+	var verifyError error // Check for matches in the URI + username + password format
 	uriMatches := uriPat.FindAllString(dataStr, -1)
 	for _, uri := range uriMatches {
 		ldapURL, err := url.Parse(uri)
@@ -95,7 +94,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return results, verifyError
 }
 
 func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL) bool {

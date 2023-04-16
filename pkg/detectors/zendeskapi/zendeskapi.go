@@ -35,7 +35,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify ZendeskApi secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	tokens := token.FindAllStringSubmatch(dataStr, -1)
 	domains := domain.FindAllStringSubmatch(dataStr, -1)
 	emails := email.FindAllStringSubmatch(dataStr, -1)
@@ -92,7 +92,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return results, nil
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

@@ -3,8 +3,11 @@ package saucelabs
 import (
 	"context"
 	b64 "encoding/base64"
+	"errors"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -35,7 +38,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify SauceLabs secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -68,7 +71,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
 				// req.SetBasicAuth(idMatch, keyMatch)
 				res, err := client.Do(req)
-				if err == nil {
+				if err != nil {
+					urlErr := &url.Error{
+						URL: req.URL.Host,
+						Op:  req.Method,
+						Err: errors.Unwrap(err),
+					}
+					verifyError = fmt.Errorf("%w: %s", pkg.ErrVerify, urlErr)
+				} else {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
@@ -85,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return results, nil
+	return results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

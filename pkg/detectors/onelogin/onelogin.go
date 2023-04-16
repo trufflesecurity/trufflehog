@@ -37,7 +37,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Onelogin secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
+	var verifyError error
 	for _, clientID := range oauthClientIDPat.FindAllStringSubmatch(dataStr, -1) {
 		if len(clientID) != 2 {
 			continue
@@ -81,7 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return results, nil
+	return results, verifyError results, verifyError
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
