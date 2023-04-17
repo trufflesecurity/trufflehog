@@ -11,40 +11,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-const defaultURL = "https://gitlab.com"
-
-type Scanner struct {
-	verifierURLs []string
-}
-
-// New creates a new Scanner with the given options.
-func New(opts ...func(*Scanner)) *Scanner {
-	scanner := &Scanner{
-		verifierURLs: make([]string, 0),
-	}
-	for _, opt := range opts {
-		opt(scanner)
-	}
-
-	return scanner
-}
-
-// WithVerifierURLs adds the given URLs to the list of URLs to check for
-// verification of secrets.
-func WithVerifierURLs(urls []string, includeDefault bool) func(*Scanner) {
-	return func(s *Scanner) {
-		if includeDefault {
-			urls = append(urls, defaultURL)
-		}
-		s.verifierURLs = append(s.verifierURLs, urls...)
-	}
-}
+type Scanner struct{ detectors.EndpointSetter }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
-func (*Scanner) Version() int { return 2 }
+func (Scanner) Version() int            { return 2 }
+func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
 	keyPat = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
@@ -62,10 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	if len(s.verifierURLs) == 0 {
-		s.verifierURLs = append(s.verifierURLs, defaultURL)
-	}
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
@@ -82,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// one of these scopes has access to, so we just check an example endpoint for each scope. If any
 			// of them contain data, we know we have a valid key, but if they all fail, we don't
 			client := common.SaneHttpClient()
-			for _, baseURL := range s.verifierURLs {
+			for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
 				// test `read_user` scope
 				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
 				if err != nil {
