@@ -15,6 +15,10 @@ type Cache interface {
 	Clear()
 	// Count the number of key/value pairs in the cache.
 	Count() int
+	// Keys returns all keys in the cache.
+	Keys() []string
+	// Values returns all values in the cache.
+	Values() []string
 	// Contents returns all keys in the cache encoded as a string.
 	Contents() string
 }

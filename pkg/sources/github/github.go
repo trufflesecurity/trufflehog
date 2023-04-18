@@ -25,6 +25,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -52,20 +54,19 @@ type Source struct {
 	repos,
 	orgs,
 	members []string
-	repoCache       *repoCache
-	orgCache        map[string]struct{}
-	memberCache     map[string]struct{}
-	git             *git.Git
-	scanOptions     *git.ScanOptions
-	httpClient      *http.Client
-	log             logr.Logger
-	conn            *sourcespb.GitHub
-	jobPool         *errgroup.Group
-	resumeInfoMutex sync.Mutex
-	resumeInfoSlice []string
-	apiClient       *github.Client
-	mu              sync.Mutex
-	publicMap       map[string]source_metadatapb.Visibility
+	filteredRepoCache *filteredRepoCache
+	memberCache       map[string]struct{}
+	git               *git.Git
+	scanOptions       *git.ScanOptions
+	httpClient        *http.Client
+	log               logr.Logger
+	conn              *sourcespb.GitHub
+	jobPool           *errgroup.Group
+	resumeInfoMutex   sync.Mutex
+	resumeInfoSlice   []string
+	apiClient         *github.Client
+	mu                sync.Mutex
+	publicMap         map[string]source_metadatapb.Visibility
 	sources.Progress
 }
 
@@ -129,45 +130,31 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 	return "", "", errors.New("unhandled credential type for token fetch")
 }
 
-// repoCache is a thread safe map of repositories that need to be scanned.
-// It also enforces the include and exclude globs.
-type repoCache struct {
-	count uint64
-	mu    sync.Mutex
-	m     map[string]struct{}
-
-	// include, exclude are globs to filter the repoCache.
+// filteredRepoCache is a wrapper around cache.Cache that filters out repos
+// based on include and exclude globs.
+type filteredRepoCache struct {
+	cache.Cache
 	include, exclude []string
 }
 
-func newRepoCache(includeRepos, excludeRepos []string) *repoCache {
-	return &repoCache{
-		m:       make(map[string]struct{}),
-		include: includeRepos,
-		exclude: excludeRepos,
-	}
+func newFilteredRepoCache(c cache.Cache, include, exclude []string) *filteredRepoCache {
+	return &filteredRepoCache{Cache: c, include: include, exclude: exclude}
 }
 
-func (r *repoCache) len() uint64 {
-	return atomic.LoadUint64(&r.count)
-}
-
-func (r *repoCache) add(url, name string) {
-	if r.ignoreRepo(name) {
+// Set overrides the cache.Cache Set method to filter out repos based on
+// include and exclude globs.
+func (c *filteredRepoCache) Set(key, val string) {
+	if c.ignoreRepo(key) {
 		return
 	}
-	if !r.includeRepo(name) {
+	if !c.includeRepo(key) {
 		return
 	}
-
-	r.mu.Lock()
-	r.count++
-	r.m[url] = struct{}{}
-	r.mu.Unlock()
+	c.Cache.Set(key, val)
 }
 
-func (r *repoCache) ignoreRepo(s string) bool {
-	for _, exclude := range r.exclude {
+func (c *filteredRepoCache) ignoreRepo(s string) bool {
+	for _, exclude := range c.exclude {
 		g, err := glob.Compile(exclude)
 		if err != nil {
 			continue
@@ -179,12 +166,12 @@ func (r *repoCache) ignoreRepo(s string) bool {
 	return false
 }
 
-func (r *repoCache) includeRepo(s string) bool {
-	if len(r.include) == 0 {
+func (c *filteredRepoCache) includeRepo(s string) bool {
+	if len(c.include) == 0 {
 		return true
 	}
 
-	for _, include := range r.include {
+	for _, include := range c.include {
 		g, err := glob.Compile(include)
 		if err != nil {
 			continue
@@ -194,24 +181,6 @@ func (r *repoCache) includeRepo(s string) bool {
 		}
 	}
 	return false
-}
-
-func (r *repoCache) exists(repo string) bool {
-	r.mu.Lock()
-	_, ok := r.m[repo]
-	r.mu.Unlock()
-	return ok
-}
-
-func (r *repoCache) repos() []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	repos := make([]string, 0, r.count)
-	for repo := range r.m {
-		repos = append(repos, repo)
-	}
-	return repos
 }
 
 // Init returns an initialized GitHub source.
@@ -235,23 +204,20 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	}
 	s.conn = &conn
 
-	s.repoCache = newRepoCache(s.conn.IncludeRepos, s.conn.IgnoreRepos)
-	s.orgCache = make(map[string]struct{})
+	s.filteredRepoCache = newFilteredRepoCache(memory.New(), s.conn.IncludeRepos, s.conn.IgnoreRepos)
 	s.memberCache = make(map[string]struct{})
 
 	s.repos = s.conn.Repositories
 	for _, repo := range s.repos {
 		r, err := s.normalizeRepo(repo)
 		if err != nil {
-			return fmt.Errorf("invalid repository %q: %v", repo, err)
+			aCtx.Logger().Error(err, "invalid repository", "repo", repo)
+			continue
 		}
-		s.repoCache.add(r, "")
+		s.filteredRepoCache.Set(r, r)
 	}
 
 	s.orgs = s.conn.Organizations
-	for _, org := range s.orgs {
-		s.orgCache[org] = struct{}{}
-	}
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -393,7 +359,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	s.repos = s.repoCache.repos()
+	s.repos = s.filteredRepoCache.Values()
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
@@ -515,7 +481,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			}
 
 			// TODO: Test it actually works to list org gists like this.
-			if err := s.getGistsByUser(ctx, org); err != nil {
+			if err := s.addUserGistsToCache(ctx, org); err != nil {
 				logger.Error(err, "error fetching gists by org")
 			}
 
@@ -530,7 +496,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
-		if err := s.getGistsByUser(ctx, ghUser.GetLogin()); err != nil {
+		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
 			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
 		}
 	}
@@ -801,7 +767,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 				logger.V(2).Info("could not normalize repo", "repo", r.GetFullName(), "error", err)
 				continue
 			}
-			s.repoCache.add(repo, r.GetFullName())
+			s.filteredRepoCache.Set(r.GetFullName(), repo)
 			numRepos++
 		}
 		if res.NextPage == 0 {
@@ -848,7 +814,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 				s.log.V(2).Info("could not normalize repo", "repo", r.GetFullName(), "error", err)
 				continue
 			}
-			s.repoCache.add(repo, r.GetFullName())
+			s.filteredRepoCache.Set(r.GetFullName(), repo)
 		}
 		if res.NextPage == 0 {
 			break
@@ -859,7 +825,9 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 	return nil
 }
 
-func (s *Source) getGistsByUser(ctx context.Context, user string) error {
+// addUserGistsToCache collects all the gist urls for a given user,
+// and adds them to the filteredRepoCache.
+func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 	gistOpts := &github.GistListOptions{}
 	logger := s.log.WithValues("user", user)
 	for {
@@ -879,7 +847,7 @@ func (s *Source) getGistsByUser(ctx context.Context, user string) error {
 				s.log.V(2).Info("could not normalize gist", "gist", gist.GetGitPullURL(), "error", err)
 				continue
 			}
-			s.repoCache.add(repoURL, "")
+			s.filteredRepoCache.Set(gist.GetID(), repoURL)
 		}
 		if res == nil || res.NextPage == 0 {
 			break
@@ -943,7 +911,7 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 				s.log.V(2).Info("could not normalize repo", "repo", r.GetFullName(), "error", err)
 				continue
 			}
-			s.repoCache.add(repo, r.GetFullName())
+			s.filteredRepoCache.Set(r.GetFullName(), repo)
 			s.log.V(2).Info("Enumerated repo", "repo", r.GetFullName())
 		}
 
@@ -995,9 +963,6 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 				continue
 			}
 			s.log.V(2).Info("adding organization for repository enumeration", "id", org.ID, "name", name)
-			if _, ok := s.orgCache[name]; !ok {
-				s.orgCache[name] = struct{}{}
-			}
 		}
 	}
 }
@@ -1026,9 +991,6 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 		for _, org := range orgs {
 			if org.Login == nil {
 				continue
-			}
-			if _, ok := s.orgCache[*org.Login]; !ok {
-				s.orgCache[*org.Login] = struct{}{}
 			}
 		}
 		if resp.NextPage == 0 {
@@ -1083,7 +1045,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 func (s *Source) addReposForMembers(ctx context.Context) {
 	s.log.Info("Fetching repos from members", "members", len(s.members))
 	for member := range s.memberCache {
-		if err := s.getGistsByUser(ctx, member); err != nil {
+		if err := s.addUserGistsToCache(ctx, member); err != nil {
 			s.log.Info("Unable to fetch gists by user", "user", member, "error", err)
 		}
 		if err := s.getReposByUser(ctx, member); err != nil {

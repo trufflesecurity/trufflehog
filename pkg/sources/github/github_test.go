@@ -80,8 +80,8 @@ func TestAddReposByOrg(t *testing.T) {
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(1), s.repoCache.len())
-	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
+	assert.Equal(t, 1, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -108,10 +108,10 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.TODO(), "super-secret-org")
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(2), s.repoCache.len())
-	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("secret/super-secret-repo")
 	assert.True(t, ok)
-	ok = s.repoCache.exists("https://github.com/super-secret-repo2.git")
+	ok = s.filteredRepoCache.Exists("secret/super-secret-repo2")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -123,7 +123,7 @@ func TestAddReposByUser(t *testing.T) {
 		Get("/users/super-secret-user/repos").
 		Reply(200).
 		JSON([]map[string]string{
-			{"clone_url": "https://github.com/super-secret-repo.git", "name": "super-secret-repo"},
+			{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"},
 			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
 		})
 
@@ -135,8 +135,8 @@ func TestAddReposByUser(t *testing.T) {
 	})
 	err := s.getReposByUser(context.TODO(), "super-secret-user")
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(1), s.repoCache.len())
-	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
+	assert.Equal(t, 1, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -147,13 +147,13 @@ func TestAddGistsByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://githug.com/super-secret-gist.git"}})
+		JSON([]map[string]string{{"git_pull_url": "https://githug.com/super-secret-gist.git", "id": "super-secret-gist"}})
 
 	s := initTestSource(nil)
-	err := s.getGistsByUser(context.TODO(), "super-secret-user")
+	err := s.addUserGistsToCache(context.TODO(), "super-secret-user")
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(1), s.repoCache.len())
-	ok := s.repoCache.exists("https://githug.com/super-secret-gist.git")
+	assert.Equal(t, 1, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-gist")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -219,18 +219,18 @@ func TestAddReposByApp(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"repositories": []map[string]string{
-				{"clone_url": "https://github/ssr1.git"},
-				{"clone_url": "https://github/ssr2.git"},
+				{"clone_url": "https://github/ssr1.git", "full_name": "ssr1"},
+				{"clone_url": "https://github/ssr2.git", "full_name": "ssr2"},
 			},
 		})
 
 	s := initTestSource(nil)
 	err := s.addReposByApp(context.TODO())
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(2), s.repoCache.len())
-	ok := s.repoCache.exists("https://github/ssr1.git")
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("ssr1")
 	assert.True(t, ok)
-	ok = s.repoCache.exists("https://github/ssr2.git")
+	ok = s.filteredRepoCache.Exists("ssr2")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -249,9 +249,6 @@ func TestAddOrgsByUser(t *testing.T) {
 
 	s := initTestSource(nil)
 	s.addOrgsByUser(context.TODO(), "super-secret-user")
-	assert.Equal(t, 1, len(s.orgCache))
-	_, ok := s.orgCache["sso2"]
-	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 
@@ -312,8 +309,12 @@ func TestNormalizeRepos(t *testing.T) {
 					assert.Equal(t, got, k)
 				}
 			}
+			res := make(map[string]struct{}, s.filteredRepoCache.Count())
+			for _, v := range s.filteredRepoCache.Keys() {
+				res[v] = struct{}{}
+			}
 
-			if got == "" && !cmp.Equal(s.repoCache.m, tt.expected) {
+			if got == "" && !cmp.Equal(res, tt.expected) {
 				t.Errorf("normalizeRepo() got = %v, want %v", s.repos, tt.expected)
 			}
 		})
@@ -337,13 +338,13 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
 
 	s := initTestSource(nil)
 	s.orgs = []string{"super-secret-org"}
 	s.enumerateUnauthenticated(context.TODO())
-	assert.Equal(t, uint64(1), s.repoCache.len())
-	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
+	assert.Equal(t, 1, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -359,26 +360,26 @@ func TestEnumerateWithToken(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		MatchParam("per_page", "100").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
+		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git", "id": "super-secret-gist"}})
 
 	s := initTestSource(nil)
 	err := s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(2), s.repoCache.len())
-	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
-	ok = s.repoCache.exists("https://github.com/super-secret-gist.git")
+	ok = s.filteredRepoCache.Exists("super-secret-gist")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -426,18 +427,18 @@ func TestEnumerate(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		MatchParam("per_page", "100").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
+		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git", "id": "super-secret-gist"}})
 
 	s := initTestSource(&sourcespb.GitHub{
 		Credential: &sourcespb.GitHub_Token{
@@ -447,10 +448,10 @@ func TestEnumerate(t *testing.T) {
 
 	_, err := s.enumerate(context.TODO(), "https://api.github.com")
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(2), s.repoCache.len())
-	ok := s.repoCache.exists("https://github.com/super-secret-repo.git")
+	assert.Equal(t, 2, s.filteredRepoCache.Count())
+	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
-	ok = s.repoCache.exists("https://github.com/super-secret-gist.git")
+	ok = s.filteredRepoCache.Exists("super-secret-gist")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }

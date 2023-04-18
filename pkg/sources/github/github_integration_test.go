@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -52,12 +53,11 @@ func TestSource_Token(t *testing.T) {
 	}
 
 	s := Source{
-		conn:        conn,
-		httpClient:  common.SaneHttpClient(),
-		log:         logr.Discard(),
-		repoCache:   newRepoCache(nil, nil),
-		memberCache: map[string]struct{}{},
-		orgCache:    map[string]struct{}{},
+		conn:              conn,
+		httpClient:        common.SaneHttpClient(),
+		log:               logr.Discard(),
+		filteredRepoCache: newFilteredRepoCache(memory.New(), nil, nil),
+		memberCache:       map[string]struct{}{},
 	}
 
 	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
@@ -529,7 +529,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.getGistsByUser(ctx, tt.user)
+				s.addUserGistsToCache(ctx, tt.user)
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
@@ -545,11 +545,11 @@ func TestSource_paginateGists(t *testing.T) {
 
 func gistsCheckFunc(expected string, minRepos int, s *Source) sources.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
-		if minRepos != 0 && uint64(minRepos) > s.repoCache.len() {
+		if minRepos != 0 && minRepos > s.filteredRepoCache.Count() {
 			return fmt.Errorf("didn't find enough repos. expected: %d, got :%d", minRepos, len(s.repos))
 		}
 		if expected != "" {
-			for _, repo := range s.repoCache.repos() {
+			for _, repo := range s.filteredRepoCache.Values() {
 				if repo == expected {
 					return nil
 				}
