@@ -158,7 +158,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	)
 
 	// Sanity check detectors for duplicate configuration. Only log in case
-	// a detector has been configure in a way that we isn't represented by
+	// a detector has been configured in a way that isn't represented by
 	// the DetectorID (type and version).
 	{
 		dets := append(e.detectors[true], e.detectors[false]...)
