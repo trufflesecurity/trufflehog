@@ -26,7 +26,7 @@ func TestDefaultDetectorsHaveUniqueVersions(t *testing.T) {
 		version := v.Version()
 		key := detector.Type()
 		if set, ok := detectorTypeToVersions[key]; ok && set != nil {
-			if _, ok := set[version]; !ok {
+			if _, ok := set[version]; ok {
 				t.Errorf("detector %q has duplicate version: %d", detectorspb.DetectorType_name[int32(key)], version)
 			}
 		}
