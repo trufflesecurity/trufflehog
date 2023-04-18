@@ -295,7 +295,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, errors.New("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "error", err)
+		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
 		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
@@ -338,7 +338,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return err
 	}
 
-	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "")
+	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs)
 	if err != nil {
 		return err
 	}
@@ -378,7 +378,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.String()
+			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
@@ -472,9 +472,9 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 	}
 }
 
-// ScanUnstaged chunks unstaged changes.
-func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	// get the URL metadata for reporting (may be empty)
+// ScanStaged chunks staged changes.
+func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+	// Get the URL metadata for reporting (may be empty).
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	commitChan, err := gitparse.NewParser().Unstaged(ctx, path)
@@ -488,11 +488,11 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 	var depth int64
 	var reachedBase = false
 
-	ctx.Logger().V(1).Info("scanning unstaged changes", "path", path)
+	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
 		for _, diff := range commit.Diffs {
 			logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", commit.Hash, "file", diff.PathB)
-			logger.V(2).Info("scanning unstaged changes from git")
+			logger.V(2).Info("scanning staged changes from git")
 
 			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 				logger.V(1).Info("reached max depth")
@@ -520,12 +520,12 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.String()
+			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
 				commitHash := plumbing.NewHash(hash)
-				metadata := s.sourceMetadataFunc(fileName, email, "Unstaged", when, urlMetadata, 0)
+				metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, 0)
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -539,7 +539,7 @@ func (s *Git) ScanUnstaged(ctx context.Context, repo *git.Repository, path strin
 				continue
 			}
 
-			metadata := s.sourceMetadataFunc(fileName, email, "Unstaged", when, urlMetadata, int64(diff.LineStart))
+			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
@@ -564,7 +564,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
-	if err := s.ScanUnstaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
+	if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 	}
 

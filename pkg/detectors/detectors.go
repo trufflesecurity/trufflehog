@@ -25,9 +25,17 @@ type Detector interface {
 	Type() detectorspb.DetectorType
 }
 
+// Versioner is an optional interface that a detector can implement to
+// differentiate instances of the same detector type.
+type Versioner interface {
+	Version() int
+}
+
 type Result struct {
 	// DetectorType is the type of Detector.
 	DetectorType detectorspb.DetectorType
+	// DetectorName is the name of the Detector. Used for custom detectors.
+	DetectorName string
 	// DecoderType is the type of Decoder.
 	DecoderType detectorspb.DecoderType
 	Verified    bool

@@ -12,10 +12,40 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+const defaultURL = "https://api.github.com"
 
-// Ensure the Scanner satisfies the interface at compile time.
+type Scanner struct {
+	verifierURLs []string
+}
+
+// New creates a new Scanner with the given options.
+func New(opts ...func(*Scanner)) *Scanner {
+	scanner := &Scanner{
+		verifierURLs: make([]string, 0),
+	}
+	for _, opt := range opts {
+		opt(scanner)
+	}
+
+	return scanner
+}
+
+// WithVerifierURLs adds the given URLs to the list of URLs to check for
+// verification of secrets.
+func WithVerifierURLs(urls []string, includeDefault bool) func(*Scanner) {
+	return func(s *Scanner) {
+		if includeDefault {
+			urls = append(urls, defaultURL)
+		}
+		s.verifierURLs = append(s.verifierURLs, urls...)
+	}
+}
+
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+
+func (s Scanner) Version() int { return 1 }
 
 var (
 	// Oauth token
@@ -38,7 +68,7 @@ type userRes struct {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"github","gh","pat"}
+	return []string{"github", "gh", "pat"}
 }
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
@@ -60,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		s := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
 		}
@@ -68,30 +98,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := common.SaneHttpClient()
 			// https://developer.github.com/v3/users/#get-the-authenticated-user
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json; charset=utf-8")
-			req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
-			res, err := client.Do(req)
-			if err == nil {
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					var userResponse userRes
-					err = json.NewDecoder(res.Body).Decode(&userResponse)
-					res.Body.Close()
-					if err == nil {
-						s.Verified = true
+			for _, url := range s.verifierURLs {
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/user", url), nil)
+				if err != nil {
+					continue
+				}
+				req.Header.Add("Content-Type", "application/json; charset=utf-8")
+				req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
+				res, err := client.Do(req)
+				if err == nil {
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						var userResponse userRes
+						err = json.NewDecoder(res.Body).Decode(&userResponse)
+						res.Body.Close()
+						if err == nil {
+							s1.Verified = true
+						}
 					}
 				}
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
-		results = append(results, s)
+		results = append(results, s1)
 	}
 
 	return results, nil

@@ -34,21 +34,24 @@ import (
 )
 
 var (
-	cli              = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd              string
-	debug            = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace            = cli.Flag("trace", "Run in trace mode.").Bool()
-	jsonOut          = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy       = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	concurrency      = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification   = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified     = cli.Flag("only-verified", "Only output verified results.").Bool()
-	filterUnverified = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	configFilename   = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd                 string
+	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
+	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
+	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
@@ -59,6 +62,7 @@ var (
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
 	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitScanExcludeGlobs = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
 	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
 	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
@@ -95,11 +99,24 @@ var (
 	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
-	s3Scan         = cli.Command("s3", "Find credentials in S3 buckets.")
-	s3ScanKey      = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
-	s3ScanSecret   = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
-	s3ScanCloudEnv = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
-	s3ScanBuckets  = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
+	s3Scan             = cli.Command("s3", "Find credentials in S3 buckets.")
+	s3ScanKey          = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
+	s3ScanSecret       = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
+	s3ScanSessionToken = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
+	s3ScanCloudEnv     = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
+	s3ScanBuckets      = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
+
+	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
+	gcsProjectID      = gcsScan.Flag("project-id", "GCS project ID used to authenticate. Can NOT be used with unauth scan. Can be provided with environment variable GOOGLE_CLOUD_PROJECT.").Envar("GOOGLE_CLOUD_PROJECT").String()
+	gcsCloudEnv       = gcsScan.Flag("cloud-environment", "Use Application Default Credentials, IAM credentials to authenticate.").Bool()
+	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
+	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
+	gcsAPIKey         = gcsScan.Flag("api-key", "GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.").Envar("GOOGLE_API_KEY").String()
+	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma seperated list of buckets. You can repeat this flag. Globs are supported").Short('I').Strings()
+	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. Comma separated list of buckets. Globs are supported").Short('X').Strings()
+	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. Comma separated list of objects. you can repeat this flag. Globs are supported").Short('i').Strings()
+	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. Comma separated list of objects. You can repeat this flag. Globs are supported").Short('x').Strings()
+	gcsMaxObjectSize  = gcsScan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("10MB").Bytes()
 
 	syslogScan     = cli.Command("syslog", "Scan syslog")
 	syslogAddress  = syslogScan.Flag("address", "Address and port to listen on for syslog. Example: 127.0.0.1:514").String()
@@ -183,7 +200,7 @@ func run(state overseer.State) {
 		*concurrency = 1
 	}
 
-	if *debug {
+	if *profile {
 		go func() {
 			router := mux.NewRouter()
 			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
@@ -204,6 +221,8 @@ func run(state overseer.State) {
 		}
 	}
 
+	urls := splitVerifierURLs(*verifiers)
+
 	if *archiveMaxSize != 0 {
 		handlers.SetArchiveMaxSize(int(*archiveMaxSize))
 	}
@@ -215,36 +234,58 @@ func run(state overseer.State) {
 	}
 
 	// Build include and exclude detector filter sets.
-	var includeDetectorTypes, excludeDetectorTypes map[detectorspb.DetectorType]struct{}
+	var includeDetectorTypes, excludeDetectorTypes map[detectorspb.DetectorType]config.DetectorID
 	{
 		includeList, err := config.ParseDetectors(*includeDetectors)
 		if err != nil {
 			// Exit if there was an error to inform the user of the misconfiguration.
-			logger.Error(err, "invalid include list detector configuration")
-			os.Exit(1)
+			logFatal(err, "invalid include list detector configuration")
 		}
 		excludeList, err := config.ParseDetectors(*excludeDetectors)
 		if err != nil {
 			// Exit if there was an error to inform the user of the misconfiguration.
-			logger.Error(err, "invalid exclude list detector configuration")
-			os.Exit(1)
+			logFatal(err, "invalid exclude list detector configuration")
 		}
-		includeDetectorTypes = detectorTypeToSet(includeList)
-		excludeDetectorTypes = detectorTypeToSet(excludeList)
+		includeDetectorTypes = detectorTypeToMap(includeList)
+		excludeDetectorTypes = detectorTypeToMap(excludeList)
 	}
 	includeFilter := func(d detectors.Detector) bool {
-		_, ok := includeDetectorTypes[d.Type()]
-		return ok
+		id, ok := includeDetectorTypes[d.Type()]
+		if id.Version == 0 {
+			return ok
+		}
+		versionD, ok := d.(detectors.Versioner)
+		if !ok {
+			// Error: version provided but not a detectors.Versioner
+			logFatal(
+				fmt.Errorf("version provided but detector does not have a version"),
+				"invalid include list detector configuration",
+				"detector", id,
+			)
+		}
+		return versionD.Version() == id.Version
 	}
 	excludeFilter := func(d detectors.Detector) bool {
-		_, ok := excludeDetectorTypes[d.Type()]
-		return !ok
+		id, ok := excludeDetectorTypes[d.Type()]
+		if id.Version == 0 {
+			return !ok
+		}
+		versionD, ok := d.(detectors.Versioner)
+		if !ok {
+			// Error: version provided but not a detectors.Versioner
+			logFatal(
+				fmt.Errorf("version provided but detector does not have a version"),
+				"invalid exclude list detector configuration",
+				"detector", id,
+			)
+		}
+		return versionD.Version() != id.Version
 	}
 
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
+		engine.WithDetectors(!*noVerification, engine.CustomDetectors(ctx, urls)...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
 		engine.WithFilterDetectors(includeFilter),
 		engine.WithFilterDetectors(excludeFilter),
@@ -266,13 +307,18 @@ func run(state overseer.State) {
 		if remote {
 			defer os.RemoveAll(repoPath)
 		}
+		excludedGlobs := []string{}
+		if *gitScanExcludeGlobs != "" {
+			excludedGlobs = strings.Split(*gitScanExcludeGlobs, ",")
+		}
 
 		cfg := sources.GitConfig{
-			RepoPath: repoPath,
-			HeadRef:  *gitScanBranch,
-			BaseRef:  *gitScanSinceCommit,
-			MaxDepth: *gitScanMaxDepth,
-			Filter:   filter,
+			RepoPath:     repoPath,
+			HeadRef:      *gitScanBranch,
+			BaseRef:      *gitScanSinceCommit,
+			MaxDepth:     *gitScanMaxDepth,
+			Filter:       filter,
+			ExcludeGlobs: excludedGlobs,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Git.")
@@ -336,10 +382,11 @@ func run(state overseer.State) {
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
-			Key:       *s3ScanKey,
-			Secret:    *s3ScanSecret,
-			Buckets:   *s3ScanBuckets,
-			CloudCred: *s3ScanCloudEnv,
+			Key:          *s3ScanKey,
+			Secret:       *s3ScanSecret,
+			SessionToken: *s3ScanSessionToken,
+			Buckets:      *s3ScanBuckets,
+			CloudCred:    *s3ScanCloudEnv,
 		}
 		if err := e.ScanS3(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan S3.")
@@ -359,6 +406,23 @@ func run(state overseer.State) {
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logFatal(err, "Failed to scan CircleCI.")
+		}
+	case gcsScan.FullCommand():
+		cfg := sources.GCSConfig{
+			ProjectID:      *gcsProjectID,
+			CloudCred:      *gcsCloudEnv,
+			ServiceAccount: *gcsServiceAccount,
+			WithoutAuth:    *gcsWithoutAuth,
+			ApiKey:         *gcsAPIKey,
+			IncludeBuckets: commaSeperatedToSlice(*gcsIncludeBuckets),
+			ExcludeBuckets: commaSeperatedToSlice(*gcsExcludeBuckets),
+			IncludeObjects: commaSeperatedToSlice(*gcsIncludeObjects),
+			ExcludeObjects: commaSeperatedToSlice(*gcsExcludeObjects),
+			Concurrency:    *concurrency,
+			MaxObjectSize:  int64(*gcsMaxObjectSize),
+		}
+		if err := e.ScanGCS(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan GCS.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
@@ -383,6 +447,8 @@ func run(state overseer.State) {
 			err = output.PrintLegacyJSON(ctx, &r)
 		case *jsonOut:
 			err = output.PrintJSON(&r)
+		case *gitHubActionsFormat:
+			err = output.PrintGitHubActionsOutput(&r)
 		default:
 			err = output.PrintPlainOutput(&r)
 		}
@@ -405,6 +471,20 @@ func run(state overseer.State) {
 	}
 }
 
+func commaSeperatedToSlice(s []string) []string {
+	var result []string
+	for _, items := range s {
+		for _, item := range strings.Split(items, ",") {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
 func printAverageDetectorTime(e *engine.Engine) {
 	fmt.Fprintln(os.Stderr, "Average detector time is the measurement of average time spent on each detector when results are returned.")
 	for detectorName, durations := range e.DetectorAvgTime() {
@@ -415,6 +495,19 @@ func printAverageDetectorTime(e *engine.Engine) {
 		avgDuration := total / time.Duration(len(durations))
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
 	}
+}
+
+func splitVerifierURLs(verifierURLs map[string]string) map[string][]string {
+	verifiers := make(map[string][]string, len(verifierURLs))
+	for k, v := range verifierURLs {
+		key := strings.ToLower(k)
+		sliceOfValues := strings.Split(v, ",")
+		for i, s := range sliceOfValues {
+			sliceOfValues[i] = strings.TrimSpace(s)
+		}
+		verifiers[key] = sliceOfValues
+	}
+	return verifiers
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
@@ -430,10 +523,10 @@ func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
 	}
 }
 
-func detectorTypeToSet(detectors []detectorspb.DetectorType) map[detectorspb.DetectorType]struct{} {
-	output := make(map[detectorspb.DetectorType]struct{}, len(detectors))
+func detectorTypeToMap(detectors []config.DetectorID) map[detectorspb.DetectorType]config.DetectorID {
+	output := make(map[detectorspb.DetectorType]config.DetectorID, len(detectors))
 	for _, d := range detectors {
-		output[d] = struct{}{}
+		output[d.ID] = d
 	}
 	return output
 }

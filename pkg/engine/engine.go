@@ -9,9 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -36,6 +38,10 @@ type Engine struct {
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
 	filterUnverified bool
+
+	// prefilter is a ahocorasick struct used for doing efficient string
+	// matching given a set of words (keywords from the rules in the config)
+	prefilter ahocorasick.AhoCorasick
 }
 
 type EngineOption func(*Engine)
@@ -110,7 +116,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	// Set defaults.
-
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
@@ -128,14 +133,46 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		e.detectors[false] = []detectors.Detector{}
 	}
 
-	ctx.Logger().V(2).Info("loaded decoders", "count", len(e.decoders))
-	ctx.Logger().V(2).Info("loaded detectors",
+	// build ahocorasick prefilter for efficient string matching
+	// on keywords
+	keywords := []string{}
+	for _, d := range e.detectors[false] {
+		keywords = append(keywords, d.Keywords()...)
+	}
+	for _, d := range e.detectors[true] {
+		keywords = append(keywords, d.Keywords()...)
+	}
+	builder := ahocorasick.NewAhoCorasickBuilder(ahocorasick.Opts{
+		AsciiCaseInsensitive: true,
+		MatchOnlyWholeWords:  false,
+		MatchKind:            ahocorasick.LeftMostLongestMatch,
+		DFA:                  true,
+	})
+	e.prefilter = builder.Build(keywords)
+
+	ctx.Logger().Info("loaded decoders", "count", len(e.decoders))
+	ctx.Logger().Info("loaded detectors",
 		"total", len(e.detectors[true])+len(e.detectors[false]),
 		"verification_enabled", len(e.detectors[true]),
 		"verification_disabled", len(e.detectors[false]),
 	)
 
-	// start the workers
+	// Sanity check detectors for duplicate configuration. Only log in case
+	// a detector has been configured in a way that isn't represented by
+	// the DetectorID (type and version).
+	{
+		dets := append(e.detectors[true], e.detectors[false]...)
+		seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
+		for _, det := range dets {
+			id := config.GetDetectorID(det)
+			if _, ok := seenDetectors[id]; ok {
+				ctx.Logger().Info("possible duplicate detector configured", "detector", id)
+			}
+			seenDetectors[id] = struct{}{}
+		}
+	}
+
+	// Start the workers.
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
@@ -208,6 +245,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
+			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
@@ -224,20 +262,27 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				if decoded == nil {
 					continue
 				}
-				dataLower := strings.ToLower(string(decoded.Data))
+
+				// build a map of all keywords that were matched in the chunk
+				for _, m := range e.prefilter.FindAll(string(decoded.Data)) {
+					matchedKeywords[strings.ToLower(string(decoded.Data[m.Start():m.End()]))] = struct{}{}
+				}
+
 				for verify, detectorsSet := range e.detectors {
 					for _, detector := range detectorsSet {
-						start := time.Now()
-						foundKeyword := false
+						chunkContainsKeyword := false
 						for _, kw := range detector.Keywords() {
-							if strings.Contains(dataLower, strings.ToLower(kw)) {
-								foundKeyword = true
+							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
+								chunkContainsKeyword = true
 								break
 							}
 						}
-						if !foundKeyword {
+
+						if !chunkContainsKeyword {
 							continue
 						}
+
+						start := time.Now()
 
 						results, err := func() ([]detectors.Result, error) {
 							ctx, cancel := context.WithTimeout(ctx, time.Second*10)

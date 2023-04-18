@@ -116,7 +116,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool) (chan Commit, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "-U5", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -126,9 +126,11 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	} else {
 		args = append(args, "--all")
 	}
+	for _, glob := range excludedGlobs {
+		args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
+	}
 
 	cmd := exec.Command("git", args...)
-
 	absPath, err := filepath.Abs(source)
 	if err == nil {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
@@ -139,7 +141,8 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 
 // Unstaged parses the output of the `git diff` command for the `source` path.
 func (c *Parser) Unstaged(ctx context.Context, source string) (chan Commit, error) {
-	args := []string{"-C", source, "diff", "-p", "-U5", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
+	// Provide the --cached flag to diff to get the diff of the staged changes.
+	args := []string{"-C", source, "diff", "-p", "-U5", "--cached", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
 
 	cmd := exec.Command("git", args...)
 
@@ -177,7 +180,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	}()
 
 	go func() {
-		c.fromReader(ctx, stdOut, commitChan)
+		c.FromReader(ctx, stdOut, commitChan)
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
@@ -186,10 +189,11 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	return commitChan, nil
 }
 
-func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
+func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 	outReader := bufio.NewReader(stdOut)
 	var currentCommit *Commit
 	var currentDiff *Diff
+	var recentlyPassedAuthor bool
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -222,6 +226,7 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			}
 		case isAuthorLine(line):
 			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
+			recentlyPassedAuthor = true
 		case isDateLine(line):
 			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
 			if err != nil {
@@ -258,6 +263,7 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isModeLine(line):
 			// NoOp
 		case isIndexLine(line):
+			recentlyPassedAuthor = false
 			// NoOp
 		case isPlusFileLine(line):
 			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
@@ -268,7 +274,9 @@ func (c *Parser) fromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isMinusDiffLine(line):
 			// NoOp. We only care about additions.
 		case isMessageLine(line):
-			currentCommit.Message.Write(line[4:])
+			if recentlyPassedAuthor {
+				currentCommit.Message.Write(line[4:])
+			}
 		case isContextDiffLine(line):
 			currentDiff.Content.Write([]byte("\n"))
 		case isBinaryLine(line):

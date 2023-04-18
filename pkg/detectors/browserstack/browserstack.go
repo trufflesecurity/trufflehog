@@ -20,8 +20,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "key", "automate", "local"}) + `\b([0-9a-zA-Z]{20})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"browserstack", "user", "automate", "local"}) + `\b([a-zA-Z\d]{3,18}[._-]?[a-zA-Z\d]{6})\b`)
+	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"https://", "http://", "hub-cloud.browserstack.com", "accessKey", "\"access_Key\":", "ACCESS_KEY", "key", "browserstackKey", "BS_AUTHKEY", "BROWSERSTACK_ACCESS_KEY"}) + `\b([0-9a-zA-Z]{20})\b`)
+	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"https://", "http://", "hub-cloud.browserstack.com", "userName", "\"username\":", "USER_NAME", "user", "browserstackUser", "BS_USERNAME", "BROWSERSTACK_USERNAME"}) + `\b([a-zA-Z\d]{3,18}[._-]+[a-zA-Z\d]{6})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api-cloud.browserstack.com/app-automate/espresso/v2/apps", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api-cloud.browserstack.com/automate/plan.json", nil)
 				if err != nil {
 					continue
 				}

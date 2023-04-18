@@ -22,17 +22,27 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}
 	if c.CloudCred {
-		if len(c.Key) > 0 || len(c.Secret) > 0 {
-			return fmt.Errorf("cannot use cloud credentials and basic auth together")
+		if len(c.Key) > 0 || len(c.Secret) > 0 || len(c.SessionToken) > 0 {
+			return fmt.Errorf("cannot use cloud environment and static credentials together")
 		}
 		connection.Credential = &sourcespb.S3_CloudEnvironment{}
 	}
 	if len(c.Key) > 0 && len(c.Secret) > 0 {
-		connection.Credential = &sourcespb.S3_AccessKey{
-			AccessKey: &credentialspb.KeySecret{
-				Key:    c.Key,
-				Secret: c.Secret,
-			},
+		if len(c.SessionToken) > 0 {
+			connection.Credential = &sourcespb.S3_SessionToken{
+				SessionToken: &credentialspb.AWSSessionTokenSecret{
+					Key:          c.Key,
+					Secret:       c.Secret,
+					SessionToken: c.SessionToken,
+				},
+			}
+		} else {
+			connection.Credential = &sourcespb.S3_AccessKey{
+				AccessKey: &credentialspb.KeySecret{
+					Key:    c.Key,
+					Secret: c.Secret,
+				},
+			}
 		}
 	}
 	if len(c.Buckets) > 0 {

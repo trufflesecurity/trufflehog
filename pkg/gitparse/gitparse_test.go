@@ -2,6 +2,7 @@ package gitparse
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -109,7 +110,7 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		parser.fromReader(context.TODO(), r, commitChan)
+		parser.FromReader(context.TODO(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -168,7 +169,7 @@ func TestMultiCommitContextDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		NewParser().fromReader(context.TODO(), r, commitChan)
+		NewParser().FromReader(context.TODO(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -198,7 +199,7 @@ func TestMaxDiffSize(t *testing.T) {
 
 	commitChan := make(chan Commit)
 	go func() {
-		parser.fromReader(context.TODO(), bigReader, commitChan)
+		parser.FromReader(context.TODO(), bigReader, commitChan)
 	}()
 
 	commit := <-commitChan
@@ -216,7 +217,7 @@ func TestMaxCommitSize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1)*time.Second)
 	defer cancel()
 	go func() {
-		parser.fromReader(ctx, &commitText, commitChan)
+		parser.FromReader(ctx, &commitText, commitChan)
 	}()
 	commitCount := 0
 	for range commitChan {
@@ -227,6 +228,38 @@ func TestMaxCommitSize(t *testing.T) {
 	}
 
 }
+
+func TestMessageParsing(t *testing.T) {
+	r := bytes.NewReader([]byte(fmt.Sprintf(singleCommitTabbedContent, `     `)))
+	commitChan := make(chan Commit)
+	parser := NewParser()
+	expectedMessage := singleCommitSingleDiffMessage
+
+	go func() {
+		parser.FromReader(context.TODO(), r, commitChan)
+	}()
+	for commit := range commitChan {
+		if commit.Message.String() != expectedMessage {
+			t.Errorf("Message does not match. Got:\n%s\nexpected:\n%s", commit.Message.String(), expectedMessage)
+		}
+	}
+}
+
+const singleCommitTabbedContent = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
+Author: Dustin Decker <humanatcomputer@gmail.com>
+Date:   Mon Mar 15 23:27:16 2021 -0700
+
+    Update aws
+
+diff --git a/aws b/aws
+index 2ee133b..12b4843 100644
+--- a/aws
++++ b/aws
+@@ -1,7 +1,5 @@
++[default]
+%saws_access_key_id = AKIAXYZDQCEN4B6JSJQI
++aws_secret_access_key = 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
+`
 
 const singleCommitSingleDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
