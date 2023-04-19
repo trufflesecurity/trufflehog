@@ -300,10 +300,8 @@ message SlackRealtime {
 }
 
 message Sharepoint {
-  string client_id = 1;
   oneof credential {
-    string refresh_token = 2;
+    credentials.Oauth2 oauth = 1;
   }
-  string site_url = 3;
-
+  string site_url = 2;
 }
