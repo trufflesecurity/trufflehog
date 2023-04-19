@@ -63,7 +63,7 @@ func TestSource_Token(t *testing.T) {
 	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
 	assert.NoError(t, err)
 
-	user, token, err := s.UserAndToken(ctx, installationClient)
+	user, token, err := s.userAndToken(ctx, installationClient)
 	assert.NotEmpty(t, token)
 	assert.NoError(t, err)
 
