@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -149,12 +150,27 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	})
 	e.prefilter = builder.Build(keywords)
 
-	ctx.Logger().V(2).Info("loaded decoders", "count", len(e.decoders))
-	ctx.Logger().V(2).Info("loaded detectors",
+	ctx.Logger().Info("loaded decoders", "count", len(e.decoders))
+	ctx.Logger().Info("loaded detectors",
 		"total", len(e.detectors[true])+len(e.detectors[false]),
 		"verification_enabled", len(e.detectors[true]),
 		"verification_disabled", len(e.detectors[false]),
 	)
+
+	// Sanity check detectors for duplicate configuration. Only log in case
+	// a detector has been configured in a way that isn't represented by
+	// the DetectorID (type and version).
+	{
+		dets := append(e.detectors[true], e.detectors[false]...)
+		seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
+		for _, det := range dets {
+			id := config.GetDetectorID(det)
+			if _, ok := seenDetectors[id]; ok {
+				ctx.Logger().Info("possible duplicate detector configured", "detector", id)
+			}
+			seenDetectors[id] = struct{}{}
+		}
+	}
 
 	// Start the workers.
 	for i := 0; i < e.concurrency; i++ {

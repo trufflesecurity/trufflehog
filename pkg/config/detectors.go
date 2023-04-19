@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	dpb "github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -34,6 +35,17 @@ func init() {
 type DetectorID struct {
 	ID      dpb.DetectorType
 	Version int
+}
+
+func GetDetectorID(d detectors.Detector) DetectorID {
+	var version int
+	if v, ok := d.(detectors.Versioner); ok {
+		version = v.Version()
+	}
+	return DetectorID{
+		ID:      d.Type(),
+		Version: version,
+	}
 }
 
 // ParseDetectors parses user supplied string into a list of detectors types.

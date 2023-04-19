@@ -111,15 +111,6 @@ message Gitlab {
   int64 line = 7;
 }
 
-message GoogleDrive {
-  string file = 1;
-  string link = 2;
-  string email = 3;
-  string timestamp = 4;
-  bool shared = 5;
-  string last_modified_by = 6;
-}
-
 message GCS {
   string bucket = 1;
   string filename = 2;
@@ -251,6 +242,15 @@ message SharePoint {
   string email = 7;
 }
 
+message GoogleDrive {
+  string file = 1;
+  string link = 2;
+  string email = 3;
+  string timestamp = 4;
+  bool shared = 5;
+  string last_modified_by = 6;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -278,5 +278,6 @@ message MetaData {
     Syslog syslog = 23;
     PublicEventMonitoring publicEventMonitoring = 24;
     SharePoint sharepoint = 25;
+    GoogleDrive googleDrive = 26;
   }
 }
