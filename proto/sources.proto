@@ -300,7 +300,7 @@ message SlackRealtime {
 }
 
 message Sharepoint {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string client_id = 1;
   oneof credential {
     string refresh_token = 2;
   }

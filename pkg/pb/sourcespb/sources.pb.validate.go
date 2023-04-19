@@ -4273,17 +4273,7 @@ func (m *Sharepoint) validate(all bool) error {
 
 	var errors []error
 
-	if _, err := url.Parse(m.GetEndpoint()); err != nil {
-		err = SharepointValidationError{
-			field:  "Endpoint",
-			reason: "value must be a valid URI",
-			cause:  err,
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for ClientId
 
 	// no validation rules for SiteUrl
 
