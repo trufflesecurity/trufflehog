@@ -4273,24 +4273,40 @@ func (m *Sharepoint) validate(all bool) error {
 
 	var errors []error
 
-	if _, err := url.Parse(m.GetEndpoint()); err != nil {
-		err = SharepointValidationError{
-			field:  "Endpoint",
-			reason: "value must be a valid URI",
-			cause:  err,
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	// no validation rules for SiteUrl
 
 	switch m.Credential.(type) {
 
-	case *Sharepoint_RefreshToken:
-		// no validation rules for RefreshToken
+	case *Sharepoint_Oauth:
+
+		if all {
+			switch v := interface{}(m.GetOauth()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SharepointValidationError{
+						field:  "Oauth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SharepointValidationError{
+						field:  "Oauth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetOauth()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SharepointValidationError{
+					field:  "Oauth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
 
 	}
 
