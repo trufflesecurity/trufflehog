@@ -2284,6 +2284,8 @@ func (m *Teams) validate(all bool) error {
 
 	// no validation rules for TeamName
 
+	// no validation rules for TeamId
+
 	if len(errors) > 0 {
 		return TeamsMultiError(errors)
 	}
