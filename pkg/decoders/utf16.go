@@ -27,13 +27,14 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 
 // utf16ToUTF8 converts a byte slice containing UTF-16 encoded data to a UTF-8 encoded byte slice.
 func utf16ToUTF8(b []byte) ([]byte, error) {
-	if len(b)%2 != 0 {
-		return nil, fmt.Errorf("input length must be even")
+	endianness, err := guessUTF16Endianness(b)
+	if err != nil {
+		return nil, err
 	}
 
 	u16 := make([]uint16, len(b)/2)
 	for i := 0; i < len(b); i += 2 {
-		u16[i/2] = binary.LittleEndian.Uint16(b[i:])
+		u16[i/2] = endianness.Uint16(b[i:])
 	}
 
 	decoded := utf16.Decode(u16)
@@ -45,4 +46,29 @@ func utf16ToUTF8(b []byte) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func guessUTF16Endianness(b []byte) (binary.ByteOrder, error) {
+	if len(b) < 2 || len(b)%2 != 0 {
+		return nil, fmt.Errorf("input length must be even and at least 2 bytes long")
+	}
+
+	var evenNullBytes, oddNullBytes int
+
+	for i := 0; i < len(b); i += 2 {
+		if b[i] == 0 {
+			oddNullBytes++
+		}
+		if b[i+1] == 0 {
+			evenNullBytes++
+		}
+	}
+
+	if evenNullBytes > oddNullBytes {
+		return binary.LittleEndian, nil
+	} else if oddNullBytes > evenNullBytes {
+		return binary.BigEndian, nil
+	} else {
+		return nil, fmt.Errorf("could not determine endianness")
+	}
 }
