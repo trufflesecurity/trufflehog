@@ -3,6 +3,7 @@ package source_configure
 import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/tabs"
 )
@@ -32,6 +33,7 @@ type SourceConfigure struct {
 	activeTab       tab
 	tabs            *tabs.Tabs
 	configTabSource string
+	tabComponents   []common.Component
 }
 
 func (m SourceConfigure) Init() tea.Cmd {
@@ -40,9 +42,16 @@ func (m SourceConfigure) Init() tea.Cmd {
 
 func New(c common.Common) *SourceConfigure {
 	tb := tabs.New(c, []string{configTab.String(), truffleConfigTab.String(), runTab.String()})
+	tabComponents := []common.Component{
+		configTab:        NewSourceComponent(c),
+		truffleConfigTab: NewTrufflehogComponent(c),
+		runTab:           NewRunComponent(c),
+	}
+
 	return &SourceConfigure{
-		tabs:   tb,
-		Common: c,
+		tabs:          tb,
+		Common:        c,
+		tabComponents: tabComponents,
 	}
 }
 
@@ -50,10 +59,11 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tabs.SelectTabMsg:
+	case tabs.ActiveTabMsg:
 		m.activeTab = tab(msg)
 		t, cmd := m.tabs.Update(msg)
 		m.tabs = t.(*tabs.Tabs)
+
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -65,13 +75,23 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case SetSourceMsg:
 		m.configTabSource = msg.Source
+
+	}
+
+	tab, cmd := m.tabComponents[m.activeTab].Update(msg)
+	m.tabComponents[m.activeTab] = tab.(common.Component)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
 }
 
 func (m *SourceConfigure) View() string {
-	return m.tabs.View()
+	return lipgloss.JoinVertical(lipgloss.Top,
+		m.tabs.View(),
+		m.tabComponents[m.activeTab].View(),
+	)
 }
 
 func (m *SourceConfigure) ShortHelp() []key.Binding {
