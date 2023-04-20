@@ -66,9 +66,9 @@ func guessUTF16Endianness(b []byte) (binary.ByteOrder, error) {
 
 	if evenNullBytes > oddNullBytes {
 		return binary.LittleEndian, nil
-	} else if oddNullBytes > evenNullBytes {
-		return binary.BigEndian, nil
-	} else {
-		return nil, fmt.Errorf("could not determine endianness")
 	}
+	if oddNullBytes > evenNullBytes {
+		return binary.BigEndian, nil
+	}
+	return nil, fmt.Errorf("could not determine endianness")
 }
