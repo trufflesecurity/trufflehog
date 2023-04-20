@@ -26,19 +26,30 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 // extacting contigous portions of printable characters that we care
 // about from some bytes
 func extractSubstrings(b []byte) []byte {
-	fields := bytes.FieldsFunc(b, func(r rune) bool {
+	isValidRune := func(r rune) bool {
 		// https://www.rapidtables.com/code/text/ascii-table.html
 		// split on anything that is not ascii space through tilde
-		return !(r > 31 && r < 127)
-	})
+		return r > 31 && r < 127
+	}
 
-	keep := [][]byte{}
-	for _, field := range fields {
-		// Remove fields shorter than 6 characters.
-		if bts := bytes.TrimSpace(field); len(bts) > 5 {
-			keep = append(keep, bts)
+	field := make([]byte, len(b))
+	fieldLen := 0
+	buf := &bytes.Buffer{}
+	for i, r := range string(b) {
+		if isValidRune(r) {
+			field[fieldLen] = byte(r)
+			fieldLen++
+		} else {
+			if fieldLen > 5 {
+				buf.Write(field[:fieldLen])
+			}
+			fieldLen = 0
+		}
+
+		if i == len(b)-1 && fieldLen > 5 {
+			buf.Write(field[:fieldLen])
 		}
 	}
 
-	return bytes.Join(keep, []byte("\n"))
+	return buf.Bytes()
 }
