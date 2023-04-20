@@ -56,11 +56,11 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIAWARWQKZNHMZBLY4I",
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
-						"account": "413504919130",
-						"arn":     "arn:aws:iam::413504919130:root",
-						"user_id": "413504919130",
+						"account": "171436882533",
+						"arn":     "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
+						"user_id": "AIDASP2TPHJSUFRSTTZX4",
 					},
 				},
 			},
@@ -78,7 +78,7 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIAWARWQKZNHMZBLY4I",
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData:    nil,
 				},
 			},
@@ -106,18 +106,18 @@ func TestAWS_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
-					Verified:     true,
-					Redacted:     id,
-					ExtraData: map[string]string{
-						"account": "413504919130",
-						"arn":     "arn:aws:iam::413504919130:root",
-						"user_id": "413504919130",
-					},
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJXYZ",
 				},
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
-					Verified:     false,
-					Redacted:     inactiveID,
+					Verified:     true,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					ExtraData: map[string]string{
+						"account": "171436882533",
+						"arn":     "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
+						"user_id": "AIDASP2TPHJSUFRSTTZX4",
+					},
 				},
 			},
 			wantErr: false,
@@ -145,11 +145,11 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     id,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
-						"account": "413504919130",
-						"arn":     "arn:aws:iam::413504919130:root",
-						"user_id": "413504919130",
+						"account": "171436882533",
+						"arn":     "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
+						"user_id": "AIDASP2TPHJSUFRSTTZX4",
 					},
 				},
 				{
@@ -172,7 +172,7 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIAWARWQKZNHMZBLY4I",
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 				},
 			},
 			wantErr: false,
@@ -181,7 +181,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			name: "skipped",
 			s: scanner{
 				skipIDs: map[string]struct{}{
-					"AKIAWARWQKZNHMZBLY4I": {},
+					"AKIASP2TPHJSQH3FJRUX": {},
 				},
 			},
 			args: args{
