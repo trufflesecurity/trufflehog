@@ -26,18 +26,18 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 // extacting contigous portions of printable characters that we care
 // about from some bytes
 func extractSubstrings(b []byte) []byte {
-	isValidRune := func(r rune) bool {
+	isValidByte := func(c byte) bool {
 		// https://www.rapidtables.com/code/text/ascii-table.html
 		// split on anything that is not ascii space through tilde
-		return r > 31 && r < 127
+		return c > 31 && c < 127
 	}
 
 	field := make([]byte, len(b))
 	fieldLen := 0
 	buf := &bytes.Buffer{}
-	for i, r := range string(b) {
-		if isValidRune(r) {
-			field[fieldLen] = byte(r)
+	for i, c := range b {
+		if isValidByte(c) {
+			field[fieldLen] = c
 			fieldLen++
 		} else {
 			if fieldLen > 5 {
