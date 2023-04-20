@@ -22,7 +22,6 @@ func New(opts ...func(*Scanner)) *Scanner {
 		ignorePatterns: []regexp.Regexp{},
 	}
 	for _, opt := range opts {
-
 		opt(scanner)
 	}
 
