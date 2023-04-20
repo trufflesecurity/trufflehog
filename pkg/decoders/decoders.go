@@ -8,6 +8,7 @@ func DefaultDecoders() []Decoder {
 	return []Decoder{
 		&UTF8{},
 		&Base64{},
+		&UTF16{},
 	}
 }
 
