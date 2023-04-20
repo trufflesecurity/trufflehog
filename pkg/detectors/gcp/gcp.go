@@ -82,6 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCP,
 			Raw:          raw,
+			RawV2:        []byte(key),
 			Redacted:     creds.ClientEmail,
 		}
 
