@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -32,14 +31,9 @@ func utf16ToUTF8(b []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	u16 := make([]uint16, len(b)/2)
-	for i := 0; i < len(b); i += 2 {
-		u16[i/2] = endianness.Uint16(b[i:])
-	}
-
-	decoded := utf16.Decode(u16)
 	buf := &bytes.Buffer{}
-	for _, r := range decoded {
+	for i := 0; i < len(b); i += 2 {
+		r := rune(endianness.Uint16(b[i:]))
 		if utf8.ValidRune(r) {
 			buf.WriteRune(r)
 		}
