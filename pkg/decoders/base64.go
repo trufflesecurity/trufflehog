@@ -3,7 +3,6 @@ package decoders
 import (
 	"bytes"
 	"encoding/base64"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -15,48 +14,7 @@ var (
 	b64EndChars = "+/="
 )
 
-func getSubstringsOfCharacterSet(data []byte, charset []byte, threshold int) []string {
-	count := 0
-	substrings := []string{}
-	letters := strings.Builder{}
-	if len(data) == 0 {
-		return nil
-	}
-	for _, char := range string(data) {
-		if bytes.ContainsRune(charset, char) {
-			letters.WriteRune(char)
-			count++
-		} else {
-			if count > threshold {
-				substrings = appendB64Substring(letters, substrings)
-			}
-			letters.Reset()
-			count = 0
-		}
-	}
-
-	if count > threshold && len(letters.String()) > 0 {
-		substrings = appendB64Substring(letters, substrings)
-	}
-
-	return substrings
-}
-
-func appendB64Substring(letters strings.Builder, substrings []string) []string {
-
-	substring := strings.TrimLeft(letters.String(), b64EndChars)
-	// handle key=value
-	if strings.Contains(strings.TrimRight(substring, b64EndChars), "=") {
-		split := strings.SplitN(substring, "=", 2)
-		substrings = append(substrings, split[len(split)-1])
-	} else {
-		substrings = append(substrings, substring)
-	}
-	return substrings
-}
-
 func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
-
 	encodedSubstrings := getSubstringsOfCharacterSet(chunk.Data, b64Charset, 20)
 	decodedSubstrings := map[string][]byte{}
 
@@ -69,10 +27,52 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 
 	if len(decodedSubstrings) > 0 {
 		for substring, dec := range decodedSubstrings {
-			chunk.Data = bytes.Replace(chunk.Data, []byte(substring), dec, 1)
+			chunk.Data = bytes.ReplaceAll(chunk.Data, []byte(substring), dec)
 		}
 		return chunk
 	}
 
 	return nil
+}
+
+func getSubstringsOfCharacterSet(data []byte, charset []byte, threshold int) []string {
+	count := 0
+	var substrings []string
+	letters := bytes.Buffer{}
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	for _, char := range data {
+		if bytes.Contains(charset, []byte{char}) {
+			letters.WriteByte(char)
+			count++
+		} else {
+			if count > threshold {
+				substrings = appendB64Substring(&letters, substrings)
+			}
+			letters.Reset()
+			count = 0
+		}
+	}
+
+	if count > threshold && letters.Len() > 0 {
+		substrings = appendB64Substring(&letters, substrings)
+	}
+
+	return substrings
+}
+
+func appendB64Substring(letters *bytes.Buffer, substrings []string) []string {
+	substring := bytes.TrimLeft(letters.Bytes(), b64EndChars)
+
+	// handle key=value
+	if bytes.Contains(bytes.TrimRight(substring, b64EndChars), []byte("=")) {
+		split := bytes.SplitN(substring, []byte("="), 2)
+		substrings = append(substrings, string(split[len(split)-1]))
+	} else {
+		substrings = append(substrings, string(substring))
+	}
+	return substrings
 }
