@@ -1,0 +1,1 @@
+?   	github.com/trufflesecurity/trufflehog/v3	[no test files]
