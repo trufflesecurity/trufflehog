@@ -15,7 +15,6 @@ var (
 )
 
 func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
-
 	encodedSubstrings := getSubstringsOfCharacterSet(chunk.Data, 20)
 	decodedSubstrings := make(map[string][]byte)
 
