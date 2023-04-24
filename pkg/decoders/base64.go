@@ -12,11 +12,20 @@ type Base64 struct{}
 var (
 	b64Charset  = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
 	b64EndChars = "+/="
+	// Given characters are mostly ASCII, we can use a simple array to map.
+	b64CharsetMapping [128]bool
 )
 
+func init() {
+	// Build an array of all the characters in the base64 charset.
+	for _, char := range b64Charset {
+		b64CharsetMapping[char] = true
+	}
+}
+
 func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
-	encodedSubstrings := getSubstringsOfCharacterSet(chunk.Data, b64Charset, 20)
-	decodedSubstrings := map[string][]byte{}
+	encodedSubstrings := getSubstringsOfCharacterSet(chunk.Data, 20)
+	decodedSubstrings := make(map[string][]byte)
 
 	for _, str := range encodedSubstrings {
 		dec, err := base64.StdEncoding.DecodeString(str)
@@ -26,51 +35,81 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 	}
 
 	if len(decodedSubstrings) > 0 {
-		for substring, dec := range decodedSubstrings {
-			chunk.Data = bytes.ReplaceAll(chunk.Data, []byte(substring), dec)
+		var result bytes.Buffer
+		result.Grow(len(chunk.Data))
+
+		start := 0
+		for _, encoded := range encodedSubstrings {
+			if decoded, ok := decodedSubstrings[encoded]; ok {
+				end := bytes.Index(chunk.Data[start:], []byte(encoded))
+				if end != -1 {
+					result.Write(chunk.Data[start : start+end])
+					result.Write(decoded)
+					start += end + len(encoded)
+				}
+			}
 		}
+		result.Write(chunk.Data[start:])
+		chunk.Data = result.Bytes()
 		return chunk
 	}
 
 	return nil
 }
 
-func getSubstringsOfCharacterSet(data []byte, charset []byte, threshold int) []string {
-	count := 0
-	var substrings []string
-	letters := bytes.Buffer{}
-
+func getSubstringsOfCharacterSet(data []byte, threshold int) []string {
 	if len(data) == 0 {
 		return nil
 	}
 
+	count := 0
+	substringsCount := 0
+
+	// Determine the number of substrings that will be returned.
+	// Pre-allocate the slice to avoid reallocations.
 	for _, char := range data {
-		if bytes.Contains(charset, []byte{char}) {
-			letters.WriteByte(char)
+		if char < 128 && b64CharsetMapping[char] {
 			count++
 		} else {
 			if count > threshold {
-				substrings = appendB64Substring(&letters, substrings)
+				substringsCount++
 			}
-			letters.Reset()
+			count = 0
+		}
+	}
+	if count > threshold {
+		substringsCount++
+	}
+
+	count = 0
+	start := 0
+	substrings := make([]string, 0, substringsCount)
+
+	for i, char := range data {
+		if char < 128 && b64CharsetMapping[char] {
+			if count == 0 {
+				start = i
+			}
+			count++
+		} else {
+			if count > threshold {
+				substrings = appendB64Substring(data, start, count, substrings)
+			}
 			count = 0
 		}
 	}
 
-	if count > threshold && letters.Len() > 0 {
-		substrings = appendB64Substring(&letters, substrings)
+	if count > threshold {
+		substrings = appendB64Substring(data, start, count, substrings)
 	}
 
 	return substrings
 }
 
-func appendB64Substring(letters *bytes.Buffer, substrings []string) []string {
-	substring := bytes.TrimLeft(letters.Bytes(), b64EndChars)
-
-	// handle key=value
-	if bytes.Contains(bytes.TrimRight(substring, b64EndChars), []byte("=")) {
-		split := bytes.SplitN(substring, []byte("="), 2)
-		substrings = append(substrings, string(split[len(split)-1]))
+func appendB64Substring(data []byte, start, count int, substrings []string) []string {
+	substring := bytes.TrimLeft(data[start:start+count], b64EndChars)
+	if idx := bytes.IndexByte(bytes.TrimRight(substring, b64EndChars), '='); idx != -1 {
+		substrings = append(substrings, string(substring[idx+1:]))
 	} else {
 		substrings = append(substrings, string(substring))
 	}
