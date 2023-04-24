@@ -12,7 +12,16 @@ type Base64 struct{}
 var (
 	b64Charset  = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
 	b64EndChars = "+/="
+	// Given characters are mostly ASCII, we can use a simple array to map.
+	b64CharsetMapping [128]bool
 )
+
+func init() {
+	// Build an array of all the characters in the base64 charset.
+	for _, char := range b64Charset {
+		b64CharsetMapping[char] = true
+	}
+}
 
 func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 	encodedSubstrings := getSubstringsOfCharacterSet(chunk.Data, 20)
@@ -51,13 +60,6 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 func getSubstringsOfCharacterSet(data []byte, threshold int) []string {
 	if len(data) == 0 {
 		return nil
-	}
-
-	// Given characters are mostly ASCII, we can use a simple array to map.
-	var b64CharsetMapping [128]bool
-	// Build an array of all the characters in the base64 charset.
-	for _, char := range b64Charset {
-		b64CharsetMapping[char] = true
 	}
 
 	count := 0
