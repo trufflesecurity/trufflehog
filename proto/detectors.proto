@@ -920,6 +920,7 @@ enum DetectorType {
   Moralis = 909;
   BscScan = 910;
   CoinMarketCap = 911;
+  Percy = 912;
 }
 
 message Result {
