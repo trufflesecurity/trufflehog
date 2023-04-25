@@ -178,7 +178,7 @@ func main() {
 
 	err := overseer.RunErr(updateCfg)
 	if err != nil {
-		logFatal(err, "error occured with trufflehog updater 🐷")
+		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
 }
 
@@ -426,7 +426,7 @@ func run(state overseer.State) {
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
-	go e.Finish(ctx)
+	go e.Finish(ctx, logFatal)
 
 	if !*jsonLegacy && !*jsonOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
