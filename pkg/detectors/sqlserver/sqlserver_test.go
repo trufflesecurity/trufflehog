@@ -5,14 +5,15 @@ package sqlserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -76,6 +77,59 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			},
 		},
 		{
+			name: "not found, in XML, missing password param (pwd is not valid)",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(`<add name="Sample2" value="SERVER=server_name;DATABASE=database_name;user=user_name;pwd=plaintextpassword;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+			mockFunc: func() {
+				ping = func(config msdsn.Config) (bool, error) {
+					return true, nil
+				}
+			},
+		},
+		{
+			name: "found, verified, in XML",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(`<add name="test db" value="SERVER=server_name;DATABASE=testdb;user=username;password=badpassword;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SQLServer,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+			mockFunc: func() {
+				ping = func(config msdsn.Config) (bool, error) {
+					if config.Host != "server_name" {
+						return false, errors.New("invalid host")
+					}
+
+					if config.User != "username" {
+						return false, errors.New("invalid database")
+					}
+
+					if config.Password != "badpassword" {
+						return false, errors.New("invalid password")
+					}
+
+					if config.Database != "testdb" {
+						return false, errors.New("invalid database")
+					}
+
+					return true, nil
+				}
+			},
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -119,13 +173,16 @@ func TestSQLServer_FromChunk(t *testing.T) {
 
 func TestSQLServer_pattern(t *testing.T) {
 	if !pattern.Match([]byte(`builder.Services.AddDbContext<Database>(optionsBuilder => optionsBuilder.UseSqlServer("Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"));`)) {
-		t.Errorf("SQLServer.pattern: did not catched connection string from Program.cs")
+		t.Errorf("SQLServer.pattern: did not find connection string from Program.cs")
 	}
 	if !pattern.Match([]byte(`{"ConnectionStrings": {"Demo": "Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"}}`)) {
-		t.Errorf("SQLServer.pattern: did not catched connection string from appsettings.json")
+		t.Errorf("SQLServer.pattern: did not find connection string from appsettings.json")
 	}
 	if !pattern.Match([]byte(`CONNECTION_STRING: Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true`)) {
-		t.Errorf("SQLServer.pattern: did not catched connection string from .env")
+		t.Errorf("SQLServer.pattern: did not find connection string from .env")
+	}
+	if !pattern.Match([]byte(`<add name="Sample2" value="SERVER=server_name;DATABASE=database_name;user=user_name;pwd=plaintextpassword;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`)) {
+		t.Errorf("SQLServer.pattern: did not find connection string in xml format")
 	}
 }
 
