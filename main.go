@@ -302,8 +302,10 @@ func run(state overseer.State) {
 		}
 		// TODO: Add flag to ignore the default endpoint.
 		urls = append(urls, customizer.DefaultEndpoint())
-		customizer.SetEndpoints(urls...)
-		logger.Info("configuring detector with verification urls",
+		if err := customizer.SetEndpoints(urls...); err != nil {
+			logFatal(err, "failed configuring custom endpoint for detector", "detector", id)
+		}
+		logger.Info("configured detector with verification urls",
 			"detector", id, "urls", urls,
 		)
 		return true
