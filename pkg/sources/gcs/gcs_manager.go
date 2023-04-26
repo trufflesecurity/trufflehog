@@ -29,9 +29,7 @@ const (
 	maxObjectSizeLimit   = 50 * 1024 * 1024 // 50MB
 )
 
-var (
-	defaultConcurrency = runtime.NumCPU()
-)
+var defaultConcurrency = runtime.NumCPU()
 
 type objectManager interface {
 	listObjects(context.Context) (chan io.Reader, error)
@@ -296,7 +294,7 @@ func withConcurrency(concurrency int) gcsManagerOption {
 
 // withMaxObjectSize sets the maximum size of objects that will be scanned.
 // If not set, set to a negative number, or set larger than 1GB,
-// the default value of 500MB will be used.
+// the default value of 50MB will be used.
 func withMaxObjectSize(maxObjectSize int64) gcsManagerOption {
 	return func(m *gcsManager) error {
 		if maxObjectSize <= 0 || maxObjectSize > maxObjectSizeLimit {

@@ -145,6 +145,8 @@ type S3Config struct {
 	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
+	// MaxObjectSize is the maximum object size to scan.
+	MaxObjectSize int64
 }
 
 // SyslogConfig defines the optional configuration for a syslog source.
