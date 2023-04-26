@@ -26,7 +26,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
@@ -233,8 +232,8 @@ func run(state overseer.State) {
 		handlers.SetArchiveMaxTimeout(*archiveTimeout)
 	}
 
-	// Build include and exclude detector filter sets.
-	var includeDetectorTypes, excludeDetectorTypes map[detectorspb.DetectorType]config.DetectorID
+	// Build include and exclude detector sets for filtering on engine initialization.
+	var includeDetectorSet, excludeDetectorSet map[config.DetectorID]struct{}
 	{
 		includeList, err := config.ParseDetectors(*includeDetectors)
 		if err != nil {
@@ -246,40 +245,55 @@ func run(state overseer.State) {
 			// Exit if there was an error to inform the user of the misconfiguration.
 			logFatal(err, "invalid exclude list detector configuration")
 		}
-		includeDetectorTypes = detectorTypeToMap(includeList)
-		excludeDetectorTypes = detectorTypeToMap(excludeList)
+		includeDetectorSet = detectorTypeToSet(includeList)
+		excludeDetectorSet = detectorTypeToSet(excludeList)
 	}
-	includeFilter := func(d detectors.Detector) bool {
-		id, ok := includeDetectorTypes[d.Type()]
-		if id.Version == 0 {
-			return ok
-		}
-		versionD, ok := d.(detectors.Versioner)
-		if !ok {
-			// Error: version provided but not a detectors.Versioner
+
+	// Verify that all the user-provided detectors support the optional
+	// detector features.
+	{
+		isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
+		for id := range includeDetectorSet {
+			if id.Version == 0 {
+				// Version not provided.
+				continue
+			}
+			if _, ok := isVersioner[id.ID]; ok {
+				// Version provided for a Versioner detector.
+				continue
+			}
+			// Version provided on a non-Versioner detector.
 			logFatal(
 				fmt.Errorf("version provided but detector does not have a version"),
 				"invalid include list detector configuration",
 				"detector", id,
 			)
 		}
-		return versionD.Version() == id.Version
-	}
-	excludeFilter := func(d detectors.Detector) bool {
-		id, ok := excludeDetectorTypes[d.Type()]
-		if id.Version == 0 {
-			return !ok
-		}
-		versionD, ok := d.(detectors.Versioner)
-		if !ok {
-			// Error: version provided but not a detectors.Versioner
+		for id := range excludeDetectorSet {
+			if id.Version == 0 {
+				// Version not provided.
+				continue
+			}
+			if _, ok := isVersioner[id.ID]; ok {
+				// Version provided for a Versioner detector.
+				continue
+			}
+			// Version provided on a non-Versioner detector.
 			logFatal(
 				fmt.Errorf("version provided but detector does not have a version"),
 				"invalid exclude list detector configuration",
 				"detector", id,
 			)
 		}
-		return versionD.Version() != id.Version
+	}
+
+	includeFilter := func(d detectors.Detector) bool {
+		_, ok := getWithDetectorID(d, includeDetectorSet)
+		return ok
+	}
+	excludeFilter := func(d detectors.Detector) bool {
+		_, ok := getWithDetectorID(d, excludeDetectorSet)
+		return !ok
 	}
 
 	e := engine.Start(ctx,
@@ -523,10 +537,27 @@ func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
 	}
 }
 
-func detectorTypeToMap(detectors []config.DetectorID) map[detectorspb.DetectorType]config.DetectorID {
-	output := make(map[detectorspb.DetectorType]config.DetectorID, len(detectors))
+// detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
+func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
+	output := make(map[config.DetectorID]struct{}, len(detectors))
 	for _, d := range detectors {
-		output[d.ID] = d
+		output[d] = struct{}{}
 	}
 	return output
+}
+
+// getWithDetectorID is a helper function to get a value from a map using a
+// detector's ID. This function behaves like a normal map lookup, with an extra
+// step of checking for the non-specific version of a detector.
+func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T) (T, bool) {
+	key := config.GetDetectorID(d)
+	// Check if the specific ID is provided.
+	if t, ok := data[key]; ok || key.Version == 0 {
+		return t, ok
+	}
+	// Check if the generic type is provided without a version.
+	// This means "all" versions of a type.
+	key.Version = 0
+	t, ok := data[key]
+	return t, ok
 }
