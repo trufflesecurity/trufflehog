@@ -2601,6 +2601,8 @@ func (m *S3) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for MaxObjectSize
+
 	switch m.Credential.(type) {
 
 	case *S3_AccessKey:

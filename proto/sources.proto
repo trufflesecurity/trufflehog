@@ -218,6 +218,7 @@ message S3 {
     credentials.AWSSessionTokenSecret session_token = 5;
   }
   repeated string buckets = 3;
+  int64 max_object_size = 6;
 }
 
 message Slack {
