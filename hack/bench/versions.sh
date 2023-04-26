@@ -30,20 +30,17 @@ count=0
 # Loop over tags and checkout each one in turn, up to the specified number of versions
 for tag in $tags
 do
-  if [ $count -eq $num_versions ]
-  then
-    break
+  if [[ $count -eq $num_versions ]]; then
+      break
   fi
 
   # Skip RC tags
-  if [[ $tag == *"rc"* ]]
-  then
+  if [[ $tag == *"rc"* ]]; then
     continue
   fi
 
   # Skip alpha tags
-  if [[ $tag == *"alpha"* ]]
-  then
+  if [[ $tag == *"alpha"* ]]; then
     continue
   fi
 
