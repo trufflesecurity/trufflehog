@@ -232,7 +232,7 @@ func run(state overseer.State) {
 		handlers.SetArchiveMaxTimeout(*archiveTimeout)
 	}
 
-	// Build include and exclude detector filter sets.
+	// Build include and exclude detector sets for filtering on engine initialization.
 	var includeDetectorSet, excludeDetectorSet map[config.DetectorID]struct{}
 	{
 		includeList, err := config.ParseDetectors(*includeDetectors)
@@ -254,10 +254,15 @@ func run(state overseer.State) {
 	{
 		isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
 		for id := range includeDetectorSet {
-			if _, ok := isVersioner[id.ID]; id.Version == 0 || ok {
+			if id.Version == 0 {
+				// Version not provided.
 				continue
 			}
-			// Version provided on a non-version detector.
+			if _, ok := isVersioner[id.ID]; ok {
+				// Version provided for a Versioner detector.
+				continue
+			}
+			// Version provided on a non-Versioner detector.
 			logFatal(
 				fmt.Errorf("version provided but detector does not have a version"),
 				"invalid include list detector configuration",
@@ -265,10 +270,15 @@ func run(state overseer.State) {
 			)
 		}
 		for id := range excludeDetectorSet {
-			if _, ok := isVersioner[id.ID]; id.Version == 0 || ok {
+			if id.Version == 0 {
+				// Version not provided.
 				continue
 			}
-			// Version provided on a non-version detector.
+			if _, ok := isVersioner[id.ID]; ok {
+				// Version provided for a Versioner detector.
+				continue
+			}
+			// Version provided on a non-Versioner detector.
 			logFatal(
 				fmt.Errorf("version provided but detector does not have a version"),
 				"invalid exclude list detector configuration",
@@ -527,6 +537,7 @@ func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
 	}
 }
 
+// detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
 func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
 	output := make(map[config.DetectorID]struct{}, len(detectors))
 	for _, d := range detectors {
@@ -535,6 +546,9 @@ func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]stru
 	return output
 }
 
+// getWithDetectorID is a helper function to get a value from a map using a
+// detector's ID. This function behaves like a normal map lookup, with an extra
+// step of checking for the non-specific version of a detector.
 func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T) (T, bool) {
 	key := config.GetDetectorID(d)
 	// Check if the specific ID is provided.
