@@ -195,6 +195,7 @@ message JIRA {
     string token = 6;
   }
   repeated string projects = 5;
+  repeated string ignore_projects = 7;
 }
 
 message NPMUnauthenticatedPackage {
