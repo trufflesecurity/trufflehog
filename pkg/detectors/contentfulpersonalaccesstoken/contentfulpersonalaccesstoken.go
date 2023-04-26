@@ -19,7 +19,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-	keyPat = regexp.MustCompile(`\b([CFPAT\-a-zA-Z-0-9]{49})\b`)
+	keyPat = regexp.MustCompile(`\b(CFPAT-[a-zA-Z0-9_\-]{43})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
