@@ -32,11 +32,15 @@ func init() {
 	}
 }
 
+// DetectorID identifies a detector type and version. This struct is used as a
+// way for users to identify detectors, whether unique or not. A DetectorID
+// with Version = 0 indicates all possible versions of a detector.
 type DetectorID struct {
 	ID      dpb.DetectorType
 	Version int
 }
 
+// GetDetectorID extracts the DetectorID from a Detector.
 func GetDetectorID(d detectors.Detector) DetectorID {
 	var version int
 	if v, ok := d.(detectors.Versioner); ok {
