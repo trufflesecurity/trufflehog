@@ -506,6 +506,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/proxycrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubpublishkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubsubscriptionkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pulumi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/purestake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pushbulletapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pusherchannelkey"
@@ -1567,6 +1568,7 @@ func DefaultDetectors() []detectors.Detector {
 		bscscan.Scanner{},
 		coinmarketcap.Scanner{},
 		percy.Scanner{},
+		pulumi.Scanner{},
 	}
 
 }
