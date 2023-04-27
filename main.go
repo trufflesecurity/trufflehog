@@ -221,8 +221,6 @@ func run(state overseer.State) {
 		}
 	}
 
-	urls := splitVerifierURLs(*verifiers)
-
 	if *archiveMaxSize != 0 {
 		handlers.SetArchiveMaxSize(int(*archiveMaxSize))
 	}
@@ -234,17 +232,21 @@ func run(state overseer.State) {
 	}
 
 	// Build include and exclude detector sets for filtering on engine initialization.
+	// Exit if there was an error to inform the user of the misconfiguration.
 	var includeDetectorSet, excludeDetectorSet map[config.DetectorID]struct{}
+	var detectorsWithCustomVerifierEndpoints map[config.DetectorID][]string
 	{
 		includeList, err := config.ParseDetectors(*includeDetectors)
 		if err != nil {
-			// Exit if there was an error to inform the user of the misconfiguration.
 			logFatal(err, "invalid include list detector configuration")
 		}
 		excludeList, err := config.ParseDetectors(*excludeDetectors)
 		if err != nil {
-			// Exit if there was an error to inform the user of the misconfiguration.
 			logFatal(err, "invalid exclude list detector configuration")
+		}
+		detectorsWithCustomVerifierEndpoints, err = config.ParseVerifierEndpoints(*verifiers)
+		if err != nil {
+			logFatal(err, "invalid verifier detector configuration")
 		}
 		includeDetectorSet = detectorTypeToSet(includeList)
 		excludeDetectorSet = detectorTypeToSet(excludeList)
@@ -253,38 +255,25 @@ func run(state overseer.State) {
 	// Verify that all the user-provided detectors support the optional
 	// detector features.
 	{
-		isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
-		for id := range includeDetectorSet {
-			if id.Version == 0 {
-				// Version not provided.
-				continue
-			}
-			if _, ok := isVersioner[id.ID]; ok {
-				// Version provided for a Versioner detector.
-				continue
-			}
-			// Version provided on a non-Versioner detector.
-			logFatal(
-				fmt.Errorf("version provided but detector does not have a version"),
-				"invalid include list detector configuration",
-				"detector", id,
-			)
+		if err, id := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
+			logFatal(err, "invalid include list detector configuration", "detector", id)
 		}
-		for id := range excludeDetectorSet {
-			if id.Version == 0 {
-				// Version not provided.
-				continue
+		if err, id := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
+			logFatal(err, "invalid exclude list detector configuration", "detector", id)
+		}
+		if err, id := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
+			logFatal(err, "invalid verifier detector configuration", "detector", id)
+		}
+		// Extra check for endpoint customization.
+		isEndpointCustomizer := engine.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
+		for id := range detectorsWithCustomVerifierEndpoints {
+			if _, ok := isEndpointCustomizer[id.ID]; !ok {
+				logFatal(
+					fmt.Errorf("endpoint provided but detector does not support endpoint customization"),
+					"invalid custom verifier endpoint detector configuration",
+					"detector", id,
+				)
 			}
-			if _, ok := isVersioner[id.ID]; ok {
-				// Version provided for a Versioner detector.
-				continue
-			}
-			// Version provided on a non-Versioner detector.
-			logFatal(
-				fmt.Errorf("version provided but detector does not have a version"),
-				"invalid exclude list detector configuration",
-				"detector", id,
-			)
 		}
 	}
 
@@ -296,14 +285,41 @@ func run(state overseer.State) {
 		_, ok := getWithDetectorID(d, excludeDetectorSet)
 		return !ok
 	}
+	// Abuse filter to cause a side-effect.
+	endpointCustomizer := func(d detectors.Detector) bool {
+		urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
+		if !ok {
+			return true
+		}
+		id := config.GetDetectorID(d)
+		customizer, ok := d.(detectors.EndpointCustomizer)
+		if !ok {
+			// NOTE: We should never reach here due to validation above.
+			logFatal(
+				fmt.Errorf("failed to configure a detector endpoint"),
+				"the provided detector does not support endpoint configuration",
+				"detector", id,
+			)
+		}
+		// TODO: Add flag to ignore the default endpoint.
+		urls = append(urls, customizer.DefaultEndpoint())
+		if err := customizer.SetEndpoints(urls...); err != nil {
+			logFatal(err, "failed configuring custom endpoint for detector", "detector", id)
+		}
+		logger.Info("configured detector with verification urls",
+			"detector", id, "urls", urls,
+		)
+		return true
+	}
 
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(!*noVerification, engine.CustomDetectors(ctx, urls)...),
+		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
 		engine.WithFilterDetectors(includeFilter),
 		engine.WithFilterDetectors(excludeFilter),
+		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
 	)
 
@@ -513,19 +529,6 @@ func printAverageDetectorTime(e *engine.Engine) {
 	}
 }
 
-func splitVerifierURLs(verifierURLs map[string]string) map[string][]string {
-	verifiers := make(map[string][]string, len(verifierURLs))
-	for k, v := range verifierURLs {
-		key := strings.ToLower(k)
-		sliceOfValues := strings.Split(v, ",")
-		for i, s := range sliceOfValues {
-			sliceOfValues[i] = strings.TrimSpace(s)
-		}
-		verifiers[key] = sliceOfValues
-	}
-	return verifiers
-}
-
 // logFatalFunc returns a log.Fatal style function. Calling the returned
 // function will terminate the program without cleanup.
 func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
@@ -562,4 +565,23 @@ func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T
 	key.Version = 0
 	t, ok := data[key]
 	return t, ok
+}
+
+// verifyDetectorsAreVersioner checks all keys in a provided map to verify the
+// provided type is actually a Versioner.
+func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (error, config.DetectorID) {
+	isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
+	for id := range data {
+		if id.Version == 0 {
+			// Version not provided.
+			continue
+		}
+		if _, ok := isVersioner[id.ID]; ok {
+			// Version provided for a Versioner detector.
+			continue
+		}
+		// Version provided on a non-Versioner detector.
+		return fmt.Errorf("version provided but detector does not have a version"), id
+	}
+	return nil, config.DetectorID{}
 }

@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -742,65 +741,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
-
-// CustomDetectors returns a list of detectors that are enabled by default, but
-// can be overridden by the user.
-func CustomDetectors(ctx context.Context, urls map[string][]string) []detectors.Detector {
-	defaultDetectors := DefaultDetectors()
-	if len(urls) == 0 {
-		return defaultDetectors
-	}
-
-	for i, detector := range defaultDetectors {
-
-		switch detector.Type() {
-		case detectorspb.DetectorType_Github:
-			githubUrls, ok := urls["github"]
-			if !ok {
-				ctx.Logger().V(2).Info("no GitHub urls to ignore")
-				continue
-			}
-			ctx.Logger().V(2).Info("ignoring GitHub urls: %v", githubUrls)
-
-			versioner, ok := detector.(detectors.Versioner)
-			if !ok {
-				ctx.Logger().V(2).Info("Failed to get version for GitHub detector")
-			}
-			switch versioner.Version() {
-			case 1:
-				defaultDetectors[i] = github_old.New(github_old.WithVerifierURLs(githubUrls, true))
-			default:
-				defaultDetectors[i] = github.New(github.WithVerifierURLs(githubUrls, true))
-			}
-
-		case detectorspb.DetectorType_Gitlab:
-			gitlabUrls, ok := urls["gitlab"]
-			if !ok {
-				ctx.Logger().V(2).Info("no GitLab urls to ignore")
-				continue
-			}
-			ctx.Logger().V(2).Info("ignoring GitLab urls: %v", gitlabUrls)
-
-			versioner, ok := detector.(detectors.Versioner)
-			if !ok {
-				ctx.Logger().V(2).Info("Failed to get version for Gitlab detector")
-			}
-			switch versioner.Version() {
-			case 1:
-				defaultDetectors[i] = gitlab.New(gitlab.WithVerifierURLs(gitlabUrls, true))
-			default:
-				defaultDetectors[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(gitlabUrls, true))
-			}
-
-		case detectorspb.DetectorType_JiraToken:
-			// TODO(ahrav): Double check that we need to do this.
-		default:
-			ctx.Logger().V(5).Info("ignoring custom detector", "type", detector.Type())
-			continue
-		}
-	}
-	return defaultDetectors
-}
 
 func DefaultDetectors() []detectors.Detector {
 	return []detectors.Detector{
