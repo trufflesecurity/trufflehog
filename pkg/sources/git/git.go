@@ -578,7 +578,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	}
 
 	scanTime := time.Now().Unix() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "Repo", repoUrl, "path", repoPath, "time (seconds)", scanTime)
+	ctx.Logger().V(1).Info("scanning git repo complete", "Repo", repoUrl, "path", repoPath, "time-seconds", scanTime)
 	return nil
 }
 
