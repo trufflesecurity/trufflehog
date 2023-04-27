@@ -389,7 +389,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
 		}
 
-		s.log.Info("Completed enumeration", "num-repos", len(s.repos), "num-orgs", len(s.orgs), "num-members", len(s.members))
+		s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", len(s.orgs), "num_members", len(s.members))
 		return nil
 	}
 
