@@ -233,7 +233,7 @@ func run(state overseer.State) {
 	// Build include and exclude detector sets for filtering on engine initialization.
 	// Exit if there was an error to inform the user of the misconfiguration.
 	var includeDetectorSet, excludeDetectorSet map[config.DetectorID]struct{}
-	var customVerifierEndpoints map[config.DetectorID][]string
+	var detectorsWithCustomVerifierEndpoints map[config.DetectorID][]string
 	{
 		includeList, err := config.ParseDetectors(*includeDetectors)
 		if err != nil {
@@ -243,7 +243,7 @@ func run(state overseer.State) {
 		if err != nil {
 			logFatal(err, "invalid exclude list detector configuration")
 		}
-		customVerifierEndpoints, err = config.ParseVerifierEndpoints(*verifiers)
+		detectorsWithCustomVerifierEndpoints, err = config.ParseVerifierEndpoints(*verifiers)
 		if err != nil {
 			logFatal(err, "invalid verifier detector configuration")
 		}
@@ -260,12 +260,12 @@ func run(state overseer.State) {
 		if err, id := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
 			logFatal(err, "invalid exclude list detector configuration", "detector", id)
 		}
-		if err, id := verifyDetectorsAreVersioner(customVerifierEndpoints); err != nil {
+		if err, id := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
 			logFatal(err, "invalid verifier detector configuration", "detector", id)
 		}
 		// Extra check for endpoint customization.
 		isEndpointCustomizer := engine.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
-		for id := range customVerifierEndpoints {
+		for id := range detectorsWithCustomVerifierEndpoints {
 			if _, ok := isEndpointCustomizer[id.ID]; !ok {
 				logFatal(
 					fmt.Errorf("endpoint provided but detector does not support endpoint customization"),
@@ -286,7 +286,7 @@ func run(state overseer.State) {
 	}
 	// Abuse filter to cause a side-effect.
 	endpointCustomizer := func(d detectors.Detector) bool {
-		urls, ok := getWithDetectorID(d, customVerifierEndpoints)
+		urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
 		if !ok {
 			return true
 		}
