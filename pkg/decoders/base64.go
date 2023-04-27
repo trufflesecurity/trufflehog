@@ -8,29 +8,20 @@ import (
 )
 
 type (
-	Base64        struct{}
-	Base64URLSafe struct{}
+	Base64 struct{}
 )
 
 var (
-	b64Charset  = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
-	b64EndChars = "+/="
+	b64Charset  = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/-_=")
+	b64EndChars = "+/-_="
 	// Given characters are mostly ASCII, we can use a simple array to map.
 	b64CharsetMapping [128]bool
-
-	b64URLCharset        = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=")
-	b64URLEndChars       = "-_="
-	b64URLCharsetMapping [128]bool
 )
 
 func init() {
 	// Build an array of all the characters in the base64 charset.
 	for _, char := range b64Charset {
 		b64CharsetMapping[char] = true
-	}
-
-	for _, char := range b64URLCharset {
-		b64URLCharsetMapping[char] = true
 	}
 }
 
@@ -40,40 +31,14 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 
 	for _, str := range encodedSubstrings {
 		dec, err := base64.StdEncoding.DecodeString(str)
-		if err == nil && len(dec) > 0 {
-			decodedSubstrings[str] = dec
-		}
-	}
-
-	if len(decodedSubstrings) > 0 {
-		var result bytes.Buffer
-		result.Grow(len(chunk.Data))
-
-		start := 0
-		for _, encoded := range encodedSubstrings {
-			if decoded, ok := decodedSubstrings[encoded]; ok {
-				end := bytes.Index(chunk.Data[start:], []byte(encoded))
-				if end != -1 {
-					result.Write(chunk.Data[start : start+end])
-					result.Write(decoded)
-					start += end + len(encoded)
-				}
+		if err == nil {
+			if len(dec) > 0 {
+				decodedSubstrings[str] = dec
 			}
+			continue
 		}
-		result.Write(chunk.Data[start:])
-		chunk.Data = result.Bytes()
-		return chunk
-	}
 
-	return nil
-}
-
-func (d *Base64URLSafe) FromChunk(chunk *sources.Chunk) *sources.Chunk {
-	encodedSubstrings := getSubstringsOfCharacterSet(chunk.Data, 20, b64URLCharsetMapping, b64URLEndChars)
-	decodedSubstrings := make(map[string][]byte)
-
-	for _, str := range encodedSubstrings {
-		dec, err := base64.RawURLEncoding.DecodeString(str)
+		dec, err = base64.RawURLEncoding.DecodeString(str)
 		if err == nil && len(dec) > 0 {
 			decodedSubstrings[str] = dec
 		}
