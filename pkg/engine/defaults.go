@@ -176,6 +176,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dandelion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dareboost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databrickstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datafire"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
@@ -1569,6 +1570,7 @@ func DefaultDetectors() []detectors.Detector {
 		coinmarketcap.Scanner{},
 		percy.Scanner{},
 		pulumi.Scanner{},
+		databrickstoken.Scanner{},
 	}
 
 }
