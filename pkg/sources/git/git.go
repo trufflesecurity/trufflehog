@@ -560,7 +560,8 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := normalizeConfig(scanOptions, repo); err != nil {
 		return err
 	}
-	start := time.Now().UnixNano()
+	start := time.Now().Unix()
+
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
@@ -576,8 +577,8 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		repoUrl = getSafeRemoteURL(repo, remotes[0].Config().Name)
 	}
 
-	scanTime := time.Now().UnixNano() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "Repo", repoUrl, "path", repoPath, "time", scanTime)
+	scanTime := time.Now().Unix() - start
+	ctx.Logger().V(1).Info("scanning git repo complete", "Repo", repoUrl, "path", repoPath, "time (seconds)", scanTime)
 	return nil
 }
 
