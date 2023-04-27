@@ -379,7 +379,6 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
 					logger.Error(err, "Unable to add members by org for org")
-					continue
 				}
 			}
 		}
