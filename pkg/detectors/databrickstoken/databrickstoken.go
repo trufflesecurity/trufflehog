@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	domain = regexp.MustCompile(`\b(https:\/\/.*\.cloud\.databricks\.com)\b`)
+	domain = regexp.MustCompile(`\b(https:\/\/[a-z0-9-]+\.cloud\.databricks\.com)\b`)
 	keyPat = regexp.MustCompile(`\b(dapi[a-z0-9]{32})\b`)
 )
 
@@ -36,7 +36,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	domainmatches := domain.FindAllStringSubmatch(dataStr, -1)
+	domainMatches := domain.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		for _, domainmatch := range domainmatches {
+		for _, domainmatch := range domainMatches {
 			if len(domainmatch) != 2 {
 				continue
 			}
