@@ -922,6 +922,7 @@ enum DetectorType {
   CoinMarketCap = 911;
   Percy = 912;
   Pulumi = 913;
+  SupabaseToken = 914;
 }
 
 message Result {

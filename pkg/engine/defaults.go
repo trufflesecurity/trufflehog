@@ -630,6 +630,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stytch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sugester"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sumologickey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supabasetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supernotesapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/surveyanyplace"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/surveybot"
@@ -1571,6 +1572,7 @@ func DefaultDetectors() []detectors.Detector {
 		percy.Scanner{},
 		pulumi.Scanner{},
 		databrickstoken.Scanner{},
+		supabasetoken.Scanner{},
 	}
 
 }
