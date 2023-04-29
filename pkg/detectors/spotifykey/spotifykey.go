@@ -35,7 +35,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, common.SaneHttpClient())
-
+	var verifyError error
 	dataStr := string(data)
 
 	matches := secretPat.FindAllStringSubmatch(dataStr, -1)
