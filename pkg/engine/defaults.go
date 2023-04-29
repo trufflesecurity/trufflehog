@@ -438,6 +438,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nugetapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
@@ -1573,6 +1574,7 @@ func DefaultDetectors() []detectors.Detector {
 		pulumi.Scanner{},
 		databrickstoken.Scanner{},
 		supabasetoken.Scanner{},
+		nugetapikey.Scanner{},
 	}
 
 }

@@ -923,6 +923,7 @@ enum DetectorType {
   Percy = 912;
   Pulumi = 913;
   SupabaseToken = 914;
+  NuGetApiKey = 915;
 }
 
 message Result {
