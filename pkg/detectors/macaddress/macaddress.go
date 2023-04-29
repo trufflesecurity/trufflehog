@@ -2,8 +2,11 @@ package macaddress
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 

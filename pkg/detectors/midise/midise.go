@@ -28,7 +28,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Midise secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-
+	var verifyError error
 	dataStr := string(data)
 
 	matches := secretKey.FindAllString(dataStr, -1)

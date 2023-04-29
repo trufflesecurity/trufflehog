@@ -32,6 +32,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Okta secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	var verifyError error
 	for _, tokenMatch := range tokenPat.FindAll(data, -1) {
 		token := string(tokenMatch)
 
