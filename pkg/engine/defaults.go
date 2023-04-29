@@ -16,6 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airship"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtableapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alconost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
@@ -1575,6 +1576,7 @@ func DefaultDetectors() []detectors.Detector {
 		databrickstoken.Scanner{},
 		supabasetoken.Scanner{},
 		nugetapikey.Scanner{},
+		aiven.Scanner{},
 	}
 
 }

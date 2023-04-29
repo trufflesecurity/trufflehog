@@ -924,6 +924,7 @@ enum DetectorType {
   Pulumi = 913;
   SupabaseToken = 914;
   NuGetApiKey = 915;
+  Aiven = 916;
 }
 
 message Result {
