@@ -925,6 +925,7 @@ enum DetectorType {
   SupabaseToken = 914;
   NuGetApiKey = 915;
   Aiven = 916;
+  Prefect = 917;
 }
 
 message Result {

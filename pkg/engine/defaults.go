@@ -501,6 +501,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postmark"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/powrbot"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prefect"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prodpad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prospectcrm"
@@ -1577,6 +1578,7 @@ func DefaultDetectors() []detectors.Detector {
 		supabasetoken.Scanner{},
 		nugetapikey.Scanner{},
 		aiven.Scanner{},
+		prefect.Scanner{},
 	}
 
 }
