@@ -66,9 +66,14 @@ func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*Leg
 		return nil, fmt.Errorf("legacy JSON output can not be used with this source: %s", r.SourceName)
 	}
 
-	// The repo will be needed to gather info needed for the legacy output that isn't included in the new
-	// output format.
-	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
+	options := &gogit.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+
+	// The repo will be needed to gather info needed for the legacy output that
+	// isn't included in the new output format.
+	repo, err := gogit.PlainOpenWithOptions(repoPath, options)
 	if err != nil {
 		return nil, fmt.Errorf("could not open repo %q: %w", repoPath, err)
 	}
