@@ -921,6 +921,7 @@ enum DetectorType {
   BscScan = 910;
   CoinMarketCap = 911;
   Percy = 912;
+  TinesWebhook = 913;
 }
 
 message Result {

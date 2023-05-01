@@ -658,6 +658,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tiingo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timecamp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timezoneapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tineswebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tmetric"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/todoist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tokeet"
@@ -1507,6 +1508,7 @@ func DefaultDetectors() []detectors.Detector {
 		bscscan.Scanner{},
 		coinmarketcap.Scanner{},
 		percy.Scanner{},
+		tineswebhook.Scanner{},
 	}
 
 }
