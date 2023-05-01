@@ -10,7 +10,7 @@ type ChunkFunc func(chunk *Chunk) error
 
 var MatchError = errors.New("chunk doesn't match")
 
-func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
+func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc, timeout int) error {
 	for {
 		select {
 		case gotChunk := <-chunksCh:
@@ -22,8 +22,8 @@ func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
 				return err
 			}
 			return nil
-		case <-time.After(20 * time.Second):
-			return fmt.Errorf("no new chunks received after 20 seconds")
+		case <-time.After(time.Duration(timeout) * time.Second):
+			return fmt.Errorf("no new chunks received after %d seconds", timeout)
 		}
 	}
 }
