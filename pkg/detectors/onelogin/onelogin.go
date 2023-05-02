@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_OneLogin,
 				Raw:          []byte(clientID[1]),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", clientID[1], clientSecret[1])),
 				Redacted:     clientID[1],
 			}
 

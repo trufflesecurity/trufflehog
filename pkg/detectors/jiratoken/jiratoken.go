@@ -24,7 +24,12 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{5,24}\.[a-zA-Z-0-9]{3,16}\.[a-zA-Z-0-9]{3,16})\b`)
-	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{5,24}\@[a-zA-Z-0-9]{3,16}\.com)\b`)
+	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`)
+)
+
+const (
+	failedAuth           = "AUTHENTICATED_FAILED"
+	loginReasonHeaderKey = "X-Seraph-LoginReason"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	emails := emailPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, email := range emails {
+		email = strings.Split(email[0], " ")
 		if len(email) != 2 {
 			continue
 		}
@@ -60,10 +66,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Raw:          []byte(resToken),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resEmail, resToken, resDomain)),
 				}
 
 				if verify {
-
 					data := fmt.Sprintf("%s:%s", resEmail, resToken)
 					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomain+"/rest/api/3/dashboard", nil)
@@ -75,7 +81,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					res, err := client.Do(req)
 					if err == nil {
 						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
+
+						// If the request is successful and the login reason is not failed authentication, then the token is valid.
+						// This is because Jira returns a 200 status code even if the token is invalid.
+						// Jira returns a default dashboard page.
+						if (res.StatusCode >= 200 && res.StatusCode < 300) && res.Header.Get(loginReasonHeaderKey) != failedAuth {
 							s1.Verified = true
 						}
 					}

@@ -195,6 +195,7 @@ message JIRA {
     string token = 6;
   }
   repeated string projects = 5;
+  repeated string ignore_projects = 7;
 }
 
 message NPMUnauthenticatedPackage {
@@ -217,6 +218,7 @@ message S3 {
     credentials.AWSSessionTokenSecret session_token = 5;
   }
   repeated string buckets = 3;
+  int64 max_object_size = 6;
 }
 
 message Slack {
@@ -263,7 +265,7 @@ message Teams {
   }
   repeated string channels = 4;
   repeated string ignoreList = 5;
-  string team_id = 6;
+  repeated string team_ids = 6;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
@@ -300,10 +302,8 @@ message SlackRealtime {
 }
 
 message Sharepoint {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
-    string refresh_token = 2;
+    credentials.Oauth2 oauth = 1;
   }
-  string site_url = 3;
-
+  string site_url = 2;
 }

@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v42/github"
 
@@ -15,7 +14,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClient *github.Client) (string, *gogit.Repository, error) {
+func (s *Source) cloneRepo(
+	ctx context.Context,
+	repoURL string,
+	installationClient *github.Client,
+) (string, *gogit.Repository, error) {
 	var (
 		path string
 		repo *gogit.Repository
@@ -52,6 +55,8 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 		}
+	default:
+		return "", nil, fmt.Errorf("unhandled credential type for repo %s", repoURL)
 	}
 	return path, repo, nil
 }
@@ -63,13 +68,13 @@ func (s *Source) userAndToken(ctx context.Context, installationClient *github.Cl
 	case *sourcespb.GitHub_GithubApp:
 		id, err := strconv.ParseInt(cred.GithubApp.InstallationId, 10, 64)
 		if err != nil {
-			return "", "", errors.New(err)
+			return "", "", fmt.Errorf("unable to parse installation id: %w", err)
 		}
 		// TODO: Check rate limit for this call.
 		token, _, err := installationClient.Apps.CreateInstallationToken(
 			ctx, id, &github.InstallationTokenOptions{})
 		if err != nil {
-			return "", "", errors.WrapPrefix(err, "unable to create installation token", 0)
+			return "", "", fmt.Errorf("unable to create installation token: %w", err)
 		}
 		return "x-access-token", token.GetToken(), nil // TODO: multiple workers request this, track the TTL
 	case *sourcespb.GitHub_Token:
@@ -84,14 +89,16 @@ func (s *Source) userAndToken(ctx context.Context, installationClient *github.Cl
 				continue
 			}
 			if err != nil {
-				return "", "", errors.New(err)
+				return "", "", fmt.Errorf("unable to get user: %w", err)
 			}
 			break
 		}
 		return ghUser.GetLogin(), cred.Token, nil
+	default:
+		return "", "", fmt.Errorf("unhandled credential type")
 	}
 
-	return "", "", errors.New("unhandled credential type for token fetch")
+	return "", "", fmt.Errorf("unhandled credential type")
 }
 
 type repoListOptions interface {
@@ -198,14 +205,10 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			}
 			numForks++
 
-			repo, err := s.normalizeRepo(r.GetCloneURL())
-			if err != nil {
-				s.log.V(2).Info("could not normalize repo", "repo", r.GetFullName(), "error", err)
-				continue
-			}
-			s.repoSizes[repo] = r.GetSize()
+			repoName := r.GetFullName()
+			s.repoSizes[repoName] = r.GetSize()
 			s.totalRepoSize += r.GetSize()
-			s.filteredRepoCache.Set(r.GetFullName(), repo)
+			s.filteredRepoCache.Set(repoName, r.GetCloneURL())
 		}
 
 		if res.NextPage == 0 {

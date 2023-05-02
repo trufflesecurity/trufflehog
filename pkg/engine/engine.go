@@ -254,6 +254,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					decoderType = detectorspb.DecoderType_PLAIN
 				case *decoders.Base64:
 					decoderType = detectorspb.DecoderType_BASE64
+				case *decoders.UTF16:
+					decoderType = detectorspb.DecoderType_UTF16
 				default:
 					ctx.Logger().Info("unknown decoder type", "type", reflect.TypeOf(decoder).String())
 					decoderType = detectorspb.DecoderType_UNKNOWN

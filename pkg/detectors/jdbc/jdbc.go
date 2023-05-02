@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -12,7 +13,35 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	ignorePatterns []regexp.Regexp
+}
+
+func New(opts ...func(*Scanner)) *Scanner {
+	scanner := &Scanner{
+		ignorePatterns: []regexp.Regexp{},
+	}
+	for _, opt := range opts {
+		opt(scanner)
+	}
+
+	return scanner
+}
+
+func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
+	return func(s *Scanner) {
+		ignorePatterns := []regexp.Regexp{}
+		for _, ignoreString := range ignoreStrings {
+			ignorePattern, err := regexp.Compile(ignoreString)
+			if err != nil {
+				panic(fmt.Sprintf("%s is not a valid regex, error received: %v", ignoreString, err))
+			}
+			ignorePatterns = append(ignorePatterns, *ignorePattern)
+		}
+
+		s.ignorePatterns = ignorePatterns
+	}
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -32,7 +61,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+matchLoop:
 	for _, match := range matches {
+		if len(s.ignorePatterns) != 0 {
+			for _, ignore := range s.ignorePatterns {
+				if ignore.MatchString(match[0]) {
+					continue matchLoop
+				}
+			}
+		}
 		jdbcConn := match[0]
 
 		s := detectors.Result{

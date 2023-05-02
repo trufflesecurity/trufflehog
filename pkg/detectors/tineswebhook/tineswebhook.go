@@ -1,8 +1,7 @@
-package contentfulpersonalaccesstoken
+package tineswebhook
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -19,58 +18,58 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-	keyPat = regexp.MustCompile(`\b(CFPAT-[a-zA-Z0-9_\-]{43})\b`)
+
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
+	keyPat = regexp.MustCompile(`(https://[\w-]+\.tines\.com/webhook/[a-z0-9]{32}/[a-z0-9]{32})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"CFPAT-"}
+	return []string{"tines.com"}
 }
 
-// FromData will find and optionally verify ContentfulDelivery secrets in a given set of bytes.
+// FromData will find and optionally verify TinesWebhook secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range keyMatches {
+	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		keyRes := strings.TrimSpace(match[1])
+		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ContentfulPersonalAccessToken,
-			Raw:          []byte(keyRes),
+			DetectorType: detectorspb.DetectorType_TinesWebhook,
+			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.contentful.com/organizations", nil)
+			payload := strings.NewReader(``)
+			req, err := http.NewRequestWithContext(ctx, "GET", resMatch, payload)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", keyRes))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
+				if err != nil {
+					continue
+				}
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
 
 		results = append(results, s1)
-
 	}
 
 	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ContentfulPersonalAccessToken
+	return detectorspb.DetectorType_TinesWebhook
 }

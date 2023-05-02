@@ -1,4 +1,4 @@
-package contentfulpersonalaccesstoken
+package percy
 
 import (
 	"context"
@@ -19,45 +19,49 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-	keyPat = regexp.MustCompile(`\b(CFPAT-[a-zA-Z0-9_\-]{43})\b`)
+
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"percy"}) + `\bPERCY_TOKEN=([0-9Aa-f]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"CFPAT-"}
+	return []string{"percy"}
 }
 
-// FromData will find and optionally verify ContentfulDelivery secrets in a given set of bytes.
+// FromData will find and optionally verify Percy secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range keyMatches {
+	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		keyRes := strings.TrimSpace(match[1])
+		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ContentfulPersonalAccessToken,
-			Raw:          []byte(keyRes),
+			DetectorType: detectorspb.DetectorType_Percy,
+			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.contentful.com/organizations", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://percy.io/api/v1/projects", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", keyRes))
+			req.Header.Add("Accept", "application/vnd.percy+json; version=3")
+			req.Header.Add("Authorization", fmt.Sprintf("Token %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
+					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}
@@ -65,12 +69,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		results = append(results, s1)
-
 	}
 
 	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ContentfulPersonalAccessToken
+	return detectorspb.DetectorType_Percy
 }
