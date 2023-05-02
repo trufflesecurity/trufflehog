@@ -205,10 +205,11 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			}
 			numForks++
 
-			repoName := r.GetFullName()
-			s.repoSizes[repoName] = r.GetSize()
+			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
+			s.repoSizes.addRepo(repoURL, r.GetSize())
 			s.totalRepoSize += r.GetSize()
-			s.filteredRepoCache.Set(repoName, r.GetCloneURL())
+			s.filteredRepoCache.Set(repoName, repoURL)
+			logger.V(3).Info("repo attributes", "name", repoName, "size", r.GetSize(), "repo_url", repoURL)
 		}
 
 		if res.NextPage == 0 {
@@ -216,7 +217,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 		}
 		opts.Page = res.NextPage
 	}
-	logger.V(2).Info("found repos", "total", numRepos, "num-forks", numForks)
+	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks)
 
 	return nil
 }

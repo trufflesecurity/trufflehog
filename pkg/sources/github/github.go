@@ -56,8 +56,8 @@ type Source struct {
 	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
 	memberCache       map[string]struct{}
-	repoSizes         map[string]int // size in bytes of each repo
-	totalRepoSize     int            // total size in bytes of all repos
+	repoSizes         repoSize
+	totalRepoSize     int // total size in bytes of all repos
 	git               *git.Git
 	scanOptions       *git.ScanOptions
 	httpClient        *http.Client
@@ -92,6 +92,27 @@ func (s *Source) SourceID() int64 {
 
 func (s *Source) JobID() int64 {
 	return s.jobID
+}
+
+type repoSize struct {
+	mu        sync.RWMutex
+	repoSizes map[string]int // size in bytes of each repo
+}
+
+func (r *repoSize) addRepo(repo string, size int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.repoSizes[repo] = size
+}
+
+func (r *repoSize) getRepo(repo string) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.repoSizes[repo]
+}
+
+func newRepoSize() repoSize {
+	return repoSize{repoSizes: make(map[string]int)}
 }
 
 // filteredRepoCache is a wrapper around cache.Cache that filters out repos
@@ -179,7 +200,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.IncludeRepos, s.conn.IgnoreRepos)
 	s.memberCache = make(map[string]struct{})
 
-	s.repoSizes = make(map[string]int)
+	s.repoSizes = newRepoSize()
 	s.repos = s.conn.Repositories
 	for _, repo := range s.repos {
 		r, err := s.normalizeRepo(repo)
@@ -475,7 +496,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
 		}
 
-		s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", len(s.orgs), "num_members", len(s.members))
+		s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", len(s.orgs), "num_members", len(s.members), "total_repos_size_bytes", s.totalRepoSize)
 		return nil
 	}
 
@@ -613,13 +634,18 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			s.scanOptions.BaseHash = s.conn.Base
 			s.scanOptions.HeadHash = s.conn.Head
 
-			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)))
+			repoSize := s.repoSizes.getRepo(repoURL)
+			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size", repoSize)
+
+			now := time.Now()
+			defer func(start time.Time) {
+				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
+			}(now)
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
-			logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)))
 
 			return nil
 		})
