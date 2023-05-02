@@ -254,6 +254,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				if totalSize > c.maxCommitSize {
 					oldCommit := currentCommit
 					commitChan <- *currentCommit
+					totalLogSize += currentCommit.Size
 					currentCommit = &Commit{
 						Hash:    currentCommit.Hash,
 						Author:  currentCommit.Author,
@@ -314,17 +315,20 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 	}
-	cleanupParse(currentCommit, currentDiff, commitChan)
+	cleanupParse(currentCommit, currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
 
-func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit) {
+func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
 	if currentDiff != nil && currentDiff.Content.Len() > 0 {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 	}
 	if currentCommit != nil {
 		commitChan <- *currentCommit
+		if totalLogSize != nil {
+			*totalLogSize += currentCommit.Size
+		}
 	}
 }
 
