@@ -249,6 +249,9 @@ func TestAddOrgsByUser(t *testing.T) {
 
 	s := initTestSource(nil)
 	s.addOrgsByUser(context.TODO(), "super-secret-user")
+	assert.Equal(t, 1, s.orgsCache.Count())
+	ok := s.orgsCache.Exists("sso2")
+	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
 

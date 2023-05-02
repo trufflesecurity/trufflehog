@@ -44,15 +44,16 @@ const (
 )
 
 type Source struct {
-	name        string
-	githubUser  string
-	githubToken string
-	sourceID    int64
-	jobID       int64
-	verify      bool
-	repos,
-	orgs,
-	members []string
+	name              string
+	githubUser        string
+	githubToken       string
+	sourceID          int64
+	jobID             int64
+	verify            bool
+	repos             []string
+	orgs              []string
+	members           []string
+	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
 	memberCache       map[string]struct{}
 	repoSizes         map[string]int // size in bytes of each repo
@@ -190,6 +191,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	}
 
 	s.orgs = s.conn.Organizations
+	s.orgsCache = memory.New()
+	for _, org := range s.orgs {
+		s.orgsCache.Set(org, org)
+	}
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -446,7 +451,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			s.addOrgsByUser(ctx, ghUser.GetLogin())
 		}
 
-		for _, org := range s.orgs {
+		for _, org := range s.orgsCache.Keys() {
 			logger := s.log.WithValues("org", org)
 			if err := s.getReposByOrg(ctx, org); err != nil {
 				logger.Error(err, "error fetching repos by org")
@@ -767,6 +772,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 			} else {
 				continue
 			}
+			s.orgsCache.Set(name, name)
 			s.log.V(2).Info("adding organization for repository enumeration", "id", org.ID, "name", name)
 		}
 	}
@@ -797,6 +803,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 			if org.Login == nil {
 				continue
 			}
+			s.orgsCache.Set(*org.Login, *org.Login)
 		}
 		if resp.NextPage == 0 {
 			break
