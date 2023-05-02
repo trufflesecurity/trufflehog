@@ -134,11 +134,27 @@ func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Cl
 // based on include and exclude globs.
 type filteredRepoCache struct {
 	cache.Cache
-	include, exclude []string
+	include, exclude []glob.Glob
 }
 
-func newFilteredRepoCache(c cache.Cache, include, exclude []string) *filteredRepoCache {
-	return &filteredRepoCache{Cache: c, include: include, exclude: exclude}
+func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) *filteredRepoCache {
+	includeGlobs := make([]glob.Glob, 0, len(include))
+	excludeGlobs := make([]glob.Glob, 0, len(exclude))
+	for _, ig := range include {
+		g, err := glob.Compile(ig)
+		if err != nil {
+			s.log.V(1).Info("invalid include glob", "glob", g, "err", err)
+		}
+		includeGlobs = append(includeGlobs, g)
+	}
+	for _, eg := range exclude {
+		g, err := glob.Compile(eg)
+		if err != nil {
+			s.log.V(1).Info("invalid exclude glob", "glob", g, "err", err)
+		}
+		excludeGlobs = append(excludeGlobs, g)
+	}
+	return &filteredRepoCache{Cache: c, include: includeGlobs, exclude: excludeGlobs}
 }
 
 // Set overrides the cache.Cache Set method to filter out repos based on
@@ -154,11 +170,7 @@ func (c *filteredRepoCache) Set(key, val string) {
 }
 
 func (c *filteredRepoCache) ignoreRepo(s string) bool {
-	for _, exclude := range c.exclude {
-		g, err := glob.Compile(exclude)
-		if err != nil {
-			continue
-		}
+	for _, g := range c.exclude {
 		if g.Match(s) {
 			return true
 		}
@@ -171,11 +183,7 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 		return true
 	}
 
-	for _, include := range c.include {
-		g, err := glob.Compile(include)
-		if err != nil {
-			continue
-		}
+	for _, g := range c.include {
 		if g.Match(s) {
 			return true
 		}
@@ -204,7 +212,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	}
 	s.conn = &conn
 
-	s.filteredRepoCache = newFilteredRepoCache(memory.New(), s.conn.IncludeRepos, s.conn.IgnoreRepos)
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.IncludeRepos, s.conn.IgnoreRepos)
 	s.memberCache = make(map[string]struct{})
 
 	s.repos = s.conn.Repositories
@@ -479,7 +487,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			}
 
 			if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-				logger.Error(err, "error fetching gists by org")
+				logger.Error(err, "error fetching repos by user")
 			}
 
 			if s.conn.ScanUsers {
@@ -763,12 +771,7 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 				}
 				numForks++
 			}
-			repo, err := s.normalizeRepo(r.GetCloneURL())
-			if err != nil {
-				logger.V(2).Info("could not normalize repo", "repo", r.GetFullName(), "error", err)
-				continue
-			}
-			s.filteredRepoCache.Set(r.GetFullName(), repo)
+			s.filteredRepoCache.Set(r.GetFullName(), r.GetCloneURL())
 			numRepos++
 		}
 		if res.NextPage == 0 {
@@ -810,12 +813,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 				continue
 			}
 
-			repo, err := s.normalizeRepo(r.GetCloneURL())
-			if err != nil {
-				s.log.V(2).Info("could not normalize repo", "repo", r.GetFullName(), "error", err)
-				continue
-			}
-			s.filteredRepoCache.Set(r.GetFullName(), repo)
+			s.filteredRepoCache.Set(r.GetFullName(), r.GetCloneURL())
 		}
 		if res.NextPage == 0 {
 			break
@@ -843,12 +841,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 			return fmt.Errorf("could not list gists for user %s: %w", user, err)
 		}
 		for _, gist := range gists {
-			repoURL, err := s.normalizeRepo(gist.GetGitPullURL())
-			if err != nil {
-				s.log.V(2).Info("could not normalize gist", "gist", gist.GetGitPullURL(), "error", err)
-				continue
-			}
-			s.filteredRepoCache.Set(gist.GetID(), repoURL)
+			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
 		}
 		if res == nil || res.NextPage == 0 {
 			break
@@ -907,12 +900,7 @@ func (s *Source) addReposByApp(ctx context.Context) error {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
-			repo, err := s.normalizeRepo(r.GetCloneURL())
-			if err != nil {
-				s.log.V(2).Info("could not normalize repo", "repo", r.GetFullName(), "error", err)
-				continue
-			}
-			s.filteredRepoCache.Set(r.GetFullName(), repo)
+			s.filteredRepoCache.Set(r.GetFullName(), r.GetCloneURL())
 			s.log.V(2).Info("Enumerated repo", "repo", r.GetFullName())
 		}
 
