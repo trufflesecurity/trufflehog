@@ -8,6 +8,7 @@ enum DecoderType {
   UNKNOWN = 0;
   PLAIN = 1;
   BASE64 = 2;
+  UTF16 = 3;
 }
 
 enum DetectorType {
@@ -919,6 +920,8 @@ enum DetectorType {
   Moralis = 909;
   BscScan = 910;
   CoinMarketCap = 911;
+  Percy = 912;
+  TinesWebhook = 913;
 }
 
 message Result {

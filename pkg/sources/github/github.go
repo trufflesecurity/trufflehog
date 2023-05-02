@@ -427,6 +427,8 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		ghUser *github.User
 		resp   *github.Response
 	)
+
+	ctx.Logger().V(1).Info("Enumerating with token", "endpoint", apiEndpoint)
 	for {
 		ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
 		if handled := s.handleRateLimit(err, resp); handled {
@@ -480,16 +482,10 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 				logger.Error(err, "error fetching gists by org")
 			}
 
-			// TODO: Test it actually works to list org gists like this.
-			if err := s.addUserGistsToCache(ctx, org); err != nil {
-				logger.Error(err, "error fetching gists by org")
-			}
-
 			if s.conn.ScanUsers {
 				err := s.addMembersByOrg(ctx, org)
 				if err != nil {
 					logger.Error(err, "Unable to add members by org for org")
-					continue
 				}
 			}
 		}
@@ -499,6 +495,9 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
 			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
 		}
+
+		s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", len(s.orgs), "num_members", len(s.members))
+		return nil
 	}
 
 	if s.conn.ScanUsers {
@@ -628,14 +627,16 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 			defer os.RemoveAll(path)
 			if err != nil {
+				scanErrs.Add(fmt.Errorf("error cloning repo %s: %w", repoURL, err))
 				return nil
 			}
 
 			s.scanOptions.BaseHash = s.conn.Base
 			s.scanOptions.HeadHash = s.conn.Head
 
+			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)))
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
-				logger.Error(err, "unable to scan repo, continuing")
+				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
@@ -647,7 +648,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		s.log.V(2).Info("encountered errors while scanning", "count", scanErrs.Count(), "errors", scanErrs)
+		s.log.V(2).Info("Errors encountered while scanning", "error-count", scanErrs.Count(), "errors", scanErrs)
 	}
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
 

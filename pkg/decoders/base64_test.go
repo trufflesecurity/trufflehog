@@ -90,13 +90,29 @@ func TestBase64_FromChunk(t *testing.T) {
 	}
 }
 
-func BenchmarkFromChunk(benchmark *testing.B) {
+func BenchmarkFromChunkSmall(b *testing.B) {
 	d := Base64{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				d.FromChunk(&sources.Chunk{Data: data})
-			}
-		})
+	data := detectors.MustGetBenchmarkData()["small"]
+
+	for n := 0; n < b.N; n++ {
+		d.FromChunk(&sources.Chunk{Data: data})
+	}
+}
+
+func BenchmarkFromChunkMedium(b *testing.B) {
+	d := Base64{}
+	data := detectors.MustGetBenchmarkData()["medium"]
+
+	for n := 0; n < b.N; n++ {
+		d.FromChunk(&sources.Chunk{Data: data})
+	}
+}
+
+func BenchmarkFromChunkLarge(b *testing.B) {
+	d := Base64{}
+	data := detectors.MustGetBenchmarkData()["big"]
+
+	for n := 0; n < b.N; n++ {
+		d.FromChunk(&sources.Chunk{Data: data})
 	}
 }

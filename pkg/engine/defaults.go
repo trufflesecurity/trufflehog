@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -16,6 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airship"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtableapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alconost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aletheiaapi"
@@ -75,6 +75,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blablabus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blazemeter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blitapp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blogger"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bombbomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boostnote"
@@ -83,6 +84,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buddyns"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
@@ -142,6 +144,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinmarketcap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/collect2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/column"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
@@ -213,6 +216,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticemail"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enablex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enigma"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etsyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/everhour"
@@ -319,6 +323,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagekit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagga"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/impala"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/infura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/insightly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instabot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/integromat"
@@ -408,6 +413,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/monkeylearn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moonclerk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moosend"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moralis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mrticktock"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mux"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myfreshworks"
@@ -471,6 +477,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pdfshift"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/peopledatalabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pepipost"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/percy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pinata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedream"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedrive"
@@ -651,6 +658,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tiingo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timecamp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/timezoneapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tineswebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tmetric"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/todoist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tokeet"
@@ -733,73 +741,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/infura"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/moralis"
-        "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinmarketcap"
 )
-
-// CustomDetectors returns a list of detectors that are enabled by default, but
-// can be overridden by the user.
-func CustomDetectors(ctx context.Context, urls map[string][]string) []detectors.Detector {
-	defaultDetectors := DefaultDetectors()
-	if len(urls) == 0 {
-		return defaultDetectors
-	}
-
-	for i, detector := range defaultDetectors {
-
-		switch detector.Type() {
-		case detectorspb.DetectorType_Github:
-			githubUrls, ok := urls["github"]
-			if !ok {
-				ctx.Logger().V(2).Info("no GitHub urls to ignore")
-				continue
-			}
-			ctx.Logger().V(2).Info("ignoring GitHub urls: %v", githubUrls)
-
-			versioner, ok := detector.(detectors.Versioner)
-			if !ok {
-				ctx.Logger().V(2).Info("Failed to get version for GitHub detector")
-			}
-			switch versioner.Version() {
-			case 1:
-				defaultDetectors[i] = github_old.New(github_old.WithVerifierURLs(githubUrls, true))
-			default:
-				defaultDetectors[i] = github.New(github.WithVerifierURLs(githubUrls, true))
-			}
-
-		case detectorspb.DetectorType_Gitlab:
-			gitlabUrls, ok := urls["gitlab"]
-			if !ok {
-				ctx.Logger().V(2).Info("no GitLab urls to ignore")
-				continue
-			}
-			ctx.Logger().V(2).Info("ignoring GitLab urls: %v", gitlabUrls)
-
-			versioner, ok := detector.(detectors.Versioner)
-			if !ok {
-				ctx.Logger().V(2).Info("Failed to get version for Gitlab detector")
-			}
-			switch versioner.Version() {
-			case 1:
-				defaultDetectors[i] = gitlab.New(gitlab.WithVerifierURLs(gitlabUrls, true))
-			default:
-				defaultDetectors[i] = gitlabv2.New(gitlabv2.WithVerifierURLs(gitlabUrls, true))
-			}
-
-		case detectorspb.DetectorType_JiraToken:
-			// TODO(ahrav): Double check that we need to do this.
-		default:
-			ctx.Logger().V(5).Info("ignoring custom detector", "type", detector.Type())
-			continue
-		}
-	}
-	return defaultDetectors
-}
 
 func DefaultDetectors() []detectors.Detector {
 	return []detectors.Detector{
@@ -1565,6 +1507,18 @@ func DefaultDetectors() []detectors.Detector {
 		moralis.Scanner{},
 		bscscan.Scanner{},
 		coinmarketcap.Scanner{},
+		percy.Scanner{},
+		tineswebhook.Scanner{},
 	}
 
+}
+
+func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {
+	out := make(map[detectorspb.DetectorType]struct{})
+	for _, detector := range DefaultDetectors() {
+		if _, ok := detector.(T); ok {
+			out[detector.Type()] = struct{}{}
+		}
+	}
+	return out
 }

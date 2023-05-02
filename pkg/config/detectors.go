@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,11 +33,15 @@ func init() {
 	}
 }
 
+// DetectorID identifies a detector type and version. This struct is used as a
+// way for users to identify detectors, whether unique or not. A DetectorID
+// with Version = 0 indicates all possible versions of a detector.
 type DetectorID struct {
 	ID      dpb.DetectorType
 	Version int
 }
 
+// GetDetectorID extracts the DetectorID from a Detector.
 func GetDetectorID(d detectors.Detector) DetectorID {
 	var version int
 	if v, ok := d.(detectors.Versioner); ok {
@@ -78,6 +83,37 @@ func ParseDetectors(input string) ([]DetectorID, error) {
 		}
 	}
 	return output, nil
+}
+
+// ParseDetector parses a user supplied string into a single DetectorID. Input
+// is case-insensitive and either the detector name or ID may be used.
+func ParseDetector(input string) (DetectorID, error) {
+	return asDetectorID(strings.TrimSpace(input))
+}
+
+// ParseVerifierEndpoints parses a map of user supplied verifier URLs. The
+// input keys are detector IDs and the values are a comma separated list of
+// URLs. The URLs are validated as HTTPS endpoints.
+func ParseVerifierEndpoints(verifierURLs map[string]string) (map[DetectorID][]string, error) {
+	verifiers := make(map[DetectorID][]string, len(verifierURLs))
+	for detectorID, urls := range verifierURLs {
+		key, err := ParseDetector(detectorID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid detector ID for verifier: %w", err)
+		}
+		verifierURLs := strings.Split(urls, ",")
+		for i, rawEndpoint := range verifierURLs {
+			rawEndpoint := strings.TrimSpace(rawEndpoint)
+			verifierURLs[i] = rawEndpoint
+			if endpoint, err := url.Parse(rawEndpoint); err != nil {
+				return nil, fmt.Errorf("invalid verifier url %q: %w", rawEndpoint, err)
+			} else if endpoint.Scheme != "https" {
+				return nil, fmt.Errorf("verifier url must be https: %q", rawEndpoint)
+			}
+		}
+		verifiers[key] = append(verifiers[key], verifierURLs...)
+	}
+	return verifiers, nil
 }
 
 func (id DetectorID) String() string {
@@ -151,8 +187,8 @@ func asRange(input string) ([]DetectorID, error) {
 	return append(output, dtEnd), nil
 }
 
-// asDetectorID converts the case-insensitive input into a DetectorID.
-// Name or ID may be used.
+// asDetectorID converts the case-insensitive input into a DetectorID. Name or
+// ID may be used. Input is expected to be already trimmed of whitespace.
 func asDetectorID(input string) (DetectorID, error) {
 	if input == "" {
 		return DetectorID{}, fmt.Errorf("empty detector")

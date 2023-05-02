@@ -156,6 +156,57 @@ func TestJdbc_FromChunk(t *testing.T) {
 	}
 }
 
+func TestJdbc_FromDataWithIgnorePattern(t *testing.T) {
+	type args struct {
+		ctx    context.Context
+		data   []byte
+		verify bool
+	}
+	tests := []struct {
+		name           string
+		args           args
+		want           []detectors.Result
+		ignorePatterns []string
+		wantErr        bool
+	}{
+		{
+			name: "not found",
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("jdbc:sqlite::secretpattern:"),
+				verify: false,
+			},
+			want: nil,
+			ignorePatterns: []string{
+				".*secretpattern.*",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := New(WithIgnorePattern(tt.ignorePatterns))
+			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Jdbc.FromDataWithConfig() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if os.Getenv("FORCE_PASS_DIFF") == "true" {
+				return
+			}
+			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatal("no raw secret present")
+				}
+				got[i].Raw = nil
+			}
+			if diff := pretty.Compare(got, tt.want); diff != "" {
+				t.Errorf("Jdbc.FromDataWithConfig() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}

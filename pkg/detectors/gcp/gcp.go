@@ -79,14 +79,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			raw = []byte(key)
 		}
 
+		credBytes, _ := json.Marshal(creds)
+
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCP,
 			Raw:          raw,
+			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
 		}
 
 		if verify {
-			credBytes, _ := json.Marshal(creds)
 			credentials, err := google.CredentialsFromJSON(ctx, credBytes, "https://www.googleapis.com/auth/cloud-platform")
 			if err != nil {
 				continue

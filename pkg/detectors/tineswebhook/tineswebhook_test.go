@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package jiratoken
+package tineswebhook
 
 import (
 	"context"
@@ -16,17 +16,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestJiraToken_FromChunk(t *testing.T) {
+func TestTinesWebhook_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	token := testSecrets.MustGetField("JIRA_TOKEN")
-	inactiveToken := testSecrets.MustGetField("JIRA_INACTIVE")
-	email := testSecrets.MustGetField("JIRA_EMAIL")
-	domain := testSecrets.MustGetField("JIRA_DOMAIN")
+	secret := testSecrets.MustGetField("TINESWEBHOOK_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("TINESWEBHOOK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,12 +43,12 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a jira secret %s within jira %s with jira %s", token, email, domain)),
+				data:   []byte(fmt.Sprintf("You can find a tineswebhook secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detectorspb.DetectorType_TinesWebhook,
 					Verified:     true,
 				},
 			},
@@ -61,12 +59,12 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a jira secret %s within jira %s but not jira %s valid", inactiveToken, email, domain)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a tineswebhook secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
+					DetectorType: detectorspb.DetectorType_TinesWebhook,
 					Verified:     false,
 				},
 			},
@@ -89,7 +87,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("JiraToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("TinesWebhook.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,10 +95,9 @@ func TestJiraToken_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("JiraToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("TinesWebhook.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
