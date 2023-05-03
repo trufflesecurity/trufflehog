@@ -48,10 +48,10 @@ func TestCache(t *testing.T) {
 
 	// Test getting only the keys.
 	keys := []string{"key1", "key2", "key3"}
-	for _, k := range keys {
-		c.Set(k, k)
+	values := []string{"value1", "value2", "value3"}
+	for i, k := range keys {
+		c.Set(k, values[i])
 	}
-
 	k := c.Keys()
 	sort.Strings(keys)
 	sort.Strings(k)
@@ -61,9 +61,9 @@ func TestCache(t *testing.T) {
 
 	// Test getting only the values.
 	vals := c.Values()
-	sort.Strings(keys)
 	sort.Strings(vals)
-	if !cmp.Equal(keys, vals) {
+	sort.Strings(values)
+	if !cmp.Equal(values, vals) {
 		t.Fatalf("Unexpected values: %v", vals)
 	}
 
