@@ -86,7 +86,6 @@ func (s *Source) JobID() int64 {
 
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
-
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -378,7 +377,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
+			when = commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
@@ -486,7 +485,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	}
 
 	var depth int64
-	var reachedBase = false
+	reachedBase := false
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
@@ -520,7 +519,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
+			when = commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
