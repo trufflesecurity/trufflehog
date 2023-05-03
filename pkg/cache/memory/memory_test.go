@@ -46,12 +46,28 @@ func TestCache(t *testing.T) {
 		t.Fatalf("Unexpected value for key10 after clear: %v, %v", v, ok)
 	}
 
-	// Test contents.
+	// Test getting only the keys.
 	keys := []string{"key1", "key2", "key3"}
-	for _, k := range keys {
-		c.Set(k, k)
+	values := []string{"value1", "value2", "value3"}
+	for i, k := range keys {
+		c.Set(k, values[i])
+	}
+	k := c.Keys()
+	sort.Strings(keys)
+	sort.Strings(k)
+	if !cmp.Equal(keys, k) {
+		t.Fatalf("Unexpected keys: %v", k)
 	}
 
+	// Test getting only the values.
+	vals := c.Values()
+	sort.Strings(vals)
+	sort.Strings(values)
+	if !cmp.Equal(values, vals) {
+		t.Fatalf("Unexpected values: %v", vals)
+	}
+
+	// Test contents.
 	items := c.Contents()
 	sort.Strings(keys)
 	res := strings.Split(items, ",")
