@@ -33,6 +33,7 @@ type Commit struct {
 	Date    time.Time
 	Message strings.Builder
 	Diffs   []Diff
+	Size    int // in bytes
 }
 
 // Diff contains the info about a file diff in a commit.
@@ -191,9 +192,12 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 
 func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
 	outReader := bufio.NewReader(stdOut)
-	var currentCommit *Commit
-	var currentDiff *Diff
-	var recentlyPassedAuthor bool
+	var (
+		currentCommit        *Commit
+		currentDiff          *Diff
+		recentlyPassedAuthor bool
+		totalLogSize         int
+	)
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -210,10 +214,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			// If there is a currentDiff, add it to currentCommit.
 			if currentDiff != nil && currentDiff.Content.Len() > 0 {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+				currentCommit.Size += currentDiff.Content.Len()
 			}
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				commitChan <- *currentCommit
+				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
 			currentDiff = &Diff{}
@@ -248,6 +254,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				if totalSize > c.maxCommitSize {
 					oldCommit := currentCommit
 					commitChan <- *currentCommit
+					totalLogSize += currentCommit.Size
 					currentCommit = &Commit{
 						Hash:    currentCommit.Hash,
 						Author:  currentCommit.Author,
@@ -308,15 +315,20 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 	}
-	cleanupParse(currentCommit, currentDiff, commitChan)
+	cleanupParse(currentCommit, currentDiff, commitChan, &totalLogSize)
+
+	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
 
-func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit) {
+func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
 	if currentDiff != nil && currentDiff.Content.Len() > 0 {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 	}
 	if currentCommit != nil {
 		commitChan <- *currentCommit
+		if totalLogSize != nil {
+			*totalLogSize += currentCommit.Size
+		}
 	}
 }
 
