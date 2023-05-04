@@ -562,8 +562,8 @@ func gistsCheckFunc(expected string, minRepos int, s *Source) sources.ChunkFunc 
 
 func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) sources.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
-		if minOrg != 0 && minOrg > len(s.orgs) {
-			return fmt.Errorf("incorrect number of orgs. expected at least: %d, got %d", minOrg, len(s.orgs))
+		if minOrg != 0 && minOrg > s.orgsCache.Count() {
+			return fmt.Errorf("incorrect number of orgs. expected at least: %d, got %d", minOrg, s.orgsCache.Count())
 		}
 		if minRepo != 0 && minRepo > len(s.repos) {
 			return fmt.Errorf("incorrect number of repos. expected at least: %d, got %d", minRepo, len(s.repos))
