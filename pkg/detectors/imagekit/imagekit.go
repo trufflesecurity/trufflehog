@@ -20,13 +20,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"imagekit"}) + `\b([a-zA-Z0-9_=]{36})`)
+	keyPat = regexp.MustCompile(`(private_[a-zA-Z0-9+\/=]{28})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"imagekit"}
+	return []string{"private_"}
 }
 
 // FromData will find and optionally verify Imagekit secrets in a given set of bytes.
