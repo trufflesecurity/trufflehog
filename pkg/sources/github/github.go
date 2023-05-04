@@ -52,7 +52,6 @@ type Source struct {
 	jobID             int64
 	verify            bool
 	repos             []string
-	orgs              []string
 	members           []string
 	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
@@ -226,9 +225,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 		s.filteredRepoCache.Set(r, r)
 	}
 
-	s.orgs = s.conn.Organizations
 	s.orgsCache = memory.New()
-	for _, org := range s.orgs {
+	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 
@@ -373,6 +371,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	}
 
 	s.repos = s.filteredRepoCache.Values()
+	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
@@ -381,11 +380,11 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 	s.apiClient = github.NewClient(s.httpClient)
-	if len(s.orgs) > unauthGithubOrgRateLimt {
+	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
 		s.log.Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
 
-	for _, org := range s.orgs {
+	for _, org := range s.orgsCache.Keys() {
 		if err := s.getReposByOrg(ctx, org); err != nil {
 			s.log.Error(err, "error fetching repos for org or user")
 		}
@@ -453,9 +452,9 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		break
 	}
 
-	if len(s.orgs) > 0 {
+	if s.orgsCache.Count() > 0 {
 		specificScope = true
-		for _, org := range s.orgs {
+		for _, org := range s.orgsCache.Keys() {
 			logger := s.log.WithValues("org", org)
 			if err := s.getReposByOrg(ctx, org); err != nil {
 				logger.Error(err, "error fetching repos for org")
@@ -509,12 +508,11 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
 		}
 
-		s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", len(s.orgs), "num_members", len(s.members))
 		return nil
 	}
 
 	if s.conn.ScanUsers {
-		s.log.Info("Adding repos", "members", len(s.members), "orgs", len(s.orgs))
+		s.log.Info("Adding repos", "members", len(s.members), "orgs", s.orgsCache.Count())
 		s.addReposForMembers(ctx)
 		return nil
 	}

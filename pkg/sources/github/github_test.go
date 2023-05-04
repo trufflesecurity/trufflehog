@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -344,7 +345,8 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
 
 	s := initTestSource(nil)
-	s.orgs = []string{"super-secret-org"}
+	s.orgsCache = memory.New()
+	s.orgsCache.Set("super-secret-org", "super-secret-org")
 	s.enumerateUnauthenticated(context.TODO())
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
