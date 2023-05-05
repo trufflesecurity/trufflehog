@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -52,10 +53,12 @@ func TestSource_Token(t *testing.T) {
 	}
 
 	s := Source{
-		conn:       conn,
-		httpClient: common.SaneHttpClient(),
-		log:        logr.Discard(),
+		conn:        conn,
+		httpClient:  common.SaneHttpClient(),
+		log:         logr.Discard(),
+		memberCache: map[string]struct{}{},
 	}
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), nil, nil)
 
 	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
 	assert.NoError(t, err)
@@ -526,7 +529,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.addGistsByUser(ctx, tt.user)
+				s.addUserGistsToCache(ctx, tt.user)
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
@@ -542,11 +545,11 @@ func TestSource_paginateGists(t *testing.T) {
 
 func gistsCheckFunc(expected string, minRepos int, s *Source) sources.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
-		if minRepos != 0 && minRepos > len(s.repos) {
+		if minRepos != 0 && minRepos > s.filteredRepoCache.Count() {
 			return fmt.Errorf("didn't find enough repos. expected: %d, got :%d", minRepos, len(s.repos))
 		}
 		if expected != "" {
-			for _, repo := range s.repos {
+			for _, repo := range s.filteredRepoCache.Values() {
 				if repo == expected {
 					return nil
 				}
@@ -559,8 +562,8 @@ func gistsCheckFunc(expected string, minRepos int, s *Source) sources.ChunkFunc 
 
 func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) sources.ChunkFunc {
 	return func(chunk *sources.Chunk) error {
-		if minOrg != 0 && minOrg > len(s.orgs) {
-			return fmt.Errorf("incorrect number of orgs. expected at least: %d, got %d", minOrg, len(s.orgs))
+		if minOrg != 0 && minOrg > s.orgsCache.Count() {
+			return fmt.Errorf("incorrect number of orgs. expected at least: %d, got %d", minOrg, s.orgsCache.Count())
 		}
 		if minRepo != 0 && minRepo > len(s.repos) {
 			return fmt.Errorf("incorrect number of repos. expected at least: %d, got %d", minRepo, len(s.repos))

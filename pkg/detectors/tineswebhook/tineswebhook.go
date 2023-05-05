@@ -1,8 +1,7 @@
-package ipstack
+package tineswebhook
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,19 +20,18 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ipstack"}) + `\b([a-fA-F0-9]{32})\b`)
+	keyPat = regexp.MustCompile(`(https://[\w-]+\.tines\.com/webhook/[a-z0-9]{32}/[a-z0-9]{32})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"ipstack"}
+	return []string{"tines.com"}
 }
 
-// FromData will find and optionally verify IpStack secrets in a given set of bytes.
+// FromData will find and optionally verify TinesWebhook secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	var verifyError error
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -42,43 +40,36 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
+
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_IpStack,
+			DetectorType: detectorspb.DetectorType_TinesWebhook,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.ipstack.com/134.201.250.155?access_key="+resMatch, nil)
+			payload := strings.NewReader(``)
+			req, err := http.NewRequestWithContext(ctx, "GET", resMatch, payload)
 			if err != nil {
 				continue
 			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					continue
 				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, "continent_code") || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
-
-				if validResponse {
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
-
 		}
 
 		results = append(results, s1)
 	}
 
-	return results, verifyError
+	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_IpStack
+	return detectorspb.DetectorType_TinesWebhook
 }
