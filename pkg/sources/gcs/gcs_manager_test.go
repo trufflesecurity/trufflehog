@@ -420,13 +420,13 @@ func TestGCSManagerStats(t *testing.T) {
 				t.Fatalf("newGCSManager() error = %v", err)
 			}
 
-			got, err := gm.attributes(ctx)
+			got, err := gm.Attributes(ctx)
 			if err != nil {
-				t.Errorf("attributes() error = %v", err)
+				t.Errorf("Attributes() error = %v", err)
 			}
 
 			if diff := cmp.Diff(got, tc.wantStats, cmp.AllowUnexported(attributes{}), cmpopts.IgnoreFields(attributes{}, "mu")); diff != "" {
-				t.Errorf("attributes() got: %v, want: %v, diff: %v", got, tc.wantStats, diff)
+				t.Errorf("Attributes() got: %v, want: %v, diff: %v", got, tc.wantStats, diff)
 			}
 		})
 	}
@@ -443,7 +443,7 @@ func TestGCSManagerStats_Time(t *testing.T) {
 
 	start := time.Now()
 	var stats *attributes
-	stats, _ = gm.attributes(ctx)
+	stats, _ = gm.Attributes(ctx)
 	end := time.Since(start).Seconds()
 
 	fmt.Printf("Time taken to get %d objects: %f seconds\n", stats.numObjects, end)
@@ -690,7 +690,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 			mgr, err := newGCSManager(tc.projectID, tc.opts...)
 			assert.Nil(t, err)
 
-			got, err := mgr.listObjects(ctx)
+			got, err := mgr.ListObjects(ctx)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("GCSManager.ListObjects() error = %v, wantErr %v", err, tc.wantErr)
 				return
@@ -714,7 +714,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 				}
 
 				if len(res) != len(tc.want) {
-					t.Errorf("gcsManager.listObjects() got: %v, want: %v", res, tc.want)
+					t.Errorf("gcsManager.ListObjects() got: %v, want: %v", res, tc.want)
 				}
 
 				// Test the bucket and object counts.
@@ -728,7 +728,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 
 				// Test the objects are equal.
 				if diff := cmp.Diff(res, tc.want, cmp.AllowUnexported(object{}), cmpopts.IgnoreFields(object{}, "Reader", "createdAt", "updatedAt")); diff != "" {
-					t.Errorf("gcsManager.listObjects() mismatch (-want +got):\n%s", diff)
+					t.Errorf("gcsManager.ListObjects() mismatch (-want +got):\n%s", diff)
 				}
 			}()
 
@@ -778,7 +778,7 @@ func TestGCSManagerListObjects_Resuming(t *testing.T) {
 			mgr, err := newGCSManager(tc.projectID, tc.opts...)
 			assert.Nil(t, err)
 
-			got, err := mgr.listObjects(ctx)
+			got, err := mgr.ListObjects(ctx)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("GCSManager.ListObjects() error = %v, wantErr %v", err, tc.wantErr)
 				return
@@ -802,7 +802,7 @@ func TestGCSManagerListObjects_Resuming(t *testing.T) {
 				}
 
 				if len(res) != len(tc.want) {
-					t.Errorf("gcsManager.listObjects() got: %v, want: %v", res, tc.want)
+					t.Errorf("gcsManager.ListObjects() got: %v, want: %v", res, tc.want)
 				}
 
 				// Test the bucket and object counts.
@@ -816,7 +816,7 @@ func TestGCSManagerListObjects_Resuming(t *testing.T) {
 
 				// Test the objects are equal.
 				if diff := cmp.Diff(res, tc.want, cmp.AllowUnexported(object{}), cmpopts.IgnoreFields(object{}, "Reader", "createdAt", "updatedAt")); diff != "" {
-					t.Errorf("gcsManager.listObjects() mismatch (-want +got):\n%s", diff)
+					t.Errorf("gcsManager.ListObjects() mismatch (-want +got):\n%s", diff)
 				}
 			}()
 
