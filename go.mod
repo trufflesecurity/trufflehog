@@ -4,10 +4,6 @@ go 1.20
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
-replace github.com/zricethezav/gitleaks/v8 => github.com/trufflesecurity/gitleaks/v8 v8.6.1-custom10
-
-replace github.com/gitleaks/go-gitdiff => github.com/trufflesecurity/go-gitdiff v0.7.6-zombies2
-
 require (
 	cloud.google.com/go/secretmanager v1.10.0
 	cloud.google.com/go/storage v1.30.1

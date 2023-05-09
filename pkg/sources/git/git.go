@@ -227,7 +227,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func RepoFromPath(path string) (*git.Repository, error) {
-	return git.PlainOpen(path)
+	options := &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+	return git.PlainOpenWithOptions(path, options)
 }
 
 func CleanOnError(err *error, path string) {
@@ -298,7 +302,11 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
-	repo, err := git.PlainOpen(clonePath)
+	options := &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+	repo, err := git.PlainOpenWithOptions(clonePath, options)
 	if err != nil {
 		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
