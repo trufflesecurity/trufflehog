@@ -78,6 +78,7 @@ message Filesystem {
   string file = 1;
   string link = 2;
   string email = 3;
+  int64 line = 4;
 }
 
 message Git {
