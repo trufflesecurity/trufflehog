@@ -53,13 +53,6 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
 			v)
 	}
 
-	for k, v := range r.Result.ExtraData {
-		printer.Printf(
-			"%s: %v\n",
-			cases.Title(language.AmericanEnglish).String(k),
-			v)
-	}
-
 	for idx, v := range r.Result.StructuredData.GithubSshKey {
 		printer.Printf("GithubSshKey %d User: %s\n", idx, v.User)
 
