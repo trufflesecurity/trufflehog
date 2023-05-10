@@ -94,6 +94,8 @@ func (s *Source) JobID() int64 {
 
 func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Client) (string, string, error) {
 	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_BasicAuth:
+		return cred.BasicAuth.Username, cred.BasicAuth.Password, nil
 	case *sourcespb.GitHub_Unauthenticated:
 		// do nothing
 	case *sourcespb.GitHub_GithubApp:
@@ -691,6 +693,11 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 	var err error
 
 	switch s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_BasicAuth:
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.conn.GetBasicAuth().GetPassword(), repoURL, s.conn.GetBasicAuth().GetUsername())
+		if err != nil {
+			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+		}
 	case *sourcespb.GitHub_Unauthenticated:
 		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
 		if err != nil {
@@ -707,7 +714,6 @@ func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClie
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 		}
-
 	case *sourcespb.GitHub_Token:
 		// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
 		if s.githubUser == "" || s.githubToken == "" {
