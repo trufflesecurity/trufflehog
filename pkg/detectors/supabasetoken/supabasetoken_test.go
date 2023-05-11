@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -48,7 +49,7 @@ func TestSupabasetoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Supabasetoken,
+					DetectorType: detectorspb.DetectorType_SupabaseToken,
 					Verified:     true,
 				},
 			},
@@ -64,7 +65,7 @@ func TestSupabasetoken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Supabasetoken,
+					DetectorType: detectorspb.DetectorType_SupabaseToken,
 					Verified:     false,
 				},
 			},
