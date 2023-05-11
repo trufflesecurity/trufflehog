@@ -87,3 +87,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 type Response struct {
 	Anonymous bool `json:"anonymous"`
 }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_FormBucket
+}

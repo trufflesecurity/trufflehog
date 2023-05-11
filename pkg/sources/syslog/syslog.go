@@ -12,7 +12,6 @@ import (
 	"github.com/bill-rich/go-syslog/pkg/syslogparser/rfc3164"
 	"github.com/crewjam/rfc5424"
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -32,7 +31,6 @@ type Source struct {
 	jobId    int64
 	verify   bool
 	syslog   *Syslog
-	aCtx     context.Context
 	sources.Progress
 	conn *sourcespb.Syslog
 }
@@ -83,9 +81,8 @@ func (s *Source) InjectConnection(conn *sourcespb.Syslog) {
 }
 
 // Init returns an initialized Syslog source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 
-	s.aCtx = aCtx
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -217,7 +214,7 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 		}
 		err := conn.SetDeadline(time.Now().Add(time.Second))
 		if err != nil {
-			logrus.WithError(err).Debug("could not set connection deadline deadline")
+			ctx.Logger().V(2).Info("could not set connection deadline", "error", err)
 		}
 		input := make([]byte, 8096)
 		remote := conn.RemoteAddr()
@@ -228,10 +225,10 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 			}
 			continue
 		}
-		logrus.Trace(string(input))
+		ctx.Logger().V(5).Info(string(input))
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
-			logrus.WithError(err).Debug("failed to generate metadata")
+			ctx.Logger().V(2).Info("failed to generate metadata", "error", err)
 		}
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
@@ -251,7 +248,7 @@ func (s *Source) acceptTCPConnections(ctx context.Context, netListener net.Liste
 		}
 		conn, err := netListener.Accept()
 		if err != nil {
-			logrus.WithError(err).Debug("failed to accept TCP connection")
+			ctx.Logger().V(2).Info("failed to accept TCP connection", "error", err)
 			continue
 		}
 		go s.monitorConnection(ctx, conn, chunksChan)
@@ -273,7 +270,7 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 		}
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
-			logrus.WithError(err).Debug("failed to parse metadata")
+			ctx.Logger().V(2).Info("failed to parse metadata", "error", err)
 		}
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,

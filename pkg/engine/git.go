@@ -5,7 +5,6 @@ import (
 	"runtime"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/sirupsen/logrus"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -16,16 +15,21 @@ import (
 )
 
 // ScanGit scans any git source.
-func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
 		git.ScanOptionLogOptions(logOptions),
 	}
 
-	repo, err := gogit.PlainOpenWithOptions(c.RepoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
+	options := &gogit.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+
+	repo, err := gogit.PlainOpenWithOptions(c.RepoPath, options)
 	if err != nil {
-		return fmt.Errorf("could open repo: %s: %w", c.RepoPath, err)
+		return fmt.Errorf("could not open repo: %s: %w", c.RepoPath, err)
 	}
 
 	if c.MaxDepth != 0 {
@@ -36,6 +40,9 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 	}
 	if c.HeadRef != "" {
 		opts = append(opts, git.ScanOptionHeadCommit(c.HeadRef))
+	}
+	if c.ExcludeGlobs != nil {
+		opts = append(opts, git.ScanOptionExcludeGlobs(c.ExcludeGlobs))
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
@@ -55,13 +62,17 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.Config) error {
 			}
 		})
 
+	ctx = context.WithValues(ctx,
+		"source_type", sourcespb.SourceType_SOURCE_TYPE_GIT.String(),
+		"source_name", "git",
+	)
 	e.sourcesWg.Add(1)
 	go func() {
 		defer common.RecoverWithExit(ctx)
 		defer e.sourcesWg.Done()
 		err := gitSource.ScanRepo(ctx, repo, c.RepoPath, scanOptions, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Fatal("could not scan repo")
+			ctx.Logger().Error(err, "could not scan repo")
 		}
 	}()
 	return nil

@@ -35,7 +35,7 @@ func FingerprintPEMKey(in []byte) (string, error) {
 		pubKey = &privateKey.PublicKey
 	case *ecdsa.PrivateKey:
 		pubKey = &privateKey.PublicKey
-	case ed25519.PrivateKey:
+	case *ed25519.PrivateKey:
 		pubKey = privateKey.Public()
 	// No fingerprinting support for DSA
 	// case *dsa.PrivateKey:

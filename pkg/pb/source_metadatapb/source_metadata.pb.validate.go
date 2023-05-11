@@ -522,6 +522,8 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for Location
 
+	// no validation rules for File
+
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
 	}
@@ -849,6 +851,8 @@ func (m *Filesystem) validate(all bool) error {
 	// no validation rules for Link
 
 	// no validation rules for Email
+
+	// no validation rules for Line
 
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
@@ -1288,11 +1292,17 @@ func (m *GCS) validate(all bool) error {
 
 	// no validation rules for Bucket
 
-	// no validation rules for File
+	// no validation rules for Filename
 
 	// no validation rules for Link
 
 	// no validation rules for Email
+
+	// no validation rules for CreatedAt
+
+	// no validation rules for UpdatedAt
+
+	// no validation rules for ContentType
 
 	if len(errors) > 0 {
 		return GCSMultiError(errors)
@@ -2272,6 +2282,12 @@ func (m *Teams) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Location
+
+	// no validation rules for TeamName
+
+	// no validation rules for TeamId
+
 	if len(errors) > 0 {
 		return TeamsMultiError(errors)
 	}
@@ -2706,6 +2722,230 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = PublicEventMonitoringValidationError{}
+
+// Validate checks the field values on SharePoint with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SharePoint) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SharePoint with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SharePointMultiError, or
+// nil if none found.
+func (m *SharePoint) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SharePoint) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Link
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Author
+
+	// no validation rules for Title
+
+	// no validation rules for Views
+
+	// no validation rules for Docid
+
+	// no validation rules for Email
+
+	if len(errors) > 0 {
+		return SharePointMultiError(errors)
+	}
+
+	return nil
+}
+
+// SharePointMultiError is an error wrapping multiple validation errors
+// returned by SharePoint.ValidateAll() if the designated constraints aren't met.
+type SharePointMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SharePointMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SharePointMultiError) AllErrors() []error { return m }
+
+// SharePointValidationError is the validation error returned by
+// SharePoint.Validate if the designated constraints aren't met.
+type SharePointValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SharePointValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SharePointValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SharePointValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SharePointValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SharePointValidationError) ErrorName() string { return "SharePointValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SharePointValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSharePoint.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SharePointValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SharePointValidationError{}
+
+// Validate checks the field values on GoogleDrive with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *GoogleDrive) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GoogleDrive with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in GoogleDriveMultiError, or
+// nil if none found.
+func (m *GoogleDrive) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GoogleDrive) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for File
+
+	// no validation rules for Link
+
+	// no validation rules for Email
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Shared
+
+	// no validation rules for LastModifiedBy
+
+	if len(errors) > 0 {
+		return GoogleDriveMultiError(errors)
+	}
+
+	return nil
+}
+
+// GoogleDriveMultiError is an error wrapping multiple validation errors
+// returned by GoogleDrive.ValidateAll() if the designated constraints aren't met.
+type GoogleDriveMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GoogleDriveMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GoogleDriveMultiError) AllErrors() []error { return m }
+
+// GoogleDriveValidationError is the validation error returned by
+// GoogleDrive.Validate if the designated constraints aren't met.
+type GoogleDriveValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GoogleDriveValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GoogleDriveValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GoogleDriveValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GoogleDriveValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GoogleDriveValidationError) ErrorName() string { return "GoogleDriveValidationError" }
+
+// Error satisfies the builtin error interface
+func (e GoogleDriveValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGoogleDrive.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GoogleDriveValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GoogleDriveValidationError{}
 
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -3469,6 +3709,68 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "PublicEventMonitoring",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Sharepoint:
+
+		if all {
+			switch v := interface{}(m.GetSharepoint()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sharepoint",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sharepoint",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSharepoint()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Sharepoint",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_GoogleDrive:
+
+		if all {
+			switch v := interface{}(m.GetGoogleDrive()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "GoogleDrive",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "GoogleDrive",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetGoogleDrive()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "GoogleDrive",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

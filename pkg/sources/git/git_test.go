@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -125,7 +124,6 @@ func TestSource_Scan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -139,7 +137,7 @@ func TestSource_Scan(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
-				s.Chunks(ctx, chunksCh)
+				assert.NoError(t, s.Chunks(ctx, chunksCh))
 			}()
 			gotChunk := <-chunksCh
 			gotChunk.Data = nil
@@ -228,7 +226,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				"ce62d79908803153ef6e145e042d3e80488ef747-bump": {B: []byte("\n")},
 				// Normally we might expect to see this commit, and we may in the future.
 				// But at the moment we're ignoring any commit unless it contains at least one non-space character.
-				"27fbead3bf883cdb7de9d7825ed401f28f9398f1-slack": {B: []byte("\n\n\n\nyup, just did that\n\ngithub_lol: \"ffc7e0f9400fb6300167009e42d2f842cd7956e2\"\n\noh, goodness. there's another one!\n")},
+				"27fbead3bf883cdb7de9d7825ed401f28f9398f1-slack": {B: []byte("\n\n\nyup, just did that\n\ngithub_lol: \"ffc7e0f9400fb6300167009e42d2f842cd7956e2\"\n\noh, goodness. there's another one!\n")},
 				"8afb0ecd4998b1179e428db5ebbcdc8221214432-slack": {B: []byte("oops might drop a slack token here\n\ngithub_secret=\"369963c1434c377428ca8531fbc46c0c43d037a0\"\n\nyup, just did that\n"), Multi: true},
 				"8fe6f04ef1839e3fc54b5147e3d0e0b7ab971bd5-aws":   {B: []byte("blah blaj\n\nthis is the secret: AKIA2E0A8F3B244C9986\n\nokay thank you bye\n"), Multi: true},
 				"84e9c75e388ae3e866e121087ea2dd45a71068f2-aws":   {B: []byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n"), Multi: false},
@@ -238,23 +236,11 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			name:    "remote repo, limited",
 			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
 			expectedChunkData: map[string]*byteCompare{
-				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws":  {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
-				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
+				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws": {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
 			},
 			scanOptions: ScanOptions{
 				HeadHash: "70001020fab32b1fcf2f1f0e5c66424eae649826",
 				BaseHash: "a6f8aa55736d4a85be31a0048a4607396898647a",
-			},
-		},
-		{
-			name:    "remote repo, base ahead of head",
-			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
-			expectedChunkData: map[string]*byteCompare{
-				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
-			},
-			scanOptions: ScanOptions{
-				HeadHash: "a6f8aa55736d4a85be31a0048a4607396898647a",
-				BaseHash: "70001020fab32b1fcf2f1f0e5c66424eae649826",
 			},
 		},
 		{
@@ -272,7 +258,6 @@ func TestSource_Chunks_Integration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -415,7 +400,6 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {

@@ -21,11 +21,28 @@ type Detector interface {
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.
 	// Use unique identifiers that are part of the secret if you can, or the provider name.
 	Keywords() []string
+	// Type returns the DetectorType number from detectors.proto for the given detector.
+	Type() detectorspb.DetectorType
+}
+
+// Versioner is an optional interface that a detector can implement to
+// differentiate instances of the same detector type.
+type Versioner interface {
+	Version() int
+}
+
+// EndpointCustomizer is an optional interface that a detector can implement to
+// support verifying against user-supplied endpoints.
+type EndpointCustomizer interface {
+	SetEndpoints(...string) error
+	DefaultEndpoint() string
 }
 
 type Result struct {
 	// DetectorType is the type of Detector.
 	DetectorType detectorspb.DetectorType
+	// DetectorName is the name of the Detector. Used for custom detectors.
+	DetectorName string
 	// DecoderType is the type of Decoder.
 	DecoderType detectorspb.DecoderType
 	Verified    bool

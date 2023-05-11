@@ -58,7 +58,7 @@ func TestGitEngine(t *testing.T) {
 			WithDecoders(decoders.DefaultDecoders()...),
 			WithDetectors(false, DefaultDetectors()...),
 		)
-		cfg := sources.Config{
+		cfg := sources.GitConfig{
 			RepoPath: path,
 			HeadRef:  tTest.branch,
 			BaseRef:  tTest.base,
@@ -116,7 +116,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// TODO: this is measuring the time it takes to initialize the source
 		// and not to do the full scan
-		cfg := sources.Config{
+		cfg := sources.GitConfig{
 			RepoPath: path,
 			Filter:   common.FilterEmpty(),
 		}

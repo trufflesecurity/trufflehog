@@ -40,6 +40,9 @@ enum SourceType {
   SOURCE_TYPE_SYSLOG = 25;
   SOURCE_TYPE_PUBLIC_EVENT_MONITORING = 26;
   SOURCE_TYPE_SLACK_REALTIME = 27;
+  SOURCE_TYPE_GOOGLE_DRIVE = 28;
+  SOURCE_TYPE_SHAREPOINT = 29;
+  SOURCE_TYPE_GCS_UNAUTHED = 30;
 }
 
 message LocalSource {
@@ -95,6 +98,10 @@ message Confluence {
 
   GetAllSpacesScope spaces_scope = 5;
   bool insecure_skip_verify_tls = 6;
+  repeated string spaces = 7;
+  repeated string ignore_spaces = 8;
+  bool include_attachments = 9;
+  bool skip_history = 10;
 }
 
 message DockerHub {
@@ -111,15 +118,28 @@ message ECR {
   repeated string registries = 2;
 }
 
-message Filesystem{
+message Filesystem {
+  // DEPRECATED: directories is deprecated and can be removed / renamed to
+  // paths when we no longer depend on the name in enterprise configs.
   repeated string directories = 1;
+  repeated string paths = 2;
 }
 
 message GCS {
   oneof credential {
-    string json_sa = 1;
+    string json_service_account = 1;
+    string api_key = 2;
+    credentials.Unauthenticated unauthenticated = 3;
+    credentials.CloudEnvironment adc = 4;
+    string service_account_file = 11;
+    credentials.Oauth2 oauth = 12;
   }
-  repeated string buckets = 2;
+  string project_id = 5;
+  repeated string include_buckets = 6;
+  repeated string exclude_buckets = 7;
+  repeated string include_objects = 8;
+  repeated string exclude_objects = 9;
+  int64 max_object_size = 10;
 }
 
 message Git {
@@ -157,6 +177,13 @@ message GitHub {
   string head = 9;
   string base = 10;
   repeated string ignoreRepos = 11;
+  repeated string includeRepos = 12;
+}
+
+message GoogleDrive {
+  oneof credential {
+    string refresh_token = 1;
+  }
 }
 
 message JIRA {
@@ -168,6 +195,7 @@ message JIRA {
     string token = 6;
   }
   repeated string projects = 5;
+  repeated string ignore_projects = 7;
 }
 
 message NPMUnauthenticatedPackage {
@@ -187,8 +215,10 @@ message S3 {
     credentials.KeySecret access_key = 1;
     credentials.Unauthenticated unauthenticated = 2;
     credentials.CloudEnvironment cloud_environment = 4;
+    credentials.AWSSessionTokenSecret session_token = 5;
   }
   repeated string buckets = 3;
+  int64 max_object_size = 6;
 }
 
 message Slack {
@@ -231,10 +261,11 @@ message Teams {
   oneof credential {
     string token = 2;
     credentials.ClientCredentials authenticated = 3;
+    credentials.Oauth2 oauth = 7;
   }
   repeated string channels = 4;
   repeated string ignoreList = 5;
-  string team_id = 6;
+  repeated string team_ids = 6;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
@@ -268,4 +299,11 @@ message SlackRealtime {
   oneof credential {
     credentials.SlackTokens tokens = 1;
   }
+}
+
+message Sharepoint {
+  oneof credential {
+    credentials.Oauth2 oauth = 1;
+  }
+  string site_url = 2;
 }

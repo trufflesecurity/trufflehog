@@ -26,10 +26,6 @@ var (
 	client = common.SaneHttpClient()
 )
 
-type proxyRes struct {
-	Verified bool `json:"verified"`
-}
-
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -70,13 +66,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		rawURL, _ := url.Parse(urlMatch)
+		rawURLStr := rawURL.String()
+		// Removing the path causes possible deduplication issues if some paths have basic auth and some do not.
 		rawURL.Path = ""
-
-		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, strings.Repeat("*", len(password)), -1))
+		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_URI,
 			Raw:          []byte(rawURL.String()),
+			RawV2:        []byte(rawURLStr),
 			Redacted:     redact,
 		}
 
@@ -149,4 +147,8 @@ func verifyURL(ctx context.Context, u *url.URL) bool {
 	}
 
 	return false
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_URI
 }

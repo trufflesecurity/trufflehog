@@ -23,7 +23,7 @@ func HandleTestChannel(chunksCh chan *Chunk, cf ChunkFunc) error {
 			}
 			return nil
 		case <-time.After(10 * time.Second):
-			return fmt.Errorf("no new chunks recieved after 10 seconds")
+			return fmt.Errorf("no new chunks received after 10 seconds")
 		}
 	}
 }

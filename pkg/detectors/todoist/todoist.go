@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.todoist.com/rest/v1/projects", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.todoist.com/rest/v2/projects", nil)
 			if err != nil {
 				continue
 			}
@@ -71,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Todoist
 }

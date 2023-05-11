@@ -13,10 +13,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
-type Scanner struct{}
+type Scanner struct{ detectors.EndpointSetter }
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+
+func (Scanner) Version() int            { return 2 }
+func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
 
 var (
 	// Oauth token
@@ -26,7 +31,7 @@ var (
 	// https://github.blog/changelog/2022-10-18-introducing-fine-grained-personal-access-tokens/
 	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
 
-	//TODO: Oauth2 client_id and client_secret
+	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
 )
 
@@ -68,27 +73,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := common.SaneHttpClient()
 			// https://developer.github.com/v3/users/#get-the-authenticated-user
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json; charset=utf-8")
-			req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
-			res, err := client.Do(req)
-			if err == nil {
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					var userResponse userRes
-					err = json.NewDecoder(res.Body).Decode(&userResponse)
-					res.Body.Close()
-					if err == nil {
-						s1.Verified = true
-						s1.ExtraData = map[string]string{
-							"username":     userResponse.Login,
-							"url":          userResponse.UserURL,
-							"account_type": userResponse.Type,
-							"site_admin":   fmt.Sprintf("%t", userResponse.SiteAdmin),
-							"name":         userResponse.Name,
-							"company":      userResponse.Company,
+			for _, url := range s.Endpoints(s.DefaultEndpoint()) {
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/user", url), nil)
+				if err != nil {
+					continue
+				}
+				req.Header.Add("Content-Type", "application/json; charset=utf-8")
+				req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
+				res, err := client.Do(req)
+				if err == nil {
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						var userResponse userRes
+						err = json.NewDecoder(res.Body).Decode(&userResponse)
+						res.Body.Close()
+						if err == nil {
+							s1.Verified = true
+							s1.ExtraData = map[string]string{
+								"username":     userResponse.Login,
+								"url":          userResponse.UserURL,
+								"account_type": userResponse.Type,
+								"site_admin":   fmt.Sprintf("%t", userResponse.SiteAdmin),
+								"name":         userResponse.Name,
+								"company":      userResponse.Company,
+							}
 						}
 					}
 				}
@@ -103,4 +110,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Github
 }

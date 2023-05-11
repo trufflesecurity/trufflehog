@@ -49,8 +49,12 @@ If you think that something should be included outside of these guidelines, plea
    ```bash
    go run hack/generate/generate.go detector <DetectorType enum name>
    ```
+3. Add Secret Scanner
 
-3. Complete the secret detector.
+   Add the secret scanner to the `pkg/engine/defaults.go` file like `github.com/trufflesecurity/trufflehog/v3/pkg/detectors/<detector_name>` and 
+   `<detector_name>.Scanner{},`
+
+4. Complete the secret detector.
 
    The previous step templated a boilerplate + some example code as a package in the `pkg/detectors` folder for you to work on.
    The secret detector can be completed with these general steps:

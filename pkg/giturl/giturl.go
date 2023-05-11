@@ -12,7 +12,7 @@ func NormalizeBitbucketRepo(repoURL string) (string, error) {
 		return "", errors.New("Bitbucket requires https repo urls: e.g. https://bitbucket.org/org/repo.git")
 	}
 
-	return NormalizeOrgRepoURL("Gitlab", repoURL)
+	return NormalizeOrgRepoURL("Bitbucket", repoURL)
 }
 
 func NormalizeGerritProject(project string) (string, error) {

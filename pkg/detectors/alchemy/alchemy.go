@@ -1,4 +1,4 @@
-package moonclerck
+package alchemy
 
 import (
 	"context"
@@ -20,16 +20,16 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"moonclerck"}) + `\b([0-9a-z]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alchemy"}) + `\b([0-9a-zA-Z]{23}_[0-9a-zA-Z]{8})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"moonclerck"}
+	return []string{"alchemy"}
 }
 
-// FromData will find and optionally verify Moonclerck secrets in a given set of bytes.
+// FromData will find and optionally verify Alchemy secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -42,17 +42,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Moonclerk,
+			DetectorType: detectorspb.DetectorType_Alchemy,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.moonclerk.com/forms", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.alchemy.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Accept", "application/vnd.moonclerk+json;version=1")
-			req.Header.Add("Authorization", "Token token="+resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -71,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Alchemy
 }

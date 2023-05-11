@@ -24,7 +24,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sqlserver"}
+	return []string{"sql", "database", "Data Source"}
 }
 
 // FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
@@ -80,4 +80,8 @@ var ping = func(config msdsn.Config) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_SQLServer
 }
