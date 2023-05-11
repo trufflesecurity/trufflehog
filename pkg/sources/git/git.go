@@ -86,7 +86,6 @@ func (s *Source) JobID() int64 {
 
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
-
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -228,7 +227,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func RepoFromPath(path string) (*git.Repository, error) {
-	return git.PlainOpen(path)
+	options := &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+	return git.PlainOpenWithOptions(path, options)
 }
 
 func CleanOnError(err *error, path string) {
@@ -299,7 +302,11 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
-	repo, err := git.PlainOpen(clonePath)
+	options := &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+	repo, err := git.PlainOpenWithOptions(clonePath, options)
 	if err != nil {
 		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
@@ -378,7 +385,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
+			when = commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
@@ -486,7 +493,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	}
 
 	var depth int64
-	var reachedBase = false
+	reachedBase := false
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
@@ -520,7 +527,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			var email, hash, when string
 			email = commit.Author
 			hash = commit.Hash
-			when = commit.Date.Format("2006-01-02 15:04:05 -0700")
+			when = commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
@@ -560,7 +567,8 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := normalizeConfig(scanOptions, repo); err != nil {
 		return err
 	}
-	start := time.Now().UnixNano()
+	start := time.Now().Unix()
+
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
@@ -576,8 +584,8 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		repoUrl = getSafeRemoteURL(repo, remotes[0].Config().Name)
 	}
 
-	scanTime := time.Now().UnixNano() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "Repo", repoUrl, "path", repoPath, "time", scanTime)
+	scanTime := time.Now().Unix() - start
+	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime)
 	return nil
 }
 
