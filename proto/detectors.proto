@@ -922,6 +922,11 @@ enum DetectorType {
   CoinMarketCap = 911;
   Percy = 912;
   TinesWebhook = 913;
+  Pulumi = 914;
+  SupabaseToken = 915;
+  NuGetApiKey = 916;
+  Aiven = 917;
+  Prefect = 918;
 }
 
 message Result {
