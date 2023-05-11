@@ -19,7 +19,6 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
 	keyPat = regexp.MustCompile(`[0-9a-f]{32}-us[0-9]{1,2}`)
 )
 
@@ -53,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.SetBasicAuth("anystring", match)
 			req.Header.Add("accept", "application/json")
-			res, err := client.Do(req)
+			res, err := http.DefaultClient.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
