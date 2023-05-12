@@ -90,6 +90,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkitev2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulbul"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulksms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buttercms"
@@ -1521,6 +1522,7 @@ func DefaultDetectors() []detectors.Detector {
 		nugetapikey.Scanner{},
 		aiven.Scanner{},
 		prefect.Scanner{},
+		buildkitev2.Scanner{},
 	}
 
 }

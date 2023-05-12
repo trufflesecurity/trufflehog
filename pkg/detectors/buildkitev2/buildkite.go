@@ -1,4 +1,4 @@
-package buildkite
+package buildkitev2
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 type Scanner struct{}
 
-func (s Scanner) Version() int { return 1 }
+func (s Scanner) Version() int { return 2 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -24,13 +24,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"buildkite"}) + `\b([a-z0-9]{40})\b`)
+	keyPat = regexp.MustCompile(`\b(bkua_[a-z0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"buildkite"}
+	return []string{"bkua_"}
 }
 
 // FromData will find and optionally verify Buildkite secrets in a given set of bytes.
