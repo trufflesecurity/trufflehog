@@ -84,7 +84,7 @@ func (s *Source) userAndToken(ctx context.Context, installationClient *github.Cl
 			err    error
 		)
 		for {
-			ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
+			ghUser, resp, err = s.apiClient.Users.Get(ctx, "")
 			if handled := s.handleRateLimit(err, resp); handled {
 				continue
 			}
@@ -115,7 +115,7 @@ func (a *appListOptions) getListOptions() *github.ListOptions {
 	return &a.ListOptions
 }
 
-func (s *Source) addReposByApp(ctx context.Context) error {
+func (s *Source) getReposByApp(ctx context.Context) error {
 	return s.processRepos(ctx, "", s.appListReposWrapper, &appListOptions{
 		ListOptions: github.ListOptions{
 			PerPage: defaultPagination,

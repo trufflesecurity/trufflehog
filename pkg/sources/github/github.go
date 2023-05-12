@@ -550,7 +550,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
-		if err = s.addReposByApp(ctx); err != nil {
+		if err = s.getReposByApp(ctx); err != nil {
 			return nil, err
 		}
 
