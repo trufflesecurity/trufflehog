@@ -852,6 +852,8 @@ func (m *Filesystem) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Line
+
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
 	}
