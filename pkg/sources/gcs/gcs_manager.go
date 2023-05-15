@@ -399,7 +399,7 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 	for _, bkt := range bkts {
 		bkt := bkt
 		g.workerPool.Go(func() error {
-			// List all the objects in the bucket and calculate a Attributes.
+			// List all the objects in the bucket and calculate attributes.
 			g.setupBktHandle(&bkt)
 
 			q, err := setObjectQuery(&bkt)
@@ -626,7 +626,7 @@ func (g *gcsManager) constructObject(ctx context.Context, obj *storage.ObjectHan
 	o := object{}
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		return o, fmt.Errorf("failed to retrieve object Attributes: %w", err)
+		return o, fmt.Errorf("failed to retrieve object attributes: %w", err)
 	}
 
 	if !isObjectTypeValid(ctx, attrs.Name) || !g.isObjectSizeValid(ctx, attrs.Size) {

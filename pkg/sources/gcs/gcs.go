@@ -238,7 +238,7 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 func (s *Source) enumerate(ctx context.Context) error {
 	stats, err := s.gcsManager.Attributes(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting Attributes during enumeration: %w", err)
+		return fmt.Errorf("error getting attributes during enumeration: %w", err)
 	}
 	s.stats = stats
 

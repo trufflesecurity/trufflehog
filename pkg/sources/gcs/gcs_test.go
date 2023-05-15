@@ -349,7 +349,7 @@ func TestSourceInit_Enumerate(t *testing.T) {
 	err := source.enumerate(ctx)
 	assert.Nil(t, err)
 
-	// Ensure the Attributes are set.
+	// Ensure the attributes are set.
 	assert.Equal(t, uint64(5), source.stats.numObjects)
 	assert.Equal(t, uint32(1), source.stats.numBuckets)
 	assert.Equal(t, uint64(5), source.stats.bucketObjects[testBucket])
