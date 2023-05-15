@@ -31,11 +31,6 @@ const (
 
 var defaultConcurrency = runtime.NumCPU()
 
-type objectManager interface {
-	listObjects(context.Context) (chan io.Reader, error)
-	attributes(ctx context.Context) (*attributes, error)
-}
-
 // bucketManager is a simplified *storage.Client wrapper.
 // It provides only a subset of methods that are needed by the gcsManager.
 type bucketManager interface {
@@ -381,7 +376,7 @@ type object struct {
 	io.Reader
 }
 
-func (g *gcsManager) attributes(ctx context.Context) (*attributes, error) {
+func (g *gcsManager) Attributes(ctx context.Context) (*attributes, error) {
 	// Get all the buckets in the project.
 	buckets, err := g.listBuckets(ctx)
 	if err != nil {
@@ -404,7 +399,7 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 	for _, bkt := range bkts {
 		bkt := bkt
 		g.workerPool.Go(func() error {
-			// List all the objects in the bucket and calculate a attributes.
+			// List all the objects in the bucket and calculate attributes.
 			g.setupBktHandle(&bkt)
 
 			q, err := setObjectQuery(&bkt)
@@ -448,7 +443,7 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 	return stats, nil
 }
 
-func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
+func (g *gcsManager) ListObjects(ctx context.Context) (chan io.Reader, error) {
 	ch := make(chan io.Reader, 100) // TODO (ahrav): Determine optimal buffer size.
 
 	// Get all the buckets in the project.
