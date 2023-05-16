@@ -226,7 +226,7 @@ func TestAddReposByApp(t *testing.T) {
 		})
 
 	s := initTestSource(nil)
-	err := s.getReposByApp(context.TODO())
+	err := s.getReposByApp(context.Background())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("ssr1")

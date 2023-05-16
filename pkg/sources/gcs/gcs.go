@@ -49,6 +49,11 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
+type objectManager interface {
+	ListObjects(context.Context) (chan io.Reader, error)
+	Attributes(ctx context.Context) (*attributes, error)
+}
+
 // Source represents a GCS source.
 type Source struct {
 	name        string
@@ -231,7 +236,7 @@ func setGCSManagerOptions(include, exclude []string, includeFn, excludeFn func([
 // enumerate all the objects and buckets in the source.
 // This will be used to calculate progress.
 func (s *Source) enumerate(ctx context.Context) error {
-	stats, err := s.gcsManager.attributes(ctx)
+	stats, err := s.gcsManager.Attributes(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting attributes during enumeration: %w", err)
 	}
@@ -244,7 +249,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	persistableCache := s.setupCache(ctx)
 
-	objectCh, err := s.gcsManager.listObjects(ctx)
+	objectCh, err := s.gcsManager.ListObjects(ctx)
 	if err != nil {
 		return fmt.Errorf("error listing objects: %w", err)
 	}
@@ -260,7 +265,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			continue
 		}
 
-		if persistableCache.Exists(o.name) {
+		if persistableCache.Exists(o.md5) {
 			ctx.Logger().V(5).Info("skipping object, object already processed", "name", o.name)
 			continue
 		}

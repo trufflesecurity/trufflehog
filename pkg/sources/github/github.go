@@ -342,6 +342,10 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	)
 
 	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_BasicAuth:
+		if err = s.enumerateBasicAuth(ctx, cred.BasicAuth); err != nil {
+			return nil, err
+		}
 	case *sourcespb.GitHub_Unauthenticated:
 		s.enumerateUnauthenticated(ctx)
 	case *sourcespb.GitHub_Token:
@@ -363,6 +367,21 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
 	return installationClient, nil
+}
+
+func (s *Source) enumerateBasicAuth(ctx context.Context, basicAuth *credentialspb.BasicAuth) error {
+	s.apiClient = github.NewClient(&http.Client{Transport: &github.BasicAuthTransport{
+		Username: basicAuth.Username,
+		Password: basicAuth.Password,
+	}})
+
+	for _, org := range s.orgsCache.Keys() {
+		if err := s.getReposByOrg(ctx, org); err != nil {
+			s.log.Error(err, "error fetching repos for org or user")
+		}
+	}
+
+	return nil
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context) {
