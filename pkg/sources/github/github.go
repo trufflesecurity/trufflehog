@@ -29,7 +29,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -56,6 +55,8 @@ type Source struct {
 	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
 	memberCache       map[string]struct{}
+	repoSizes         repoSize
+	totalRepoSize     int // total size in bytes of all repos
 	git               *git.Git
 	scanOptions       *git.ScanOptions
 	httpClient        *http.Client
@@ -92,44 +93,25 @@ func (s *Source) JobID() int64 {
 	return s.jobID
 }
 
-func (s *Source) UserAndToken(ctx context.Context, installationClient *github.Client) (string, string, error) {
-	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_BasicAuth:
-		return cred.BasicAuth.Username, cred.BasicAuth.Password, nil
-	case *sourcespb.GitHub_Unauthenticated:
-		// do nothing
-	case *sourcespb.GitHub_GithubApp:
-		id, err := strconv.ParseInt(cred.GithubApp.InstallationId, 10, 64)
-		if err != nil {
-			return "", "", errors.New(err)
-		}
-		// TODO: Check rate limit for this call.
-		token, _, err := installationClient.Apps.CreateInstallationToken(
-			ctx, id, &github.InstallationTokenOptions{})
-		if err != nil {
-			return "", "", errors.WrapPrefix(err, "unable to create installation token", 0)
-		}
-		return "x-access-token", token.GetToken(), nil // TODO: multiple workers request this, track the TTL
-	case *sourcespb.GitHub_Token:
-		var (
-			ghUser *github.User
-			resp   *github.Response
-			err    error
-		)
-		for {
-			ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
-			if handled := s.handleRateLimit(err, resp); handled {
-				continue
-			}
-			if err != nil {
-				return "", "", errors.New(err)
-			}
-			break
-		}
-		return ghUser.GetLogin(), cred.Token, nil
-	}
+type repoSize struct {
+	mu        sync.RWMutex
+	repoSizes map[string]int // size in bytes of each repo
+}
 
-	return "", "", errors.New("unhandled credential type for token fetch")
+func (r *repoSize) addRepo(repo string, size int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.repoSizes[repo] = size
+}
+
+func (r *repoSize) getRepo(repo string) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.repoSizes[repo]
+}
+
+func newRepoSize() repoSize {
+	return repoSize{repoSizes: make(map[string]int)}
 }
 
 // filteredRepoCache is a wrapper around cache.Cache that filters out repos
@@ -217,6 +199,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.IncludeRepos, s.conn.IgnoreRepos)
 	s.memberCache = make(map[string]struct{})
 
+	s.repoSizes = newRepoSize()
 	s.repos = s.conn.Repositories
 	for _, repo := range s.repos {
 		r, err := s.normalizeRepo(repo)
@@ -353,8 +336,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
-	var installationClient *github.Client
-	var err error
+	var (
+		installationClient *github.Client
+		err                error
+	)
 
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_BasicAuth:
@@ -584,7 +569,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
-		if err = s.addReposByApp(ctx); err != nil {
+		if err = s.getReposByApp(ctx); err != nil {
 			return nil, err
 		}
 
@@ -666,13 +651,18 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			s.scanOptions.BaseHash = s.conn.Base
 			s.scanOptions.HeadHash = s.conn.Head
 
-			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)))
+			repoSize := s.repoSizes.getRepo(repoURL)
+			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size", repoSize)
+
+			now := time.Now()
+			defer func(start time.Time) {
+				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
+			}(now)
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
-			logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)))
 
 			return nil
 		})
@@ -685,49 +675,6 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
 
 	return nil
-}
-
-func (s *Source) cloneRepo(ctx context.Context, repoURL string, installationClient *github.Client) (string, *gogit.Repository, error) {
-	var path string
-	var repo *gogit.Repository
-	var err error
-
-	switch s.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_BasicAuth:
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.conn.GetBasicAuth().GetPassword(), repoURL, s.conn.GetBasicAuth().GetUsername())
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-	case *sourcespb.GitHub_Unauthenticated:
-		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-
-	case *sourcespb.GitHub_GithubApp:
-		s.githubUser, s.githubToken, err = s.UserAndToken(ctx, installationClient)
-		if err != nil {
-			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-		}
-
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-	case *sourcespb.GitHub_Token:
-		// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
-		if s.githubUser == "" || s.githubToken == "" {
-			s.githubUser, s.githubToken, err = s.UserAndToken(ctx, installationClient)
-			if err != nil {
-				return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-			}
-		}
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-	}
-	return path, repo, nil
 }
 
 // handleRateLimit returns true if a rate limit was handled
@@ -766,90 +713,16 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 	return true
 }
 
-func (s *Source) getReposByOrg(ctx context.Context, org string) error {
-	logger := s.log.WithValues("org", org)
-
-	opts := &github.RepositoryListByOrgOptions{
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-		},
+func (s *Source) addReposForMembers(ctx context.Context) {
+	s.log.Info("Fetching repos from members", "members", len(s.members))
+	for member := range s.memberCache {
+		if err := s.addUserGistsToCache(ctx, member); err != nil {
+			s.log.Info("Unable to fetch gists by user", "user", member, "error", err)
+		}
+		if err := s.getReposByUser(ctx, member); err != nil {
+			s.log.Info("Unable to fetch repos by user", "user", member, "error", err)
+		}
 	}
-
-	var numRepos, numForks int
-	for {
-		someRepos, res, err := s.apiClient.Repositories.ListByOrg(ctx, org, opts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("could not list repos for org %s: %w", org, err)
-		}
-		if len(someRepos) == 0 || res == nil {
-			break
-		}
-
-		logger.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
-		for _, r := range someRepos {
-			if r.GetFork() {
-				if !s.conn.IncludeForks {
-					continue
-				}
-				numForks++
-			}
-			s.filteredRepoCache.Set(r.GetFullName(), r.GetCloneURL())
-			numRepos++
-		}
-		if res.NextPage == 0 {
-			break
-		}
-		opts.Page = res.NextPage
-	}
-
-	logger.V(2).Info("found repos", "total", numRepos, "forks", numForks)
-	return nil
-}
-
-func (s *Source) getReposByUser(ctx context.Context, user string) error {
-	opts := &github.RepositoryListOptions{
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-		},
-	}
-
-	logger := s.log.WithValues("user", user)
-	for {
-		someRepos, res, err := s.apiClient.Repositories.List(ctx, user, opts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("could not list repos for user %s: %w", user, err)
-		}
-		if res == nil {
-			break
-		}
-
-		logger.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
-		for _, r := range someRepos {
-			if r.GetFork() && !s.conn.IncludeForks {
-				continue
-			}
-
-			s.filteredRepoCache.Set(r.GetFullName(), r.GetCloneURL())
-		}
-		if res.NextPage == 0 {
-			break
-		}
-		opts.Page = res.NextPage
-	}
-
-	return nil
 }
 
 // addUserGistsToCache collects all the gist urls for a given user,
@@ -900,43 +773,6 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 		}
 	}
 
-	return nil
-}
-
-func (s *Source) addReposByApp(ctx context.Context) error {
-	// Authenticated enumeration of repos.
-	opts := &github.ListOptions{
-		PerPage: defaultPagination,
-	}
-
-	for {
-		someRepos, res, err := s.apiClient.Apps.ListRepos(ctx, opts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
-			continue
-		}
-		if err != nil {
-			return errors.WrapPrefix(err, "unable to list repositories", 0)
-		}
-		if res == nil {
-			break
-		}
-		s.log.V(2).Info("Listed repos for app", "page", opts.Page, "last_page", res.LastPage)
-		for _, r := range someRepos.Repositories {
-			if r.GetFork() && !s.conn.IncludeForks {
-				continue
-			}
-			s.filteredRepoCache.Set(r.GetFullName(), r.GetCloneURL())
-			s.log.V(2).Info("Enumerated repo", "repo", r.GetFullName())
-		}
-
-		if res.NextPage == 0 {
-			break
-		}
-		opts.Page = res.NextPage
-	}
 	return nil
 }
 
@@ -1059,27 +895,6 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 	}
 
 	return nil
-}
-
-func (s *Source) addReposForMembers(ctx context.Context) {
-	s.log.Info("Fetching repos from members", "members", len(s.members))
-	for member := range s.memberCache {
-		if err := s.addUserGistsToCache(ctx, member); err != nil {
-			s.log.Info("Unable to fetch gists by user", "user", member, "error", err)
-		}
-		if err := s.getReposByUser(ctx, member); err != nil {
-			s.log.Info("Unable to fetch repos by user", "user", member, "error", err)
-		}
-	}
-}
-
-func (s *Source) normalizeRepo(repo string) (string, error) {
-	// If there's a '/', assume it's a URL and try to normalize it.
-	if strings.ContainsRune(repo, '/') {
-		return giturl.NormalizeGithubRepo(repo)
-	}
-
-	return "", fmt.Errorf("no repositories found for %s", repo)
 }
 
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
