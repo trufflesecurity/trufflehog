@@ -11,9 +11,9 @@ import (
 
 func TestBase64_FromChunk(t *testing.T) {
 	tests := []struct {
-		name  string
 		chunk *sources.Chunk
 		want  *sources.Chunk
+		name  string
 	}{
 		{
 			name: "only b64 chunk",
@@ -67,6 +67,60 @@ func TestBase64_FromChunk(t *testing.T) {
 			want: &sources.Chunk{
 				Data: []byte(`Many substrings in this slack message could be base64 decoded
 				but only this encapsulated secret should be decoded.`),
+			},
+		},
+		{
+			name: "b64-url-safe: only b64 chunk",
+			chunk: &sources.Chunk{
+				Data: []byte(`bG9uZ2VyLWVuY29kZWQtc2VjcmV0LXRlc3Q`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`longer-encoded-secret-test`),
+			},
+		},
+		{
+			name: "b64-url-safe: mixed content",
+			chunk: &sources.Chunk{
+				Data: []byte(`token: bG9uZ2VyLWVuY29kZWQtc2VjcmV0LXRlc3Q`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`token: longer-encoded-secret-test`),
+			},
+		},
+		{
+			name: "b64-url-safe: env var (looks like all b64 decodable but has `=` in the middle)",
+			chunk: &sources.Chunk{
+				Data: []byte(`some-encoded-secret=dGVzdHNlY3JldA`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`some-encoded-secret=testsecret`),
+			},
+		},
+		{
+			name: "b64-url-safe: has longer b64 inside",
+			chunk: &sources.Chunk{
+				Data: []byte(`some-encoded-secret="bG9uZ2VyLWVuY29kZWQtc2VjcmV0LXRlc3Q"`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`some-encoded-secret="longer-encoded-secret-test"`),
+			},
+		},
+		{
+			name: "b64-url-safe: hyphen url b64",
+			chunk: &sources.Chunk{
+				Data: []byte(`dHJ1ZmZsZWhvZz4-ZmluZHMtc2VjcmV0cw`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`trufflehog>>finds-secrets`),
+			},
+		},
+		{
+			name: "b64-url-safe: underscore url b64",
+			chunk: &sources.Chunk{
+				Data: []byte(`YjY0dXJsc2FmZS10ZXN0LXNlY3JldC11bmRlcnNjb3Jlcz8_`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`b64urlsafe-test-secret-underscores??`),
 			},
 		},
 	}
