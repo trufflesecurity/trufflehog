@@ -32,6 +32,10 @@ Have questions? Feedback? Jump in slack and hang out with us
 
 https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ
 
+and check out the Secret Scanning Discord 
+
+https://discord.gg/zpB2jDhr
+
 
 # :tv: Demo
 
