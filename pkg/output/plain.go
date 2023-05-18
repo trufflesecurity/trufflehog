@@ -53,18 +53,20 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
 			v)
 	}
 
-	for idx, v := range r.Result.StructuredData.GithubSshKey {
-		printer.Printf("GithubSshKey %d User: %s\n", idx, v.User)
+	if r.Result.StructuredData != nil {
+		for idx, v := range r.Result.StructuredData.GithubSshKey {
+			printer.Printf("GithubSshKey %d User: %s\n", idx, v.User)
 
-		if v.PublicKeyFingerprint != "" {
-			printer.Printf("GithubSshKey %d Fingerprint: %s\n", idx, v.PublicKeyFingerprint)
+			if v.PublicKeyFingerprint != "" {
+				printer.Printf("GithubSshKey %d Fingerprint: %s\n", idx, v.PublicKeyFingerprint)
+			}
 		}
-	}
 
-	for idx, v := range r.Result.StructuredData.TlsPrivateKey {
-		printer.Printf("TlsPrivateKey %d Fingerprint: %s\n", idx, v.CertificateFingerprint)
-		printer.Printf("TlsPrivateKey %d Verification URL: %s\n", idx, v.VerificationUrl)
-		printer.Printf("TlsPrivateKey %d Expiration: %d\n", idx, v.ExpirationTimestamp)
+		for idx, v := range r.Result.StructuredData.TlsPrivateKey {
+			printer.Printf("TlsPrivateKey %d Fingerprint: %s\n", idx, v.CertificateFingerprint)
+			printer.Printf("TlsPrivateKey %d Verification URL: %s\n", idx, v.VerificationUrl)
+			printer.Printf("TlsPrivateKey %d Expiration: %d\n", idx, v.ExpirationTimestamp)
+		}
 	}
 
 	aggregateData := make(map[string]interface{})
