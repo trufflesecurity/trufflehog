@@ -13,6 +13,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
+      actions: 'read'
       contents: 'read'
       id-token: 'write'
     steps:
@@ -32,6 +33,7 @@ jobs:
   test-detectors:
     runs-on: ubuntu-latest
     permissions:
+      actions: 'read'
       contents: 'read'
       id-token: 'write'
     steps:
@@ -49,4 +51,3 @@ jobs:
     - name: Test
       run: make test-detectors
       continue-on-error: true
-    
