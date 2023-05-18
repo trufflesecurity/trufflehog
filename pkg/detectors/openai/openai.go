@@ -20,7 +20,8 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b((?:sk)-[a-zA-Z0-9]{48})\b`)
+	// The magic string T3BlbkFJ is the base64-encoded string: OpenAI
+	keyPat = regexp.MustCompile(`\b((?:sk)-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z-09]{20})\b`)
 )
 
 // TODO: Add secret context?? Information about access, ownership etc
