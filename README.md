@@ -28,14 +28,12 @@
 </div>
 
 # :loudspeaker: Join Our Community
-Have questions? Feedback? Jump in slack and hang out with us
 
-https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ
+Have questions? Feedback? Jump in slack or discord and hang out with us
 
-and check out the Secret Scanning Discord 
+Join our [Slack Community](https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ)
 
-https://discord.gg/zpB2jDhr
-
+Join the [Secret Scanning Discord](https://discord.gg/zpB2jDhr)
 
 # :tv: Demo
 
