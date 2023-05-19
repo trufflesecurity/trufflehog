@@ -234,7 +234,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 						Link:       git.GenerateLink(repository, commit, file),
 						Timestamp:  sanitizer.UTF8(timestamp),
 						Line:       line,
-						Visibility: s.visibilityOf(repository),
+						Visibility: s.visibilityOf(aCtx, repository),
 					},
 				},
 			}
@@ -243,7 +243,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
-func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visibility) {
+func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
 	s.mu.Lock()
 	visibility, ok := s.publicMap[repoURL]
 	s.mu.Unlock()
@@ -274,7 +274,7 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 		repoName := urlPathParts[1]
 		repoName = strings.TrimSuffix(repoName, ".git")
 		for {
-			gist, resp, err = s.apiClient.Gists.Get(context.TODO(), repoName)
+			gist, resp, err = s.apiClient.Gists.Get(ctx, repoName)
 			if !s.handleRateLimit(err, resp) {
 				break
 			}
@@ -296,7 +296,7 @@ func (s *Source) visibilityOf(repoURL string) (visibility source_metadatapb.Visi
 		repoName := urlPathParts[2]
 		repoName = strings.TrimSuffix(repoName, ".git")
 		for {
-			repo, resp, err = s.apiClient.Repositories.Get(context.TODO(), owner, repoName)
+			repo, resp, err = s.apiClient.Repositories.Get(ctx, owner, repoName)
 			if !s.handleRateLimit(err, resp) {
 				break
 			}
@@ -448,7 +448,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	ctx.Logger().V(1).Info("Enumerating with token", "endpoint", apiEndpoint)
 	for {
-		ghUser, resp, err = s.apiClient.Users.Get(context.TODO(), "")
+		ghUser, resp, err = s.apiClient.Users.Get(ctx, "")
 		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}

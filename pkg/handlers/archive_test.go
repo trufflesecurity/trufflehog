@@ -9,6 +9,7 @@ import (
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -79,7 +80,7 @@ func TestArchiveHandler(t *testing.T) {
 		if err != nil {
 			t.Errorf("error creating reusable reader: %s", err)
 		}
-		archiveChan := archive.FromFile(context.TODO(), newReader)
+		archiveChan := archive.FromFile(context.Background(), newReader)
 
 		count := 0
 		re := regexp.MustCompile(testCase.matchString)
