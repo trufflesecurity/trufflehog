@@ -1,9 +1,12 @@
 package source_configure
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 /*
@@ -32,11 +35,13 @@ string options
 
 type TrufflehogComponent struct {
 	common.Common
+	parent *SourceConfigure
 }
 
-func NewTrufflehogComponent(common common.Common) *TrufflehogComponent {
+func NewTrufflehogComponent(common common.Common, parent *SourceConfigure) *TrufflehogComponent {
 	return &TrufflehogComponent{
 		Common: common,
+		parent: parent,
 	}
 }
 
@@ -49,7 +54,13 @@ func (m *TrufflehogComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *TrufflehogComponent) View() string {
-	return "trufflehog configure component"
+	var view strings.Builder
+
+	view.WriteString(styles.BoldTextStyle.Render("\nConfiguring "+styles.PrimaryTextStyle.Render("Trufflehog")) + "\n")
+
+	view.WriteString(styles.HintTextStyle.Render("You can skip this completely and run with defaults") + "\n")
+
+	return view.String()
 }
 
 func (m *TrufflehogComponent) ShortHelp() []key.Binding {

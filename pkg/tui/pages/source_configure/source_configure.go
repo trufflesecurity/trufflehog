@@ -22,8 +22,8 @@ const (
 
 func (t tab) String() string {
 	return []string{
-		"1. Configuration",
-		"2. Truffle Configuration",
+		"1. Source Configuration",
+		"2. Trufflehog Configuration",
 		"3. Run",
 	}[t]
 }
@@ -41,18 +41,14 @@ func (m SourceConfigure) Init() tea.Cmd {
 }
 
 func New(c common.Common) *SourceConfigure {
-	tb := tabs.New(c, []string{configTab.String(), truffleConfigTab.String(), runTab.String()})
-	tabComponents := []common.Component{
-		configTab:        NewSourceComponent(c),
-		truffleConfigTab: NewTrufflehogComponent(c),
-		runTab:           NewRunComponent(c),
+	conf := SourceConfigure{Common: c}
+	conf.tabs = tabs.New(c, []string{configTab.String(), truffleConfigTab.String(), runTab.String()})
+	conf.tabComponents = []common.Component{
+		configTab:        NewSourceComponent(c, &conf),
+		truffleConfigTab: NewTrufflehogComponent(c, &conf),
+		runTab:           NewRunComponent(c, &conf),
 	}
-
-	return &SourceConfigure{
-		tabs:          tb,
-		Common:        c,
-		tabComponents: tabComponents,
-	}
+	return &conf
 }
 
 func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -75,7 +71,6 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case SetSourceMsg:
 		m.configTabSource = msg.Source
-
 	}
 
 	tab, cmd := m.tabComponents[m.activeTab].Update(msg)

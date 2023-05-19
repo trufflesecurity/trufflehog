@@ -1,18 +1,23 @@
 package source_configure
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 type SourceComponent struct {
 	common.Common
+	parent *SourceConfigure
 }
 
-func NewSourceComponent(common common.Common) *SourceComponent {
+func NewSourceComponent(common common.Common, parent *SourceConfigure) *SourceComponent {
 	return &SourceComponent{
 		Common: common,
+		parent: parent,
 	}
 }
 
@@ -25,7 +30,13 @@ func (m *SourceComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *SourceComponent) View() string {
-	return "source view component"
+	var view strings.Builder
+
+	view.WriteString(styles.BoldTextStyle.Render("\nConfiguring "+styles.PrimaryTextStyle.Render(m.parent.configTabSource)) + "\n")
+
+	view.WriteString(styles.HintTextStyle.Render("* required field"))
+
+	return view.String()
 }
 
 func (m *SourceComponent) ShortHelp() []key.Binding {

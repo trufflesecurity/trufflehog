@@ -24,6 +24,18 @@ var Colors = map[string]string{
 	"violet":    "#6b5b9a",
 }
 
+var (
+	BoldTextStyle = lipgloss.NewStyle().Bold(true)
+
+	PrimaryTextStyle = lipgloss.NewStyle().Foreground(
+		lipgloss.Color("28")) // green
+
+	HintTextStyle = lipgloss.NewStyle().Foreground(
+		lipgloss.Color("8")) // grey
+
+	CodeTextStyle = lipgloss.NewStyle().Background(lipgloss.Color("130")).Foreground(lipgloss.Color("15"))
+)
+
 var AppStyle = lipgloss.NewStyle().Padding(1, 2)
 
 // Styles defines styles for the UI.
