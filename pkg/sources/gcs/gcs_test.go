@@ -210,7 +210,7 @@ type mockObjectManager struct {
 	wantErr    bool
 }
 
-func (m *mockObjectManager) attributes(_ context.Context) (*attributes, error) {
+func (m *mockObjectManager) Attributes(_ context.Context) (*attributes, error) {
 	if m.wantErr {
 		return nil, fmt.Errorf("some error")
 	}
@@ -237,7 +237,7 @@ func (m *mockReader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (m *mockObjectManager) listObjects(context.Context) (chan io.Reader, error) {
+func (m *mockObjectManager) ListObjects(context.Context) (chan io.Reader, error) {
 	if m.wantErr {
 		return nil, fmt.Errorf("some error")
 	}

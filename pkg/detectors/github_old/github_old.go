@@ -12,40 +12,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-const defaultURL = "https://api.github.com"
-
-type Scanner struct {
-	verifierURLs []string
-}
-
-// New creates a new Scanner with the given options.
-func New(opts ...func(*Scanner)) *Scanner {
-	scanner := &Scanner{
-		verifierURLs: make([]string, 0),
-	}
-	for _, opt := range opts {
-		opt(scanner)
-	}
-
-	return scanner
-}
-
-// WithVerifierURLs adds the given URLs to the list of URLs to check for
-// verification of secrets.
-func WithVerifierURLs(urls []string, includeDefault bool) func(*Scanner) {
-	return func(s *Scanner) {
-		if includeDefault {
-			urls = append(urls, defaultURL)
-		}
-		s.verifierURLs = append(s.verifierURLs, urls...)
-	}
-}
+type Scanner struct{ detectors.EndpointSetter }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
-func (s Scanner) Version() int { return 1 }
+func (Scanner) Version() int            { return 1 }
+func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
 
 var (
 	// Oauth token
@@ -98,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := common.SaneHttpClient()
 			// https://developer.github.com/v3/users/#get-the-authenticated-user
-			for _, url := range s.verifierURLs {
+			for _, url := range s.Endpoints(s.DefaultEndpoint()) {
 				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/user", url), nil)
 				if err != nil {
 					continue

@@ -29,14 +29,7 @@ const (
 	maxObjectSizeLimit   = 50 * 1024 * 1024 // 50MB
 )
 
-var (
-	defaultConcurrency = runtime.NumCPU()
-)
-
-type objectManager interface {
-	listObjects(context.Context) (chan io.Reader, error)
-	attributes(ctx context.Context) (*attributes, error)
-}
+var defaultConcurrency = runtime.NumCPU()
 
 // bucketManager is a simplified *storage.Client wrapper.
 // It provides only a subset of methods that are needed by the gcsManager.
@@ -296,7 +289,7 @@ func withConcurrency(concurrency int) gcsManagerOption {
 
 // withMaxObjectSize sets the maximum size of objects that will be scanned.
 // If not set, set to a negative number, or set larger than 1GB,
-// the default value of 500MB will be used.
+// the default value of 50MB will be used.
 func withMaxObjectSize(maxObjectSize int64) gcsManagerOption {
 	return func(m *gcsManager) error {
 		if maxObjectSize <= 0 || maxObjectSize > maxObjectSizeLimit {
@@ -383,7 +376,7 @@ type object struct {
 	io.Reader
 }
 
-func (g *gcsManager) attributes(ctx context.Context) (*attributes, error) {
+func (g *gcsManager) Attributes(ctx context.Context) (*attributes, error) {
 	// Get all the buckets in the project.
 	buckets, err := g.listBuckets(ctx)
 	if err != nil {
@@ -406,7 +399,7 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 	for _, bkt := range bkts {
 		bkt := bkt
 		g.workerPool.Go(func() error {
-			// List all the objects in the bucket and calculate a attributes.
+			// List all the objects in the bucket and calculate attributes.
 			g.setupBktHandle(&bkt)
 
 			q, err := setObjectQuery(&bkt)
@@ -450,7 +443,7 @@ func (g *gcsManager) enumerate(ctx context.Context, bkts []bucket) (*attributes,
 	return stats, nil
 }
 
-func (g *gcsManager) listObjects(ctx context.Context) (chan io.Reader, error) {
+func (g *gcsManager) ListObjects(ctx context.Context) (chan io.Reader, error) {
 	ch := make(chan io.Reader, 100) // TODO (ahrav): Determine optimal buffer size.
 
 	// Get all the buckets in the project.

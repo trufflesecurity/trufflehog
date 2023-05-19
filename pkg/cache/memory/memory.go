@@ -74,6 +74,26 @@ func (c *Cache) Count() int {
 	return c.c.ItemCount()
 }
 
+// Keys returns all keys in the cache.
+func (c *Cache) Keys() []string {
+	items := c.c.Items()
+	res := make([]string, 0, len(items))
+	for k := range items {
+		res = append(res, k)
+	}
+	return res
+}
+
+// Values returns all values in the cache.
+func (c *Cache) Values() []string {
+	items := c.c.Items()
+	res := make([]string, 0, len(items))
+	for _, v := range items {
+		res = append(res, v.Object.(string))
+	}
+	return res
+}
+
 // Contents returns all key-value pairs in the cache encodes as a string.
 func (c *Cache) Contents() string {
 	items := c.c.Items()

@@ -29,6 +29,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const (
+	defaultMaxObjectSize = 250 * 1024 * 1024 // 250 MiB
+	maxObjectSizeLimit   = 250 * 1024 * 1024 // 250 MiB
+)
+
 type Source struct {
 	name        string
 	sourceId    int64
@@ -37,9 +42,10 @@ type Source struct {
 	concurrency int
 	log         logr.Logger
 	sources.Progress
-	errorCount *sync.Map
-	conn       *sourcespb.S3
-	jobPool    *errgroup.Group
+	errorCount    *sync.Map
+	conn          *sourcespb.S3
+	jobPool       *errgroup.Group
+	maxObjectSize int64
 }
 
 // Ensure the Source satisfies the interface at compile time
@@ -79,7 +85,20 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	}
 	s.conn = &conn
 
+	s.setMaxObjectSize(conn.GetMaxObjectSize())
+
 	return nil
+}
+
+// setMaxObjectSize sets the maximum size of objects that will be scanned. If
+// not set, set to a negative number, or set larger than the
+// maxObjectSizeLimit, the defaultMaxObjectSizeLimit will be used.
+func (s *Source) setMaxObjectSize(maxObjectSize int64) {
+	if maxObjectSize <= 0 || maxObjectSize > maxObjectSizeLimit {
+		s.maxObjectSize = defaultMaxObjectSize
+	} else {
+		s.maxObjectSize = maxObjectSize
+	}
 }
 
 func (s *Source) newClient(region string) (*s3.S3, error) {
@@ -206,8 +225,8 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 		}
 
 		// ignore large files
-		if *obj.Size > int64(250*common.MB) {
-			s.log.V(3).Info("Skipping %d byte file (over 250MB limit)", "object", *obj.Key)
+		if *obj.Size > s.maxObjectSize {
+			s.log.V(3).Info("Skipping %d byte file (over maxObjectSize limit)", "object", *obj.Key)
 			return
 		}
 

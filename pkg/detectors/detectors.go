@@ -31,6 +31,13 @@ type Versioner interface {
 	Version() int
 }
 
+// EndpointCustomizer is an optional interface that a detector can implement to
+// support verifying against user-supplied endpoints.
+type EndpointCustomizer interface {
+	SetEndpoints(...string) error
+	DefaultEndpoint() string
+}
+
 type Result struct {
 	// DetectorType is the type of Detector.
 	DetectorType detectorspb.DetectorType

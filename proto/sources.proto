@@ -169,6 +169,7 @@ message GitHub {
     credentials.GitHubApp github_app = 2;
     string token = 3;
     credentials.Unauthenticated unauthenticated = 4;
+    credentials.BasicAuth basic_auth = 13;
   }
   repeated string repositories = 5;
   repeated string organizations = 6;
@@ -195,6 +196,7 @@ message JIRA {
     string token = 6;
   }
   repeated string projects = 5;
+  repeated string ignore_projects = 7;
 }
 
 message NPMUnauthenticatedPackage {
@@ -217,6 +219,7 @@ message S3 {
     credentials.AWSSessionTokenSecret session_token = 5;
   }
   repeated string buckets = 3;
+  int64 max_object_size = 6;
 }
 
 message Slack {

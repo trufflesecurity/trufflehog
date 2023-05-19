@@ -22,7 +22,12 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 		git.ScanOptionLogOptions(logOptions),
 	}
 
-	repo, err := gogit.PlainOpenWithOptions(c.RepoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
+	options := &gogit.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+
+	repo, err := gogit.PlainOpenWithOptions(c.RepoPath, options)
 	if err != nil {
 		return fmt.Errorf("could not open repo: %s: %w", c.RepoPath, err)
 	}
