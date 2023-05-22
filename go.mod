@@ -24,7 +24,7 @@ require (
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/go-ldap/ldap/v3 v3.4.4
 	github.com/go-logr/logr v1.2.4
-	github.com/go-logr/zapr v1.2.3
+	github.com/go-logr/zapr v1.2.4
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gobwas/glob v0.2.3
