@@ -105,6 +105,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/carboninterface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cashboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/caspio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/celigo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/censys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/centralstationcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cexio"
@@ -1523,6 +1524,7 @@ func DefaultDetectors() []detectors.Detector {
 		aiven.Scanner{},
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
+		celigo.Scanner{},
 	}
 
 }
