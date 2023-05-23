@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -24,16 +25,18 @@ import (
 )
 
 type Engine struct {
-	concurrency     int
-	chunks          chan *sources.Chunk
-	results         chan detectors.ResultWithMetadata
-	decoders        []decoders.Decoder
-	detectors       map[bool][]detectors.Detector
-	chunksScanned   uint64
-	bytesScanned    uint64
-	detectorAvgTime sync.Map
-	sourcesWg       sync.WaitGroup
-	workersWg       sync.WaitGroup
+	concurrency          int
+	chunks               chan *sources.Chunk
+	results              chan detectors.ResultWithMetadata
+	decoders             []decoders.Decoder
+	detectors            map[bool][]detectors.Detector
+	detectableChunksChan chan detectableChunk
+	chunksScanned        uint64
+	bytesScanned         uint64
+	detectorAvgTime      sync.Map
+	sourcesWg            sync.WaitGroup
+	workersWg            sync.WaitGroup
+	detectChunkWg        sync.WaitGroup
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
@@ -42,6 +45,16 @@ type Engine struct {
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words (keywords from the rules in the config)
 	prefilter ahocorasick.AhoCorasick
+}
+
+const defaultChannelBuffer = 1
+
+// detectableChunk is a decoded chunk that is ready to be scanned by its detector.
+type detectableChunk struct {
+	detector detectors.Detector
+	chunk    sources.Chunk
+	decoder  detectorspb.DecoderType
+	wgDoneFn func()
 }
 
 type EngineOption func(*Engine)
@@ -106,9 +119,10 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
-		chunks:          make(chan *sources.Chunk),
-		results:         make(chan detectors.ResultWithMetadata),
-		detectorAvgTime: sync.Map{},
+		chunks:               make(chan *sources.Chunk),
+		results:              make(chan detectors.ResultWithMetadata),
+		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
+		detectorAvgTime:      sync.Map{},
 	}
 
 	for _, option := range options {
@@ -170,6 +184,17 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 			}
 			seenDetectors[id] = struct{}{}
 		}
+	}
+
+	// Run the Secret scanner workers and Notifier pipelines.
+	const detectorWorkerMultiplier = 50
+	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
+		e.detectChunkWg.Add(1)
+		go func() {
+			defer common.Recover(ctx)
+			defer e.detectChunkWg.Done()
+			e.detectChunks(ctx)
+		}()
 	}
 
 	// Start the workers.
@@ -242,7 +267,56 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	return avgTime
 }
 
+func (e *Engine) detectChunks(ctx context.Context) {
+	for data := range e.detectableChunksChan {
+		results, err := func() ([]detectors.Result, error) {
+			ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+			defer cancel()
+			defer common.Recover(ctx)
+			return data.detector.FromData(ctx, data.chunk.Verify, data.chunk.Data)
+		}()
+		if err != nil {
+			ctx.Logger().Error(err, "could not scan chunk")
+			continue
+		}
+
+		if e.filterUnverified {
+			results = detectors.CleanResults(results)
+		}
+		for _, result := range results {
+			resultChunk := data.chunk
+			if SupportsLineNumbers(data.chunk.SourceType) {
+				copyChunk := data.chunk
+				copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
+				if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
+					copyChunk.SourceMetadata = copyMetaData
+				}
+				fragStart, mdLine := FragmentFirstLine(&copyChunk)
+				SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
+				resultChunk = copyChunk
+			}
+			result.DecoderType = data.decoder
+			fmt.Println("resultChunk", resultChunk)
+			fmt.Println("result", result)
+			e.results <- detectors.CopyMetadata(&resultChunk, result)
+
+		}
+		if len(results) > 0 {
+			detectorName := results[0].DetectorType.String()
+			avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
+			var avgTime []time.Duration
+			if ok {
+				avgTime, ok = avgTimeI.([]time.Duration)
+				if !ok {
+					continue
+				}
+			}
+			e.detectorAvgTime.Store(detectorName, avgTime)
+		}
+	}
+}
 func (e *Engine) detectorWorker(ctx context.Context) {
+	var wgDetect sync.WaitGroup
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
 			matchedKeywords := make(map[string]struct{})
@@ -270,7 +344,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					matchedKeywords[strings.ToLower(string(decoded.Data[m.Start():m.End()]))] = struct{}{}
 				}
 
-				for verify, detectorsSet := range e.detectors {
+				for _, detectorsSet := range e.detectors {
 					for _, detector := range detectorsSet {
 						chunkContainsKeyword := false
 						for _, kw := range detector.Keywords() {
@@ -279,66 +353,24 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 								break
 							}
 						}
-
 						if !chunkContainsKeyword {
 							continue
 						}
-
-						start := time.Now()
-
-						results, err := func() ([]detectors.Result, error) {
-							ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-							defer cancel()
-							defer common.Recover(ctx)
-							return detector.FromData(ctx, verify, decoded.Data)
-						}()
-						if err != nil {
-							ctx.Logger().Error(err, "could not scan chunk",
-								"source_type", decoded.SourceType.String(),
-								"metadata", decoded.SourceMetadata,
-							)
-							continue
+						wgDetect.Add(1)
+						e.detectableChunksChan <- detectableChunk{
+							chunk:    *decoded,
+							detector: detector,
+							decoder:  decoderType,
+							wgDoneFn: wgDetect.Done,
 						}
 
-						if e.filterUnverified {
-							results = detectors.CleanResults(results)
-						}
-						for _, result := range results {
-							resultChunk := chunk
-							if SupportsLineNumbers(chunk.SourceType) {
-								copyChunk := *chunk
-								copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
-								if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
-									copyChunk.SourceMetadata = copyMetaData
-								}
-								fragStart, mdLine := FragmentFirstLine(&copyChunk)
-								SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
-								resultChunk = &copyChunk
-							}
-							result.DecoderType = decoderType
-							e.results <- detectors.CopyMetadata(resultChunk, result)
-
-						}
-						if len(results) > 0 {
-							elapsed := time.Since(start)
-							detectorName := results[0].DetectorType.String()
-							avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
-							var avgTime []time.Duration
-							if ok {
-								avgTime, ok = avgTimeI.([]time.Duration)
-								if !ok {
-									continue
-								}
-							}
-							avgTime = append(avgTime, elapsed)
-							e.detectorAvgTime.Store(detectorName, avgTime)
-						}
 					}
 				}
 			}
 		}
 		atomic.AddUint64(&e.chunksScanned, 1)
 	}
+	wgDetect.Wait()
 }
 
 // lineNumberSupportedSources is a list of sources that support line numbers.

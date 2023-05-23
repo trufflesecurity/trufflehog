@@ -53,6 +53,7 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
 			v)
 	}
 
+	fmt.Println("INSIDE PLAIN: ", r.Result)
 	for idx, v := range r.Result.StructuredData.GithubSshKey {
 		printer.Printf("GithubSshKey %d User: %s\n", idx, v.User)
 
