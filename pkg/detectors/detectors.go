@@ -68,6 +68,8 @@ type ResultWithMetadata struct {
 	// SourceName is the name of the Source.
 	SourceName string
 	Result
+	// Data from the sources.Chunk which this result was emitted for
+	Data []byte
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
@@ -78,6 +80,7 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
 		Result:         result,
+		Data:           chunk.Data,
 	}
 }
 
