@@ -220,6 +220,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
 	}
 
+	err = git.GitCmdCheck()
+	if err != nil {
+		return err
+	}
+
 	s.publicMap = map[string]source_metadatapb.Visibility{}
 
 	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),

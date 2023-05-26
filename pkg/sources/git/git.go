@@ -102,6 +102,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 		concurrency = runtime.NumCPU()
 	}
 
+	err := GitCmdCheck()
+	if err != nil {
+		return err
+	}
+
 	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
 		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
@@ -256,7 +261,7 @@ func gitURLParse(gitURL string) (*url.URL, error) {
 }
 
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args ...string) (string, *git.Repository, error) {
-	if err := gitCmdCheck(); err != nil {
+	if err := GitCmdCheck(); err != nil {
 		return "", nil, err
 	}
 	clonePath, err := os.MkdirTemp(os.TempDir(), "trufflehog")
@@ -332,8 +337,8 @@ func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
-// gitCmdCheck checks if git is installed.
-func gitCmdCheck() error {
+// GitCmdCheck checks if git is installed.
+func GitCmdCheck() error {
 	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
 		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
 	}
@@ -341,7 +346,7 @@ func gitCmdCheck() error {
 }
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	if err := gitCmdCheck(); err != nil {
+	if err := GitCmdCheck(); err != nil {
 		return err
 	}
 
