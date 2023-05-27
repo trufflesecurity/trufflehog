@@ -55,13 +55,11 @@ message Confluence {
   string file = 8;
 }
 
-message Dockerhub {
+message Docker {
   string file = 1;
   string image = 2;
   string layer = 3;
   string tag = 4;
-  string link = 5;
-  string email = 6;
 }
 
 message ECR {
@@ -258,7 +256,7 @@ message MetaData {
     Bitbucket bitbucket = 2;
     CircleCI circleci = 3;
     Confluence confluence = 4;
-    Dockerhub dockerhub = 5;
+    Docker docker = 5;
     ECR ecr = 6;
     GCS gcs = 7;
     Github github = 8;

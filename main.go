@@ -15,6 +15,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
+	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -26,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
@@ -127,6 +129,9 @@ var (
 
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
+
+	dockerScan       = cli.Command("docker", "Scan Docker Image")
+	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
 )
 
 func init() {
@@ -455,6 +460,20 @@ func run(state overseer.State) {
 		}
 		if err := e.ScanGCS(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan GCS.")
+		}
+	case dockerScan.FullCommand():
+		dockerConn := sourcespb.Docker{
+			Images: *dockerScanImages,
+			Credential: &sourcespb.Docker_DockerKeychain{
+				DockerKeychain: true,
+			},
+		}
+		anyConn, err := anypb.New(&dockerConn)
+		if err != nil {
+			logFatal(err, "Failed to marshal Docker connection")
+		}
+		if err := e.ScanDocker(ctx, anyConn); err != nil {
+			logFatal(err, "Failed to scan Docker.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup

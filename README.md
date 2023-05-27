@@ -135,6 +135,12 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
+# 8: Scan a Docker image for verified secrets.
+
+```bash
+trufflehog docker --image trufflesecurity/secrets --only-verified
+```
+
 # :question: FAQ
 
 + All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -166,6 +172,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - git
 - github
 - gitlab
+- docker
 - S3
 - filesystem (files and directories)
 - syslog
