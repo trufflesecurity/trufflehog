@@ -50,7 +50,7 @@ require (
 	github.com/stretchr/testify v1.8.3
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/xanzy/go-gitlab v0.83.0
-	go.mongodb.org/mongo-driver v1.11.4
+	go.mongodb.org/mongo-driver v1.11.6
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.9.0
 	golang.org/x/exp v0.0.0-20221018205818-5c77f4b2bbd7
