@@ -2,6 +2,7 @@ package detectors
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -152,4 +153,10 @@ func MustGetBenchmarkData() map[string][]byte {
 		"medium": medium,
 		"big":    big,
 	}
+}
+
+func RedactURL(u *url.URL) string {
+	urlSafe := *u
+	urlSafe.User = url.UserPassword(urlSafe.User.Username(), "********")
+	return strings.TrimSpace(strings.Replace(urlSafe.String(), "%2A", "*", -1))
 }
