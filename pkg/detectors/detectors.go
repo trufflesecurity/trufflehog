@@ -155,8 +155,7 @@ func MustGetBenchmarkData() map[string][]byte {
 	}
 }
 
-func RedactURL(u *url.URL) string {
-	urlSafe := *u
-	urlSafe.User = url.UserPassword(urlSafe.User.Username(), "********")
-	return strings.TrimSpace(strings.Replace(urlSafe.String(), "%2A", "*", -1))
+func RedactURL(u url.URL) string {
+	u.User = url.UserPassword(u.User.Username(), "********")
+	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
 }

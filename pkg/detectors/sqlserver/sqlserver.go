@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_SQLServer,
 			Raw:          []byte(paramsUnsafe.Password),
 			RawV2:        []byte(paramsUnsafe.URL().String()),
-			Redacted:     detectors.RedactURL(paramsUnsafe.URL()),
+			Redacted:     detectors.RedactURL(*paramsUnsafe.URL()),
 		}
 
 		if verify {

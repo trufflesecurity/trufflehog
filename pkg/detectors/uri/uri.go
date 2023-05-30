@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_URI,
 			Raw:          []byte(rawURL.String()),
 			RawV2:        []byte(rawURLStr),
-			Redacted:     detectors.RedactURL(rawURL),
+			Redacted:     detectors.RedactURL(*rawURL),
 		}
 
 		if verify {
