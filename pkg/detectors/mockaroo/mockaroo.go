@@ -3,6 +3,7 @@ package mockaroo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -48,18 +49,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.mockaroo.com/api/types", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.mockaroo.com/api/types?key=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("X-API-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					var t []typeResponse
+					var t typeRes
 					err = json.NewDecoder(res.Body).Decode(&t)
-					if err == nil && len(t) > 0 {
+					if err == nil && len(t.Types) > 0 {
 						s1.Verified = true
 					}
 				} else {
@@ -81,14 +81,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mockaroo
 }
 
-type typeResponse struct {
-	Name       string      `json:"name"`
-	Parameters []parameter `json:"parameters"`
-}
-
-type parameter struct {
-	Name        string      `json:"name"`
-	Type        string      `json:"type"`
-	Description string      `json:"description"`
-	Default     interface{} `json:"default"`
+type typeRes struct {
+	Types []struct {
+		Name       string        `json:"name"`
+		Type       interface{}   `json:"type"`
+		Parameters []interface{} `json:"parameters"`
+	} `json:"types"`
 }
