@@ -720,7 +720,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: token},
 		)
-		tc := oauth2.NewClient(context.TODO(), ts)
+		tc := oauth2.NewClient(ctx, ts)
 		client = github.NewClient(tc)
 	}
 

@@ -38,7 +38,7 @@ func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
 
 func initTestSource(src *sourcespb.GitHub) *Source {
 	s, conn := createTestSource(src)
-	if err := s.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1); err != nil {
+	if err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1); err != nil {
 		panic(err)
 	}
 	s.apiClient = github.NewClient(s.httpClient)
@@ -54,7 +54,7 @@ func TestInit(t *testing.T) {
 		},
 	})
 
-	err := source.Init(context.TODO(), "test - github", 0, 1337, false, conn, 1)
+	err := source.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
 	assert.Nil(t, err)
 
 	// TODO: test error case
@@ -79,7 +79,7 @@ func TestAddReposByOrg(t *testing.T) {
 		IgnoreRepos:  []string{"secret/super-*-repo2"},
 	})
 	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.getReposByOrg(context.TODO(), "super-secret-org")
+	err := s.getReposByOrg(context.Background(), "super-secret-org")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
@@ -107,7 +107,7 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		Organizations: []string{"super-secret-org"},
 	})
 	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.getReposByOrg(context.TODO(), "super-secret-org")
+	err := s.getReposByOrg(context.Background(), "super-secret-org")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("secret/super-secret-repo")
@@ -134,7 +134,7 @@ func TestAddReposByUser(t *testing.T) {
 		},
 		IgnoreRepos: []string{"secret/super-secret-repo2"},
 	})
-	err := s.getReposByUser(context.TODO(), "super-secret-user")
+	err := s.getReposByUser(context.Background(), "super-secret-user")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
@@ -151,7 +151,7 @@ func TestAddGistsByUser(t *testing.T) {
 		JSON([]map[string]string{{"git_pull_url": "https://githug.com/super-secret-gist.git", "id": "super-secret-gist"}})
 
 	s := initTestSource(nil)
-	err := s.addUserGistsToCache(context.TODO(), "super-secret-user")
+	err := s.addUserGistsToCache(context.Background(), "super-secret-user")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-gist")
@@ -171,7 +171,7 @@ func TestAddMembersByOrg(t *testing.T) {
 		})
 
 	s := initTestSource(nil)
-	err := s.addMembersByOrg(context.TODO(), "org1")
+	err := s.addMembersByOrg(context.Background(), "org1")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(s.memberCache))
 	_, ok := s.memberCache["testman1"]
@@ -200,7 +200,7 @@ func TestAddMembersByApp(t *testing.T) {
 		})
 
 	s := initTestSource(nil)
-	err := s.addMembersByApp(context.TODO(), github.NewClient(nil))
+	err := s.addMembersByApp(context.Background(), github.NewClient(nil))
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(s.memberCache))
 	_, ok := s.memberCache["ssm1"]
@@ -249,7 +249,7 @@ func TestAddOrgsByUser(t *testing.T) {
 		})
 
 	s := initTestSource(nil)
-	s.addOrgsByUser(context.TODO(), "super-secret-user")
+	s.addOrgsByUser(context.Background(), "super-secret-user")
 	assert.Equal(t, 1, s.orgsCache.Count())
 	ok := s.orgsCache.Exists("sso2")
 	assert.True(t, ok)
@@ -347,7 +347,7 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 	s := initTestSource(nil)
 	s.orgsCache = memory.New()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
-	s.enumerateUnauthenticated(context.TODO())
+	s.enumerateUnauthenticated(context.Background())
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
@@ -379,7 +379,7 @@ func TestEnumerateWithToken(t *testing.T) {
 		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git", "id": "super-secret-gist"}})
 
 	s := initTestSource(nil)
-	err := s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
+	err := s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
@@ -417,7 +417,7 @@ func BenchmarkEnumerateWithToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
+		_ = s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
 	}
 }
 
@@ -451,7 +451,7 @@ func TestEnumerate(t *testing.T) {
 		},
 	})
 
-	_, err := s.enumerate(context.TODO(), "https://api.github.com")
+	_, err := s.enumerate(context.Background(), "https://api.github.com")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
@@ -512,7 +512,7 @@ func BenchmarkEnumerate(b *testing.B) {
 		setupMocks(b)
 
 		b.StartTimer()
-		_, _ = s.enumerate(context.TODO(), "https://api.github.com")
+		_, _ = s.enumerate(context.Background(), "https://api.github.com")
 	}
 }
 
@@ -527,7 +527,7 @@ func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	s := initTestSource(nil)
 	s.repos = []string{"some-special-repo"}
 
-	err := s.enumerateWithToken(context.TODO(), "https://api.github.com", "token")
+	err := s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"some-special-repo"}, s.repos)
@@ -567,7 +567,7 @@ func TestEnumerateWithApp(t *testing.T) {
 
 	s := initTestSource(nil)
 	_, err := s.enumerateWithApp(
-		context.TODO(),
+		context.Background(),
 		"https://api.github.com",
 		&credentialspb.GitHubApp{
 			InstallationId: "1337",

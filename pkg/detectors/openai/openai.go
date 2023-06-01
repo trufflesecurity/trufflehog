@@ -19,9 +19,8 @@ type Scanner struct{}
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-var (
-	keyPat = regexp.MustCompile(`\b((?:sk)-[a-zA-Z0-9]{48})\b`)
-)
+// The magic string T3BlbkFJ is the base64-encoded string: OpenAI
+var keyPat = regexp.MustCompile(`\b(sk-[[:alnum:]]{20}T3BlbkFJ[[:alnum:]]{20})\b`)
 
 // TODO: Add secret context?? Information about access, ownership etc
 type orgResponse struct {
@@ -29,7 +28,7 @@ type orgResponse struct {
 }
 
 type organization struct {
-	Id          string `json:"id"`
+	ID          string `json:"id"`
 	Title       string `json:"title"`
 	User        string `json:"name"`
 	Description string `json:"description"`
@@ -41,7 +40,7 @@ type organization struct {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sk-"}
+	return []string{"T3BlbkFJ"}
 }
 
 // FromData will find and optionally verify OpenAI secrets in a given set of bytes.
@@ -84,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 						org := orgs.Data[0]
 						s1.ExtraData = map[string]string{
-							"id":          org.Id,
+							"id":          org.ID,
 							"title":       org.Title,
 							"user":        org.User,
 							"description": org.Description,
