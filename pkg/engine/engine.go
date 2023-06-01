@@ -209,18 +209,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	return e
 }
 
-// real 35.54s
-// user 88.99s
-// sys  9.59s
-// memory:719596KB
-// cpu 277%
-
-// real 27.19s
-// user 54.54s
-// sys  5.66s
-// memory:745888KB
-// cpu 221%
-
 // Finish waits for running sources to complete and workers to finish scanning
 // chunks before closing their respective channels. Once Finish is called, no
 // more sources may be scanned by the engine.
