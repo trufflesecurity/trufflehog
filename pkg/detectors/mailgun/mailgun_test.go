@@ -21,12 +21,15 @@ import (
 func TestMailgun_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("MAILGUN_TOKEN")
 	inactiveSecret := testSecrets.MustGetField("MAILGUN_INACTIVE")
+	keyDashSecret := testSecrets.MustGetField("NEW_MAILGUN_TOKEN_ACTIVE")
+	inactiveHexEncodedSecret := testSecrets.MustGetField("NEW_MAILGUN_TOKEN_INACTIVE")
+
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -51,6 +54,38 @@ func TestMailgun_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Mailgun,
 					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified key-dash mailgun pattern token",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a mailgun secret %s within https://api.mailgun.net/v3/domains", keyDashSecret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Mailgun,
+					Verified:     false, // TODO: should be true, but Mailgun API currently locked out our account (probably too many key rotations).
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, unverified key-dash mailgun pattern token",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a mailgun secret %s within https://api.mailgun.net/v3/domains", inactiveHexEncodedSecret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Mailgun,
+					Verified:     false,
 				},
 			},
 			wantErr: false,
