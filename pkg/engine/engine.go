@@ -185,8 +185,8 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}
 	}
 
-	// Run the Secret scanner workers and Notifier pipelines.
-	const detectorWorkerMultiplier = 50
+	// Run the Secret scanner workersand Notifier pipelines.
+	const detectorWorkerMultiplier = 2
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
 		e.detectChunkWg.Add(1)
 		go func() {
