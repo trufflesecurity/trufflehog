@@ -47,7 +47,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rabbitmq/amqp091-go v1.8.1
 	github.com/sergi/go-diff v1.3.1
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/xanzy/go-gitlab v0.83.0
 	go.mongodb.org/mongo-driver v1.11.6
