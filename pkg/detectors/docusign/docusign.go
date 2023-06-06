@@ -2,6 +2,7 @@ package docusign
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -21,7 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docusign"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"integration", "id"}) + common.UUIDPattern)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"secret"}) + common.UUIDPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,41 +36,54 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, idMatch := range idMatches {
+		if len(idMatch) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resIDMatch := strings.TrimSpace(idMatch[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Docusign,
-			Raw:          []byte(resMatch),
-		}
-
-		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.docusign.com/apps", nil)
-			if err != nil {
+		for _, secretMatch := range secretMatches {
+			if len(secretMatch) != 2 {
 				continue
 			}
-			req.Header.Add("Accept", "application/vnd.docusign+json; version=3")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
+			resSecretMatch := strings.TrimSpace(secretMatch[1])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Docusign,
+				Raw:          []byte(resIDMatch),
+				Redacted:     resIDMatch,
+				RawV2:        []byte(resIDMatch + resSecretMatch),
+			}
+
+			if verify {
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://account-d.docusign.com/oauth/token?grant_type=client_credentials", nil)
+				if err != nil {
+					continue
+				}
+
+				encodedCredentials := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", resIDMatch, resSecretMatch)))
+
+				req.Header.Add("Accept", "application/vnd.docusign+json; version=3")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedCredentials))
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+						if detectors.IsKnownFalsePositive(resIDMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
 					}
 				}
 			}
-		}
 
-		results = append(results, s1)
+			results = append(results, s1)
+		}
 	}
 
 	return results, nil
