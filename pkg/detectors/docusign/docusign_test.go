@@ -5,6 +5,7 @@ package docusign
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"testing"
 	"time"
@@ -19,12 +20,19 @@ import (
 func TestDocusign_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DOCUSIGN")
-	inactiveSecret := testSecrets.MustGetField("DOCUSIGN_INACTIVE")
+	integrationKey := testSecrets.MustGetField("DOCUSIGN_INTEGRATION_KEY_ACTIVE")
+	activeSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_ACTIVE")
+	inactiveSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_INACTIVE")
+
+	encodedCredentialsActive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
+		integrationKey, activeSecret)))
+
+	encodedCredentialsInactive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
+		integrationKey, inactiveSecret)))
 
 	type args struct {
 		ctx    context.Context
@@ -43,7 +51,7 @@ func TestDocusign_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a docusign secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a docusign secret %s within", encodedCredentialsActive)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -59,7 +67,7 @@ func TestDocusign_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a docusign secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a docusign secret %s within but not valid", encodedCredentialsInactive)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

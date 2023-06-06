@@ -15,6 +15,11 @@ import (
 
 type Scanner struct{}
 
+type Result struct {
+	accessToken string
+	statusCode  int
+}
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
@@ -69,6 +74,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Accept", "application/vnd.docusign+json; version=3")
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedCredentials))
 				res, err := client.Do(req)
+
+				fmt.Println("res", res)
+
+				fmt.Println("body", res.Body)
+
+				//resp := Result{
+				//	accessToken: string(accessToken),
+				//	statusCode:  res.StatusCode,
+				//}
+				//
+				//fmt.Println("resp", resp)
+
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
