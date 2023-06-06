@@ -69,6 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				RawV2:        []byte(resIDMatch + resSecretMatch),
 			}
 
+			// Verify client id and secret pair by using an *undocumented* client_credentials grant type on the oauth2 endpoint.
+			// If verifier breaks in the future, confirm that the oauth2 endpoint is still accepting the client_credentials grant type.
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "POST", "https://account-d.docusign.com/oauth/token?grant_type=client_credentials", nil)
 				if err != nil {
