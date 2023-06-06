@@ -27,12 +27,6 @@ func TestDocusign_FromChunk(t *testing.T) {
 	activeSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_ACTIVE")
 	inactiveSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_INACTIVE")
 
-	//encodedCredentialsActive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
-	//	integrationKey, activeSecret)))
-	//
-	//encodedCredentialsInactive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
-	//	integrationKey, inactiveSecret)))
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
