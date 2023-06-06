@@ -3,7 +3,9 @@ package docusign
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
@@ -18,6 +20,10 @@ type Scanner struct{}
 type Result struct {
 	accessToken string
 	statusCode  int
+}
+
+type Response struct {
+	AccessToken string `json:"access_token"`
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -75,20 +81,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedCredentials))
 				res, err := client.Do(req)
 
-				fmt.Println("res", res)
+				// Read the response body
+				body, err := ioutil.ReadAll(res.Body)
 
-				fmt.Println("body", res.Body)
+				if err != nil {
+					fmt.Println("Error reading response body:", err)
+				}
 
-				//resp := Result{
-				//	accessToken: string(accessToken),
-				//	statusCode:  res.StatusCode,
-				//}
-				//
-				//fmt.Println("resp", resp)
+				// Close the response body
+				res.Body.Close()
+
+				// Parse the response body into a Response struct
+				var parsedResponse Response
+				err = json.Unmarshal(body, &parsedResponse)
+				if err != nil {
+					fmt.Println("Error parsing response body:", err)
+				}
+
+				// Access the accept_token field
+				accessToken := parsedResponse.AccessToken
 
 				if err == nil {
 					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.HasPrefix(accessToken, "ey") {
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
