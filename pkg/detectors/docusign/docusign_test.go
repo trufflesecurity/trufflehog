@@ -5,7 +5,6 @@ package docusign
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"testing"
 	"time"
@@ -28,11 +27,11 @@ func TestDocusign_FromChunk(t *testing.T) {
 	activeSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_ACTIVE")
 	inactiveSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_INACTIVE")
 
-	encodedCredentialsActive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
-		integrationKey, activeSecret)))
-
-	encodedCredentialsInactive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
-		integrationKey, inactiveSecret)))
+	//encodedCredentialsActive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
+	//	integrationKey, activeSecret)))
+	//
+	//encodedCredentialsInactive := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s",
+	//	integrationKey, inactiveSecret)))
 
 	type args struct {
 		ctx    context.Context
@@ -51,13 +50,15 @@ func TestDocusign_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a docusign secret %s within", encodedCredentialsActive)),
+				data:   []byte(fmt.Sprintf("You can find a docusign id %s and secret %s within", integrationKey, activeSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Docusign,
 					Verified:     true,
+					RawV2:        []byte(integrationKey + activeSecret),
+					Redacted:     integrationKey,
 				},
 			},
 			wantErr: false,
@@ -67,13 +68,15 @@ func TestDocusign_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a docusign secret %s within but not valid", encodedCredentialsInactive)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a docusign id %s and secret %s within", integrationKey, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Docusign,
 					Verified:     false,
+					RawV2:        []byte(integrationKey + inactiveSecret),
+					Redacted:     integrationKey,
 				},
 			},
 			wantErr: false,
