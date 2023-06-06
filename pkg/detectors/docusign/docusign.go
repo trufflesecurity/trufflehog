@@ -100,12 +100,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					return nil, errors.WrapPrefix(err, "Error reading response body", 0)
 				}
 
-				// Access the accept_token field
-				accessToken := parsedResponse.AccessToken
-
 				if err == nil {
 					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.HasPrefix(accessToken, "ey") {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.HasPrefix(parsedResponse.AccessToken, "ey") {
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
