@@ -5,7 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"github.com/go-errors/errors"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -16,11 +17,6 @@ import (
 )
 
 type Scanner struct{}
-
-type Result struct {
-	accessToken string
-	statusCode  int
-}
 
 type Response struct {
 	AccessToken string `json:"access_token"`
@@ -83,11 +79,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedCredentials))
 				res, err := client.Do(req)
 
+				if err != nil {
+					return nil, errors.WrapPrefix(err, "Error making request", 0)
+				}
+
 				// Read the response body
-				body, err := ioutil.ReadAll(res.Body)
+				body, err := io.ReadAll(res.Body)
 
 				if err != nil {
-					fmt.Println("Error reading response body:", err)
+					return nil, errors.WrapPrefix(err, "Error reading response body", 0)
 				}
 
 				// Close the response body
@@ -97,7 +97,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				var parsedResponse Response
 				err = json.Unmarshal(body, &parsedResponse)
 				if err != nil {
-					fmt.Println("Error parsing response body:", err)
+					return nil, errors.WrapPrefix(err, "Error reading response body", 0)
 				}
 
 				// Access the accept_token field
