@@ -97,11 +97,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				var parsedResponse Response
 				err = json.Unmarshal(body, &parsedResponse)
 				if err != nil {
-					return nil, errors.WrapPrefix(err, "Error reading response body", 0)
+					return nil, errors.WrapPrefix(err, "Error parsing response", 0)
 				}
 
 				if err == nil {
-					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.HasPrefix(parsedResponse.AccessToken, "ey") {
 						s1.Verified = true
 					} else {
