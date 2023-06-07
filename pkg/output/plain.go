@@ -18,13 +18,14 @@ var (
 	yellowPrinter = color.New(color.FgYellow)
 	greenPrinter  = color.New(color.FgHiGreen)
 	whitePrinter  = color.New(color.FgWhite)
+	redPrinter    = color.New(color.FgRed)
 )
 
 func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),
-		Verified:     r.Result.Verified,
+		Verified:     r.Result.Verified.String(),
 		MetaData:     r.SourceMetadata,
 		Raw:          strings.TrimSpace(string(r.Result.Raw)),
 	}
@@ -36,11 +37,13 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
 
 	printer := greenPrinter
 
-	if out.Verified {
+	if out.Verified == detectors.Verified.String() {
 		yellowPrinter.Print("Found verified result 🐷🔑\n")
-	} else {
+	} else if out.Verified == detectors.Unverified.String() {
 		printer = whitePrinter
 		whitePrinter.Print("Found unverified result 🐷🔑❓\n")
+	} else {
+		redPrinter.Print("Found unknown result 🐷🔑❓\n")
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
 	printer.Printf("Decoder Type: %s\n", out.DecoderType)
@@ -98,7 +101,7 @@ func structToMap(obj interface{}) (m map[string]map[string]interface{}, err erro
 type outputFormat struct {
 	DetectorType,
 	DecoderType string
-	Verified bool
+	Verified string
 	Raw      string
 	*source_metadatapb.MetaData
 }

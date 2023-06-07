@@ -163,9 +163,10 @@ func (c *customRegexWebhook) createResults(ctx context.Context, match map[string
 		// TODO: Read response body.
 		res.Body.Close()
 		if res.StatusCode == http.StatusOK {
-			result.Verified = true
+			result.Verified = detectors.Verified
 			break
 		}
+		result.Verified = detectors.Unverified
 	}
 
 	select {

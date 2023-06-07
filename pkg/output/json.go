@@ -26,7 +26,7 @@ func PrintJSON(r *detectors.ResultWithMetadata) error {
 		DetectorName string
 		// DecoderName is the string name of the DecoderType.
 		DecoderName string
-		Verified    bool
+		Verified    string
 		// Raw contains the raw secret data.
 		Raw string
 		// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -45,7 +45,7 @@ func PrintJSON(r *detectors.ResultWithMetadata) error {
 		DetectorType:   r.DetectorType,
 		DetectorName:   r.DetectorType.String(),
 		DecoderName:    r.DecoderType.String(),
-		Verified:       r.Verified,
+		Verified:       r.Verified.String(),
 		Raw:            string(r.Raw),
 		RawV2:          string(r.RawV2),
 		Redacted:       r.Redacted,

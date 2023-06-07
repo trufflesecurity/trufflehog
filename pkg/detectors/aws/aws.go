@@ -172,37 +172,38 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.URL.RawQuery = params.Encode()
 
 				res, err := client.Do(req)
-				if err == nil {
-
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						identityInfo := identityRes{}
-						err := json.NewDecoder(res.Body).Decode(&identityInfo)
-						if err == nil {
-							s1.Verified = true
-							s1.ExtraData = map[string]string{
-								"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
-								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
-								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
-							}
+				if err != nil {
+					continue
+				}
+				s1.Verified = detectors.Unverified
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					identityInfo := identityRes{}
+					err := json.NewDecoder(res.Body).Decode(&identityInfo)
+					if err == nil {
+						s1.Verified = detectors.Verified
+						s1.ExtraData = map[string]string{
+							"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
+							"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
+							"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
 						}
-						res.Body.Close()
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
-						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
+					}
+					res.Body.Close()
+				} else {
+					// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
+					if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+						continue
 					}
 				}
 			}
 
 			// If the result is unverified and matches something like a git hash, don't include it in the results.
-			if !s1.Verified && falsePositiveSecretCheck.MatchString(resSecretMatch) {
+			if s1.Verified == detectors.Unverified && falsePositiveSecretCheck.MatchString(resSecretMatch) {
 				continue
 			}
 
 			results = append(results, s1)
 			// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
-			if s1.Verified {
+			if s1.Verified == detectors.Verified {
 				break
 			}
 		}
@@ -219,7 +220,7 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 	idResults := map[string]detectors.Result{}
 	for _, result := range results {
 		// Always accept the verified result as the result for the given ID.
-		if result.Verified {
+		if result.Verified == detectors.Verified {
 			idResults[result.Redacted] = result
 			continue
 		}

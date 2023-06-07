@@ -15,7 +15,7 @@ func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
 	out := gitHubActionsOutputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),
-		Verified:     r.Result.Verified,
+		Verified:     r.Result.Verified.String(),
 	}
 
 	meta, err := structToMap(r.SourceMetadata.Data)
@@ -38,9 +38,11 @@ func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
 		}
 	}
 
-	verifiedStatus := "unverified"
-	if out.Verified {
+	verifiedStatus := "unknown"
+	if out.Verified == detectors.Verified.String() {
 		verifiedStatus = "verified"
+	} else if out.Verified == detectors.Unverified.String() {
+		verifiedStatus = "unverified"
 	}
 
 	key := fmt.Sprintf("%s:%s:%s:%s:%d", out.DecoderType, out.DetectorType, verifiedStatus, out.Filename, out.StartLine)
@@ -66,7 +68,7 @@ func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
 type gitHubActionsOutputFormat struct {
 	DetectorType,
 	DecoderType string
-	Verified  bool
+	Verified  string
 	StartLine int64
 	Filename  string
 }

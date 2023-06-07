@@ -14,6 +14,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const (
+	// Convenience consts for implementing detectors.
+	Unknown    = detectorspb.VerifiedResult_VERIFIED_UNKNOWN
+	Verified   = detectorspb.VerifiedResult_VERIFIED
+	Unverified = detectorspb.VerifiedResult_UNVERIFIED
+)
+
 // Detector defines an interface for scanning for and verifying secrets.
 type Detector interface {
 	// FromData will scan bytes for results, and optionally verify them.
@@ -45,7 +52,7 @@ type Result struct {
 	DetectorName string
 	// DecoderType is the type of Decoder.
 	DecoderType detectorspb.DecoderType
-	Verified    bool
+	Verified    detectorspb.VerifiedResult
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -94,7 +101,7 @@ func CleanResults(results []Result) []Result {
 	var cleaned = make(map[string]Result, 0)
 
 	for _, s := range results {
-		if s.Verified {
+		if s.Verified == Verified {
 			cleaned[s.Redacted] = s
 		}
 	}

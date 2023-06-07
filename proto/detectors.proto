@@ -929,10 +929,16 @@ enum DetectorType {
   Prefect = 918;
 }
 
+enum VerifiedResult {
+  VERIFIED_UNKNOWN = 0;
+  UNVERIFIED = 1;
+  VERIFIED = 2;
+}
+
 message Result {
   int64 source_id = 2;
   string redacted = 3;
-  bool verified = 4;
+  VerifiedResult verified = 4;
   string hash = 5;
   map<string, string> extra_data = 6;
   StructuredData structured_data = 7;
