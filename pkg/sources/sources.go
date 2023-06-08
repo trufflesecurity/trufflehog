@@ -46,9 +46,10 @@ type Source interface {
 
 // SourceUnit is an object that represents a Source's unit of work. This is
 // used for source configuration, progress reporting, and job distribution.
-type SourceUnit interface {
+type SourceUnit struct {
 	// SourceUnitID uniquely identifies a source unit.
-	SourceUnitID() string
+	ID   string
+	Data []byte
 }
 
 // GCSConfig defines the optional configuration for a GCS source.
