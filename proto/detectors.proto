@@ -928,6 +928,7 @@ enum DetectorType {
   Aiven = 917;
   Prefect = 918;
   Docusign = 919;
+  Couchbase = 920;
 }
 
 message Result {
