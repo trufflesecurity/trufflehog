@@ -39,8 +39,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	username := "zubair-truffling-biriyani"
-	password := "Annoyed123$!"
+	username := "pullfromenv"
+	password := "pullfromenv"
 
 	options := gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
