@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	sidMatches := sidPat.FindAllString(dataStr, -1)
 
 	for _, sid := range sidMatches {
-
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Twilio,
 			Raw:          []byte(sid),

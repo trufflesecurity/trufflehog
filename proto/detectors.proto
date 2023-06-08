@@ -927,6 +927,7 @@ enum DetectorType {
   NuGetApiKey = 916;
   Aiven = 917;
   Prefect = 918;
+  Docusign = 919;
 }
 
 message Result {
