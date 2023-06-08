@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/couchbase/gocb/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -21,13 +22,15 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	connectionString = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
+	usernamePat      = regexp.MustCompile(detectors.PrefixRegex([]string{"user", "usr", "u"}) + `\b[^ ?\n]{8,100}\b`)
+	passwordPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"pass", "pwd", "p"}) + `\b[^ ?\n]{2,35}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"couchbase"}
+	return []string{"couchbase://", "couchbases://"}
 }
 
 // FromData will find and optionally verify Couchbase secrets in a given set of bytes.
@@ -35,6 +38,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+
+	username := "zubair-truffling-biriyani"
+	password := "Annoyed123$!"
+
+	options := gocb.ClusterOptions{
+		Authenticator: gocb.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		},
+	}
 
 	for _, match := range matches {
 		if len(match) != 2 {
