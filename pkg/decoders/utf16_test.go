@@ -31,7 +31,7 @@ func TestUTF16Decoder(t *testing.T) {
 			name:      "Invalid UTF-16 input (it's UTF-8)",
 			input:     []byte("Hello World!"),
 			expected:  nil,
-			expectNil: true,
+			expectNil: false,
 		},
 		{
 			name:      "Invalid UTF-16 input (odd length)",
@@ -58,7 +58,7 @@ func TestUTF16Decoder(t *testing.T) {
 				return
 			}
 			if !bytes.Equal(decodedChunk.Data, tc.expected) {
-				t.Errorf("Expected decoded data: %v, got: %v", tc.expected, decodedChunk.Data)
+				t.Errorf("Expected decoded data: %s, got: %s", tc.expected, decodedChunk.Data)
 			}
 		})
 	}
