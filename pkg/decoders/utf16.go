@@ -3,7 +3,6 @@ package decoders
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"unicode/utf8"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -34,36 +33,7 @@ func utf16ToUTF8(b []byte) ([]byte, error) {
 		if r := rune(binary.LittleEndian.Uint16(b[i:])); b[i+1] == 0 && utf8.ValidRune(r) {
 			bufLE.WriteRune(r)
 		}
-		// Guard against index out of bounds for the next check.
-		if i+1 >= len(b)-1 {
-			continue
-		}
 	}
 
 	return append(bufLE.Bytes(), bufBE.Bytes()...), nil
-}
-
-func guessUTF16Endianness(b []byte) (binary.ByteOrder, error) {
-	if len(b) < 2 {
-		return nil, fmt.Errorf("input length must at least 2 bytes long")
-	}
-
-	var evenNullBytes, oddNullBytes int
-
-	for i := 0; i < len(b)-1; i += 2 {
-		if b[i] == 0 {
-			oddNullBytes++
-		}
-		if b[i+1] == 0 {
-			evenNullBytes++
-		}
-	}
-
-	if evenNullBytes > oddNullBytes {
-		return binary.LittleEndian, nil
-	}
-	if oddNullBytes > evenNullBytes {
-		return binary.BigEndian, nil
-	}
-	return nil, fmt.Errorf("could not determine endianness")
 }
