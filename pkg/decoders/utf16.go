@@ -26,39 +26,21 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 
 // utf16ToUTF8 converts a byte slice containing UTF-16 encoded data to a UTF-8 encoded byte slice.
 func utf16ToUTF8(b []byte) ([]byte, error) {
-	endianness, err := guessUTF16Endianness(b)
-	if err != nil {
-		return nil, err
-	}
-
-	var buf1, buf2 bytes.Buffer
-	var numLines1, numLines2 int
+	var bufBE, bufLE bytes.Buffer
 	for i := 0; i < len(b)-1; i += 2 {
-		if r := rune(endianness.Uint16(b[i:])); utf8.ValidRune(r) {
-			buf1.WriteRune(r)
-			if r == '\n' {
-				numLines1++
-			}
+		if r := rune(binary.BigEndian.Uint16(b[i:])); b[i] == 0 && utf8.ValidRune(r) {
+			bufBE.WriteRune(r)
+		}
+		if r := rune(binary.LittleEndian.Uint16(b[i:])); b[i+1] == 0 && utf8.ValidRune(r) {
+			bufLE.WriteRune(r)
 		}
 		// Guard against index out of bounds for the next check.
 		if i+1 >= len(b)-1 {
 			continue
 		}
-		// Same check but offset by one.
-		if r := rune(endianness.Uint16(b[i+1:])); utf8.ValidRune(r) {
-			buf2.WriteRune(r)
-			if r == '\n' {
-				numLines2++
-			}
-		}
 	}
 
-	// Choose the one that had more newline characters as it's most likely to contain secrets.
-	// This is a heuristic and won't catch everything.
-	if numLines1 >= numLines2 {
-		return buf1.Bytes(), nil
-	}
-	return buf2.Bytes(), nil
+	return append(bufLE.Bytes(), bufBE.Bytes()...), nil
 }
 
 func guessUTF16Endianness(b []byte) (binary.ByteOrder, error) {
