@@ -185,7 +185,6 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 
 	for {
 		chunkBytes := make([]byte, BufferSize)
-		chunk := *chunkSkel
 		reader := bufio.NewReaderSize(reReader, BufferSize)
 		n, err := reader.Read(chunkBytes)
 		if err != nil && !errors.Is(err, io.EOF) {
@@ -193,7 +192,6 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		}
 		peekData, _ := reader.Peek(PeekSize)
 		if n > 0 {
-			chunksChan <- &chunk
 			chunksChan <- &sources.Chunk{
 				SourceType: s.Type(),
 				SourceName: s.name,
