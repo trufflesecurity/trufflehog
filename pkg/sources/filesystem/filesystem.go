@@ -207,6 +207,9 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 				Verify: s.verify,
 			}
 		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
 	}
 	return nil
 }
