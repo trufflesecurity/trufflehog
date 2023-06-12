@@ -4,7 +4,6 @@ package sources
 // use instead of implementing their own types.
 type CommonSourceUnit struct {
 	ID string `json:"source_unit_id"`
-	// The SourceType this unit belongs to.
 }
 
 // Implement the SourceUnit interface.

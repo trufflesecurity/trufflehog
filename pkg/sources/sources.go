@@ -51,8 +51,7 @@ type SourceUnitUnmarshaller interface {
 }
 
 // SourceUnit is an object that represents a Source's unit of work. This is
-// used as the output of source configuration, progress reporting, and job
-// distribution.
+// used as the output of enumeration, progress reporting, and job distribution.
 type SourceUnit interface {
 	// SourceUnitID uniquely identifies a source unit.
 	SourceUnitID() string
