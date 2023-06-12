@@ -44,8 +44,15 @@ type Source interface {
 	GetProgress() *Progress
 }
 
+// SourceUnitUnmarshaller defines an optional interface a Source can implement
+// to support units coming from an external source.
+type SourceUnitUnmarshaller interface {
+	UnmarshalSourceUnit(data []byte) (SourceUnit, error)
+}
+
 // SourceUnit is an object that represents a Source's unit of work. This is
-// used for source configuration, progress reporting, and job distribution.
+// used as the output of source configuration, progress reporting, and job
+// distribution.
 type SourceUnit interface {
 	// SourceUnitID uniquely identifies a source unit.
 	SourceUnitID() string
