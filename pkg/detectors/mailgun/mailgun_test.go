@@ -67,7 +67,8 @@ func TestMailgun_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Mailgun,
-					Verified:     true, 
+					Verified:     true,
+				},
 			},
 			wantErr: false,
 		},
