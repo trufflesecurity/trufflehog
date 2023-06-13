@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	// "strings"
-
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 

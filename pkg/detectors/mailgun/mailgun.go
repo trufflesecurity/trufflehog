@@ -20,7 +20,6 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"mailgun"}) + `\b([a-zA-Z-0-9]{72})\b`)
 	tokenPats = map[string]*regexp.Regexp{
 		"Original MailGun Token": regexp.MustCompile(detectors.PrefixRegex([]string{"mailgun"}) + `\b([a-zA-Z-0-9]{72})\b`),
 		"Key-MailGun Token":      regexp.MustCompile(`\b(key-[a-z0-9]{32})\b`),
@@ -63,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else {
 					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", resMatch))
 				}
-				
+
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
