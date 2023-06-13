@@ -31,7 +31,7 @@ func TestUTF16Decoder(t *testing.T) {
 			name:      "Invalid UTF-16 input (it's UTF-8)",
 			input:     []byte("Hello World!"),
 			expected:  nil,
-			expectNil: false,
+			expectNil: true,
 		},
 		{
 			name:      "Invalid UTF-16 input (odd length)",
