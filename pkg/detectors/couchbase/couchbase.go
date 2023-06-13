@@ -3,9 +3,11 @@ package couchbase
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"log"
 	"regexp"
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/couchbase/gocb/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,10 +24,32 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	connectionString = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
-	usernamePat      = regexp.MustCompile(detectors.PrefixRegex([]string{"user", "usr", "u"}) + `\b[^ ?\n]{8,100}\b`)
-	passwordPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"pass", "pwd", "p"}) + `\b[^ ?\n]{2,35}\b`)
+	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
+	usernamePat         = regexp.MustCompile(detectors.PrefixRegex([]string{"user", "usr"}) + `\b[^ ?\n]{2,35}\b`)
+	passwordPat         = regexp.MustCompile(detectors.PrefixRegex([]string{"pass", "pwd"}) + `\b[^ ?\n]{8,100}\b`)
 )
+
+func meetsCouchbasePasswordRequirements(password string) bool {
+	var hasLower, hasUpper, hasNumber, hasSpecialChar bool
+	for _, char := range password {
+		switch {
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsNumber(char):
+			hasNumber = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecialChar = true
+		}
+
+		if hasLower && hasUpper && hasNumber && hasSpecialChar {
+			return true
+		}
+	}
+
+	return false
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -37,53 +61,88 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	connectionStringMatches := connectionStringPat.FindAllStringSubmatch(dataStr, -1)
+	usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
+	passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
 
-	username := "pullfromenv"
-	password := "pullfromenv"
+	fmt.Println("connectionStringMatches: ", connectionStringMatches)
+	fmt.Println("usernameMatches: ", usernameMatches)
+	fmt.Println("passwordMatches: ", passwordMatches)
 
-	options := gocb.ClusterOptions{
-		Authenticator: gocb.PasswordAuthenticator{
-			Username: username,
-			Password: password,
-		},
-	}
-
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, connectionStringMatch := range connectionStringMatches {
+		if len(connectionStringMatch) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resConnectionStringMatch := strings.TrimSpace(connectionStringMatch[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Couchbase,
-			Raw:          []byte(resMatch),
-		}
-
-		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.couchbase.com/apps", nil)
-			if err != nil {
+		for _, usernameMatch := range usernameMatches {
+			if len(usernameMatch) != 2 {
 				continue
 			}
-			req.Header.Add("Accept", "application/vnd.couchbase+json; version=3")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			resUsernameMatch := strings.TrimSpace(usernameMatch[1])
+
+			for _, passwordMatch := range passwordMatches {
+				if len(passwordMatch) != 2 {
+					continue
+				}
+
+				if !meetsCouchbasePasswordRequirements(passwordMatch[1]) {
+					continue
+				}
+
+				resPasswordMatch := strings.TrimSpace(passwordMatch[1])
+
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_Couchbase,
+					Raw:          []byte(fmt.Sprintf("%s:%s@%s", resUsernameMatch, resPasswordMatch, resConnectionStringMatch)),
+				}
+
+				if verify {
+
+					options := gocb.ClusterOptions{
+						Authenticator: gocb.PasswordAuthenticator{
+							Username: resUsernameMatch,
+							Password: resPasswordMatch,
+						},
+					}
+
+					// Sets a pre-configured profile called "wan-development" to help avoid latency issues
+					// when accessing Capella from a different Wide Area Network
+					// or Availability Zone (e.g. your laptop).
+					if err := options.ApplyProfile(gocb.ClusterConfigProfileWanDevelopment); err != nil {
+						log.Fatal("apply profile err", err)
+					}
+
+					// Initialize the Connection
+					cluster, err := gocb.Connect(resConnectionStringMatch, options)
+					if err != nil {
 						continue
 					}
+
+					// We'll ping the KV nodes in our cluster.
+					pings, err := cluster.Ping(&gocb.PingOptions{
+						Timeout: time.Second * 5,
+					})
+
+					for _, ping := range pings.Services {
+						for _, pingEndpoint := range ping {
+							if pingEndpoint.State == gocb.PingStateOk {
+								s1.Verified = true
+								break
+							} else {
+								// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+								if detectors.IsKnownFalsePositive(resPasswordMatch, detectors.DefaultFalsePositives, true) {
+									continue
+								}
+							}
+						}
+					}
 				}
+
+				results = append(results, s1)
 			}
 		}
-
-		results = append(results, s1)
 	}
-
 	return results, nil
 }
 

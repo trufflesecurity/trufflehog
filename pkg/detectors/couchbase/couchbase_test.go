@@ -19,12 +19,14 @@ import (
 func TestCouchbase_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COUCHBASE")
-	inactiveSecret := testSecrets.MustGetField("COUCHBASE_INACTIVE")
+	endpoint := testSecrets.MustGetField("COUCHBASE_ENDPOINT")
+	username := testSecrets.MustGetField("COUCHBASE_USERNAME")
+	password := testSecrets.MustGetField("COUCHBASE_PASSWORD")
+	inactiveSecret := testSecrets.MustGetField("COUCHBASE_INACTIVE_PASSWORD")
 
 	type args struct {
 		ctx    context.Context
@@ -43,7 +45,7 @@ func TestCouchbase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a couchbase secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find password %s for db uri: %s using username %s", password, endpoint, username)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -59,7 +61,7 @@ func TestCouchbase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a couchbase secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find password %s for db uri: %s using username %s", inactiveSecret, endpoint, username)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
