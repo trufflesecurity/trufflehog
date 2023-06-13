@@ -31,22 +31,24 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	matches := pattern.FindAllStringSubmatch(string(data), -1)
 	for _, match := range matches {
-		params, _, err := msdsn.Parse(match[1])
+		paramsUnsafe, _, err := msdsn.Parse(match[1])
 		if err != nil {
 			continue
 		}
 
-		if params.Password == "" {
+		if paramsUnsafe.Password == "" {
 			continue
 		}
 
 		detected := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SQLServer,
-			Raw:          []byte(params.Password),
+			Raw:          []byte(paramsUnsafe.Password),
+			RawV2:        []byte(paramsUnsafe.URL().String()),
+			Redacted:     detectors.RedactURL(*paramsUnsafe.URL()),
 		}
 
 		if verify {
-			verified, err := ping(params)
+			verified, err := ping(paramsUnsafe)
 			if err != nil {
 			} else {
 				detected.Verified = verified
