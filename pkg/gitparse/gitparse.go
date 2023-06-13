@@ -388,7 +388,7 @@ func isMinusFileLine(line []byte) bool {
 
 // +++ b/internal/addrs/move_endpoint_module.go
 func isPlusFileLine(line []byte) bool {
-	if len(line) >= 6 && bytes.Equal(line[:3], []byte("+++")) {
+	if len(line) >= 6 && bytes.Equal(line[:4], []byte("+++ ")) {
 		return true
 	}
 	return false

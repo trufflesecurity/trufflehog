@@ -165,7 +165,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
 		for _, det := range dets {
 			id := config.GetDetectorID(det)
-			if _, ok := seenDetectors[id]; ok {
+			if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
 				ctx.Logger().Info("possible duplicate detector configured", "detector", id)
 			}
 			seenDetectors[id] = struct{}{}
