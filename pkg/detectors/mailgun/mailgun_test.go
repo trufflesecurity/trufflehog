@@ -69,8 +69,7 @@ func TestMailgun_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Mailgun,
-					Verified:     false, // TODO: should be true, but Mailgun API currently locked out our account (probably too many key rotations).
-				},
+					Verified:     true, 
 			},
 			wantErr: false,
 		},

@@ -56,7 +56,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", resMatch))
+				
+				// If resMatch has "key" prefix, use it as the username for basic auth.
+				if strings.HasPrefix(resMatch, "key-") {
+					req.SetBasicAuth("api", resMatch)
+				} else {
+					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", resMatch))
+				}
+				
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
