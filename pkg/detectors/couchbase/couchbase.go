@@ -25,11 +25,11 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
-	usernamePat         = regexp.MustCompile(detectors.PrefixRegex([]string{"user", "usr"}) + `\b[^ ?\n]{2,35}\b`)
-	passwordPat         = regexp.MustCompile(detectors.PrefixRegex([]string{"pass", "pwd"}) + `\b[^ ?\n]{8,100}\b`)
+	usernamePat         = regexp.MustCompile(`(?i)(?:user|usr)(?:.|[\n\r]){0,10}\b[^\s\n?]{2,35}\b`)
+	passwordPat         = regexp.MustCompile(detectors.PrefixRegex([]string{"pass", "pwd"}) + `\b[^\s?\n<>;.*&|£]{8,100}\b`)
 )
 
-func meetsCouchbasePasswordRequirements(password string) bool {
+func meetsCouchbasePasswordRequirements(password string) (string, bool) {
 	var hasLower, hasUpper, hasNumber, hasSpecialChar bool
 	for _, char := range password {
 		switch {
@@ -44,11 +44,11 @@ func meetsCouchbasePasswordRequirements(password string) bool {
 		}
 
 		if hasLower && hasUpper && hasNumber && hasSpecialChar {
-			return true
+			return password, true
 		}
 	}
 
-	return false
+	return "", false
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -65,9 +65,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
 	passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
 
-	fmt.Println("connectionStringMatches: ", connectionStringMatches)
-	fmt.Println("usernameMatches: ", usernameMatches)
-	fmt.Println("passwordMatches: ", passwordMatches)
+	fmt.Printf("username regex string %+v\n ", detectors.PrefixRegex([]string{"user", "usr"})+`\b[^\s\n?]{2,35}\b`)
+	fmt.Printf("usernameMatches: %+v\n ", usernameMatches)
+	fmt.Printf("passwordMatches: %+v\n", passwordMatches)
 
 	for _, connectionStringMatch := range connectionStringMatches {
 		if len(connectionStringMatch) != 2 {
@@ -85,8 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if len(passwordMatch) != 2 {
 					continue
 				}
-
-				if !meetsCouchbasePasswordRequirements(passwordMatch[1]) {
+				_, metPasswordRequirements := meetsCouchbasePasswordRequirements(passwordMatch[1])
+				if !metPasswordRequirements {
 					continue
 				}
 

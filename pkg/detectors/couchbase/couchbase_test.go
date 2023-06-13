@@ -45,7 +45,7 @@ func TestCouchbase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find password %s for db uri: %s using username %s", password, endpoint, username)),
+				data:   []byte(fmt.Sprintf("db uri: %s username %s password: %s", endpoint, username, password)),
 				verify: true,
 			},
 			want: []detectors.Result{
