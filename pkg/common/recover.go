@@ -18,8 +18,7 @@ func Recover(ctx context.Context) {
 		if eventID := sentry.CurrentHub().Recover(err); eventID != nil {
 			ctx.Logger().Info("panic captured", "event_id", *eventID)
 		}
-		ctx.Logger().Error(fmt.Errorf("panic"), "recovered from panic",
-			"stack-trace", panicStack,
+		ctx.Logger().Error(fmt.Errorf("panic"), panicStack,
 			"recover", err,
 		)
 		if !sentry.Flush(time.Second * 5) {
