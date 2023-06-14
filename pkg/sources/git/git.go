@@ -102,6 +102,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 		concurrency = runtime.NumCPU()
 	}
 
+	err := GitCmdCheck()
+	if err != nil {
+		return err
+	}
+
 	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
 		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
@@ -227,7 +232,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func RepoFromPath(path string) (*git.Repository, error) {
-	return git.PlainOpen(path)
+	options := &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+	return git.PlainOpenWithOptions(path, options)
 }
 
 func CleanOnError(err *error, path string) {
@@ -252,7 +261,7 @@ func gitURLParse(gitURL string) (*url.URL, error) {
 }
 
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args ...string) (string, *git.Repository, error) {
-	if err := gitCmdCheck(); err != nil {
+	if err := GitCmdCheck(); err != nil {
 		return "", nil, err
 	}
 	clonePath, err := os.MkdirTemp(os.TempDir(), "trufflehog")
@@ -298,7 +307,11 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
 	}
 
-	repo, err := git.PlainOpen(clonePath)
+	options := &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+	repo, err := git.PlainOpenWithOptions(clonePath, options)
 	if err != nil {
 		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
@@ -324,16 +337,8 @@ func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
-// gitCmdCheck checks if git is installed.
-func gitCmdCheck() error {
-	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
-		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
-	}
-	return nil
-}
-
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
-	if err := gitCmdCheck(); err != nil {
+	if err := GitCmdCheck(); err != nil {
 		return err
 	}
 
@@ -712,7 +717,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: token},
 		)
-		tc := oauth2.NewClient(context.TODO(), ts)
+		tc := oauth2.NewClient(ctx, ts)
 		client = github.NewClient(tc)
 	}
 

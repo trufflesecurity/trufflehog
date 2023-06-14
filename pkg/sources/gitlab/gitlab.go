@@ -111,6 +111,11 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 		s.url = "https://gitlab.com/"
 	}
 
+	err = git.GitCmdCheck()
+	if err != nil {
+		return err
+	}
+
 	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
 		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{

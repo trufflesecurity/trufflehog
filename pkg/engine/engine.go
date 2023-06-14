@@ -347,9 +347,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	}
 }
 
-// gitSources is a list of sources that utilize the Git source. It is stored this way because slice consts are not
-// supported.
-func gitSources() []sourcespb.SourceType {
+// lineNumberSupportedSources is a list of sources that support line numbers.
+// It is stored this way because slice consts are not supported.
+func lineNumberSupportedSources() []sourcespb.SourceType {
 	return []sourcespb.SourceType{
 		sourcespb.SourceType_SOURCE_TYPE_GIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB,
@@ -358,12 +358,13 @@ func gitSources() []sourcespb.SourceType {
 		sourcespb.SourceType_SOURCE_TYPE_GERRIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG,
 		sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT,
+		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM,
 	}
 }
 
 // SupportsLineNumbers determines if a line number can be found for a source type.
 func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
-	for _, i := range gitSources() {
+	for _, i := range lineNumberSupportedSources() {
 		if i == sourceType {
 			return true
 		}
@@ -397,6 +398,8 @@ func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 		fragmentStart = &metadata.Bitbucket.Line
 	case *source_metadatapb.MetaData_Gerrit:
 		fragmentStart = &metadata.Gerrit.Line
+	case *source_metadatapb.MetaData_Filesystem:
+		fragmentStart = &metadata.Filesystem.Line
 	default:
 		return 0, nil
 	}

@@ -1,12 +1,9 @@
-package buildkite
+package pulumi
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -17,29 +14,25 @@ import (
 
 type Scanner struct{}
 
-func (s Scanner) Version() int { return 1 }
-
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"buildkite"}) + `\b([a-z0-9]{40})\b`)
+	keyPat = regexp.MustCompile(`\b(pul-[a-z0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"buildkite"}
+	return []string{"pul-"}
 }
 
-// FromData will find and optionally verify Buildkite secrets in a given set of bytes.
+// FromData will find and optionally verify Pulumi secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	var verifyError error
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -50,25 +43,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Buildkite,
+			DetectorType: detectorspb.DetectorType_Pulumi,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.buildkite.com/v2/access-token", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.pulumi.com/api/user/stacks", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+			req.Header.Add("Accept", "application/vnd.pulumi+8")
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("Authorization", fmt.Sprintf("token %s", resMatch))
 			res, err := client.Do(req)
-			if err != nil {
-				urlErr := &url.Error{
-					URL: req.URL.Host,
-					Op:  req.Method,
-					Err: errors.Unwrap(err),
-				}
-				verifyError = fmt.Errorf("%w: %s", pkg.ErrVerify, urlErr)
-			} else {
+			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
@@ -84,9 +72,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, verifyError
+	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Buildkite
+	return detectorspb.DetectorType_Pulumi
 }

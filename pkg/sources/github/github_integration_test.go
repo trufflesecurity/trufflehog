@@ -57,13 +57,14 @@ func TestSource_Token(t *testing.T) {
 		httpClient:  common.SaneHttpClient(),
 		log:         logr.Discard(),
 		memberCache: map[string]struct{}{},
+		repoSizes:   newRepoSize(),
 	}
 	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), nil, nil)
 
 	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
 	assert.NoError(t, err)
 
-	user, token, err := s.UserAndToken(ctx, installationClient)
+	user, token, err := s.userAndToken(ctx, installationClient)
 	assert.NotEmpty(t, token)
 	assert.NoError(t, err)
 

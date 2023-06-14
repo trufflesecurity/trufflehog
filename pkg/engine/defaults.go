@@ -15,6 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airship"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtableapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alconost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
@@ -89,6 +90,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkitev2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulbul"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulksms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buttercms"
@@ -175,6 +177,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dandelion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dareboost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databrickstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datafire"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
@@ -436,6 +439,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/npmtokenv2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nugetapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
@@ -497,6 +501,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postmark"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/powrbot"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prefect"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prodpad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prospectcrm"
@@ -505,6 +510,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/proxycrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubpublishkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubsubscriptionkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pulumi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/purestake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pushbulletapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pusherchannelkey"
@@ -627,6 +633,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stytch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sugester"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sumologickey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supabasetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/supernotesapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/surveyanyplace"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/surveybot"
@@ -1509,6 +1516,13 @@ func DefaultDetectors() []detectors.Detector {
 		coinmarketcap.Scanner{},
 		percy.Scanner{},
 		tineswebhook.Scanner{},
+		pulumi.Scanner{},
+		databrickstoken.Scanner{},
+		supabasetoken.Scanner{},
+		nugetapikey.Scanner{},
+		aiven.Scanner{},
+		prefect.Scanner{},
+		buildkitev2.Scanner{},
 	}
 
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mholt/archiver/v4"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -91,12 +92,6 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 		return err
 	}
 	switch archive := format.(type) {
-	case archiver.Extractor:
-		err := archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, d.extractorHandler(archiveChan))
-		if err != nil {
-			return err
-		}
-		return nil
 	case archiver.Decompressor:
 		compReader, err := archive.OpenReader(reader)
 		if err != nil {
@@ -108,6 +103,12 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 		}
 		newReader := bytes.NewReader(fileBytes)
 		return d.openArchive(ctx, depth+1, newReader, archiveChan)
+	case archiver.Extractor:
+		err := archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, d.extractorHandler(archiveChan))
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 	return fmt.Errorf("Unknown archive type: %s", format.Name())
 }

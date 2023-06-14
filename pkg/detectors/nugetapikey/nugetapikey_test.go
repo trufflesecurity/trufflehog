@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package buildkite
+package nugetapikey
 
 import (
 	"context"
@@ -11,20 +11,21 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestBuildkite_FromChunk(t *testing.T) {
+func TestNugetapikey_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BUILDKITE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("BUILDKITE_INACTIVE")
+	secret := testSecrets.MustGetField("NUGETAPIKEY")
+	inactiveSecret := testSecrets.MustGetField("NUGETAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +44,12 @@ func TestBuildkite_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a buildkite secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a nugetapikey secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Buildkite,
+					DetectorType: detectorspb.DetectorType_NuGetApiKey,
 					Verified:     true,
 				},
 			},
@@ -59,12 +60,12 @@ func TestBuildkite_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a buildkite secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a nugetapikey secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Buildkite,
+					DetectorType: detectorspb.DetectorType_NuGetApiKey,
 					Verified:     false,
 				},
 			},
@@ -87,7 +88,7 @@ func TestBuildkite_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Buildkite.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Nugetapikey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +98,7 @@ func TestBuildkite_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Buildkite.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Nugetapikey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

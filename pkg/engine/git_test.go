@@ -26,7 +26,7 @@ func TestGitEngine(t *testing.T) {
 	}
 	defer os.RemoveAll(path)
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	type testProfile struct {
 		expected map[string]expResult
@@ -98,7 +98,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	}
 	defer os.RemoveAll(path)
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	e := Start(ctx,

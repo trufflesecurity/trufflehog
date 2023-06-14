@@ -110,7 +110,7 @@ func TestSingleCommitSingleDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		parser.FromReader(context.TODO(), r, commitChan)
+		parser.FromReader(context.Background(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -169,7 +169,7 @@ func TestMultiCommitContextDiff(t *testing.T) {
 		},
 	}
 	go func() {
-		NewParser().FromReader(context.TODO(), r, commitChan)
+		NewParser().FromReader(context.Background(), r, commitChan)
 	}()
 	i := 0
 	for commit := range commitChan {
@@ -199,7 +199,7 @@ func TestMaxDiffSize(t *testing.T) {
 
 	commitChan := make(chan Commit)
 	go func() {
-		parser.FromReader(context.TODO(), bigReader, commitChan)
+		parser.FromReader(context.Background(), bigReader, commitChan)
 	}()
 
 	commit := <-commitChan
@@ -236,7 +236,7 @@ func TestMessageParsing(t *testing.T) {
 	expectedMessage := singleCommitSingleDiffMessage
 
 	go func() {
-		parser.FromReader(context.TODO(), r, commitChan)
+		parser.FromReader(context.Background(), r, commitChan)
 	}()
 	for commit := range commitChan {
 		if commit.Message.String() != expectedMessage {
