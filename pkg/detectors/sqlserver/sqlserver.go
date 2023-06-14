@@ -3,6 +3,9 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg"
 	"regexp"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
@@ -30,6 +33,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	matches := pattern.FindAllStringSubmatch(string(data), -1)
+
 	for _, match := range matches {
 		params, _, err := msdsn.Parse(match[1])
 		if err != nil {
@@ -48,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			verified, err := ping(params)
 			if err != nil {
+				return results, err
 			} else {
 				detected.Verified = verified
 			}
@@ -76,7 +81,12 @@ var ping = func(config msdsn.Config) (bool, error) {
 
 	err = conn.Ping()
 	if err != nil {
-		return false, err
+		urlErr := &url.Error{
+			URL: req.URL.Host,
+			Op:  req.Method,
+			Err: errors.Unwrap(err),
+		}
+		return false, fmt.Errorf("%w: %s", pkg.ErrVerify, urlErr)
 	}
 
 	return true, nil
