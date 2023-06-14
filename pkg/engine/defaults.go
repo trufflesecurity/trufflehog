@@ -200,6 +200,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/doppler"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dotmailer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dovico"
@@ -975,6 +976,7 @@ func DefaultDetectors() []detectors.Detector {
 		&pandadoc.Scanner{},
 		&juro.Scanner{},
 		&documo.Scanner{},
+		&docusign.Scanner{},
 		&roninapp.Scanner{},
 		&doppler.Scanner{},
 		&codacy.Scanner{},

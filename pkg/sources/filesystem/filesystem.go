@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"io/fs"
@@ -181,23 +182,34 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		return err
 	}
 	reReader.Stop()
-	data, err := io.ReadAll(reReader)
-	if err != nil {
-		return fmt.Errorf("unable to read file: %w", err)
-	}
-	chunksChan <- &sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		Data:       data,
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Filesystem{
-				Filesystem: &source_metadatapb.Filesystem{
-					File: sanitizer.UTF8(path),
+
+	for {
+		chunkBytes := make([]byte, BufferSize)
+		reader := bufio.NewReaderSize(reReader, BufferSize)
+		n, err := reader.Read(chunkBytes)
+		if err != nil && !errors.Is(err, io.EOF) {
+			break
+		}
+		peekData, _ := reader.Peek(PeekSize)
+		if n > 0 {
+			chunksChan <- &sources.Chunk{
+				SourceType: s.Type(),
+				SourceName: s.name,
+				SourceID:   s.SourceID(),
+				Data:       append(chunkBytes[:n], peekData...),
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Filesystem{
+						Filesystem: &source_metadatapb.Filesystem{
+							File: sanitizer.UTF8(path),
+						},
+					},
 				},
-			},
-		},
-		Verify: s.verify,
+				Verify: s.verify,
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
 	}
 	return nil
 }
