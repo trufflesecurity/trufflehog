@@ -2,6 +2,7 @@ package decoders
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -35,8 +36,8 @@ func TestUTF16Decoder(t *testing.T) {
 		{
 			name:      "Invalid UTF-16 input (odd length)",
 			input:     []byte{72, 0, 101, 0, 108, 0, 108, 0, 111, 0, 32, 0, 87, 0, 111, 0, 114, 0, 108, 0, 0},
-			expected:  nil,
-			expectNil: true,
+			expected:  []byte("Hello Worl"),
+			expectNil: false,
 		},
 	}
 
@@ -57,9 +58,29 @@ func TestUTF16Decoder(t *testing.T) {
 				return
 			}
 			if !bytes.Equal(decodedChunk.Data, tc.expected) {
-				t.Errorf("Expected decoded data: %v, got: %v", tc.expected, decodedChunk.Data)
+				t.Errorf("Expected decoded data: %s, got: %s", tc.expected, decodedChunk.Data)
 			}
 		})
+	}
+}
+
+func TestDLL(t *testing.T) {
+	data, err := os.ReadFile("utf16_test.dll")
+	if err != nil {
+		t.Errorf("Failed to read test data: %v", err)
+		return
+	}
+
+	chunk := &sources.Chunk{Data: data}
+	decoder := &UTF16{}
+	decodedChunk := decoder.FromChunk(chunk)
+	if decodedChunk == nil {
+		t.Errorf("Expected chunk with data, got nil")
+		return
+	}
+	if !bytes.Contains(decodedChunk.Data, []byte("aws_secret_access_key")) {
+		t.Errorf("Expected chunk to have aws_secret_access_key")
+		return
 	}
 }
 
