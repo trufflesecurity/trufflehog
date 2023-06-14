@@ -25,8 +25,8 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
-	usernamePat         = regexp.MustCompile(`(?i)(?:user|usr)(?:.|[\n\r]){0,10}\b[^\s\n?]{2,35}\b`)
-	passwordPat         = regexp.MustCompile(detectors.PrefixRegex([]string{"pass", "pwd"}) + `\b[^\s?\n<>;.*&|£]{8,100}\b`)
+	usernamePat         = regexp.MustCompile(`(?i)(?:user|usr)(?:.|[\n\r]){0,10}(\b[^:?()/\+=\n\s]{2,35}\b)`)
+	passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}\b)`)
 )
 
 func meetsCouchbasePasswordRequirements(password string) (string, bool) {
@@ -65,32 +65,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
 	passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
 
-	fmt.Printf("username regex string %+v\n ", detectors.PrefixRegex([]string{"user", "usr"})+`\b[^\s\n?]{2,35}\b`)
 	fmt.Printf("usernameMatches: %+v\n ", usernameMatches)
 	fmt.Printf("passwordMatches: %+v\n", passwordMatches)
+	fmt.Printf("connectionStringMatches: %+v\n", connectionStringMatches)
 
 	for _, connectionStringMatch := range connectionStringMatches {
-		if len(connectionStringMatch) != 2 {
-			continue
-		}
-		resConnectionStringMatch := strings.TrimSpace(connectionStringMatch[1])
+		resConnectionStringMatch := strings.TrimSpace(connectionStringMatch[0])
+		fmt.Printf("resConnectionStringMatch: %+v\n", resConnectionStringMatch)
 
 		for _, usernameMatch := range usernameMatches {
-			if len(usernameMatch) != 2 {
-				continue
-			}
-			resUsernameMatch := strings.TrimSpace(usernameMatch[1])
+			fmt.Printf("len(usernameMatch): %+v\n", len(usernameMatch))
+			fmt.Printf("usernameMatch: %+v\n", usernameMatch[1])
 
+			splitUserNameMatches := strings.Split(usernameMatch[0], " ")
+
+			resUsernameMatch := strings.TrimSpace(splitUserNameMatches[1])
+
+			fmt.Printf("resUsernameMatch:%+v\n", resUsernameMatch)
 			for _, passwordMatch := range passwordMatches {
 				if len(passwordMatch) != 2 {
 					continue
 				}
-				_, metPasswordRequirements := meetsCouchbasePasswordRequirements(passwordMatch[1])
+
+				fmt.Printf("len(passwordMatch): %+v\n", len(passwordMatch))
+				fmt.Printf("passwordMatch: %+v\n", passwordMatch)
+
+				splitUserNameMatches := strings.Split(usernameMatch[0], " ")
+
+				resUsernameMatch := strings.TrimSpace(splitUserNameMatches[1])
+
+				resPasswordMatch := strings.TrimSpace(passwordMatch[1])
+				fmt.Printf("resPasswordMatch: %+v\n", resPasswordMatch)
+
+				_, metPasswordRequirements := meetsCouchbasePasswordRequirements(resPasswordMatch)
+				fmt.Printf("metPasswordRequirements: %+v\n", metPasswordRequirements)
 				if !metPasswordRequirements {
 					continue
 				}
-
-				resPasswordMatch := strings.TrimSpace(passwordMatch[1])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Couchbase,

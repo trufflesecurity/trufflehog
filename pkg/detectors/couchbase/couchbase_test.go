@@ -45,7 +45,7 @@ func TestCouchbase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("db uri: %s username %s password: %s", endpoint, username, password)),
+				data:   []byte(fmt.Sprintf("db uri: %s username = %s password = %s", endpoint, username, password)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -61,7 +61,7 @@ func TestCouchbase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find password %s for db uri: %s using username %s", inactiveSecret, endpoint, username)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("db uri: %s username = %s password = %s", endpoint, username, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -87,6 +87,7 @@ func TestCouchbase_FromChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
+			fmt.Printf("data: %s\n", tt.args.data)
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Couchbase.FromData() error = %v, wantErr %v", err, tt.wantErr)
