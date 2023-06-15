@@ -659,9 +659,7 @@ func stripPassword(u string) (string, error) {
 		return "", errors.WrapPrefix(err, "repo remote cannot be sanitized as URI", 0)
 	}
 
-	repoURL.User = nil
-
-	return repoURL.String(), nil
+	return repoURL.Redacted(), nil
 }
 
 // TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
@@ -738,7 +736,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 	var path string
 	switch {
 	case uri.User != nil:
-		ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri)
+		ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri.Redacted())
 		password, ok := uri.User.Password()
 		if !ok {
 			return "", true, fmt.Errorf("password must be included in Git repo URL when username is provided")
@@ -776,7 +774,7 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 		remote = true
 		switch {
 		case uri.User != nil:
-			ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri)
+			ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri.Redacted())
 			password, ok := uri.User.Password()
 			if !ok {
 				return "", remote, fmt.Errorf("password must be included in Git repo URL when username is provided")
