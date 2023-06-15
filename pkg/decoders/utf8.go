@@ -26,11 +26,6 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 // extacting contigous portions of printable characters that we care
 // about from some bytes
 func extractSubstrings(b []byte) []byte {
-	isValidByte := func(c byte) bool {
-		// https://www.rapidtables.com/code/text/ascii-table.html
-		// split on anything that is not ascii space through tilde
-		return c > 31 && c < 127
-	}
 
 	field := make([]byte, len(b))
 	fieldLen := 0
@@ -52,4 +47,10 @@ func extractSubstrings(b []byte) []byte {
 	}
 
 	return buf.Bytes()
+}
+
+func isValidByte(c byte) bool {
+	// https://www.rapidtables.com/code/text/ascii-table.html
+	// split on anything that is not ascii space through tilde
+	return c > 31 && c < 127
 }
