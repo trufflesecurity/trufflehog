@@ -86,8 +86,6 @@ func (s *Source) Validate() []error {
 				errors = append(errors, fmt.Errorf("error listening on udp socket: %s", err))
 			}
 			srv.Close()
-		default:
-			errors = append(errors, fmt.Errorf("protocol must be 'tcp' or 'udp', got: %s", s.conn.Protocol))
 		}
 	}
 	if s.conn.Protocol != "tcp" && s.conn.Protocol != "udp" {
