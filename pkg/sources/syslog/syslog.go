@@ -59,6 +59,44 @@ func NewSyslog(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceNam
 	}
 }
 
+// Validate validates the configuration of the source.
+func (s *Source) Validate() []error {
+	errors := []error{}
+
+	if s.conn.TlsCert != nilString || s.conn.TlsKey != nilString {
+		if s.conn.TlsCert == nilString || s.conn.TlsKey == nilString {
+			errors = append(errors, fmt.Errorf("tls cert and key must both be set"))
+		}
+		if _, err := tls.LoadX509KeyPair(s.conn.TlsCert, s.conn.TlsKey); err != nil {
+			errors = append(errors, fmt.Errorf("error loading tls cert and key: %s", err))
+		}
+	}
+
+	if s.conn.ListenAddress != nilString {
+		switch s.conn.Protocol {
+		case "tcp":
+			_, err := net.Listen(s.conn.Protocol, s.conn.ListenAddress)
+			if err != nil {
+				errors = append(errors, fmt.Errorf("error listening on tcp socket: %s", err))
+			}
+		case "udp":
+			_, err := net.ListenPacket(s.conn.Protocol, s.conn.ListenAddress)
+			if err != nil {
+				errors = append(errors, fmt.Errorf("error listening on udp socket: %s", err))
+			}
+		default:
+			errors = append(errors, fmt.Errorf("invalid protocol: %s", s.conn.Protocol))
+		}
+	}
+	if s.conn.Protocol != "tcp" && s.conn.Protocol != "udp" {
+		errors = append(errors, fmt.Errorf("invalid protocol: %s", s.conn.Protocol))
+	}
+	if s.conn.Format != "rfc5424" && s.conn.Format != "rfc3164" {
+		errors = append(errors, fmt.Errorf("invalid format: %s", s.conn.Format))
+	}
+	return errors
+}
+
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
