@@ -2,9 +2,7 @@ package engine
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -318,11 +316,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 								resultChunk = &copyChunk
 							}
 							result.DecoderType = decoderType
-
-							if detector.Type().String() == "CustomRegex" {
-								result = setCustomDetectorName(result, detector)
-							}
-
 							e.results <- detectors.CopyMetadata(resultChunk, result)
 
 						}
@@ -411,19 +404,4 @@ func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) {
 	offset := FragmentLineOffset(chunk, result)
 	*mdLine = fragStart + offset
-}
-
-func setCustomDetectorName(result detectors.Result, detector detectors.Detector) detectors.Result {
-	s := fmt.Sprintf("%v", detector)
-	regex, err := regexp.Compile(`name:"([^"]+)"`)
-	if err != nil {
-		return result
-	}
-	match := regex.FindStringSubmatch(s)
-	if len(match) > 1 {
-		name := match[1]
-		result.ExtraData = make(map[string]string)
-		result.ExtraData["name"] = name
-	}
-	return result
 }
