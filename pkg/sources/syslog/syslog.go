@@ -75,24 +75,26 @@ func (s *Source) Validate() []error {
 	if s.conn.ListenAddress != nilString {
 		switch s.conn.Protocol {
 		case "tcp":
-			_, err := net.Listen(s.conn.Protocol, s.conn.ListenAddress)
+			srv, err := net.Listen(s.conn.Protocol, s.conn.ListenAddress)
 			if err != nil {
 				errors = append(errors, fmt.Errorf("error listening on tcp socket: %s", err))
 			}
+			srv.Close()
 		case "udp":
-			_, err := net.ListenPacket(s.conn.Protocol, s.conn.ListenAddress)
+			srv, err := net.ListenPacket(s.conn.Protocol, s.conn.ListenAddress)
 			if err != nil {
 				errors = append(errors, fmt.Errorf("error listening on udp socket: %s", err))
 			}
+			srv.Close()
 		default:
-			errors = append(errors, fmt.Errorf("invalid protocol: %s", s.conn.Protocol))
+			errors = append(errors, fmt.Errorf("protocol must be 'tcp' or 'udp', got: %s", s.conn.Protocol))
 		}
 	}
 	if s.conn.Protocol != "tcp" && s.conn.Protocol != "udp" {
-		errors = append(errors, fmt.Errorf("invalid protocol: %s", s.conn.Protocol))
+		errors = append(errors, fmt.Errorf("protocol must be 'tcp' or 'udp', got: %s", s.conn.Protocol))
 	}
 	if s.conn.Format != "rfc5424" && s.conn.Format != "rfc3164" {
-		errors = append(errors, fmt.Errorf("invalid format: %s", s.conn.Format))
+		errors = append(errors, fmt.Errorf("format must be 'rfc5424' or 'rfc3164', got: %s", s.conn.Format))
 	}
 	return errors
 }
