@@ -175,6 +175,12 @@ type Progress struct {
 	SectionsRemaining int32
 }
 
+// Validator is an interface for validating a source. Sources can optionally implement this interface to validate
+// their configuration.
+type Validator interface {
+	Validate() []error
+}
+
 // SetProgressComplete sets job progress information for a running job based on the highest level objects in the source.
 // i is the current iteration in the loop of target scope
 // scope should be the len(scopedItems)
