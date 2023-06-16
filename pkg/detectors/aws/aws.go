@@ -52,7 +52,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
-	idPat     = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
+	idPat     = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA|AGPA|AIDA|ANPA|ANVA|AROA|ASCA)[0-9A-Z]{16})\b`)
 	secretPat = regexp.MustCompile(`[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}`)
 	// Hashes, like those for git, do technically match the secret pattern.
 	// But they are extremely unlikely to be generated as an actual AWS secret.
@@ -68,6 +68,12 @@ func (s scanner) Keywords() []string {
 		"ABIA",
 		"ACCA",
 		"ASIA",
+		"AGPA",
+		"AIDA",
+		"ANPA",
+		"ANVA",
+		"AROA",
+		"ASCA",
 	}
 }
 
