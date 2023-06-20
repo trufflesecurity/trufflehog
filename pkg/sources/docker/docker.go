@@ -57,6 +57,10 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 	s.jobId = jobId
 	s.verify = verify
 
+	// Reset metrics for this source at initialization time.
+	dockerImagesScanned.WithLabelValues(s.name).Set(0)
+	dockerLayersScanned.WithLabelValues(s.name).Set(0)
+
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
@@ -164,7 +168,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 				chunksChan <- chunk
 			}
+			dockerLayersScanned.WithLabelValues(s.name).Inc()
 		}
+
+		dockerImagesScanned.WithLabelValues(s.name).Inc()
 	}
 
 	return nil

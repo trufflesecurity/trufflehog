@@ -46,6 +46,7 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20211021192214-5ab2d9280aa9
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.16.0
 	github.com/rabbitmq/amqp091-go v1.8.1
 	github.com/sergi/go-diff v1.3.1
 	github.com/stretchr/testify v1.8.4
@@ -85,9 +86,11 @@ require (
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
+	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bodgit/plumbing v1.2.0 // indirect
 	github.com/bodgit/sevenzip v1.3.0 // indirect
 	github.com/bodgit/windows v1.0.0 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/connesc/cipherio v0.2.1 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
@@ -128,6 +131,7 @@ require (
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
@@ -139,6 +143,10 @@ require (
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/diff v0.0.0-20200914180035-5b29258ca4f7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/common v0.42.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/skeema/knownhosts v1.1.1 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
