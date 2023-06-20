@@ -21,7 +21,6 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
@@ -116,6 +115,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					pings, err := cluster.Ping(&gocb.PingOptions{
 						Timeout: time.Second * 5,
 					})
+
+					if err != nil {
+						fmt.Errorf("ping err: %v", err)
+					}
 
 					for _, ping := range pings.Services {
 						for _, pingEndpoint := range ping {
