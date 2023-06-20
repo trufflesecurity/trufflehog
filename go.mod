@@ -31,7 +31,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-github/v42 v42.0.0
-	github.com/googleapis/gax-go/v2 v2.10.0
+	github.com/googleapis/gax-go/v2 v2.11.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/jlaffaye/ftp v0.1.0
@@ -57,7 +57,7 @@ require (
 	golang.org/x/oauth2 v0.9.0
 	golang.org/x/sync v0.2.0
 	golang.org/x/text v0.10.0
-	google.golang.org/api v0.125.0
+	google.golang.org/api v0.126.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/h2non/gock.v1 v1.1.2
