@@ -45,6 +45,7 @@ func ToUpperCase(input string) string {
 
 func (r RegexState) Matches(data []byte) []string {
 	matches := r.compiledRegex.FindAllStringSubmatch(string(data), -1)
+	fmt.Println("Matches inside patterns.go", matches)
 	var res []string
 
 	// trim off spaces and different quote types ('").
@@ -57,13 +58,7 @@ func (r RegexState) Matches(data []byte) []string {
 
 // UsernameRegexCheck constructs an username regex pattern from a given pattern of excluded characters.
 func UsernameRegexCheck(pattern string) RegexState {
-	raw := fmt.Sprintf(`(?im)(?:user|usr)\S{0,40}[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})['"\n\r]`, pattern)
-
-	//username = "dustin123"
-	//username=dustin123
-	//username='dustin123'
-	//username=`dustin123`
-	//username:="dustin123"
+	raw := fmt.Sprintf(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})\b`, pattern)
 
 	return RegexState{regexp.MustCompile(raw)}
 }
