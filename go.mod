@@ -57,7 +57,7 @@ require (
 	golang.org/x/oauth2 v0.9.0
 	golang.org/x/sync v0.2.0
 	golang.org/x/text v0.10.0
-	google.golang.org/api v0.126.0
+	google.golang.org/api v0.128.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/h2non/gock.v1 v1.1.2
@@ -108,7 +108,7 @@ require (
 	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.2.4 // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
