@@ -45,7 +45,7 @@ func ToUpperCase(input string) string {
 
 func (r RegexState) Matches(data []byte) []string {
 	matches := r.compiledRegex.FindAllStringSubmatch(string(data), -1)
-	fmt.Println("Matches inside patterns.go", matches)
+
 	var res []string
 
 	// trim off spaces and different quote types ('").
