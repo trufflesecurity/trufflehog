@@ -44,6 +44,19 @@ type Source interface {
 	GetProgress() *Progress
 }
 
+// SourceUnitUnmarshaller defines an optional interface a Source can implement
+// to support units coming from an external source.
+type SourceUnitUnmarshaller interface {
+	UnmarshalSourceUnit(data []byte) (SourceUnit, error)
+}
+
+// SourceUnit is an object that represents a Source's unit of work. This is
+// used as the output of enumeration, progress reporting, and job distribution.
+type SourceUnit interface {
+	// SourceUnitID uniquely identifies a source unit.
+	SourceUnitID() string
+}
+
 // GCSConfig defines the optional configuration for a GCS source.
 type GCSConfig struct {
 	// CloudCred determines whether to use cloud credentials.
@@ -173,6 +186,12 @@ type Progress struct {
 	EncodedResumeInfo string
 	SectionsCompleted int32
 	SectionsRemaining int32
+}
+
+// Validator is an interface for validating a source. Sources can optionally implement this interface to validate
+// their configuration.
+type Validator interface {
+	Validate() []error
 }
 
 // SetProgressComplete sets job progress information for a running job based on the highest level objects in the source.

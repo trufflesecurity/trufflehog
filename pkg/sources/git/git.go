@@ -337,14 +337,6 @@ func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
-// GitCmdCheck checks if git is installed.
-func GitCmdCheck() error {
-	if errors.Is(exec.Command("git").Run(), exec.ErrNotFound) {
-		return fmt.Errorf("'git' command not found in $PATH. Make sure git is installed and included in $PATH")
-	}
-	return nil
-}
-
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	if err := GitCmdCheck(); err != nil {
 		return err
