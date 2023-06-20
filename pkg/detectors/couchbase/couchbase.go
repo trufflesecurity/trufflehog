@@ -25,8 +25,8 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
-	usernamePat         = regexp.MustCompile(`(?i)(?:user|usr)(?:.|[\n\r]){0,10}(\b[^:?()/\+=\n\s]{2,35}\b)`)
-	passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}\b)`)
+	usernamePat         = regexp.MustCompile(`(?i)(?:user|usr)(?:.|[\n\r]){0,15}(\b[^:?()/\+=\n\s]{2,35}\b)`)
+	passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
 )
 
 func meetsCouchbasePasswordRequirements(password string) (string, bool) {
