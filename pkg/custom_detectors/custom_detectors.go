@@ -99,6 +99,10 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	close(resultsCh)
 
 	for result := range resultsCh {
+		// NOTE: I don't believe this is being set anywhere else, hence the map assignment.
+		result.ExtraData = map[string]string{
+			"name": c.GetName(),
+		}
 		results = append(results, result)
 	}
 

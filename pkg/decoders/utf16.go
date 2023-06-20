@@ -3,7 +3,6 @@ package decoders
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"unicode/utf8"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -17,6 +16,9 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 	}
 
 	if utf16Data, err := utf16ToUTF8(chunk.Data); err == nil {
+		if len(utf16Data) == 0 {
+			return nil
+		}
 		chunk.Data = utf16Data
 		return chunk
 	}
@@ -26,43 +28,19 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *sources.Chunk {
 
 // utf16ToUTF8 converts a byte slice containing UTF-16 encoded data to a UTF-8 encoded byte slice.
 func utf16ToUTF8(b []byte) ([]byte, error) {
-	endianness, err := guessUTF16Endianness(b)
-	if err != nil {
-		return nil, err
-	}
-
-	buf := &bytes.Buffer{}
-	for i := 0; i < len(b); i += 2 {
-		r := rune(endianness.Uint16(b[i:]))
-		if utf8.ValidRune(r) {
-			buf.WriteRune(r)
+	var bufBE, bufLE bytes.Buffer
+	for i := 0; i < len(b)-1; i += 2 {
+		if r := rune(binary.BigEndian.Uint16(b[i:])); b[i] == 0 && utf8.ValidRune(r) {
+			if isValidByte(byte(r)) {
+				bufBE.WriteRune(r)
+			}
+		}
+		if r := rune(binary.LittleEndian.Uint16(b[i:])); b[i+1] == 0 && utf8.ValidRune(r) {
+			if isValidByte(byte(r)) {
+				bufLE.WriteRune(r)
+			}
 		}
 	}
 
-	return buf.Bytes(), nil
-}
-
-func guessUTF16Endianness(b []byte) (binary.ByteOrder, error) {
-	if len(b) < 2 || len(b)%2 != 0 {
-		return nil, fmt.Errorf("input length must be even and at least 2 bytes long")
-	}
-
-	var evenNullBytes, oddNullBytes int
-
-	for i := 0; i < len(b); i += 2 {
-		if b[i] == 0 {
-			oddNullBytes++
-		}
-		if b[i+1] == 0 {
-			evenNullBytes++
-		}
-	}
-
-	if evenNullBytes > oddNullBytes {
-		return binary.LittleEndian, nil
-	}
-	if oddNullBytes > evenNullBytes {
-		return binary.BigEndian, nil
-	}
-	return nil, fmt.Errorf("could not determine endianness")
+	return append(bufLE.Bytes(), bufBE.Bytes()...), nil
 }

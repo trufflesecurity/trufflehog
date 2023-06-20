@@ -45,6 +45,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
+					Redacted:     "sqlserver://sa:********@localhost?database=Demo&disableRetry=false",
 					Verified:     true,
 				},
 			},
@@ -66,6 +67,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
+					Redacted:     "sqlserver://sa:********@localhost?disableRetry=false",
 					Verified:     false,
 				},
 			},
@@ -103,6 +105,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
+					Redacted:     "sqlserver://username:********@server_name?database=testdb&disableRetry=false",
 					Verified:     true,
 				},
 			},
