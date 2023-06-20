@@ -112,13 +112,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 
 					// We'll ping the KV nodes in our cluster.
-					pings, err := cluster.Ping(&gocb.PingOptions{
+					pings, _ := cluster.Ping(&gocb.PingOptions{
 						Timeout: time.Second * 5,
 					})
-
-					if err != nil {
-						fmt.Errorf("ping err: %v", err)
-					}
 
 					for _, ping := range pings.Services {
 						for _, pingEndpoint := range ping {
