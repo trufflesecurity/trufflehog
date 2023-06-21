@@ -13,7 +13,6 @@ import (
 
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
-	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -202,9 +201,9 @@ func run(state overseer.State) {
 
 	if *profile {
 		go func() {
-			router := mux.NewRouter()
-			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
-			router.PathPrefix("/debug/fgprof").Handler(fgprof.Handler())
+			router := http.NewServeMux()
+			router.Handle("/debug/pprof", http.DefaultServeMux)
+			router.Handle("/debug/fgprof", fgprof.Handler())
 			logger.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
 			if err := http.ListenAndServe(":18066", router); err != nil {
 				logger.Error(err, "error serving pprof and fgprof")
