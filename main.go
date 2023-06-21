@@ -112,7 +112,7 @@ var (
 	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
 	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
 	gcsAPIKey         = gcsScan.Flag("api-key", "GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.").Envar("GOOGLE_API_KEY").String()
-	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma seperated list of buckets. You can repeat this flag. Globs are supported").Short('I').Strings()
+	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma separated list of buckets. You can repeat this flag. Globs are supported").Short('I').Strings()
 	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. Comma separated list of buckets. Globs are supported").Short('X').Strings()
 	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. Comma separated list of objects. you can repeat this flag. Globs are supported").Short('i').Strings()
 	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. Comma separated list of objects. You can repeat this flag. Globs are supported").Short('x').Strings()
@@ -178,7 +178,7 @@ func main() {
 
 	err := overseer.RunErr(updateCfg)
 	if err != nil {
-		logFatal(err, "error occured with trufflehog updater 🐷")
+		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
 }
 
@@ -446,10 +446,10 @@ func run(state overseer.State) {
 			ServiceAccount: *gcsServiceAccount,
 			WithoutAuth:    *gcsWithoutAuth,
 			ApiKey:         *gcsAPIKey,
-			IncludeBuckets: commaSeperatedToSlice(*gcsIncludeBuckets),
-			ExcludeBuckets: commaSeperatedToSlice(*gcsExcludeBuckets),
-			IncludeObjects: commaSeperatedToSlice(*gcsIncludeObjects),
-			ExcludeObjects: commaSeperatedToSlice(*gcsExcludeObjects),
+			IncludeBuckets: commaSeparatedToSlice(*gcsIncludeBuckets),
+			ExcludeBuckets: commaSeparatedToSlice(*gcsExcludeBuckets),
+			IncludeObjects: commaSeparatedToSlice(*gcsIncludeObjects),
+			ExcludeObjects: commaSeparatedToSlice(*gcsExcludeObjects),
 			Concurrency:    *concurrency,
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
@@ -503,7 +503,7 @@ func run(state overseer.State) {
 	}
 }
 
-func commaSeperatedToSlice(s []string) []string {
+func commaSeparatedToSlice(s []string) []string {
 	var result []string
 	for _, items := range s {
 		for _, item := range strings.Split(items, ",") {

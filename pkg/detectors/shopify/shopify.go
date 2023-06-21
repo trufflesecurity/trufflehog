@@ -20,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives.
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(`\b(shppa_|shpat_)([0-9A-Fa-f]{32})\b`)
 	domainPat = regexp.MustCompile(`[a-zA-Z0-9-]+\.myshopify\.com`)
 )

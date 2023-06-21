@@ -398,6 +398,6 @@ Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE
 
 # :money_with_wings: Enterprise product
 
-Are you interested in continously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
+Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.

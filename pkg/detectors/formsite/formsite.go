@@ -20,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{32})\b`)
 	serverPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b(fs[0-9]{1,4})\b`)
 	userPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{6})\b`)

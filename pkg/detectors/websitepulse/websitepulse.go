@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"websitepulse"}) + `\b([0-9a-f]{32})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"websitepulse"}) + `\b([0-9a-zA-Z._]{4,22})\b`)
 )
