@@ -5,6 +5,9 @@ import (
 	"fmt"
 )
 
+// Ensure CommonSourceUnit implements SourceUnit at compile time.
+var _ SourceUnit = CommonSourceUnit{}
+
 // CommonSourceUnit is a common implementation of SourceUnit that Sources can
 // use instead of implementing their own types.
 type CommonSourceUnit struct {

@@ -46,10 +46,12 @@ type Source struct {
 	conn          *sourcespb.S3
 	jobPool       *errgroup.Group
 	maxObjectSize int64
+	sources.CommonSourceUnitUnmarshaller
 }
 
-// Ensure the Source satisfies the interface at compile time
+// Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 
 // Type returns the type of source
 func (s *Source) Type() sourcespb.SourceType {

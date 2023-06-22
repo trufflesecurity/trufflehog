@@ -69,14 +69,17 @@ type Source struct {
 	mu                sync.Mutex
 	publicMap         map[string]source_metadatapb.Visibility
 	sources.Progress
+	sources.CommonSourceUnitUnmarshaller
 }
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
-// Ensure the Source satisfies the interface at compile time
+// Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+
 var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 
 // Type returns the type of source.
