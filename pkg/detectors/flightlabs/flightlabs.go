@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flightlabs"}) + `\b(ey[a-zA-Z0-9]{34}.ey[a-zA-Z0-9._-]{300,350})\b`)
 )
 

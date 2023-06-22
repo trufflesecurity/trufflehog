@@ -13,8 +13,8 @@ import (
 
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
-	"github.com/gorilla/mux"
 	"github.com/jpillora/overseer"
+	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -26,6 +26,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
@@ -112,7 +113,7 @@ var (
 	gcsServiceAccount = gcsScan.Flag("service-account", "Path to GCS service account JSON file.").ExistingFile()
 	gcsWithoutAuth    = gcsScan.Flag("without-auth", "Scan GCS buckets without authentication. This will only work for public buckets").Bool()
 	gcsAPIKey         = gcsScan.Flag("api-key", "GCS API key used to authenticate. Can be provided with environment variable GOOGLE_API_KEY.").Envar("GOOGLE_API_KEY").String()
-	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma seperated list of buckets. You can repeat this flag. Globs are supported").Short('I').Strings()
+	gcsIncludeBuckets = gcsScan.Flag("include-buckets", "Buckets to scan. Comma separated list of buckets. You can repeat this flag. Globs are supported").Short('I').Strings()
 	gcsExcludeBuckets = gcsScan.Flag("exclude-buckets", "Buckets to exclude from scan. Comma separated list of buckets. Globs are supported").Short('X').Strings()
 	gcsIncludeObjects = gcsScan.Flag("include-objects", "Objects to scan. Comma separated list of objects. you can repeat this flag. Globs are supported").Short('i').Strings()
 	gcsExcludeObjects = gcsScan.Flag("exclude-objects", "Objects to exclude from scan. Comma separated list of objects. You can repeat this flag. Globs are supported").Short('x').Strings()
@@ -127,6 +128,9 @@ var (
 
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
+
+	dockerScan       = cli.Command("docker", "Scan Docker Image")
+	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
 )
 
 func init() {
@@ -178,7 +182,7 @@ func main() {
 
 	err := overseer.RunErr(updateCfg)
 	if err != nil {
-		logFatal(err, "error occured with trufflehog updater 🐷")
+		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
 }
 
@@ -202,9 +206,9 @@ func run(state overseer.State) {
 
 	if *profile {
 		go func() {
-			router := mux.NewRouter()
-			router.PathPrefix("/debug/pprof").Handler(http.DefaultServeMux)
-			router.PathPrefix("/debug/fgprof").Handler(fgprof.Handler())
+			router := http.NewServeMux()
+			router.Handle("/debug/pprof", http.DefaultServeMux)
+			router.Handle("/debug/fgprof", fgprof.Handler())
 			logger.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
 			if err := http.ListenAndServe(":18066", router); err != nil {
 				logger.Error(err, "error serving pprof and fgprof")
@@ -446,15 +450,29 @@ func run(state overseer.State) {
 			ServiceAccount: *gcsServiceAccount,
 			WithoutAuth:    *gcsWithoutAuth,
 			ApiKey:         *gcsAPIKey,
-			IncludeBuckets: commaSeperatedToSlice(*gcsIncludeBuckets),
-			ExcludeBuckets: commaSeperatedToSlice(*gcsExcludeBuckets),
-			IncludeObjects: commaSeperatedToSlice(*gcsIncludeObjects),
-			ExcludeObjects: commaSeperatedToSlice(*gcsExcludeObjects),
+			IncludeBuckets: commaSeparatedToSlice(*gcsIncludeBuckets),
+			ExcludeBuckets: commaSeparatedToSlice(*gcsExcludeBuckets),
+			IncludeObjects: commaSeparatedToSlice(*gcsIncludeObjects),
+			ExcludeObjects: commaSeparatedToSlice(*gcsExcludeObjects),
 			Concurrency:    *concurrency,
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
 		if err := e.ScanGCS(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan GCS.")
+		}
+	case dockerScan.FullCommand():
+		dockerConn := sourcespb.Docker{
+			Images: *dockerScanImages,
+			Credential: &sourcespb.Docker_DockerKeychain{
+				DockerKeychain: true,
+			},
+		}
+		anyConn, err := anypb.New(&dockerConn)
+		if err != nil {
+			logFatal(err, "Failed to marshal Docker connection")
+		}
+		if err := e.ScanDocker(ctx, anyConn); err != nil {
+			logFatal(err, "Failed to scan Docker.")
 		}
 	}
 	// asynchronously wait for scanning to finish and cleanup
@@ -503,7 +521,7 @@ func run(state overseer.State) {
 	}
 }
 
-func commaSeperatedToSlice(s []string) []string {
+func commaSeparatedToSlice(s []string) []string {
 	var result []string
 	for _, items := range s {
 		for _, item := range strings.Split(items, ",") {
