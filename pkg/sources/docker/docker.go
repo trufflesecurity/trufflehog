@@ -31,7 +31,7 @@ type Source struct {
 	sources.Progress
 }
 
-var FilesizeLimitBytes int64 = 10 * 1024 * 1024 // 10MB
+var FilesizeLimitBytes int64 = 50 * 1024 * 1024 // 50MB
 
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -75,6 +75,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return err
 	}
 
+	logger := ctx.Logger().WithValues("source_type", s.Type(), "source_name", s.name)
+
 	for _, image := range s.conn.GetImages() {
 		var img v1.Image
 		var err error
@@ -100,16 +102,23 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 		}
 
+		logger = logger.WithValues("image", base, "tag", tag)
+		logger.V(2).Info("scanning image")
+
 		layers, err := img.Layers()
 		if err != nil {
 			return err
 		}
 
 		for _, layer := range layers {
+
 			digest, err := layer.Digest()
 			if err != nil {
 				return err
 			}
+
+			logger = logger.WithValues("layer", digest.String())
+			logger.V(2).Info("scanning layer")
 
 			rc, err := layer.Compressed()
 			if err != nil {
@@ -156,7 +165,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 					SourceMetadata: &source_metadatapb.MetaData{
 						Data: &source_metadatapb.MetaData_Docker{
 							Docker: &source_metadatapb.Docker{
-								File:  header.Name,
+								File:  "/" + header.Name, // Prepend /, because the file is relative to the root of the image
 								Image: base,
 								Tag:   tag,
 								Layer: digest.String(),
