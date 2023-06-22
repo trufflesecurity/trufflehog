@@ -123,7 +123,7 @@ func PrefixRegex(keywords []string) string {
 }
 
 // KeyIsRandom is a Low cost check to make sure that 'keys' include a number to reduce FPs.
-// Golang doesnt support regex lookaheads, so must be done in separate calls.
+// Golang doesn't support regex lookaheads, so must be done in separate calls.
 // TODO improve checks. Shannon entropy did not work well.
 func KeyIsRandom(key string) bool {
 	for _, ch := range key {

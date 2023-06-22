@@ -16,7 +16,7 @@ enum SourceType {
   SOURCE_TYPE_BITBUCKET = 1;
   SOURCE_TYPE_CIRCLECI = 2;
   SOURCE_TYPE_CONFLUENCE = 3;
-  SOURCE_TYPE_DOCKERHUB_IMAGES = 4;
+  SOURCE_TYPE_DOCKER = 4;
   SOURCE_TYPE_ECR = 5;
   SOURCE_TYPE_GCS = 6;
   SOURCE_TYPE_GITHUB = 7;
@@ -104,11 +104,14 @@ message Confluence {
   bool skip_history = 10;
 }
 
-message DockerHub {
+message Docker {
   oneof credential {
     credentials.Unauthenticated unauthenticated = 1;
+    credentials.BasicAuth basic_auth = 2;
+    string bearer_token = 3;
+    bool docker_keychain = 4;
   }
-  repeated string repositories = 2;
+  repeated string images = 5;
 }
 
 message ECR {
