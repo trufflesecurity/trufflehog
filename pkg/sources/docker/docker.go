@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -138,7 +139,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 			for {
 				header, err := tarReader.Next()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break // End of archive
 				}
 				if err != nil {
@@ -150,7 +151,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 					continue
 				}
 
-				file := bytes.NewBuffer(nil)
+				file := bytes.NewBuffer(make([]byte, 0, header.Size))
 
 				_, err = io.Copy(file, tarReader)
 				if err != nil {
@@ -175,8 +176,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 					Verify: s.verify,
 				}
 
-				chunksChan <- chunk
+				select {
+				case chunksChan <- chunk:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 			}
+
 			dockerLayersScanned.WithLabelValues(s.name).Inc()
 		}
 
