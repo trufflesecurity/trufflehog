@@ -663,11 +663,17 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			defer func(start time.Time) {
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
+
+			fmt.Printf("Scanning repoURL %s, path %+v, repo %+v \n ", repoURL, path, repo)
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
+
+			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
+				fmt.Println("test")
+			}
 
 			return nil
 		})
@@ -915,4 +921,51 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+}
+
+func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning comments")
+	fmt.Print("repoPath: ", repoPath, "\n")
+
+	trimmedURL := removeURLAndSplit(repoPath)
+
+	for _, part := range trimmedURL {
+		fmt.Println(part)
+	}
+
+	sortType := "created"
+	directionType := "desc"
+
+	opts := &github.IssueListCommentsOptions{
+		Sort:      &sortType,
+		Direction: &directionType,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    1,
+		},
+	}
+	comments, resp, err := s.apiClient.Issues.ListComments(ctx, trimmedURL[1], trimmedURL[2], 0, opts)
+
+	fmt.Println("comments: ", comments)
+	fmt.Println("resp: ", resp)
+	fmt.Println("err: ", err)
+
+	//for _, repo := range s.repos {
+	//	s.log.V(1).Info("scanning comments for repo", "repo", repo)
+	//
+	//	//
+
+	//	//
+	//	//opts.ListOptions.ListOptions.Page += 1
+	//	// https://api.github.com/repos/trufflesecurity/trufflehog/issues/comments?sort=created&direction=desc&per_page=100&page=2
+	//}
+	return nil
+}
+
+func removeURLAndSplit(url string) []string {
+	trimmedURL := strings.TrimPrefix(url, "https://")
+	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
+	splitURL := strings.Split(trimmedURL, "/")
+
+	return splitURL
 }
