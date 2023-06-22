@@ -25,7 +25,8 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
 	usernamePat         = `?()/\+=\s\n`
-	passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
+	passwordPat         = `^<>;.*&|£\n\s`
+	//passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
 	// passwordPat = regexp.MustCompile(`(?im)(?:pass|pwd)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:?()/\+=\s\n]{4,40})\b`)
 )
 
@@ -65,7 +66,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	usernameRegexState := common.UsernameRegexCheck(usernamePat)
 	usernameMatches := usernameRegexState.Matches(data)
-	passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
+	passwordRegexState := common.PasswordRegexCheck(passwordPat)
+	passwordMatches := passwordRegexState.Matches(data)
 
 	fmt.Println("passwordMatches", passwordMatches)
 

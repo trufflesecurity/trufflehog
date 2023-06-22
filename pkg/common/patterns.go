@@ -50,7 +50,7 @@ func (r RegexState) Matches(data []byte) []string {
 
 	// trim off spaces and different quote types ('").
 	for i := range matches {
-		res = append(res, strings.Trim(matches[i][1], `"' `))
+		res = append(res, strings.Trim(matches[i][1], `"' )`))
 	}
 
 	return res
@@ -65,7 +65,6 @@ func UsernameRegexCheck(pattern string) RegexState {
 
 // PasswordRegexCheck constructs an username usernameRegex pattern from a given pattern of excluded characters.
 func PasswordRegexCheck(pattern string) RegexState {
-	// `(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`
 	raw := fmt.Sprintf(`(?im)(?:pass|password)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})`, pattern)
 
 	return RegexState{regexp.MustCompile(raw)}
