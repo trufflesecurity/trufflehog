@@ -19,7 +19,11 @@ func TestUsernameRegexCheck(t *testing.T) {
 		t.Errorf("\n got %v \n want %v", usernameRegexPat.compiledRegex, expectedRegexPattern)
 	}
 
-	testString := `username = "johnsmith123" \n username='johnsmith123' username:="johnsmith123" username = johnsmith123 username=dustin123`
+	testString := `username = "johnsmith123"
+                   username='johnsmith123'
+				   username:="johnsmith123"
+                   username = johnsmith123
+                   username=johnsmith123`
 
 	expectedStr := []string{"johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123"}
 
