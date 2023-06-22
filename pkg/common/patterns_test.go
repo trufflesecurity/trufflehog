@@ -32,9 +32,7 @@ func TestUsernameRegexCheck(t *testing.T) {
 
 	usernameRegexMatches := usernameRegexPat.Matches([]byte(testString))
 
-	if len(usernameRegexMatches) != len(expectedStr) {
-		t.Errorf("\n got %v \n want %v", usernameRegexMatches, expectedStr)
-	}
+	assert.Exactly(t, usernameRegexMatches, expectedStr)
 
 }
 
@@ -43,10 +41,6 @@ func TestPasswordRegexCheck(t *testing.T) {
 
 	expectedRegexPattern := regexp.MustCompile(passwordRegex)
 	assert.Equal(t, passwordRegexPat.compiledRegex, expectedRegexPattern)
-
-	//if passwordRegexPat.compiledRegex.String() != expectedRegexPattern.String() {
-	//	t.Errorf("\n got  %v \n want %v", passwordRegexPat.compiledRegex, expectedRegexPattern)
-	//}
 
 	testString := `password = "johnsmith123$!"
                    password='johnsmith123$!'
@@ -61,9 +55,5 @@ func TestPasswordRegexCheck(t *testing.T) {
 	passwordRegexMatches := passwordRegexPat.Matches([]byte(testString))
 
 	assert.Exactly(t, passwordRegexMatches, expectedStr)
-
-	//if len(passwordRegexMatches) != len(expectedStr) {
-	//	t.Errorf("\n got %v \n want %v", passwordRegexMatches, expectedStr)
-	//}
 
 }
