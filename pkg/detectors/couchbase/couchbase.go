@@ -26,6 +26,7 @@ var (
 	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
 	usernamePat         = `?()/\+=\s\n`
 	passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
+	// passwordPat = regexp.MustCompile(`(?im)(?:pass|pwd)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:?()/\+=\s\n]{4,40})\b`)
 )
 
 func meetsCouchbasePasswordRequirements(password string) (string, bool) {
@@ -66,6 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	usernameMatches := usernameRegexState.Matches(data)
 	passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
 
+	fmt.Println("passwordMatches", passwordMatches)
+
 	for _, connectionStringMatch := range connectionStringMatches {
 		resConnectionStringMatch := strings.TrimSpace(connectionStringMatch[0])
 
@@ -77,8 +80,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				resPasswordMatch := strings.TrimSpace(passwordMatch[1])
+				fmt.Println("resPasswordMatch", resPasswordMatch)
 
 				_, metPasswordRequirements := meetsCouchbasePasswordRequirements(resPasswordMatch)
+
+				fmt.Println("metPasswordRequirements", metPasswordRequirements)
 
 				if !metPasswordRequirements {
 					continue
@@ -88,6 +94,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Couchbase,
 					Raw:          []byte(fmt.Sprintf("%s:%s@%s", resUsernameMatch, resPasswordMatch, resConnectionStringMatch)),
 				}
+
+				fmt.Printf("s1: %+v \n", s1)
 
 				if verify {
 

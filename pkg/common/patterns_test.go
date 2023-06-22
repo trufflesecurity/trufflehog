@@ -6,14 +6,16 @@ import (
 )
 
 const (
-	pattern = `?()/\+=\s\n`
-	regex   = `(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:?()/\+=\s\n]{4,40})\b`
+	usernamePattern = `?()/\+=\s\n`
+	passwordPattern = `^<>;.*&|£\n\s`
+	usernameRegex   = `(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:?()/\+=\s\n]{4,40})\b`
+	passwordRegex   = `(?im)(?:pass|password)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:^<>;.*&|£\n\s]{4,40})`
 )
 
 func TestUsernameRegexCheck(t *testing.T) {
-	usernameRegexPat := UsernameRegexCheck(pattern)
+	usernameRegexPat := UsernameRegexCheck(usernamePattern)
 
-	expectedRegexPattern := regexp.MustCompile(regex)
+	expectedRegexPattern := regexp.MustCompile(usernameRegex)
 
 	if usernameRegexPat.compiledRegex.String() != expectedRegexPattern.String() {
 		t.Errorf("\n got %v \n want %v", usernameRegexPat.compiledRegex, expectedRegexPattern)
@@ -27,11 +29,37 @@ func TestUsernameRegexCheck(t *testing.T) {
 
 	expectedStr := []string{"johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123"}
 
-	usernameRegexState := UsernameRegexCheck(pattern)
-	usernameRegexMatches := usernameRegexState.Matches([]byte(testString))
+	usernameRegexMatches := usernameRegexPat.Matches([]byte(testString))
 
 	if len(usernameRegexMatches) != len(expectedStr) {
 		t.Errorf("\n got %v \n want %v", usernameRegexMatches, expectedStr)
+	}
+
+}
+
+func TestPasswordRegexCheck(t *testing.T) {
+	passwordRegexPat := PasswordRegexCheck(passwordPattern)
+
+	expectedRegexPattern := regexp.MustCompile(passwordRegex)
+
+	if passwordRegexPat.compiledRegex.String() != expectedRegexPattern.String() {
+		t.Errorf("\n got  %v \n want %v", passwordRegexPat.compiledRegex, expectedRegexPattern)
+	}
+
+	testString := `password = "johnsmith123$!"
+                   password='johnsmith123$!'
+				   password:="johnsmith123$!"
+                   password = johnsmith123$!
+                   password=johnsmith123$!
+				   PasswordAuthenticator(username, "johnsmith123$!")`
+
+	expectedStr := []string{"johnsmith123$!", "johnsmith123$!", "johnsmith123$!", "johnsmith123$!", "johnsmith123$!",
+		"johnsmith123$!"}
+
+	passwordRegexMatches := passwordRegexPat.Matches([]byte(testString))
+
+	if len(passwordRegexMatches) != len(expectedStr) {
+		t.Errorf("\n got %v \n want %v", passwordRegexMatches, expectedStr)
 	}
 
 }
