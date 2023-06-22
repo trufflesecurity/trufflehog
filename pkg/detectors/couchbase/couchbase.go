@@ -64,7 +64,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	connectionStringMatches := connectionStringPat.FindAllStringSubmatch(dataStr, -1)
 
-	// prepend 'couchbases://' to the connection string
+	// prepend 'couchbases://' to the connection string as the connection
+	// string format is couchbases://cb.stuff.cloud.couchbase.com but the
+	// cb.stuff.cloud.couchbase.com may be separated from the couchbases:// in codebases.
 	for i, connectionStringMatch := range connectionStringMatches {
 		connectionStringMatches[i][0] = "couchbases://" + connectionStringMatch[0]
 	}
