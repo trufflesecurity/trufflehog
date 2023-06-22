@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	connectionStringPat = regexp.MustCompile(detectors.PrefixRegex([]string{"couchbase://", "couchbases://", "conn"}) + `\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
+	connectionStringPat = regexp.MustCompile(`\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
 	usernamePat         = `?()/\+=\s\n`
 	passwordPat         = `^<>;.*&|£\n\s`
 	//passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
@@ -64,29 +64,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	connectionStringMatches := connectionStringPat.FindAllStringSubmatch(dataStr, -1)
 
+	// prepend 'couchbases://' to the connection string
+	for i, connectionStringMatch := range connectionStringMatches {
+		connectionStringMatches[i][0] = "couchbases://" + connectionStringMatch[0]
+	}
+
 	usernameRegexState := common.UsernameRegexCheck(usernamePat)
 	usernameMatches := usernameRegexState.Matches(data)
+
 	passwordRegexState := common.PasswordRegexCheck(passwordPat)
 	passwordMatches := passwordRegexState.Matches(data)
-
-	fmt.Println("passwordMatches", passwordMatches)
 
 	for _, connectionStringMatch := range connectionStringMatches {
 		resConnectionStringMatch := strings.TrimSpace(connectionStringMatch[0])
 
 		for _, resUsernameMatch := range usernameMatches {
 
-			for _, passwordMatch := range passwordMatches {
-				if len(passwordMatch) != 2 {
-					continue
-				}
-
-				resPasswordMatch := strings.TrimSpace(passwordMatch[1])
-				fmt.Println("resPasswordMatch", resPasswordMatch)
-
+			for _, resPasswordMatch := range passwordMatches {
 				_, metPasswordRequirements := meetsCouchbasePasswordRequirements(resPasswordMatch)
-
-				fmt.Println("metPasswordRequirements", metPasswordRequirements)
 
 				if !metPasswordRequirements {
 					continue
@@ -96,8 +91,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Couchbase,
 					Raw:          []byte(fmt.Sprintf("%s:%s@%s", resUsernameMatch, resPasswordMatch, resConnectionStringMatch)),
 				}
-
-				fmt.Printf("s1: %+v \n", s1)
 
 				if verify {
 
