@@ -14,7 +14,7 @@ type CommonSourceUnit struct {
 	ID string `json:"source_unit_id"`
 }
 
-// Implement the SourceUnit interface.
+// SourceUnitID implements the SourceUnit interface.
 func (c CommonSourceUnit) SourceUnitID() string {
 	return c.ID
 }
@@ -24,7 +24,7 @@ func (c CommonSourceUnit) SourceUnitID() string {
 // functionality of converting []byte to a CommonSourceUnit.
 type CommonSourceUnitUnmarshaller struct{}
 
-// Implement the SourceUnitUnmarshaller interface.
+// UnmarshalSourceUnit implements the SourceUnitUnmarshaller interface.
 func (c CommonSourceUnitUnmarshaller) UnmarshalSourceUnit(data []byte) (SourceUnit, error) {
 	var unit CommonSourceUnit
 	if err := json.Unmarshal(data, &unit); err != nil {
