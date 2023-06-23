@@ -38,19 +38,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllString(dataStr, -1)
 
 	for _, key := range keyMatches {
+		secMatches := secretPat.FindAllString(dataStr, -1)
 
-		if verify {
-			secMatches := secretPat.FindAllString(dataStr, -1)
+		for _, secret := range secMatches {
 
-			for _, secret := range secMatches {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_RazorPay,
+				Raw:          []byte(key),
+				RawV2:        []byte(key + secret),
+				Redacted:     key,
+			}
 
-				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_RazorPay,
-					Raw:          []byte(key),
-					RawV2:        []byte(key + secret),
-					Redacted:     key,
-				}
-
+			if verify {
 				req, err := http.NewRequest("GET", "https://api.razorpay.com/v1/items?count=1", nil)
 				if err != nil {
 					continue
@@ -66,25 +65,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if json.Valid(bodyBytes) {
 							s1.Verified = true
-						} else {
-							s1.Verified = false
-						}
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-							continue
 						}
 					}
 				}
-
-				results = append(results, s1)
 			}
+
+			if !s1.Verified && detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
+				continue
+			}
+
+			results = append(results, s1)
 		}
 
 	}
 
-	results = detectors.CleanResults(results)
-	return
+	return detectors.CleanResults(results), nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
