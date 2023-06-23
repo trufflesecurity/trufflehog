@@ -30,12 +30,14 @@ type Source struct {
 	verify   bool
 	conn     sourcespb.Docker
 	sources.Progress
+	sources.CommonSourceUnitUnmarshaller
 }
 
 var FilesizeLimitBytes int64 = 50 * 1024 * 1024 // 50MB
 
-// Ensure the Source satisfies the interface at compile time.
+// Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.

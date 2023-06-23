@@ -67,8 +67,9 @@ func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName s
 	}
 }
 
-// Ensure the Source satisfies the interface at compile time.
+// Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -874,4 +875,8 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	chunksChan <- &chunk
 
 	return nil
+}
+
+func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	return UnmarshalUnit(data)
 }
