@@ -2,7 +2,6 @@ package common
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"strings"
 )
@@ -52,7 +51,6 @@ func containsSubstring(reader io.ReadCloser, target string) (bool, error) {
 
 		// Check if the current line contains the target substring
 		if strings.Contains(line, target) {
-			fmt.Println("Found", target, "in response", line)
 			return true, nil
 		}
 
