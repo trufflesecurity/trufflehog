@@ -23,6 +23,8 @@ func RemoveStringSliceItem(item string, slice *[]string) {
 		}
 	}
 }
+
+// ParseResponseForKeywords parses the response from detector verification calls for expected keywords in the response.
 func ParseResponseForKeywords(reader io.ReadCloser, keywords []string) (bool, error) {
 	for _, keyword := range keywords {
 		if keyword == "" {

@@ -77,7 +77,7 @@ func TestRemoveItem(t *testing.T) {
 	}
 }
 
-// Test ParseResponseForKeywords
+// Test ParseResponseForKeywords with a reader that contains the keyword and a reader that doesn't.
 func TestParseResponseForKeywords(t *testing.T) {
 	testReader := strings.NewReader("ey: abc")
 	testReadCloser := ioutil.NopCloser(testReader)
@@ -88,6 +88,19 @@ func TestParseResponseForKeywords(t *testing.T) {
 	}
 
 	if !found {
-		t.Errorf("Expected true, got false")
+		t.Errorf("Expected true, got %+v", found)
 	}
+
+	testReader2 := strings.NewReader("fake response")
+	testReadCloser2 := ioutil.NopCloser(testReader2)
+	found, err = ParseResponseForKeywords(testReadCloser2, []string{"ey"})
+
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	if found {
+		t.Errorf("Expected false, got %+v", found)
+	}
+
 }
