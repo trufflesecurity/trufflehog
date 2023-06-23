@@ -1,7 +1,9 @@
 package common
 
 import (
+	"io/ioutil"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -72,5 +74,20 @@ func TestRemoveItem(t *testing.T) {
 		if !reflect.DeepEqual(test.Slice, test.Expected) {
 			t.Errorf("%s: expected:%v, got:%v", name, test.Expected, test.Slice)
 		}
+	}
+}
+
+// Test ParseResponseForKeywords
+func TestParseResponseForKeywords(t *testing.T) {
+	testReader := strings.NewReader("ey: abc")
+	testReadCloser := ioutil.NopCloser(testReader)
+	found, err := ParseResponseForKeywords(testReadCloser, []string{"ey"})
+
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	if !found {
+		t.Errorf("Expected true, got false")
 	}
 }
