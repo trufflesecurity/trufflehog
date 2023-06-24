@@ -74,6 +74,7 @@ func New(c common.Common) *SourceSelect {
 		SourceItem{"AWS S3", "Scan Amazon S3 buckets.", nil},
 		SourceItem{"CircleCI", "Scan CircleCI, a CI/CD platform.", nil},
 		SourceItem{"Syslog", "Scan syslog, event data logs.", nil},
+		SourceItem{"Docker", "Scan a Docker instance, a containerized application.", nil},
 		// Enterprise sources.
 		SourceItem{"Artifactory", "Scan JFrog Artifactory packages.", nil},
 		SourceItem{"BitBucket", "Scan Atlassian's Git-based source code repository hosting service.", nil},
@@ -84,6 +85,8 @@ func New(c common.Common) *SourceSelect {
 		SourceItem{"Jira", "Scan Atlassian's issue & project tracking software.", nil},
 		SourceItem{"Slack", "Scan Slack, a messaging and communication platform.", nil},
 		SourceItem{"Microsoft Teams", "Scan Microsoft Teams, a messaging and communication platform.", nil},
+		SourceItem{"Microsoft Sharepoint", "Scan Microsoft Sharepoint, a collaboration and document management platform.", nil},
+		SourceItem{"Google Drive", "Scan Google Drive, a cloud-based storage and file sync service.", nil},
 	}
 
 	// Setup list
