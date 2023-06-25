@@ -67,26 +67,26 @@ func New(c common.Common) *SourceSelect {
 	// Make list of SourceItems.
 	SourceItems := []list.Item{
 		// Open source sources.
-		SourceItem{"Git", "Scan git repositories.", nil},
-		SourceItem{"GitHub", "Scan GitHub repositories and/or organizations.", nil},
-		SourceItem{"GitLab", "Scan GitLab repositories.", nil},
-		SourceItem{"Filesystem", "Scan your filesystem by selecting what directories to scan.", nil},
-		SourceItem{"AWS S3", "Scan Amazon S3 buckets.", nil},
-		SourceItem{"CircleCI", "Scan CircleCI, a CI/CD platform.", nil},
-		SourceItem{"Syslog", "Scan syslog, event data logs.", nil},
-		SourceItem{"Docker", "Scan a Docker instance, a containerized application.", nil},
+		OssItem("Git", "Scan git repositories."),
+		OssItem("GitHub", "Scan GitHub repositories and/or organizations."),
+		OssItem("GitLab", "Scan GitLab repositories."),
+		OssItem("Filesystem", "Scan your filesystem by selecting what directories to scan."),
+		OssItem("AWS S3", "Scan Amazon S3 buckets."),
+		OssItem("CircleCI", "Scan CircleCI, a CI/CD platform."),
+		OssItem("Syslog", "Scan syslog, event data logs."),
+		OssItem("Docker", "Scan a Docker instance, a containerized application."),
 		// Enterprise sources.
-		SourceItem{"Artifactory", "Scan JFrog Artifactory packages.", nil},
-		SourceItem{"BitBucket", "Scan Atlassian's Git-based source code repository hosting service.", nil},
-		SourceItem{"Buildkite", "Scan Buildkite, a CI/CD platform.", nil},
-		SourceItem{"Confluence", "Scan Atlassian's web-based wiki and knowledge base.", nil},
-		SourceItem{"Gerrit", "Scan Gerrit, a code collaboration tool", nil},
-		SourceItem{"Jenkins ", "Scan Jenkins, a CI/CD platform.", nil},
-		SourceItem{"Jira", "Scan Atlassian's issue & project tracking software.", nil},
-		SourceItem{"Slack", "Scan Slack, a messaging and communication platform.", nil},
-		SourceItem{"Microsoft Teams", "Scan Microsoft Teams, a messaging and communication platform.", nil},
-		SourceItem{"Microsoft Sharepoint", "Scan Microsoft Sharepoint, a collaboration and document management platform.", nil},
-		SourceItem{"Google Drive", "Scan Google Drive, a cloud-based storage and file sync service.", nil},
+		EnterpriseItem("Artifactory", "Scan JFrog Artifactory packages."),
+		EnterpriseItem("BitBucket", "Scan Atlassian's Git-based source code repository hosting service."),
+		EnterpriseItem("Buildkite", "Scan Buildkite, a CI/CD platform."),
+		EnterpriseItem("Confluence", "Scan Atlassian's web-based wiki and knowledge base."),
+		EnterpriseItem("Gerrit", "Scan Gerrit, a code collaboration tool"),
+		EnterpriseItem("Jenkins ", "Scan Jenkins, a CI/CD platform."),
+		EnterpriseItem("Jira", "Scan Atlassian's issue & project tracking software."),
+		EnterpriseItem("Slack", "Scan Slack, a messaging and communication platform."),
+		EnterpriseItem("Microsoft Teams", "Scan Microsoft Teams, a messaging and communication platform."),
+		EnterpriseItem("Microsoft Sharepoint", "Scan Microsoft Sharepoint, a collaboration and document management platform."),
+		EnterpriseItem("Google Drive", "Scan Google Drive, a cloud-based storage and file sync service."),
 	}
 
 	// Setup list
@@ -180,7 +180,7 @@ func newSourceItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
 		}
 
 		if msg, ok := msg.(tea.KeyMsg); ok && key.Matches(msg, keys.choose) {
-			if selectedSourceItem.isEnterprise() {
+			if selectedSourceItem.enterprise {
 				return m.NewStatusMessage(errorStatusMessageStyle(
 					"That's an enterprise only source. Learn more at trufflesecurity.com",
 				))

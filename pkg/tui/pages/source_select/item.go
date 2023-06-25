@@ -1,29 +1,29 @@
 package source_select
 
-import (
-	"gopkg.in/alecthomas/kingpin.v2"
-)
-
 type SourceItem struct {
 	title       string
 	description string
-	cmd         *kingpin.CmdModel
+	enterprise  bool
 }
 
-func (i SourceItem) isEnterprise() bool {
-	return i.cmd == nil
+func OssItem(title, description string) SourceItem {
+	return SourceItem{title, description, false}
+}
+
+func EnterpriseItem(title, description string) SourceItem {
+	return SourceItem{title, description, true}
 }
 
 func (i SourceItem) ID() string { return i.title }
 
 func (i SourceItem) Title() string {
-	if i.isEnterprise() {
+	if i.enterprise {
 		return "💸 " + i.title
 	}
 	return i.title
 }
 func (i SourceItem) Description() string {
-	if i.isEnterprise() {
+	if i.enterprise {
 		return i.description + " (Enterprise only)"
 	}
 	return i.description
