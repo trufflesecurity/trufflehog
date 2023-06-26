@@ -1,7 +1,7 @@
 package common
 
 import (
-	"io/ioutil"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -80,7 +80,7 @@ func TestRemoveItem(t *testing.T) {
 // Test ParseResponseForKeywords with a reader that contains the keyword and a reader that doesn't.
 func TestParseResponseForKeywords(t *testing.T) {
 	testReader := strings.NewReader("ey: abc")
-	testReadCloser := ioutil.NopCloser(testReader)
+	testReadCloser := io.NopCloser(testReader)
 	found, err := ParseResponseForKeywords(testReadCloser, []string{"ey"})
 
 	if err != nil {
@@ -92,7 +92,7 @@ func TestParseResponseForKeywords(t *testing.T) {
 	}
 
 	testReader2 := strings.NewReader("fake response")
-	testReadCloser2 := ioutil.NopCloser(testReader2)
+	testReadCloser2 := io.NopCloser(testReader2)
 	found, err = ParseResponseForKeywords(testReadCloser2, []string{"ey"})
 
 	if err != nil {

@@ -43,24 +43,35 @@ func ParseResponseForKeywords(reader io.ReadCloser, keywords []string) (bool, er
 }
 
 func containsSubstring(reader io.ReadCloser, target string) (bool, error) {
-	r := bufio.NewReader(reader)
-
-	for {
-		line, err := r.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return false, err
-		}
-
-		// Check if the current line contains the target substring
-		if strings.Contains(line, target) {
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), target) {
 			return true, nil
 		}
-
-		// Break if the reader reached EOF (end of the file)
-		if err == io.EOF {
-			break
-		}
 	}
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+	return false, nil
+
+	//r := bufio.NewReader(reader)
+	//
+	//for {
+	//	line, err := r.ReadString('\n')
+	//	if err != nil && err != io.EOF {
+	//		return false, err
+	//	}
+	//
+	//	// Check if the current line contains the target substring
+	//	if strings.Contains(line, target) {
+	//		return true, nil
+	//	}
+	//
+	//	// Break if the reader reached EOF (end of the file)
+	//	if err == io.EOF {
+	//		break
+	//	}
+	//}
 
 	return false, nil
 }
