@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/go-errors/errors"
@@ -53,14 +54,13 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) error {
 		return err
 	}
 
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			ctx.Logger().Error(err, "could not scan syslog")
+			return fmt.Errorf("could not scan syslog: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }

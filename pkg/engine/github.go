@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+
 	gogit "github.com/go-git/go-git/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -58,14 +60,13 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	scanOptions := git.NewScanOptions(opts...)
 	source.WithScanOptions(scanOptions)
 
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			ctx.Logger().Error(err, "could not scan github")
+			return fmt.Errorf("could not scan github: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }

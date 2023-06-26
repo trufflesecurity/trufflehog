@@ -10,6 +10,7 @@ import (
 	"time"
 
 	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -32,7 +33,7 @@ type Engine struct {
 	chunksScanned   uint64
 	bytesScanned    uint64
 	detectorAvgTime sync.Map
-	sourcesWg       sync.WaitGroup
+	sourcesWg       *errgroup.Group
 	workersWg       sync.WaitGroup
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
@@ -123,6 +124,11 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 	ctx.Logger().V(2).Info("engine started", "workers", e.concurrency)
 
+	sourcesWg, egCtx := errgroup.WithContext(ctx)
+	sourcesWg.SetLimit(e.concurrency)
+	e.sourcesWg = sourcesWg
+	ctx.SetParent(egCtx)
+
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
 	}
@@ -188,10 +194,14 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 // Finish waits for running sources to complete and workers to finish scanning
 // chunks before closing their respective channels. Once Finish is called, no
 // more sources may be scanned by the engine.
-func (e *Engine) Finish(ctx context.Context) {
+func (e *Engine) Finish(ctx context.Context, logFunc func(error, string, ...any)) {
 	defer common.RecoverWithExit(ctx)
 	// wait for the sources to finish putting chunks onto the chunks channel
-	e.sourcesWg.Wait()
+	sourceErr := e.sourcesWg.Wait()
+	if sourceErr != nil {
+		logFunc(sourceErr, "error occurred while collecting chunks")
+	}
+
 	close(e.chunks)
 	// wait for the workers to finish processing all of the chunks and putting
 	// results onto the results channel

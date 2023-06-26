@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"runtime"
 
 	"github.com/go-errors/errors"
@@ -38,14 +39,13 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 		return errors.WrapPrefix(err, "failed to init Circle CI source", 0)
 	}
 
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		err := circleSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning Circle CI")
+			return fmt.Errorf("error scanning CircleCI: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }

@@ -197,7 +197,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			})
 
 		if err != nil {
-			s.log.Error(err, "could not list objects in s3 bucket", "bucket", bucket)
+			return fmt.Errorf(
+				"could not list objects in s3 bucket: bucket %s: %w",
+				bucket,
+				err)
 		}
 	}
 	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
