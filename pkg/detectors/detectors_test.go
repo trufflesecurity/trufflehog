@@ -88,3 +88,52 @@ func TestIsVerified(t *testing.T) {
 		})
 	}
 }
+
+func TestIsUnverified(t *testing.T) {
+	tests := []struct {
+		name   string
+		result Result
+		want   bool
+	}{
+		{
+			name: "Verified true, HasVerificationIndeterminate false",
+			result: Result{
+				Verified:                     true,
+				HasVerificationIndeterminate: false,
+			},
+			want: false,
+		},
+		{
+			name: "Verified false, HasVerificationIndeterminate false",
+			result: Result{
+				Verified:                     false,
+				HasVerificationIndeterminate: false,
+			},
+			want: true,
+		},
+		{
+			name: "Verified true, HasVerificationIndeterminate true",
+			result: Result{
+				Verified:                     true,
+				HasVerificationIndeterminate: true,
+			},
+			want: false,
+		},
+		{
+			name: "Verified false, HasVerificationIndeterminate true",
+			result: Result{
+				Verified:                     false,
+				HasVerificationIndeterminate: true,
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.result.IsUnverified(); got != tt.want {
+				t.Errorf("IsUnverified() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

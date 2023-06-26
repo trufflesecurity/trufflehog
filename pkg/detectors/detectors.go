@@ -74,6 +74,12 @@ func (r Result) IsVerified() bool {
 	return r.Verified && !r.HasVerificationIndeterminate
 }
 
+// IsUnverified checks if a result is guaranteed to be unverified.
+// This is used to differentiate between secrets that are NOT verified and secrets that COULD NOT be verified.
+func (r Result) IsUnverified() bool {
+	return !r.Verified && !r.HasVerificationIndeterminate
+}
+
 type ResultWithMetadata struct {
 	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
