@@ -928,10 +928,12 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	fmt.Print("repoPath: ", repoPath, "\n")
 
 	trimmedURL := removeURLAndSplit(repoPath)
+	owner := trimmedURL[1]
+	repo := trimmedURL[2]
 
-	for _, part := range trimmedURL {
-		fmt.Println(part)
-	}
+	//for _, part := range trimmedURL {
+	//	fmt.Println(part)
+	//}
 
 	sortType := "created"
 	directionType := "desc"
@@ -944,11 +946,40 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 			Page:    1,
 		},
 	}
-	comments, resp, err := s.apiClient.Issues.ListComments(ctx, trimmedURL[1], trimmedURL[2], 0, opts)
+	comments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, opts)
 
 	fmt.Println("comments: ", comments)
 	fmt.Println("resp: ", resp)
 	fmt.Println("err: ", err)
+
+	for _, comment := range comments {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
+						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+
+	}
 
 	//for _, repo := range s.repos {
 	//	s.log.V(1).Info("scanning comments for repo", "repo", repo)
