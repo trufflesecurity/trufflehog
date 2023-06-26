@@ -660,7 +660,9 @@ func stripPassword(u string) (string, error) {
 		return "", errors.WrapPrefix(err, "repo remote cannot be sanitized as URI", 0)
 	}
 
-	return repoURL.Redacted(), nil
+	repoURL.User = nil
+
+	return repoURL.String(), nil
 }
 
 // TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
