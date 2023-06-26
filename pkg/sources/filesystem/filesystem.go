@@ -45,6 +45,7 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.SourceUnitEnumerator = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -211,6 +212,19 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		}
 		if errors.Is(err, io.EOF) {
 			break
+		}
+	}
+	return nil
+}
+
+// Enumerate implements SourceUnitEnumerator interface. This implementation simply
+// passes the configured paths as the source unit, whether it be a single
+// filepath or a directory.
+func (s *Source) Enumerate(ctx context.Context, units chan<- sources.EnumerationResult) error {
+	for _, path := range s.paths {
+		item := sources.CommonEnumerationOk(path)
+		if err := common.CancellableWrite(ctx, units, item); err != nil {
+			return err
 		}
 	}
 	return nil
