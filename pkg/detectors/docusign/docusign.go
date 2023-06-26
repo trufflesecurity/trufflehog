@@ -81,7 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					return nil, errors.WrapPrefix(err, "Error making request", 0)
 				}
 
-				verifiedBodyResponse, err := common.ParseResponseForKeywords(res.Body, []string{"ey"})
+				verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "ey")
+				res.Body.Close()
 
 				if err != nil {
 					return nil, err

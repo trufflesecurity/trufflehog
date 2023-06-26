@@ -79,28 +79,57 @@ func TestRemoveItem(t *testing.T) {
 
 // Test ParseResponseForKeywords with a reader that contains the keyword and a reader that doesn't.
 func TestParseResponseForKeywords(t *testing.T) {
-	testReader := strings.NewReader("ey: abc")
-	testReadCloser := io.NopCloser(testReader)
-	found, err := ParseResponseForKeywords(testReadCloser, []string{"ey"})
-
-	if err != nil {
-		t.Errorf("Error: %v", err)
+	testCases := []struct {
+		name     string
+		input    string
+		keyword  string
+		expected bool
+	}{
+		{
+			name:     "Should find keyword",
+			input:    "ey: abc",
+			keyword:  "ey",
+			expected: true,
+		},
+		{
+			name:     "Should not find keyword",
+			input:    "fake response",
+			keyword:  "ey",
+			expected: false,
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			keyword:  "ey",
+			expected: false,
+		},
+		{
+			name:     "Keyword at end",
+			input:    "abc ey",
+			keyword:  "ey",
+			expected: true,
+		},
+		{
+			name:     "Keyword at start",
+			input:    "ey abc",
+			keyword:  "ey",
+			expected: true,
+		},
 	}
 
-	if !found {
-		t.Errorf("Expected true, got %+v", found)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testReader := strings.NewReader(tc.input)
+			testReadCloser := io.NopCloser(testReader)
+			found, err := ResponseContainsSubstring(testReadCloser, tc.keyword)
+
+			if err != nil {
+				t.Errorf("Error: %v", err)
+			}
+
+			if found != tc.expected {
+				t.Errorf("Expected %v, got %v", tc.expected, found)
+			}
+		})
 	}
-
-	testReader2 := strings.NewReader("fake response")
-	testReadCloser2 := io.NopCloser(testReader2)
-	found, err = ParseResponseForKeywords(testReadCloser2, []string{"ey"})
-
-	if err != nil {
-		t.Errorf("Error: %v", err)
-	}
-
-	if found {
-		t.Errorf("Expected false, got %+v", found)
-	}
-
 }
