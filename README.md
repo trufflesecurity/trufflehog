@@ -33,7 +33,7 @@ Have questions? Feedback? Jump in slack or discord and hang out with us
 
 Join our [Slack Community](https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ)
 
-Join the [Secret Scanning Discord](https://discord.gg/zpB2jDhr)
+Join the [Secret Scanning Discord](https://discord.gg/sydS6AHTUP)
 
 # :tv: Demo
 
@@ -135,6 +135,14 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
+# 8: Scan a Docker image for verified secrets.
+
+Use the `--image` flag multiple times to scan multiple images.
+
+```bash
+trufflehog docker --image trufflesecurity/secrets --only-verified
+```
+
 # :question: FAQ
 
 + All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -166,6 +174,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - git
 - github
 - gitlab
+- docker
 - S3
 - filesystem (files and directories)
 - syslog
@@ -398,6 +407,6 @@ Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE
 
 # :money_with_wings: Enterprise product
 
-Are you interested in continously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
+Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.

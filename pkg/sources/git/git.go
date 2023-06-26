@@ -67,8 +67,9 @@ func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName s
 	}
 }
 
-// Ensure the Source satisfies the interface at compile time.
+// Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -573,7 +574,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 	}
 
-	// We're logging time, but the repoPath is usally a dynamically generated folder in /tmp
+	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp
 	// To make this duration logging useful, we need to log the remote as well
 	remotes, _ := repo.Remotes()
 	repoUrl := "Could not get remote for repo"
@@ -872,4 +873,8 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	chunksChan <- &chunk
 
 	return nil
+}
+
+func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	return UnmarshalUnit(data)
 }

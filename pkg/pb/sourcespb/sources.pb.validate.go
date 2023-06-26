@@ -855,22 +855,21 @@ var _ interface {
 	ErrorName() string
 } = ConfluenceValidationError{}
 
-// Validate checks the field values on DockerHub with the rules defined in the
+// Validate checks the field values on Docker with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
-func (m *DockerHub) Validate() error {
+func (m *Docker) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on DockerHub with the rules defined in
-// the proto definition for this message. If any rules are violated, the
-// result is a list of violation errors wrapped in DockerHubMultiError, or nil
-// if none found.
-func (m *DockerHub) ValidateAll() error {
+// ValidateAll checks the field values on Docker with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in DockerMultiError, or nil if none found.
+func (m *Docker) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *DockerHub) validate(all bool) error {
+func (m *Docker) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -879,13 +878,13 @@ func (m *DockerHub) validate(all bool) error {
 
 	switch m.Credential.(type) {
 
-	case *DockerHub_Unauthenticated:
+	case *Docker_Unauthenticated:
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, DockerHubValidationError{
+					errors = append(errors, DockerValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -893,7 +892,7 @@ func (m *DockerHub) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, DockerHubValidationError{
+					errors = append(errors, DockerValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -902,7 +901,7 @@ func (m *DockerHub) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return DockerHubValidationError{
+				return DockerValidationError{
 					field:  "Unauthenticated",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -910,21 +909,58 @@ func (m *DockerHub) validate(all bool) error {
 			}
 		}
 
+	case *Docker_BasicAuth:
+
+		if all {
+			switch v := interface{}(m.GetBasicAuth()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DockerValidationError{
+						field:  "BasicAuth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DockerValidationError{
+						field:  "BasicAuth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetBasicAuth()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DockerValidationError{
+					field:  "BasicAuth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Docker_BearerToken:
+		// no validation rules for BearerToken
+
+	case *Docker_DockerKeychain:
+		// no validation rules for DockerKeychain
+
 	}
 
 	if len(errors) > 0 {
-		return DockerHubMultiError(errors)
+		return DockerMultiError(errors)
 	}
 
 	return nil
 }
 
-// DockerHubMultiError is an error wrapping multiple validation errors returned
-// by DockerHub.ValidateAll() if the designated constraints aren't met.
-type DockerHubMultiError []error
+// DockerMultiError is an error wrapping multiple validation errors returned by
+// Docker.ValidateAll() if the designated constraints aren't met.
+type DockerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m DockerHubMultiError) Error() string {
+func (m DockerMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -933,11 +969,11 @@ func (m DockerHubMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m DockerHubMultiError) AllErrors() []error { return m }
+func (m DockerMultiError) AllErrors() []error { return m }
 
-// DockerHubValidationError is the validation error returned by
-// DockerHub.Validate if the designated constraints aren't met.
-type DockerHubValidationError struct {
+// DockerValidationError is the validation error returned by Docker.Validate if
+// the designated constraints aren't met.
+type DockerValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -945,22 +981,22 @@ type DockerHubValidationError struct {
 }
 
 // Field function returns field value.
-func (e DockerHubValidationError) Field() string { return e.field }
+func (e DockerValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e DockerHubValidationError) Reason() string { return e.reason }
+func (e DockerValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e DockerHubValidationError) Cause() error { return e.cause }
+func (e DockerValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e DockerHubValidationError) Key() bool { return e.key }
+func (e DockerValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e DockerHubValidationError) ErrorName() string { return "DockerHubValidationError" }
+func (e DockerValidationError) ErrorName() string { return "DockerValidationError" }
 
 // Error satisfies the builtin error interface
-func (e DockerHubValidationError) Error() string {
+func (e DockerValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -972,14 +1008,14 @@ func (e DockerHubValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sDockerHub.%s: %s%s",
+		"invalid %sDocker.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = DockerHubValidationError{}
+var _ error = DockerValidationError{}
 
 var _ interface {
 	Field() string
@@ -987,7 +1023,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = DockerHubValidationError{}
+} = DockerValidationError{}
 
 // Validate checks the field values on ECR with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error

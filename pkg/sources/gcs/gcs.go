@@ -30,8 +30,9 @@ import (
 
 const defaultCachePersistIncrement = 2500
 
-// Ensure the Source satisfies the interface at compile time.
+// Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -69,6 +70,7 @@ type Source struct {
 
 	mu               sync.Mutex
 	sources.Progress // progress is not thread safe
+	sources.CommonSourceUnitUnmarshaller
 }
 
 // persistableCache is a wrapper around cache.Cache that allows

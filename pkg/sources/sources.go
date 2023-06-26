@@ -44,6 +44,19 @@ type Source interface {
 	GetProgress() *Progress
 }
 
+// SourceUnitUnmarshaller defines an optional interface a Source can implement
+// to support units coming from an external source.
+type SourceUnitUnmarshaller interface {
+	UnmarshalSourceUnit(data []byte) (SourceUnit, error)
+}
+
+// SourceUnit is an object that represents a Source's unit of work. This is
+// used as the output of enumeration, progress reporting, and job distribution.
+type SourceUnit interface {
+	// SourceUnitID uniquely identifies a source unit.
+	SourceUnitID() string
+}
+
 // GCSConfig defines the optional configuration for a GCS source.
 type GCSConfig struct {
 	// CloudCred determines whether to use cloud credentials.

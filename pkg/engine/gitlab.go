@@ -63,14 +63,13 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	}
 	gitlabSource.WithScanOptions(scanOptions)
 
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		err := gitlabSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning GitLab")
+			return fmt.Errorf("error scanning GitLab: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }

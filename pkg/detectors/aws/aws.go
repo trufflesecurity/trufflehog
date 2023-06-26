@@ -215,7 +215,7 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 		return results
 	}
 
-	// For every ID, we want at most one result, preferrably verified.
+	// For every ID, we want at most one result, preferably verified.
 	idResults := map[string]detectors.Result{}
 	for _, result := range results {
 		// Always accept the verified result as the result for the given ID.

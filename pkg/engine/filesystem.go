@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"runtime"
 
 	"github.com/go-errors/errors"
@@ -37,14 +38,13 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 		return errors.WrapPrefix(err, "could not init filesystem source", 0)
 	}
 	fileSystemSource.WithFilter(c.Filter)
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		err := fileSystemSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning filesystem")
+			return fmt.Errorf("error scanning filesystem: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }
