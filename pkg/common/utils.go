@@ -24,24 +24,6 @@ func RemoveStringSliceItem(item string, slice *[]string) {
 	}
 }
 
-// ParseResponseForKeywords parses the response from detector verification calls for expected keywords in the response.
-//func ParseResponseForKeywords(reader io.ReadCloser, keywords []string) (bool, error) {
-//	for _, keyword := range keywords {
-//		if keyword == "" {
-//			continue
-//		}
-//
-//		found, err := containsSubstring(reader, keyword)
-//
-//		if err != nil {
-//			return false, err
-//		}
-//		return found, nil
-//	}
-//
-//	return false, nil
-//}
-
 func ResponseContainsSubstring(reader io.ReadCloser, target string) (bool, error) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -52,26 +34,5 @@ func ResponseContainsSubstring(reader io.ReadCloser, target string) (bool, error
 	if err := scanner.Err(); err != nil {
 		return false, err
 	}
-	return false, nil
-
-	//r := bufio.NewReader(reader)
-	//
-	//for {
-	//	line, err := r.ReadString('\n')
-	//	if err != nil && err != io.EOF {
-	//		return false, err
-	//	}
-	//
-	//	// Check if the current line contains the target substring
-	//	if strings.Contains(line, target) {
-	//		return true, nil
-	//	}
-	//
-	//	// Break if the reader reached EOF (end of the file)
-	//	if err == io.EOF {
-	//		break
-	//	}
-	//}
-
 	return false, nil
 }
