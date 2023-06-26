@@ -670,7 +670,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
-
+			fmt.Println("SCANNNNN COMMENTS")
 			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
 				fmt.Println("test")
 			}
@@ -938,7 +938,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	sortType := "created"
 	directionType := "desc"
 
-	opts := &github.IssueListCommentsOptions{
+	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
 		ListOptions: github.ListOptions{
@@ -946,49 +946,50 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 			Page:    1,
 		},
 	}
-	comments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, opts)
+	issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
 
-	fmt.Println("comments: ", comments)
+	prOpts := &github.PullRequestListCommentsOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    1,
+		},
+	}
+
+	prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
+
+	fmt.Println("issue comments: ", issueComments)
+	fmt.Println("pr comments: ", prComments)
 	fmt.Println("resp: ", resp)
 	fmt.Println("err: ", err)
 
-	for _, comment := range comments {
-		// Create chunk and send it to the channel.
-		chunk := &sources.Chunk{
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			SourceType: s.Type(),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Github{
-					Github: &source_metadatapb.Github{
-						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
-						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
-						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
-						Repository: sanitizer.UTF8(repo),
-						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
-					},
-				},
-			},
-			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
-			Verify: s.verify,
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case chunksChan <- chunk:
-		}
-
-	}
-
-	//for _, repo := range s.repos {
-	//	s.log.V(1).Info("scanning comments for repo", "repo", repo)
+	//for _, comment := range comments {
+	//	// Create chunk and send it to the channel.
+	//	chunk := &sources.Chunk{
+	//		SourceName: s.name,
+	//		SourceID:   s.SourceID(),
+	//		SourceType: s.Type(),
+	//		SourceMetadata: &source_metadatapb.MetaData{
+	//			Data: &source_metadatapb.MetaData_Github{
+	//				Github: &source_metadatapb.Github{
+	//					Link:       sanitizer.UTF8(comment.GetHTMLURL()),
+	//					Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+	//					Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+	//					Repository: sanitizer.UTF8(repo),
+	//					Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+	//				},
+	//			},
+	//		},
+	//		Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+	//		Verify: s.verify,
+	//	}
 	//
-	//	//
-
-	//	//
-	//	//opts.ListOptions.ListOptions.Page += 1
-	//	// https://api.github.com/repos/trufflesecurity/trufflehog/issues/comments?sort=created&direction=desc&per_page=100&page=2
+	//	select {
+	//	case <-ctx.Done():
+	//		return ctx.Err()
+	//	case chunksChan <- chunk:
+	//	}
 	//}
 	return nil
 }
