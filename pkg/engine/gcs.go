@@ -54,14 +54,13 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 		return fmt.Errorf("failed to initialize GCS source: %w", err)
 	}
 
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		if err := source.Chunks(ctx, e.ChunksChan()); err != nil {
-			ctx.Logger().Error(err, "could not scan GCS")
+			return fmt.Errorf("could not scan GCS: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }
 

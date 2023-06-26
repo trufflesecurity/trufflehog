@@ -67,8 +67,9 @@ func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName s
 	}
 }
 
-// Ensure the Source satisfies the interface at compile time.
+// Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -738,7 +739,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 	var path string
 	switch {
 	case uri.User != nil:
-		ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri)
+		ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri.Redacted())
 		password, ok := uri.User.Password()
 		if !ok {
 			return "", true, fmt.Errorf("password must be included in Git repo URL when username is provided")
@@ -776,7 +777,7 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 		remote = true
 		switch {
 		case uri.User != nil:
-			ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri)
+			ctx.Logger().V(1).Info("cloning repo with authentication", "uri", uri.Redacted())
 			password, ok := uri.User.Password()
 			if !ok {
 				return "", remote, fmt.Errorf("password must be included in Git repo URL when username is provided")
@@ -874,4 +875,8 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	chunksChan <- &chunk
 
 	return nil
+}
+
+func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
+	return UnmarshalUnit(data)
 }

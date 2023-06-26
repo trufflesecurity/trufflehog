@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -15,7 +16,11 @@ const RegexPattern = "0-9a-z"
 const AlphaNumPattern = "0-9a-zA-Z"
 const HexPattern = "0-9a-f"
 
-//Custom Regex functions
+type RegexState struct {
+	compiledRegex *regexp.Regexp
+}
+
+// Custom Regex functions
 func BuildRegex(pattern string, specialChar string, length int) string {
 	return fmt.Sprintf(`\b([%s%s]{%s})\b`, pattern, specialChar, strconv.Itoa(length))
 }
@@ -36,4 +41,31 @@ func RangeValidation(rangeInput string) bool {
 
 func ToUpperCase(input string) string {
 	return strings.ToUpper(input)
+}
+
+func (r RegexState) Matches(data []byte) []string {
+	matches := r.compiledRegex.FindAllStringSubmatch(string(data), -1)
+
+	res := make([]string, 0, len(matches))
+
+	// trim off spaces and different quote types ('").
+	for i := range matches {
+		res = append(res, strings.Trim(matches[i][1], `"' )`))
+	}
+
+	return res
+}
+
+// UsernameRegexCheck constructs an username usernameRegex pattern from a given pattern of excluded characters.
+func UsernameRegexCheck(pattern string) RegexState {
+	raw := fmt.Sprintf(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})\b`, pattern)
+
+	return RegexState{regexp.MustCompile(raw)}
+}
+
+// PasswordRegexCheck constructs an username usernameRegex pattern from a given pattern of excluded characters.
+func PasswordRegexCheck(pattern string) RegexState {
+	raw := fmt.Sprintf(`(?im)(?:pass|password)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})`, pattern)
+
+	return RegexState{regexp.MustCompile(raw)}
 }

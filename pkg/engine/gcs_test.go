@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -55,12 +56,30 @@ func TestScanGCS(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			e := &Engine{}
-			err := e.ScanGCS(context.Background(), test.gcsConfig)
+			ctx, cancel := context.WithCancel(context.TODO())
+			defer cancel()
+
+			e := Start(ctx,
+				WithConcurrency(1),
+				WithDecoders(decoders.DefaultDecoders()...),
+				WithDetectors(false, DefaultDetectors()...),
+			)
+			go func() {
+				resultCount := 0
+				for range e.ResultsChan() {
+					resultCount++
+				}
+			}()
+
+			err := e.ScanGCS(ctx, test.gcsConfig)
 			if err != nil && !test.wantErr && !strings.Contains(err.Error(), "googleapi: Error 400: Bad Request") {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, nil)
 				return
 			}
+			logFatalFunc := func(_ error, _ string, _ ...any) {
+				t.Fatalf("error logging function should not have been called")
+			}
+			e.Finish(ctx, logFatalFunc)
 
 			if err == nil && test.wantErr {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, "error")

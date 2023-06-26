@@ -53,39 +53,45 @@ func TestGitEngine(t *testing.T) {
 			base:   "2f251b8c1e72135a375b659951097ec7749d4af9",
 		},
 	} {
-		e := Start(ctx,
-			WithConcurrency(1),
-			WithDecoders(decoders.DefaultDecoders()...),
-			WithDetectors(false, DefaultDetectors()...),
-		)
-		cfg := sources.GitConfig{
-			RepoPath: path,
-			HeadRef:  tTest.branch,
-			BaseRef:  tTest.base,
-			MaxDepth: tTest.maxDepth,
-			Filter:   tTest.filter,
-		}
-		if err := e.ScanGit(ctx, cfg); err != nil {
-			return
-		}
-		go e.Finish(ctx)
-		resultCount := 0
-		for result := range e.ResultsChan() {
-			switch meta := result.SourceMetadata.GetData().(type) {
-			case *source_metadatapb.MetaData_Git:
-				if tTest.expected[meta.Git.Commit].B != string(result.Raw) {
-					t.Errorf("%s: unexpected result. Got: %s, Expected: %s", tName, string(result.Raw), tTest.expected[meta.Git.Commit].B)
-				}
-				if tTest.expected[meta.Git.Commit].LineNumber != result.SourceMetadata.GetGit().Line {
-					t.Errorf("%s: unexpected line number. Got: %d, Expected: %d", tName, result.SourceMetadata.GetGit().Line, tTest.expected[meta.Git.Commit].LineNumber)
-				}
+		t.Run(tName, func(t *testing.T) {
+			e := Start(ctx,
+				WithConcurrency(1),
+				WithDecoders(decoders.DefaultDecoders()...),
+				WithDetectors(false, DefaultDetectors()...),
+			)
+			cfg := sources.GitConfig{
+				RepoPath: path,
+				HeadRef:  tTest.branch,
+				BaseRef:  tTest.base,
+				MaxDepth: tTest.maxDepth,
+				Filter:   tTest.filter,
 			}
-			resultCount++
+			if err := e.ScanGit(ctx, cfg); err != nil {
+				return
+			}
 
-		}
-		if resultCount != len(tTest.expected) {
-			t.Errorf("%s: unexpected number of results. Got: %d, Expected: %d", tName, resultCount, len(tTest.expected))
-		}
+			logFatalFunc := func(_ error, _ string, _ ...any) {
+				t.Fatalf("error logging function should not have been called")
+			}
+			go e.Finish(ctx, logFatalFunc)
+			resultCount := 0
+			for result := range e.ResultsChan() {
+				switch meta := result.SourceMetadata.GetData().(type) {
+				case *source_metadatapb.MetaData_Git:
+					if tTest.expected[meta.Git.Commit].B != string(result.Raw) {
+						t.Errorf("%s: unexpected result. Got: %s, Expected: %s", tName, string(result.Raw), tTest.expected[meta.Git.Commit].B)
+					}
+					if tTest.expected[meta.Git.Commit].LineNumber != result.SourceMetadata.GetGit().Line {
+						t.Errorf("%s: unexpected line number. Got: %d, Expected: %d", tName, result.SourceMetadata.GetGit().Line, tTest.expected[meta.Git.Commit].LineNumber)
+					}
+				}
+				resultCount++
+
+			}
+			if resultCount != len(tTest.expected) {
+				t.Errorf("%s: unexpected number of results. Got: %d, Expected: %d", tName, resultCount, len(tTest.expected))
+			}
+		})
 	}
 }
 
@@ -124,5 +130,8 @@ func BenchmarkGitEngine(b *testing.B) {
 			return
 		}
 	}
-	e.Finish(ctx)
+	logFatalFunc := func(_ error, _ string, _ ...any) {
+		b.Fatalf("error logging function should not have been called")
+	}
+	e.Finish(ctx, logFatalFunc)
 }
