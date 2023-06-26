@@ -3,7 +3,9 @@
 
 package detectors
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestPrefixRegex(t *testing.T) {
 	tests := []struct {
@@ -35,5 +37,54 @@ func BenchmarkPrefixRegex(b *testing.B) {
 	kws := []string{"securitytrails"}
 	for i := 0; i < b.N; i++ {
 		PrefixRegex(kws)
+	}
+}
+
+func TestIsVerified(t *testing.T) {
+	tests := []struct {
+		name   string
+		result Result
+		want   bool
+	}{
+		{
+			name: "Verified true, HasVerificationIndeterminate false",
+			result: Result{
+				Verified:                     true,
+				HasVerificationIndeterminate: false,
+			},
+			want: true,
+		},
+		{
+			name: "Verified false, HasVerificationIndeterminate false",
+			result: Result{
+				Verified:                     false,
+				HasVerificationIndeterminate: false,
+			},
+			want: false,
+		},
+		{
+			name: "Verified true, HasVerificationIndeterminate true",
+			result: Result{
+				Verified:                     true,
+				HasVerificationIndeterminate: true,
+			},
+			want: false,
+		},
+		{
+			name: "Verified false, HasVerificationIndeterminate true",
+			result: Result{
+				Verified:                     false,
+				HasVerificationIndeterminate: true,
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.result.IsVerified(); got != tt.want {
+				t.Errorf("IsVerified() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

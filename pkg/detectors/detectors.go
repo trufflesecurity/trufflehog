@@ -39,6 +39,8 @@ type EndpointCustomizer interface {
 	DefaultEndpoint() string
 }
 
+// Result is a secret that has been found by a Detector and optionally verified.
+// It contains the raw secret identification data, redacted data, and extra data.
 type Result struct {
 	// DetectorType is the type of Detector.
 	DetectorType detectorspb.DetectorType
@@ -46,7 +48,15 @@ type Result struct {
 	DetectorName string
 	// DecoderType is the type of Decoder.
 	DecoderType detectorspb.DecoderType
-	Verified    bool
+	// Verified is true if the secret has been confirmed to be a valid secret.
+	Verified bool
+	// HasVerificationIndeterminate is true if the secret could NOT be verified.
+	// This is used to differentiate between secrets that are NOT verified and secrets that COULD NOT be verified.
+	// Ex: A 429 response from a service, or a timeout would set this to true.
+	HasVerificationIndeterminate bool
+	// VerificationIndeterminateError holds the error if the secret could NOT be verified.
+	// This is used specifically for cases that resulted in indeterminate resolution, such as a 429 or timeout.
+	VerificationIndeterminateError error
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -57,6 +67,11 @@ type Result struct {
 	Redacted       string
 	ExtraData      map[string]string
 	StructuredData *detectorspb.StructuredData
+}
+
+// IsVerified checks if a result is guaranteed to be verified.
+func (r Result) IsVerified() bool {
+	return r.Verified && !r.HasVerificationIndeterminate
 }
 
 type ResultWithMetadata struct {
