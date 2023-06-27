@@ -13,29 +13,40 @@ func TestFragmentLineOffset(t *testing.T) {
 		chunk        *sources.Chunk
 		result       *detectors.Result
 		expectedLine int64
-		expectedBool bool
+		ignore       bool
 	}{
 		{
-			name: "trufflehog:ignore found",
+			name: "ignore found on same line",
 			chunk: &sources.Chunk{
-				Data: []byte("line1\nline2\ntrufflehog:ignore\nline4"),
+				Data: []byte("line1\nline2\nsecret here trufflehog:ignore\nline4"),
 			},
 			result: &detectors.Result{
-				Raw: []byte("trufflehog:ignore"),
+				Raw: []byte("secret here"),
 			},
 			expectedLine: 2,
-			expectedBool: true,
+			ignore:       true,
 		},
 		{
-			name: "nonexistent string",
+			name: "no ignore",
 			chunk: &sources.Chunk{
-				Data: []byte("line1\nline2\ntrufflehog:ignore\nline4"),
+				Data: []byte("line1\nline2\nsecret here\nline4"),
 			},
 			result: &detectors.Result{
-				Raw: []byte("nonexistent"),
+				Raw: []byte("secret here"),
 			},
-			expectedLine: 0,
-			expectedBool: false,
+			expectedLine: 2,
+			ignore:       false,
+		},
+		{
+			name: "ignore on different line",
+			chunk: &sources.Chunk{
+				Data: []byte("line1\nline2\ntrufflehog:ignore\nline4\nsecret here\nline6"),
+			},
+			result: &detectors.Result{
+				Raw: []byte("secret here"),
+			},
+			expectedLine: 4,
+			ignore:       false,
 		},
 	}
 
@@ -45,8 +56,8 @@ func TestFragmentLineOffset(t *testing.T) {
 			if lineOffset != tt.expectedLine {
 				t.Errorf("Expected line offset to be %d, got %d", tt.expectedLine, lineOffset)
 			}
-			if isIgnored != tt.expectedBool {
-				t.Errorf("Expected isIgnored to be %v, got %v", tt.expectedBool, isIgnored)
+			if isIgnored != tt.ignore {
+				t.Errorf("Expected isIgnored to be %v, got %v", tt.ignore, isIgnored)
 			}
 		})
 	}
