@@ -942,8 +942,11 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 
 	for {
 		issueComments, _, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
-		err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
+		if err != nil {
+			return err
+		}
 
+		err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
 		if err != nil {
 			return err
 		}
@@ -971,6 +974,9 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 		}
 
 		err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
+		if err != nil {
+			return err
+		}
 
 		prOpts.ListOptions.Page++
 
