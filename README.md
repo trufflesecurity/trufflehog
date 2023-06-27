@@ -152,7 +152,7 @@ trufflehog docker --image trufflesecurity/secrets --only-verified
 + It says a private key was verified, what does that mean?
   + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 + Is there an easy way to ignore specific secrets?
-  + If the scanned source supports line numbers, then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets. 
+  + If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets. 
 
 
 # :newspaper: What's new in v3?
