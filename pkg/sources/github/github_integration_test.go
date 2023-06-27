@@ -80,6 +80,112 @@ func TestSource_Token(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSource_ScanComments(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	// For the personal access token test
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	const totalChunks = 3
+
+	type init struct {
+		name       string
+		verify     bool
+		connection *sourcespb.GitHub
+	}
+	tests := []struct {
+		name      string
+		init      init
+		wantChunk *sources.Chunk
+		wantErr   bool
+		minRepo   int
+		minOrg    int
+	}{
+		{
+			name: "token authenticated, single repo",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/truffle-test-integration-org/another-test-repo.git",
+							Link:       "https://github.com/truffle-test-integration-org/another-test-repo/issues/1#issuecomment-1603436833",
+							Username:   "truffle-sandbox",
+							Timestamp:  "2023-06-22 23:33:46 +0000 UTC",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			chunksCh := make(chan *sources.Chunk, 5)
+			go func() {
+				// Close the channel
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh)
+				if (err != nil) != tt.wantErr {
+					if ctx.Err() != nil {
+						return
+					}
+					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+			}()
+
+			i := 0
+			for gotChunk := range chunksCh {
+				i++
+				githubCommentCheckFunc(gotChunk, tt.wantChunk, i, t)
+			}
+
+			// Confirm all comments were processed.
+
+			if i != totalChunks {
+				t.Errorf("did not complete all chunks, got %d, want %d", i, totalChunks)
+			}
+
+		})
+	}
+}
+
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
@@ -577,6 +683,21 @@ func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) so
 		}
 		return nil
 	}
+}
+
+func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testing.T) {
+	if gotChunk.SourceType != wantChunk.SourceType {
+		t.Errorf("want SourceType %v, got %v", wantChunk.SourceType, gotChunk.SourceType)
+	}
+
+	assert.NotEmpty(t, gotChunk.SourceMetadata.Data, "SourceMetadata.Data should not be empty")
+
+	if i == 1 && gotChunk.SourceMetadata != wantChunk.SourceMetadata {
+		if diff := pretty.Compare(gotChunk.SourceMetadata, wantChunk.SourceMetadata); diff != "" {
+			t.Errorf("SourceMetadata diff: (-got +want)\n%s", diff)
+		}
+	}
+
 }
 
 // func TestSource_paginateRepos(t *testing.T) {

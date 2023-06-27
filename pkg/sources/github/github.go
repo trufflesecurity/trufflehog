@@ -664,16 +664,17 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
 
+			fmt.Println("SCANNNNN COMMENTS")
+			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
+				fmt.Println("test")
+			}
+
 			fmt.Printf("Scanning repoURL %s, path %+v, repo %+v \n ", repoURL, path, repo)
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
 			}
 			atomic.AddUint64(&scanned, 1)
-
-			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
-				fmt.Println("test")
-			}
 
 			return nil
 		})
@@ -928,15 +929,17 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	fmt.Print("repoPath: ", repoPath, "\n")
 
 	trimmedURL := removeURLAndSplit(repoPath)
+	owner := trimmedURL[1]
+	repo := trimmedURL[2]
 
-	for _, part := range trimmedURL {
-		fmt.Println(part)
-	}
+	//for _, part := range trimmedURL {
+	//	fmt.Println(part)
+	//}
 
 	sortType := "created"
 	directionType := "desc"
 
-	opts := &github.IssueListCommentsOptions{
+	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
 		ListOptions: github.ListOptions{
@@ -944,21 +947,96 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 			Page:    1,
 		},
 	}
-	comments, resp, err := s.apiClient.Issues.ListComments(ctx, trimmedURL[1], trimmedURL[2], 0, opts)
+	issueComments, _, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
 
-	fmt.Println("comments: ", comments)
-	fmt.Println("resp: ", resp)
-	fmt.Println("err: ", err)
+	err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
 
-	//for _, repo := range s.repos {
-	//	s.log.V(1).Info("scanning comments for repo", "repo", repo)
-	//
-	//	//
+	if err != nil {
+		return err
+	}
 
-	//	//
-	//	//opts.ListOptions.ListOptions.Page += 1
-	//	// https://api.github.com/repos/trufflesecurity/trufflehog/issues/comments?sort=created&direction=desc&per_page=100&page=2
-	//}
+	prOpts := &github.PullRequestListCommentsOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    1,
+		},
+	}
+
+	prComments, _, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
+	err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
+
+	fmt.Println("issue comments: ", issueComments)
+	// fmt.Println("pr comments: ", prComments)
+
+	return nil
+}
+
+func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments []*github.IssueComment, chunksChan chan *sources.Chunk, repoPath string) error {
+	for _, comment := range comments {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
+						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+						Visibility: s.visibilityOf(ctx, repoPath),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		fmt.Printf("chunk: %+v\n", chunk)
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk, repoPath string) error {
+	for _, comment := range comments {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
+						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		fmt.Printf("pr chunk: %+v\n", chunk)
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
 	return nil
 }
 
