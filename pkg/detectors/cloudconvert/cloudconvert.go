@@ -20,8 +20,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudconvert"}) + `\b(ey[0-9a-zA-Z]{34}.ey[0-9a-zA-Z-_]{200,500}.[0-9a-zA-Z-_]{600,700})\b`)
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudconvert"}) + common.BuildRegexJWT("30,34", "200,500", "600,700"))
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,7 +35,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
@@ -60,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
@@ -71,5 +70,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_CloudConvert
 }

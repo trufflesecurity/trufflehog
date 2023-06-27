@@ -2,7 +2,7 @@ package text2data
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				body, errBody := ioutil.ReadAll(res.Body)
+				body, errBody := io.ReadAll(res.Body)
 
 				if errBody == nil {
 					bodyString := string(body)
@@ -85,10 +85,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 type Response struct {
 	Status       int    `json:"Status"`
 	ErrorMessage string `json:"ErrorMessage"`
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Text2Data
 }

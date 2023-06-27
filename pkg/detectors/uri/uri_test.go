@@ -7,23 +7,13 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestURI_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("URI_SECRET")
-	secretInactive := testSecrets.MustGetField("URI_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -36,20 +26,19 @@ func TestURI_FromChunk(t *testing.T) {
 		want    []detectors.Result
 		wantErr bool
 	}{
-
 		{
 			name: "found, unverified, wrong username",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", secretInactive)),
+				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", "https://user:pass@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx")),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_URI,
 					Verified:     false,
-					Redacted:     "https://user:**********@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx",
+					Redacted:     "https://user:********@www.httpwatch.com",
 				},
 			},
 			wantErr: false,
@@ -59,20 +48,37 @@ func TestURI_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", "https://httpwatch:pass@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx")),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_URI,
 					Verified:     true,
-					Redacted:     "https://httpwatch:**********@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx",
+					Redacted:     "https://httpwatch:********@www.httpwatch.com",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "bad proto",
+			name: "found, verified, defused",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", "https://httpwatch:pass@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?foo=bar")),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_URI,
+					Verified:     true,
+					Redacted:     "https://httpwatch:********@www.httpwatch.com",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "bad scheme",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -95,6 +101,7 @@ func TestURI_FromChunk(t *testing.T) {
 			// }
 			for i := range got {
 				got[i].Raw = nil
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

@@ -12,7 +12,7 @@ func NormalizeBitbucketRepo(repoURL string) (string, error) {
 		return "", errors.New("Bitbucket requires https repo urls: e.g. https://bitbucket.org/org/repo.git")
 	}
 
-	return NormalizeOrgRepoURL("Gitlab", repoURL)
+	return NormalizeOrgRepoURL("Bitbucket", repoURL)
 }
 
 func NormalizeGerritProject(project string) (string, error) {
@@ -24,8 +24,8 @@ func NormalizeGithubRepo(repoURL string) (string, error) {
 }
 
 func NormalizeGitlabRepo(repoURL string) (string, error) {
-	if !strings.HasPrefix(repoURL, "https") {
-		return "", errors.New("Gitlab requires https repo urls: e.g. https://gitlab.com/org/repo.git")
+	if !strings.HasPrefix(repoURL, "http:") && !strings.HasPrefix(repoURL, "https:") {
+		return "", errors.New("Gitlab requires http/https repo urls: e.g. https://gitlab.com/org/repo.git")
 	}
 
 	return NormalizeOrgRepoURL("Gitlab", repoURL)
@@ -72,8 +72,8 @@ func NormalizeOrgRepoURL(provider, repoURL string) (string, error) {
 			return "", errors.Errorf("%s repo appears to be missing the repo name. Org: %q Repo url: %q", provider, org, repoURL)
 		}
 
-	case len(parts) > 3:
-		return "", errors.Errorf("%s repo appears to be too long or contains a trailing slash. Repo url: %q", provider, repoURL)
+	case len(parts) > 3 && strings.HasSuffix(parsed.Path, "/"):
+		return "", errors.Errorf("%s repo contains a trailing slash. Repo url: %q", provider, repoURL)
 	}
 
 	// If we're here it's probably a provider repo without ".git" at the end, so add it and return

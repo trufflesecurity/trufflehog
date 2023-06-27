@@ -19,8 +19,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"codemagic"}) + `\b([a-zA-Z0-9_]{43})\b`)
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"codemagic"}) + common.BuildRegex(common.AlphaNumPattern, "_", 43))
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
@@ -70,5 +70,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Codemagic
 }

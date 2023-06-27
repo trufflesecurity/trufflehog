@@ -13,40 +13,41 @@ jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
+      actions: 'read'
       contents: 'read'
       id-token: 'write'
     steps:
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
-        go-version: '1.18'
+        go-version: '1.20'
     - name: Checkout code
       uses: actions/checkout@v3
     - id: 'auth'
-      uses: 'google-github-actions/auth@v0'
+      uses: 'google-github-actions/auth@v1'
       with:
         workload_identity_provider: 'projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
         service_account: 'github-ci-external@trufflehog-testing.iam.gserviceaccount.com'
     - name: Test
-      run: make test
+      run: make test-integration
   test-detectors:
     runs-on: ubuntu-latest
     permissions:
+      actions: 'read'
       contents: 'read'
       id-token: 'write'
     steps:
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
-        go-version: '1.18'
+        go-version: '1.20'
     - name: Checkout code
       uses: actions/checkout@v3
     - id: 'auth'
-      uses: 'google-github-actions/auth@v0'
+      uses: 'google-github-actions/auth@v1'
       with:
         workload_identity_provider: 'projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
         service_account: 'github-ci-external@trufflehog-testing.iam.gserviceaccount.com'
     - name: Test
       run: make test-detectors
       continue-on-error: true
-    

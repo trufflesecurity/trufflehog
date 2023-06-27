@@ -1,12 +1,14 @@
 package sources
 
 import (
-	"context"
 	"sync"
 
+	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.
@@ -38,11 +40,145 @@ type Source interface {
 	Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error
 	// Chunks emits data over a channel that is decoded and scanned for secrets.
 	Chunks(ctx context.Context, chunksChan chan *Chunk) error
-	// Completion Percentage for Scanned Source
+	// GetProgress is the completion progress (percentage) for Scanned Source.
 	GetProgress() *Progress
 }
 
-// PercentComplete is used to update job completion percentages across sources
+// SourceUnitUnmarshaller defines an optional interface a Source can implement
+// to support units coming from an external source.
+type SourceUnitUnmarshaller interface {
+	UnmarshalSourceUnit(data []byte) (SourceUnit, error)
+}
+
+// SourceUnit is an object that represents a Source's unit of work. This is
+// used as the output of enumeration, progress reporting, and job distribution.
+type SourceUnit interface {
+	// SourceUnitID uniquely identifies a source unit.
+	SourceUnitID() string
+}
+
+// GCSConfig defines the optional configuration for a GCS source.
+type GCSConfig struct {
+	// CloudCred determines whether to use cloud credentials.
+	// This can NOT be used with a secret.
+	CloudCred,
+	// WithoutAuth is a flag to indicate whether to use authentication.
+	WithoutAuth bool
+	// ApiKey is the API key to use to authenticate with the source.
+	ApiKey,
+	// ProjectID is the project ID to use to authenticate with the source.
+	ProjectID,
+	// ServiceAccount is the service account to use to authenticate with the source.
+	ServiceAccount string
+	// MaxObjectSize is the maximum object size to scan.
+	MaxObjectSize int64
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency int
+	// IncludeBuckets is a list of buckets to include in the scan.
+	IncludeBuckets,
+	// ExcludeBuckets is a list of buckets to exclude from the scan.
+	ExcludeBuckets,
+	// IncludeObjects is a list of objects to include in the scan.
+	IncludeObjects,
+	// ExcludeObjects is a list of objects to exclude from the scan.
+	ExcludeObjects []string
+}
+
+// GitConfig defines the optional configuration for a git source.
+type GitConfig struct {
+	// RepoPath is the path to the repository to scan.
+	RepoPath,
+	// HeadRef is the head reference to use to scan from.
+	HeadRef,
+	// BaseRef is the base reference to use to scan from.
+	BaseRef string
+	// MaxDepth is the maximum depth to scan the source.
+	MaxDepth int
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
+	// ExcludeGlobs is a list of globs to exclude from the scan.
+	// This differs from the Filter exclusions as ExcludeGlobs is applied at the `git log -p` level
+	ExcludeGlobs []string
+}
+
+// GithubConfig defines the optional configuration for a github source.
+type GithubConfig struct {
+	// Endpoint is the endpoint of the source.
+	Endpoint,
+	// Token is the token to use to authenticate with the source.
+	Token string
+	// IncludeForks indicates whether to include forks in the scan.
+	IncludeForks,
+	// IncludeMembers indicates whether to include members in the scan.
+	IncludeMembers bool
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency int
+	// Repos is the list of repositories to scan.
+	Repos,
+	// Orgs is the list of organizations to scan.
+	Orgs,
+	// ExcludeRepos is a list of repositories to exclude from the scan.
+	ExcludeRepos,
+	// IncludeRepos is a list of repositories to include in the scan.
+	IncludeRepos []string
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
+}
+
+// GitlabConfig defines the optional configuration for a gitlab source.
+type GitlabConfig struct {
+	// Endpoint is the endpoint of the source.
+	Endpoint,
+	// Token is the token to use to authenticate with the source.
+	Token string
+	// Repos is the list of repositories to scan.
+	Repos []string
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
+}
+
+// FilesystemConfig defines the optional configuration for a filesystem source.
+type FilesystemConfig struct {
+	// Paths is the list of files and directories to scan.
+	Paths []string
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
+}
+
+// S3Config defines the optional configuration for an S3 source.
+type S3Config struct {
+	// CloudCred determines whether to use cloud credentials.
+	// This can NOT be used with a secret.
+	CloudCred bool
+	// Key is any key to use to authenticate with the source.
+	Key,
+	// Secret is any secret to use to authenticate with the source.
+	Secret,
+	// Temporary session token associated with a temporary access key id and secret key.
+	SessionToken string
+	// Buckets is the list of buckets to scan.
+	Buckets []string
+	// MaxObjectSize is the maximum object size to scan.
+	MaxObjectSize int64
+}
+
+// SyslogConfig defines the optional configuration for a syslog source.
+type SyslogConfig struct {
+	// Address used to connect to the source.
+	Address,
+	// Protocol used to connect to the source.
+	Protocol,
+	// CertPath is the path to the certificate to use to connect to the source.
+	CertPath,
+	// Format is the format used to connect to the source.
+	Format,
+	// KeyPath is the path to the key to use to connect to the source.
+	KeyPath string
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency int
+}
+
+// Progress is used to update job completion progress across sources.
 type Progress struct {
 	mut               sync.Mutex
 	PercentComplete   int64
@@ -50,6 +186,12 @@ type Progress struct {
 	EncodedResumeInfo string
 	SectionsCompleted int32
 	SectionsRemaining int32
+}
+
+// Validator is an interface for validating a source. Sources can optionally implement this interface to validate
+// their configuration.
+type Validator interface {
+	Validate() []error
 }
 
 // SetProgressComplete sets job progress information for a running job based on the highest level objects in the source.
@@ -65,10 +207,17 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 	p.EncodedResumeInfo = encodedResumeInfo
 	p.SectionsCompleted = int32(i)
 	p.SectionsRemaining = int32(scope)
+
+	// If the iteration and scope are both 0, completion is 100%.
+	if i == 0 && scope == 0 {
+		p.PercentComplete = 100
+		return
+	}
+
 	p.PercentComplete = int64((float64(i) / float64(scope)) * 100)
 }
 
-//GetProgressComplete gets job completion percentage for metrics reporting
+// GetProgress gets job completion percentage for metrics reporting.
 func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()

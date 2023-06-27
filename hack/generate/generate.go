@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,6 +9,8 @@ import (
 	"text/template"
 
 	"github.com/go-errors/errors"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -25,7 +26,7 @@ func main() {
 	log.SetPrefix("😲 [generate] ")
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
-	nameTitle = strings.Title(*name)
+	nameTitle = cases.Title(language.AmericanEnglish).String(*name)
 	nameLower = strings.ToLower(*name)
 	nameUpper = strings.ToUpper(*name)
 
@@ -66,7 +67,7 @@ type templateJob struct {
 }
 
 func mustWriteTemplates(jobs []templateJob) {
-	log.Printf("Generating %s %s\n", strings.Title(*kind), nameTitle)
+	log.Printf("Generating %s %s\n", cases.Title(language.AmericanEnglish).String(*kind), nameTitle)
 
 	// Make the folder.
 	log.Printf("Creating folder %s\n", folderPath())
@@ -77,7 +78,7 @@ func mustWriteTemplates(jobs []templateJob) {
 
 	// Write the files from templates.
 	for _, job := range jobs {
-		tmplBytes, err := ioutil.ReadFile(job.TemplatePath)
+		tmplBytes, err := os.ReadFile(job.TemplatePath)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -85,7 +86,7 @@ func mustWriteTemplates(jobs []templateJob) {
 
 		for _, rplString := range job.ReplaceString {
 			tmplRaw = strings.ReplaceAll(tmplRaw, strings.ToLower(rplString), "<<.NameLower>>")
-			tmplRaw = strings.ReplaceAll(tmplRaw, strings.Title(rplString), "<<.NameTitle>>")
+			tmplRaw = strings.ReplaceAll(tmplRaw, cases.Title(language.AmericanEnglish).String(rplString), "<<.NameTitle>>")
 			tmplRaw = strings.ReplaceAll(tmplRaw, strings.ToUpper(rplString), "<<.NameUpper>>")
 		}
 

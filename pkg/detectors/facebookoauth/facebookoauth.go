@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_FacebookOAuth,
 				Redacted:     apiIdRes,
 				Raw:          []byte(apiSecretRes),
+				RawV2:        []byte(apiIdRes + apiSecretRes),
 			}
 
 			if verify {
@@ -79,5 +80,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_FacebookOAuth
 }

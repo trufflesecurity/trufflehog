@@ -2,6 +2,7 @@ package detectors
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,14 +22,36 @@ type Detector interface {
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.
 	// Use unique identifiers that are part of the secret if you can, or the provider name.
 	Keywords() []string
+	// Type returns the DetectorType number from detectors.proto for the given detector.
+	Type() detectorspb.DetectorType
+}
+
+// Versioner is an optional interface that a detector can implement to
+// differentiate instances of the same detector type.
+type Versioner interface {
+	Version() int
+}
+
+// EndpointCustomizer is an optional interface that a detector can implement to
+// support verifying against user-supplied endpoints.
+type EndpointCustomizer interface {
+	SetEndpoints(...string) error
+	DefaultEndpoint() string
 }
 
 type Result struct {
 	// DetectorType is the type of Detector.
 	DetectorType detectorspb.DetectorType
-	Verified     bool
+	// DetectorName is the name of the Detector. Used for custom detectors.
+	DetectorName string
+	// DecoderType is the type of Decoder.
+	DecoderType detectorspb.DecoderType
+	Verified    bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
+	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
+	// This is used for secrets that are multi part and could have the same ID. Ex: AWS credentials
+	RawV2 []byte
 	// Redacted contains the redacted version of the raw secret identification data for display purposes.
 	// A secret ID should be used if available.
 	Redacted       string
@@ -46,6 +69,8 @@ type ResultWithMetadata struct {
 	// SourceName is the name of the Source.
 	SourceName string
 	Result
+	// Data from the sources.Chunk which this result was emitted for
+	Data []byte
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
@@ -56,6 +81,7 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
 		Result:         result,
+		Data:           chunk.Data,
 	}
 }
 
@@ -96,9 +122,9 @@ func PrefixRegex(keywords []string) string {
 	return pre + middle + post
 }
 
-//KeyIsRandom is a Low cost check to make sure that 'keys' include a number to reduce FPs.
-//Golang doesnt support regex lookaheads, so must be done in separate calls.
-//TODO improve checks. Shannon entropy did not work well.
+// KeyIsRandom is a Low cost check to make sure that 'keys' include a number to reduce FPs.
+// Golang doesn't support regex lookaheads, so must be done in separate calls.
+// TODO improve checks. Shannon entropy did not work well.
 func KeyIsRandom(key string) bool {
 	for _, ch := range key {
 		if unicode.IsDigit(ch) {
@@ -127,4 +153,9 @@ func MustGetBenchmarkData() map[string][]byte {
 		"medium": medium,
 		"big":    big,
 	}
+}
+
+func RedactURL(u url.URL) string {
+	u.User = url.UserPassword(u.User.Username(), "********")
+	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
 }

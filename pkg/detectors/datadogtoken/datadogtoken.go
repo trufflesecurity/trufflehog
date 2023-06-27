@@ -20,8 +20,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog"}) + `\b([a-zA-Z-0-9]{40})\b`)
-	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog"}) + `\b([a-zA-Z-0-9]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
+	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_DatadogToken,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resApiMatch),
 			}
 
 			if verify {
@@ -81,5 +82,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_DatadogToken
 }

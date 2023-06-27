@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Bitmex,
 				Raw:          []byte(resSecretMatch),
+				RawV2:        []byte(resMatch + resSecretMatch),
 			}
 
 			if verify {
@@ -98,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 func getBitmexSignature(timeStamp string, secret string, action string, path string, payload string) string {
@@ -107,4 +108,8 @@ func getBitmexSignature(timeStamp string, secret string, action string, path str
 	mac.Write([]byte(action + path + timeStamp + payload))
 	macsum := mac.Sum(nil)
 	return hex.EncodeToString(macsum)
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Bitmex
 }

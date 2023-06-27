@@ -8,9 +8,14 @@ inputs:
     required: true
   base:
     description: Start scanning from here (usually main branch).
-    required: true
+    required: false
+    default: ''
   head:
     description: Scan commits until here (usually dev branch).
+    required: false
+  extra_args:
+    default: ''
+    description: Extra args to be passed to the trufflehog cli.
     required: false
 branding:
   icon: "shield"
@@ -26,3 +31,6 @@ runs:
     - --branch
     - ${{ inputs.head }}
     - --fail
+    - --no-update
+    - --github-actions
+    - ${{ inputs.extra_args }}

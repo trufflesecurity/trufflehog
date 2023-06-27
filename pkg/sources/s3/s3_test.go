@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -10,12 +9,14 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Chunks(t *testing.T) {
@@ -60,25 +61,22 @@ func TestSource_Chunks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log.SetFormatter(&log.TextFormatter{ForceColors: true})
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 			var cancelOnce sync.Once
 			defer cancelOnce.Do(cancel)
 
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
-
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 10)
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			chunksCh := make(chan *sources.Chunk, 100)
+			chunksCh := make(chan *sources.Chunk)
 			go func() {
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
@@ -92,6 +90,8 @@ func TestSource_Chunks(t *testing.T) {
 			if diff := pretty.Compare(gotChunk.Data, wantData); diff != "" {
 				t.Errorf("%s: Source.Chunks() diff: (-got +want)\n%s", tt.name, diff)
 			}
+			assert.Equal(t, "", s.GetProgress().EncodedResumeInfo)
+			assert.Equal(t, int64(100), s.GetProgress().PercentComplete)
 		})
 	}
 }

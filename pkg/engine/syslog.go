@@ -1,33 +1,36 @@
 package engine
 
 import (
-	"context"
+	"fmt"
 	"os"
 
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/syslog"
 )
 
-func (e *Engine) ScanSyslog(ctx context.Context, address, protocol, certPath, keyPath, format string, concurrency int) error {
+// ScanSyslog is a source that scans syslog files.
+func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) error {
 	connection := &sourcespb.Syslog{
-		Protocol:      protocol,
-		ListenAddress: address,
-		Format:        format,
+		Protocol:      c.Protocol,
+		ListenAddress: c.Address,
+		Format:        c.Format,
 	}
 
-	if certPath != "" && keyPath != "" {
-		cert, err := os.ReadFile(certPath)
+	if c.CertPath != "" && c.KeyPath != "" {
+		cert, err := os.ReadFile(c.CertPath)
 		if err != nil {
 			return errors.WrapPrefix(err, "could not open TLS cert file", 0)
 		}
 		connection.TlsCert = string(cert)
 
-		key, err := os.ReadFile(keyPath)
+		key, err := os.ReadFile(c.KeyPath)
 		if err != nil {
 			return errors.WrapPrefix(err, "could not open TLS key file", 0)
 		}
@@ -40,20 +43,24 @@ func (e *Engine) ScanSyslog(ctx context.Context, address, protocol, certPath, ke
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 	source := syslog.Source{}
-	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, concurrency)
+	ctx = context.WithValues(ctx,
+		"source_type", source.Type().String(),
+		"source_name", "syslog",
+	)
+	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, c.Concurrency)
 	source.InjectConnection(connection)
 	if err != nil {
-		logrus.WithError(err).Error("failed to initialize syslog source")
+		ctx.Logger().Error(err, "failed to initialize syslog source")
 		return err
 	}
 
-	e.sourcesWg.Add(1)
-	go func() {
-		defer e.sourcesWg.Done()
+	e.sourcesWg.Go(func() error {
+		defer common.RecoverWithExit(ctx)
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Fatal("could not scan syslog")
+			return fmt.Errorf("could not scan syslog: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }

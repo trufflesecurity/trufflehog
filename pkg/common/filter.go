@@ -6,7 +6,7 @@ import (
 	"os"
 	"regexp"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type Filter struct {
@@ -20,7 +20,8 @@ type FilterRuleSet []regexp.Regexp
 func FilterEmpty() *Filter {
 	filter, err := FilterFromFiles("", "")
 	if err != nil {
-		log.WithError(err).Fatalf("could not create empty filter")
+		context.Background().Logger().Error(err, "could not create empty filter")
+		os.Exit(1)
 	}
 	return filter
 }
@@ -57,15 +58,19 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 	}
 
 	commentPattern := regexp.MustCompile(`^\s*#`)
+	emptyLinePattern := regexp.MustCompile(`^\s*$`)
 
 	file, err := os.Open(source)
+	logger := context.Background().Logger().WithValues("file", source)
 	if err != nil {
-		log.WithError(err).Fatalf("unable to open filter file: %s", source)
+		logger.Error(err, "unable to open filter file", "file", source)
+		os.Exit(1)
 	}
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			log.WithError(err).Fatalf("unable to close filter file: %s", source)
+			logger.Error(err, "unable to close filter file")
+			os.Exit(1)
 		}
 	}(file)
 
@@ -73,6 +78,9 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if commentPattern.MatchString(line) {
+			continue
+		}
+		if emptyLinePattern.MatchString(line) {
 			continue
 		}
 		pattern, err := regexp.Compile(line)
@@ -86,6 +94,9 @@ func FilterRulesFromFile(source string) (*FilterRuleSet, error) {
 
 // Pass returns true if the include FilterRuleSet matches the pattern and the exclude FilterRuleSet does not match.
 func (filter *Filter) Pass(object string) bool {
+	if filter == nil {
+		return true
+	}
 	excluded := filter.exclude.Matches(object)
 	included := filter.include.Matches(object)
 	return !excluded && included

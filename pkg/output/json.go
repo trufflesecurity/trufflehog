@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
-func PrintJSON(r *detectors.ResultWithMetadata) {
+func PrintJSON(r *detectors.ResultWithMetadata) error {
 	v := &struct {
 		// SourceMetadata contains source-specific contextual information.
 		SourceMetadata *source_metadatapb.MetaData
@@ -25,9 +24,14 @@ func PrintJSON(r *detectors.ResultWithMetadata) {
 		DetectorType detectorspb.DetectorType
 		// DetectorName is the string name of the DetectorType.
 		DetectorName string
-		Verified     bool
-		// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
-		Raw []byte
+		// DecoderName is the string name of the DecoderType.
+		DecoderName string
+		Verified    bool
+		// Raw contains the raw secret data.
+		Raw string
+		// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
+		// This is used for secrets that are multi part and could have the same ID. Ex: AWS credentials
+		RawV2 string
 		// Redacted contains the redacted version of the raw secret identification data for display purposes.
 		// A secret ID should be used if available.
 		Redacted       string
@@ -40,15 +44,18 @@ func PrintJSON(r *detectors.ResultWithMetadata) {
 		SourceName:     r.SourceName,
 		DetectorType:   r.DetectorType,
 		DetectorName:   r.DetectorType.String(),
+		DecoderName:    r.DecoderType.String(),
 		Verified:       r.Verified,
-		Raw:            r.Raw,
+		Raw:            string(r.Raw),
+		RawV2:          string(r.RawV2),
 		Redacted:       r.Redacted,
 		ExtraData:      r.ExtraData,
 		StructuredData: r.StructuredData,
 	}
 	out, err := json.Marshal(v)
 	if err != nil {
-		logrus.WithError(err).Fatal("could not marshal result")
+		return fmt.Errorf("could not marshal result: %w", err)
 	}
 	fmt.Println(string(out))
+	return nil
 }

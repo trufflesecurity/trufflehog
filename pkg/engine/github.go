@@ -1,52 +1,72 @@
 package engine
 
 import (
-	"context"
+	"fmt"
 
-	"github.com/sirupsen/logrus"
+	gogit "github.com/go-git/go-git/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
-func (e *Engine) ScanGitHub(ctx context.Context, endpoint string, repos, orgs []string, token string, includeForks bool, filter *common.Filter, concurrency int, includeMembers bool) error {
+// ScanGitHub scans Github with the provided options.
+func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	source := github.Source{}
+
 	connection := sourcespb.GitHub{
-		Endpoint:      endpoint,
-		Organizations: orgs,
-		Repositories:  repos,
-		ScanUsers:     includeMembers,
+		Endpoint:      c.Endpoint,
+		Organizations: c.Orgs,
+		Repositories:  c.Repos,
+		ScanUsers:     c.IncludeMembers,
+		IgnoreRepos:   c.ExcludeRepos,
+		IncludeRepos:  c.IncludeRepos,
 	}
-	if len(token) > 0 {
+	if len(c.Token) > 0 {
 		connection.Credential = &sourcespb.GitHub_Token{
-			Token: token,
+			Token: c.Token,
 		}
 	} else {
 		connection.Credential = &sourcespb.GitHub_Unauthenticated{}
 	}
-	connection.IncludeForks = includeForks
+	connection.IncludeForks = c.IncludeForks
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
-		logrus.WithError(err).Error("failed to marshal github connection")
-		return err
-	}
-	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, concurrency)
-	if err != nil {
-		logrus.WithError(err).Error("failed to initialize github source")
+		ctx.Logger().Error(err, "failed to marshal github connection")
 		return err
 	}
 
-	e.sourcesWg.Add(1)
-	go func() {
-		defer e.sourcesWg.Done()
+	ctx = context.WithValues(ctx,
+		"source_type", source.Type().String(),
+		"source_name", "github",
+	)
+	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, c.Concurrency)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to initialize github source")
+		return err
+	}
+
+	logOptions := &gogit.LogOptions{}
+	opts := []git.ScanOption{
+		git.ScanOptionFilter(c.Filter),
+		git.ScanOptionLogOptions(logOptions),
+	}
+	scanOptions := git.NewScanOptions(opts...)
+	source.WithScanOptions(scanOptions)
+
+	e.sourcesWg.Go(func() error {
+		defer common.RecoverWithExit(ctx)
 		err := source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			logrus.WithError(err).Fatal("could not scan github")
+			return fmt.Errorf("could not scan github: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }

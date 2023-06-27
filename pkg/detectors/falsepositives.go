@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample"}
+var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
 
 type FalsePositive string
 
@@ -31,9 +31,9 @@ var FalsePositiveWordlists = Wordlists{
 	programmingBookWords: bytesToCleanWordList(programmingBookWords),
 }
 
-//IsKnownFalsePositives will not return a valid secret finding if any of the disqualifying conditions are met
-//Currently that includes: No number, english word in key, or matches common example pattens.
-//Only the secret key material should be passed into this function
+// IsKnownFalsePositives will not return a valid secret finding if any of the disqualifying conditions are met
+// Currently that includes: No number, english word in key, or matches common example pattens.
+// Only the secret key material should be passed into this function
 func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) bool {
 
 	for _, fp := range falsePositives {

@@ -2,7 +2,7 @@ package mesibo
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -13,7 +13,6 @@ import (
 )
 
 type Scanner struct{}
-
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
@@ -55,13 +54,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					continue
 				}
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "INVALIDTOKEN") {
+				if !strings.Contains(body, "AUTHFAIL") {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
@@ -75,5 +74,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Mesibo
 }

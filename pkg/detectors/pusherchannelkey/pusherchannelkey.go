@@ -72,6 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_PusherChannelKey,
 					Raw:          []byte(resappMatch),
+					RawV2:        []byte(resappMatch + reskeyMatch),
 				}
 
 				if verify {
@@ -126,10 +127,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 func hmacBytes(toSign, secret []byte) []byte {
 	_authSignature := hmac.New(sha256.New, secret)
 	_authSignature.Write(toSign)
 	return _authSignature.Sum(nil)
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_PusherChannelKey
 }

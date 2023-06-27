@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -57,11 +57,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				body, errBody := ioutil.ReadAll(res.Body)
+				body, errBody := io.ReadAll(res.Body)
 
 				var result Response
 				if errBody == nil {
-					json.Unmarshal(body, &result)
+					if err := json.Unmarshal(body, &result); err != nil {
+						continue
+					}
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 && result.ReturnCode == 0 {
 						s1.Verified = true
@@ -78,9 +80,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 type Response struct {
 	ReturnCode int `json:"return_code"`
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Api2Cart
 }

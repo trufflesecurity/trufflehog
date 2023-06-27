@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Aylien,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.aylien.com/news/stories", nil)
@@ -78,5 +79,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Aylien
 }

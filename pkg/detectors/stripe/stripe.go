@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	//doesnt include test keys with "sk_test"
+	//doesn't include test keys with "sk_test"
 	secretKey = regexp.MustCompile(`[rs]k_live_[a-zA-Z0-9]{20,30}`)
 )
 
@@ -72,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Stripe
 }

@@ -41,7 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
-		fmt.Printf("\nresMatch: %s\n", resMatch)
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Courier,
@@ -56,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
-			fmt.Println(res)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
@@ -68,5 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Courier
 }

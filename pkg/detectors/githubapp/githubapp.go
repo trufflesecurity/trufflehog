@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				//issued at time
+				// issued at time
 				iat := time.Now().Add(-60 * time.Second)
 				exp := time.Now().Add(9 * 60 * time.Second)
 
@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				//end get token
+				// end get token
 
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/app", nil)
 				if err != nil {
@@ -100,5 +100,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_GitHubApp
 }

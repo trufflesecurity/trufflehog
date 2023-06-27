@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -72,11 +72,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					body, errBody := ioutil.ReadAll(res.Body)
+					body, errBody := io.ReadAll(res.Body)
 
 					if errBody == nil {
 						response := Response{}
-						xml.Unmarshal(body, &response)
+						if err := xml.Unmarshal(body, &response); err != nil {
+							continue
+						}
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
 							s1.Verified = true
@@ -94,11 +96,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 type Response struct {
 	Error []struct {
 		ErrorCode int `xml:"ErrorCode"`
 	} `xml:"Error"`
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_GoCanvas
 }

@@ -3,9 +3,9 @@ package alibaba
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -38,10 +38,9 @@ func (s Scanner) Keywords() []string {
 }
 
 func randString(n int) string {
-	rand.Seed(time.Now().UnixNano())
 	const alphanum = "0123456789abcdefghijklmnopqrstuvwxyz"
 	var bytes = make([]byte, n)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	for i, b := range bytes {
 		bytes[i] = alphanum[b%byte(len(alphanum))]
 	}
@@ -84,6 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Alibaba,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resIdMatch),
 			}
 
 			if verify {
@@ -103,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Version", "2014-05-26")
 
 				stringToSign := buildStringToSign(req.Method, params.Encode())
-				signature := GetSignature(stringToSign, resMatch+"&") //Get Signature HMAC SHA1
+				signature := GetSignature(stringToSign, resMatch+"&") // Get Signature HMAC SHA1
 				params.Add("Signature", signature)
 				req.URL.RawQuery = params.Encode()
 
@@ -127,5 +127,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Alibaba
 }

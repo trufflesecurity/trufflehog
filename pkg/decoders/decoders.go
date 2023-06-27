@@ -6,8 +6,9 @@ import (
 
 func DefaultDecoders() []Decoder {
 	return []Decoder{
-		&Plain{},
+		&UTF8{},
 		&Base64{},
+		&UTF16{},
 	}
 }
 

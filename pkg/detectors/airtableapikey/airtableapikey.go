@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_AirtableApiKey,
 				Redacted:     appRes,
 				Raw:          []byte(keyRes),
+				RawV2:        []byte(keyRes + appRes),
 			}
 
 			if verify {
@@ -78,5 +79,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_AirtableApiKey
 }

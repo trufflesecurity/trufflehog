@@ -51,15 +51,15 @@ message Confluence {
   string link = 4;
   string email = 5;
   string timestamp = 6;
+  string location = 7;
+  string file = 8;
 }
 
-message Dockerhub {
+message Docker {
   string file = 1;
   string image = 2;
   string layer = 3;
   string tag = 4;
-  string link = 5;
-  string email = 6;
 }
 
 message ECR {
@@ -76,6 +76,7 @@ message Filesystem {
   string file = 1;
   string link = 2;
   string email = 3;
+  int64 line = 4;
 }
 
 message Git {
@@ -96,6 +97,7 @@ message Github {
   string file = 6;
   string timestamp = 7;
   int64 line = 8;
+  Visibility visibility = 9;
 }
 
 message Gitlab {
@@ -110,9 +112,13 @@ message Gitlab {
 
 message GCS {
   string bucket = 1;
-  string file = 2;
+  string filename = 2;
   string link = 3;
   string email = 4;
+  string created_at = 5;
+  string updated_at = 6;
+  repeated string acls = 7;
+  string content_type = 8;
 }
 
 message Jira {
@@ -148,6 +154,13 @@ message S3 {
   string timestamp = 6;
 }
 
+enum Visibility {
+  public = 0;
+  private = 1;
+  shared = 2;
+  unknown = 3;
+}
+
 message Slack {
   string channel_id = 1;
   string channel_name = 2;
@@ -156,6 +169,8 @@ message Slack {
   string link = 5;
   string file = 6;
   string email = 7;
+  Visibility visibility = 8;
+  string location = 9;
 }
 
 message Gerrit {
@@ -186,6 +201,9 @@ message Teams {
   string link = 5;
   string file = 6;
   string email = 7;
+  string location = 8;
+  string team_name = 9;
+  string team_id = 10;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-FileInfo
@@ -213,13 +231,32 @@ message PublicEventMonitoring {
   }
 }
 
+message SharePoint {
+  string link = 1;
+  string timestamp = 2;
+  string author = 3;
+  string title = 4;
+  int64 views = 5;
+  string docid = 6;
+  string email = 7;
+}
+
+message GoogleDrive {
+  string file = 1;
+  string link = 2;
+  string email = 3;
+  string timestamp = 4;
+  bool shared = 5;
+  string last_modified_by = 6;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
     Bitbucket bitbucket = 2;
     CircleCI circleci = 3;
     Confluence confluence = 4;
-    Dockerhub dockerhub = 5;
+    Docker docker = 5;
     ECR ecr = 6;
     GCS gcs = 7;
     Github github = 8;
@@ -239,5 +276,7 @@ message MetaData {
     Artifactory artifactory = 22;
     Syslog syslog = 23;
     PublicEventMonitoring publicEventMonitoring = 24;
+    SharePoint sharepoint = 25;
+    GoogleDrive googleDrive = 26;
   }
 }

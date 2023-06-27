@@ -2,19 +2,20 @@ package git
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Scan(t *testing.T) {
@@ -123,7 +124,6 @@ func TestSource_Scan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -137,7 +137,7 @@ func TestSource_Scan(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
-				s.Chunks(ctx, chunksCh)
+				assert.NoError(t, s.Chunks(ctx, chunksCh))
 			}()
 			gotChunk := <-chunksCh
 			gotChunk.Data = nil
@@ -208,39 +208,56 @@ func TestSource_Chunks_Integration(t *testing.T) {
 	tests := []struct {
 		name string
 		init init
-		//verified
+		// verified
+		repoURL           string
 		expectedChunkData map[string]*byteCompare
+		scanOptions       ScanOptions
 	}{
 		{
-			name: "remote repo, unauthenticated",
-			init: init{
-				name: "test source",
-				connection: &sourcespb.Git{
-					Repositories: []string{"https://github.com/dustin-decker/secretsandstuff.git"},
-					Credential: &sourcespb.Git_Unauthenticated{
-						Unauthenticated: &credentialspb.Unauthenticated{},
-					},
-				},
-			},
+			name:    "remote repo, unauthenticated",
+			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
 			expectedChunkData: map[string]*byteCompare{
-				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws":   {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
-				"a6f8aa55736d4a85be31a0048a4607396898647a-bump":  {B: []byte("f\n")},
-				"07d96d011005fe8296bdd237c13a06a72e96783d-bump":  {B: []byte(" s \n")},
-				"2f251b8c1e72135a375b659951097ec7749d4af9-bump":  {B: []byte(" \n")},
-				"e6c8bbabd8796ea3cd85bfc2e55b27e0a491747f-bump":  {B: []byte("oops \n")},
-				"735b52b0eb40610002bb1088e902bd61824eb305-bump":  {B: []byte("oops\n")},
-				"ce62d79908803153ef6e145e042d3e80488ef747-bump":  {B: []byte("\n")},
-				"27fbead3bf883cdb7de9d7825ed401f28f9398f1-slack": {B: []byte("yup, just did that\n\ngithub_lol: \"ffc7e0f9400fb6300167009e42d2f842cd7956e2\"\n\noh, goodness. there's another one!")},
-				"8afb0ecd4998b1179e428db5ebbcdc8221214432-slack": {B: []byte("oops might drop a slack token here\n\ngithub_secret=\"369963c1434c377428ca8531fbc46c0c43d037a0\"\n\nyup, just did that"), Multi: true},
-				"8fe6f04ef1839e3fc54b5147e3d0e0b7ab971bd5-aws":   {B: []byte("blah blaj\n\nthis is the secret: AKIA2E0A8F3B244C9986\n\nokay thank you bye"), Multi: true},
-				"90c75f884c65dc3638ca1610bd9844e668f213c2-aws":   {B: []byte("this is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n"), Multi: true},
+				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws":  {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
+				"a6f8aa55736d4a85be31a0048a4607396898647a-bump": {B: []byte("\n\nf\n")},
+				"73ab4713057944753f1bdeb80e757380e64c6b5b-bump": {B: []byte(" s \n\n")},
+				"2f251b8c1e72135a375b659951097ec7749d4af9-bump": {B: []byte(" \n\n")},
+				"e6c8bbabd8796ea3cd85bfc2e55b27e0a491747f-bump": {B: []byte("\noops \n")},
+				"735b52b0eb40610002bb1088e902bd61824eb305-bump": {B: []byte("\noops\n")},
+				"ce62d79908803153ef6e145e042d3e80488ef747-bump": {B: []byte("\n")},
+				// Normally we might expect to see this commit, and we may in the future.
+				// But at the moment we're ignoring any commit unless it contains at least one non-space character.
+				"27fbead3bf883cdb7de9d7825ed401f28f9398f1-slack": {B: []byte("\n\n\nyup, just did that\n\ngithub_lol: \"ffc7e0f9400fb6300167009e42d2f842cd7956e2\"\n\noh, goodness. there's another one!\n")},
+				"8afb0ecd4998b1179e428db5ebbcdc8221214432-slack": {B: []byte("oops might drop a slack token here\n\ngithub_secret=\"369963c1434c377428ca8531fbc46c0c43d037a0\"\n\nyup, just did that\n"), Multi: true},
+				"8fe6f04ef1839e3fc54b5147e3d0e0b7ab971bd5-aws":   {B: []byte("blah blaj\n\nthis is the secret: AKIA2E0A8F3B244C9986\n\nokay thank you bye\n"), Multi: true},
+				"84e9c75e388ae3e866e121087ea2dd45a71068f2-aws":   {B: []byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n"), Multi: false},
+			},
+		},
+		{
+			name:    "remote repo, limited",
+			repoURL: "https://github.com/dustin-decker/secretsandstuff.git",
+			expectedChunkData: map[string]*byteCompare{
+				"70001020fab32b1fcf2f1f0e5c66424eae649826-aws": {B: []byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")},
+			},
+			scanOptions: ScanOptions{
+				HeadHash: "70001020fab32b1fcf2f1f0e5c66424eae649826",
+				BaseHash: "a6f8aa55736d4a85be31a0048a4607396898647a",
+			},
+		},
+		{
+			name:    "remote repo, main ahead of branch",
+			repoURL: "https://github.com/bill-rich/bad-secrets.git",
+			expectedChunkData: map[string]*byteCompare{
+				"547865c6cc0da46622306902b1b66f7e25dd0412-some_branch_file": {B: []byte("[default]\naws_access_key=AKIAYVP4CIPPH5TNP3SW\naws_secret_access_key=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\nregion=us-east-2\noutput=json\n\n#addibng a comment\n")},
+			},
+			scanOptions: ScanOptions{
+				HeadHash: "some_branch",
+				BaseHash: "master",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -253,18 +270,21 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
 				defer close(chunksCh)
-				err := s.Chunks(ctx, chunksCh)
+				repoPath, repo, err := CloneRepoUsingUnauthenticated(ctx, tt.repoURL)
+				if err != nil {
+					panic(err)
+				}
+				err = s.git.ScanRepo(ctx, repo, repoPath, &tt.scanOptions, chunksCh)
 				if err != nil {
 					panic(err)
 				}
 			}()
 
 			for chunk := range chunksCh {
-
 				key := ""
 				switch meta := chunk.SourceMetadata.GetData().(type) {
 				case *source_metadatapb.MetaData_Git:
-					key = meta.Git.Commit + "-" + meta.Git.File
+					key = strings.TrimRight(meta.Git.Commit+"-"+meta.Git.File, "\n")
 				}
 
 				if expectedData, exists := tt.expectedChunkData[key]; !exists {
@@ -380,7 +400,6 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -441,7 +460,8 @@ func TestPrepareRepo(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		repo, b, err := PrepareRepo(tt.uri)
+		ctx := context.Background()
+		repo, b, err := PrepareRepo(ctx, tt.uri)
 		var repoLen bool
 		if len(repo) > 0 {
 			repoLen = true
@@ -456,7 +476,69 @@ func TestPrepareRepo(t *testing.T) {
 
 func BenchmarkPrepareRepo(b *testing.B) {
 	uri := "https://github.com/dustin-decker/secretsandstuff.git"
+	ctx := context.Background()
 	for i := 0; i < b.N; i++ {
-		_, _, _ = PrepareRepo(uri)
+		_, _, _ = PrepareRepo(ctx, uri)
+	}
+}
+
+func TestGitURLParse(t *testing.T) {
+	for _, tt := range []struct {
+		url      string
+		host     string
+		user     string
+		password string
+		port     string
+		path     string
+		scheme   string
+	}{
+		{
+			"https://user@github.com/org/repo",
+			"github.com",
+			"user",
+			"",
+			"",
+			"/org/repo",
+			"https",
+		},
+		{
+			"https://user:pass@github.com/org/repo",
+			"github.com",
+			"user",
+			"pass",
+			"",
+			"/org/repo",
+			"https",
+		},
+		{
+			"ssh://user@github.com/org/repo",
+			"github.com",
+			"user",
+			"",
+			"",
+			"/org/repo",
+			"ssh",
+		},
+		{
+			"user@github.com:org/repo",
+			"github.com",
+			"user",
+			"",
+			"",
+			"/org/repo",
+			"ssh",
+		},
+	} {
+		u, err := gitURLParse(tt.url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, tt.host, u.Host)
+		assert.Equal(t, tt.user, u.User.Username())
+		password, _ := u.User.Password()
+		assert.Equal(t, tt.password, password)
+		assert.Equal(t, tt.port, u.Port())
+		assert.Equal(t, tt.path, u.Path)
+		assert.Equal(t, tt.scheme, u.Scheme)
 	}
 }

@@ -1,16 +1,9 @@
 name: Release
 
-# on:
-#   push:
-#     tags:
-#       - 'v*'
-
 on:
   push:
     tags:
       - v*
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -40,11 +33,11 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: '1.18'
+          go-version: '1.20'
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
           version: latest

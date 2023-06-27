@@ -11,10 +11,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{ detectors.EndpointSetter }
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+
+func (Scanner) Version() int            { return 2 }
+func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
 	keyPat = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
@@ -47,27 +52,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// they all grant access to different parts of the API. I couldn't find an endpoint that every
 			// one of these scopes has access to, so we just check an example endpoint for each scope. If any
 			// of them contain data, we know we have a valid key, but if they all fail, we don't
-			baseURL := "https://gitlab.com/api/v4"
-
 			client := common.SaneHttpClient()
+			for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+				// test `read_user` scope
+				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
+				if err != nil {
+					continue
+				}
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
+				res, err := client.Do(req)
+				if err == nil {
+					res.Body.Close() // The request body is unused.
 
-			// test `read_user` scope
-			req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/user", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
-			res, err := client.Do(req)
-			if err == nil {
-				res.Body.Close() // The request body is unused.
-
-				// 200 means good key and has `read_user` scope
-				// 403 means good key but not the right scope
-				// 401 is bad key
-				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					secret.Verified = true
+					// 200 means good key and has `read_user` scope
+					// 403 means good key but not the right scope
+					// 401 is bad key
+					if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
+						secret.Verified = true
+					}
 				}
 			}
+
 		}
 
 		if !secret.Verified && detectors.IsKnownFalsePositive(string(secret.Raw), detectors.DefaultFalsePositives, true) {
@@ -78,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Gitlab
 }

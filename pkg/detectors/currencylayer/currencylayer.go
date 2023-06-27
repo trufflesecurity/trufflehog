@@ -3,7 +3,7 @@ package currencylayer
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, err2 := ioutil.ReadAll(res.Body)
+				bodyBytes, err2 := io.ReadAll(res.Body)
 				if err2 == nil {
 					bodyString := string(bodyBytes)
 					validResponse := strings.Contains(bodyString, `"success": true`) || strings.Contains(bodyString, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
@@ -80,5 +80,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Currencylayer
 }

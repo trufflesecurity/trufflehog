@@ -3,7 +3,7 @@ package diffbot
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := io.ReadAll(res.Body)
 				if err == nil {
 					bodyString := string(bodyBytes)
 					validResponse := strings.Contains(bodyString, `"token":`) && strings.Contains(bodyString, `"planCredits":`)
@@ -82,5 +82,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Diffbot
 }

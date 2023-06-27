@@ -6,8 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -69,6 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_CexIO,
 					Raw:          []byte(resKeyMatch),
+					RawV2:        []byte(resUserIdMatch + resSecretMatch),
 				}
 
 				if verify {
@@ -91,18 +91,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err == nil {
 						defer res.Body.Close()
 
-						body, err := ioutil.ReadAll(res.Body)
+						body, err := io.ReadAll(res.Body)
 						if err != nil {
 							continue
 						}
 						bodyString := string(body)
 						validResponse := strings.Contains(bodyString, `timestamp`)
-						if err != nil {
-							fmt.Print(err.Error())
-						}
 
 						var responseObject Response
-						json.Unmarshal(body, &responseObject)
+						if err := json.Unmarshal(body, &responseObject); err != nil {
+							continue
+						}
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 							s1.Verified = true
@@ -128,7 +127,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 type Response struct {
@@ -142,4 +141,8 @@ func getCexIOPassphrase(apiSecret string, apiKey string, nonce string, userId st
 	mac.Write([]byte(msg))
 	macsum := mac.Sum(nil)
 	return strings.ToUpper(hex.EncodeToString(macsum))
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_CexIO
 }

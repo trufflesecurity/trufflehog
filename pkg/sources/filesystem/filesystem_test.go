@@ -1,15 +1,13 @@
 package filesystem
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	log "github.com/sirupsen/logrus"
-
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -35,7 +33,7 @@ func TestSource_Scan(t *testing.T) {
 			init: init{
 				name: "this repo",
 				connection: &sourcespb.Filesystem{
-					Directories: []string{"."},
+					Paths: []string{"."},
 				},
 				verify: true,
 			},
@@ -52,8 +50,6 @@ func TestSource_Scan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
-			log.SetFormatter(&log.TextFormatter{ForceColors: true})
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {

@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CloudflareGlobalApiKey,
 				Redacted:     emailRes,
 				Raw:          []byte(apiKeyRes),
+				RawV2:        []byte(apiKeyRes + emailRes),
 			}
 
 			if verify {
@@ -84,5 +85,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_CloudflareGlobalApiKey
 }

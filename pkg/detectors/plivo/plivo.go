@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Plivo,
 				Redacted:     id,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + id),
 			}
 			stringResMatch := fmt.Sprintf("%s:%s", id, resMatch)
 			decodeSecret := b64.StdEncoding.EncodeToString([]byte(stringResMatch))
@@ -80,5 +81,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Plivo
 }

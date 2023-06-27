@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Poloniex,
 				Raw:          []byte(resSecretMatch),
+				RawV2:        []byte(resMatch + resSecretMatch),
 			}
 
 			if verify {
@@ -99,7 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 func getPoloniexSignature(secret string, payload string) string {
@@ -107,4 +108,8 @@ func getPoloniexSignature(secret string, payload string) string {
 	mac.Write([]byte(payload))
 	macsum := mac.Sum(nil)
 	return hex.EncodeToString(macsum)
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Poloniex
 }

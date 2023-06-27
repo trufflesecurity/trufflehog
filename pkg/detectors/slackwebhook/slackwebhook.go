@@ -2,7 +2,7 @@ package slackwebhook
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`(https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9+\/]{44,46})`)
+	keyPat = regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -57,12 +57,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					continue
 				}
 				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 400 && strings.Contains(body, "missing_text")) {
+				if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
 					s1.Verified = true
 				}
 			}
@@ -71,5 +71,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_SlackWebhook
 }
