@@ -1016,8 +1016,6 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments [
 			Verify: s.verify,
 		}
 
-		//fmt.Printf("issue chunk: %+v\n", comment.GetBody())
-
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -1048,8 +1046,6 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
 			Verify: s.verify,
 		}
-
-		//fmt.Printf("pr chunk: %+v\n", comment.GetBody())
 
 		select {
 		case <-ctx.Done():
