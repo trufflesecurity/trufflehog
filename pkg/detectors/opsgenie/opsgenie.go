@@ -24,6 +24,10 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"opsgenie"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Opsgenie
+}
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
