@@ -923,15 +923,10 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
 	s.log.Info("scanning comments")
-	fmt.Print("repoPath: ", repoPath, "\n")
 
 	trimmedURL := removeURLAndSplit(repoPath)
 	owner := trimmedURL[1]
 	repo := trimmedURL[2]
-
-	//for _, part := range trimmedURL {
-	//	fmt.Println(part)
-	//}
 
 	sortType := "created"
 	directionType := "desc"
@@ -944,12 +939,20 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 			Page:    1,
 		},
 	}
-	issueComments, _, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
 
-	err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
+	for {
+		issueComments, _, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
+		err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+
+		issueOpts.ListOptions.Page++
+
+		if len(issueComments) < defaultPagination {
+			break
+		}
 	}
 
 	prOpts := &github.PullRequestListCommentsOptions{
@@ -961,11 +964,20 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 		},
 	}
 
-	prComments, _, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
-	err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
+	for {
+		prComments, _, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
+		if err != nil {
+			return err
+		}
 
-	//	fmt.Println("issue comments: ", issueComments)
-	// fmt.Println("pr comments: ", prComments)
+		err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
+
+		prOpts.ListOptions.Page++
+
+		if len(prComments) < defaultPagination {
+			break
+		}
+	}
 
 	return nil
 }
