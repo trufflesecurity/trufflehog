@@ -3,10 +3,8 @@ package docusign
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/go-errors/errors"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -83,25 +81,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					return nil, errors.WrapPrefix(err, "Error making request", 0)
 				}
 
-				// Read the response body
-				body, err := io.ReadAll(res.Body)
-
-				if err != nil {
-					return nil, errors.WrapPrefix(err, "Error reading response body", 0)
-				}
-
-				// Close the response body
+				verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "ey")
 				res.Body.Close()
 
-				// Parse the response body into a Response struct
-				var parsedResponse Response
-				err = json.Unmarshal(body, &parsedResponse)
 				if err != nil {
-					return nil, errors.WrapPrefix(err, "Error parsing response", 0)
+					return nil, err
 				}
 
 				if err == nil {
-					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.HasPrefix(parsedResponse.AccessToken, "ey") {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
