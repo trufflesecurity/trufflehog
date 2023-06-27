@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package twilio
+package couchbase
 
 import (
 	"context"
@@ -10,22 +10,23 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestTwilio_FromChunk(t *testing.T) {
+func TestCouchbase_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TWILLIO_API")
-	secretInactive := testSecrets.MustGetField("TWILLIO_API_INACTIVE")
-	id := testSecrets.MustGetField("TWILLIO_ID")
+	endpoint := testSecrets.MustGetField("COUCHBASE_ENDPOINT")
+	username := testSecrets.MustGetField("COUCHBASE_USERNAME")
+	password := testSecrets.MustGetField("COUCHBASE_PASSWORD")
+	inactiveSecret := testSecrets.MustGetField("COUCHBASE_INACTIVE_PASSWORD")
 
 	type args struct {
 		ctx    context.Context
@@ -44,31 +45,29 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
+				data:   []byte(fmt.Sprintf("db uri: %s \n username = %s \n password = %s", endpoint, username, password)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detectorspb.DetectorType_Couchbase,
 					Verified:     true,
-					Redacted:     id,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "found, not verified",
+			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secretInactive, id)),
+				data:   []byte(fmt.Sprintf("db uri: %s \n username = %s \n password = %s", endpoint, username, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detectorspb.DetectorType_Couchbase,
 					Verified:     false,
-					Redacted:     id,
 				},
 			},
 			wantErr: false,
@@ -88,20 +87,20 @@ func TestTwilio_FromChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
+
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Twilio.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Couchbase.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Twilio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Couchbase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

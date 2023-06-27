@@ -65,14 +65,13 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 		return errors.WrapPrefix(err, "failed to init S3 source", 0)
 	}
 
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		err := s3Source.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning S3")
+			return fmt.Errorf("error scanning S3: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }

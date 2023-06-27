@@ -1,8 +1,8 @@
-package slackwebhook
+package opsgenie
 
 import (
 	"context"
-	"io"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,16 +21,20 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"opsgenie"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Opsgenie
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"hooks.slack.com"}
+	return []string{"opsgenie"}
 }
 
-// FromData will find and optionally verify SlackWebhook secrets in a given set of bytes.
+// FromData will find and optionally verify Opsgenie secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -43,27 +47,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_SlackWebhook,
+			DetectorType: detectorspb.DetectorType_Opsgenie,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			payload := strings.NewReader(`{"text": ""}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/users", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("Authorization", fmt.Sprintf("GenieKey %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
+				} else {
+					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						continue
+					}
 				}
 			}
 		}
@@ -71,9 +74,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
-}
-
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SlackWebhook
+	return detectors.CleanResults(results), nil
 }

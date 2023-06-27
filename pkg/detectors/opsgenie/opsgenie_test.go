@@ -1,7 +1,4 @@
-//go:build detectors
-// +build detectors
-
-package twilio
+package opsgenie
 
 import (
 	"context"
@@ -10,22 +7,21 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestTwilio_FromChunk(t *testing.T) {
+func TestOpsgenie_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TWILLIO_API")
-	secretInactive := testSecrets.MustGetField("TWILLIO_API_INACTIVE")
-	id := testSecrets.MustGetField("TWILLIO_ID")
+	secret := testSecrets.MustGetField("OPSGENIE")
+	inactiveSecret := testSecrets.MustGetField("OPSGENIE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -44,31 +40,29 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a opsgenie secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detectorspb.DetectorType_Opsgenie,
 					Verified:     true,
-					Redacted:     id,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "found, not verified",
+			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secretInactive, id)),
+				data:   []byte(fmt.Sprintf("You can find a opsgenie secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Twilio,
+					DetectorType: detectorspb.DetectorType_Opsgenie,
 					Verified:     false,
-					Redacted:     id,
 				},
 			},
 			wantErr: false,
@@ -90,18 +84,17 @@ func TestTwilio_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Twilio.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Opsgenie.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Twilio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Opsgenie.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

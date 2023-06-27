@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"runtime"
 
 	"github.com/go-errors/errors"
@@ -25,14 +26,13 @@ func (e *Engine) ScanDocker(ctx context.Context, conn *anypb.Any) error {
 		return errors.WrapPrefix(err, "could not init docker source", 0)
 	}
 
-	e.sourcesWg.Add(1)
-	go func() {
+	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
-		defer e.sourcesWg.Done()
 		err := dockerSource.Chunks(ctx, e.ChunksChan())
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning docker image")
+			return fmt.Errorf("error scanning docker image: %w", err)
 		}
-	}()
+		return nil
+	})
 	return nil
 }
