@@ -664,12 +664,9 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
 
-			fmt.Println("SCANNNNN COMMENTS")
 			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
-				fmt.Println("test")
 			}
 
-			fmt.Printf("Scanning repoURL %s, path %+v, repo %+v \n ", repoURL, path, repo)
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
@@ -967,7 +964,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	prComments, _, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
 	err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
 
-	fmt.Println("issue comments: ", issueComments)
+	//	fmt.Println("issue comments: ", issueComments)
 	// fmt.Println("pr comments: ", prComments)
 
 	return nil
@@ -996,7 +993,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments [
 			Verify: s.verify,
 		}
 
-		fmt.Printf("chunk: %+v\n", chunk)
+		//fmt.Printf("issue chunk: %+v\n", comment.GetBody())
 
 		select {
 		case <-ctx.Done():
@@ -1029,7 +1026,7 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 			Verify: s.verify,
 		}
 
-		fmt.Printf("pr chunk: %+v\n", chunk)
+		//fmt.Printf("pr chunk: %+v\n", comment.GetBody())
 
 		select {
 		case <-ctx.Done():

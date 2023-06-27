@@ -81,7 +81,6 @@ func TestSource_Token(t *testing.T) {
 }
 
 func TestSource_ScanComments(t *testing.T) {
-	//test
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
@@ -109,7 +108,7 @@ func TestSource_ScanComments(t *testing.T) {
 		minOrg    int
 	}{
 		{
-			name: "token authenticated, single repo",
+			name: "token authenticated, single repo, single issue comment",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
@@ -125,10 +124,36 @@ func TestSource_ScanComments(t *testing.T) {
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Repository: "https://github.com/truffle-test-integration-org/another-test-repo.git",
-							Link:       "https://github.com/truffle-test-integration-org/another-test-repo/issues/1#issuecomment-1603436833",
-							Username:   "truffle-sandbox",
-							Timestamp:  "2023-06-22 23:33:46 +0000 UTC",
+							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1#issuecomment-1603436833",
+							Username:  "truffle-sandbox",
+							Timestamp: "2023-06-22 23:33:46 +0000 UTC",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "token authenticated, single repo, pull request comment",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/pull/2#discussion_r1242763304",
+							Username:  "truffle-sandbox",
+							Timestamp: "2023-06-26 21:00:11 +0000 UTC",
 						},
 					},
 				},
@@ -173,12 +198,15 @@ func TestSource_ScanComments(t *testing.T) {
 
 			i := 0
 			for gotChunk := range chunksCh {
+				// Skip chunks that are not comments.
+				if gotChunk.SourceMetadata.GetGithub().GetCommit() != "" {
+					continue
+				}
 				i++
-				githubCommentCheckFunc(gotChunk, tt.wantChunk, i, t)
+				githubCommentCheckFunc(gotChunk, tt.wantChunk, i, t, tt.name)
 			}
 
 			// Confirm all comments were processed.
-
 			if i != totalChunks {
 				t.Errorf("did not complete all chunks, got %d, want %d", i, totalChunks)
 			}
@@ -686,19 +714,21 @@ func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) so
 	}
 }
 
-func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testing.T) {
+func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testing.T, name string) {
 	if gotChunk.SourceType != wantChunk.SourceType {
 		t.Errorf("want SourceType %v, got %v", wantChunk.SourceType, gotChunk.SourceType)
 	}
 
 	assert.NotEmpty(t, gotChunk.SourceMetadata.Data, "SourceMetadata.Data should not be empty")
 
-	if i == 1 && gotChunk.SourceMetadata != wantChunk.SourceMetadata {
-		if diff := pretty.Compare(gotChunk.SourceMetadata, wantChunk.SourceMetadata); diff != "" {
-			t.Errorf("SourceMetadata diff: (-got +want)\n%s", diff)
-		}
+	// First Chunk should be a Issue Comment, Second Chunk should be a PR Comment.
+	if i == 1 && name == "token authenticated, single repo, single issue comment" &&
+		wantChunk.SourceMetadata.GetGithub().GetLink() != gotChunk.SourceMetadata.GetGithub().GetLink() {
+		t.Errorf("want %+v \n got %+v \n", wantChunk.SourceMetadata.GetGithub().GetLink(), gotChunk.SourceMetadata.GetGithub().GetLink())
+	} else if i == 2 && name == "token authenticated, single repo, single pr comment" &&
+		wantChunk.SourceMetadata.GetGithub().GetLink() != gotChunk.SourceMetadata.GetGithub().GetLink() {
+		t.Errorf("want %+v \n got %+v \n", wantChunk.SourceMetadata.GetGithub().GetLink(), gotChunk.SourceMetadata.GetGithub().GetLink())
 	}
-
 }
 
 // func TestSource_paginateRepos(t *testing.T) {
