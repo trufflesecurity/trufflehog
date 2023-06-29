@@ -53,6 +53,8 @@ func WithConcurrency(concurrency int) EngineOption {
 	}
 }
 
+const ignoreTag = "trufflehog:ignore"
+
 func WithDetectors(verify bool, d ...detectors.Detector) EngineOption {
 	return func(e *Engine) {
 		if e.detectors == nil {
@@ -315,6 +317,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						}
 						for _, result := range results {
 							resultChunk := chunk
+							ignoreLinePresent := false
 							if SupportsLineNumbers(chunk.SourceType) {
 								copyChunk := *chunk
 								copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
@@ -322,8 +325,11 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 									copyChunk.SourceMetadata = copyMetaData
 								}
 								fragStart, mdLine := FragmentFirstLine(&copyChunk)
-								SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
+								ignoreLinePresent = SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
 								resultChunk = &copyChunk
+							}
+							if ignoreLinePresent {
+								continue
 							}
 							result.DecoderType = decoderType
 							e.results <- detectors.CopyMetadata(resultChunk, result)
@@ -377,14 +383,18 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 }
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
-func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) int64 {
+func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
 	lines := bytes.Split(chunk.Data, []byte("\n"))
 	for i, line := range lines {
 		if bytes.Contains(line, result.Raw) {
-			return int64(i)
+			// if the line contains the ignore tag, we should ignore the result
+			if bytes.Contains(line, []byte(ignoreTag)) {
+				return int64(i), true
+			}
+			return int64(i), false
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // FragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
@@ -411,7 +421,8 @@ func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
 }
 
 // SetResultLineNumber sets the line number in the provided result.
-func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) {
-	offset := FragmentLineOffset(chunk, result)
+func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) bool {
+	offset, skip := FragmentLineOffset(chunk, result)
 	*mdLine = fragStart + offset
+	return skip
 }

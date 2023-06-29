@@ -459,6 +459,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opengraphr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opsgenie"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/optimizely"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/owlbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/packagecloud"
@@ -1525,6 +1526,7 @@ func DefaultDetectors() []detectors.Detector {
 		aiven.Scanner{},
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
+		opsgenie.Scanner{},
 	}
 
 }
