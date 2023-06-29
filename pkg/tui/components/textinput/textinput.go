@@ -19,7 +19,7 @@ func New(placeholder string) TextInput {
 	ti.Placeholder = placeholder
 	ti.Focus()
 	ti.CharLimit = 156
-	ti.Width = 20
+	ti.Width = 60
 
 	return TextInput{
 		textInput: ti,

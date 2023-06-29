@@ -7,6 +7,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/tabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure/source/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure/source/github"
 )
 
 type SetSourceMsg struct {
@@ -76,6 +77,8 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.configTabSource {
 		case "Git":
 			m.tabComponents[configTab].(*SourceComponent).SetForm(git.GetFields())
+		case "GitHub":
+			m.tabComponents[configTab].(*SourceComponent).SetForm(github.GetFields())
 		}
 	}
 

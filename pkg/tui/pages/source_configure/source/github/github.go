@@ -1,28 +1,23 @@
 package github
 
 import (
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/formfield"
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
-func GetFields() []*formfield.FormField {
-	repo := formfield.FormField{
-		Label:       "Repository",
-		Help:        "GitHub repo to scan.",
-		Required:    false,
-		Placeholder: "https://github.com/trufflesecurity/test_keys",
-		Component:   nil,
-	}
-
-	org := formfield.FormField{
+func GetFields() tea.Model {
+	org := textinputs.InputConfig{
 		Label:       "Organization",
-		Help:        "GitHub organization to scan.",
-		Required:    false,
-		Placeholder: "trufflesecurity",
-		Component:   nil,
+		Required:    true,
+		Placeholder: "GitHub organization to scan.",
 	}
 
-	return []*formfield.FormField{
-		&repo,
-		&org,
+	repo := textinputs.InputConfig{
+		Label:       "Repository",
+		Required:    true,
+		Placeholder: "GitHub repo to scan.",
 	}
+
+	return textinputs.New([]textinputs.InputConfig{org, repo})
 }

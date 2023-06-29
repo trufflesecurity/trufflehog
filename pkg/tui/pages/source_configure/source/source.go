@@ -1,18 +1,18 @@
 package source
 
 import (
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/formfield"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure/source/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure/source/github"
 )
 
 type SourceForm struct {
 	sourceType string
-	fields     []*formfield.FormField
+	fields     tea.Model
 }
 
 func NewSourceForm(sourceType string) *SourceForm {
-	var sourceFields []*formfield.FormField
+	var sourceFields tea.Model
 	switch sourceType {
 	case "git":
 		sourceFields = git.GetFields()
@@ -28,6 +28,6 @@ func NewSourceForm(sourceType string) *SourceForm {
 	}
 }
 
-func (s *SourceForm) GetFields() []*formfield.FormField {
+func (s *SourceForm) GetFields() tea.Model {
 	return s.fields
 }

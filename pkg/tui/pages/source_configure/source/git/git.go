@@ -1,19 +1,16 @@
 package git
 
 import (
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/formfield"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
-func GetFields() []*formfield.FormField {
-	gitUri := formfield.FormField{
-		Label:     "Git URI",
-		Required:  true,
-		Help:      "",
-		Component: textinput.New(""),
+func GetFields() tea.Model {
+	uri := textinputs.InputConfig{
+		Label:       "Git URI",
+		Required:    true,
+		Placeholder: "git@github.com:trufflesecurity/trufflehog.git.",
 	}
 
-	return []*formfield.FormField{
-		&gitUri,
-	}
+	return textinputs.New([]textinputs.InputConfig{uri})
 }
