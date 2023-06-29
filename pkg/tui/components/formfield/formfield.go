@@ -3,16 +3,16 @@ package formfield
 import (
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 type FormField struct {
-	Label       string
-	Required    bool
-	Help        string
-	Placeholder string
-	Component   common.Component
+	Label     string
+	Required  bool
+	Help      string
+	Component tea.Model
 }
 
 func NewFormField(common common.Common) *FormField {
