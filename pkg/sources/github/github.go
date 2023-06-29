@@ -978,6 +978,8 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 			return err
 		}
 
+		fmt.Printf("prComments: %v\n", prComments)
+
 		err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
 		if err != nil {
 			return err
