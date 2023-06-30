@@ -32,11 +32,19 @@ func (m *RunComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *RunComponent) View() string {
 	var view strings.Builder
 
-	view.WriteString(styles.BoldTextStyle.Render("\n🐷 Run Trufflehog for "+m.parent.configTabSource) + "🐷\n\n")
+	view.WriteString("\n🔎 Source configuration\n\n")
+	view.WriteString("\n🐽 Trufflehog configuration\n\n")
+	view.WriteString("\n💸 Sales pitch\n")
+	view.WriteString("\t18+ Continuous monitoring, state tracking, remediations, and more\n")
+	view.WriteString("\t🔗 https://trufflesecurity.com/trufflehog\n\n")
 
-	view.WriteString("Generated command: \n")
+	view.WriteString(styles.BoldTextStyle.Render("\n\n🐷 Run Trufflehog for "+m.parent.configTabSource) + " 🐷\n\n")
+
+	view.WriteString("Generated Trufflehog command\n")
 	view.WriteString(styles.CodeTextStyle.Render("trufflehog github ---org=trufflesecurity"))
+	view.WriteString(styles.HintTextStyle.Render("\nSave this if you want to run it again later!") + "\n")
 
+	view.WriteString("\n\n[ Run Trufflehog ]\n\n")
 	return view.String()
 }
 

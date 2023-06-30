@@ -36,12 +36,14 @@ string options
 type TrufflehogComponent struct {
 	common.Common
 	parent *SourceConfigure
+	form   tea.Model
 }
 
 func NewTrufflehogComponent(common common.Common, parent *SourceConfigure) *TrufflehogComponent {
 	return &TrufflehogComponent{
 		Common: common,
 		parent: parent,
+		form:   GetTrufflehogConfiguration(),
 	}
 }
 
@@ -50,6 +52,12 @@ func (m *TrufflehogComponent) Init() tea.Cmd {
 }
 
 func (m *TrufflehogComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// TODO: Add a focus variable.
+	if m.form != nil {
+		model, cmd := m.form.Update(msg)
+		m.form = model
+		return m, cmd
+	}
 	return m, nil
 }
 
@@ -57,8 +65,12 @@ func (m *TrufflehogComponent) View() string {
 	var view strings.Builder
 
 	view.WriteString(styles.BoldTextStyle.Render("\nConfiguring "+styles.PrimaryTextStyle.Render("Trufflehog")) + "\n")
+	view.WriteString(styles.HintTextStyle.Render("You can skip this completely and run with defaults") + "\n\n")
 
-	view.WriteString(styles.HintTextStyle.Render("You can skip this completely and run with defaults") + "\n")
+	if m.form != nil {
+		view.WriteString(m.form.View())
+		view.WriteString("\n")
+	}
 
 	return view.String()
 }
