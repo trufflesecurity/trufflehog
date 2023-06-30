@@ -10,13 +10,15 @@ func GetFields() tea.Model {
 	org := textinputs.InputConfig{
 		Label:       "Organization",
 		Required:    true,
-		Placeholder: "GitHub organization to scan.",
+		Help:        "GitHub organization to scan.",
+		Placeholder: "https://github.com/trufflesecurity",
 	}
 
 	repo := textinputs.InputConfig{
 		Label:       "Repository",
 		Required:    true,
-		Placeholder: "GitHub repo to scan.",
+		Help:        "GitHub repo to scan.",
+		Placeholder: "https://github.com/trufflesecurity/test_keys",
 	}
 
 	return textinputs.New([]textinputs.InputConfig{org, repo})

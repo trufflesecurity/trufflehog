@@ -20,13 +20,14 @@ var (
 	helpStyle           = blurredStyle.Copy()
 	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
-	focusedButton = focusedStyle.Copy().Render("[ Submit ]")
-	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+	focusedButton = focusedStyle.Copy().Render("[ Next ]")
+	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Next"))
 )
 
 type model struct {
 	focusIndex int
 	inputs     []textinput.Model
+	configs    []InputConfig
 	cursorMode cursor.Mode
 }
 
@@ -45,10 +46,14 @@ func New(config []InputConfig) model {
 	for i, conf := range config {
 		input := textinput.New()
 		input.Placeholder = conf.Placeholder
+		if i == 0 {
+			input.Focus()
+		}
 
 		m.inputs[i] = input
 	}
 
+	m.configs = config
 	return m
 }
 
@@ -139,7 +144,12 @@ func (m model) View() string {
 	var b strings.Builder
 
 	for i := range m.inputs {
+		if m.configs[i].Label != "" {
+			b.WriteString(m.GetLabel(m.configs[i]))
+		}
+
 		b.WriteString(m.inputs[i].View())
+		b.WriteRune('\n')
 		if i < len(m.inputs)-1 {
 			b.WriteRune('\n')
 		}
@@ -156,4 +166,20 @@ func (m model) View() string {
 	b.WriteString(helpStyle.Render(" (ctrl+r to change style)"))
 
 	return b.String()
+}
+
+func (m model) GetLabel(c InputConfig) string {
+	var label strings.Builder
+
+	label.WriteString(c.Label)
+	if c.Required {
+		label.WriteString("*")
+	}
+
+	if len(c.Help) > 0 {
+		label.WriteString("\n" + helpStyle.Render(c.Help))
+	}
+
+	label.WriteString("\n")
+	return label.String()
 }

@@ -45,10 +45,11 @@ func (m *SourceComponent) View() string {
 
 	view.WriteString(styles.BoldTextStyle.Render("\nConfiguring "+styles.PrimaryTextStyle.Render(m.parent.configTabSource)) + "\n")
 
-	view.WriteString(styles.HintTextStyle.Render("* required field") + "\n")
+	view.WriteString(styles.HintTextStyle.Render("* required field") + "\n\n")
 
 	if m.form != nil {
 		view.WriteString(m.form.View())
+		view.WriteString("\n")
 	}
 	return view.String()
 }
