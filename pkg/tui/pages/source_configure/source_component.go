@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
@@ -46,6 +47,11 @@ func (m *SourceComponent) View() string {
 	view.WriteString(styles.BoldTextStyle.Render("\nConfiguring "+styles.PrimaryTextStyle.Render(m.parent.configTabSource)) + "\n")
 
 	view.WriteString(styles.HintTextStyle.Render("* required field") + "\n\n")
+
+	sourceNote := sources.GetSourceNotes(m.parent.configTabSource)
+	if len(sourceNote) > 0 {
+		view.WriteString("⭐ " + sourceNote + " ⭐\n\n")
+	}
 
 	if m.form != nil {
 		view.WriteString(m.form.View())

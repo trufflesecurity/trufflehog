@@ -46,8 +46,11 @@ func New(config []InputConfig) model {
 	for i, conf := range config {
 		input := textinput.New()
 		input.Placeholder = conf.Placeholder
+
 		if i == 0 {
 			input.Focus()
+			input.TextStyle = focusedStyle
+			input.PromptStyle = focusedStyle
 		}
 
 		m.inputs[i] = input

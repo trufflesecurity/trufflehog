@@ -6,8 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/tabs"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure/source/git"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure/source/github"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
 type SetSourceMsg struct {
@@ -74,11 +73,9 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SetSourceMsg:
 		m.configTabSource = msg.Source
 		// TODO: Use actual messages or something?
-		switch m.configTabSource {
-		case "Git":
-			m.tabComponents[configTab].(*SourceComponent).SetForm(git.GetFields())
-		case "GitHub":
-			m.tabComponents[configTab].(*SourceComponent).SetForm(github.GetFields())
+		fields := sources.GetSourceFields(m.configTabSource)
+		if fields != nil {
+			m.tabComponents[configTab].(*SourceComponent).SetForm(fields)
 		}
 	}
 

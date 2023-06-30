@@ -6,6 +6,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
+func GetNote() string {
+	return "Please enter an organization OR repository."
+}
+
 func GetFields() tea.Model {
 	org := textinputs.InputConfig{
 		Label:       "Organization",
