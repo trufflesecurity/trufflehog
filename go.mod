@@ -6,7 +6,7 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1
 
 require (
 	cloud.google.com/go/secretmanager v1.11.1
-	cloud.google.com/go/storage v1.31.0
+	cloud.google.com/go/storage v1.29.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/TheZeroSlave/zapsentry v1.15.0
 	github.com/aws/aws-sdk-go v1.44.83
