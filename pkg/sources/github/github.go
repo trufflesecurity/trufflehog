@@ -936,6 +936,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	var (
 		sortType      = "created"
 		directionType = "desc"
+		allComments   = 0
 	)
 
 	issueOpts := &github.IssueListCommentsOptions{
@@ -948,7 +949,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	}
 
 	for {
-		issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
+		issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
 
 		if !s.handleRateLimit(err, resp) {
 			break
@@ -980,7 +981,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	}
 
 	for {
-		prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
+		prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
 
 		if !s.handleRateLimit(err, resp) {
 			break
