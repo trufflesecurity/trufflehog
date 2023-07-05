@@ -339,7 +339,8 @@ func TestHandleRateLimit(t *testing.T) {
 func TestEnumerateUnauthenticated(t *testing.T) {
 	defer gock.Off()
 
-	gock.New("https://api.github.com").
+	apiEndpoint := "https://api.github.com"
+	gock.New(apiEndpoint).
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
 		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
@@ -347,7 +348,7 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 	s := initTestSource(nil)
 	s.orgsCache = memory.New()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
-	s.enumerateUnauthenticated(context.Background())
+	s.enumerateUnauthenticated(context.Background(), apiEndpoint)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
