@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Trufflehogenterprise,
+			DetectorType: detectorspb.DetectorType_TrufflehogEnterpriseWeb,
 			Raw:          []byte(resMatch),
 		}
 
@@ -77,5 +77,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Trufflehogenterprise
+	return detectorspb.DetectorType_TrufflehogEnterpriseWeb
 }
