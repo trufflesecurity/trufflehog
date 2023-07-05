@@ -482,7 +482,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	// Get the URL metadata for reporting (may be empty).
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
-	commitChan, err := gitparse.NewParser().Unstaged(ctx, path)
+	commitChan, err := gitparse.NewParser().Staged(ctx, path)
 	if err != nil {
 		return err
 	}

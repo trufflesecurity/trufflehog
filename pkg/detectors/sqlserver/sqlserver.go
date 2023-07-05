@@ -24,7 +24,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sql", "database", "Data Source"}
+	return []string{"sql", "database", "Data Source", "Server=", "Network addres="}
 }
 
 // FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.

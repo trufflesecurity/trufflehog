@@ -140,10 +140,10 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	return c.executeCommand(ctx, cmd)
 }
 
-// Unstaged parses the output of the `git diff` command for the `source` path.
-func (c *Parser) Unstaged(ctx context.Context, source string) (chan Commit, error) {
+// Staged parses the output of the `git diff` command for the `source` path.
+func (c *Parser) Staged(ctx context.Context, source string) (chan Commit, error) {
 	// Provide the --cached flag to diff to get the diff of the staged changes.
-	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z", "HEAD"}
+	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 
 	cmd := exec.Command("git", args...)
 
