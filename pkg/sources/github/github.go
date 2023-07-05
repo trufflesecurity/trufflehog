@@ -933,8 +933,10 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	owner := trimmedURL[1]
 	repo := trimmedURL[2]
 
-	sortType := "created"
-	directionType := "desc"
+	var (
+		sortType      = "created"
+		directionType = "desc"
+	)
 
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
@@ -946,7 +948,12 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	}
 
 	for {
-		issueComments, _, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
+		issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, 0, issueOpts)
+
+		if !s.handleRateLimit(err, resp) {
+			break
+		}
+
 		if err != nil {
 			return err
 		}
@@ -973,7 +980,12 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	}
 
 	for {
-		prComments, _, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
+		prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, 0, prOpts)
+
+		if !s.handleRateLimit(err, resp) {
+			break
+		}
+
 		if err != nil {
 			return err
 		}
