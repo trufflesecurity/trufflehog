@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprisescanner/scannerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -25,8 +24,6 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat     = regexp.MustCompile(`\bthog-agent-[0-9a-f]{32}\b`)
 	groupPat   = regexp.MustCompile(`\bthog-scanner-[a-zA-Z]+\b`)
