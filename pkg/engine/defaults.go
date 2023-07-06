@@ -323,7 +323,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/iconfinder"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/iexapis"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/iexcloud"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/image4"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagekit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/imagga"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/impala"
@@ -1418,7 +1417,6 @@ func DefaultDetectors() []detectors.Detector {
 		exportsdk.Scanner{},
 		rechargepayments.Scanner{},
 		browserstack.Scanner{},
-		image4.Scanner{},
 		crossbrowsertesting.Scanner{},
 		flowdash.Scanner{},
 		lunchmoney.Scanner{},
