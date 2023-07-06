@@ -24,6 +24,13 @@ func RemoveStringSliceItem(item string, slice *[]string) {
 	}
 }
 
+func MinInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func ResponseContainsSubstring(reader io.ReadCloser, target string) (bool, error) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
