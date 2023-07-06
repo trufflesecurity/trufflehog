@@ -37,3 +37,10 @@ protoc -I proto/ \
     --go_out=plugins=grpc:./pkg/pb/custom_detectorspb --go_opt=paths=source_relative \
     --validate_out="lang=go,paths=source_relative:./pkg/pb/custom_detectorspb" \
     proto/custom_detectors.proto
+protoc -I proto/ \
+    -I ${GOPATH}/src \
+    -I /usr/local/include \
+    -I ${GOPATH}/src/github.com/envoyproxy/protoc-gen-validate \
+    --go_out=plugins=grpc:./pkg/detectors/trufflehogenterprisescanner/scannerpb --go_opt=paths=source_relative \
+    --validate_out="lang=go,paths=source_relative:./pkg/detectors/trufflehogenterprisescanner/scannerpb" \
+    proto/api.proto

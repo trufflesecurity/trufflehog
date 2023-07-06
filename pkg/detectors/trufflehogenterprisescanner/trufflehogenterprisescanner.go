@@ -2,13 +2,21 @@ package trufflehogenterprisescanner
 
 import (
 	"context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	//"trufflehog/pkg/grpcapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprisescanner/scannerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{}
@@ -22,7 +30,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat     = regexp.MustCompile(`\bthog-agent-[0-9a-f]{32}\b`)
 	groupPat   = regexp.MustCompile(`\bthog-scanner-[a-zA-Z]+\b`)
-	addressPat = regexp.MustCompile(`\b[a-z]+-[a-z]+-[a-z]+\.[a-z][0-9]\.[a-z]+\.trufflehog\.org:\d{4}\b`)
+	addressPat = regexp.MustCompile(`\b[a-z]+-[a-z]+-[a-z]+.[a-z]+\.[a-z][0-9]\.[a-z]+\.trufflehog\.org:[0-9]{4}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,28 +43,37 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
+	fmt.Println("dataStr: ", dataStr)
+
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	groupMatches := groupPat.FindAllStringSubmatch(dataStr, -1)
 	addressMatches := addressPat.FindAllStringSubmatch(dataStr, -1)
+
+	fmt.Println("keyMatches: ", keyMatches)
+	fmt.Println("groupMatches: ", groupMatches)
+	fmt.Println("addressMatches: ", addressMatches)
 
 	for _, keyMatch := range keyMatches {
 		if len(keyMatch) != 1 {
 			continue
 		}
-		resKeyMatch := strings.TrimSpace(keyMatch[1])
+		resKeyMatch := strings.TrimSpace(keyMatch[0])
+		fmt.Println("resKeyMatch: ", resKeyMatch)
 
 		for _, groupMatch := range groupMatches {
 			if len(groupMatch) != 1 {
 				continue
 			}
-			resGroupMatch := strings.TrimSpace(groupMatch[1])
+			resGroupMatch := strings.TrimSpace(groupMatch[0])
+			fmt.Println("resGroupMatch: ", resGroupMatch)
 
 			for _, addressMatch := range addressMatches {
 				if len(addressMatch) != 1 {
 					continue
 				}
 
-				resAddressMatch := strings.TrimSpace(addressMatch[1])
+				resAddressMatch := strings.TrimSpace(addressMatch[0])
+				fmt.Println("resAddressMatch: ", resAddressMatch)
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_TrufflehogEnterpriseScanner,
@@ -65,6 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					err := grpcHeartbeat(resAddressMatch, resGroupMatch, resKeyMatch)
+					fmt.Println("err: ", err)
 					if err == nil {
 						s1.Verified = true
 					}
@@ -82,32 +100,32 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func grpcHeartbeat(address, group, token string) error {
-	//	ctx := context.Background()
-	//	ctx = metadata.NewOutgoingContext(ctx,
-	//		metadata.New(map[string]string{
-	//			"name":          strings.TrimSpace(group),
-	//			"authorization": strings.TrimSpace(token),
-	//		}))
-	//
-	//	systemRoots, err := x509.SystemCertPool()
-	//	if err != nil {
-	//		panic(errors.Wrap(err, "cannot load root CA certs"))
-	//	}
-	//	creds := credentials.NewTLS(&tls.Config{
-	//		RootCAs: systemRoots,
-	//	})
-	//
-	//	conn, err := grpc.Dial("real-strong-chipmunk.api.c1.prod.trufflehog.org:8443", grpc.WithTransportCredentials(creds))
-	//	if err != nil {
-	//		log.Fatalf("Did not connect: %v", err)
-	//	}
-	//	defer conn.Close()
-	//
-	//	c := grpcapi.NewAgentServiceClient(conn)
-	//
-	//	r, err := c.Heartbeat(ctx, &pb.HeartbeatRequest{Status: "GOOD", Reason: "", Version: "v1.0.0"})
-	//	if err != nil {
-	//		log.Fatalf("could not heartbeat: %v", err)
-	//	}
-	//	log.Printf("Heartbeat response: %s", r)
+	ctx := context.Background()
+	ctx = metadata.NewOutgoingContext(ctx,
+		metadata.New(map[string]string{
+			"name":          strings.TrimSpace(group),
+			"authorization": strings.TrimSpace(token),
+		}))
+
+	systemRoots, err := x509.SystemCertPool()
+	if err != nil {
+		panic(errors.Wrap(err, "cannot load root CA certs"))
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		RootCAs: systemRoots,
+	})
+
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return errors.Wrap(err, "cannot dial")
+	}
+	defer conn.Close()
+
+	c := scannerpb.NewAgentServiceClient(conn)
+
+	_, err = c.Heartbeat(ctx, &scannerpb.HeartbeatRequest{Status: "GOOD", Reason: "", Version: "v1.0.0"})
+	if err != nil {
+		return errors.Wrap(err, "cannot heartbeat")
+	}
+	return nil
 }

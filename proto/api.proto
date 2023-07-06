@@ -1,0 +1,19 @@
+
+syntax = "proto3";
+
+package api;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprisescanner/scannerpb";
+
+
+message HeartbeatRequest {
+  string status = 1;
+  string reason = 2;
+  string version = 3;
+}
+
+message HeartbeatResponse {}
+
+service AgentService {
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}

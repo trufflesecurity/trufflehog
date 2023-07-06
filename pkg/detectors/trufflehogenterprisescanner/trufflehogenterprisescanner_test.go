@@ -45,7 +45,7 @@ func TestTrufflehogEnterpriseScanner_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a thog scanner secret %s for %s at %s within", token, group, address)),
+				data:   []byte(fmt.Sprintf("%s \n for %s \n %s", token, group, address)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -61,7 +61,7 @@ func TestTrufflehogEnterpriseScanner_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a thog scanner secret %s for %s at %s within but not valid", token, group, address)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a thog scanner secret %s for %s at %s within but not valid", inactiveToken, group, address)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
