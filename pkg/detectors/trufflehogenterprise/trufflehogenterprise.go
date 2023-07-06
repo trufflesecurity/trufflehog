@@ -23,7 +23,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat      = regexp.MustCompile(`\bthog-key-[0-9a-f]{16}\b`)
 	secretPat   = regexp.MustCompile(`\bthog-secret-[0-9a-f]{32}\b`)
-	hostnamePat = regexp.MustCompile(`\b[a-z]+-[a-z]+-[a-z]+.[a-z][0-9].[a-z]+.trufflehog.org\b`)
+	hostnamePat = regexp.MustCompile(`\b[a-z]+-[a-z]+-[a-z]+\.[a-z][0-9]\.[a-z]+\.trufflehog\.org\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
