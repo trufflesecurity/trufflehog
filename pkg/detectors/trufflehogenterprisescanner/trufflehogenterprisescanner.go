@@ -2,10 +2,18 @@ package trufflehogenterprisescanner
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -43,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Trufflehogenterprisescanner,
+			DetectorType: detectorspb.DetectorType_TrufflehogEnterpriseScanner,
 			Raw:          []byte(resMatch),
 		}
 
@@ -75,5 +83,36 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Trufflehogenterprisescanner
+	return detectorspb.DetectorType_TrufflehogEnterpriseScanner
+}
+
+func grpcHeartbeat(group, token string) error {
+	ctx := context.Background()
+	ctx = metadata.NewOutgoingContext(ctx,
+		metadata.New(map[string]string{
+			"name":          strings.TrimSpace(group),
+			"authorization": strings.TrimSpace(token),
+		}))
+
+	systemRoots, err := x509.SystemCertPool()
+	if err != nil {
+		panic(errors.Wrap(err, "cannot load root CA certs"))
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		RootCAs: systemRoots,
+	})
+
+	conn, err := grpc.Dial("real-strong-chipmunk.api.c1.prod.trufflehog.org:8443", grpc.WithTransportCredentials(creds))
+	if err != nil {
+		log.Fatalf("Did not connect: %v", err)
+	}
+	defer conn.Close()
+
+	c := pb.NewAgentServiceClient(conn)
+
+	r, err := c.Heartbeat(ctx, &pb.HeartbeatRequest{Status: "GOOD", Reason: "", Version: "v1.0.0"})
+	if err != nil {
+		log.Fatalf("could not heartbeat: %v", err)
+	}
+	log.Printf("Heartbeat response: %s", r)
 }
