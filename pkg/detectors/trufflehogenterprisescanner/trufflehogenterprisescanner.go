@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -40,29 +39,21 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	fmt.Println("dataStr: ", dataStr)
-
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	groupMatches := groupPat.FindAllStringSubmatch(dataStr, -1)
 	addressMatches := addressPat.FindAllStringSubmatch(dataStr, -1)
-
-	fmt.Println("keyMatches: ", keyMatches)
-	fmt.Println("groupMatches: ", groupMatches)
-	fmt.Println("addressMatches: ", addressMatches)
 
 	for _, keyMatch := range keyMatches {
 		if len(keyMatch) != 1 {
 			continue
 		}
 		resKeyMatch := strings.TrimSpace(keyMatch[0])
-		fmt.Println("resKeyMatch: ", resKeyMatch)
 
 		for _, groupMatch := range groupMatches {
 			if len(groupMatch) != 1 {
 				continue
 			}
 			resGroupMatch := strings.TrimSpace(groupMatch[0])
-			fmt.Println("resGroupMatch: ", resGroupMatch)
 
 			for _, addressMatch := range addressMatches {
 				if len(addressMatch) != 1 {
@@ -70,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				resAddressMatch := strings.TrimSpace(addressMatch[0])
-				fmt.Println("resAddressMatch: ", resAddressMatch)
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_TrufflehogEnterpriseScanner,
@@ -79,7 +69,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					err := grpcHeartbeat(resAddressMatch, resGroupMatch, resKeyMatch)
-					fmt.Println("err: ", err)
 					if err == nil {
 						s1.Verified = true
 					}
