@@ -57,6 +57,12 @@ type Result struct {
 	Redacted       string
 	ExtraData      map[string]string
 	StructuredData *detectorspb.StructuredData
+
+	// This field should only be populated if the verification process itself failed in a way that provides no
+	// information about the verification status of the candidate secret. This is because if this field is set, the
+	// application will ignore the contents of the `verified` field. An example of such a situation is a verification
+	// request that timed out.
+	VerificationErrorMessage string
 }
 
 type ResultWithMetadata struct {
