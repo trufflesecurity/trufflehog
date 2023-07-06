@@ -45,7 +45,7 @@ func TestTrufflehogEnterpriseScanner_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("%s \n for %s \n %s", token, group, address)),
+				data:   []byte(fmt.Sprintf("You can find a thog scanner secret %s for %s at %s within", token, group, address)),
 				verify: true,
 			},
 			want: []detectors.Result{
