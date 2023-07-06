@@ -281,7 +281,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					// it's likely already picked up by the PLAIN decoder. See related issue: https://github.com/trufflesecurity/trufflehog/issues/1450
 					(decoded != nil &&
 						decoderType == detectorspb.DecoderType_BASE64 &&
-						bytes.Compare(original[0:common.MinInt(40, len(original)-1)], decoded.Data[0:common.MinInt(40, len(decoded.Data)-1)]) == 0) {
+						bytes.Equal(original[0:common.MinInt(40, len(original)-1)], decoded.Data[0:common.MinInt(40, len(decoded.Data)-1)])) {
 					continue
 				}
 
