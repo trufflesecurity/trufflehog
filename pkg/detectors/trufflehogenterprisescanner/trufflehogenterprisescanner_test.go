@@ -16,15 +16,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestTrufflehogenterprisescanner_FromChunk(t *testing.T) {
+func TestTrufflehogEnterpriseScanner_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TRUFFLEHOGENTERPRISESCANNER")
-	inactiveSecret := testSecrets.MustGetField("TRUFFLEHOGENTERPRISESCANNER_INACTIVE")
+	address := testSecrets.MustGetField("THOG_SCANNER_ADDRESS")
+	group := testSecrets.MustGetField("THOG_SCANNER_GROUP")
+	token := testSecrets.MustGetField("THOG_SCANNER_TOKEN")
+	inactiveToken := testSecrets.MustGetField("THOG_SCANNER_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +45,12 @@ func TestTrufflehogenterprisescanner_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a trufflehogenterprisescanner secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a thog scanner secret %s for %s at %s within", token, group, address)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Trufflehogenterprisescanner,
+					DetectorType: detectorspb.DetectorType_TrufflehogEnterpriseScanner,
 					Verified:     true,
 				},
 			},
@@ -59,12 +61,12 @@ func TestTrufflehogenterprisescanner_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a trufflehogenterprisescanner secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a thog scanner secret %s for %s at %s within but not valid", token, group, address)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Trufflehogenterprisescanner,
+					DetectorType: detectorspb.DetectorType_TrufflehogEnterpriseScanner,
 					Verified:     false,
 				},
 			},
