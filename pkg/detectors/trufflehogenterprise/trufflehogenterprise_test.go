@@ -19,12 +19,14 @@ import (
 func TestTrufflehogenterprise_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TRUFFLEHOGENTERPRISE")
-	inactiveSecret := testSecrets.MustGetField("TRUFFLEHOGENTERPRISE_INACTIVE")
+	host := testSecrets.MustGetField("THOG_HOSTNAME")
+	key := testSecrets.MustGetField("THOG_WEB_KEY")
+	secret := testSecrets.MustGetField("THOG_WEB_SECRET")
+	inactiveSecret := testSecrets.MustGetField("THOG_WEB_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +45,12 @@ func TestTrufflehogenterprise_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a trufflehogenterprise secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a thog secret %s for %s with key %s within", secret, host, key)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Trufflehogenterprise,
+					DetectorType: detectorspb.DetectorType_TrufflehogEnterprise,
 					Verified:     true,
 				},
 			},
@@ -59,12 +61,12 @@ func TestTrufflehogenterprise_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a trufflehogenterprise secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a trufflehogenterprise secret %s for %s with key %s within but not valid", inactiveSecret, host, key)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Trufflehogenterprise,
+					DetectorType: detectorspb.DetectorType_TrufflehogEnterprise,
 					Verified:     false,
 				},
 			},
