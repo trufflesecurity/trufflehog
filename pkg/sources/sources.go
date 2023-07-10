@@ -50,6 +50,26 @@ type SourceUnitUnmarshaller interface {
 	UnmarshalSourceUnit(data []byte) (SourceUnit, error)
 }
 
+// SourceUnitEnumerator defines an optional interface a Source can implement to
+// support enumerating an initialized Source into SourceUnits.
+type SourceUnitEnumerator interface {
+	// Enumerate enumerates the initialized Source, outputting units. This
+	// method is synchronous but can be called in a goroutine to support
+	// concurrent enumeration and chunking. An error should only be
+	// returned from this method in the case of context cancellation. All
+	// other errors related to unit enumeration are tracked in the
+	// EnumerationResult.
+	Enumerate(ctx context.Context, units chan<- EnumerationResult) error
+}
+
+// EnumerationResult is the result of an enumeration, containing the unit and
+// error if any. Unit and Error are mutually exclusive (only one will be
+// non-nil).
+type EnumerationResult struct {
+	Unit  SourceUnit
+	Error error
+}
+
 // SourceUnit is an object that represents a Source's unit of work. This is
 // used as the output of enumeration, progress reporting, and job distribution.
 type SourceUnit interface {
@@ -222,4 +242,17 @@ func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 	return p
+}
+
+// CommonEnumerationOk is a helper function to construct an EnumerationResult
+// using a CommonSourceUnit.
+func CommonEnumerationOk(id string) EnumerationResult {
+	unit := CommonSourceUnit{ID: id}
+	return EnumerationResult{Unit: unit}
+}
+
+// EnumerationErr is a helper function to construct an EnumerationResult from
+// an error.
+func EnumerationErr(err error) EnumerationResult {
+	return EnumerationResult{Error: err}
 }
