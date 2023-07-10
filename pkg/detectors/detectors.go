@@ -59,9 +59,7 @@ type Result struct {
 	StructuredData *detectorspb.StructuredData
 
 	// This field should only be populated if the verification process itself failed in a way that provides no
-	// information about the verification status of the candidate secret. This is because if this field is set, the
-	// application will ignore the contents of the `verified` field. An example of such a situation is a verification
-	// request that timed out.
+	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	VerificationErrorMessage string
 }
 
