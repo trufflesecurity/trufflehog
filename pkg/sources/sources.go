@@ -247,17 +247,12 @@ func (p *Progress) GetProgress() *Progress {
 // CommonEnumerationOk is a helper function to construct an EnumerationResult
 // using a CommonSourceUnit.
 func CommonEnumerationOk(id string) EnumerationResult {
-	return EnumerationResult{
-		Unit:  CommonSourceUnit{ID: id},
-		Error: nil,
-	}
+	unit := CommonSourceUnit{ID: id}
+	return EnumerationResult{Unit: unit}
 }
 
 // EnumerationErr is a helper function to construct an EnumerationResult from
 // an error.
 func EnumerationErr(err error) EnumerationResult {
-	return EnumerationResult{
-		Unit:  nil,
-		Error: err,
-	}
+	return EnumerationResult{Error: err}
 }
