@@ -60,7 +60,7 @@ type Result struct {
 
 	// This field should only be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
-	VerificationErrorMessage string
+	VerificationError error
 }
 
 type ResultWithMetadata struct {
