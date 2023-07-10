@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"strings"
 )
@@ -22,6 +23,18 @@ func RemoveStringSliceItem(item string, slice *[]string) {
 			*slice = (*slice)[:len(*slice)-1]
 		}
 	}
+}
+
+func MinInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func BytesEqual(a, b []byte, numBytes int) bool {
+	limit := MinInt(numBytes, MinInt(len(a), len(b))-1)
+	return bytes.Equal(a[:limit], b[:limit])
 }
 
 func ResponseContainsSubstring(reader io.ReadCloser, target string) (bool, error) {
