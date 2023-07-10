@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alecthomas/chroma"
+	"github.com/alecthomas/chroma/lexers"
 	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -43,6 +46,9 @@ type Engine struct {
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words (keywords from the rules in the config)
 	prefilter ahocorasick.AhoCorasick
+
+	// v2 detection engine map, key is the length of characters in the secret capture group
+	v2Detectors map[int]detectors.Detector
 }
 
 type EngineOption func(*Engine)
@@ -276,6 +282,20 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				if decoded == nil {
 					continue
 				}
+
+				// use chroma to find all strings and comments
+				l := lexers.Analyse(string(chunk.Data))
+				if l != nil {
+					iterator, err := l.Tokenise(nil, string(chunk.Data))
+					if err != nil {
+						fmt.Println("error: ", err)
+					}
+					for _, token := range iterator.Tokens() {
+						if token.Type == chroma.LiteralString && len(token.Value) > 8 {
+						}
+					}
+				}
+				continue
 
 				// build a map of all keywords that were matched in the chunk
 				for _, m := range e.prefilter.FindAll(string(decoded.Data)) {
