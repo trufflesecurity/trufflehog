@@ -276,12 +276,15 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				original := chunk.Data
 				decoded := decoder.FromChunk(chunk)
 
+				if decoded == nil {
+					continue
+				}
+
 				if decoded == nil ||
 					// check if the decoded data is similar "enough" to the original data. If it is, then we can skip scanning the decoded data as
 					// it's likely already picked up by the PLAIN decoder. See related issue: https://github.com/trufflesecurity/trufflehog/issues/1450
 					(decoded != nil &&
-						decoderType == detectorspb.DecoderType_BASE64 &&
-						bytes.Equal(original[0:common.MinInt(40, len(original)-1)], decoded.Data[0:common.MinInt(40, len(decoded.Data)-1)])) {
+						decoderType == detectorspb.DecoderType_BASE64 && common.BytesEqual(original, decoded.Data, 40)) {
 					continue
 				}
 
