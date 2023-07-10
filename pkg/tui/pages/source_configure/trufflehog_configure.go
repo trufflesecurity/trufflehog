@@ -42,5 +42,5 @@ func GetTrufflehogConfiguration() tea.Model {
 		Placeholder: "1",
 	}
 
-	return textinputs.New([]textinputs.InputConfig{jsonOutput, verification, verifiedResults, excludeDetectors, concurrency})
+	return textinputs.New([]textinputs.InputConfig{jsonOutput, verification, verifiedResults, excludeDetectors, concurrency}).SetSkip(true)
 }

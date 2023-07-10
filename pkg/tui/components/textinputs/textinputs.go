@@ -20,8 +20,10 @@ var (
 	helpStyle           = blurredStyle.Copy()
 	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
-	focusedButton = focusedStyle.Copy().Render("[ Next ]")
-	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Next"))
+	focusedButton     = focusedStyle.Copy().Render("[ Next ]")
+	blurredButton     = fmt.Sprintf("[ %s ]", blurredStyle.Render("Next"))
+	focusedSkipButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render("[ Run with defaults ]")
+	blurredSkipButton = fmt.Sprintf("[ %s ]", lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Run with defaults"))
 )
 
 type model struct {
@@ -29,6 +31,7 @@ type model struct {
 	inputs     []textinput.Model
 	configs    []InputConfig
 	cursorMode cursor.Mode
+	skipButton bool
 }
 
 type InputConfig struct {
@@ -102,7 +105,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.focusIndex > len(m.inputs) {
 				m.focusIndex = 0
-			} else if m.focusIndex < 0 {
+			} else if !m.skipButton && m.focusIndex < 0 {
+				m.focusIndex = len(m.inputs)
+			} else if m.skipButton && m.focusIndex < -1 {
 				m.focusIndex = len(m.inputs)
 			}
 
@@ -146,6 +151,14 @@ func (m *model) updateInputs(msg tea.Msg) tea.Cmd {
 func (m model) View() string {
 	var b strings.Builder
 
+	if m.skipButton {
+		button := &blurredSkipButton
+		if m.focusIndex == -1 {
+			button = &focusedSkipButton
+		}
+		fmt.Fprintf(&b, "%s\n\n\n", *button)
+	}
+
 	for i := range m.inputs {
 		if m.configs[i].Label != "" {
 			b.WriteString(m.GetLabel(m.configs[i]))
@@ -185,4 +198,15 @@ func (m model) GetLabel(c InputConfig) string {
 
 	label.WriteString("\n")
 	return label.String()
+}
+
+func (m model) SetSkip(skip bool) model {
+	m.skipButton = skip
+	if m.skipButton {
+		if len(m.inputs) > 0 {
+			m.inputs[0].Blur()
+		}
+		m.focusIndex = -1
+	}
+	return m
 }

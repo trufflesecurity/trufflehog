@@ -64,6 +64,14 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
+	case tabs.SelectTabMsg:
+		m.activeTab = tab(msg)
+		t, cmd := m.tabs.Update(msg)
+		m.tabs = t.(*tabs.Tabs)
+
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	case tea.KeyMsg:
 		t, cmd := m.tabs.Update(msg)
 		m.tabs = t.(*tabs.Tabs)
