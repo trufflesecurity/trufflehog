@@ -52,9 +52,7 @@ jobs:
         service_account: 'github-ci-external@trufflehog-testing.iam.gserviceaccount.com'
     - name: Test
       run: make test-detectors
-      continue-on-error: true
-  
-  
+      continue-on-error: true  
   test-fork:
     if: ${{ github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
