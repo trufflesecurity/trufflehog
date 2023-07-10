@@ -940,6 +940,10 @@ message Result {
   StructuredData structured_data = 7;
   string hash_v2 = 8;
   DecoderType decoder_type = 9;
+
+  // This field should only be populated if the verification process itself failed in a way that provides no information
+  // about the verification status of the candidate secret, such as if the verification request timed out.
+  string verification_error_message = 10;
 }
 
 message StructuredData {
