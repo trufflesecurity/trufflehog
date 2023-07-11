@@ -190,6 +190,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
 						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
 							continue
+						} else {
+							s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 						}
 					}
 				} else {
