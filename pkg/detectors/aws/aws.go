@@ -191,7 +191,11 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
+
+						s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 					}
+				} else {
+					s1.VerificationError = err
 				}
 			}
 

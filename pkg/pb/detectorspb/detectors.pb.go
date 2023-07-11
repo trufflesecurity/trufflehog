@@ -2877,9 +2877,7 @@ type Result struct {
 	HashV2         string            `protobuf:"bytes,8,opt,name=hash_v2,json=hashV2,proto3" json:"hash_v2,omitempty"`
 	DecoderType    DecoderType       `protobuf:"varint,9,opt,name=decoder_type,json=decoderType,proto3,enum=detectors.DecoderType" json:"decoder_type,omitempty"`
 	// This field should only be populated if the verification process itself failed in a way that provides no information
-	// about the verification status of the candidate secret. This is because if this field is set, the application will
-	// ignore the contents of the `verified` field. An example of such a situation is a verification request that timed
-	// out.
+	// about the verification status of the candidate secret, such as if the verification request timed out.
 	VerificationErrorMessage string `protobuf:"bytes,10,opt,name=verification_error_message,json=verificationErrorMessage,proto3" json:"verification_error_message,omitempty"`
 }
 
