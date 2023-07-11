@@ -46,6 +46,7 @@ type Source struct {
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 var _ sources.SourceUnitEnumerator = (*Source)(nil)
+var _ sources.SourceUnitChunker = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -226,6 +227,46 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		if err := reporter.UnitOk(ctx, item); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// ChunkUnit implements SourceUnitChunker interface.
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, chunks chan<- sources.ChunkResult) error {
+	path := unit.SourceUnitID()
+	logger := ctx.Logger().WithValues("path", path)
+
+	cleanPath := filepath.Clean(path)
+	fileInfo, err := os.Stat(cleanPath)
+	if err != nil {
+		return common.CancellableWrite(ctx, chunks, sources.ChunkErr(fmt.Errorf("unable to get file info: %w", err)))
+	}
+
+	ch := make(chan *sources.Chunk)
+	go func() {
+		defer close(ch)
+		if fileInfo.IsDir() {
+			// TODO: Finer grain error tracking of individual chunks.
+			err = s.scanDir(ctx, cleanPath, ch)
+		} else {
+			// TODO: Finer grain error tracking of individual
+			// chunks (in the case of archives).
+			err = s.scanFile(ctx, cleanPath, ch)
+		}
+	}()
+
+	for chunk := range ch {
+		if chunk == nil {
+			continue
+		}
+		if err := common.CancellableWrite(ctx, chunks, sources.ChunkOk(*chunk)); err != nil {
+			return err
+		}
+	}
+
+	if err != nil && err != io.EOF {
+		logger.Info("error scanning filesystem", "error", err)
+		return common.CancellableWrite(ctx, chunks, sources.ChunkErr(err))
 	}
 	return nil
 }
