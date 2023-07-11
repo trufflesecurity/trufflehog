@@ -237,6 +237,9 @@ func (e *Engine) BytesScanned() uint64 {
 func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
 	dedupeMap := make(map[string]struct{})
 	for _, result := range chunkResults {
+		// dedupe by comparing the detector type, raw result, and source metadata
+		// NOTE: in order for the PLAIN decoder to maintain precedence, make sure UTF8 is the first decoder in the
+		// default decoders list
 		if _, ok := dedupeMap[result.DetectorType.String()+string(result.Raw)+fmt.Sprintf("%+v", result.SourceMetadata)]; ok {
 			continue
 		}
