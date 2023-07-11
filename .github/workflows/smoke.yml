@@ -14,9 +14,6 @@ jobs:
         go-version: '1.18'
     - name: Checkout code
       uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-        ref: ${{ github.head_ref }}
     - name: Smoke
       run: |
         set -e

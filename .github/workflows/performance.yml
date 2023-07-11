@@ -4,6 +4,10 @@ on: [pull_request]
 
 jobs:
   speed:
+    #   skip if PR is from a fork.
+    # TODO: this could probabaly be refactored a bit so that it runs on forks
+    if: ${{ ! github.event.pull_request.head.repo.fork }}
+    
     runs-on: ubuntu-latest
     steps:
     - name: Install Go
