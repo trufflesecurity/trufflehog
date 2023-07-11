@@ -110,9 +110,6 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 	cfg.Region = aws.String(region)
 
 	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.S3_AssumeRole:
-		sess := session.Must(session.NewSession())
-		cfg.Credentials = stscreds.NewCredentials(sess, cred.AssumeRole.RoleArn)
 	case *sourcespb.S3_SessionToken:
 		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
 	case *sourcespb.S3_AccessKey:
@@ -138,6 +135,7 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	// TODO: need to wrap credential enumeration with enumeration of AssumeRole
 	const defaultAWSRegion = "us-east-1"
 
 	client, err := s.newClient(defaultAWSRegion)
