@@ -2796,6 +2796,37 @@ func (m *S3) validate(all bool) error {
 			}
 		}
 
+	case *S3_AssumeRole:
+
+		if all {
+			switch v := interface{}(m.GetAssumeRole()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, S3ValidationError{
+						field:  "AssumeRole",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, S3ValidationError{
+						field:  "AssumeRole",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAssumeRole()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return S3ValidationError{
+					field:  "AssumeRole",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	}
 
 	if len(errors) > 0 {
