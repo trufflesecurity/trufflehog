@@ -105,6 +105,8 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case key.Matches(msg, ui.common.KeyMap.Back):
 			case key.Matches(msg, ui.common.KeyMap.Help):
+			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage != sourceConfigurePage:
+				return ui, tea.Quit
 			case key.Matches(msg, ui.common.KeyMap.Quit):
 				return ui, tea.Quit
 			case ui.activePage > 0 && key.Matches(msg, ui.common.KeyMap.Back):

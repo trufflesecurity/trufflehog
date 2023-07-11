@@ -5,6 +5,7 @@ import "github.com/charmbracelet/bubbles/key"
 // KeyMap is a map of key bindings for the UI.
 type KeyMap struct {
 	Quit      key.Binding
+	CmdQuit   key.Binding
 	Up        key.Binding
 	Down      key.Binding
 	UpDown    key.Binding
@@ -29,6 +30,16 @@ func DefaultKeyMap() *KeyMap {
 
 	km.Quit = key.NewBinding(
 		key.WithKeys(
+			"ctrl+c",
+		),
+		key.WithHelp(
+			"ctrl+c",
+			"quit",
+		),
+	)
+
+	km.CmdQuit = key.NewBinding(
+		key.WithKeys(
 			"q",
 			"ctrl+c",
 		),
@@ -44,7 +55,7 @@ func DefaultKeyMap() *KeyMap {
 			"k",
 		),
 		key.WithHelp(
-			"↑",
+			"↑/k",
 			"up",
 		),
 	)
@@ -55,7 +66,7 @@ func DefaultKeyMap() *KeyMap {
 			"j",
 		),
 		key.WithHelp(
-			"↓",
+			"↓/j",
 			"down",
 		),
 	)
