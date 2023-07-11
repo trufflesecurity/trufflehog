@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/tabs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
@@ -84,6 +85,16 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		fields := sources.GetSourceFields(m.configTabSource)
 		if fields != nil {
 			m.tabComponents[configTab].(*SourceComponent).SetForm(fields)
+		}
+	case textinputs.SelectNextMsg, textinputs.SelectSkipMsg:
+		if m.activeTab < runTab {
+			m.activeTab++
+		}
+		t, cmd := m.tabs.Update(tabs.SelectTabMsg(int(m.activeTab)))
+		m.tabs = t.(*tabs.Tabs)
+
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 	}
 

@@ -26,6 +26,12 @@ var (
 	blurredSkipButton = fmt.Sprintf("[ %s ]", lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Run with defaults"))
 )
 
+// SelectNextMsg used for emitting events when the 'Next' button is selected.
+type SelectNextMsg int
+
+// SelectSkipMsg used for emitting events when the 'Skip' button is selected.
+type SelectSkipMsg int
+
 type model struct {
 	focusIndex int
 	inputs     []textinput.Model
@@ -71,33 +77,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
-			return m, tea.Quit
-
-		// Change cursor mode
-		case "ctrl+r":
-			m.cursorMode++
-			if m.cursorMode > cursor.CursorHide {
-				m.cursorMode = cursor.CursorBlink
-			}
-			cmds := make([]tea.Cmd, len(m.inputs))
-			for i := range m.inputs {
-				cmds[i] = m.inputs[i].Cursor.SetMode(m.cursorMode)
-			}
-			return m, tea.Batch(cmds...)
-
 		// Set focus to next input
-		case "tab", "shift+tab", "enter", "up", "down":
+		case "enter", "up", "down":
 			s := msg.String()
 
-			// Did the user press enter while the submit button was focused?
-			// If so, exit.
+			// Did the user press enter while the submit or skip button was focused?
+			// If so, emit the appropriate command.
 			if s == "enter" && m.focusIndex == len(m.inputs) {
-				return m, tea.Quit
+				return m, func() tea.Msg { return SelectNextMsg(0) }
+			} else if s == "enter" && m.focusIndex == -1 {
+				return m, func() tea.Msg { return SelectSkipMsg(0) }
 			}
 
 			// Cycle indexes
-			if s == "up" || s == "shift+tab" {
+			if s == "up" {
 				m.focusIndex--
 			} else {
 				m.focusIndex++
@@ -112,18 +105,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			cmds := make([]tea.Cmd, len(m.inputs))
-			for i := 0; i <= len(m.inputs)-1; i++ {
+			for i := 0; i < len(m.inputs); i++ {
 				if i == m.focusIndex {
 					// Set focused state
-					cmds[i] = m.inputs[i].Focus()
-					m.inputs[i].PromptStyle = focusedStyle
-					m.inputs[i].TextStyle = focusedStyle
+					cmds[i] = m.focusInput(i)
 					continue
 				}
 				// Remove focused state
-				m.inputs[i].Blur()
-				m.inputs[i].PromptStyle = noStyle
-				m.inputs[i].TextStyle = noStyle
+				m.unfocusInput(i)
 			}
 
 			return m, tea.Batch(cmds...)
@@ -177,10 +166,6 @@ func (m model) View() string {
 	}
 	fmt.Fprintf(&b, "\n\n%s\n\n", *button)
 
-	b.WriteString(helpStyle.Render("cursor mode is "))
-	b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
-	b.WriteString(helpStyle.Render(" (ctrl+r to change style)"))
-
 	return b.String()
 }
 
@@ -204,9 +189,21 @@ func (m model) SetSkip(skip bool) model {
 	m.skipButton = skip
 	if m.skipButton {
 		if len(m.inputs) > 0 {
-			m.inputs[0].Blur()
+			m.unfocusInput(0)
 		}
 		m.focusIndex = -1
 	}
 	return m
+}
+
+func (m *model) unfocusInput(index int) {
+	m.inputs[index].Blur()
+	m.inputs[index].PromptStyle = noStyle
+	m.inputs[index].TextStyle = noStyle
+}
+
+func (m *model) focusInput(index int) tea.Cmd {
+	m.inputs[index].PromptStyle = focusedStyle
+	m.inputs[index].TextStyle = focusedStyle
+	return m.inputs[index].Focus()
 }
