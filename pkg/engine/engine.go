@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -257,6 +258,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
+			var chunkResults = make([]detectors.ResultWithMetadata, 0)
 			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
@@ -273,18 +275,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					decoderType = detectorspb.DecoderType_UNKNOWN
 				}
 
-				original := chunk.Data
 				decoded := decoder.FromChunk(chunk)
 
 				if decoded == nil {
-					continue
-				}
-
-				if decoded == nil ||
-					// check if the decoded data is similar "enough" to the original data. If it is, then we can skip scanning the decoded data as
-					// it's likely already picked up by the PLAIN decoder. See related issue: https://github.com/trufflesecurity/trufflehog/issues/1450
-					(decoded != nil &&
-						decoderType == detectorspb.DecoderType_BASE64 && common.BytesEqual(original, decoded.Data, 40)) {
 					continue
 				}
 
@@ -343,7 +336,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 								continue
 							}
 							result.DecoderType = decoderType
-							e.results <- detectors.CopyMetadata(resultChunk, result)
+							chunkResults = append(chunkResults, detectors.CopyMetadata(resultChunk, result))
+							// e.results <- detectors.CopyMetadata(resultChunk, result)
 
 						}
 						if len(results) > 0 {
@@ -362,6 +356,16 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						}
 					}
 				}
+			}
+			dedupeMap := make(map[string]struct{})
+			for _, result := range chunkResults {
+				// dedupe results
+				if _, ok := dedupeMap[result.DetectorType.String()+string(result.RawV2)+fmt.Sprintf("%+v", result.SourceMetadata)]; ok {
+					continue
+				}
+				dedupeMap[result.DetectorType.String()+string(result.RawV2)+fmt.Sprintf("%+v", result.SourceMetadata)] = struct{}{}
+				e.results <- result
+
 			}
 		}
 		atomic.AddUint64(&e.chunksScanned, 1)
