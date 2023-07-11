@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	levenshtein "github.com/ka-weihe/fast-levenshtein"
+
 	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -276,15 +278,16 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				original := chunk.Data
 				decoded := decoder.FromChunk(chunk)
 
-				if decoded == nil {
-					continue
-				}
-
 				if decoded == nil ||
 					// check if the decoded data is similar "enough" to the original data. If it is, then we can skip scanning the decoded data as
 					// it's likely already picked up by the PLAIN decoder. See related issue: https://github.com/trufflesecurity/trufflehog/issues/1450
 					(decoded != nil &&
-						decoderType == detectorspb.DecoderType_BASE64 && common.BytesEqual(original, decoded.Data, 40)) {
+						// quick performant test to see if the decoded data is similar enough to the original data
+						decoderType == detectorspb.DecoderType_BASE64 && common.BytesEqual(original, decoded.Data, 40) &&
+						// more accurate test to see if the decoded data is similar enough to the original data.
+						// Explainer: if the levenshtein distance is less than half the length of the original string, then it's likely similar enough
+						// to the original string to be picked up by the PLAIN decoder. This is a very rough heuristic, but it's better than nothing.
+						levenshtein.Distance(string(original), string(decoded.Data)) < (len(original)/2)) {
 					continue
 				}
 
