@@ -192,7 +192,9 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							continue
 						}
 
-						s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+						if res.StatusCode != 403 {
+							s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+						}
 					}
 				} else {
 					s1.VerificationError = err
