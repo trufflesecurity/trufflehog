@@ -92,7 +92,8 @@ func TestSource_ScanComments(t *testing.T) {
 	// For the personal access token test
 	githubToken := secret.MustGetField("GITHUB_TOKEN")
 
-	const totalChunks = 3
+	const totalPRChunks = 2
+	const totalIssueChunks = 1
 
 	type init struct {
 		name       string
@@ -100,24 +101,28 @@ func TestSource_ScanComments(t *testing.T) {
 		connection *sourcespb.GitHub
 	}
 	tests := []struct {
-		name      string
-		init      init
-		wantChunk *sources.Chunk
-		wantErr   bool
-		minRepo   int
-		minOrg    int
+		name              string
+		init              init
+		wantChunk         *sources.Chunk
+		wantErr           bool
+		minRepo           int
+		minOrg            int
+		numExpectedChunks int
 	}{
 		{
 			name: "token authenticated, single repo, single issue comment",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
-					Repositories: []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					Repositories:               []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					IncludeIssueComments:       true,
+					IncludePullRequestComments: false,
 					Credential: &sourcespb.GitHub_Token{
 						Token: githubToken,
 					},
 				},
 			},
+			numExpectedChunks: totalIssueChunks,
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
 				SourceName: "test source",
@@ -139,12 +144,15 @@ func TestSource_ScanComments(t *testing.T) {
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
-					Repositories: []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					Repositories:               []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					IncludePullRequestComments: true,
+					IncludeIssueComments:       false,
 					Credential: &sourcespb.GitHub_Token{
 						Token: githubToken,
 					},
 				},
 			},
+			numExpectedChunks: totalPRChunks,
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
 				SourceName: "test source",
@@ -207,8 +215,8 @@ func TestSource_ScanComments(t *testing.T) {
 			}
 
 			// Confirm all comments were processed.
-			if i != totalChunks {
-				t.Errorf("did not complete all chunks, got %d, want %d", i, totalChunks)
+			if i != tt.numExpectedChunks {
+				t.Errorf("did not complete all chunks, got %d, want %d", i, tt.numExpectedChunks)
 			}
 
 		})

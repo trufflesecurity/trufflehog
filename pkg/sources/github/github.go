@@ -44,30 +44,32 @@ const (
 )
 
 type Source struct {
-	name              string
-	githubUser        string
-	githubToken       string
-	sourceID          int64
-	jobID             int64
-	verify            bool
-	repos             []string
-	members           []string
-	orgsCache         cache.Cache
-	filteredRepoCache *filteredRepoCache
-	memberCache       map[string]struct{}
-	repoSizes         repoSize
-	totalRepoSize     int // total size in bytes of all repos
-	git               *git.Git
-	scanOptions       *git.ScanOptions
-	httpClient        *http.Client
-	log               logr.Logger
-	conn              *sourcespb.GitHub
-	jobPool           *errgroup.Group
-	resumeInfoMutex   sync.Mutex
-	resumeInfoSlice   []string
-	apiClient         *github.Client
-	mu                sync.Mutex
-	publicMap         map[string]source_metadatapb.Visibility
+	name                 string
+	githubUser           string
+	githubToken          string
+	sourceID             int64
+	jobID                int64
+	verify               bool
+	repos                []string
+	members              []string
+	orgsCache            cache.Cache
+	filteredRepoCache    *filteredRepoCache
+	memberCache          map[string]struct{}
+	repoSizes            repoSize
+	totalRepoSize        int // total size in bytes of all repos
+	git                  *git.Git
+	scanOptions          *git.ScanOptions
+	httpClient           *http.Client
+	log                  logr.Logger
+	conn                 *sourcespb.GitHub
+	jobPool              *errgroup.Group
+	resumeInfoMutex      sync.Mutex
+	resumeInfoSlice      []string
+	apiClient            *github.Client
+	mu                   sync.Mutex
+	publicMap            map[string]source_metadatapb.Visibility
+	includePRComments    bool
+	includeIssueComments bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -212,6 +214,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 		}
 		s.filteredRepoCache.Set(r, r)
 	}
+
+	s.includeIssueComments = s.conn.IncludeIssueComments
+	s.includePRComments = s.conn.IncludePullRequestComments
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -945,66 +950,71 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 		allComments   = 0
 	)
 
-	issueOpts := &github.IssueListCommentsOptions{
-		Sort:      &sortType,
-		Direction: &directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    1,
-		},
+	if s.includeIssueComments {
+
+		issueOpts := &github.IssueListCommentsOptions{
+			Sort:      &sortType,
+			Direction: &directionType,
+			ListOptions: github.ListOptions{
+				PerPage: defaultPagination,
+				Page:    1,
+			},
+		}
+
+		for {
+			issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
+			if s.handleRateLimit(err, resp) {
+				break
+			}
+
+			if err != nil {
+				return err
+			}
+
+			err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
+			if err != nil {
+				return err
+			}
+
+			issueOpts.ListOptions.Page++
+
+			if len(issueComments) < defaultPagination {
+				break
+			}
+		}
+
 	}
 
-	for {
-		issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
-		if s.handleRateLimit(err, resp) {
-			break
+	if s.includePRComments {
+		prOpts := &github.PullRequestListCommentsOptions{
+			Sort:      sortType,
+			Direction: directionType,
+			ListOptions: github.ListOptions{
+				PerPage: defaultPagination,
+				Page:    1,
+			},
 		}
 
-		if err != nil {
-			return err
-		}
+		for {
+			prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
+			if s.handleRateLimit(err, resp) {
+				break
+			}
 
-		err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
-		if err != nil {
-			return err
-		}
+			if err != nil {
+				return err
+			}
 
-		issueOpts.ListOptions.Page++
+			err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
+			if err != nil {
+				return err
+			}
 
-		if len(issueComments) < defaultPagination {
-			break
-		}
-	}
+			prOpts.ListOptions.Page++
 
-	prOpts := &github.PullRequestListCommentsOptions{
-		Sort:      sortType,
-		Direction: directionType,
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    1,
-		},
-	}
-
-	for {
-		prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
-
-		if s.handleRateLimit(err, resp) {
-			break
-		}
-
-		if err != nil {
-			return err
-		}
-
-		err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
-		if err != nil {
-			return err
-		}
-
-		prOpts.ListOptions.Page++
-
-		if len(prComments) < defaultPagination {
-			break
+			if len(prComments) < defaultPagination {
+				break
+			}
 		}
 	}
 
