@@ -349,7 +349,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							}
 							result.DecoderType = decoderType
 							chunkResults = append(chunkResults, detectors.CopyMetadata(resultChunk, result))
-							// e.results <- detectors.CopyMetadata(resultChunk, result)
 
 						}
 						if len(results) > 0 {
