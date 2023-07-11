@@ -240,10 +240,11 @@ func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
 		// dedupe by comparing the detector type, raw result, and source metadata
 		// NOTE: in order for the PLAIN decoder to maintain precedence, make sure UTF8 is the first decoder in the
 		// default decoders list
-		if _, ok := dedupeMap[result.DetectorType.String()+string(result.Raw)+fmt.Sprintf("%+v", result.SourceMetadata)]; ok {
+		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
+		if _, ok := dedupeMap[key]; ok {
 			continue
 		}
-		dedupeMap[result.DetectorType.String()+string(result.Raw)+fmt.Sprintf("%+v", result.SourceMetadata)] = struct{}{}
+		dedupeMap[key] = struct{}{}
 		e.results <- result
 	}
 
