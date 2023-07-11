@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -39,11 +38,12 @@ func TestAWS_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                  string
+		s                     scanner
+		args                  args
+		want                  []detectors.Result
+		wantErr               bool
+		wantVerificationError bool
 	}{
 		{
 			name: "found, verified",
@@ -205,17 +205,17 @@ func TestAWS_FromChunk(t *testing.T) {
 			args: args{
 				ctx:    timeoutContext(1 * time.Microsecond),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
-				verify: false,
+				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:      detectorspb.DetectorType_AWS,
-					Verified:          false,
-					VerificationError: errors.New("wip"),
-					Redacted:          "AKIASP2TPHJSQH3FJRUX",
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 				},
 			},
-			wantErr: false,
+			wantErr:               false,
+			wantVerificationError: true,
 		},
 	}
 	for _, tt := range tests {
@@ -230,8 +230,11 @@ func TestAWS_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+				if (got[i].VerificationError != nil) != tt.wantVerificationError {
+					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationError)
+				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AWS.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
