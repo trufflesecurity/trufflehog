@@ -3,6 +3,7 @@ package engine
 import (
 	"testing"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -60,5 +61,14 @@ func TestFragmentLineOffset(t *testing.T) {
 				t.Errorf("Expected isIgnored to be %v, got %v", tt.ignore, isIgnored)
 			}
 		})
+	}
+}
+
+// Test to make sure that DefaultDecoders always returns the UTF8 decoder first.
+// Technically a decoder test but we want this to run and fail in CI
+func TestDefaultDecoders(t *testing.T) {
+	ds := decoders.DefaultDecoders()
+	if _, ok := ds[0].(*decoders.UTF8); !ok {
+		t.Errorf("DefaultDecoders() = %v, expected UTF8 decoder to be first", ds)
 	}
 }
