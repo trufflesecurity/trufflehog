@@ -55,10 +55,9 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:      detectorspb.DetectorType_AWS,
-					Verified:          true,
-					VerificationError: nil,
-					Redacted:          "AKIASP2TPHJSQH3FJRUX",
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     true,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"account": "171436882533",
 						"arn":     "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
@@ -78,11 +77,10 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:      detectorspb.DetectorType_AWS,
-					Verified:          false,
-					VerificationError: nil,
-					Redacted:          "AKIASP2TPHJSQH3FJRUX",
-					ExtraData:         nil,
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					ExtraData:    nil,
 				},
 			},
 			wantErr: false,
@@ -108,10 +106,9 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:      detectorspb.DetectorType_AWS,
-					Verified:          false,
-					VerificationError: nil,
-					Redacted:          "AKIASP2TPHJSQH3FJXYZ",
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJXYZ",
 				},
 				{
 					DetectorType:      detectorspb.DetectorType_AWS,
@@ -148,10 +145,9 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:      detectorspb.DetectorType_AWS,
-					Verified:          true,
-					VerificationError: nil,
-					Redacted:          "AKIASP2TPHJSQH3FJRUX",
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     true,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"account": "171436882533",
 						"arn":     "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
@@ -159,10 +155,9 @@ func TestAWS_FromChunk(t *testing.T) {
 					},
 				},
 				{
-					DetectorType:      detectorspb.DetectorType_AWS,
-					Verified:          false,
-					VerificationError: nil,
-					Redacted:          inactiveID,
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     inactiveID,
 				},
 			},
 			wantErr: false,
@@ -177,10 +172,9 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType:      detectorspb.DetectorType_AWS,
-					Verified:          false,
-					VerificationError: nil,
-					Redacted:          "AKIASP2TPHJSQH3FJRUX",
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 				},
 			},
 			wantErr: false,
