@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -198,6 +199,24 @@ func TestAWS_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "found, would be verified if not for http timeout",
+			s:    scanner{},
+			args: args{
+				ctx:    timeoutContext(1 * time.Microsecond),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType:      detectorspb.DetectorType_AWS,
+					Verified:          false,
+					VerificationError: errors.New("wip"),
+					Redacted:          "AKIASP2TPHJSQH3FJRUX",
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -233,4 +252,9 @@ func BenchmarkFromData(benchmark *testing.B) {
 			}
 		})
 	}
+}
+
+func timeoutContext(timeout time.Duration) context.Context {
+	c, _ := context.WithTimeout(context.Background(), timeout)
+	return c
 }
