@@ -246,7 +246,7 @@ func CleanOnError(err *error, path string) {
 	}
 }
 
-func gitURLParse(gitURL string) (*url.URL, error) {
+func GitURLParse(gitURL string) (*url.URL, error) {
 	parsedURL, originalError := url.Parse(gitURL)
 	if originalError != nil {
 		var err error
@@ -270,7 +270,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, err
 	}
 	defer CleanOnError(&err, clonePath)
-	cloneURL, err := gitURLParse(gitUrl)
+	cloneURL, err := GitURLParse(gitUrl)
 	if err != nil {
 		return "", nil, err
 	}
@@ -698,7 +698,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 	// the uriString is github.com, then we query the API for the timestamp of the
 	// hash and use that to clone.
 
-	uri, err := gitURLParse(uriString)
+	uri, err := GitURLParse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}
@@ -763,7 +763,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
 func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 	var path string
-	uri, err := gitURLParse(uriString)
+	uri, err := GitURLParse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}

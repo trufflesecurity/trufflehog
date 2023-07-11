@@ -529,7 +529,7 @@ func TestGitURLParse(t *testing.T) {
 			"ssh",
 		},
 	} {
-		u, err := gitURLParse(tt.url)
+		u, err := GitURLParse(tt.url)
 		if err != nil {
 			t.Fatal(err)
 		}
