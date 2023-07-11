@@ -234,6 +234,18 @@ func (e *Engine) BytesScanned() uint64 {
 	return e.bytesScanned
 }
 
+func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
+	dedupeMap := make(map[string]struct{})
+	for _, result := range chunkResults {
+		if _, ok := dedupeMap[result.DetectorType.String()+string(result.Raw)+fmt.Sprintf("%+v", result.SourceMetadata)]; ok {
+			continue
+		}
+		dedupeMap[result.DetectorType.String()+string(result.Raw)+fmt.Sprintf("%+v", result.SourceMetadata)] = struct{}{}
+		e.results <- result
+	}
+
+}
+
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
@@ -357,16 +369,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					}
 				}
 			}
-			dedupeMap := make(map[string]struct{})
-			for _, result := range chunkResults {
-				// dedupe results
-				if _, ok := dedupeMap[result.DetectorType.String()+string(result.RawV2)+fmt.Sprintf("%+v", result.SourceMetadata)]; ok {
-					continue
-				}
-				dedupeMap[result.DetectorType.String()+string(result.RawV2)+fmt.Sprintf("%+v", result.SourceMetadata)] = struct{}{}
-				e.results <- result
-
-			}
+			e.dedupeAndSend(chunkResults)
 		}
 		atomic.AddUint64(&e.chunksScanned, 1)
 	}
