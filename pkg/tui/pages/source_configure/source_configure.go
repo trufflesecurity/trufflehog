@@ -37,6 +37,7 @@ type SourceConfigure struct {
 	configTabSource string
 	tabComponents   []common.Component
 	sourceFields    sources.CmdModel
+	truffleFields   sources.CmdModel
 }
 
 func (m SourceConfigure) Init() tea.Cmd {
@@ -44,8 +45,9 @@ func (m SourceConfigure) Init() tea.Cmd {
 }
 
 func New(c common.Common) *SourceConfigure {
-	conf := SourceConfigure{Common: c}
+	conf := SourceConfigure{Common: c, truffleFields: GetTrufflehogConfiguration()}
 	conf.tabs = tabs.New(c, []string{configTab.String(), truffleConfigTab.String(), runTab.String()})
+
 	conf.tabComponents = []common.Component{
 		configTab:        NewSourceComponent(c, &conf),
 		truffleConfigTab: NewTrufflehogComponent(c, &conf),
@@ -83,11 +85,14 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SetSourceMsg:
 		m.configTabSource = msg.Source
 		// TODO: Use actual messages or something?
+		m.tabComponents[truffleConfigTab].(*TrufflehogComponent).SetForm(m.truffleFields)
 		fields := sources.GetSourceFields(m.configTabSource)
+
 		if fields != nil {
 			m.sourceFields = fields
 			m.tabComponents[configTab].(*SourceComponent).SetForm(fields)
 		}
+
 	case textinputs.SelectNextMsg, textinputs.SelectSkipMsg:
 		if m.activeTab < runTab {
 			m.activeTab++

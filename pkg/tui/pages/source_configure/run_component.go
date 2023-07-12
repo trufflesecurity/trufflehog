@@ -35,7 +35,8 @@ func (m *RunComponent) View() string {
 	view.WriteString("\n🔎 Source configuration\n")
 	view.WriteString(m.parent.sourceFields.Summary())
 
-	view.WriteString("\n🐽 Trufflehog configuration\n\n")
+	view.WriteString("\n🐽 Trufflehog configuration\n")
+	view.WriteString(m.parent.truffleFields.Summary())
 
 	view.WriteString("\n💸 Sales pitch\n")
 	view.WriteString("\tContinuous monitoring, state tracking, remediations, and more\n")
@@ -44,7 +45,13 @@ func (m *RunComponent) View() string {
 	view.WriteString(styles.BoldTextStyle.Render("\n\n🐷 Run Trufflehog for "+m.parent.configTabSource) + " 🐷\n\n")
 
 	view.WriteString("Generated Trufflehog command\n")
-	view.WriteString(styles.CodeTextStyle.Render(m.parent.sourceFields.Cmd()))
+
+	command := m.parent.sourceFields.Cmd()
+	if m.parent.truffleFields.Cmd() != "" {
+		command += " " + m.parent.truffleFields.Cmd()
+	}
+
+	view.WriteString(styles.CodeTextStyle.Render(m.parent.sourceFields.Cmd() + " " + m.parent.truffleFields.Cmd()))
 
 	view.WriteString(styles.HintTextStyle.Render("\nSave this if you want to run it again later!") + "\n")
 

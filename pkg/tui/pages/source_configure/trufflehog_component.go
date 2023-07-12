@@ -9,30 +9,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
-/*
-OUTPUT
-- Command line text
-- JSON output	(--json)
-
-SWITCH 1: Verification
-- Verify things (default)
-- Skip verification (--no-verification)
-
-SWITCH 2: Print results
-- all results found (default)
-- all verified results found (--only-verified)
-
-numberical options
-- concurrency
-- archive_max_size
-- archive_max_depth
-- archive_timeout
-
-string options
-- include-detectors
-- exclude-detectors
-*/
-
 type TrufflehogComponent struct {
 	common.Common
 	parent *SourceConfigure
@@ -43,8 +19,11 @@ func NewTrufflehogComponent(common common.Common, parent *SourceConfigure) *Truf
 	return &TrufflehogComponent{
 		Common: common,
 		parent: parent,
-		form:   GetTrufflehogConfiguration(),
 	}
+}
+
+func (m *TrufflehogComponent) SetForm(form tea.Model) {
+	m.form = form
 }
 
 func (m *TrufflehogComponent) Init() tea.Cmd {
@@ -56,6 +35,7 @@ func (m *TrufflehogComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.form != nil {
 		model, cmd := m.form.Update(msg)
 		m.form = model
+
 		return m, cmd
 	}
 	return m, nil

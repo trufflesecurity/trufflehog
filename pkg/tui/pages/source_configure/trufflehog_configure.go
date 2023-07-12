@@ -1,6 +1,7 @@
 package source_configure
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
@@ -54,7 +55,7 @@ func GetTrufflehogConfiguration() truffleCmdModel {
 	return truffleCmdModel{textinputs.New([]textinputs.InputConfig{jsonOutput, verification, verifiedResults, excludeDetectors, concurrency}).SetSkip(true)}
 }
 
-func (m truffleCmdModel) GetFlags() string {
+func (m truffleCmdModel) Cmd() string {
 	var command []string
 	inputs := m.GetInputs()
 
@@ -82,9 +83,16 @@ func (m truffleCmdModel) GetFlags() string {
 	return strings.Join(command, " ")
 }
 
+func (m truffleCmdModel) Summary() string {
+
+	return "\tRunning with defaults\n\n"
+}
+
 func isTrue(val string) bool {
 	value := strings.ToLower(val)
-	if value == "true" || value == "yes" || value == "y" || value == "1" {
+	isTrue, _ := strconv.ParseBool(value)
+
+	if isTrue || value == "yes" || value == "y" {
 		return true
 	}
 	return false
