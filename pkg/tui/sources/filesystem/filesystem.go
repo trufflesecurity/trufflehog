@@ -1,18 +1,36 @@
 package filesystem
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
-func GetFields() tea.Model {
+type fsModel struct {
+	textinputs.Model
+}
+
+func GetFields() fsModel {
 	path := textinputs.InputConfig{
 		Label:       "Path",
+		Key:         "path",
 		Required:    true,
 		Help:        "Files and directories to scan. Separate by space if multiple.",
 		Placeholder: "path/to/file.txt path/to/another/dir",
 	}
 
-	return textinputs.New([]textinputs.InputConfig{path})
+	return fsModel{textinputs.New([]textinputs.InputConfig{path})}
+}
+
+func (m fsModel) Cmd() string {
+	var command []string
+	command = append(command, "trufflehog", "filesystem")
+
+	inputs := m.GetInputs()
+
+	if inputs["path"] != "" {
+		command = append(command, inputs["path"])
+	}
+
+	return strings.Join(command, " ")
 }

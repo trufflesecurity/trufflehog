@@ -1,29 +1,52 @@
 package github
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
+
+type githubCmdModel struct {
+	textinputs.Model
+}
 
 func GetNote() string {
 	return "Please enter an organization OR repository."
 }
 
-func GetFields() tea.Model {
+func GetFields() githubCmdModel {
 	org := textinputs.InputConfig{
 		Label:       "Organization",
-		Required:    true,
+		Key:         "org",
+		Required:    false,
 		Help:        "GitHub organization to scan.",
 		Placeholder: "https://github.com/trufflesecurity",
 	}
 
 	repo := textinputs.InputConfig{
 		Label:       "Repository",
-		Required:    true,
+		Key:         "repo",
+		Required:    false,
 		Help:        "GitHub repo to scan.",
 		Placeholder: "https://github.com/trufflesecurity/test_keys",
 	}
 
-	return textinputs.New([]textinputs.InputConfig{org, repo})
+	return githubCmdModel{textinputs.New([]textinputs.InputConfig{org, repo})}
+}
+
+func (m githubCmdModel) Cmd() string {
+	var command []string
+	command = append(command, "trufflehog", "github")
+
+	inputs := m.GetInputs()
+
+	if inputs["org"] != "" {
+		command = append(command, "--org="+inputs["org"])
+	}
+
+	if inputs["repo"] != "" {
+		command = append(command, "--repo="+inputs["repo"])
+	}
+
+	return strings.Join(command, " ")
 }

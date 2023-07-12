@@ -26,7 +26,12 @@ func GetSourceNotes(sourceName string) string {
 	}
 }
 
-func GetSourceFields(sourceName string) tea.Model {
+type CmdModel interface {
+	tea.Model
+	Cmd() string
+}
+
+func GetSourceFields(sourceName string) CmdModel {
 	source := strings.ToLower(sourceName)
 
 	switch source {
@@ -40,7 +45,7 @@ func GetSourceFields(sourceName string) tea.Model {
 		return filesystem.GetFields()
 	case "aws s3":
 		return s3.GetFields()
-	case "gcs":
+	case "gcs (google cloud storage)":
 		return gcs.GetFields()
 	case "syslog":
 		return syslog.GetFields()

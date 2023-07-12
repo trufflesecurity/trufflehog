@@ -1,17 +1,39 @@
 package s3
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
-func GetFields() tea.Model {
+type s3CmdModel struct {
+	textinputs.Model
+}
+
+func GetFields() s3CmdModel {
 	bucket := textinputs.InputConfig{
-		Label:       "S3 bucket name",
+		Label:       "S3 bucket name(s)",
+		Key:         "buckets",
 		Required:    true,
 		Placeholder: "my-bucket-name",
+		Help:        "Buckets to scan. Separate by space if multiple.",
 	}
 
-	return textinputs.New([]textinputs.InputConfig{bucket})
+	return s3CmdModel{textinputs.New([]textinputs.InputConfig{bucket})}
+}
+
+func (m s3CmdModel) Cmd() string {
+	var command []string
+	command = append(command, "trufflehog", "s3")
+
+	inputs := m.GetInputs()
+	vals := inputs["buckets"]
+	if vals != "" {
+		buckets := strings.Fields(vals)
+		for _, bucket := range buckets {
+			command = append(command, "--bucket="+bucket)
+		}
+	}
+
+	return strings.Join(command, " ")
 }

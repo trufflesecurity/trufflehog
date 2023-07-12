@@ -1,18 +1,40 @@
 package docker
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
-func GetFields() tea.Model {
+type dockerCmdModel struct {
+	textinputs.Model
+}
+
+func GetFields() dockerCmdModel {
 	images := textinputs.InputConfig{
 		Label:       "Docker image(s)",
+		Key:         "images",
 		Required:    true,
 		Help:        "Separate by space if multiple.",
 		Placeholder: "trufflesecurity/secrets",
 	}
 
-	return textinputs.New([]textinputs.InputConfig{images})
+	return dockerCmdModel{textinputs.New([]textinputs.InputConfig{images})}
+}
+
+func (m dockerCmdModel) Cmd() string {
+
+	var command []string
+	command = append(command, "trufflehog", "docker")
+
+	inputs := m.GetInputs()
+	vals := inputs["images"]
+	if vals != "" {
+		images := strings.Fields(vals)
+		for _, image := range images {
+			command = append(command, "--image="+image)
+		}
+	}
+
+	return strings.Join(command, " ")
 }

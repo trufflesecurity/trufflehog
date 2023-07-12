@@ -1,18 +1,36 @@
 package gitlab
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
-func GetFields() tea.Model {
+type gitlabCmdModel struct {
+	textinputs.Model
+}
+
+func GetFields() gitlabCmdModel {
 	token := textinputs.InputConfig{
 		Label:       "GitLab token",
+		Key:         "token",
 		Required:    true,
 		Help:        "Personal access token with read access",
 		Placeholder: "glpat-",
 	}
 
-	return textinputs.New([]textinputs.InputConfig{token})
+	return gitlabCmdModel{textinputs.New([]textinputs.InputConfig{token})}
+}
+
+func (m gitlabCmdModel) Cmd() string {
+	var command []string
+	command = append(command, "trufflehog", "gitlab")
+
+	inputs := m.GetInputs()
+
+	if inputs["token"] != "" {
+		command = append(command, "--token="+inputs["token"])
+	}
+
+	return strings.Join(command, " ")
 }

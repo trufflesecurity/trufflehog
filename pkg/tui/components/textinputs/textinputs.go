@@ -32,7 +32,7 @@ type SelectNextMsg int
 // SelectSkipMsg used for emitting events when the 'Skip' button is selected.
 type SelectSkipMsg int
 
-type model struct {
+type Model struct {
 	focusIndex int
 	inputs     []textinput.Model
 	configs    []InputConfig
@@ -42,13 +42,24 @@ type model struct {
 
 type InputConfig struct {
 	Label       string
+	Key         string
 	Help        string
 	Required    bool
 	Placeholder string
 }
 
-func New(config []InputConfig) model {
-	m := model{
+func (m Model) GetInputs() map[string]string {
+	inputs := make(map[string]string)
+
+	for i, input := range m.inputs {
+		inputs[m.configs[i].Key] = input.Value()
+	}
+
+	return inputs
+}
+
+func New(config []InputConfig) Model {
+	m := Model{
 		inputs: make([]textinput.Model, len(config)),
 	}
 
@@ -69,11 +80,11 @@ func New(config []InputConfig) model {
 	return m
 }
 
-func (m model) Init() tea.Cmd {
+func (m Model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -125,7 +136,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *model) updateInputs(msg tea.Msg) tea.Cmd {
+func (m *Model) updateInputs(msg tea.Msg) tea.Cmd {
 	cmds := make([]tea.Cmd, len(m.inputs))
 
 	// Only text inputs with Focus() set will respond, so it's safe to simply
@@ -137,7 +148,7 @@ func (m *model) updateInputs(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m model) View() string {
+func (m Model) View() string {
 	var b strings.Builder
 
 	if m.skipButton {
@@ -169,7 +180,7 @@ func (m model) View() string {
 	return b.String()
 }
 
-func (m model) GetLabel(c InputConfig) string {
+func (m Model) GetLabel(c InputConfig) string {
 	var label strings.Builder
 
 	label.WriteString(c.Label)
@@ -185,7 +196,7 @@ func (m model) GetLabel(c InputConfig) string {
 	return label.String()
 }
 
-func (m model) SetSkip(skip bool) model {
+func (m Model) SetSkip(skip bool) Model {
 	m.skipButton = skip
 	if m.skipButton {
 		if len(m.inputs) > 0 {
@@ -196,13 +207,13 @@ func (m model) SetSkip(skip bool) model {
 	return m
 }
 
-func (m *model) unfocusInput(index int) {
+func (m *Model) unfocusInput(index int) {
 	m.inputs[index].Blur()
 	m.inputs[index].PromptStyle = noStyle
 	m.inputs[index].TextStyle = noStyle
 }
 
-func (m *model) focusInput(index int) tea.Cmd {
+func (m *Model) focusInput(index int) tea.Cmd {
 	m.inputs[index].PromptStyle = focusedStyle
 	m.inputs[index].TextStyle = focusedStyle
 	return m.inputs[index].Focus()

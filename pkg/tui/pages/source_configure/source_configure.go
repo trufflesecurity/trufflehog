@@ -36,6 +36,7 @@ type SourceConfigure struct {
 	tabs            *tabs.Tabs
 	configTabSource string
 	tabComponents   []common.Component
+	sourceFields    sources.CmdModel
 }
 
 func (m SourceConfigure) Init() tea.Cmd {
@@ -84,6 +85,7 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// TODO: Use actual messages or something?
 		fields := sources.GetSourceFields(m.configTabSource)
 		if fields != nil {
+			m.sourceFields = fields
 			m.tabComponents[configTab].(*SourceComponent).SetForm(fields)
 		}
 	case textinputs.SelectNextMsg, textinputs.SelectSkipMsg:

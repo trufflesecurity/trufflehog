@@ -75,6 +75,7 @@ func New(c common.Common) *SourceSelect {
 		OssItem("CircleCI", "Scan CircleCI, a CI/CD platform."),
 		OssItem("Syslog", "Scan syslog, event data logs."),
 		OssItem("Docker", "Scan a Docker instance, a containerized application."),
+		OssItem("GCS (Google Cloud Storage)", "Scan a Google Cloud Storage instance."),
 		// Enterprise sources.
 		EnterpriseItem("Artifactory", "Scan JFrog Artifactory packages."),
 		EnterpriseItem("BitBucket", "Scan Atlassian's Git-based source code repository hosting service."),

@@ -1,15 +1,20 @@
 package syslog
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
+type syslogCmdModel struct {
+	textinputs.Model
+}
+
 // TODO: review fields
-func GetFields() tea.Model {
+func GetFields() syslogCmdModel {
 	protocol := textinputs.InputConfig{
 		Label:       "Protocol",
+		Key:         "protocol",
 		Required:    true,
 		Help:        "udp or tcp",
 		Placeholder: "tcp",
@@ -17,20 +22,23 @@ func GetFields() tea.Model {
 
 	listenAddress := textinputs.InputConfig{
 		Label:       "Address",
+		Key:         "address",
 		Help:        "Address and port to listen on for syslog",
 		Required:    true,
 		Placeholder: "127.0.0.1:514",
 	}
 
 	tlsCert := textinputs.InputConfig{
-		Label:       "Protocol",
+		Label:       "TLS Certificate",
+		Key:         "cert",
 		Required:    true,
 		Help:        "Path to TLS certificate",
 		Placeholder: "/path/to/cert",
 	}
 
 	tlsKey := textinputs.InputConfig{
-		Label:       "Protocol",
+		Label:       "TLS Key",
+		Key:         "key",
 		Required:    true,
 		Help:        "Path to TLS key",
 		Placeholder: "/path/to/key",
@@ -38,14 +46,28 @@ func GetFields() tea.Model {
 
 	format := textinputs.InputConfig{
 		Label:       "Log format",
+		Key:         "format",
 		Required:    true,
 		Help:        "Can be rfc3164 or rfc5424",
 		Placeholder: "rfc3164",
 	}
 
-	return textinputs.New([]textinputs.InputConfig{listenAddress, protocol, tlsCert, tlsKey, format})
+	return syslogCmdModel{textinputs.New([]textinputs.InputConfig{listenAddress, protocol, tlsCert, tlsKey, format})}
 }
 
-func GetNote() string {
-	return ""
+func (m syslogCmdModel) Cmd() string {
+	var command []string
+	command = append(command, "trufflehog", "syslog")
+
+	inputs := m.GetInputs()
+	syslogKeys := [5]string{"address", "protocol", "cert", "key", "format"}
+
+	for _, key := range syslogKeys {
+		if inputs[key] != "" {
+			flag := "--" + key + "=" + inputs[key]
+			command = append(command, flag)
+		}
+	}
+
+	return strings.Join(command, " ")
 }
