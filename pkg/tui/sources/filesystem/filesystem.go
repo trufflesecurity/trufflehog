@@ -3,6 +3,7 @@ package filesystem
 import (
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
@@ -33,4 +34,12 @@ func (m fsModel) Cmd() string {
 	}
 
 	return strings.Join(command, " ")
+}
+
+func (m fsModel) Summary() string {
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+
+	keys := []string{"path"}
+	return common.SummarizeSource(keys, inputs, labels)
 }

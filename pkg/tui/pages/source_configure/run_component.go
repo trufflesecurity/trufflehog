@@ -33,7 +33,7 @@ func (m *RunComponent) View() string {
 	var view strings.Builder
 
 	view.WriteString("\n🔎 Source configuration\n")
-	view.WriteString("\ttest\n\n")
+	view.WriteString(m.parent.sourceFields.Summary())
 
 	view.WriteString("\n🐽 Trufflehog configuration\n\n")
 

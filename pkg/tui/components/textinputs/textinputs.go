@@ -58,6 +58,16 @@ func (m Model) GetInputs() map[string]string {
 	return inputs
 }
 
+func (m Model) GetLabels() map[string]string {
+	labels := make(map[string]string)
+
+	for _, config := range m.configs {
+		labels[config.Key] = config.Label
+	}
+
+	return labels
+}
+
 func New(config []InputConfig) Model {
 	m := Model{
 		inputs: make([]textinput.Model, len(config)),

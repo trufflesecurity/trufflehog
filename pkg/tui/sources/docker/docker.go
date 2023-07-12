@@ -3,6 +3,7 @@ package docker
 import (
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
@@ -37,4 +38,12 @@ func (m dockerCmdModel) Cmd() string {
 	}
 
 	return strings.Join(command, " ")
+}
+
+func (m dockerCmdModel) Summary() string {
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+	keys := []string{"images"}
+
+	return common.SummarizeSource(keys, inputs, labels)
 }

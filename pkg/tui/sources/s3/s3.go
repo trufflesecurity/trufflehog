@@ -3,6 +3,7 @@ package s3
 import (
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
@@ -36,4 +37,12 @@ func (m s3CmdModel) Cmd() string {
 	}
 
 	return strings.Join(command, " ")
+}
+
+func (m s3CmdModel) Summary() string {
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+
+	keys := []string{"buckets"}
+	return common.SummarizeSource(keys, inputs, labels)
 }

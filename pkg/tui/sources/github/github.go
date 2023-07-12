@@ -3,6 +3,7 @@ package github
 import (
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
@@ -49,4 +50,12 @@ func (m githubCmdModel) Cmd() string {
 	}
 
 	return strings.Join(command, " ")
+}
+
+func (m githubCmdModel) Summary() string {
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+
+	keys := []string{"org", "repo"}
+	return common.SummarizeSource(keys, inputs, labels)
 }

@@ -3,6 +3,7 @@ package gcs
 import (
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
@@ -32,4 +33,12 @@ func (m gcsCmdModel) Cmd() string {
 
 	command = append(command, "--cloud-environment")
 	return strings.Join(command, " ")
+}
+
+func (m gcsCmdModel) Summary() string {
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+
+	keys := []string{"project_id"}
+	return common.SummarizeSource(keys, inputs, labels)
 }

@@ -3,6 +3,7 @@ package syslog
 import (
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
@@ -70,4 +71,12 @@ func (m syslogCmdModel) Cmd() string {
 	}
 
 	return strings.Join(command, " ")
+}
+
+func (m syslogCmdModel) Summary() string {
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+	keys := []string{"address", "protocol", "cert", "key", "format"}
+
+	return common.SummarizeSource(keys, inputs, labels)
 }

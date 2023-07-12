@@ -29,6 +29,7 @@ func GetSourceNotes(sourceName string) string {
 type CmdModel interface {
 	tea.Model
 	Cmd() string
+	Summary() string
 }
 
 func GetSourceFields(sourceName string) CmdModel {

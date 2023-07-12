@@ -3,6 +3,7 @@ package circleci
 import (
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 )
 
@@ -32,4 +33,12 @@ func (m circleCiCmdModel) Cmd() string {
 	}
 
 	return strings.Join(command, " ")
+}
+
+func (m circleCiCmdModel) Summary() string {
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+	keys := []string{"token"}
+
+	return common.SummarizeSource(keys, inputs, labels)
 }
