@@ -74,18 +74,20 @@ type UnitReporter interface {
 // SourceUnitChunker defines an optional interface a Source can implement to
 // support chunking a single SourceUnit.
 type SourceUnitChunker interface {
-	// ChunkUnit creates 0 or more chunks from a unit, writing them to the
-	// chunks channel. An error should only be returned from this method in
-	// the case of context cancellation or fatal source errors. All other
-	// errors related to unit chunking are tracked in ChunkResult.
-	ChunkUnit(ctx context.Context, unit SourceUnit, chunks chan<- ChunkResult) error
+	// ChunkUnit creates 0 or more chunks from a unit, reporting them or
+	// any errors to the ChunkReporter. An error should only be returned
+	// from this method in the case of context cancellation, fatal source
+	// errors, or errors returned by the reporter. All other errors related
+	// to unit chunking are tracked by the ChunkReporter.
+	ChunkUnit(ctx context.Context, unit SourceUnit, reporter ChunkReporter) error
 }
 
-// ChunkResult is the result of chunking a single unit. Chunk and Error are
-// mutually exclusive (only one will be non-nil).
-type ChunkResult struct {
-	Chunk *Chunk
-	Error error
+// ChunkReporter defines the interface a source will use to report whether a
+// chunk was found during unit chunking. Either method may be called any number
+// of times. Implementors of this interface should allow for concurrent calls.
+type ChunkReporter interface {
+	ChunkOk(ctx context.Context, chunk Chunk) error
+	ChunkErr(ctx context.Context, err error) error
 }
 
 // SourceUnit is an object that represents a Source's unit of work. This is
@@ -260,15 +262,4 @@ func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 	return p
-}
-
-// ChunkOk is a helper function to construct a successfully chunked
-// ChunkResult.
-func ChunkOk(chunk Chunk) ChunkResult {
-	return ChunkResult{Chunk: &chunk}
-}
-
-// ChunkErr is a helper function to construct a ChunkResult from an error.
-func ChunkErr(err error) ChunkResult {
-	return ChunkResult{Error: err}
 }
