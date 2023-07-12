@@ -5,6 +5,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -70,5 +71,32 @@ func TestDefaultDecoders(t *testing.T) {
 	ds := decoders.DefaultDecoders()
 	if _, ok := ds[0].(*decoders.UTF8); !ok {
 		t.Errorf("DefaultDecoders() = %v, expected UTF8 decoder to be first", ds)
+	}
+}
+
+func TestSupportsLineNumbers(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    sourcespb.SourceType
+		expected bool
+	}{
+		{"Git source type", sourcespb.SourceType_SOURCE_TYPE_GIT, true},
+		{"Github source type", sourcespb.SourceType_SOURCE_TYPE_GITHUB, true},
+		{"Gitlab source type", sourcespb.SourceType_SOURCE_TYPE_GITLAB, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if result := SupportsLineNumbers(tc.input); result != tc.expected {
+				t.Errorf("Expected %v for input %v, got %v", tc.expected, tc.input, result)
+			}
+		})
+	}
+}
+
+func BenchmarkSupportsLineNumbersLoop(b *testing.B) {
+	sourceType := sourcespb.SourceType_SOURCE_TYPE_GITHUB
+	for i := 0; i < b.N; i++ {
+		_ = SupportsLineNumbers(sourceType)
 	}
 }
