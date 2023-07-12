@@ -395,12 +395,19 @@ func lineNumberSupportedSources() []sourcespb.SourceType {
 
 // SupportsLineNumbers determines if a line number can be found for a source type.
 func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
-	for _, i := range lineNumberSupportedSources() {
-		if i == sourceType {
-			return true
-		}
+	switch sourceType {
+	case sourcespb.SourceType_SOURCE_TYPE_GIT,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+		sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+		sourcespb.SourceType_SOURCE_TYPE_BITBUCKET,
+		sourcespb.SourceType_SOURCE_TYPE_GERRIT,
+		sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG,
+		sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT,
+		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM:
+		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
