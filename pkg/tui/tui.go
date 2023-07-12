@@ -103,7 +103,6 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch {
-			case key.Matches(msg, ui.common.KeyMap.Back):
 			case key.Matches(msg, ui.common.KeyMap.Help):
 			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage != sourceConfigurePage:
 				return ui, tea.Quit
@@ -111,6 +110,7 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return ui, tea.Quit
 			case ui.activePage > 0 && key.Matches(msg, ui.common.KeyMap.Back):
 				ui.activePage -= 1
+				return ui, nil
 			}
 		case tea.MouseMsg:
 			switch msg.Type {
