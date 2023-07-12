@@ -220,10 +220,10 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
 // passes the configured paths as the source unit, whether it be a single
 // filepath or a directory.
-func (s *Source) Enumerate(ctx context.Context, units chan<- sources.EnumerationResult) error {
+func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		item := sources.CommonEnumerationOk(path)
-		if err := common.CancellableWrite(ctx, units, item); err != nil {
+		item := sources.CommonSourceUnit{ID: path}
+		if err := reporter.UnitOk(ctx, item); err != nil {
 			return err
 		}
 	}
