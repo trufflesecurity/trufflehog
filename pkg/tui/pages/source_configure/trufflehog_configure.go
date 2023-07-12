@@ -84,8 +84,24 @@ func (m truffleCmdModel) Cmd() string {
 }
 
 func (m truffleCmdModel) Summary() string {
+	summary := strings.Builder{}
+	keys := []string{"no-verification", "only-verified", "json", "exclude_detectors", "concurrency"}
 
-	return "\tRunning with defaults\n\n"
+	inputs := m.GetInputs()
+	labels := m.GetLabels()
+	for _, key := range keys {
+		if inputs[key] != "" {
+			summary.WriteString("\t" + labels[key] + ": " + inputs[key] + "\n")
+		}
+	}
+
+	if summary.Len() == 0 {
+		summary.WriteString("\tRunning with defaults\n")
+
+	}
+
+	summary.WriteString("\n")
+	return summary.String()
 }
 
 func isTrue(val string) bool {
