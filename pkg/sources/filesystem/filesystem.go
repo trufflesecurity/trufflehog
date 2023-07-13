@@ -46,6 +46,7 @@ type Source struct {
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 var _ sources.SourceUnitEnumerator = (*Source)(nil)
+var _ sources.SourceUnitChunker = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -220,12 +221,53 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
 // passes the configured paths as the source unit, whether it be a single
 // filepath or a directory.
-func (s *Source) Enumerate(ctx context.Context, units chan<- sources.EnumerationResult) error {
+func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		item := sources.CommonEnumerationOk(path)
-		if err := common.CancellableWrite(ctx, units, item); err != nil {
+		item := sources.CommonSourceUnit{ID: path}
+		if err := reporter.UnitOk(ctx, item); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// ChunkUnit implements SourceUnitChunker interface.
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	path := unit.SourceUnitID()
+	logger := ctx.Logger().WithValues("path", path)
+
+	cleanPath := filepath.Clean(path)
+	fileInfo, err := os.Stat(cleanPath)
+	if err != nil {
+		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get file info: %w", err))
+	}
+
+	ch := make(chan *sources.Chunk)
+	var scanErr error
+	go func() {
+		defer close(ch)
+		if fileInfo.IsDir() {
+			// TODO: Finer grain error tracking of individual chunks.
+			scanErr = s.scanDir(ctx, cleanPath, ch)
+		} else {
+			// TODO: Finer grain error tracking of individual
+			// chunks (in the case of archives).
+			scanErr = s.scanFile(ctx, cleanPath, ch)
+		}
+	}()
+
+	for chunk := range ch {
+		if chunk == nil {
+			continue
+		}
+		if err := reporter.ChunkOk(ctx, *chunk); err != nil {
+			return err
+		}
+	}
+
+	if scanErr != nil && scanErr != io.EOF {
+		logger.Info("error scanning filesystem", "error", scanErr)
+		return reporter.ChunkErr(ctx, scanErr)
 	}
 	return nil
 }

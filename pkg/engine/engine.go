@@ -378,29 +378,21 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	}
 }
 
-// lineNumberSupportedSources is a list of sources that support line numbers.
-// It is stored this way because slice consts are not supported.
-func lineNumberSupportedSources() []sourcespb.SourceType {
-	return []sourcespb.SourceType{
-		sourcespb.SourceType_SOURCE_TYPE_GIT,
+// SupportsLineNumbers determines if a line number can be found for a source type.
+func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
+	switch sourceType {
+	case sourcespb.SourceType_SOURCE_TYPE_GIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB,
 		sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 		sourcespb.SourceType_SOURCE_TYPE_BITBUCKET,
 		sourcespb.SourceType_SOURCE_TYPE_GERRIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG,
 		sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT,
-		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM,
+		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM:
+		return true
+	default:
+		return false
 	}
-}
-
-// SupportsLineNumbers determines if a line number can be found for a source type.
-func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
-	for _, i := range lineNumberSupportedSources() {
-		if i == sourceType {
-			return true
-		}
-	}
-	return false
 }
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
