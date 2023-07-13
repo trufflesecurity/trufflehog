@@ -243,15 +243,16 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	}
 
 	ch := make(chan *sources.Chunk)
+	var scanErr error
 	go func() {
 		defer close(ch)
 		if fileInfo.IsDir() {
 			// TODO: Finer grain error tracking of individual chunks.
-			err = s.scanDir(ctx, cleanPath, ch)
+			scanErr = s.scanDir(ctx, cleanPath, ch)
 		} else {
 			// TODO: Finer grain error tracking of individual
 			// chunks (in the case of archives).
-			err = s.scanFile(ctx, cleanPath, ch)
+			scanErr = s.scanFile(ctx, cleanPath, ch)
 		}
 	}()
 
@@ -264,9 +265,9 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
-	if err != nil && err != io.EOF {
-		logger.Info("error scanning filesystem", "error", err)
-		return reporter.ChunkErr(ctx, err)
+	if scanErr != nil && scanErr != io.EOF {
+		logger.Info("error scanning filesystem", "error", scanErr)
+		return reporter.ChunkErr(ctx, scanErr)
 	}
 	return nil
 }
