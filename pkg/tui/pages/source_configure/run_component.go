@@ -11,6 +11,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
+type SetArgsMsg string
+
 type RunComponent struct {
 	common.Common
 	parent          *SourceConfigure
@@ -55,6 +57,15 @@ func (m *RunComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		h, v := styles.AppStyle.GetFrameSize()
 		m.reviewList.SetSize(msg.Width-h, msg.Height/2-v)
+	case tea.KeyMsg:
+		if msg.Type == tea.KeyEnter {
+			command := m.parent.sourceFields.Cmd()
+			if m.parent.truffleFields.Cmd() != "" {
+				command += " " + m.parent.truffleFields.Cmd()
+			}
+			cmd := func() tea.Msg { return SetArgsMsg(command) }
+			return m, cmd
+		}
 	}
 	if len(m.reviewListItems) > 0 && m.parent != nil && m.parent.sourceFields != nil {
 		m.reviewListItems[0] = m.reviewListItems[0].(Item).SetDescription(m.parent.sourceFields.Summary())
@@ -89,7 +100,8 @@ func (m *RunComponent) View() string {
 	}
 	view.WriteString(styles.CodeTextStyle.Render(command))
 
-	view.WriteString("\n\n[ Run Trufflehog ]\n\n")
+	focusedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	view.WriteString("\n\n" + focusedStyle.Render("[ Run Trufflehog ]") + "\n\n")
 
 	// view.WriteString(m.reviewList.View())
 	return view.String()

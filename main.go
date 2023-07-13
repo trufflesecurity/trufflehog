@@ -147,12 +147,14 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
-	commands := os.Args[1:]
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
-		commands = tui.Run()
+		args := tui.Run()
+		// Overwrite the Args slice so overseer works properly.
+		os.Args = os.Args[:1]
+		os.Args = append(os.Args, args...)
 	}
 
-	cmd = kingpin.MustParse(cli.Parse(commands))
+	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
 	switch {
 	case *trace:

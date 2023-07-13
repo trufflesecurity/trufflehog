@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,6 +43,7 @@ type TUI struct {
 	pages      []common.Component
 	activePage page
 	state      sessionState
+	args       []string
 }
 
 // New returns a new TUI model.
@@ -138,7 +140,9 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return source_configure.SetSourceMsg{Source: item.ID()}
 			})
 		}
-
+	case source_configure.SetArgsMsg:
+		ui.args = strings.Split(string(msg), " ")[1:]
+		return ui, tea.Quit
 	}
 
 	if ui.state == loadedState {
@@ -188,7 +192,5 @@ func Run() []string {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
-	// TODO: Remove exit when we finish.
-	os.Exit(0)
-	return nil
+	return m.args
 }
