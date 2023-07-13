@@ -4,20 +4,45 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 type RunComponent struct {
 	common.Common
-	parent *SourceConfigure
+	parent          *SourceConfigure
+	reviewList      list.Model
+	reviewListItems []list.Item
 }
 
 func NewRunComponent(common common.Common, parent *SourceConfigure) *RunComponent {
+	// Make list of SourceItems.
+	listItems := []list.Item{
+		Item{title: "🔎 Source configuration"},
+		Item{title: "🐽 Trufflehog configuration"},
+		Item{title: "💸 Sales pitch", description: "\tContinuous monitoring, state tracking, remediations, and more\n\t🔗 https://trufflesecurity.com/trufflehog"},
+	}
+
+	// Setup list
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("white"))
+	delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("white"))
+	delegate.SetHeight(3)
+
+	reviewList := list.New(listItems, delegate, common.Width, common.Height)
+
+	reviewList.SetShowTitle(false)
+	reviewList.SetShowStatusBar(false)
+	reviewList.SetFilteringEnabled(false)
+
 	return &RunComponent{
-		Common: common,
-		parent: parent,
+		Common:          common,
+		parent:          parent,
+		reviewList:      reviewList,
+		reviewListItems: listItems,
 	}
 }
 
@@ -26,7 +51,18 @@ func (m *RunComponent) Init() tea.Cmd {
 }
 
 func (m *RunComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return m, nil
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		h, v := styles.AppStyle.GetFrameSize()
+		m.reviewList.SetSize(msg.Width-h, msg.Height/2-v)
+	}
+	if len(m.reviewListItems) > 0 && m.parent != nil && m.parent.sourceFields != nil {
+		m.reviewListItems[0] = m.reviewListItems[0].(Item).SetDescription(m.parent.sourceFields.Summary())
+		m.reviewListItems[1] = m.reviewListItems[1].(Item).SetDescription(m.parent.truffleFields.Summary())
+	}
+	var cmd tea.Cmd
+	m.reviewList, cmd = m.reviewList.Update(msg)
+	return m, tea.Batch(cmd)
 }
 
 func (m *RunComponent) View() string {
@@ -54,6 +90,8 @@ func (m *RunComponent) View() string {
 	view.WriteString(styles.CodeTextStyle.Render(command))
 
 	view.WriteString("\n\n[ Run Trufflehog ]\n\n")
+
+	// view.WriteString(m.reviewList.View())
 	return view.String()
 }
 

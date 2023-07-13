@@ -60,6 +60,13 @@ func (m *SourceConfigure) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		for i := range m.tabComponents {
+			model, cmd := m.tabComponents[i].Update(msg)
+			m.tabComponents[i] = model.(common.Component)
+			cmds = append(cmds, cmd)
+		}
+
 	case tabs.ActiveTabMsg:
 		m.activeTab = tab(msg)
 		t, cmd := m.tabs.Update(msg)
