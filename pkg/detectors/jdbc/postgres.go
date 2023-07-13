@@ -24,26 +24,12 @@ func (s *postgresJDBC) ping(ctx context.Context) bool {
 		return true
 	}
 	// build a connection string
-	data := map[string]string{
-		// default user
-		"user": "postgres",
-	}
-	for key, val := range s.params {
-		if key == "host" {
-			if h, p, found := strings.Cut(val, ":"); found {
-				data["host"] = h
-				data["port"] = p
-				continue
-			}
-		}
-		data[key] = val
-	}
-	if ping(ctx, "postgres", joinKeyValues(data, " ")) {
+	if ping(ctx, "postgres", buildPostgresConnectionString(s.params, true)) {
 		return true
 	}
-	if s.params["dbname"] != "" {
-		delete(s.params, "dbname")
-		return s.ping(ctx)
+	// ignore the db
+	if ping(ctx, "postgres", buildPostgresConnectionString(s.params, false)) {
+		return true
 	}
 	return false
 }
@@ -78,4 +64,26 @@ func parsePostgres(subname string) (jdbc, error) {
 	}
 
 	return &postgresJDBC{subname[2:], params}, nil
+}
+
+func buildPostgresConnectionString(params map[string]string, includeDbName bool) string {
+	data := map[string]string{
+		// default user
+		"user": "postgres",
+	}
+	for key, val := range params {
+		if key == "host" {
+			if h, p, found := strings.Cut(val, ":"); found {
+				data["host"] = h
+				data["port"] = p
+				continue
+			}
+		}
+		if key == "dbname" && !includeDbName {
+			continue
+		}
+		data[key] = val
+	}
+
+	return joinKeyValues(data, " ")
 }

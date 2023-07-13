@@ -21,14 +21,14 @@ func (s *mysqlJDBC) ping(ctx context.Context) bool {
 		return true
 	}
 	// try building connection string (should be same as s.conn though)
-	if ping(ctx, "mysql", buildConnectionString(s.host, s.database, s.userPass, s.params)) {
+	if ping(ctx, "mysql", buildMySQLConnectionString(s.host, s.database, s.userPass, s.params)) {
 		return true
 	}
 	// try removing database
-	return ping(ctx, "mysql", buildConnectionString(s.host, "", s.userPass, s.params))
+	return ping(ctx, "mysql", buildMySQLConnectionString(s.host, "", s.userPass, s.params))
 }
 
-func buildConnectionString(host, database, userPass, params string) string {
+func buildMySQLConnectionString(host, database, userPass, params string) string {
 	conn := host + "/" + database
 	if userPass != "" {
 		conn = userPass + "@" + conn
