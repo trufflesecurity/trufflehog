@@ -87,6 +87,17 @@ func TestURI_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "nothing found, password was redacted two different ways",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("Both %s and %s have been redacted within", "https://httpwatch::********@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?foo=bar", "https://httpwatch::%2A%2A%2A%2A%2A%2A@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?foo=bar")),
+				verify: true,
+			},
+			want:    []detectors.Result{},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
