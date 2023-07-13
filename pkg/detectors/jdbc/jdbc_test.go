@@ -220,6 +220,11 @@ func TestJdbc_Redact(t *testing.T) {
 			want: "//wrongUser:*********@tcp(127.0.0.1:3306)/",
 		},
 		{
+			name: "username:password@host with unfortunate db name",
+			conn: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/passwords",
+			want: "//wrongUser:*********@tcp(127.0.0.1:3306)/passwords",
+		},
+		{
 			name: "url param-style",
 			conn: "jdbc:postgresql://localhost:5432/foo?sslmode=disable&password=p@ssw04d",
 			want: "jdbc:postgresql://localhost:5432/foo?sslmode=disable&password=********",
