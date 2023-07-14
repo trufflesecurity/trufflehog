@@ -3,9 +3,7 @@ package twilio
 import (
 	"context"
 	"net/http"
-	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -53,14 +51,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-
-				form := url.Values{}
-				form.Add("FriendlyName", "MyServiceName")
 				req, err := http.NewRequestWithContext(
-					ctx, "POST", "https://verify.twilio.com/v2/Services",
-
-					strings.NewReader(form.Encode()),
-				)
+					ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
 				if err != nil {
 					continue
 				}
