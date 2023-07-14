@@ -9,6 +9,7 @@ func DefaultDecoders() []Decoder {
 		// UTF8 must be first for duplicate detection
 		&UTF8{},
 		&Base64{},
+		&Compressed{},
 		&UTF16{},
 	}
 }
