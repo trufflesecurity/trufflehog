@@ -159,6 +159,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convertkit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/copper"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/couchbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/countrylayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/courier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coveralls"
@@ -1523,6 +1524,7 @@ func DefaultDetectors() []detectors.Detector {
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
 		opsgenie.Scanner{},
+		couchbase.Scanner{},
 	}
 
 }
