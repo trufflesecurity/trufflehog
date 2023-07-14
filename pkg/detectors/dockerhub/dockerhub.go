@@ -54,8 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Dockerhub,
 				Raw:          []byte(fmt.Sprintf("%s: %s", resUserMatch, resAccessTokenMatch)),
-				RawV2:        []byte("bubbles"),
-				Redacted:     "mang",
 			}
 
 			if verify {
