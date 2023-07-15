@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -117,7 +118,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string) (chan Commit, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -134,7 +135,24 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	cmd := exec.Command("git", args...)
 	absPath, err := filepath.Abs(source)
 	if err == nil {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+		if !isBare {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+		} else {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", absPath))
+
+			// We need those variables to handle incoming commits
+			// while using trufflehog in pre-receive hooks
+			for _, v := range os.Environ() {
+				switch {
+				case strings.HasPrefix(v, "GIT_OBJECT_DIRECTORY="):
+				case strings.HasPrefix(v, "GIT_ALTERNATE_OBJECT_DIRECTORIES="):
+				default:
+					continue
+				}
+
+				cmd.Env = append(cmd.Env, v)
+			}
+		}
 	}
 
 	return c.executeCommand(ctx, cmd)
