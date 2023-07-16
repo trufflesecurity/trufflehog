@@ -34,12 +34,12 @@ func main() {
 	case "detector":
 		mustWriteTemplates([]templateJob{
 			{
-				TemplatePath:  "pkg/detectors/heroku/heroku.go",
+				TemplatePath:  "pkg/detectors/alchemy/alchemy.go",
 				WritePath:     filepath.Join(folderPath(), nameLower+".go"),
 				ReplaceString: []string{"heroku"},
 			},
 			{
-				TemplatePath:  "pkg/detectors/heroku/heroku_test.go",
+				TemplatePath:  "pkg/detectors/alchemy/alchemy_test.go",
 				WritePath:     filepath.Join(folderPath(), nameLower+"_test.go"),
 				ReplaceString: []string{"heroku"},
 			},
