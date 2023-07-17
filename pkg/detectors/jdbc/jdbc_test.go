@@ -231,8 +231,8 @@ func TestJdbc_Redact(t *testing.T) {
 		},
 		{
 			name: "odbc-style",
-			conn: "//odbc:server=localhost;user id=sa;database=master;password=p@ssw0rd",
-			want: "//odbc:server=localhost;user id=sa;database=master;password=********",
+			conn: "//odbc:server=localhost;user id=sa;database=master;password=/p?s=sw&rd",
+			want: "//odbc:server=localhost;user id=sa;database=master;password=**********",
 		},
 	}
 	for _, tt := range tests {
