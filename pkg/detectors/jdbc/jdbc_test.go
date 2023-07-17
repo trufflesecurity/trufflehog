@@ -215,12 +215,17 @@ func TestJdbc_Redact(t *testing.T) {
 		want string
 	}{
 		{
-			name: "username:password@host",
+			name: "basic auth'",
+			conn: "//user:secret@tcp(127.0.0.1:3306)/",
+			want: "//user:******@tcp(127.0.0.1:3306)/",
+		},
+		{
+			name: "basic auth including raw string 'pass'",
 			conn: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/",
 			want: "//wrongUser:*********@tcp(127.0.0.1:3306)/",
 		},
 		{
-			name: "username:password@host with unfortunate db name",
+			name: "basic auth including raw string 'pass' with unfortunate db name",
 			conn: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/passwords",
 			want: "//wrongUser:*********@tcp(127.0.0.1:3306)/passwords",
 		},
@@ -230,9 +235,14 @@ func TestJdbc_Redact(t *testing.T) {
 			want: "jdbc:postgresql://localhost:5432/foo?sslmode=disable&password=********",
 		},
 		{
-			name: "odbc-style",
+			name: "odbc-style without server",
 			conn: "//odbc:server=localhost;user id=sa;database=master;password=/p?s=sw&rd",
 			want: "//odbc:server=localhost;user id=sa;database=master;password=**********",
+		},
+		{
+			name: "odbc-style with server",
+			conn: "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=super-secret-password",
+			want: "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=*********************",
 		},
 	}
 	for _, tt := range tests {

@@ -159,10 +159,7 @@ func tryRedactODBC(conn string) (string, bool) {
 	var newParams []string
 	for _, param := range strings.Split(conn, ";") {
 		key, val, isKvp := strings.Cut(param, "=")
-		if !isKvp {
-			continue
-		}
-		if strings.Contains(strings.ToLower(key), "pass") {
+		if isKvp && strings.Contains(strings.ToLower(key), "pass") {
 			newParams = append(newParams, key+"="+strings.Repeat("*", len(val)))
 			found = true
 			continue
