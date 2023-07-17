@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lib/pq"
+	"net"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -15,15 +17,49 @@ type postgresJDBC struct {
 }
 
 func (s *postgresJDBC) ping(ctx context.Context) pingResult {
+	// It is crucial that we try to build a connection string ourselves before using the one we found. This is because
+	// if the found connection string doesn't include a username, the driver will attempt to connect using the current
+	// user's name, which will fail in a way that looks like a determinate failure, thus terminating the waterfall. In
+	// contrast, when we build a connection string ourselves, if there's no username, we try 'postgres' instead, which
+	// actually has a chance of working.
 	return ping(ctx, "postgres", isPostgresErrorDeterminate,
-		s.conn,
-		"postgres://"+s.conn,
 		buildPostgresConnectionString(s.params, true),
-		buildPostgresConnectionString(s.params, false))
+		buildPostgresConnectionString(s.params, false),
+		s.conn,
+		"postgres://"+s.conn)
 }
 
 func isPostgresErrorDeterminate(err error) bool {
-	return true
+	// Could be an invalid host, but it could also be transient
+	if _, isNetError := err.(*net.OpError); isNetError {
+		return false
+	}
+
+	// Postgres codes from https://www.postgresql.org/docs/current/errcodes-appendix.html
+	if pqErr, isPostgresError := err.(*pq.Error); isPostgresError {
+		switch pqErr.Code {
+		case "28P01":
+			// Invalid username/password; we know these credentials aren't live
+			return true
+		case "3D000":
+			// Unknown database; this is "indeterminate" so that other connection permutations will be tried
+			return false
+		case "3F000":
+			// Unknown schema; this is "indeterminate" so that other connection permutations will be tried
+			return false
+		}
+	}
+
+	// We don't want to incorrectly invalidate a bunch of secrets because an SSL config got borked
+	if err.Error() == "pq: SSL is not enabled on the server" {
+		return false
+	}
+
+	// For most detectors, if we don't know exactly what the problem is, we should return "determinate" in order to
+	// mimic the two-state verification logic. But the JDBC detector is special: It tries multiple variations on a given
+	// found secret in a waterfall, and returning "true" here terminates the waterfall. Therefore, it is safer to return
+	// false by default so that we don't incorrectly terminate before we find a valid variation.
+	return false
 }
 
 func joinKeyValues(m map[string]string, sep string) string {

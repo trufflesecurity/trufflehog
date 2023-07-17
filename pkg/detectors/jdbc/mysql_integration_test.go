@@ -68,6 +68,8 @@ func TestMySQL(t *testing.T) {
 			pr := j.ping(context.Background())
 			if tt.wantPingErr {
 				assert.Error(t, pr.err)
+			} else {
+				assert.NoError(t, pr.err)
 			}
 			assert.Equal(t, pr.determinate, tt.wantPingDeterminate)
 		})

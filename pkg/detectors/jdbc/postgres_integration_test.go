@@ -44,7 +44,7 @@ func TestPostgres(t *testing.T) {
 		{
 			input:               "//localhost:5432/foo?password=" + postgresPass,
 			wantPingErr:         true,
-			wantPingDeterminate: true,
+			wantPingDeterminate: false, // No SSL
 		},
 		{
 			input:               "//localhost:5432/foo?sslmode=disable&password=foo",
@@ -55,6 +55,11 @@ func TestPostgres(t *testing.T) {
 			input:               "//localhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
 			wantPingErr:         true,
 			wantPingDeterminate: true,
+		},
+		{
+			input:               "//badhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
+			wantPingErr:         true,
+			wantPingDeterminate: false,
 		},
 		{
 			input:        "invalid",
@@ -72,6 +77,8 @@ func TestPostgres(t *testing.T) {
 			pr := j.ping(context.Background())
 			if tt.wantPingErr {
 				assert.Error(t, pr.err)
+			} else {
+				assert.NoError(t, pr.err)
 			}
 			assert.Equal(t, pr.determinate, tt.wantPingDeterminate)
 		})
