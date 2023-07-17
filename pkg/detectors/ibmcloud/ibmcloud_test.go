@@ -19,12 +19,12 @@ import (
 func TestIbmcloud_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IBMCLOUD")
-	inactiveSecret := testSecrets.MustGetField("IBMCLOUD_INACTIVE")
+	secret := testSecrets.MustGetField("IBM_CLOUD_KEY")
+	inactiveSecret := testSecrets.MustGetField("IBM_CLOUD_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -48,7 +48,7 @@ func TestIbmcloud_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Ibmcloud,
+					DetectorType: detectorspb.DetectorType_IbmClou,
 					Verified:     true,
 				},
 			},
