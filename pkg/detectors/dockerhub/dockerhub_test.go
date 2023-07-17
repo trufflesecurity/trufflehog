@@ -25,8 +25,8 @@ func TestDockerhub_FromChunk(t *testing.T) {
 	}
 	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
 	email := testSecrets.MustGetField("DOCKERHUB_EMAIL")
-	password := testSecrets.MustGetField("DOCKERHUB_PASSWORD")
-	inactive_password := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PASSWORD")
+	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
+	inactive_pat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
 
 	type args struct {
 		ctx    context.Context
@@ -45,7 +45,7 @@ func TestDockerhub_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, password)),
+				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, pat)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -61,7 +61,7 @@ func TestDockerhub_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", email, password)),
+				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", email, pat)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -77,7 +77,7 @@ func TestDockerhub_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, inactive_password)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, inactive_pat)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

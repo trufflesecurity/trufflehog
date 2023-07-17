@@ -22,11 +22,11 @@ var (
 	client = common.SaneHttpClient()
 
 	// Can use email or username for login.
-	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([a-zA-Z0-9]{4,40})\b[^@]?`)
+	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(`\b(?:dckr_pat_)([a-zA-Z0-9_-]){27}\b`)
+	accessTokenPat = regexp.MustCompile(`\bdckr_pat_([a-zA-Z0-9_-]){27}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,8 +39,10 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
 	emailMatches := emailPat.FindAllString(dataStr, -1)
+	dataStr = emailPat.ReplaceAllString(dataStr, "")
+	usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
+
 	accessTokenMatches := accessTokenPat.FindAllString(dataStr, -1)
 
 	userMatches := emailMatches
