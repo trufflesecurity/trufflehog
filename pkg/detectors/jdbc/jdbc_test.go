@@ -5,6 +5,7 @@ package jdbc
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 
@@ -203,6 +204,51 @@ func TestJdbc_FromDataWithIgnorePattern(t *testing.T) {
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromDataWithConfig() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
+		})
+	}
+}
+
+func TestJdbc_Redact(t *testing.T) {
+	tests := []struct {
+		name string
+		conn string
+		want string
+	}{
+		{
+			name: "basic auth'",
+			conn: "//user:secret@tcp(127.0.0.1:3306)/",
+			want: "//user:******@tcp(127.0.0.1:3306)/",
+		},
+		{
+			name: "basic auth including raw string 'pass'",
+			conn: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/",
+			want: "//wrongUser:*********@tcp(127.0.0.1:3306)/",
+		},
+		{
+			name: "basic auth including raw string 'pass' with unfortunate db name",
+			conn: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/passwords",
+			want: "//wrongUser:*********@tcp(127.0.0.1:3306)/passwords",
+		},
+		{
+			name: "url param-style",
+			conn: "jdbc:postgresql://localhost:5432/foo?sslmode=disable&password=p@ssw04d",
+			want: "jdbc:postgresql://localhost:5432/foo?sslmode=disable&password=********",
+		},
+		{
+			name: "odbc-style without server",
+			conn: "//odbc:server=localhost;user id=sa;database=master;password=/p?s=sw&rd",
+			want: "//odbc:server=localhost;user id=sa;database=master;password=**********",
+		},
+		{
+			name: "odbc-style with server",
+			conn: "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=super-secret-password",
+			want: "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=*********************",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tryRedactAnonymousJDBC(tt.conn)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
