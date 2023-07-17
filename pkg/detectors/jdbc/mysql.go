@@ -16,8 +16,8 @@ type mysqlJDBC struct {
 	params   string
 }
 
-func (s *mysqlJDBC) ping(ctx context.Context) bool {
-	return ping(ctx, "mysql",
+func (s *mysqlJDBC) ping(ctx context.Context) pingResult {
+	return ping(ctx, "mysql", isMySQLErrorDeterminate,
 		s.conn,
 		buildMySQLConnectionString(s.host, s.database, s.userPass, s.params),
 		buildMySQLConnectionString(s.host, "", s.userPass, s.params))
@@ -32,6 +32,10 @@ func buildMySQLConnectionString(host, database, userPass, params string) string 
 		conn = conn + "?" + params
 	}
 	return conn
+}
+
+func isMySQLErrorDeterminate(err error) bool {
+	return true
 }
 
 func parseMySQL(subname string) (jdbc, error) {

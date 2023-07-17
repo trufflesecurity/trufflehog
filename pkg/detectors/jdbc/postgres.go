@@ -14,12 +14,16 @@ type postgresJDBC struct {
 	params map[string]string
 }
 
-func (s *postgresJDBC) ping(ctx context.Context) bool {
-	return ping(ctx, "postgres",
+func (s *postgresJDBC) ping(ctx context.Context) pingResult {
+	return ping(ctx, "postgres", isPostgresErrorDeterminate,
 		s.conn,
 		"postgres://"+s.conn,
 		buildPostgresConnectionString(s.params, true),
 		buildPostgresConnectionString(s.params, false))
+}
+
+func isPostgresErrorDeterminate(err error) bool {
+	return true
 }
 
 func joinKeyValues(m map[string]string, sep string) string {

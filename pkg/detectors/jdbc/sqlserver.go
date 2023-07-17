@@ -13,11 +13,15 @@ type sqlServerJDBC struct {
 	params map[string]string
 }
 
-func (s *sqlServerJDBC) ping(ctx context.Context) bool {
-	return ping(ctx, "mssql",
+func (s *sqlServerJDBC) ping(ctx context.Context) pingResult {
+	return ping(ctx, "mssql", isSqlServerErrorDeterminate,
 		s.conn,
 		joinKeyValues(s.params, ";"),
 		"sqlserver://"+s.conn)
+}
+
+func isSqlServerErrorDeterminate(err error) bool {
+	return true
 }
 
 func parseSqlServer(subname string) (jdbc, error) {
