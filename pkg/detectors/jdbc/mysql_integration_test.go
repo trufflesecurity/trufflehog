@@ -22,44 +22,54 @@ const (
 
 func TestMySQL(t *testing.T) {
 	tests := []struct {
-		input    string
-		wantErr  bool
-		wantPing bool
+		input               string
+		wantParseErr        bool
+		wantPingErr         bool
+		wantPingDeterminate bool
 	}{
 		{
-			input:   "",
-			wantErr: true,
+			input:        "",
+			wantParseErr: true,
 		},
 		{
-			input:    "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPing: true,
+			input:               "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			wantPingErr:         false,
+			wantPingDeterminate: true,
 		},
 		{
-			input:    "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPing: false,
+			input:               "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			wantPingErr:         true,
+			wantPingDeterminate: true,
 		},
 		{
-			input:    "//" + mysqlUser + ":wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPing: false,
+			input:               "//" + mysqlUser + ":wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			wantPingErr:         true,
+			wantPingDeterminate: true,
 		},
 		{
-			input:    "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/",
-			wantPing: true,
+			input:               "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/",
+			wantPingErr:         false,
+			wantPingDeterminate: true,
 		},
 		{
-			input:    "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/wrongDB",
-			wantPing: true,
+			input:               "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/wrongDB",
+			wantPingErr:         false,
+			wantPingDeterminate: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parseMySQL(tt.input)
-			if tt.wantErr {
+			if tt.wantParseErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantPing, j.ping(context.Background()))
+			pr := j.ping(context.Background())
+			if tt.wantPingErr {
+				assert.Error(t, pr.err)
+			}
+			assert.Equal(t, pr.determinate, tt.wantPingDeterminate)
 		})
 	}
 }

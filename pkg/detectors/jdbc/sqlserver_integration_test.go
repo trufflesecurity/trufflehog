@@ -22,32 +22,39 @@ const (
 
 func TestSqlServer(t *testing.T) {
 	tests := []struct {
-		input    string
-		wantErr  bool
-		wantPing bool
+		input               string
+		wantParseErr        bool
+		wantPingErr         bool
+		wantPingDeterminate bool
 	}{
 		{
-			input:   "",
-			wantErr: true,
+			input:        "",
+			wantParseErr: true,
 		},
 		{
-			input:    "//odbc:server=localhost;user id=sa;database=master;password=" + sqlServerPass,
-			wantPing: true,
+			input:               "//odbc:server=localhost;user id=sa;database=master;password=" + sqlServerPass,
+			wantPingErr:         false,
+			wantPingDeterminate: true,
 		},
 		{
-			input:    "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
-			wantPing: true,
+			input:               "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
+			wantPingErr:         false,
+			wantPingDeterminate: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parseSqlServer(tt.input)
-			if tt.wantErr {
+			if tt.wantParseErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantPing, j.ping(context.Background()))
+			pr := j.ping(context.Background())
+			if tt.wantPingErr {
+				assert.Error(t, pr.err)
+			}
+			assert.Equal(t, pr.determinate, tt.wantPingDeterminate)
 		})
 	}
 }
