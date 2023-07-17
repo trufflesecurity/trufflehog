@@ -36,12 +36,12 @@ func main() {
 			{
 				TemplatePath:  "pkg/detectors/alchemy/alchemy.go",
 				WritePath:     filepath.Join(folderPath(), nameLower+".go"),
-				ReplaceString: []string{"heroku"},
+				ReplaceString: []string{"alchemy"},
 			},
 			{
 				TemplatePath:  "pkg/detectors/alchemy/alchemy_test.go",
 				WritePath:     filepath.Join(folderPath(), nameLower+"_test.go"),
-				ReplaceString: []string{"heroku"},
+				ReplaceString: []string{"alchemy"},
 			},
 		})
 		// case "source":
