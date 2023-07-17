@@ -47,7 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	userMatches := emailMatches
 	for _, usernameMatch := range usernameMatches {
-		userMatches = append(userMatches, usernameMatch[1])
+		if len(usernameMatch) > 1 {
+			userMatches = append(userMatches, usernameMatch[1])
+		}
 	}
 
 	for _, resUserMatch := range userMatches {
