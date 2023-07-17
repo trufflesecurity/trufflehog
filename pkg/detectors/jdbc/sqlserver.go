@@ -14,14 +14,10 @@ type sqlServerJDBC struct {
 }
 
 func (s *sqlServerJDBC) ping(ctx context.Context) bool {
-	if ping(ctx, "mssql", s.conn) {
-		return true
-	}
-	if ping(ctx, "mssql", joinKeyValues(s.params, ";")) {
-		return true
-	}
-	// try URL format
-	return ping(ctx, "mssql", "sqlserver://"+s.conn)
+	return ping(ctx, "mssql",
+		s.conn,
+		joinKeyValues(s.params, ";"),
+		"sqlserver://"+s.conn)
 }
 
 func parseSqlServer(subname string) (jdbc, error) {

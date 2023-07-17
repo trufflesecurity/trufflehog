@@ -17,15 +17,10 @@ type mysqlJDBC struct {
 }
 
 func (s *mysqlJDBC) ping(ctx context.Context) bool {
-	if ping(ctx, "mysql", s.conn) {
-		return true
-	}
-	// try building connection string (should be same as s.conn though)
-	if ping(ctx, "mysql", buildMySQLConnectionString(s.host, s.database, s.userPass, s.params)) {
-		return true
-	}
-	// try removing database
-	return ping(ctx, "mysql", buildMySQLConnectionString(s.host, "", s.userPass, s.params))
+	return ping(ctx, "mysql",
+		s.conn,
+		buildMySQLConnectionString(s.host, s.database, s.userPass, s.params),
+		buildMySQLConnectionString(s.host, "", s.userPass, s.params))
 }
 
 func buildMySQLConnectionString(host, database, userPass, params string) string {

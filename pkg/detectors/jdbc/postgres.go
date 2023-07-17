@@ -15,23 +15,11 @@ type postgresJDBC struct {
 }
 
 func (s *postgresJDBC) ping(ctx context.Context) bool {
-	// try the provided connection string directly
-	if ping(ctx, "postgres", s.conn) {
-		return true
-	}
-	// try as a URL
-	if ping(ctx, "postgres", "postgres://"+s.conn) {
-		return true
-	}
-	// build a connection string
-	if ping(ctx, "postgres", buildPostgresConnectionString(s.params, true)) {
-		return true
-	}
-	// ignore the db
-	if ping(ctx, "postgres", buildPostgresConnectionString(s.params, false)) {
-		return true
-	}
-	return false
+	return ping(ctx, "postgres",
+		s.conn,
+		"postgres://"+s.conn,
+		buildPostgresConnectionString(s.params, true),
+		buildPostgresConnectionString(s.params, false))
 }
 
 func joinKeyValues(m map[string]string, sep string) string {
