@@ -22,20 +22,21 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	/*
-		The following patterns cover the methods of authentication found here: https://support.atlassian.com/bitbucket-cloud/docs/using-app-passwords/, as well as for other general cases.
-	*/
+	// The following patterns cover the methods of authentication found here:
+	// https://support.atlassian.com/bitbucket-cloud/docs/using-app-passwords/, as well as for other general cases.
 
 	// Covers 'username:appPassword' pattern
-	usernamePat1 = regexp.MustCompile(`\b([A-Za-z0-9-_]{1,30}):(?:ATBB[A-Za-z0-9_=\.-]+[A-Z0-9]{8})\b`)
+	usernamePat1 = regexp.MustCompile(`\b([A-Za-z0-9-_]{1,30}):ATBB[A-Za-z0-9_=.-]+[A-Z0-9]{8}\b`)
 	// Covers assignment of username to variable
-	usernamePat2 = regexp.MustCompile(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([a-zA-Z0-9-_]{1,30})\b`)
+	usernamePat2 = regexp.MustCompile(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9-_]{1,30})\b`)
 	// Covers 'https://username@bitbucket.org' pattern
-	usernamePat3 = regexp.MustCompile(`https:\/\/([a-zA-Z0-9-_]{1,30})@bitbucket.org`)
+	usernamePat3 = regexp.MustCompile(`https://([a-zA-Z0-9-_]{1,30})@bitbucket.org`)
 	// Covers '("username", "password")' pattern, used for HTTP Basic Auth
-	usernamePat4 = regexp.MustCompile(`"([a-zA-Z0-9-_]{1,30})",(?: )?"(?:ATBB[A-Za-z0-9_=\.-]+[A-Z0-9]{8})"`)
+	usernamePat4 = regexp.MustCompile(`"([a-zA-Z0-9-_]{1,30})",(?: )?"ATBB[A-Za-z0-9_=.-]+[A-Z0-9]{8}"`)
 
-	appPasswordPat = regexp.MustCompile(`\bATBB[A-Za-z0-9_=\.-]+[A-Z0-9]{8}\b`)
+	usernamePatterns = []*regexp.Regexp{usernamePat1, usernamePat2, usernamePat3, usernamePat4}
+
+	appPasswordPat = regexp.MustCompile(`\bATBB[A-Za-z0-9_=.-]+[A-Z0-9]{8}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,9 +49,10 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	usernameMatches := append(usernamePat1.FindAllStringSubmatch(dataStr, -1), usernamePat2.FindAllStringSubmatch(dataStr, -1)...)
-	usernameMatches = append(usernameMatches, usernamePat3.FindAllStringSubmatch(dataStr, -1)...)
-	usernameMatches = append(usernameMatches, usernamePat4.FindAllStringSubmatch(dataStr, -1)...)
+	var usernameMatches [][]string
+	for _, pattern := range usernamePatterns {
+		usernameMatches = append(usernameMatches, pattern.FindAllStringSubmatch(dataStr, -1)...)
+	}
 	appPasswordMatches := appPasswordPat.FindAllString(dataStr, -1)
 
 	for _, usernameMatch := range usernameMatches {
