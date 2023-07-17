@@ -221,6 +221,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticemail"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enablex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enigma"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etsyapikey"
@@ -1525,6 +1526,7 @@ func DefaultDetectors() []detectors.Detector {
 		buildkitev2.Scanner{},
 		opsgenie.Scanner{},
 		couchbase.Scanner{},
+		envoyapikey.Scanner{},
 	}
 
 }
