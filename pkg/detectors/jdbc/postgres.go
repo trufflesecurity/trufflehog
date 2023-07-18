@@ -44,11 +44,6 @@ func isPostgresErrorDeterminate(err error) bool {
 		}
 	}
 
-	// For most detectors, if we don't know exactly what the problem is, we should return "determinate" in order to
-	// mimic the two-state verification logic. But the JDBC detector is special: It tries multiple variations on a given
-	// found secret in a waterfall, and returning "true" here terminates the waterfall. Therefore, it is safer to return
-	// false by default so that we don't incorrectly terminate before we find a valid variation. This catch-all also
-	// handles cases like network errors.
 	return false
 }
 
