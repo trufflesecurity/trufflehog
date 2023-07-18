@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lib/pq"
-	"net"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -30,35 +29,26 @@ func (s *postgresJDBC) ping(ctx context.Context) pingResult {
 }
 
 func isPostgresErrorDeterminate(err error) bool {
-	// Could be an invalid host, but it could also be transient
-	if _, isNetError := err.(*net.OpError); isNetError {
-		return false
-	}
-
 	// Postgres codes from https://www.postgresql.org/docs/current/errcodes-appendix.html
 	if pqErr, isPostgresError := err.(*pq.Error); isPostgresError {
 		switch pqErr.Code {
 		case "28P01":
-			// Invalid username/password; we know these credentials aren't live
+			// Invalid username/password
 			return true
 		case "3D000":
-			// Unknown database; this is "indeterminate" so that other connection permutations will be tried
-			return false
+			// Unknown database
+			return false // "Indeterminate" so that other connection variations will be tried
 		case "3F000":
-			// Unknown schema; this is "indeterminate" so that other connection permutations will be tried
-			return false
+			// Unknown schema
+			return false // "Indeterminate" so that other connection variations will be tried
 		}
-	}
-
-	// We don't want to incorrectly invalidate a bunch of secrets because an SSL config got borked
-	if err.Error() == "pq: SSL is not enabled on the server" {
-		return false
 	}
 
 	// For most detectors, if we don't know exactly what the problem is, we should return "determinate" in order to
 	// mimic the two-state verification logic. But the JDBC detector is special: It tries multiple variations on a given
 	// found secret in a waterfall, and returning "true" here terminates the waterfall. Therefore, it is safer to return
-	// false by default so that we don't incorrectly terminate before we find a valid variation.
+	// false by default so that we don't incorrectly terminate before we find a valid variation. This catch-all also
+	// handles cases like network errors.
 	return false
 }
 

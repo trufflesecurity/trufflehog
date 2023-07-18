@@ -38,16 +38,21 @@ func buildMySQLConnectionString(host, database, userPass, params string) string 
 func isMySQLErrorDeterminate(err error) bool {
 	// MySQL error numbers from https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html
 	if mySQLErr, isMySQLErr := err.(*mysql.MySQLError); isMySQLErr {
-		// User access denied
-		// Note that error number 1044 is user access denied to a particular database, which is different. We return
-		// 1044 as indeterminate so that the waterfall will try again with the default database.
-		return mySQLErr.Number == 1045
+		switch mySQLErr.Number {
+		case 1044:
+			// User access denied to a particular database
+			return false // "Indeterminate" so that other connection variations will be tried
+		case 1045:
+			// User access denied
+			return true
+		}
 	}
 
 	// For most detectors, if we don't know exactly what the problem is, we should return "determinate" in order to
 	// mimic the two-state verification logic. But the JDBC detector is special: It tries multiple variations on a given
 	// found secret in a waterfall, and returning "true" here terminates the waterfall. Therefore, it is safer to return
-	// false by default so that we don't incorrectly terminate before we find a valid variation.
+	// false by default so that we don't incorrectly terminate before we find a valid variation. This catch-all also
+	// handles cases like network errors.
 	return false
 }
 

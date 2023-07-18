@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	mssql "github.com/denisenkom/go-mssqldb"
-	"net"
 	"strings"
 
 	_ "github.com/denisenkom/go-mssqldb"
@@ -23,11 +22,6 @@ func (s *sqlServerJDBC) ping(ctx context.Context) pingResult {
 }
 
 func isSqlServerErrorDeterminate(err error) bool {
-	// Could be an invalid host, but it could also be transient
-	if _, isDnsError := err.(*net.DNSError); isDnsError {
-		return false
-	}
-
 	// Error numbers from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
 	if mssqlError, isMssqlError := err.(mssql.Error); isMssqlError {
 		switch mssqlError.Number {
@@ -41,7 +35,8 @@ func isSqlServerErrorDeterminate(err error) bool {
 	// For most detectors, if we don't know exactly what the problem is, we should return "determinate" in order to
 	// mimic the two-state verification logic. But the JDBC detector is special: It tries multiple variations on a given
 	// found secret in a waterfall, and returning "true" here terminates the waterfall. Therefore, it is safer to return
-	// false by default so that we don't incorrectly terminate before we find a valid variation.
+	// false by default so that we don't incorrectly terminate before we find a valid variation. This catch-all also
+	// handles cases like network errors.
 	return false
 }
 
