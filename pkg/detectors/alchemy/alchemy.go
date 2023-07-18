@@ -62,6 +62,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						continue
 					}
 				}
+			} else {
+				s1.VerificationError = err
 			}
 		}
 
