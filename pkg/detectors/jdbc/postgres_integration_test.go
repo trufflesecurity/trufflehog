@@ -20,67 +20,62 @@ const (
 )
 
 func TestPostgres(t *testing.T) {
+	type result struct {
+		parseErr        bool
+		pingOk          bool
+		pingDeterminate bool
+	}
 	tests := []struct {
-		input               string
-		wantParseErr        bool
-		wantPingErr         bool
-		wantPingDeterminate bool
+		input string
+		want  result
 	}{
 		{
-			input:               "//localhost:5432/foo?sslmode=disable&password=" + postgresPass,
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//localhost:5432/foo?sslmode=disable&password=" + postgresPass,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:               "//localhost:5432/foo?sslmode=disable&user=" + postgresUser + "&password=" + postgresPass,
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//localhost:5432/foo?sslmode=disable&user=" + postgresUser + "&password=" + postgresPass,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:               "//localhost/foo?sslmode=disable&port=5432&password=" + postgresPass,
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//localhost/foo?sslmode=disable&port=5432&password=" + postgresPass,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:               "//localhost:5432/foo?password=" + postgresPass,
-			wantPingErr:         true,
-			wantPingDeterminate: false, // No SSL
+			input: "//localhost:5432/foo?password=" + postgresPass,
+			want:  result{pingOk: false, pingDeterminate: false},
 		},
 		{
-			input:               "//localhost:5432/foo?sslmode=disable&password=foo",
-			wantPingErr:         true,
-			wantPingDeterminate: true,
+			input: "//localhost:5432/foo?sslmode=disable&password=foo",
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:               "//localhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
-			wantPingErr:         true,
-			wantPingDeterminate: true,
+			input: "//localhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:               "//badhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
-			wantPingErr:         true,
-			wantPingDeterminate: false,
+			input: "//badhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
+			want:  result{pingOk: false, pingDeterminate: false},
 		},
 		{
-			input:        "invalid",
-			wantParseErr: true,
+			input: "invalid",
+			want:  result{parseErr: true},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parsePostgres(tt.input)
-			if tt.wantParseErr {
-				assert.Error(t, err)
+
+			if err != nil {
+				got := result{parseErr: true}
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			assert.NoError(t, err)
+
 			pr := j.ping(context.Background())
-			if tt.wantPingErr {
-				assert.Error(t, pr.err)
-			} else {
-				assert.NoError(t, pr.err)
-			}
-			assert.Equal(t, tt.wantPingDeterminate, pr.determinate)
+
+			got := result{pingOk: pr.err == nil, pingDeterminate: pr.determinate}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
