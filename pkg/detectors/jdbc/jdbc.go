@@ -101,13 +101,13 @@ matchLoop:
 }
 
 func tryRedactAnonymousJDBC(conn string) string {
-	if s, ok := tryRedactBasicAuth(conn); ok {
-		return s
-	}
 	if s, ok := tryRedactURLParams(conn); ok {
 		return s
 	}
 	if s, ok := tryRedactODBC(conn); ok {
+		return s
+	}
+	if s, ok := tryRedactBasicAuth(conn); ok {
 		return s
 	}
 	if s, ok := tryRedactRegex(conn); ok {
@@ -158,8 +158,8 @@ func tryRedactODBC(conn string) (string, bool) {
 	var found bool
 	var newParams []string
 	for _, param := range strings.Split(conn, ";") {
-		key, val, _ := strings.Cut(param, "=")
-		if strings.Contains(strings.ToLower(key), "pass") {
+		key, val, isKvp := strings.Cut(param, "=")
+		if isKvp && strings.Contains(strings.ToLower(key), "pass") {
 			newParams = append(newParams, key+"="+strings.Repeat("*", len(val)))
 			found = true
 			continue

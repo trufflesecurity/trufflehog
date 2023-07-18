@@ -99,6 +99,8 @@ func (m *Result) validate(all bool) error {
 
 	// no validation rules for DecoderType
 
+	// no validation rules for VerificationErrorMessage
+
 	if len(errors) > 0 {
 		return ResultMultiError(errors)
 	}

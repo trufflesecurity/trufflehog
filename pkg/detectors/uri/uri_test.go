@@ -31,14 +31,14 @@ func TestURI_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", "https://user:pass@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx")),
+				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", "https://user:pass@httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx")),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_URI,
 					Verified:     false,
-					Redacted:     "https://user:********@www.httpwatch.com",
+					Redacted:     "https://user:********@httpwatch.com",
 				},
 			},
 			wantErr: false,
@@ -85,6 +85,17 @@ func TestURI_FromChunk(t *testing.T) {
 				data:   []byte("file://user:pass@foo.com:123/wh/at/ever"),
 				verify: true,
 			},
+			wantErr: false,
+		},
+		{
+			name: "nothing found, password was redacted two different ways",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("Both %s and %s have been redacted within", "https://httpwatch::********@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?foo=bar", "https://httpwatch::%2A%2A%2A%2A%2A%2A@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?foo=bar")),
+				verify: true,
+			},
+			want:    []detectors.Result{},
 			wantErr: false,
 		},
 	}
