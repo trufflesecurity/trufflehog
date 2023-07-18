@@ -32,11 +32,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                  string
+		s                     Scanner
+		args                  args
+		want                  []detectors.Result
+		wantErr               bool
+		wantVerificationError bool
 	}{
 		{
 			name: "found, verified",
@@ -81,6 +82,23 @@ func TestAlchemy_FromChunk(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
+		{
+			name: "found, would be verified if not for http timeout",
+			s:    Scanner{},
+			args: args{
+				ctx:    timeoutContext(1 * time.Microsecond),
+				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Alchemy,
+					Verified:     false,
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -95,6 +113,10 @@ func TestAlchemy_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if (got[i].VerificationError != nil) != tt.wantVerificationError {
+					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationError)
+				}
+				got[i].VerificationError = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Alchemy.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
@@ -116,4 +138,9 @@ func BenchmarkFromData(benchmark *testing.B) {
 			}
 		})
 	}
+}
+
+func timeoutContext(timeout time.Duration) context.Context {
+	c, _ := context.WithTimeout(context.Background(), timeout)
+	return c
 }
