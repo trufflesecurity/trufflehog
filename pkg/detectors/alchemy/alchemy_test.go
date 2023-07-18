@@ -99,11 +99,27 @@ func TestAlchemy_FromChunk(t *testing.T) {
 			wantErr:               false,
 			wantVerificationError: true,
 		},
+		{
+			name: "found, verified but unexpected api surface",
+			s:    Scanner{methodOverride: "nonexistent"},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Alchemy,
+					Verified:     false,
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Alchemy.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
