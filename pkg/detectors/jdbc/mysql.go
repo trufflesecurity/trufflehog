@@ -3,6 +3,7 @@ package jdbc
 import (
 	"context"
 	"errors"
+	"github.com/go-sql-driver/mysql"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -35,7 +36,19 @@ func buildMySQLConnectionString(host, database, userPass, params string) string 
 }
 
 func isMySQLErrorDeterminate(err error) bool {
-	return true
+	// MySQL error numbers from https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html
+	if mySQLErr, isMySQLErr := err.(*mysql.MySQLError); isMySQLErr {
+		// User access denied
+		// Note that error number 1044 is user access denied to a particular database, which is different. We return
+		// 1044 as indeterminate so that the waterfall will try again with the default database.
+		return mySQLErr.Number == 1045
+	}
+
+	// For most detectors, if we don't know exactly what the problem is, we should return "determinate" in order to
+	// mimic the two-state verification logic. But the JDBC detector is special: It tries multiple variations on a given
+	// found secret in a waterfall, and returning "true" here terminates the waterfall. Therefore, it is safer to return
+	// false by default so that we don't incorrectly terminate before we find a valid variation.
+	return false
 }
 
 func parseMySQL(subname string) (jdbc, error) {
