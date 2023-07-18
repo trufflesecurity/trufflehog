@@ -21,52 +21,62 @@ const (
 )
 
 func TestSqlServer(t *testing.T) {
+	type result struct {
+		parseErr        bool
+		pingErr         bool
+		pingDeterminate bool
+	}
 	tests := []struct {
-		input               string
-		wantParseErr        bool
-		wantPingErr         bool
-		wantPingDeterminate bool
+		input string
+		want  result
 	}{
 		{
-			input:        "",
-			wantParseErr: true,
+			input: "",
+			want:  result{parseErr: true},
 		},
 		{
-			input:               "//server=localhost;user id=sa;database=master;password=" + sqlServerPass,
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//server=localhost;user id=sa;database=master;password=" + sqlServerPass,
+			want: result{
+				pingErr:         false,
+				pingDeterminate: true,
+			},
 		},
 		{
-			input:               "//server=badhost;user id=sa;database=master;password=" + sqlServerPass,
-			wantPingErr:         true,
-			wantPingDeterminate: false,
+			input: "//server=badhost;user id=sa;database=master;password=" + sqlServerPass,
+			want: result{
+				pingErr:         true,
+				pingDeterminate: false,
+			},
 		},
 		{
-			input:               "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
+			want: result{
+				pingErr:         false,
+				pingDeterminate: true,
+			},
 		},
 		{
-			input:               "//localhost;database=master;spring.datasource.password=badpassword",
-			wantPingErr:         true,
-			wantPingDeterminate: true,
+			input: "//localhost;database=master;spring.datasource.password=badpassword",
+			want: result{
+				pingErr:         true,
+				pingDeterminate: true,
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parseSqlServer(tt.input)
-			if tt.wantParseErr {
-				assert.Error(t, err)
+
+			if err != nil {
+				got := result{parseErr: true}
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			assert.NoError(t, err)
+
 			pr := j.ping(context.Background())
-			if tt.wantPingErr {
-				assert.Error(t, pr.err)
-			} else {
-				assert.NoError(t, pr.err)
-			}
-			assert.Equal(t, tt.wantPingDeterminate, pr.determinate)
+
+			got := result{pingErr: pr.err != nil, pingDeterminate: pr.determinate}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
