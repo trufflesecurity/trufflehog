@@ -136,22 +136,15 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	absPath, err := filepath.Abs(source)
 	if err == nil {
 		if !isBare {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+			cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 		} else {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", absPath))
-
-			// We need those variables to handle incoming commits
-			// while using trufflehog in pre-receive hooks
-			for _, v := range os.Environ() {
-				switch {
-				case strings.HasPrefix(v, "GIT_OBJECT_DIRECTORY="):
-				case strings.HasPrefix(v, "GIT_ALTERNATE_OBJECT_DIRECTORIES="):
-				default:
-					continue
-				}
-
-				cmd.Env = append(cmd.Env, v)
-			}
+			cmd.Env = append(cmd.Env,
+				"GIT_DIR="+absPath,
+				// We need those variables to handle incoming commits
+				// while using trufflehog in pre-receive hooks
+				"GIT_OBJECT_DIRECTORY="+os.Getenv("GIT_OBJECT_DIRECTORY"),
+				"GIT_ALTERNATE_OBJECT_DIRECTORIES="+os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"),
+			)
 		}
 	}
 
