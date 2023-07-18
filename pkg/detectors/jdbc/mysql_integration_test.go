@@ -21,57 +21,54 @@ const (
 )
 
 func TestMySQL(t *testing.T) {
+	type result struct {
+		parseErr        bool
+		pingOk          bool
+		pingDeterminate bool
+	}
 	tests := []struct {
-		input               string
-		wantParseErr        bool
-		wantPingErr         bool
-		wantPingDeterminate bool
+		input string
+		want  result
 	}{
 		{
-			input:        "",
-			wantParseErr: true,
+			input: "",
+			want:  result{parseErr: true},
 		},
 		{
-			input:               "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:               "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPingErr:         true,
-			wantPingDeterminate: true,
+			input: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:               "//" + mysqlUser + ":wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPingErr:         true,
-			wantPingDeterminate: true,
+			input: "//" + mysqlUser + ":wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:               "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/",
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/",
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:               "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/wrongDB",
-			wantPingErr:         false,
-			wantPingDeterminate: true,
+			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/wrongDB",
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parseMySQL(tt.input)
-			if tt.wantParseErr {
-				assert.Error(t, err)
+
+			if err != nil {
+				got := result{parseErr: true}
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			assert.NoError(t, err)
+
 			pr := j.ping(context.Background())
-			if tt.wantPingErr {
-				assert.Error(t, pr.err)
-			} else {
-				assert.NoError(t, pr.err)
-			}
-			assert.Equal(t, pr.determinate, tt.wantPingDeterminate)
+
+			got := result{pingOk: pr.err == nil, pingDeterminate: pr.determinate}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
