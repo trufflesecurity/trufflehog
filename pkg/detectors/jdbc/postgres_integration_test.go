@@ -80,7 +80,7 @@ func TestPostgres(t *testing.T) {
 			} else {
 				assert.NoError(t, pr.err)
 			}
-			assert.Equal(t, pr.determinate, tt.wantPingDeterminate)
+			assert.Equal(t, tt.wantPingDeterminate, pr.determinate)
 		})
 	}
 }
