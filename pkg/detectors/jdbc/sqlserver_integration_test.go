@@ -23,7 +23,7 @@ const (
 func TestSqlServer(t *testing.T) {
 	type result struct {
 		parseErr        bool
-		pingErr         bool
+		pingOk          bool
 		pingDeterminate bool
 	}
 	tests := []struct {
@@ -36,31 +36,19 @@ func TestSqlServer(t *testing.T) {
 		},
 		{
 			input: "//server=localhost;user id=sa;database=master;password=" + sqlServerPass,
-			want: result{
-				pingErr:         false,
-				pingDeterminate: true,
-			},
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
 			input: "//server=badhost;user id=sa;database=master;password=" + sqlServerPass,
-			want: result{
-				pingErr:         true,
-				pingDeterminate: false,
-			},
+			want:  result{pingOk: false, pingDeterminate: false},
 		},
 		{
 			input: "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
-			want: result{
-				pingErr:         false,
-				pingDeterminate: true,
-			},
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
 			input: "//localhost;database=master;spring.datasource.password=badpassword",
-			want: result{
-				pingErr:         true,
-				pingDeterminate: true,
-			},
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 	}
 	for _, tt := range tests {
@@ -75,7 +63,7 @@ func TestSqlServer(t *testing.T) {
 
 			pr := j.ping(context.Background())
 
-			got := result{pingErr: pr.err != nil, pingDeterminate: pr.determinate}
+			got := result{pingOk: pr.err == nil, pingDeterminate: pr.determinate}
 			assert.Equal(t, tt.want, got)
 		})
 	}
