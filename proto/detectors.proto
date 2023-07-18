@@ -930,6 +930,7 @@ enum DetectorType {
   Docusign = 919;
   Couchbase = 920;
   EnvoyApiKey = 921;
+  TrufflehogEnterprise = 922;
 }
 
 message Result {
