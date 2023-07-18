@@ -32,13 +32,23 @@ func TestSqlServer(t *testing.T) {
 			wantParseErr: true,
 		},
 		{
-			input:               "//odbc:server=localhost;user id=sa;database=master;password=" + sqlServerPass,
+			input:               "//server=localhost;user id=sa;database=master;password=" + sqlServerPass,
 			wantPingErr:         false,
 			wantPingDeterminate: true,
 		},
 		{
+			input:               "//server=badhost;user id=sa;database=master;password=" + sqlServerPass,
+			wantPingErr:         true,
+			wantPingDeterminate: false,
+		},
+		{
 			input:               "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
 			wantPingErr:         false,
+			wantPingDeterminate: true,
+		},
+		{
+			input:               "//localhost;database=master;spring.datasource.password=badpassword",
+			wantPingErr:         true,
 			wantPingDeterminate: true,
 		},
 	}
@@ -56,7 +66,7 @@ func TestSqlServer(t *testing.T) {
 			} else {
 				assert.NoError(t, pr.err)
 			}
-			assert.Equal(t, pr.determinate, tt.wantPingDeterminate)
+			assert.Equal(t, tt.wantPingDeterminate, pr.determinate)
 		})
 	}
 }
