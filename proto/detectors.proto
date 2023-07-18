@@ -929,7 +929,7 @@ enum DetectorType {
   Prefect = 918;
   Docusign = 919;
   Couchbase = 920;
-  TrufflehogEnterprise = 921;
+  TrufflehogEnterprise = 922;
 }
 
 message Result {

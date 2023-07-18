@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resKeyMatch := strings.TrimSpace(keyMatch[0])
-
 		for _, secretMatch := range secretMatches {
 
 			if len(secretMatch) != 1 {
@@ -78,7 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					res, err := client.Do(req)
 					if err == nil {
-
 						verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "data")
 						if err != nil {
 							return nil, err
