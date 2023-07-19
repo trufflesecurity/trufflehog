@@ -101,7 +101,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but unexpected api surface",
-			s:    Scanner{methodOverride: "nonexistent"},
+			s:    Scanner{methodOverride: "nonexistent-method"},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
