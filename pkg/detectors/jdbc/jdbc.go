@@ -220,11 +220,13 @@ func newJDBC(conn string) (jdbc, error) {
 	return parser(subname)
 }
 
-func ping(ctx context.Context, driverName, conn string) bool {
-	if err := pingErr(ctx, driverName, conn); err != nil {
-		return false
+func ping(ctx context.Context, driverName string, candidateConns ...string) bool {
+	for _, c := range candidateConns {
+		if err := pingErr(ctx, driverName, c); err == nil {
+			return true
+		}
 	}
-	return true
+	return false
 }
 
 func pingErr(ctx context.Context, driverName, conn string) error {

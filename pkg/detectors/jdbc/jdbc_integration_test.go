@@ -105,6 +105,22 @@ func TestJdbcVerified(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "sql server verified",
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("jdbc:sqlserver://odbc:server=localhost;database=%s;password=%s", sqlServerDatabase, sqlServerPass)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_JDBC,
+					Verified:     true,
+					Redacted:     "jdbc:sqlserver://odbc:server=localhost;database=master;password=**************",
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
