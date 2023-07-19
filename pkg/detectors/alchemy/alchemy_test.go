@@ -53,7 +53,8 @@ func TestAlchemy_FromChunk(t *testing.T) {
 					Verified:     true,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, unverified",
@@ -69,7 +70,8 @@ func TestAlchemy_FromChunk(t *testing.T) {
 					Verified:     false,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
@@ -79,8 +81,9 @@ func TestAlchemy_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:    nil,
-			wantErr: false,
+			want:                nil,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, would be verified if not for http timeout",
