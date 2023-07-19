@@ -32,12 +32,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name                  string
-		s                     Scanner
-		args                  args
-		want                  []detectors.Result
-		wantErr               bool
-		wantVerificationError bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
@@ -99,8 +99,8 @@ func TestAlchemy_FromChunk(t *testing.T) {
 					Verified:     false,
 				},
 			},
-			wantErr:               false,
-			wantVerificationError: true,
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "found, verified but unexpected api surface",
@@ -116,8 +116,8 @@ func TestAlchemy_FromChunk(t *testing.T) {
 					Verified:     false,
 				},
 			},
-			wantErr:               false,
-			wantVerificationError: true,
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -132,8 +132,8 @@ func TestAlchemy_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				if (got[i].VerificationError != nil) != tt.wantVerificationError {
-					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationError)
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationErr)
 				}
 				got[i].VerificationError = nil
 			}
