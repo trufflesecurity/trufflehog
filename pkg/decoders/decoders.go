@@ -6,6 +6,7 @@ import (
 
 func DefaultDecoders() []Decoder {
 	return []Decoder{
+		// UTF8 must be first for duplicate detection
 		&UTF8{},
 		&Base64{},
 		&UTF16{},

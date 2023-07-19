@@ -44,30 +44,32 @@ const (
 )
 
 type Source struct {
-	name              string
-	githubUser        string
-	githubToken       string
-	sourceID          int64
-	jobID             int64
-	verify            bool
-	repos             []string
-	members           []string
-	orgsCache         cache.Cache
-	filteredRepoCache *filteredRepoCache
-	memberCache       map[string]struct{}
-	repoSizes         repoSize
-	totalRepoSize     int // total size in bytes of all repos
-	git               *git.Git
-	scanOptions       *git.ScanOptions
-	httpClient        *http.Client
-	log               logr.Logger
-	conn              *sourcespb.GitHub
-	jobPool           *errgroup.Group
-	resumeInfoMutex   sync.Mutex
-	resumeInfoSlice   []string
-	apiClient         *github.Client
-	mu                sync.Mutex
-	publicMap         map[string]source_metadatapb.Visibility
+	name                 string
+	githubUser           string
+	githubToken          string
+	sourceID             int64
+	jobID                int64
+	verify               bool
+	repos                []string
+	members              []string
+	orgsCache            cache.Cache
+	filteredRepoCache    *filteredRepoCache
+	memberCache          map[string]struct{}
+	repoSizes            repoSize
+	totalRepoSize        int // total size in bytes of all repos
+	git                  *git.Git
+	scanOptions          *git.ScanOptions
+	httpClient           *http.Client
+	log                  logr.Logger
+	conn                 *sourcespb.GitHub
+	jobPool              *errgroup.Group
+	resumeInfoMutex      sync.Mutex
+	resumeInfoSlice      []string
+	apiClient            *github.Client
+	mu                   sync.Mutex
+	publicMap            map[string]source_metadatapb.Visibility
+	includePRComments    bool
+	includeIssueComments bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -213,6 +215,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 		s.filteredRepoCache.Set(r, r)
 	}
 
+	s.includeIssueComments = s.conn.IncludeIssueComments
+	s.includePRComments = s.conn.IncludePullRequestComments
+
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
@@ -239,7 +244,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 						File:       sanitizer.UTF8(file),
 						Email:      sanitizer.UTF8(email),
 						Repository: sanitizer.UTF8(repository),
-						Link:       git.GenerateLink(repository, commit, file),
+						Link:       git.GenerateLink(repository, commit, file, line),
 						Timestamp:  sanitizer.UTF8(timestamp),
 						Line:       line,
 						Visibility: s.visibilityOf(aCtx, repository),
@@ -666,6 +671,12 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			defer func(start time.Time) {
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
+
+			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
+				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
+				return nil
+			}
+
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
@@ -918,4 +929,165 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
+}
+
+func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning comments")
+
+	// Support ssh and https URLs
+	repoURL, err := git.GitURLParse(repoPath)
+	if err != nil {
+		return err
+	}
+
+	trimmedURL := removeURLAndSplit(repoURL.String())
+	owner := trimmedURL[1]
+	repo := trimmedURL[2]
+
+	var (
+		sortType      = "created"
+		directionType = "desc"
+		allComments   = 0
+	)
+
+	if s.includeIssueComments {
+
+		issueOpts := &github.IssueListCommentsOptions{
+			Sort:      &sortType,
+			Direction: &directionType,
+			ListOptions: github.ListOptions{
+				PerPage: defaultPagination,
+				Page:    1,
+			},
+		}
+
+		for {
+			issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
+			if s.handleRateLimit(err, resp) {
+				break
+			}
+
+			if err != nil {
+				return err
+			}
+
+			err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
+			if err != nil {
+				return err
+			}
+
+			issueOpts.ListOptions.Page++
+
+			if len(issueComments) < defaultPagination {
+				break
+			}
+		}
+
+	}
+
+	if s.includePRComments {
+		prOpts := &github.PullRequestListCommentsOptions{
+			Sort:      sortType,
+			Direction: directionType,
+			ListOptions: github.ListOptions{
+				PerPage: defaultPagination,
+				Page:    1,
+			},
+		}
+
+		for {
+			prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
+			if s.handleRateLimit(err, resp) {
+				break
+			}
+
+			if err != nil {
+				return err
+			}
+
+			err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
+			if err != nil {
+				return err
+			}
+
+			prOpts.ListOptions.Page++
+
+			if len(prComments) < defaultPagination {
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments []*github.IssueComment, chunksChan chan *sources.Chunk, repoPath string) error {
+	for _, comment := range comments {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
+						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+						Visibility: s.visibilityOf(ctx, repoPath),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk, repoPath string) error {
+	for _, comment := range comments {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
+						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
+func removeURLAndSplit(url string) []string {
+	trimmedURL := strings.TrimPrefix(url, "https://")
+	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
+	splitURL := strings.Split(trimmedURL, "/")
+
+	return splitURL
 }

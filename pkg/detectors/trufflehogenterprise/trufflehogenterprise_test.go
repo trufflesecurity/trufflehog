@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package shortcut
+package trufflehogenterprise
 
 import (
 	"context"
@@ -10,21 +10,23 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestShortcut_FromChunk(t *testing.T) {
+func TestTrufflehogenterprise_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SHORTCUT")
-	inactiveSecret := testSecrets.MustGetField("SHORTCUT_INACTIVE")
+	host := testSecrets.MustGetField("THOG_HOSTNAME")
+	key := testSecrets.MustGetField("THOG_WEB_KEY")
+	secret := testSecrets.MustGetField("THOG_WEB_SECRET")
+	inactiveSecret := testSecrets.MustGetField("THOG_WEB_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +45,12 @@ func TestShortcut_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a shortcut secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a thog secret %s for %s with key %s within", secret, host, key)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Shortcut,
+					DetectorType: detectorspb.DetectorType_TrufflehogEnterprise,
 					Verified:     true,
 				},
 			},
@@ -59,12 +61,12 @@ func TestShortcut_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a shortcut secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a trufflehogenterprise secret %s for %s with key %s within but not valid", inactiveSecret, host, key)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Shortcut,
+					DetectorType: detectorspb.DetectorType_TrufflehogEnterprise,
 					Verified:     false,
 				},
 			},
@@ -87,7 +89,7 @@ func TestShortcut_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Shortcut.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Trufflehogenterprise.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +99,7 @@ func TestShortcut_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Shortcut.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Trufflehogenterprise.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

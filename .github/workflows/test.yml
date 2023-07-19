@@ -11,6 +11,7 @@ on:
 
 jobs:
   test:
+    if: ${{ ! github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     permissions:
       actions: 'read'
@@ -31,6 +32,7 @@ jobs:
     - name: Test
       run: make test-integration
   test-detectors:
+    if: ${{ ! github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     permissions:
       actions: 'read'
@@ -50,4 +52,19 @@ jobs:
         service_account: 'github-ci-external@trufflehog-testing.iam.gserviceaccount.com'
     - name: Test
       run: make test-detectors
-      continue-on-error: true
+      continue-on-error: true  
+  test-fork:
+    if: ${{ github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: 'read'
+      contents: 'read'
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Test
+      run: make test-forks

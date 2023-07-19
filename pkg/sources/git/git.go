@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -246,7 +247,7 @@ func CleanOnError(err *error, path string) {
 	}
 }
 
-func gitURLParse(gitURL string) (*url.URL, error) {
+func GitURLParse(gitURL string) (*url.URL, error) {
 	parsedURL, originalError := url.Parse(gitURL)
 	if originalError != nil {
 		var err error
@@ -270,7 +271,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 		return "", nil, err
 	}
 	defer CleanOnError(&err, clonePath)
-	cloneURL, err := gitURLParse(gitUrl)
+	cloneURL, err := GitURLParse(gitUrl)
 	if err != nil {
 		return "", nil, err
 	}
@@ -637,15 +638,23 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error)
 }
 
 // GenerateLink crafts a link to the specific file from a commit. This works in most major git providers (Github/Gitlab)
-func GenerateLink(repo, commit, file string) string {
+func GenerateLink(repo, commit, file string, line int64) string {
 	// bitbucket links are commits not commit...
 	if strings.Contains(repo, "bitbucket.org/") {
 		return repo[:len(repo)-4] + "/commits/" + commit
 	}
-	link := repo[:len(repo)-4] + "/blob/" + commit + "/" + file
-
+	var link string
 	if file == "" {
 		link = repo[:len(repo)-4] + "/commit/" + commit
+	} else {
+		link = repo[:len(repo)-4] + "/blob/" + commit + "/" + file
+
+		// Both GitHub and Gitlab support hyperlinking to a specific line with #L<number>, e.g.:
+		// https://github.com/trufflesecurity/trufflehog/blob/e856a6890d0da5a218f4f9283500b80043884641/go.mod#L169
+		// https://gitlab.com/pdftk-java/pdftk/-/blob/88559a08f34175b6fae76c40a88f0377f64a12d7/java/com/gitlab/pdftk_java/report.java#L893
+		if line > 0 && (strings.Contains(repo, "github") || strings.Contains(repo, "gitlab")) {
+			link += "#L" + strconv.FormatInt(line, 10)
+		}
 	}
 	return link
 }
@@ -698,7 +707,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 	// the uriString is github.com, then we query the API for the timestamp of the
 	// hash and use that to clone.
 
-	uri, err := gitURLParse(uriString)
+	uri, err := GitURLParse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}
@@ -763,7 +772,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 // PrepareRepo clones a repo if possible and returns the cloned repo path.
 func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 	var path string
-	uri, err := gitURLParse(uriString)
+	uri, err := GitURLParse(uriString)
 	if err != nil {
 		return "", false, fmt.Errorf("unable to parse Git URI: %s", err)
 	}
