@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"strings"
-
-	_ "github.com/lib/pq"
 )
 
 type postgresJDBC struct {

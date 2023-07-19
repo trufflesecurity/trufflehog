@@ -5,8 +5,6 @@ import (
 	"errors"
 	mssql "github.com/denisenkom/go-mssqldb"
 	"strings"
-
-	_ "github.com/denisenkom/go-mssqldb"
 )
 
 type sqlServerJDBC struct {

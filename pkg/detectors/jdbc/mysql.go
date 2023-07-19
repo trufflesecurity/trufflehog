@@ -5,8 +5,6 @@ import (
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"strings"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 type mysqlJDBC struct {
