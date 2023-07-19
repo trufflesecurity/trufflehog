@@ -20,13 +20,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"launchdarkly"}) + `\b([a-z0-9-]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"launchdarkly", "launch_darkly"}) + `\b([a-z0-9-]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"launchdarkly"}
+	return []string{"launchdarkly", "launch_darkly"}
 }
 
 // FromData will find and optionally verify LaunchDarkly secrets in a given set of bytes.

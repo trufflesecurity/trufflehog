@@ -15,37 +15,11 @@ type postgresJDBC struct {
 }
 
 func (s *postgresJDBC) ping(ctx context.Context) bool {
-	// try the provided connection string directly
-	if ping(ctx, "postgres", s.conn) {
-		return true
-	}
-	// try as a URL
-	if ping(ctx, "postgres", "postgres://"+s.conn) {
-		return true
-	}
-	// build a connection string
-	data := map[string]string{
-		// default user
-		"user": "postgres",
-	}
-	for key, val := range s.params {
-		if key == "host" {
-			if h, p, found := strings.Cut(val, ":"); found {
-				data["host"] = h
-				data["port"] = p
-				continue
-			}
-		}
-		data[key] = val
-	}
-	if ping(ctx, "postgres", joinKeyValues(data, " ")) {
-		return true
-	}
-	if s.params["dbname"] != "" {
-		delete(s.params, "dbname")
-		return s.ping(ctx)
-	}
-	return false
+	return ping(ctx, "postgres",
+		s.conn,
+		"postgres://"+s.conn,
+		buildPostgresConnectionString(s.params, true),
+		buildPostgresConnectionString(s.params, false))
 }
 
 func joinKeyValues(m map[string]string, sep string) string {
@@ -78,4 +52,26 @@ func parsePostgres(subname string) (jdbc, error) {
 	}
 
 	return &postgresJDBC{subname[2:], params}, nil
+}
+
+func buildPostgresConnectionString(params map[string]string, includeDbName bool) string {
+	data := map[string]string{
+		// default user
+		"user": "postgres",
+	}
+	for key, val := range params {
+		if key == "host" {
+			if h, p, found := strings.Cut(val, ":"); found {
+				data["host"] = h
+				data["port"] = p
+				continue
+			}
+		}
+		if key == "dbname" && !includeDbName {
+			continue
+		}
+		data[key] = val
+	}
+
+	return joinKeyValues(data, " ")
 }

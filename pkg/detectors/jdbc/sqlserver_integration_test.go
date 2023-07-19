@@ -35,7 +35,7 @@ func TestSqlServer(t *testing.T) {
 			wantPing: true,
 		},
 		{
-			input:    "//localhost;database= master;spring.datasource.password=" + sqlServerPass,
+			input:    "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
 			wantPing: true,
 		},
 	}
