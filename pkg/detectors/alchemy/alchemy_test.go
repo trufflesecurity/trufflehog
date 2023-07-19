@@ -161,5 +161,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 
 func timeoutContext(timeout time.Duration) context.Context {
 	c, _ := context.WithTimeout(context.Background(), timeout)
+	// The cancellation function is discarded for test ergonomics - this is expected to be used with a short timeout,
+	// and it's test code anyway.
 	return c
 }
