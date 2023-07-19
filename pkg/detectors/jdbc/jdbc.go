@@ -86,7 +86,14 @@ matchLoop:
 			}
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			s.Verified = j.ping(ctx)
+			pingRes := j.ping(ctx)
+			s.Verified = pingRes.err == nil
+			// If there's a ping error that is marked as "determinate" we throw it away. We do this because this was the
+			// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
+			// detectors to use tri-state verification.
+			if pingRes.err != nil && !pingRes.determinate {
+				s.VerificationError = pingRes.err
+			}
 			// TODO: specialized redaction
 		}
 
@@ -198,8 +205,13 @@ var supportedSubprotocols = map[string]func(string) (jdbc, error){
 	"sqlserver":  parseSqlServer,
 }
 
+type pingResult struct {
+	err         error
+	determinate bool
+}
+
 type jdbc interface {
-	ping(context.Context) bool
+	ping(context.Context) pingResult
 }
 
 func newJDBC(conn string) (jdbc, error) {
@@ -220,13 +232,16 @@ func newJDBC(conn string) (jdbc, error) {
 	return parser(subname)
 }
 
-func ping(ctx context.Context, driverName string, candidateConns ...string) bool {
+func ping(ctx context.Context, driverName string, isDeterminate func(error) bool, candidateConns ...string) pingResult {
+	var indeterminateErrors []error
 	for _, c := range candidateConns {
-		if err := pingErr(ctx, driverName, c); err == nil {
-			return true
+		err := pingErr(ctx, driverName, c)
+		if err == nil || isDeterminate(err) {
+			return pingResult{err, true}
 		}
+		indeterminateErrors = append(indeterminateErrors, err)
 	}
-	return false
+	return pingResult{errors.Join(indeterminateErrors...), false}
 }
 
 func pingErr(ctx context.Context, driverName, conn string) error {

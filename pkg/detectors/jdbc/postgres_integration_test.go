@@ -20,49 +20,62 @@ const (
 )
 
 func TestPostgres(t *testing.T) {
+	type result struct {
+		parseErr        bool
+		pingOk          bool
+		pingDeterminate bool
+	}
 	tests := []struct {
-		input    string
-		wantErr  bool
-		wantPing bool
+		input string
+		want  result
 	}{
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&password=" + postgresPass,
-			wantPing: true,
+			input: "//localhost:5432/foo?sslmode=disable&password=" + postgresPass,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&user=" + postgresUser + "&password=" + postgresPass,
-			wantPing: true,
+			input: "//localhost:5432/foo?sslmode=disable&user=" + postgresUser + "&password=" + postgresPass,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:    "//localhost/foo?sslmode=disable&port=5432&password=" + postgresPass,
-			wantPing: true,
+			input: "//localhost/foo?sslmode=disable&port=5432&password=" + postgresPass,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:    "//localhost:5432/foo?password=" + postgresPass,
-			wantPing: false,
+			input: "//localhost:5432/foo?password=" + postgresPass,
+			want:  result{pingOk: false, pingDeterminate: false},
 		},
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&password=foo",
-			wantPing: false,
+			input: "//localhost:5432/foo?sslmode=disable&password=foo",
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
-			wantPing: false,
+			input: "//localhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:   "invalid",
-			wantErr: true,
+			input: "//badhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
+			want:  result{pingOk: false, pingDeterminate: false},
+		},
+		{
+			input: "invalid",
+			want:  result{parseErr: true},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parsePostgres(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
+
+			if err != nil {
+				got := result{parseErr: true}
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantPing, j.ping(context.Background()))
+
+			pr := j.ping(context.Background())
+
+			got := result{pingOk: pr.err == nil, pingDeterminate: pr.determinate}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
