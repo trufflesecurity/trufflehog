@@ -76,7 +76,7 @@ If you think that something should be included outside of these guidelines, plea
 
 ### Verification indeterminacy
 
-There are two types reasons that secret verification can fail:
+There are two types of reasons that secret verification can fail:
 * The candidate secret is not actually a valid secret.
 * Something went wrong in the process unrelated to the candidate secret, such as a transient network error or an unexpected API response.
 
