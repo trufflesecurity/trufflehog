@@ -91,7 +91,7 @@ matchLoop:
 			// If there's a ping error that is marked as "determinate" we throw it away. We do this because this was the
 			// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
 			// detectors to use tri-state verification.
-			if pingRes.err != nil && pingRes.determinate {
+			if pingRes.err != nil && !pingRes.determinate {
 				s.VerificationError = pingRes.err
 			}
 			// TODO: specialized redaction
