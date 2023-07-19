@@ -86,7 +86,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, would be verified if not for http timeout",
+			name: "found, would be verified if not for timeout",
 			s:    Scanner{},
 			args: args{
 				ctx:    timeoutContext(1 * time.Microsecond),
