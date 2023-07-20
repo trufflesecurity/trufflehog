@@ -176,9 +176,9 @@ func SaneHttpClient() *http.Client {
 }
 
 // SaneHttpClientTimeOut adds a custom timeout for some scanners
-func SaneHttpClientTimeOut(timeoutMs int64) *http.Client {
+func SaneHttpClientTimeOut(timeout time.Duration) *http.Client {
 	httpClient := &http.Client{}
-	httpClient.Timeout = time.Millisecond * time.Duration(timeoutMs)
+	httpClient.Timeout = timeout
 	httpClient.Transport = NewCustomTransport(nil)
 	return httpClient
 }

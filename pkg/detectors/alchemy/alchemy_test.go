@@ -87,7 +87,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1)},
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
