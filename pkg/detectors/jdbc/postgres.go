@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lib/pq"
 	"strings"
-
-	_ "github.com/lib/pq"
 )
 
 type postgresJDBC struct {
@@ -14,37 +13,35 @@ type postgresJDBC struct {
 	params map[string]string
 }
 
-func (s *postgresJDBC) ping(ctx context.Context) bool {
-	// try the provided connection string directly
-	if ping(ctx, "postgres", s.conn) {
-		return true
-	}
-	// try as a URL
-	if ping(ctx, "postgres", "postgres://"+s.conn) {
-		return true
-	}
-	// build a connection string
-	data := map[string]string{
-		// default user
-		"user": "postgres",
-	}
-	for key, val := range s.params {
-		if key == "host" {
-			if h, p, found := strings.Cut(val, ":"); found {
-				data["host"] = h
-				data["port"] = p
-				continue
-			}
+func (s *postgresJDBC) ping(ctx context.Context) pingResult {
+	// It is crucial that we try to build a connection string ourselves before using the one we found. This is because
+	// if the found connection string doesn't include a username, the driver will attempt to connect using the current
+	// user's name, which will fail in a way that looks like a determinate failure, thus terminating the waterfall. In
+	// contrast, when we build a connection string ourselves, if there's no username, we try 'postgres' instead, which
+	// actually has a chance of working.
+	return ping(ctx, "postgres", isPostgresErrorDeterminate,
+		buildPostgresConnectionString(s.params, true),
+		buildPostgresConnectionString(s.params, false),
+		s.conn,
+		"postgres://"+s.conn)
+}
+
+func isPostgresErrorDeterminate(err error) bool {
+	// Postgres codes from https://www.postgresql.org/docs/current/errcodes-appendix.html
+	if pqErr, isPostgresError := err.(*pq.Error); isPostgresError {
+		switch pqErr.Code {
+		case "28P01":
+			// Invalid username/password
+			return true
+		case "3D000":
+			// Unknown database
+			return false // "Indeterminate" so that other connection variations will be tried
+		case "3F000":
+			// Unknown schema
+			return false // "Indeterminate" so that other connection variations will be tried
 		}
-		data[key] = val
 	}
-	if ping(ctx, "postgres", joinKeyValues(data, " ")) {
-		return true
-	}
-	if s.params["dbname"] != "" {
-		delete(s.params, "dbname")
-		return s.ping(ctx)
-	}
+
 	return false
 }
 
@@ -78,4 +75,26 @@ func parsePostgres(subname string) (jdbc, error) {
 	}
 
 	return &postgresJDBC{subname[2:], params}, nil
+}
+
+func buildPostgresConnectionString(params map[string]string, includeDbName bool) string {
+	data := map[string]string{
+		// default user
+		"user": "postgres",
+	}
+	for key, val := range params {
+		if key == "host" {
+			if h, p, found := strings.Cut(val, ":"); found {
+				data["host"] = h
+				data["port"] = p
+				continue
+			}
+		}
+		if key == "dbname" && !includeDbName {
+			continue
+		}
+		data[key] = val
+	}
+
+	return joinKeyValues(data, " ")
 }

@@ -80,6 +80,149 @@ func TestSource_Token(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSource_ScanComments(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	// For the personal access token test
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	const totalPRChunks = 2
+	const totalIssueChunks = 1
+
+	type init struct {
+		name       string
+		verify     bool
+		connection *sourcespb.GitHub
+	}
+	tests := []struct {
+		name              string
+		init              init
+		wantChunk         *sources.Chunk
+		wantErr           bool
+		minRepo           int
+		minOrg            int
+		numExpectedChunks int
+	}{
+		{
+			name: "token authenticated, single repo, single issue comment",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories:               []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					IncludeIssueComments:       true,
+					IncludePullRequestComments: false,
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			numExpectedChunks: totalIssueChunks,
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1#issuecomment-1603436833",
+							Username:  "truffle-sandbox",
+							Timestamp: "2023-06-22 23:33:46 +0000 UTC",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "token authenticated, single repo, pull request comment",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories:               []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					IncludePullRequestComments: true,
+					IncludeIssueComments:       false,
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			numExpectedChunks: totalPRChunks,
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/pull/2#discussion_r1242763304",
+							Username:  "truffle-sandbox",
+							Timestamp: "2023-06-26 21:00:11 +0000 UTC",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			chunksCh := make(chan *sources.Chunk, 5)
+			go func() {
+				// Close the channel
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh)
+				if (err != nil) != tt.wantErr {
+					if ctx.Err() != nil {
+						return
+					}
+					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+			}()
+
+			i := 0
+			for gotChunk := range chunksCh {
+				// Skip chunks that are not comments.
+				if gotChunk.SourceMetadata.GetGithub().GetCommit() != "" {
+					continue
+				}
+				i++
+				githubCommentCheckFunc(gotChunk, tt.wantChunk, i, t, tt.name)
+			}
+
+			// Confirm all comments were processed.
+			if i != tt.numExpectedChunks {
+				t.Errorf("did not complete all chunks, got %d, want %d", i, tt.numExpectedChunks)
+			}
+
+		})
+	}
+}
+
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
@@ -576,6 +719,23 @@ func basicCheckFunc(minOrg, minRepo int, wantChunk *sources.Chunk, s *Source) so
 			return sources.MatchError
 		}
 		return nil
+	}
+}
+
+func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testing.T, name string) {
+	if gotChunk.SourceType != wantChunk.SourceType {
+		t.Errorf("want SourceType %v, got %v", wantChunk.SourceType, gotChunk.SourceType)
+	}
+
+	assert.NotEmpty(t, gotChunk.SourceMetadata.Data, "SourceMetadata.Data should not be empty")
+
+	// First Chunk should be a Issue Comment, Second Chunk should be a PR Comment.
+	if i == 1 && name == "token authenticated, single repo, single issue comment" &&
+		wantChunk.SourceMetadata.GetGithub().GetLink() != gotChunk.SourceMetadata.GetGithub().GetLink() {
+		t.Errorf("want %+v \n got %+v \n", wantChunk.SourceMetadata.GetGithub().GetLink(), gotChunk.SourceMetadata.GetGithub().GetLink())
+	} else if i == 2 && name == "token authenticated, single repo, single pr comment" &&
+		wantChunk.SourceMetadata.GetGithub().GetLink() != gotChunk.SourceMetadata.GetGithub().GetLink() {
+		t.Errorf("want %+v \n got %+v \n", wantChunk.SourceMetadata.GetGithub().GetLink(), gotChunk.SourceMetadata.GetGithub().GetLink())
 	}
 }
 

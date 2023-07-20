@@ -86,7 +86,14 @@ matchLoop:
 			}
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			s.Verified = j.ping(ctx)
+			pingRes := j.ping(ctx)
+			s.Verified = pingRes.err == nil
+			// If there's a ping error that is marked as "determinate" we throw it away. We do this because this was the
+			// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
+			// detectors to use tri-state verification.
+			if pingRes.err != nil && !pingRes.determinate {
+				s.VerificationError = pingRes.err
+			}
 			// TODO: specialized redaction
 		}
 
@@ -101,13 +108,13 @@ matchLoop:
 }
 
 func tryRedactAnonymousJDBC(conn string) string {
-	if s, ok := tryRedactBasicAuth(conn); ok {
-		return s
-	}
 	if s, ok := tryRedactURLParams(conn); ok {
 		return s
 	}
 	if s, ok := tryRedactODBC(conn); ok {
+		return s
+	}
+	if s, ok := tryRedactBasicAuth(conn); ok {
 		return s
 	}
 	if s, ok := tryRedactRegex(conn); ok {
@@ -158,8 +165,8 @@ func tryRedactODBC(conn string) (string, bool) {
 	var found bool
 	var newParams []string
 	for _, param := range strings.Split(conn, ";") {
-		key, val, _ := strings.Cut(param, "=")
-		if strings.Contains(strings.ToLower(key), "pass") {
+		key, val, isKvp := strings.Cut(param, "=")
+		if isKvp && strings.Contains(strings.ToLower(key), "pass") {
 			newParams = append(newParams, key+"="+strings.Repeat("*", len(val)))
 			found = true
 			continue
@@ -198,8 +205,13 @@ var supportedSubprotocols = map[string]func(string) (jdbc, error){
 	"sqlserver":  parseSqlServer,
 }
 
+type pingResult struct {
+	err         error
+	determinate bool
+}
+
 type jdbc interface {
-	ping(context.Context) bool
+	ping(context.Context) pingResult
 }
 
 func newJDBC(conn string) (jdbc, error) {
@@ -220,11 +232,16 @@ func newJDBC(conn string) (jdbc, error) {
 	return parser(subname)
 }
 
-func ping(ctx context.Context, driverName, conn string) bool {
-	if err := pingErr(ctx, driverName, conn); err != nil {
-		return false
+func ping(ctx context.Context, driverName string, isDeterminate func(error) bool, candidateConns ...string) pingResult {
+	var indeterminateErrors []error
+	for _, c := range candidateConns {
+		err := pingErr(ctx, driverName, c)
+		if err == nil || isDeterminate(err) {
+			return pingResult{err, true}
+		}
+		indeterminateErrors = append(indeterminateErrors, err)
 	}
-	return true
+	return pingResult{errors.Join(indeterminateErrors...), false}
 }
 
 func pingErr(ctx context.Context, driverName, conn string) error {
