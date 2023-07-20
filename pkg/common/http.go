@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -97,6 +98,21 @@ func NewCustomTransport(T http.RoundTripper) *CustomTransport {
 		T = http.DefaultTransport
 	}
 	return &CustomTransport{T}
+}
+
+func ConstantStatusHttpClient(statusCode int) *http.Client {
+	return &http.Client{
+		Timeout: DefaultResponseTimeout,
+		Transport: FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					Request:    req,
+					Body:       io.NopCloser(strings.NewReader("")),
+					StatusCode: statusCode,
+				}, nil
+			},
+		},
+	}
 }
 
 func PinnedRetryableHttpClient() *http.Client {
