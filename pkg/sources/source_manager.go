@@ -21,19 +21,17 @@ type handle int64
 type SourceManager struct {
 	api apiClient
 	// Map of handle to source information.
-	handles     map[handle]sourceTemplate
+	handles     map[handle]namedSource
 	handlesLock sync.Mutex
-	// Counters for assigning handle and job IDs for headless managers.
-	headlessHandleCounter int64
-	headlessJobCounter    int64
 	// Pool limiting the amount of concurrent sources running.
 	pool errgroup.Group
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
 }
 
-// sourceTemplate is an aggregate struct to hold the Source and its name.
-type sourceTemplate struct {
+// namedSource is an aggregate struct to hold the Source and its name. This
+// might evolve to hold more items, in which case the name should be changed.
+type namedSource struct {
 	name   string
 	source Source
 }
@@ -59,7 +57,9 @@ func WithConcurrency(concurrency int) func(*SourceManager) {
 // NewManager creates a new manager with the provided options.
 func NewManager(outputChunks chan *Chunk, opts ...func(*SourceManager)) *SourceManager {
 	man := SourceManager{
-		handles:      make(map[handle]sourceTemplate),
+		// Default to the headless API. Can be overwritten by the WithAPI option.
+		api:          &headlessAPI{},
+		handles:      make(map[handle]namedSource),
 		outputChunks: outputChunks,
 	}
 	for _, opt := range opts {
@@ -68,24 +68,28 @@ func NewManager(outputChunks chan *Chunk, opts ...func(*SourceManager)) *SourceM
 	return &man
 }
 
-// Manage informs the SourceManager to track and manage a Source.
-func (s *SourceManager) Manage(ctx context.Context, name string, source Source) (handle, error) {
-	id, err := s.registerSource(ctx, name, source)
+// Enroll informs the SourceManager to track and manage a Source.
+func (s *SourceManager) Enroll(ctx context.Context, name string, source Source) (handle, error) {
+	id, err := s.api.RegisterSource(ctx, name, source.Type())
 	if err != nil {
 		return 0, err
 	}
+	handleID := handle(id)
 	s.handlesLock.Lock()
 	defer s.handlesLock.Unlock()
-	if _, ok := s.handles[id]; ok {
+	if _, ok := s.handles[handleID]; ok {
 		// TODO: smartly handle this?
-		return 0, fmt.Errorf("generated handle ID '%d' already in use locally", id)
+		return 0, fmt.Errorf("generated handle ID '%d' already in use locally", handleID)
 	}
-	s.handles[id] = sourceTemplate{name, source}
+	s.handles[handleID] = namedSource{name, source}
 	return 0, nil
 }
 
 // Run blocks until a resource is available to run the source, then synchronously runs it.
 func (s *SourceManager) Run(ctx context.Context, handle handle, conn *anypb.Any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	template, ok := s.getTemplate(handle)
 	if !ok {
 		return fmt.Errorf("unrecognized handle")
@@ -121,8 +125,8 @@ func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle, conn *an
 
 // run is a helper method to sychronously run the source. It does not check for
 // acquired resources. It also assumes s.handles[handle] == template.
-func (s *SourceManager) run(ctx context.Context, handle handle, template sourceTemplate, conn *anypb.Any) error {
-	jobID, err := s.getJobID(ctx, handle)
+func (s *SourceManager) run(ctx context.Context, handle handle, template namedSource, conn *anypb.Any) error {
+	jobID, err := s.api.GetJobID(ctx, int64(handle))
 	if err != nil {
 		return err
 	}
@@ -134,35 +138,26 @@ func (s *SourceManager) run(ctx context.Context, handle handle, template sourceT
 	return template.source.Chunks(ctx, s.outputChunks)
 }
 
-// registerSource is a helper method to register a source and get a unique
-// source ID for it. If the API is available, it gets it from that, otherwise
-// it uses a local counter.
-func (s *SourceManager) registerSource(ctx context.Context, name string, source Source) (handle, error) {
-	if s.api == nil {
-		id := atomic.AddInt64(&s.headlessHandleCounter, 1)
-		return handle(id), nil
-	}
-	sourceID, err := s.api.RegisterSource(ctx, name, source.Type())
-	if err != nil {
-		return 0, err
-	}
-	return handle(sourceID), nil
-}
-
-// getJobID is a helper method to get a new or existing job ID given a source
-// ID (handle). If the API is not available, it uses a local counter.
-func (s *SourceManager) getJobID(ctx context.Context, handle handle) (int64, error) {
-	if s.api == nil {
-		return atomic.AddInt64(&s.headlessJobCounter, 1), nil
-	}
-	return s.api.GetJobID(ctx, int64(handle))
-}
-
 // getTemplate is a helper method for safe concurrenty access to the
-// map[handle]sourceTemplate map.
-func (s *SourceManager) getTemplate(handle handle) (sourceTemplate, bool) {
+// map[handle]namedSource map.
+func (s *SourceManager) getTemplate(handle handle) (namedSource, bool) {
 	s.handlesLock.Lock()
 	defer s.handlesLock.Unlock()
 	template, ok := s.handles[handle]
 	return template, ok
+}
+
+// headlessAPI implements the apiClient interface locally.
+type headlessAPI struct {
+	// Counters for assigning handle and job IDs.
+	sourceIDCounter int64
+	jobIDCounter    int64
+}
+
+func (api *headlessAPI) RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error) {
+	return atomic.AddInt64(&api.sourceIDCounter, 1), nil
+}
+
+func (api *headlessAPI) GetJobID(ctx context.Context, id int64) (int64, error) {
+	return atomic.AddInt64(&api.jobIDCounter, 1), nil
 }
