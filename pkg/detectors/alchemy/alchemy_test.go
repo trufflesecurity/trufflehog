@@ -87,9 +87,9 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for timeout",
-			s:    Scanner{},
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1)},
 			args: args{
-				ctx:    timeoutContext(1 * time.Microsecond),
+				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
 				verify: true,
 			},
@@ -157,11 +157,4 @@ func BenchmarkFromData(benchmark *testing.B) {
 			}
 		})
 	}
-}
-
-func timeoutContext(timeout time.Duration) context.Context {
-	c, _ := context.WithTimeout(context.Background(), timeout)
-	// The cancellation function is discarded for test ergonomics - this is expected to be used with a short timeout,
-	// and it's test code anyway.
-	return c
 }
