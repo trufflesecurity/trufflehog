@@ -127,9 +127,10 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 	ctx.Logger().V(2).Info("engine started", "workers", e.concurrency)
 
-	sourcesWg := &errgroup.Group{}
+	sourcesWg, egCtx := errgroup.WithContext(ctx)
 	sourcesWg.SetLimit(e.concurrency)
 	e.sourcesWg = sourcesWg
+	ctx = context.WithLogger(egCtx, ctx.Logger())
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
