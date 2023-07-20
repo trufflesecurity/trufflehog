@@ -1,0 +1,168 @@
+package sources
+
+import (
+	"fmt"
+	"runtime"
+	"sync"
+	"sync/atomic"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/anypb"
+)
+
+// handle uniquely identifies a Source given to the manager to manage. If the
+// SourceManager is connected to the API, it will be equivalent to the unique
+// source ID, otherwise it behaves as a counter.
+type handle int64
+
+type SourceManager struct {
+	api apiClient
+	// Map of handle to source information.
+	handles     map[handle]sourceTemplate
+	handlesLock sync.Mutex
+	// Counters for assigning handle and job IDs for headless managers.
+	headlessHandleCounter int64
+	headlessJobCounter    int64
+	// Pool limiting the amount of concurrent sources running.
+	pool errgroup.Group
+	// Downstream chunks channel to be scanned.
+	outputChunks chan *Chunk
+}
+
+// sourceTemplate is an aggregate struct to hold the Source and its name.
+type sourceTemplate struct {
+	name   string
+	source Source
+}
+
+// apiClient is an interface for optionally communicating with an external API.
+type apiClient interface {
+	// RegisterSource lets the API know we have a source and it returns a unique source ID for it.
+	RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error)
+	// GetJobID queries the API for an existing job or new job ID.
+	GetJobID(ctx context.Context, id int64) (int64, error)
+}
+
+// WithAPI adds an API client to the manager for tracking jobs and progress.
+func WithAPI(api apiClient) func(*SourceManager) {
+	return func(man *SourceManager) { man.api = api }
+}
+
+// WithConcurrency limits the concurrent number of sources a manager can run.
+func WithConcurrency(concurrency int) func(*SourceManager) {
+	return func(man *SourceManager) { man.pool.SetLimit(concurrency) }
+}
+
+// NewManager creates a new manager with the provided options.
+func NewManager(outputChunks chan *Chunk, opts ...func(*SourceManager)) *SourceManager {
+	man := SourceManager{
+		handles:      make(map[handle]sourceTemplate),
+		outputChunks: outputChunks,
+	}
+	for _, opt := range opts {
+		opt(&man)
+	}
+	return &man
+}
+
+// Manage informs the SourceManager to track and manage a Source.
+func (s *SourceManager) Manage(ctx context.Context, name string, source Source) (handle, error) {
+	id, err := s.registerSource(ctx, name, source)
+	if err != nil {
+		return 0, err
+	}
+	s.handlesLock.Lock()
+	defer s.handlesLock.Unlock()
+	if _, ok := s.handles[id]; ok {
+		// TODO: smartly handle this?
+		return 0, fmt.Errorf("generated handle ID '%d' already in use locally", id)
+	}
+	s.handles[id] = sourceTemplate{name, source}
+	return 0, nil
+}
+
+// Run blocks until a resource is available to run the source, then synchronously runs it.
+func (s *SourceManager) Run(ctx context.Context, handle handle, conn *anypb.Any) error {
+	template, ok := s.getTemplate(handle)
+	if !ok {
+		return fmt.Errorf("unrecognized handle")
+	}
+	ch := make(chan error)
+	s.pool.Go(func() error {
+		defer common.Recover(ctx)
+		// TODO: The manager should record these errors.
+		ch <- s.run(ctx, handle, template, conn)
+		return nil
+	})
+	return <-ch
+}
+
+// ScheduleRun blocks until a resource is available to run the source, then
+// asynchronously runs it. Error information is lost in this case.
+func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle, conn *anypb.Any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	template, ok := s.getTemplate(handle)
+	if !ok {
+		return fmt.Errorf("unrecognized handle")
+	}
+	s.pool.Go(func() error {
+		defer common.Recover(ctx)
+		// TODO: The manager should record these errors.
+		_ = s.run(ctx, handle, template, conn)
+		return nil
+	})
+	return nil
+}
+
+// run is a helper method to sychronously run the source. It does not check for
+// acquired resources. It also assumes s.handles[handle] == template.
+func (s *SourceManager) run(ctx context.Context, handle handle, template sourceTemplate, conn *anypb.Any) error {
+	jobID, err := s.getJobID(ctx, handle)
+	if err != nil {
+		return err
+	}
+	if err := template.source.Init(ctx, template.name, jobID, int64(handle), true, conn, runtime.NumCPU()); err != nil {
+		return err
+	}
+	// TODO: Support UnitChunker and SourceUnitEnumerator.
+	// TODO: This is where we can introspect on the chunks collected.
+	return template.source.Chunks(ctx, s.outputChunks)
+}
+
+// registerSource is a helper method to register a source and get a unique
+// source ID for it. If the API is available, it gets it from that, otherwise
+// it uses a local counter.
+func (s *SourceManager) registerSource(ctx context.Context, name string, source Source) (handle, error) {
+	if s.api == nil {
+		id := atomic.AddInt64(&s.headlessHandleCounter, 1)
+		return handle(id), nil
+	}
+	sourceID, err := s.api.RegisterSource(ctx, name, source.Type())
+	if err != nil {
+		return 0, err
+	}
+	return handle(sourceID), nil
+}
+
+// getJobID is a helper method to get a new or existing job ID given a source
+// ID (handle). If the API is not available, it uses a local counter.
+func (s *SourceManager) getJobID(ctx context.Context, handle handle) (int64, error) {
+	if s.api == nil {
+		return atomic.AddInt64(&s.headlessJobCounter, 1), nil
+	}
+	return s.api.GetJobID(ctx, int64(handle))
+}
+
+// getTemplate is a helper method for safe concurrenty access to the
+// map[handle]sourceTemplate map.
+func (s *SourceManager) getTemplate(handle handle) (sourceTemplate, bool) {
+	s.handlesLock.Lock()
+	defer s.handlesLock.Unlock()
+	template, ok := s.handles[handle]
+	return template, ok
+}
