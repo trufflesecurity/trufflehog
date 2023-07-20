@@ -2,7 +2,6 @@ package sources
 
 import (
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // handle uniquely identifies a Source given to the manager to manage. If the
@@ -18,22 +16,19 @@ import (
 // source ID, otherwise it behaves as a counter.
 type handle int64
 
+// SourceInitFunc is a function that takes a source and job ID and returns an
+// initialized Source.
+type SourceInitFunc func(sourceID int64, jobID int64) (Source, error)
+
 type SourceManager struct {
 	api apiClient
-	// Map of handle to source information.
-	handles     map[handle]namedSource
+	// Map of handle to source initializer.
+	handles     map[handle]SourceInitFunc
 	handlesLock sync.Mutex
 	// Pool limiting the amount of concurrent sources running.
 	pool errgroup.Group
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
-}
-
-// namedSource is an aggregate struct to hold the Source and its name. This
-// might evolve to hold more items, in which case the name should be changed.
-type namedSource struct {
-	name   string
-	source Source
 }
 
 // apiClient is an interface for optionally communicating with an external API.
@@ -59,7 +54,7 @@ func NewManager(outputChunks chan *Chunk, opts ...func(*SourceManager)) *SourceM
 	man := SourceManager{
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
-		handles:      make(map[handle]namedSource),
+		handles:      make(map[handle]SourceInitFunc),
 		outputChunks: outputChunks,
 	}
 	for _, opt := range opts {
@@ -69,8 +64,8 @@ func NewManager(outputChunks chan *Chunk, opts ...func(*SourceManager)) *SourceM
 }
 
 // Enroll informs the SourceManager to track and manage a Source.
-func (s *SourceManager) Enroll(ctx context.Context, name string, source Source) (handle, error) {
-	id, err := s.api.RegisterSource(ctx, name, source.Type())
+func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.SourceType, f SourceInitFunc) (handle, error) {
+	id, err := s.api.RegisterSource(ctx, name, kind)
 	if err != nil {
 		return 0, err
 	}
@@ -79,26 +74,26 @@ func (s *SourceManager) Enroll(ctx context.Context, name string, source Source) 
 	defer s.handlesLock.Unlock()
 	if _, ok := s.handles[handleID]; ok {
 		// TODO: smartly handle this?
-		return 0, fmt.Errorf("generated handle ID '%d' already in use locally", handleID)
+		return 0, fmt.Errorf("handle ID '%d' already in use", handleID)
 	}
-	s.handles[handleID] = namedSource{name, source}
+	s.handles[handleID] = f
 	return 0, nil
 }
 
 // Run blocks until a resource is available to run the source, then synchronously runs it.
-func (s *SourceManager) Run(ctx context.Context, handle handle, conn *anypb.Any) error {
+func (s *SourceManager) Run(ctx context.Context, handle handle) error {
+	// Check the handle is valid before waiting on the pool.
+	if _, ok := s.getInitFunc(handle); !ok {
+		return fmt.Errorf("unrecognized handle")
+	}
 	if err := ctx.Err(); err != nil {
 		return err
-	}
-	template, ok := s.getTemplate(handle)
-	if !ok {
-		return fmt.Errorf("unrecognized handle")
 	}
 	ch := make(chan error)
 	s.pool.Go(func() error {
 		defer common.Recover(ctx)
 		// TODO: The manager should record these errors.
-		ch <- s.run(ctx, handle, template, conn)
+		ch <- s.run(ctx, handle)
 		return nil
 	})
 	return <-ch
@@ -106,41 +101,47 @@ func (s *SourceManager) Run(ctx context.Context, handle handle, conn *anypb.Any)
 
 // ScheduleRun blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is lost in this case.
-func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle, conn *anypb.Any) error {
+func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) error {
+	// Check the handle is valid before waiting on the pool.
+	if _, ok := s.getInitFunc(handle); !ok {
+		return fmt.Errorf("unrecognized handle")
+	}
 	if err := ctx.Err(); err != nil {
 		return err
-	}
-	template, ok := s.getTemplate(handle)
-	if !ok {
-		return fmt.Errorf("unrecognized handle")
 	}
 	s.pool.Go(func() error {
 		defer common.Recover(ctx)
 		// TODO: The manager should record these errors.
-		_ = s.run(ctx, handle, template, conn)
+		_ = s.run(ctx, handle)
 		return nil
 	})
+	// TODO: Maybe wait for a signal here that initialization was successful?
 	return nil
 }
 
 // run is a helper method to sychronously run the source. It does not check for
-// acquired resources. It also assumes s.handles[handle] == template.
-func (s *SourceManager) run(ctx context.Context, handle handle, template namedSource, conn *anypb.Any) error {
+// acquired resources.
+func (s *SourceManager) run(ctx context.Context, handle handle) error {
 	jobID, err := s.api.GetJobID(ctx, int64(handle))
 	if err != nil {
 		return err
 	}
-	if err := template.source.Init(ctx, template.name, jobID, int64(handle), true, conn, runtime.NumCPU()); err != nil {
+	initFunc, ok := s.getInitFunc(handle)
+	if !ok {
+		return fmt.Errorf("unrecognized handle")
+	}
+	source, err := initFunc(jobID, int64(handle))
+	if err != nil {
 		return err
 	}
 	// TODO: Support UnitChunker and SourceUnitEnumerator.
 	// TODO: This is where we can introspect on the chunks collected.
-	return template.source.Chunks(ctx, s.outputChunks)
+	return source.Chunks(ctx, s.outputChunks)
 }
 
-// getTemplate is a helper method for safe concurrenty access to the
-// map[handle]namedSource map.
-func (s *SourceManager) getTemplate(handle handle) (namedSource, bool) {
+// getInitFunc is a helper method for safe concurrent access to the
+// map[handle]SourceInitFunc map.
+func (s *SourceManager) getInitFunc(handle handle) (SourceInitFunc, bool) {
 	s.handlesLock.Lock()
 	defer s.handlesLock.Unlock()
 	template, ok := s.handles[handle]
