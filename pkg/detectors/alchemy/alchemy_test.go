@@ -6,6 +6,9 @@ package alchemy
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -104,7 +107,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but unexpected api surface",
-			s:    Scanner{methodOverride: "nonexistent-method"},
+			s:    Scanner{client: constantStatusHttpClient(404)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
@@ -156,6 +159,21 @@ func BenchmarkFromData(benchmark *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func constantStatusHttpClient(statusCode int) *http.Client {
+	return &http.Client{
+		Timeout: common.DefaultResponseTimeout,
+		Transport: common.FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					Request:    req,
+					Body:       io.NopCloser(strings.NewReader("")),
+					StatusCode: statusCode,
+				}, nil
+			},
+		},
 	}
 }
 

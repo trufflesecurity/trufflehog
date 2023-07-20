@@ -75,6 +75,14 @@ func PinnedCertPool() *x509.CertPool {
 	return trustedCerts
 }
 
+type FakeTransport struct {
+	CreateResponse func(req *http.Request) (*http.Response, error)
+}
+
+func (t FakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.CreateResponse(req)
+}
+
 type CustomTransport struct {
 	T http.RoundTripper
 }

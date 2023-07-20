@@ -13,15 +13,13 @@ import (
 )
 
 type Scanner struct {
-	methodOverride string
+	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alchemy"}) + `\b([0-9a-zA-Z]{23}_[0-9a-zA-Z]{8})\b`)
 )
@@ -50,11 +48,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			method := s.methodOverride
-			if method == "" {
-				method = "getNFTs"
+			client := s.client
+			if client == nil {
+				client = common.SaneHttpClient()
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.alchemy.com/v2/"+resMatch+"/"+method+"/?owner=vitalik.eth", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.alchemy.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
 			if err != nil {
 				continue
 			}
