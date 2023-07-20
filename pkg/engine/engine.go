@@ -130,7 +130,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	sourcesWg, egCtx := errgroup.WithContext(ctx)
 	sourcesWg.SetLimit(e.concurrency)
 	e.sourcesWg = sourcesWg
-	ctx.SetParent(egCtx)
+	ctx = context.WithLogger(egCtx, ctx.Logger())
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
