@@ -44,6 +44,9 @@ type Source struct {
 	sources.Progress
 	conn        *sourcespb.Git
 	scanOptions *ScanOptions
+	// Kludge to preserve engine.ScanGit functionality which doesn't expect
+	// the scanning to clean up the directory.
+	preserveTempDirs bool
 }
 
 type Git struct {
@@ -98,6 +101,14 @@ func (s *Source) WithScanOptions(scanOptions *ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
+// WithPreserveTempDirs sets whether to preserve temp directories when scanning
+// the provided list of s.conn.Directories. NOTE: This is *only* for
+// s.conn.Directories, not all temp directories created. This is also a kludge
+// and should be refactored away.
+func (s *Source) WithPreserveTempDirs(preserve bool) {
+	s.preserveTempDirs = preserve
+}
+
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
@@ -141,7 +152,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	// TODO: refactor to remove duplicate code
 	if err := s.scanRepos(ctx, chunksChan); err != nil {
 		return err
 	}
@@ -164,6 +174,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 		return nil
 	}
 	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
+	// TODO: refactor to remove duplicate code
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.Git_BasicAuth:
 		user := cred.BasicAuth.Username
@@ -252,7 +263,7 @@ func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) e
 		}
 
 		err = func(repoPath string) error {
-			if strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
+			if !s.preserveTempDirs && strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
 				defer os.RemoveAll(repoPath)
 			}
 
