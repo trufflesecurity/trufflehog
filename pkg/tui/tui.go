@@ -129,6 +129,10 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, tea.Quit)
 			case wizard_intro.ViewOSSProject:
 				ui.activePage = viewOSSProjectPage
+			case wizard_intro.ViewHelpDocs:
+				ui.args = []string{"--help"}
+
+				return ui, tea.Batch(nil, tea.Quit)
 			case wizard_intro.EnterpriseInquire:
 				ui.activePage = contactEnterprisePage
 			case wizard_intro.ScanSourceWithWizard:

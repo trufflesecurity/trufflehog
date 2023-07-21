@@ -149,6 +149,10 @@ func init() {
 
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
 		args := tui.Run()
+		if len(args) == 0 {
+			os.Exit(0)
+		}
+
 		// Overwrite the Args slice so overseer works properly.
 		os.Args = os.Args[:1]
 		os.Args = append(os.Args, args...)
