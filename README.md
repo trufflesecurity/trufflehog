@@ -283,53 +283,6 @@ repos:
       stages: ["commit", "push"]
 ```
 
-# Pre-receive hook
-
-Trufflehog can be also used in pre-receive hooks to prevents Git servers from receiving secrets even if developer 
-doesn't use pre-commit hook.
-
-This is an example of script that you can use as pre-receive hook:
-```bash
-#!/bin/bash
-
-# To use newer git and other utilities
-export PATH=/opt/gitlab/embedded/bin:$PATH
-
-# Developer should has an option to skip check
-if [ -n "$GIT_PUSH_OPTION_COUNT" ]; then
-  i=0
-  while [ "$i" -lt "$GIT_PUSH_OPTION_COUNT" ]; do
-    eval "value=\$GIT_PUSH_OPTION_$i"
-    if [ "$value" == "ignore_secrets" ]; then
-      echo "Skipping Secret Detection ..."
-      exit 0
-    fi
-    i=$((i + 1))
-  done
-fi
-
-zero_commit='0000000000000000000000000000000000000000'
-
-while read -r oldrev newrev refname; do
-  echo "Branch ${refname/#refs\/heads\/}"
-
-  # Branch or tag got deleted, ignore the push
-  if [[ $newrev = "$zero_commit" ]]; then
-    continue
-  fi
-
-  # Calculate range for new branch/updated branch
-  cmd="trufflehog git file://. --bare --fail --no-update --branch $newrev"
-
-  # Calculate range for new branch/updated branch
-  if [[ $oldrev = "$zero_commit" ]]; then
-    $cmd
-  else
-    $cmd --since-commit "$oldrev"
-  fi
-done
-```
-
 # Regex Detector (alpha)
 
 Trufflehog supports detection and verification of custom regular expressions.
