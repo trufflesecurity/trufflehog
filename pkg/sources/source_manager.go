@@ -144,8 +144,8 @@ func (s *SourceManager) run(ctx context.Context, handle handle) error {
 func (s *SourceManager) getInitFunc(handle handle) (SourceInitFunc, bool) {
 	s.handlesLock.Lock()
 	defer s.handlesLock.Unlock()
-	template, ok := s.handles[handle]
-	return template, ok
+	f, ok := s.handles[handle]
+	return f, ok
 }
 
 // headlessAPI implements the apiClient interface locally.
