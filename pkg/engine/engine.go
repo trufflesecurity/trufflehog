@@ -113,6 +113,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		chunks:          make(chan *sources.Chunk),
 		results:         make(chan detectors.ResultWithMetadata),
 		detectorAvgTime: sync.Map{},
+		sourcesWg:       &errgroup.Group{},
 	}
 
 	for _, option := range options {
@@ -127,10 +128,8 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 	ctx.Logger().V(2).Info("engine started", "workers", e.concurrency)
 
-	sourcesWg, egCtx := errgroup.WithContext(ctx)
-	sourcesWg.SetLimit(e.concurrency)
-	e.sourcesWg = sourcesWg
-	ctx.SetParent(egCtx)
+	// Limit number of concurrent goroutines dedicated to chunking a source.
+	e.sourcesWg.SetLimit(e.concurrency)
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
