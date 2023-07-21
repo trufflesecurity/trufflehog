@@ -20,6 +20,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alchemy"}) + `\b([0-9a-zA-Z]{23}_[0-9a-zA-Z]{8})\b`)
 )
@@ -50,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := s.client
 			if client == nil {
-				client = common.SaneHttpClient()
+				client = defaultClient
 			}
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.alchemy.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
 			if err != nil {
