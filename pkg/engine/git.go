@@ -57,6 +57,9 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 		return errors.WrapPrefix(err, "could not init git source", 0)
 	}
 	gitSource.WithScanOptions(scanOptions)
+	// Don't try to clean up the provided directory. That's handled by the
+	// caller of ScanGit.
+	gitSource.WithPreserveTempDirs(true)
 
 	ctx = context.WithValues(ctx,
 		"source_type", sourcespb.SourceType_SOURCE_TYPE_GIT.String(),
