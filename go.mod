@@ -2,10 +2,7 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.20
 
-replace (
-	github.com/go-git/go-git/v5 v5.7.0 => ../go-git
-	github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
-)
+replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
 require (
 	cloud.google.com/go/secretmanager v1.11.1
@@ -25,7 +22,7 @@ require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.22.0
 	github.com/go-errors/errors v1.4.2
-	github.com/go-git/go-git/v5 v5.7.0
+	github.com/go-git/go-git/v5 v5.7.1-0.20230721064901-1a1bc149278e
 	github.com/go-ldap/ldap/v3 v3.4.5
 	github.com/go-logr/logr v1.2.4
 	github.com/go-logr/zapr v1.2.4
