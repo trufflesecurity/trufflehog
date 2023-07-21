@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -159,6 +161,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convertkit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/convier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/copper"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/couchbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/countrylayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/courier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coveralls"
@@ -198,6 +201,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -1523,6 +1527,9 @@ func DefaultDetectors() []detectors.Detector {
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
 		opsgenie.Scanner{},
+		dockerhub.Scanner{},
+		couchbase.Scanner{},
+		envoyapikey.Scanner{},
 	}
 
 }

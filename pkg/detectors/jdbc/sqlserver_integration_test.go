@@ -21,33 +21,50 @@ const (
 )
 
 func TestSqlServer(t *testing.T) {
+	type result struct {
+		parseErr        bool
+		pingOk          bool
+		pingDeterminate bool
+	}
 	tests := []struct {
-		input    string
-		wantErr  bool
-		wantPing bool
+		input string
+		want  result
 	}{
 		{
-			input:   "",
-			wantErr: true,
+			input: "",
+			want:  result{parseErr: true},
 		},
 		{
-			input:    "//odbc:server=localhost;user id=sa;database=master;password=" + sqlServerPass,
-			wantPing: true,
+			input: "//server=localhost;user id=sa;database=master;password=" + sqlServerPass,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:    "//localhost;database= master;spring.datasource.password=" + sqlServerPass,
-			wantPing: true,
+			input: "//server=badhost;user id=sa;database=master;password=" + sqlServerPass,
+			want:  result{pingOk: false, pingDeterminate: false},
+		},
+		{
+			input: "//localhost;database=master;spring.datasource.password=" + sqlServerPass,
+			want:  result{pingOk: true, pingDeterminate: true},
+		},
+		{
+			input: "//localhost;database=master;spring.datasource.password=badpassword",
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parseSqlServer(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
+
+			if err != nil {
+				got := result{parseErr: true}
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantPing, j.ping(context.Background()))
+
+			pr := j.ping(context.Background())
+
+			got := result{pingOk: pr.err == nil, pingDeterminate: pr.determinate}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
