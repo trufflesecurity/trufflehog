@@ -28,6 +28,22 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	}
 
 	fileSystemSource := filesystem.Source{}
+	fileSystemSource.WithFilter(c.Filter)
+
+	// TODO: This is how it would be used; everything after these comments would be removed.
+	// handle, err := e.sourceManager.Enroll(ctx, "trufflehog - filesystem", fileSystemSource.Type(),
+	// 	func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
+	// 		fileSystemSource := filesystem.Source{}
+	// 		fileSystemSource.WithFilter(c.Filter)
+	// 		if err := fileSystemSource.Init(ctx, "trufflehog - filesystem", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	// 			return nil, err
+	// 		}
+	// 		return &fileSystemSource, nil
+	// 	})
+	// if err != nil {
+	// 	return err
+	// }
+	// return e.sourceManager.ScheduleRun(ctx, handle)
 
 	ctx = context.WithValues(ctx,
 		"source_type", fileSystemSource.Type().String(),
@@ -37,7 +53,6 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not init filesystem source", 0)
 	}
-	fileSystemSource.WithFilter(c.Filter)
 	e.sourcesWg.Go(func() error {
 		defer common.RecoverWithExit(ctx)
 		err := fileSystemSource.Chunks(ctx, e.ChunksChan())
