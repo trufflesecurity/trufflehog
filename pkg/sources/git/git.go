@@ -42,7 +42,8 @@ type Source struct {
 	verify   bool
 	git      *Git
 	sources.Progress
-	conn *sourcespb.Git
+	conn        *sourcespb.Git
+	scanOptions *ScanOptions
 }
 
 type Git struct {
@@ -92,6 +93,11 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
+// WithScanOptions sets the scan options.
+func (s *Source) WithScanOptions(scanOptions *ScanOptions) {
+	s.scanOptions = scanOptions
+}
+
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
@@ -136,6 +142,27 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// TODO: refactor to remove duplicate code
+	if err := s.scanRepos(ctx, chunksChan); err != nil {
+		return err
+	}
+	if err := s.scanDirs(ctx, chunksChan); err != nil {
+		return err
+	}
+
+	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
+	ctx.Logger().V(1).Info("Git source finished scanning", "repo_count", totalRepos)
+	s.SetProgressComplete(
+		totalRepos, totalRepos,
+		fmt.Sprintf("Completed scanning source %s", s.name), "",
+	)
+	return nil
+}
+
+// scanRepos scans the configured repositories in s.conn.Repositories.
+func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	if len(s.conn.Repositories) == 0 {
+		return nil
+	}
 	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.Git_BasicAuth:
@@ -153,7 +180,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -172,7 +199,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -191,7 +218,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -201,41 +228,42 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	default:
 		return errors.New("invalid connection type for git source")
 	}
+	return nil
+}
 
+// scanDirs scans the configured directories in s.conn.Directories.
+func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
 	for i, gitDir := range s.conn.Directories {
 		s.SetProgressComplete(len(s.conn.Repositories)+i, totalRepos, fmt.Sprintf("Repo: %s", gitDir), "")
 
 		if len(gitDir) == 0 {
 			continue
 		}
-		if !strings.HasSuffix(gitDir, "git") {
-			// try paths instead of url
-			repo, err := RepoFromPath(gitDir)
-			if err != nil {
-				ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
-				continue
+		if strings.HasSuffix(gitDir, "git") {
+			// TODO: Figure out why we skip directories ending in "git".
+			continue
+		}
+		// try paths instead of url
+		repo, err := RepoFromPath(gitDir)
+		if err != nil {
+			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+			continue
+		}
+
+		err = func(repoPath string) error {
+			if strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
+				defer os.RemoveAll(repoPath)
 			}
 
-			err = func(repoPath string) error {
-				if strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
-					defer os.RemoveAll(repoPath)
-				}
-
-				return s.git.ScanRepo(ctx, repo, repoPath, NewScanOptions(), chunksChan)
-			}(gitDir)
-			if err != nil {
-				ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
-				continue
-			}
+			return s.git.ScanRepo(ctx, repo, repoPath, s.scanOptions, chunksChan)
+		}(gitDir)
+		if err != nil {
+			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+			continue
 		}
 
 	}
-
-	ctx.Logger().V(1).Info("Git source finished scanning", "repo-count", totalRepos)
-	s.SetProgressComplete(
-		totalRepos, totalRepos,
-		fmt.Sprintf("Completed scanning source %s", s.name), "",
-	)
 	return nil
 }
 
