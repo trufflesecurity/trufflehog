@@ -35,6 +35,12 @@ const (
 	maxObjectSizeLimit   = 250 * 1024 * 1024 // 250 MiB
 )
 
+type ClientOptions struct {
+	RoleARN string
+}
+
+type ClientOptionSetter func(*ClientOptions)
+
 type Source struct {
 	name        string
 	sourceId    int64
@@ -65,6 +71,12 @@ func (s *Source) SourceID() int64 {
 
 func (s *Source) JobID() int64 {
 	return s.jobId
+}
+
+func WithRoleARN(roleARN string) ClientOptionSetter {
+	return func(opt *ClientOptions) {
+		opt.RoleARN = roleARN
+	}
 }
 
 // Init returns an initialized AWS source
@@ -104,23 +116,43 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 	}
 }
 
-func (s *Source) newClient(region string) (*s3.S3, error) {
+func (s *Source) newClient(region string, setters ...ClientOptionSetter) (*s3.S3, error) {
+	opts := &ClientOptions{}
+
+	for _, setter := range setters {
+		setter(opts)
+	}
+
 	cfg := aws.NewConfig()
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
 	cfg.Region = aws.String(region)
 
+	var baseCredentials *credentials.Credentials
+
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.S3_SessionToken:
-		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
+		baseCredentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
 	case *sourcespb.S3_AccessKey:
-		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
+		baseCredentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
 	case *sourcespb.S3_Unauthenticated:
-		cfg.Credentials = credentials.AnonymousCredentials
+		baseCredentials = credentials.AnonymousCredentials
 	case *sourcespb.S3_CloudEnvironment:
 		// Nothing needs to be done!
 	default:
 		return nil, errors.Errorf("invalid configuration given for %s source", s.name)
 	}
+
+	// If a RoleARN is provided in the options, assume that role
+	if opts.RoleARN != "" {
+		sess, err := session.NewSession(cfg)
+		if err != nil {
+			return nil, err
+		}
+		baseCredentials = stscreds.NewCredentials(sess, opts.RoleARN)
+	}
+
+	// Use the final credentials to configure the AWS client
+	cfg.Credentials = baseCredentials
 
 	sess, err := session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
@@ -138,74 +170,96 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	// TODO: need to wrap credential enumeration with enumeration of AssumeRole
 	const defaultAWSRegion = "us-east-1"
 
+	processBuckets := func(client *s3.S3) error {
+		var bucketsToScan []string
+
+		switch s.conn.GetCredential().(type) {
+		case *sourcespb.S3_AccessKey, *sourcespb.S3_SessionToken, *sourcespb.S3_CloudEnvironment:
+			if len(s.conn.Buckets) == 0 {
+				res, err := client.ListBuckets(&s3.ListBucketsInput{})
+				if err != nil {
+					return fmt.Errorf("could not list s3 buckets: %w", err)
+				}
+				buckets := res.Buckets
+				for _, bucket := range buckets {
+					bucketsToScan = append(bucketsToScan, *bucket.Name)
+				}
+			} else {
+				bucketsToScan = s.conn.Buckets
+			}
+		case *sourcespb.S3_Unauthenticated:
+			bucketsToScan = s.conn.Buckets
+		default:
+			return errors.Errorf("invalid configuration given for %s source", s.name)
+		}
+
+		objectCount := uint64(0)
+		for i, bucket := range bucketsToScan {
+			if common.IsDone(ctx) {
+				return nil
+			}
+
+			s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
+
+			s.log.Info("Scanning bucket", "bucket", bucket)
+			region, err := s3manager.GetBucketRegionWithClient(context.Background(), client, bucket)
+			if err != nil {
+				s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
+				continue
+			}
+			var regionalClient *s3.S3
+			if region != defaultAWSRegion {
+				regionalClient, err = s.newClient(region)
+				if err != nil {
+					s.log.Error(err, "could not make regional s3 client")
+				}
+			} else {
+				regionalClient = client
+			}
+
+			errorCount := sync.Map{}
+
+			err = regionalClient.ListObjectsV2PagesWithContext(
+				ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
+				func(page *s3.ListObjectsV2Output, last bool) bool {
+					s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
+					return true
+				})
+
+			if err != nil {
+				return fmt.Errorf(
+					"could not list objects in s3 bucket: bucket %s: %w",
+					bucket,
+					err)
+			}
+	}
+
+	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
+
+	return nil
+
+	}
+
 	client, err := s.newClient(defaultAWSRegion)
 	if err != nil {
 		return errors.WrapPrefix(err, "could not create s3 client", 0)
 	}
 
-	var bucketsToScan []string
-
-	switch s.conn.GetCredential().(type) {
-	case *sourcespb.S3_AccessKey, *sourcespb.S3_SessionToken, *sourcespb.S3_CloudEnvironment:
-		if len(s.conn.Buckets) == 0 {
-			res, err := client.ListBuckets(&s3.ListBucketsInput{})
-			if err != nil {
-				return fmt.Errorf("could not list s3 buckets: %w", err)
-			}
-			buckets := res.Buckets
-			for _, bucket := range buckets {
-				bucketsToScan = append(bucketsToScan, *bucket.Name)
-			}
-		} else {
-			bucketsToScan = s.conn.Buckets
-		}
-	case *sourcespb.S3_Unauthenticated:
-		bucketsToScan = s.conn.Buckets
-	default:
-		return errors.Errorf("invalid configuration given for %s source", s.name)
+	if err := processBuckets(client); err != nil {
+		return err
 	}
 
-	objectCount := uint64(0)
-	for i, bucket := range bucketsToScan {
-		if common.IsDone(ctx) {
-			return nil
-		}
-
-		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
-
-		s.log.Info("Scanning bucket", "bucket", bucket)
-		region, err := s3manager.GetBucketRegionWithClient(context.Background(), client, bucket)
+	// If roles are provided, create additional clients for each role and process
+	for _, roleARN := range s.conn.Roles {
+		roleClient, err := s.newClient(defaultAWSRegion, WithRoleARN(roleARN))
 		if err != nil {
-			s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
-			continue
+			return errors.WrapPrefix(err, "could not create s3 client with assumed role", 0)
 		}
-		var regionalClient *s3.S3
-		if region != defaultAWSRegion {
-			regionalClient, err = s.newClient(region)
-			if err != nil {
-				s.log.Error(err, "could not make regional s3 client")
-			}
-		} else {
-			regionalClient = client
-		}
-
-		errorCount := sync.Map{}
-
-		err = regionalClient.ListObjectsV2PagesWithContext(
-			ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
-			func(page *s3.ListObjectsV2Output, last bool) bool {
-				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
-				return true
-			})
-
-		if err != nil {
-			return fmt.Errorf(
-				"could not list objects in s3 bucket: bucket %s: %w",
-				bucket,
-				err)
+		if err := processBuckets(roleClient); err != nil {
+			return err
 		}
 	}
-	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
+
 
 	return nil
 }
