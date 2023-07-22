@@ -11,7 +11,6 @@ import (
 	"time"
 
 	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -27,14 +26,13 @@ import (
 
 type Engine struct {
 	concurrency     int
-	chunks          chan *sources.Chunk
+	sourceManager   *sources.SourceManager
 	results         chan detectors.ResultWithMetadata
 	decoders        []decoders.Decoder
 	detectors       map[bool][]detectors.Detector
 	chunksScanned   uint64
 	bytesScanned    uint64
 	detectorAvgTime sync.Map
-	sourcesWg       *errgroup.Group
 	workersWg       sync.WaitGroup
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
@@ -110,10 +108,8 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
-		chunks:          make(chan *sources.Chunk),
 		results:         make(chan detectors.ResultWithMetadata),
 		detectorAvgTime: sync.Map{},
-		sourcesWg:       &errgroup.Group{},
 	}
 
 	for _, option := range options {
@@ -128,9 +124,6 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 	ctx.Logger().V(2).Info("engine started", "workers", e.concurrency)
 
-	// Limit number of concurrent goroutines dedicated to chunking a source.
-	e.sourcesWg.SetLimit(e.concurrency)
-
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
 	}
@@ -140,6 +133,9 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		e.detectors[true] = DefaultDetectors()
 		e.detectors[false] = []detectors.Detector{}
 	}
+
+	// Setup source manager now that we know the concurrency.
+	e.sourceManager = sources.NewManager(sources.WithConcurrency(e.concurrency))
 
 	// build ahocorasick prefilter for efficient string matching
 	// on keywords
@@ -198,13 +194,12 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 // more sources may be scanned by the engine.
 func (e *Engine) Finish(ctx context.Context, logFunc func(error, string, ...any)) {
 	defer common.RecoverWithExit(ctx)
-	// wait for the sources to finish putting chunks onto the chunks channel
-	sourceErr := e.sourcesWg.Wait()
+	// Wait for the sources to finish putting chunks onto the chunks channel.
+	sourceErr := e.sourceManager.Wait()
 	if sourceErr != nil {
 		logFunc(sourceErr, "error occurred while collecting chunks")
 	}
 
-	close(e.chunks)
 	// wait for the workers to finish processing all of the chunks and putting
 	// results onto the results channel
 	e.workersWg.Wait()
@@ -217,8 +212,8 @@ func (e *Engine) Finish(ctx context.Context, logFunc func(error, string, ...any)
 	close(e.results)
 }
 
-func (e *Engine) ChunksChan() chan *sources.Chunk {
-	return e.chunks
+func (e *Engine) ChunksChan() <-chan *sources.Chunk {
+	return e.sourceManager.Chunks()
 }
 
 func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
@@ -271,7 +266,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {
-	for originalChunk := range e.chunks {
+	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			var chunkResults []detectors.ResultWithMetadata
 			matchedKeywords := make(map[string]struct{})
