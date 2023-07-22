@@ -18,7 +18,7 @@ type handle int64
 
 // SourceInitFunc is a function that takes a source and job ID and returns an
 // initialized Source.
-type SourceInitFunc func(sourceID int64, jobID int64) (Source, error)
+type SourceInitFunc func(ctx context.Context, sourceID int64, jobID int64) (Source, error)
 
 type SourceManager struct {
 	api apiClient
@@ -50,12 +50,12 @@ func WithConcurrency(concurrency int) func(*SourceManager) {
 }
 
 // NewManager creates a new manager with the provided options.
-func NewManager(outputChunks chan *Chunk, opts ...func(*SourceManager)) *SourceManager {
+func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	man := SourceManager{
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
 		handles:      make(map[handle]SourceInitFunc),
-		outputChunks: outputChunks,
+		outputChunks: make(chan *Chunk),
 	}
 	for _, opt := range opts {
 		opt(&man)
@@ -77,7 +77,7 @@ func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.
 		return 0, fmt.Errorf("handle ID '%d' already in use", handleID)
 	}
 	s.handles[handleID] = f
-	return 0, nil
+	return handleID, nil
 }
 
 // Run blocks until a resource is available to run the source, then synchronously runs it.
@@ -119,6 +119,21 @@ func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) error {
 	return nil
 }
 
+// Chunks returns the read only channel of all the chunks produced by all of
+// the sources managed by this manager.
+func (s *SourceManager) Chunks() <-chan *Chunk {
+	return s.outputChunks
+}
+
+// Wait blocks until all running sources are completed and returns the first
+// error encountered if any. It also closes the channel returned by Chunks().
+// The manager should not be reused after calling this method.
+func (s *SourceManager) Wait() error {
+	// TODO: Aggregate all errors from all sources.
+	defer close(s.outputChunks)
+	return s.pool.Wait()
+}
+
 // run is a helper method to sychronously run the source. It does not check for
 // acquired resources.
 func (s *SourceManager) run(ctx context.Context, handle handle) error {
@@ -130,7 +145,7 @@ func (s *SourceManager) run(ctx context.Context, handle handle) error {
 	if !ok {
 		return fmt.Errorf("unrecognized handle")
 	}
-	source, err := initFunc(jobID, int64(handle))
+	source, err := initFunc(ctx, jobID, int64(handle))
 	if err != nil {
 		return err
 	}
