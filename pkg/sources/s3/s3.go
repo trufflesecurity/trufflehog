@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -148,11 +149,18 @@ func (s *Source) newClient(region string, setters ...ClientOptionSetter) (*s3.S3
 		if err != nil {
 			return nil, err
 		}
-		baseCredentials = stscreds.NewCredentials(sess, opts.RoleARN)
-	}
 
-	// Use the final credentials to configure the AWS client
-	cfg.Credentials = baseCredentials
+		// Create an STS client with the session
+		stsClient := sts.New(sess)
+
+		// Use stscreds.NewCredentialsWithClient to provide a session name
+		baseCredentials = stscreds.NewCredentialsWithClient(stsClient, opts.RoleARN, func(p *stscreds.AssumeRoleProvider) {
+			p.RoleSessionName = fmt.Sprintf("trufflehog-%s", time.Now())  // Choose an appropriate session name
+		})
+
+		// Re-configure the AWS client with the assumed role's credentials
+		cfg.Credentials = baseCredentials
+	}
 
 	sess, err := session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
