@@ -755,7 +755,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 		}
 		path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username(), "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
+			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
 		}
 	default:
 		ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
