@@ -793,13 +793,13 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 			}
 			path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username())
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
+				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
 			}
 		default:
 			ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
 			path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath)
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
+				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", uri.Redacted(), err)
 			}
 		}
 	case "ssh":
