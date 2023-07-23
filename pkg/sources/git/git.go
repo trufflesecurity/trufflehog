@@ -799,7 +799,7 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 			ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
 			path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath)
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", uri.Redacted(), err)
+				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 			}
 		}
 	case "ssh":
