@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.shodan.io/shodan/host/count?key="+resMatch+"&query=port:22&facets=org,os", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.shodan.io/shodan/host/count?key="+resMatch+"&query=port:3389&facets=org,os", nil)
 			if err != nil {
 				continue
 			}
