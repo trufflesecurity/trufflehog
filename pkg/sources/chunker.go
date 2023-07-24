@@ -37,7 +37,7 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 				if errors.Is(err, io.EOF) {
 					break
 				}
-				break
+				continue
 			}
 			peekData, _ := reader.Peek(PeekSize)
 			copy(chunkBytes[n:], peekData)
