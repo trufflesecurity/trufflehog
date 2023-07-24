@@ -12,6 +12,8 @@ const (
 	ChunkSize = 10 * 1024
 	// PeekSize is the size of the peek into the previous chunk.
 	PeekSize = 3 * 1024
+	// TotalChunkSize is the total size of a chunk with peek data.
+	TotalChunkSize = ChunkSize + PeekSize
 )
 
 // Chunker takes a chunk and splits it into chunks of ChunkSize.
@@ -19,14 +21,14 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 	chunkChan := make(chan *Chunk)
 	go func() {
 		defer close(chunkChan)
-		if len(originalChunk.Data) <= ChunkSize+PeekSize {
+		if len(originalChunk.Data) <= TotalChunkSize {
 			chunkChan <- originalChunk
 			return
 		}
 		r := bytes.NewReader(originalChunk.Data)
 		reader := bufio.NewReaderSize(bufio.NewReader(r), ChunkSize)
 		for {
-			chunkBytes := make([]byte, ChunkSize+PeekSize)
+			chunkBytes := make([]byte, TotalChunkSize)
 			chunk := *originalChunk
 			chunkBytes = chunkBytes[:ChunkSize]
 			n, err := reader.Read(chunkBytes)
