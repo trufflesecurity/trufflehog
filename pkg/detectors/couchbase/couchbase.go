@@ -8,9 +8,8 @@ import (
 	"time"
 	"unicode"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/couchbase/gocb/v2"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
