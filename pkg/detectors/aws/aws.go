@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -9,7 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -86,19 +86,17 @@ func GetHMAC(key []byte, data []byte) []byte {
 
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
 
 	for _, idMatch := range idMatches {
 		if len(idMatch) != 2 {
 			continue
 		}
-		resIDMatch := strings.TrimSpace(idMatch[1])
+		resIDMatch := bytes.TrimSpace(idMatch[1])
 
 		if s.skipIDs != nil {
-			if _, ok := s.skipIDs[resIDMatch]; ok {
+			if _, ok := s.skipIDs[string(resIDMatch)]; ok {
 				continue
 			}
 		}
@@ -107,13 +105,13 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecretMatch := strings.TrimSpace(secretMatch[1])
+			resSecretMatch := bytes.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AWS,
 				Raw:          []byte(resIDMatch),
-				Redacted:     resIDMatch,
-				RawV2:        []byte(resIDMatch + resSecretMatch),
+				Redacted:     string(resIDMatch),
+				RawV2:        append(append([]byte(nil), resIDMatch...), resSecretMatch...),
 			}
 
 			if verify {
@@ -144,7 +142,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Action", "GetCallerIdentity")
 				params.Add("Version", "2011-06-15")
 				params.Add("X-Amz-Algorithm", algorithm)
-				params.Add("X-Amz-Credential", resIDMatch+"/"+credentialScope)
+				params.Add("X-Amz-Credential", string(resIDMatch)+"/"+credentialScope)
 				params.Add("X-Amz-Date", amzDate)
 				params.Add("X-Amz-Expires", "30")
 				params.Add("X-Amz-SignedHeaders", signedHeaders)
@@ -204,7 +202,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			// If the result is unverified and matches something like a git hash, don't include it in the results.
-			if !s1.Verified && falsePositiveSecretCheck.MatchString(resSecretMatch) {
+			if !s1.Verified && falsePositiveSecretCheck.Match(resSecretMatch) {
 				continue
 			}
 

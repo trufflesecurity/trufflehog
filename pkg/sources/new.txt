@@ -1,0 +1,16 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/trufflesecurity/trufflehog/v3/pkg/sources
+BenchmarkChunker
+BenchmarkChunker-8   	    5373	    227210 ns/op	 1263779 B/op	     208 allocs/op
+BenchmarkChunker-8   	    5258	    234875 ns/op	 1263778 B/op	     208 allocs/op
+BenchmarkChunker-8   	    4918	    225338 ns/op	 1263776 B/op	     208 allocs/op
+BenchmarkChunker-8   	    4744	    228474 ns/op	 1263777 B/op	     208 allocs/op
+BenchmarkChunker-8   	    5186	    238129 ns/op	 1263777 B/op	     208 allocs/op
+BenchmarkChunker-8   	    4994	    227981 ns/op	 1263777 B/op	     208 allocs/op
+BenchmarkChunker-8   	    4886	    228613 ns/op	 1263778 B/op	     208 allocs/op
+BenchmarkChunker-8   	    4744	    226342 ns/op	 1263779 B/op	     208 allocs/op
+BenchmarkChunker-8   	    4608	    230216 ns/op	 1263781 B/op	     208 allocs/op
+BenchmarkChunker-8   	    4980	    228544 ns/op	 1263783 B/op	     208 allocs/op
+PASS
+ok  	github.com/trufflesecurity/trufflehog/v3/pkg/sources	12.870s
