@@ -184,7 +184,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for i := 0; i < e.concurrency; i++ {
 		e.workersWg.Add(1)
 		go func() {
-			defer common.RecoverWithExit(ctx)
+			defer common.Recover(ctx)
 			defer e.workersWg.Done()
 			e.detectorWorker(ctx)
 		}()
