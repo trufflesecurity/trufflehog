@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/go-ldap/ldap/v3"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )

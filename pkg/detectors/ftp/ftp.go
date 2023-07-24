@@ -3,9 +3,10 @@ package ftp
 import (
 	"context"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/jlaffaye/ftp"
 

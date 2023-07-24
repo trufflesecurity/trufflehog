@@ -3,8 +3,9 @@ package redis
 import (
 	"context"
 	"net/url"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/go-redis/redis"
 

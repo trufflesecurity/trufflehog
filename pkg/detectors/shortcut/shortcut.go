@@ -2,10 +2,11 @@ package shortcut
 
 import (
 	"context"
-	"github.com/go-errors/errors"
 	"net/http"
-	"regexp"
 	"strings"
+
+	"github.com/go-errors/errors"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

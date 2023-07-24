@@ -3,12 +3,14 @@ package gcp
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
+
+	"golang.org/x/oauth2/google"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/oauth2/google"
 )
 
 type Scanner struct{}

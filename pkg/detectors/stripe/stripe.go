@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -17,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	//doesn't include test keys with "sk_test"
+	// doesn't include test keys with "sk_test"
 	secretKey = regexp.MustCompile(`[rs]k_live_[a-zA-Z0-9]{20,30}`)
 )
 

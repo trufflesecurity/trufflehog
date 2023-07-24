@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"regexp"
+	ogregex "regexp"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -181,7 +183,7 @@ func tryRedactODBC(conn string) (string, bool) {
 
 // Naively search the string for "pass="
 func tryRedactRegex(conn string) (string, bool) {
-	pattern := regexp.MustCompile(`(?i)pass.*?=(.+?)\b`)
+	pattern := ogregex.MustCompile(`(?i)pass.*?=(.+?)\b`)
 	var found bool
 	newConn := pattern.ReplaceAllStringFunc(conn, func(s string) string {
 		index := strings.Index(s, "=")

@@ -3,9 +3,11 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
-	"regexp"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

@@ -2,15 +2,16 @@ package githubapp
 
 import (
 	"context"
-
 	// b64 "encoding/base64"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/golang-jwt/jwt"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
