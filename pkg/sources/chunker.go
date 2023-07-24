@@ -26,20 +26,24 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 		r := bytes.NewReader(originalChunk.Data)
 		reader := bufio.NewReaderSize(bufio.NewReader(r), ChunkSize)
 		for {
-			chunkBytes := make([]byte, ChunkSize)
+			chunkBytes := make([]byte, ChunkSize+PeekSize)
 			chunk := *originalChunk
+			chunkBytes = chunkBytes[:ChunkSize]
 			n, err := reader.Read(chunkBytes)
 			if err != nil && !errors.Is(err, io.EOF) {
 				break
 			}
-			peekData, _ := reader.Peek(PeekSize)
-			chunk.Data = append(chunkBytes[:n], peekData...)
-			if n > 0 {
-				chunkChan <- &chunk
-			}
-			if errors.Is(err, io.EOF) {
+			if n == 0 {
+				if errors.Is(err, io.EOF) {
+					break
+				}
 				break
 			}
+			peekData, _ := reader.Peek(PeekSize)
+			copy(chunkBytes[n:], peekData)
+			chunk.Data = chunkBytes[:n+len(peekData)]
+
+			chunkChan <- &chunk
 		}
 	}()
 	return chunkChan
