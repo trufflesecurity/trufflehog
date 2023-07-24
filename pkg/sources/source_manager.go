@@ -29,6 +29,8 @@ type SourceManager struct {
 	pool errgroup.Group
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
+	// Set to true when Wait() returns.
+	done bool
 }
 
 // apiClient is an interface for optionally communicating with an external API.
@@ -49,6 +51,11 @@ func WithConcurrency(concurrency int) func(*SourceManager) {
 	return func(man *SourceManager) { man.pool.SetLimit(concurrency) }
 }
 
+// WithBufferedOutput sets the size of the buffer used for the Chunks() channel.
+func WithBufferedOutput(size int) func(*SourceManager) {
+	return func(man *SourceManager) { man.outputChunks = make(chan *Chunk, size) }
+}
+
 // NewManager creates a new manager with the provided options.
 func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	man := SourceManager{
@@ -65,6 +72,9 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 
 // Enroll informs the SourceManager to track and manage a Source.
 func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.SourceType, f SourceInitFunc) (handle, error) {
+	if s.done {
+		return 0, fmt.Errorf("manager is done")
+	}
 	id, err := s.api.RegisterSource(ctx, name, kind)
 	if err != nil {
 		return 0, err
@@ -80,13 +90,11 @@ func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.
 	return handleID, nil
 }
 
-// Run blocks until a resource is available to run the source, then synchronously runs it.
+// Run blocks until a resource is available to run the source, then
+// synchronously runs it.
 func (s *SourceManager) Run(ctx context.Context, handle handle) error {
-	// Check the handle is valid before waiting on the pool.
-	if _, ok := s.getInitFunc(handle); !ok {
-		return fmt.Errorf("unrecognized handle")
-	}
-	if err := ctx.Err(); err != nil {
+	// Do preflight checks before waiting on the pool.
+	if err := s.preflightChecks(ctx, handle); err != nil {
 		return err
 	}
 	ch := make(chan error)
@@ -102,11 +110,8 @@ func (s *SourceManager) Run(ctx context.Context, handle handle) error {
 // ScheduleRun blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is lost in this case.
 func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) error {
-	// Check the handle is valid before waiting on the pool.
-	if _, ok := s.getInitFunc(handle); !ok {
-		return fmt.Errorf("unrecognized handle")
-	}
-	if err := ctx.Err(); err != nil {
+	// Do preflight checks before waiting on the pool.
+	if err := s.preflightChecks(ctx, handle); err != nil {
 		return err
 	}
 	s.pool.Go(func() error {
@@ -125,13 +130,32 @@ func (s *SourceManager) Chunks() <-chan *Chunk {
 	return s.outputChunks
 }
 
-// Wait blocks until all running sources are completed and returns the first
-// error encountered if any. It also closes the channel returned by Chunks().
-// The manager should not be reused after calling this method.
+// Wait blocks until all running sources are completed and returns an error if
+// any of the sources had fatal errors. It also closes the channel returned by
+// Chunks(). The manager should not be reused after calling this method.
 func (s *SourceManager) Wait() error {
+	// Check if the manager has been Waited.
+	if s.done {
+		return nil
+	}
 	// TODO: Aggregate all errors from all sources.
 	defer close(s.outputChunks)
+	defer func() { s.done = true }()
 	return s.pool.Wait()
+}
+
+// preflightChecks is a helper method to check the Manager or the context isn't
+// done and that the handle is valid.
+func (s *SourceManager) preflightChecks(ctx context.Context, handle handle) error {
+	// Check if the manager has been Waited.
+	if s.done {
+		return fmt.Errorf("manager is done")
+	}
+	// Check the handle is valid.
+	if _, ok := s.getInitFunc(handle); !ok {
+		return fmt.Errorf("unrecognized handle")
+	}
+	return ctx.Err()
 }
 
 // run is a helper method to sychronously run the source. It does not check for
