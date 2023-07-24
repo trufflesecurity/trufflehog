@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -75,6 +76,14 @@ func PinnedCertPool() *x509.CertPool {
 	return trustedCerts
 }
 
+type FakeTransport struct {
+	CreateResponse func(req *http.Request) (*http.Response, error)
+}
+
+func (t FakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.CreateResponse(req)
+}
+
 type CustomTransport struct {
 	T http.RoundTripper
 }
@@ -89,6 +98,21 @@ func NewCustomTransport(T http.RoundTripper) *CustomTransport {
 		T = http.DefaultTransport
 	}
 	return &CustomTransport{T}
+}
+
+func ConstantStatusHttpClient(statusCode int) *http.Client {
+	return &http.Client{
+		Timeout: DefaultResponseTimeout,
+		Transport: FakeTransport{
+			CreateResponse: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					Request:    req,
+					Body:       io.NopCloser(strings.NewReader("")),
+					StatusCode: statusCode,
+				}, nil
+			},
+		},
+	}
 }
 
 func PinnedRetryableHttpClient() *http.Client {
@@ -152,9 +176,9 @@ func SaneHttpClient() *http.Client {
 }
 
 // SaneHttpClientTimeOut adds a custom timeout for some scanners
-func SaneHttpClientTimeOut(timeOutSeconds int64) *http.Client {
+func SaneHttpClientTimeOut(timeout time.Duration) *http.Client {
 	httpClient := &http.Client{}
-	httpClient.Timeout = time.Second * time.Duration(timeOutSeconds)
+	httpClient.Timeout = timeout
 	httpClient.Transport = NewCustomTransport(nil)
 	return httpClient
 }
