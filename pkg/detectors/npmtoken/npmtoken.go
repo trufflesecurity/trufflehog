@@ -36,7 +36,6 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify NpmToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
 		if len(match) != 2 {
