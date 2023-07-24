@@ -932,6 +932,7 @@ enum DetectorType {
   Dockerhub = 921;
   TrufflehogEnterprise = 922;
   EnvoyApiKey = 923;
+  Postgres = 925;
 }
 
 message Result {
