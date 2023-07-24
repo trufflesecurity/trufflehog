@@ -29,6 +29,8 @@ func (d *DummySource) GetProgress() *Progress { return nil }
 // Interface to easily test different chunking methods.
 type chunker interface {
 	Chunks(context.Context, chan *Chunk) error
+	ChunkUnit(ctx context.Context, unit SourceUnit, reporter ChunkReporter) error
+	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
 
 // Chunk method that writes count bytes to the channel before returning.
@@ -44,6 +46,34 @@ func (c *counterChunker) Chunks(_ context.Context, ch chan *Chunk) error {
 	}
 	return nil
 }
+
+// countChunk implements SourceUnit.
+type countChunk byte
+
+func (c countChunk) SourceUnitID() string { return fmt.Sprintf("countChunk(%d)", c) }
+
+func (c *counterChunker) Enumerate(ctx context.Context, reporter UnitReporter) error {
+	for i := 0; i < c.count; i++ {
+		if err := reporter.UnitOk(ctx, countChunk(byte(i))); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *counterChunker) ChunkUnit(ctx context.Context, unit SourceUnit, reporter ChunkReporter) error {
+	if err := reporter.ChunkOk(ctx, Chunk{Data: []byte{byte(unit.(countChunk))}}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Chunk method that always returns an error.
+type errorChunker struct{ error }
+
+func (c errorChunker) Chunks(context.Context, chan *Chunk) error                  { return c }
+func (c errorChunker) Enumerate(context.Context, UnitReporter) error              { return c }
+func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error { return c }
 
 // enrollDummy is a helper function to enroll a DummySource with a SourceManager.
 func enrollDummy(mgr *SourceManager, chunkMethod chunker) (handle, error) {
@@ -115,5 +145,52 @@ func TestSourceManagerWait(t *testing.T) {
 	}
 	if err := mgr.ScheduleRun(context.Background(), handle); err == nil {
 		t.Fatalf("expected scheduling run to fail")
+	}
+}
+
+func TestSourceManagerError(t *testing.T) {
+	mgr := NewManager()
+	handle, err := enrollDummy(mgr, errorChunker{fmt.Errorf("oops")})
+	if err != nil {
+		t.Fatalf("unexpected error enrolling source: %v", err)
+	}
+	// A synchronous run should fail.
+	if err := mgr.Run(context.Background(), handle); err == nil {
+		t.Fatalf("expected run to fail")
+	}
+	// Scheduling a run should not fail, but the error should surface in
+	// Wait().
+	if err := mgr.ScheduleRun(context.Background(), handle); err != nil {
+		t.Fatalf("unexpected error scheduling run: %v", err)
+	}
+	if err := mgr.Wait(); err == nil {
+		t.Fatalf("expected wait to fail")
+	}
+}
+
+func TestSourceManagerReport(t *testing.T) {
+	for _, opts := range [][]func(*SourceManager){
+		{WithBufferedOutput(8)},
+		{WithBufferedOutput(8), WithSourceUnits()},
+	} {
+		mgr := NewManager(opts...)
+		handle, err := enrollDummy(mgr, &counterChunker{count: 4})
+		if err != nil {
+			t.Fatalf("unexpected error enrolling source: %v", err)
+		}
+		// Synchronously run the source.
+		if err := mgr.Run(context.Background(), handle); err != nil {
+			t.Fatalf("unexpected error running source: %v", err)
+		}
+		report := mgr.Report(handle)
+		if report == nil {
+			t.Fatalf("expected a report")
+		}
+		if err := report.Errors(); err != nil {
+			t.Fatalf("unexpected error in report: %v", err)
+		}
+		if report.TotalChunks != 4 {
+			t.Fatalf("expected report to have 4 chunks, got: %d", report.TotalChunks)
+		}
 	}
 }
