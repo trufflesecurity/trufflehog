@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	ahocorasick "github.com/petar-dambovaliev/aho-corasick"
+	ahocorasick "github.com/BobuSumisu/aho-corasick"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
@@ -43,7 +43,7 @@ type Engine struct {
 
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words (keywords from the rules in the config)
-	prefilter ahocorasick.AhoCorasick
+	prefilter ahocorasick.Trie
 }
 
 type EngineOption func(*Engine)
@@ -150,13 +150,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for _, d := range e.detectors[true] {
 		keywords = append(keywords, d.Keywords()...)
 	}
-	builder := ahocorasick.NewAhoCorasickBuilder(ahocorasick.Opts{
-		AsciiCaseInsensitive: true,
-		MatchOnlyWholeWords:  false,
-		MatchKind:            ahocorasick.LeftMostLongestMatch,
-		DFA:                  true,
-	})
-	e.prefilter = builder.Build(keywords)
+	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 
 	ctx.Logger().Info("loaded decoders", "count", len(e.decoders))
 	ctx.Logger().Info("loaded detectors",
@@ -297,8 +291,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				// build a map of all keywords that were matched in the chunk
-				for _, m := range e.prefilter.FindAll(string(decoded.Data)) {
-					matchedKeywords[strings.ToLower(string(decoded.Data[m.Start():m.End()]))] = struct{}{}
+				for _, m := range e.prefilter.MatchString(string(decoded.Data)) {
+					matchedKeywords[strings.ToLower(m.MatchString())] = struct{}{}
 				}
 
 				for verify, detectorsSet := range e.detectors {
