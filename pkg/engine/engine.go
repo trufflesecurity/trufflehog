@@ -145,10 +145,14 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	// on keywords
 	keywords := []string{}
 	for _, d := range e.detectors[false] {
-		keywords = append(keywords, d.Keywords()...)
+		for _, kw := range d.Keywords() {
+			keywords = append(keywords, strings.ToLower(kw))
+		}
 	}
 	for _, d := range e.detectors[true] {
-		keywords = append(keywords, d.Keywords()...)
+		for _, kw := range d.Keywords() {
+			keywords = append(keywords, strings.ToLower(kw))
+		}
 	}
 	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 
@@ -291,7 +295,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				// build a map of all keywords that were matched in the chunk
-				for _, m := range e.prefilter.MatchString(string(decoded.Data)) {
+				for _, m := range e.prefilter.MatchString(strings.ToLower(string(decoded.Data))) {
 					matchedKeywords[strings.ToLower(m.MatchString())] = struct{}{}
 				}
 
