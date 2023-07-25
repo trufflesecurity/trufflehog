@@ -37,7 +37,7 @@ const (
 )
 
 type ClientOptions struct {
-	RoleARN string
+	RoleArn string
 }
 
 type ClientOptionSetter func(*ClientOptions)
@@ -74,9 +74,9 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
-func WithRoleARN(roleARN string) ClientOptionSetter {
+func WithRoleArn(RoleArn string) ClientOptionSetter {
 	return func(opt *ClientOptions) {
-		opt.RoleARN = roleARN
+		opt.RoleArn = RoleArn
 	}
 }
 
@@ -144,7 +144,7 @@ func (s *Source) newClient(region string, setters ...ClientOptionSetter) (*s3.S3
 	}
 
 	// If a RoleARN is provided in the options, assume that role
-	if opts.RoleARN != "" {
+	if opts.RoleArn != "" {
 		sess, err := session.NewSession(cfg)
 		if err != nil {
 			return nil, err
@@ -154,7 +154,7 @@ func (s *Source) newClient(region string, setters ...ClientOptionSetter) (*s3.S3
 		stsClient := sts.New(sess)
 
 		// Use stscreds.NewCredentialsWithClient to provide a session name
-		baseCredentials = stscreds.NewCredentialsWithClient(stsClient, opts.RoleARN, func(p *stscreds.AssumeRoleProvider) {
+		baseCredentials = stscreds.NewCredentialsWithClient(stsClient, opts.RoleArn, func(p *stscreds.AssumeRoleProvider) {
 			p.RoleSessionName = fmt.Sprintf("trufflehog-%s", time.Now())  // Choose an appropriate session name
 		})
 
@@ -258,8 +258,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	// If roles are provided, create additional clients for each role and process
-	for _, roleARN := range s.conn.Roles {
-		roleClient, err := s.newClient(defaultAWSRegion, WithRoleARN(roleARN))
+	for _, roleArn := range s.conn.Roles {
+		roleClient, err := s.newClient(defaultAWSRegion, WithRoleArn(roleArn))
 		if err != nil {
 			return errors.WrapPrefix(err, "could not create s3 client with assumed role", 0)
 		}
