@@ -212,3 +212,9 @@ func TestErrCallstackTimeoutCancel(t *testing.T) {
 	cancel()
 	assert.Equal(t, err, ctx.Err())
 }
+
+func TestRace(t *testing.T) {
+	_, cancel := WithCancel(Background())
+	go cancel()
+	cancel()
+}
