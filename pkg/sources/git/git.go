@@ -56,7 +56,7 @@ type Git struct {
 }
 
 type metrics struct {
-	commitsScanned map[string]struct{}
+	commitsScanned int
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
@@ -70,9 +70,6 @@ func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName s
 		sourceMetadataFunc: sourceMetadataFunc,
 		verify:             verify,
 		concurrency:        semaphore.NewWeighted(int64(concurrency)),
-		metrics: metrics{
-			commitsScanned: map[string]struct{}{},
-		},
 	}
 }
 
@@ -347,7 +344,7 @@ func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
-func (s *Git) CommitsScanned() map[string]struct{} {
+func (s *Git) CommitsScanned() int {
 	return s.metrics.commitsScanned
 }
 
@@ -383,7 +380,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 		depth++
-		s.metrics.commitsScanned[commit.Hash] = struct{}{}
+		s.metrics.commitsScanned++
 		logger.V(5).Info("scanning commit", "commit", commit.Hash)
 		for _, diff := range commit.Diffs {
 			if !scanOptions.Filter.Pass(diff.PathB) {
