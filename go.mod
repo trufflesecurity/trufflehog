@@ -8,7 +8,6 @@ require (
 	cloud.google.com/go/secretmanager v1.11.1
 	cloud.google.com/go/storage v1.31.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
-	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.17.0
 	github.com/aws/aws-sdk-go v1.44.83
 	github.com/bill-rich/disk-buffer-reader v0.1.7
@@ -151,6 +150,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/skeema/knownhosts v1.1.1 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
+	github.com/trufflesecurity/aho-corasick v0.1.0
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
