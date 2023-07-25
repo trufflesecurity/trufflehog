@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -28,8 +29,9 @@ type CancelFunc = context.CancelFunc
 type logCtx struct {
 	// Embed context.Context to get all methods for free.
 	context.Context
-	log logr.Logger
-	err *error
+	log     logr.Logger
+	err     *error
+	errLock *sync.Mutex
 }
 
 // Logger returns a structured logger.
@@ -145,8 +147,11 @@ func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.
 	if ctx.err == nil {
 		var err error
 		ctx.err = &err
+		ctx.errLock = &sync.Mutex{}
 	}
 	return ctx, func() {
+		ctx.errLock.Lock()
+		defer ctx.errLock.Unlock()
 		// We must check Err() before calling f() since f() sets the error.
 		// If there's already an error, do nothing special.
 		if ctx.Err() != nil {
