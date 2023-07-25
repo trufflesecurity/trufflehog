@@ -72,3 +72,15 @@ func TestChunker(t *testing.T) {
 	}
 
 }
+
+func BenchmarkChunker(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), ChunkSize*100)
+	chunk := &Chunk{
+		Data: data,
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for range Chunker(chunk) {
+		}
+	}
+}
