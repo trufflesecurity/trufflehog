@@ -85,9 +85,11 @@ func TestArchiveHandler(t *testing.T) {
 		count := 0
 		re := regexp.MustCompile(testCase.matchString)
 		matched := false
-		for chunk := range archiveChan {
+		var chunk sources.Chunk
+		for opt := range archiveChan {
 			count++
-			if re.Match(chunk) {
+			opt(&chunk)
+			if re.Match(chunk.Data) {
 				matched = true
 			}
 		}
