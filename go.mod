@@ -32,7 +32,7 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-cmp v0.5.9
-	github.com/google/go-containerregistry v0.14.0
+	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-github/v42 v42.0.0
 	github.com/googleapis/gax-go/v2 v2.12.0
 	github.com/hashicorp/go-retryablehttp v0.7.4
