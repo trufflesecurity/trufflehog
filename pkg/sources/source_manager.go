@@ -43,31 +43,31 @@ type apiClient interface {
 
 // WithAPI adds an API client to the manager for tracking jobs and progress.
 func WithAPI(api apiClient) func(*SourceManager) {
-	return func(man *SourceManager) { man.api = api }
+	return func(mgr *SourceManager) { mgr.api = api }
 }
 
 // WithConcurrency limits the concurrent number of sources a manager can run.
 func WithConcurrency(concurrency int) func(*SourceManager) {
-	return func(man *SourceManager) { man.pool.SetLimit(concurrency) }
+	return func(mgr *SourceManager) { mgr.pool.SetLimit(concurrency) }
 }
 
 // WithBufferedOutput sets the size of the buffer used for the Chunks() channel.
 func WithBufferedOutput(size int) func(*SourceManager) {
-	return func(man *SourceManager) { man.outputChunks = make(chan *Chunk, size) }
+	return func(mgr *SourceManager) { mgr.outputChunks = make(chan *Chunk, size) }
 }
 
 // NewManager creates a new manager with the provided options.
 func NewManager(opts ...func(*SourceManager)) *SourceManager {
-	man := SourceManager{
+	mgr := SourceManager{
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
 		handles:      make(map[handle]SourceInitFunc),
 		outputChunks: make(chan *Chunk),
 	}
 	for _, opt := range opts {
-		opt(&man)
+		opt(&mgr)
 	}
-	return &man
+	return &mgr
 }
 
 // Enroll informs the SourceManager to track and manage a Source.
