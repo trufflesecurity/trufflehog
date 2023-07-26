@@ -3,6 +3,7 @@ package s3
 import (
 	"fmt"
 	"io"
+	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -145,6 +146,7 @@ func (s *Source) newClient(region string, setters ...ClientOptionSetter) (*s3.S3
 
 	// If a RoleARN is provided in the options, assume that role
 	if opts.RoleArn != "" {
+		log.Println("Attempting to assume role:", opts.RoleArn)
 		sess, err := session.NewSession(cfg)
 		if err != nil {
 			return nil, err
