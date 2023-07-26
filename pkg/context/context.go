@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -18,29 +19,19 @@ var (
 type Context interface {
 	context.Context
 	Logger() logr.Logger
-	Parent() context.Context
-	SetParent(ctx context.Context) Context
 }
 
-// Parent returns the parent context.
-func (l logCtx) Parent() context.Context {
-	return l.Context
-}
-
-// SetParent sets the parent context on the context.
-func (l logCtx) SetParent(ctx context.Context) Context {
-	l.Context = ctx
-	return l
-}
-
-type CancelFunc context.CancelFunc
+// CancelFunc is a type alias to context.CancelFunc to allow use as if they are
+// the same types.
+type CancelFunc = context.CancelFunc
 
 // logCtx implements Context.
 type logCtx struct {
 	// Embed context.Context to get all methods for free.
 	context.Context
-	log logr.Logger
-	err *error
+	log     logr.Logger
+	err     *error
+	errLock *sync.Mutex
 }
 
 // Logger returns a structured logger.
@@ -156,8 +147,11 @@ func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.
 	if ctx.err == nil {
 		var err error
 		ctx.err = &err
+		ctx.errLock = &sync.Mutex{}
 	}
 	return ctx, func() {
+		ctx.errLock.Lock()
+		defer ctx.errLock.Unlock()
 		// We must check Err() before calling f() since f() sets the error.
 		// If there's already an error, do nothing special.
 		if ctx.Err() != nil {
