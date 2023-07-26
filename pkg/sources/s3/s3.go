@@ -173,12 +173,7 @@ func (s *Source) newClient(region string, setters ...ClientOptionSetter) (*s3.S3
 	return s3.New(sess), nil
 }
 
-// Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	// TODO: need to wrap credential enumeration with enumeration of AssumeRole
-	const defaultAWSRegion = "us-east-1"
-
-	processBuckets := func(client *s3.S3) error {
+func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, chunksChan chan *sources.Chunk, defaultAWSRegion string) error {
 		var bucketsToScan []string
 
 		switch s.conn.GetCredential().(type) {
@@ -240,36 +235,50 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 					bucket,
 					err)
 			}
-	}
-
 	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
+		}
 
 	return nil
 
-	}
+}
 
-	client, err := s.newClient(defaultAWSRegion)
-	if err != nil {
-		return errors.WrapPrefix(err, "could not create s3 client", 0)
-	}
+// Chunks emits chunks of bytes over a channel.
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+    const defaultAWSRegion = "us-east-1"
 
-	if err := processBuckets(client); err != nil {
-		return err
-	}
+    // If roles are provided, loop over them and assume each role one-by-one
+    if len(s.conn.Roles) > 0 {
+        for _, roleARN := range s.conn.Roles {
+            // Create an S3 client by assuming the current role
+            client, err := s.newClient(defaultAWSRegion, WithRoleArn(roleARN))
+            if err != nil {
+                // Log the error and continue with the next role
+                s.log.Error(err, "Failed to assume role", "roleARN", roleARN)
+                continue
+            }
 
-	// If roles are provided, create additional clients for each role and process
-	for _, roleArn := range s.conn.Roles {
-		roleClient, err := s.newClient(defaultAWSRegion, WithRoleArn(roleArn))
-		if err != nil {
-			return errors.WrapPrefix(err, "could not create s3 client with assumed role", 0)
-		}
-		if err := processBuckets(roleClient); err != nil {
-			return err
-		}
-	}
+            // Scan the S3 buckets using the client with the assumed role's credentials
+            err = s.scanBuckets(ctx, client, chunksChan, defaultAWSRegion)
+            if err != nil {
+                // Handle/log the error and continue with the next role
+                s.log.Error(err, "Failed to scan buckets with assumed role", "roleARN", roleARN)
+            }
+        }
+    } else {
+        // If no roles are provided, just proceed with the base credentials
+        client, err := s.newClient(defaultAWSRegion)
+        if err != nil {
+            s.log.Error(err, "could not create s3 client")
+        }
+        err = s.scanBuckets(ctx, client, chunksChan, defaultAWSRegion)
+        if err != nil {
+            return err
+        }
+    }
 
+    // ... [Any post-processing or cleanup code] ...
 
-	return nil
+    return nil
 }
 
 // pageChunker emits chunks onto the given channel from a page
