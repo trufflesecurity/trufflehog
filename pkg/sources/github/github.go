@@ -697,15 +697,16 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
 
+			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
+				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
+				return nil
+			}
+
 			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
 				return nil
 			}
 
-			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
-				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
-				return nil
-			}
 			atomic.AddUint64(&scanned, 1)
 
 			return nil
@@ -966,79 +967,118 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	}
 
 	trimmedURL := removeURLAndSplit(repoURL.String())
-	owner := trimmedURL[1]
-	repo := trimmedURL[2]
-
-	var (
-		sortType      = "created"
-		directionType = "desc"
-		allComments   = 0
-	)
-
-	if s.includeIssueComments {
-
-		issueOpts := &github.IssueListCommentsOptions{
-			Sort:      &sortType,
-			Direction: &directionType,
-			ListOptions: github.ListOptions{
-				PerPage: defaultPagination,
-				Page:    1,
-			},
+	if repoURL.Host == "gist.github.com" {
+		// GitHub Gist URL.
+		var gistId string
+		if len(trimmedURL) == 2 {
+			// https://gist.github.com/<id>
+			gistId = trimmedURL[1]
+		} else if len(trimmedURL) == 3 {
+			// https://gist.github.com/<owner>/<id>
+			gistId = trimmedURL[2]
+		} else {
+			return fmt.Errorf("failed to parse Gist URL: '%s'", repoURL.String())
 		}
 
+		options := &github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    1,
+		}
 		for {
-			issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
+			comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistId, options)
 			if s.handleRateLimit(err, resp) {
 				break
 			}
-
 			if err != nil {
 				return err
 			}
 
-			err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
+			err = s.chunkGistComments(ctx, repoURL.String(), comments, chunksChan)
 			if err != nil {
 				return err
 			}
 
-			issueOpts.ListOptions.Page++
-
-			if len(issueComments) < defaultPagination {
+			options.Page++
+			if len(comments) < options.PerPage {
 				break
 			}
 		}
+	} else {
+		// Normal repository URL (https://github.com/<owner>/<repo>).
+		owner := trimmedURL[1]
+		repo := trimmedURL[2]
 
-	}
+		var (
+			sortType      = "created"
+			directionType = "desc"
+			allComments   = 0
+		)
 
-	if s.includePRComments {
-		prOpts := &github.PullRequestListCommentsOptions{
-			Sort:      sortType,
-			Direction: directionType,
-			ListOptions: github.ListOptions{
-				PerPage: defaultPagination,
-				Page:    1,
-			},
+		if s.includeIssueComments {
+
+			issueOpts := &github.IssueListCommentsOptions{
+				Sort:      &sortType,
+				Direction: &directionType,
+				ListOptions: github.ListOptions{
+					PerPage: defaultPagination,
+					Page:    1,
+				},
+			}
+
+			for {
+				issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
+				if s.handleRateLimit(err, resp) {
+					break
+				}
+
+				if err != nil {
+					return err
+				}
+
+				err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
+				if err != nil {
+					return err
+				}
+
+				issueOpts.ListOptions.Page++
+
+				if len(issueComments) < defaultPagination {
+					break
+				}
+			}
+
 		}
 
-		for {
-			prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
-			if s.handleRateLimit(err, resp) {
-				break
+		if s.includePRComments {
+			prOpts := &github.PullRequestListCommentsOptions{
+				Sort:      sortType,
+				Direction: directionType,
+				ListOptions: github.ListOptions{
+					PerPage: defaultPagination,
+					Page:    1,
+				},
 			}
 
-			if err != nil {
-				return err
-			}
+			for {
+				prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
+				if s.handleRateLimit(err, resp) {
+					break
+				}
 
-			err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
-			if err != nil {
-				return err
-			}
+				if err != nil {
+					return err
+				}
 
-			prOpts.ListOptions.Page++
+				err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
+				if err != nil {
+					return err
+				}
 
-			if len(prComments) < defaultPagination {
-				break
+				prOpts.ListOptions.Page++
+
+				if len(prComments) < defaultPagination {
+					break
+				}
 			}
 		}
 	}
@@ -1093,6 +1133,40 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
 						Repository: sanitizer.UTF8(repo),
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
+	for _, comment := range comments {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(comment.GetURL()),
+						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(gistUrl),
+						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+						// Fetching this information requires making an additional API call.
+						// We may want to include this in the future.
+						//Visibility: s.visibilityOf(ctx, repoPath),
 					},
 				},
 			},
