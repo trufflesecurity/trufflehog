@@ -13,8 +13,10 @@ func DefaultHandlers() []Handler {
 	}
 }
 
+type ChunkOpt func(*sources.Chunk)
+
 type Handler interface {
-	FromFile(context.Context, io.Reader) chan ([]byte)
+	FromFile(context.Context, io.Reader) chan ChunkOpt
 	IsFiletype(context.Context, io.Reader) (io.Reader, bool)
 	New()
 }
@@ -38,13 +40,13 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 	handlerChan := handler.FromFile(ctx, file)
 	for {
 		select {
-		case data, open := <-handlerChan:
+		case opt, open := <-handlerChan:
 			if !open {
 				// We finished reading everything from handlerChan.
 				return true
 			}
 			chunk := *chunkSkel
-			chunk.Data = data
+			opt(&chunk)
 			// Send data on chunksChan.
 			select {
 			case chunksChan <- &chunk:

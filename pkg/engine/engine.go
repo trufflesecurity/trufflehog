@@ -349,8 +349,15 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 								continue
 							}
 							result.DecoderType = decoderType
+							if result.ExtraData == nil && chunk.HandleMetadata != nil {
+								result.ExtraData = chunk.HandleMetadata
+							} else {
+								for k, v := range chunk.HandleMetadata {
+									// TODO: Check key collisions.
+									result.ExtraData[k] = v
+								}
+							}
 							chunkResults = append(chunkResults, detectors.CopyMetadata(resultChunk, result))
-
 						}
 						if len(results) > 0 {
 							elapsed := time.Since(start)

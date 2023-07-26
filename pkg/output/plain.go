@@ -96,9 +96,9 @@ func structToMap(obj interface{}) (m map[string]map[string]interface{}, err erro
 }
 
 type outputFormat struct {
-	DetectorType,
-	DecoderType string
-	Verified bool
-	Raw      string
+	DetectorType string
+	DecoderType  string
+	Verified     bool
+	Raw          string
 	*source_metadatapb.MetaData
 }
