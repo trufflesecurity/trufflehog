@@ -957,7 +957,7 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 }
 
 func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning comments")
+	s.log.Info("scanning comments", "repository", repoPath)
 
 	// Support ssh and https URLs
 	repoURL, err := git.GitURLParse(repoPath)
