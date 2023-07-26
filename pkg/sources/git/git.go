@@ -51,7 +51,12 @@ type Git struct {
 	jobID              int64
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
+	metrics            metrics
 	concurrency        *semaphore.Weighted
+}
+
+type metrics struct {
+	commitsScanned int
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
@@ -339,6 +344,10 @@ func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
+func (s *Git) CommitsScanned() int {
+	return s.metrics.commitsScanned
+}
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	if err := GitCmdCheck(); err != nil {
 		return err
@@ -371,6 +380,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 		depth++
+		s.metrics.commitsScanned++
 		logger.V(5).Info("scanning commit", "commit", commit.Hash)
 		for _, diff := range commit.Diffs {
 			if !scanOptions.Filter.Pass(diff.PathB) {
@@ -755,7 +765,7 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 		}
 		path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username(), "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
+			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
 		}
 	default:
 		ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
@@ -793,7 +803,7 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 			}
 			path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username())
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", remotePath, err)
+				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
 			}
 		default:
 			ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)

@@ -207,7 +207,7 @@ func run(state overseer.State) {
 	if *profile {
 		go func() {
 			router := http.NewServeMux()
-			router.Handle("/debug/pprof", http.DefaultServeMux)
+			router.Handle("/debug/pprof/", http.DefaultServeMux)
 			router.Handle("/debug/fgprof", fgprof.Handler())
 			logger.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
 			if err := http.ListenAndServe(":18066", router); err != nil {

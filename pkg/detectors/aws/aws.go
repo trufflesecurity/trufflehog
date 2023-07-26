@@ -184,6 +184,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
 							}
+						} else {
+							s1.VerificationError = err
 						}
 						res.Body.Close()
 					} else {
