@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -123,8 +124,9 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				host := "sts.amazonaws.com"
 				region := "us-east-1"
 				endpoint := "https://sts.amazonaws.com"
-				datestamp := time.Now().UTC().Format("20060102")
-				amzDate := time.Now().UTC().Format("20060102T150405Z0700")
+				now := time.Now().UTC()
+				datestamp := now.Format("20060102")
+				amzDate := now.Format("20060102T150405Z0700")
 
 				req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 				if err != nil {
@@ -171,6 +173,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
 				req.URL.RawQuery = params.Encode()
 
+				sentAt := time.Now()
 				res, err := client.Do(req)
 				if err == nil {
 
@@ -184,6 +187,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
 							}
+							s1.VerificationError = fmt.Errorf("%d @ %v", res.StatusCode, sentAt)
 						} else {
 							s1.VerificationError = err
 						}
@@ -194,9 +198,16 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							continue
 						}
 
-						if res.StatusCode != 403 {
-							s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+						bytes, err := io.ReadAll(res.Body)
+						res.Body.Close()
+						if err != nil {
+							panic(err)
 						}
+						s1.VerificationError = fmt.Errorf("%d @ %v (%s)", res.StatusCode, sentAt, string(bytes))
+
+						//if res.StatusCode != 403 {
+						//s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+						//}
 					}
 				} else {
 					s1.VerificationError = err
@@ -260,4 +271,61 @@ type identityRes struct {
 
 func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AWS
+}
+
+func buildRequest(ctx context.Context, resIDMatch, resSecretMatch string) *http.Request {
+	method := "GET"
+	service := "sts"
+	host := "sts.amazonaws.com"
+	region := "us-east-1"
+	endpoint := "https://sts.amazonaws.com"
+	datestamp := time.Now().UTC().Format("20060102")
+	amzDate := time.Now().UTC().Format("20060102T150405Z0700")
+
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	// TASK 1: CREATE A CANONICAL REQUEST.
+	// http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
+	canonicalURI := "/"
+	canonicalHeaders := "host:" + host + "\n"
+	signedHeaders := "host"
+	algorithm := "AWS4-HMAC-SHA256"
+	credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
+
+	params := req.URL.Query()
+	params.Add("Action", "GetCallerIdentity")
+	params.Add("Version", "2011-06-15")
+	params.Add("X-Amz-Algorithm", algorithm)
+	params.Add("X-Amz-Credential", resIDMatch+"/"+credentialScope)
+	params.Add("X-Amz-Date", amzDate)
+	params.Add("X-Amz-Expires", "30")
+	params.Add("X-Amz-SignedHeaders", signedHeaders)
+
+	canonicalQuerystring := params.Encode()
+	payloadHash := GetHash("") // empty payload
+	canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
+
+	// TASK 2: CREATE THE STRING TO SIGN.
+	stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
+
+	// TASK 3: CALCULATE THE SIGNATURE.
+	// https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
+	hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resSecretMatch)), []byte(datestamp))
+	hash = GetHMAC(hash, []byte(region))
+	hash = GetHMAC(hash, []byte(service))
+	hash = GetHMAC(hash, []byte("aws4_request"))
+
+	signature2 := GetHMAC(hash, []byte(stringToSign)) // Get Signature HMAC SHA256
+	signature := hex.EncodeToString(signature2)
+
+	// TASK 4: ADD SIGNING INFORMATION TO THE REQUEST.
+	params.Add("X-Amz-Signature", signature)
+	req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
+	req.URL.RawQuery = params.Encode()
+
+	return req
 }
