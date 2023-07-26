@@ -2865,6 +2865,8 @@ func (m *GoogleDrive) validate(all bool) error {
 
 	// no validation rules for LastModifiedBy
 
+	// no validation rules for Path
+
 	if len(errors) > 0 {
 		return GoogleDriveMultiError(errors)
 	}
