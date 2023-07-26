@@ -4,6 +4,9 @@ go 1.20
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
+// go wants to pull in the latest but after v10.2.5 has a breaking API change
+replace github.com/couchbase/gocbcore/v10 => github.com/couchbase/gocbcore/v10 v10.2.4
+
 require (
 	cloud.google.com/go/secretmanager v1.11.1
 	cloud.google.com/go/storage v1.31.0
