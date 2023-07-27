@@ -67,6 +67,25 @@ func TestLineChecks(t *testing.T) {
 			},
 			function: isCommitLine,
 		},
+		"mergeLine": {
+			passes: []testCaseLine{
+				{
+					CommitLine,
+					[]byte("Merge: f21a95535a2 ed08d10bcf5"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					DateLine,
+					[]byte("    Merge pull request #34511 from cescoffier/duplicated-context-doc"),
+				},
+				{
+					CommitLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isMergeLine,
+		},
 		"authorLine": {
 			passes: []testCaseLine{
 				{

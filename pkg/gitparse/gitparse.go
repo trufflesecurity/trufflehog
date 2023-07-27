@@ -56,6 +56,7 @@ type ParseState int
 const (
 	Initial ParseState = iota
 	CommitLine
+	MergeLine
 	AuthorLine
 	DateLine
 	MessageStartLine
@@ -76,6 +77,7 @@ func (state ParseState) String() string {
 	return [...]string{
 		"Initial",
 		"CommitLine",
+		"MergeLine",
 		"AuthorLine",
 		"DateLine",
 		"MessageStartLine",
@@ -276,6 +278,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
 			}
+		case isMergeLine(isStaged, latestState, line):
+			latestState = MergeLine
 		case isAuthorLine(isStaged, latestState, line):
 			latestState = AuthorLine
 
@@ -428,6 +432,16 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
 
+func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != CommitLine {
+		return false
+	}
+	if len(line) > 6 && bytes.Equal(line[:6], []byte("Merge:")) {
+		return true
+	}
+	return false
+}
+
 // commit 7a95bbf0199e280a0e42dbb1d1a3f56cdd0f6e05
 func isCommitLine(isStaged bool, latestState ParseState, line []byte) bool {
 	if isStaged || !(latestState == Initial ||
@@ -450,7 +464,7 @@ func isCommitLine(isStaged bool, latestState ParseState, line []byte) bool {
 
 // Author: Bill Rich <bill.rich@trufflesec.com>
 func isAuthorLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if isStaged || !(latestState == CommitLine) {
+	if isStaged || !(latestState == CommitLine || latestState == MergeLine) {
 		return false
 	}
 	if len(line) > 8 && bytes.Equal(line[:7], []byte("Author:")) {
