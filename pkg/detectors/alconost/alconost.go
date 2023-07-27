@@ -1,12 +1,12 @@
 package alconost
 
 import (
+	"bytes"
 	"context"
 	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -33,24 +33,22 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Alconost secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Alconost,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
-			data := fmt.Sprintf("%s:", resMatch)
-			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
+			data := append(resMatch, ':')
+			sEnc := b64.StdEncoding.EncodeToString(data)
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://nitro.alconost.com/api/v1/account", nil)
 			if err != nil {
 				continue

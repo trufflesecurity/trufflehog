@@ -1,11 +1,11 @@
 package alchemy
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -33,19 +33,17 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Alchemy secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Alchemy,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -53,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.alchemy.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.alchemy.com/v2/"+string(resMatch)+"/getNFTs/?owner=vitalik.eth", nil)
 			if err != nil {
 				continue
 			}
