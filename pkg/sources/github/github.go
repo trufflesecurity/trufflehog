@@ -554,6 +554,17 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		return nil, errors.New(err)
 	}
 
+	// This client is required to create installation tokens for cloning.
+	// Otherwise, the required JWT is not in the request for the token :/
+	appItr, err := ghinstallation.NewAppsTransport(
+		s.httpClient.Transport,
+		appID,
+		[]byte(app.PrivateKey))
+	if err != nil {
+		return nil, errors.New(err)
+	}
+
+	appItr.BaseURL = apiEndpoint
 	// This client is used for most APIs.
 	itr, err := ghinstallation.New(
 		s.httpClient.Transport,
@@ -570,17 +581,6 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	if err != nil {
 		return nil, errors.New(err)
 	}
-
-	// This client is required to create installation tokens for cloning.
-	// Otherwise, the required JWT is not in the request for the token :/
-	appItr, err := ghinstallation.NewAppsTransport(
-		s.httpClient.Transport,
-		appID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, errors.New(err)
-	}
-	appItr.BaseURL = apiEndpoint
 
 	// Does this need to be separate from |s.httpClient|?
 	instHttpClient := common.RetryableHttpClientTimeout(60)
