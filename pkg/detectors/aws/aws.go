@@ -18,7 +18,8 @@ import (
 )
 
 type scanner struct {
-	skipIDs map[string]struct{}
+	verificationClient *http.Client
+	skipIDs            map[string]struct{}
 }
 
 func New(opts ...func(*scanner)) *scanner {
@@ -48,7 +49,7 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 var _ detectors.Detector = (*scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultVerificationClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -172,6 +173,10 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
 				req.URL.RawQuery = params.Encode()
 
+				client := s.verificationClient
+				if client == nil {
+					client = defaultVerificationClient
+				}
 				res, err := client.Do(req)
 				if err == nil {
 
