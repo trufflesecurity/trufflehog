@@ -212,6 +212,42 @@ func TestAWS_FromChunk(t *testing.T) {
 			wantErr:               false,
 			wantVerificationError: true,
 		},
+		{
+			name: "found, unverified due to unexpected http response status",
+			s:    scanner{verificationClient: common.ConstantResponseHttpClient(500, "internal server error")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: true,
+		},
+		{
+			name: "found, unverified due to unexpected 403 response reason",
+			s:    scanner{verificationClient: common.ConstantResponseHttpClient(403, `{"Error": {"Code": "SignatureDoesNotMatch"} }`)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -226,7 +262,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError != nil) != tt.wantVerificationError {
-					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationError)
+					t.Fatalf("wantVerificationError %v, verification error = %v", tt.wantVerificationError, got[i].VerificationError)
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "VerificationError")
@@ -250,9 +286,4 @@ func BenchmarkFromData(benchmark *testing.B) {
 			}
 		})
 	}
-}
-
-func timeoutContext(timeout time.Duration) context.Context {
-	c, _ := context.WithTimeout(context.Background(), timeout)
-	return c
 }

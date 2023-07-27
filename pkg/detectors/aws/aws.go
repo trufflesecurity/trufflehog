@@ -208,7 +208,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								if body.Error.Code == "InvalidClientTokenId" {
 									// determinate failure - nothing to do
 								} else {
-									// We see a surprising number of signature mismatch errors here
+									// We see a surprising number of false-negative signature mismatch errors here
 									// (The official SDK somehow elicits even more than just making the request ourselves)
 									s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
 								}
