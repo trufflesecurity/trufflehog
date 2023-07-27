@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"net/http"
 	"regexp"
 	"strings"
@@ -17,6 +19,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
+
+type awsError struct {
+	Code    string
+	Message string
+}
+
+type awsErrorResponseBody struct {
+	Error awsError
+}
 
 type scanner struct {
 	skipIDs map[string]struct{}
@@ -118,6 +129,19 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
+				//info, err := verifyWithSts(resIDMatch, resSecretMatch)
+				//
+				//s1.Verified = info != nil
+				//s1.VerificationError = err
+				//
+				//if info != nil {
+				//	s1.ExtraData = map[string]string{
+				//		"account": *info.Account,
+				//		"user_id": *info.UserId,
+				//		"arn":     *info.Arn,
+				//	}
+				//}
+
 				// REQUEST VALUES.
 				method := "GET"
 				service := "sts"
@@ -126,7 +150,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				endpoint := "https://sts.amazonaws.com"
 				now := time.Now().UTC()
 				datestamp := now.Format("20060102")
-				amzDate := now.Format("20060102T150405Z0700")
+				amzDate := now.Format("20060102T150405Z")
 
 				req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 				if err != nil {
@@ -173,7 +197,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
 				req.URL.RawQuery = params.Encode()
 
-				sentAt := time.Now()
 				res, err := client.Do(req)
 				if err == nil {
 
@@ -187,7 +210,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
 							}
-							s1.VerificationError = fmt.Errorf("%d @ %v", res.StatusCode, sentAt)
+							s1.VerificationError = fmt.Errorf("%d", res.StatusCode)
 						} else {
 							s1.VerificationError = err
 						}
@@ -198,15 +221,32 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							continue
 						}
 
-						bytes, err := io.ReadAll(res.Body)
-						res.Body.Close()
-						if err != nil {
-							panic(err)
+						if res.StatusCode == 403 {
+							var body awsErrorResponseBody
+							err = json.NewDecoder(res.Body).Decode(&body)
+							res.Body.Close()
+							if err == nil {
+								if body.Error.Code == "InvalidClientTokenId" {
+									// determinate failure - nothing to do
+								} else {
+									s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
+								}
+							} else {
+								s1.VerificationError = fmt.Errorf("couldn't parse the sts response body (%v)", err)
+							}
+						} else {
+							s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 						}
-						s1.VerificationError = fmt.Errorf("%d @ %v (%s)", res.StatusCode, sentAt, string(bytes))
+
+						//bytes, err := io.ReadAll(res.Body)
+						//res.Body.Close()
+						//if err != nil {
+						//	panic(err)
+						//}
+						//s1.VerificationError = fmt.Errorf("%d (%s)", res.StatusCode, string(bytes))
 
 						//if res.StatusCode != 403 {
-						//s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+						//	s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 						//}
 					}
 				} else {
@@ -328,4 +368,23 @@ func buildRequest(ctx context.Context, resIDMatch, resSecretMatch string) *http.
 	req.URL.RawQuery = params.Encode()
 
 	return req
+}
+
+func verifyWithSts(keyId, secret string) (*sts.GetCallerIdentityOutput, error) {
+	//cfg := aws.NewConfig().WithCredentials(credentials.NewStaticCredentials(keyId, secret, ""))
+	//cfg := &aws.Config{
+	//	Credentials: credentials.NewStaticCredentials(keyId, secret, ""),
+	//}
+	s, err := session.NewSession()
+	s.Config.Credentials = credentials.NewStaticCredentials(keyId, secret, "")
+	if err != nil {
+		return nil, err
+	}
+	svc := sts.New(s)
+	input := &sts.GetCallerIdentityInput{}
+	output, err := svc.GetCallerIdentity(input)
+	if err == nil {
+		return output, err
+	}
+	return nil, err
 }
