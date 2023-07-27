@@ -194,9 +194,9 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for http timeout",
-			s:    scanner{},
+			s:    scanner{verificationClient: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
-				ctx:    timeoutContext(1 * time.Microsecond),
+				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
 				verify: true,
 			},
