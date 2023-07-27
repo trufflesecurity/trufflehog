@@ -183,14 +183,12 @@ func (s *SourceManager) Wait() error {
 	// TODO: Maybe switch to using a semaphore.Weighted.
 	_ = s.pool.Wait()
 
-	// Aggregate all errors from all job reports.
-	// TODO: This should probably only be the fatal errors. We'll also need
-	//       to rewrite this for when the reports start getting culled.
+	// Aggregate the first fatal errors from all job reports.
 	s.reportLock.Lock()
 	defer s.reportLock.Unlock()
 	errs := make([]error, 0, len(s.report))
 	for _, report := range s.report {
-		errs = append(errs, report.Errors())
+		errs = append(errs, report.FatalError())
 	}
 	s.doneErr = errors.Join(errs...)
 	return s.doneErr
@@ -251,8 +249,8 @@ func (s *SourceManager) run(ctx context.Context, handle handle) (*JobReport, err
 	// Initialize the source.
 	source, err := initFunc(ctx, jobID, int64(handle))
 	if err != nil {
-		report.AddError(err)
-		return report, err
+		report.AddError(Fatal{err})
+		return report, Fatal{err}
 	}
 	// Check for the preferred method of tracking source units.
 	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits {
@@ -283,8 +281,8 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 	defer wg.Wait()
 	defer close(ch)
 	if err := source.Chunks(ctx, ch); err != nil {
-		report.AddError(err)
-		return report, err
+		report.AddChunkError(nil, Fatal{err})
+		return report, Fatal{err}
 	}
 	return report, nil
 }
@@ -295,13 +293,14 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source SourceUnitEnumChunker, report *JobReport) (*JobReport, error) {
 	reporter := &mgrUnitReporter{
 		unitCh: make(chan SourceUnit),
+		report: report,
 	}
 	// Produce units.
 	go func() {
 		// TODO: Catch panics and add to report.
 		defer close(reporter.unitCh)
 		if err := source.Enumerate(ctx, reporter); err != nil {
-			report.AddError(err)
+			report.AddError(Fatal{err})
 		}
 	}()
 	var wg sync.WaitGroup
@@ -312,17 +311,18 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		unitPool.SetLimit(s.concurrentUnits)
 	}
 	for unit := range reporter.unitCh {
-		reporter := &mgrChunkReporter{
-			unitID:  unit.SourceUnitID(),
-			chunkCh: make(chan *Chunk),
-		}
 		unit := unit
+		reporter := &mgrChunkReporter{
+			unit:    unit,
+			chunkCh: make(chan *Chunk),
+			report:  report,
+		}
 		// Consume units and produce chunks.
 		unitPool.Go(func() error {
 			// TODO: Catch panics and add to report.
 			defer close(reporter.chunkCh)
 			if err := source.ChunkUnit(ctx, unit, reporter); err != nil {
-				report.AddError(err)
+				report.AddError(Fatal{err})
 			}
 			return nil
 		})
@@ -338,8 +338,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		}()
 	}
 	wg.Wait()
-	// TODO: Return fatal errors.
-	return report, nil
+	return report, report.FatalError()
 }
 
 // getInitFunc is a helper method for safe concurrent access to the
@@ -368,9 +367,8 @@ func (api *headlessAPI) GetJobID(ctx context.Context, id int64) (int64, error) {
 
 // mgrUnitReporter implements the UnitReporter interface.
 type mgrUnitReporter struct {
-	unitCh       chan SourceUnit
-	unitErrs     []error
-	unitErrsLock sync.Mutex
+	unitCh chan SourceUnit
+	report *JobReport
 }
 
 func (s *mgrUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
@@ -378,18 +376,15 @@ func (s *mgrUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
 }
 
 func (s *mgrUnitReporter) UnitErr(ctx context.Context, err error) error {
-	s.unitErrsLock.Lock()
-	defer s.unitErrsLock.Unlock()
-	s.unitErrs = append(s.unitErrs, err)
+	s.report.AddError(err)
 	return nil
 }
 
 // mgrChunkReporter implements the ChunkReporter interface.
 type mgrChunkReporter struct {
-	unitID        string
-	chunkCh       chan *Chunk
-	chunkErrs     []error
-	chunkErrsLock sync.Mutex
+	unit    SourceUnit
+	chunkCh chan *Chunk
+	report  *JobReport
 }
 
 func (s *mgrChunkReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
@@ -397,8 +392,6 @@ func (s *mgrChunkReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
 }
 
 func (s *mgrChunkReporter) ChunkErr(ctx context.Context, err error) error {
-	s.chunkErrsLock.Lock()
-	defer s.chunkErrsLock.Unlock()
-	s.chunkErrs = append(s.chunkErrs, err)
+	s.report.AddChunkError(s.unit, err)
 	return nil
 }
