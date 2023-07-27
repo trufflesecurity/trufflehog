@@ -565,6 +565,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	}
 	itr.BaseURL = apiEndpoint
 
+	originalTransport := s.httpClient.Transport
 	s.httpClient.Transport = itr
 	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
 	if err != nil {
@@ -574,7 +575,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	// This client is required to create installation tokens for cloning.
 	// Otherwise, the required JWT is not in the request for the token :/
 	appItr, err := ghinstallation.NewAppsTransport(
-		s.httpClient.Transport,
+		originalTransport,
 		appID,
 		[]byte(app.PrivateKey))
 	if err != nil {
