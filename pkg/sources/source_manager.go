@@ -29,8 +29,8 @@ type SourceManager struct {
 	handlesLock sync.Mutex
 	// Map of handle to job reports.
 	// TODO: Manage culling and flushing to the API.
-	reports     map[handle][]*JobReport
-	reportsLock sync.Mutex
+	report     map[handle]*JobReport
+	reportLock sync.Mutex
 	// Pool limiting the amount of concurrent sources running.
 	pool            errgroup.Group
 	concurrentUnits int
@@ -84,7 +84,7 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
 		handles:      make(map[handle]SourceInitFunc),
-		reports:      make(map[handle][]*JobReport),
+		report:       make(map[handle]*JobReport),
 		outputChunks: make(chan *Chunk),
 	}
 	for _, opt := range opts {
@@ -125,9 +125,9 @@ func (s *SourceManager) Run(ctx context.Context, handle handle) error {
 		defer common.Recover(ctx)
 		report, err := s.run(ctx, handle)
 		if report != nil {
-			s.reportsLock.Lock()
-			s.reports[handle] = append(s.reports[handle], report)
-			s.reportsLock.Unlock()
+			s.reportLock.Lock()
+			s.report[handle] = report
+			s.reportLock.Unlock()
 		}
 		if err != nil {
 			ch <- err
@@ -152,9 +152,9 @@ func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) error {
 		// it here.
 		report, _ := s.run(ctx, handle)
 		if report != nil {
-			s.reportsLock.Lock()
-			s.reports[handle] = append(s.reports[handle], report)
-			s.reportsLock.Unlock()
+			s.reportLock.Lock()
+			s.report[handle] = report
+			s.reportLock.Unlock()
 		}
 		return nil
 	})
@@ -186,13 +186,11 @@ func (s *SourceManager) Wait() error {
 	// Aggregate all errors from all job reports.
 	// TODO: This should probably only be the fatal errors. We'll also need
 	//       to rewrite this for when the reports start getting culled.
-	s.reportsLock.Lock()
-	defer s.reportsLock.Unlock()
-	errs := make([]error, 0, len(s.reports))
-	for _, reports := range s.reports {
-		for _, report := range reports {
-			errs = append(errs, report.Errors())
-		}
+	s.reportLock.Lock()
+	defer s.reportLock.Unlock()
+	errs := make([]error, 0, len(s.report))
+	for _, report := range s.report {
+		errs = append(errs, report.Errors())
 	}
 	s.doneErr = errors.Join(errs...)
 	return s.doneErr
@@ -201,14 +199,9 @@ func (s *SourceManager) Wait() error {
 // Report retrieves a scan report for a given handle. If no report exists or
 // the Source has not finished, nil will be returned.
 func (s *SourceManager) Report(handle handle) *JobReport {
-	s.reportsLock.Lock()
-	defer s.reportsLock.Unlock()
-	reports := s.reports[handle]
-	if len(reports) == 0 {
-		return nil
-	}
-	// Return the last report for this handle.
-	return reports[len(reports)-1]
+	s.reportLock.Lock()
+	defer s.reportLock.Unlock()
+	return s.report[handle]
 }
 
 // preflightChecks is a helper method to check the Manager or the context isn't
