@@ -32,7 +32,8 @@ type SourceManager struct {
 	reports     map[handle][]*JobReport
 	reportsLock sync.Mutex
 	// Pool limiting the amount of concurrent sources running.
-	pool errgroup.Group
+	pool            errgroup.Group
+	concurrentUnits int
 	// Run the sources using source unit enumeration / chunking if available.
 	useSourceUnits bool
 	// Downstream chunks channel to be scanned.
@@ -69,6 +70,12 @@ func WithBufferedOutput(size int) func(*SourceManager) {
 // source supports it.
 func WithSourceUnits() func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.useSourceUnits = true }
+}
+
+// WithConcurrentUnits limits the number of units to be scanned concurrently.
+// The default is unlimited.
+func WithConcurrentUnits(n int) func(*SourceManager) {
+	return func(mgr *SourceManager) { mgr.concurrentUnits = n }
 }
 
 // NewManager creates a new manager with the provided options.
@@ -293,7 +300,6 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 // SourceUnitEnumChunker. This allows better introspection of what is getting
 // scanned and any errors encountered.
 func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source SourceUnitEnumChunker, report *JobReport) (*JobReport, error) {
-	// Spawn a goroutine to start enumeration.
 	reporter := &mgrUnitReporter{
 		unitCh: make(chan SourceUnit),
 	}
@@ -306,6 +312,12 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		}
 	}()
 	var wg sync.WaitGroup
+	// TODO: Maybe switch to using a semaphore.Weighted.
+	var unitPool errgroup.Group
+	if s.concurrentUnits != 0 {
+		// Negative values indicated no limit.
+		unitPool.SetLimit(s.concurrentUnits)
+	}
 	for unit := range reporter.unitCh {
 		reporter := &mgrChunkReporter{
 			unitID:  unit.SourceUnitID(),
@@ -313,14 +325,14 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		}
 		unit := unit
 		// Consume units and produce chunks.
-		// TODO: Limit unit consumption.
-		go func() {
+		unitPool.Go(func() error {
 			// TODO: Catch panics and add to report.
 			defer close(reporter.chunkCh)
 			if err := source.ChunkUnit(ctx, unit, reporter); err != nil {
 				report.AddError(err)
 			}
-		}()
+			return nil
+		})
 		// Consume chunks and export chunks.
 		wg.Add(1)
 		go func() {

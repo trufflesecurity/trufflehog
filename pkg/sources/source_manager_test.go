@@ -62,10 +62,7 @@ func (c *counterChunker) Enumerate(ctx context.Context, reporter UnitReporter) e
 }
 
 func (c *counterChunker) ChunkUnit(ctx context.Context, unit SourceUnit, reporter ChunkReporter) error {
-	if err := reporter.ChunkOk(ctx, Chunk{Data: []byte{byte(unit.(countChunk))}}); err != nil {
-		return err
-	}
-	return nil
+	return reporter.ChunkOk(ctx, Chunk{Data: []byte{byte(unit.(countChunk))}})
 }
 
 // Chunk method that always returns an error.
@@ -172,6 +169,7 @@ func TestSourceManagerReport(t *testing.T) {
 	for _, opts := range [][]func(*SourceManager){
 		{WithBufferedOutput(8)},
 		{WithBufferedOutput(8), WithSourceUnits()},
+		{WithBufferedOutput(8), WithSourceUnits(), WithConcurrentUnits(1)},
 	} {
 		mgr := NewManager(opts...)
 		handle, err := enrollDummy(mgr, &counterChunker{count: 4})
