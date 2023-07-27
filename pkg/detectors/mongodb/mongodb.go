@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(mongodb(\+srv)?://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+)\b`)
+	keyPat = regexp.MustCompile(`\b(mongodb(\+srv)?://[\S]{3,50}:([\S]{3,88})@[-.%\w\/:]+)\b`)
 	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.
 )
 
