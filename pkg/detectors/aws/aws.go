@@ -205,11 +205,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							err = json.NewDecoder(res.Body).Decode(&body)
 							res.Body.Close()
 							if err == nil {
-								if body.Error.Code == "InvalidClientTokenId" {
+								// All instances of the code I've seen in the wild are PascalCased but this check is
+								// case-insensitive out of an abundance of caution
+								if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
 									// determinate failure - nothing to do
 								} else {
 									// We see a surprising number of false-negative signature mismatch errors here
-									// (The official SDK somehow elicits even more than just making the request ourselves)
+									// (The official SDK somehow elicits even more than just making the request
+									// ourselves)
 									s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
 								}
 							} else {
@@ -267,12 +270,12 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 }
 
 type awsError struct {
-	Code    string
-	Message string
+	Code    string `json:"Code"`
+	Message string `json:"Message"`
 }
 
 type awsErrorResponseBody struct {
-	Error awsError
+	Error awsError `json:"Error"`
 }
 
 type identityRes struct {
