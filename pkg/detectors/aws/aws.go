@@ -126,7 +126,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				endpoint := "https://sts.amazonaws.com"
 				now := time.Now().UTC()
 				datestamp := now.Format("20060102")
-				amzDate := now.Format("20060102T150405Z")
+				amzDate := now.Format("20060102T150405Z0700")
 
 				req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 				if err != nil {
