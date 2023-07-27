@@ -17,6 +17,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
+
 func TestAWS_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -69,7 +71,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified",
-			s:    scanner{},
+			s:    scanner{verificationClient: unverifiedSecretClient},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
@@ -163,7 +165,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified, with leading +",
-			s:    scanner{},
+			s:    scanner{verificationClient: unverifiedSecretClient},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", "+HaNv9cTwheDKGJaws/+BMF2GgybQgBWdhcOOdfF", id)), // the secret would satisfy the regex but not pass validation
