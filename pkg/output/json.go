@@ -11,11 +11,6 @@ import (
 )
 
 func PrintJSON(r *detectors.ResultWithMetadata) error {
-	var ve string
-	if r.VerificationError != nil {
-		ve = r.VerificationError.Error()
-	}
-
 	v := &struct {
 		// SourceMetadata contains source-specific contextual information.
 		SourceMetadata *source_metadatapb.MetaData
@@ -42,23 +37,20 @@ func PrintJSON(r *detectors.ResultWithMetadata) error {
 		Redacted       string
 		ExtraData      map[string]string
 		StructuredData *detectorspb.StructuredData
-
-		VerificationErrorMessage string
 	}{
-		SourceMetadata:           r.SourceMetadata,
-		SourceID:                 r.SourceID,
-		SourceType:               r.SourceType,
-		SourceName:               r.SourceName,
-		DetectorType:             r.DetectorType,
-		DetectorName:             r.DetectorType.String(),
-		DecoderName:              r.DecoderType.String(),
-		Verified:                 r.Verified,
-		Raw:                      string(r.Raw),
-		RawV2:                    string(r.RawV2),
-		Redacted:                 r.Redacted,
-		ExtraData:                r.ExtraData,
-		StructuredData:           r.StructuredData,
-		VerificationErrorMessage: ve,
+		SourceMetadata: r.SourceMetadata,
+		SourceID:       r.SourceID,
+		SourceType:     r.SourceType,
+		SourceName:     r.SourceName,
+		DetectorType:   r.DetectorType,
+		DetectorName:   r.DetectorType.String(),
+		DecoderName:    r.DecoderType.String(),
+		Verified:       r.Verified,
+		Raw:            string(r.Raw),
+		RawV2:          string(r.RawV2),
+		Redacted:       r.Redacted,
+		ExtraData:      r.ExtraData,
+		StructuredData: r.StructuredData,
 	}
 	out, err := json.Marshal(v)
 	if err != nil {
