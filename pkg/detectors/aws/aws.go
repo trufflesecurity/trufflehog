@@ -117,19 +117,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				//info, err := verifyWithSts(resIDMatch, resSecretMatch)
-				//
-				//s1.Verified = info != nil
-				//s1.VerificationError = err
-				//
-				//if info != nil {
-				//	s1.ExtraData = map[string]string{
-				//		"account": *info.Account,
-				//		"user_id": *info.UserId,
-				//		"arn":     *info.Arn,
-				//	}
-				//}
-
 				// REQUEST VALUES.
 				method := "GET"
 				service := "sts"
@@ -198,7 +185,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
 							}
-							s1.VerificationError = fmt.Errorf("%d", res.StatusCode)
 						} else {
 							s1.VerificationError = err
 						}
