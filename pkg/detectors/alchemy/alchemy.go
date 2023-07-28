@@ -62,19 +62,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
+				} else if res.StatusCode == 401 {
+					// The secret is determinately not verified (nothing to do)
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-
-					if res.StatusCode != 401 {
-						s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
-					}
+					s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 				}
 			} else {
 				s1.VerificationError = err
 			}
+		}
+
+		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s1)
