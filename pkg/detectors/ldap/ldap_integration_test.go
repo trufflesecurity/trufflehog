@@ -61,11 +61,12 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found with URI and separate user+password usage, verified",
@@ -154,6 +155,26 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "inaccessible host",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				data: []byte(`
+		ldap://badhost:1389
+		binddn="cn=admin,dc=example,dc=org"
+		pass="P@55w0rd"`),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LDAP,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -177,8 +198,11 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Ldap.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
