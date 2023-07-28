@@ -8,22 +8,22 @@ import (
 
 func Test_NormalizeOrgRepoURL(t *testing.T) {
 	tests := map[string]struct {
-		Provider string
+		Provider provider
 		Repo     string
 		Out      string
 		Err      error
 	}{
-		"github is good":             {Provider: "Github", Repo: "https://github.com/org/repo", Out: "https://github.com/org/repo.git", Err: nil},
-		"gitlab is good":             {Provider: "Gitlab", Repo: "https://gitlab.com/org/repo", Out: "https://gitlab.com/org/repo.git", Err: nil},
-		"bitbucket is good":          {Provider: "Bitbucket", Repo: "https://bitbucket.com/org/repo", Out: "https://bitbucket.com/org/repo.git", Err: nil},
+		"github is good":             {Provider: providerGithub, Repo: "https://github.com/org/repo", Out: "https://github.com/org/repo.git", Err: nil},
+		"gitlab is good":             {Provider: providerGitlab, Repo: "https://gitlab.com/org/repo", Out: "https://gitlab.com/org/repo.git", Err: nil},
+		"bitbucket is good":          {Provider: providerBitbucket, Repo: "https://bitbucket.com/org/repo", Out: "https://bitbucket.com/org/repo.git", Err: nil},
 		"example provider is good":   {Provider: "example", Repo: "https://example.com/org/repo", Out: "https://example.com/org/repo.git", Err: nil},
 		"example provider problem":   {Provider: "example", Repo: "https://example.com/org", Out: "", Err: errors.Errorf("example repo appears to be missing the repo name. Org: %q Repo url: %q", "org", "https://example.com/org")},
-		"no path":                    {Provider: "Github", Repo: "https://github.com", Out: "", Err: errors.Errorf("Github repo appears to be missing the path. Repo url: %q", "https://github.com")},
-		"org but no repo":            {Provider: "Github", Repo: "https://github.com/org", Out: "", Err: errors.Errorf("Github repo appears to be missing the repo name. Org: %q Repo url: %q", "org", "https://github.com/org")},
-		"org but no repo with slash": {Provider: "Github", Repo: "https://github.com/org/", Out: "", Err: errors.Errorf("Github repo appears to be missing the repo name. Org: %q Repo url: %q", "org", "https://github.com/org/")},
-		"two slashes":                {Provider: "Github", Repo: "https://github.com//", Out: "", Err: errors.Errorf("Github repo appears to be missing the org name. Repo url: %q", "https://github.com//")},
-		"repo with trailing slash":   {Provider: "Github", Repo: "https://github.com/org/repo/", Out: "", Err: errors.Errorf("Github repo contains a trailing slash. Repo url: %q", "https://github.com/org/repo/")},
-		"too many url path parts":    {Provider: "Github", Repo: "https://github.com/org/repo/unknown/", Out: "", Err: errors.Errorf("Github repo contains a trailing slash. Repo url: %q", "https://github.com/org/repo/unknown/")},
+		"no path":                    {Provider: providerGithub, Repo: "https://github.com", Out: "", Err: errors.Errorf("Github repo appears to be missing the path. Repo url: %q", "https://github.com")},
+		"org but no repo":            {Provider: providerGithub, Repo: "https://github.com/org", Out: "", Err: errors.Errorf("Github repo appears to be missing the repo name. Org: %q Repo url: %q", "org", "https://github.com/org")},
+		"org but no repo with slash": {Provider: providerGithub, Repo: "https://github.com/org/", Out: "", Err: errors.Errorf("Github repo appears to be missing the repo name. Org: %q Repo url: %q", "org", "https://github.com/org/")},
+		"two slashes":                {Provider: providerGithub, Repo: "https://github.com//", Out: "", Err: errors.Errorf("Github repo appears to be missing the org name. Repo url: %q", "https://github.com//")},
+		"repo with trailing slash":   {Provider: providerGithub, Repo: "https://github.com/org/repo/", Out: "", Err: errors.Errorf("Github repo contains a trailing slash. Repo url: %q", "https://github.com/org/repo/")},
+		"too many url path parts":    {Provider: providerGithub, Repo: "https://github.com/org/repo/unknown/", Out: "", Err: errors.Errorf("Github repo contains a trailing slash. Repo url: %q", "https://github.com/org/repo/unknown/")},
 	}
 
 	for name, tt := range tests {
@@ -91,5 +91,51 @@ func Test_NormalizeGitlabRepo(t *testing.T) {
 		if out != tt.Out {
 			t.Errorf("Test %q, output does not match expected out, got: %q want: %q", name, out, tt.Out)
 		}
+	}
+}
+
+func TestNormalizeAzureRepo(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		repoURL  string
+		expected string
+		err      error
+	}{
+		{
+			desc:     "Valid Azure Repo",
+			repoURL:  "https://dev.azure.com/org/repo",
+			expected: "https://dev.azure.com/org/repo",
+			err:      nil,
+		},
+		{
+			desc:     "Invalid Azure Repo (missing path)",
+			repoURL:  "https://dev.azure.com",
+			expected: "",
+			err:      errors.New("Azure repo appears to be missing the path. Repo url: \"https://dev.azure.com\""),
+		},
+		{
+			desc:     "Invalid Azure Repo (missing org name)",
+			repoURL:  "https://dev.azure.com/",
+			expected: "",
+			err:      errors.New("Azure repo appears to be missing the org name. Repo url: \"https://dev.azure.com/\""),
+		},
+		{
+			desc:     "Invalid Azure Repo (missing repo name)",
+			repoURL:  "https://dev.azure.com/org/",
+			expected: "",
+			err:      errors.New("Azure repo appears to be missing the repo name. Org: \"org\" Repo url: \"https://dev.azure.com/org/\""),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			result, err := NormalizeAzureRepo(tc.repoURL)
+			if result != tc.expected {
+				t.Errorf("Got: %s; Expected: %s", result, tc.expected)
+			}
+			if err != nil && err.Error() != tc.err.Error() {
+				t.Errorf("Got error: %v; Expected error: %v", err, tc.err)
+			}
+		})
 	}
 }
