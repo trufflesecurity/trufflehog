@@ -230,7 +230,7 @@ func startOpenLDAP() error {
 		return nil
 	case <-time.After(30 * time.Second):
 		stopOpenLDAP()
-		return errors.New("timeout waiting for postgres database to be ready")
+		return errors.New("timeout waiting for ldap service to be ready")
 	}
 }
 

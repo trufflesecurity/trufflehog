@@ -3,6 +3,8 @@ package ldap
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -63,7 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					s1.Verified = verifyLDAP(ctx, username[1], password[1], ldapURL)
+					err := verifyLDAP(ctx, username[1], password[1], ldapURL)
+					s1.Verified = err == nil
+					if !isErrDeterminate(err) {
+						s1.VerificationError = err
+					}
 				}
 
 				results = append(results, s1)
@@ -89,7 +95,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			s1.Verified = verifyLDAP(ctx, username, password, ldapURL)
+			err := verifyLDAP(ctx, username, password, ldapURL)
+			s1.Verified = err == nil
+			if !isErrDeterminate(err) {
+				s1.VerificationError = err
+			}
 		}
 
 		results = append(results, s1)
@@ -98,7 +108,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL) bool {
+func isErrDeterminate(err error) bool {
+	switch e := err.(type) {
+	case *ldap.Error:
+		switch e.Err.(type) {
+		case *net.OpError:
+			return false
+		}
+	}
+
+	return true
+}
+
+func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL) error {
 	// Tests with non-TLS, TLS, and STARTTLS
 
 	ldap.DefaultTimeout = 5 * time.Second
@@ -114,18 +136,19 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 			// Non-TLS verify
 			err = l.Bind(username, password)
 			if err == nil {
-				return true
+				return nil
 			}
 
 			// STARTTLS
 			err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
 			if err == nil {
 				// STARTTLS verify
-				err = l.Bind(username, password)
-				if err == nil {
-					return true
-				}
+				return l.Bind(username, password)
+			} else {
+				return err
 			}
+		} else {
+			return err
 		}
 	case "ldaps":
 		// TLS dial
@@ -133,14 +156,13 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 		if err == nil {
 			defer l.Close()
 			// TLS verify
-			err = l.Bind(username, password)
-			if err == nil {
-				return true
-			}
+			return l.Bind(username, password)
+		} else {
+			return err
 		}
 	}
 
-	return false
+	return fmt.Errorf("unknown ldap scheme %q", ldapURL.Scheme)
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
