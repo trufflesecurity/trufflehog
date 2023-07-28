@@ -134,6 +134,7 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 	return s3.New(sess), nil
 }
 
+// Separate role assumption functionality into a different newClient function
 func (s *Source) newRoleClient(region string, roleArn string) (*s3.S3, error) {
 
 	cfg := aws.NewConfig()
