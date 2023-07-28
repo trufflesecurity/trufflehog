@@ -236,7 +236,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit, isStaged bool) {
 	outReader := bufio.NewReader(stdOut)
 	var (
-		currentCommit Commit
+		currentCommit *Commit
 		currentDiff   Diff
 
 		totalLogSize int
@@ -265,13 +265,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				currentCommit.Size += currentDiff.Content.Len()
 			}
 			// If there is a currentCommit, send it to the channel.
-			if currentCommit.Size > 0 {
-				commitChan <- currentCommit
+			if currentCommit != nil {
+				commitChan <- *currentCommit
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
 			currentDiff = Diff{}
-			currentCommit = Commit{
+			currentCommit = &Commit{
 				Message: strings.Builder{},
 			}
 			// Check that the commit line contains a hash and set it.
@@ -305,6 +305,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isDiffLine(isStaged, latestState, line):
 			latestState = DiffLine
 
+			// This should never be nil, but check in case the stdin stream is messed up.
+			if currentCommit == nil {
+				currentCommit = &Commit{}
+			}
 			if currentDiff.Content.Len() > 0 {
 				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
@@ -314,9 +318,9 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				}
 				if totalSize > c.maxCommitSize {
 					oldCommit := currentCommit
-					commitChan <- currentCommit
+					commitChan <- *currentCommit
 					totalLogSize += currentCommit.Size
-					currentCommit = Commit{
+					currentCommit = &Commit{
 						Hash:    currentCommit.Hash,
 						Author:  currentCommit.Author,
 						Date:    currentCommit.Date,
@@ -403,7 +407,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			// Here be dragons...
 			// Build an informative error message.
 			var err error
-			if currentCommit.Hash != "" {
+			if currentCommit != nil && currentCommit.Hash != "" {
 				err = fmt.Errorf(`failed to parse line "%s" after state "%s" (commit=%s)`, line, latestState, currentCommit.Hash)
 			} else {
 				err = fmt.Errorf(`failed to parse line "%s" after state "%s"`, line, latestState)
@@ -420,7 +424,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 	}
-	cleanupParse(&currentCommit, &currentDiff, commitChan, &totalLogSize)
+	cleanupParse(currentCommit, &currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
