@@ -131,35 +131,32 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 	case "ldap":
 		// Non-TLS dial
 		l, err := ldap.DialURL(uri)
-		if err == nil {
-			defer l.Close()
-			// Non-TLS verify
-			err = l.Bind(username, password)
-			if err == nil {
-				return nil
-			}
-
-			// STARTTLS
-			err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
-			if err == nil {
-				// STARTTLS verify
-				return l.Bind(username, password)
-			} else {
-				return err
-			}
-		} else {
+		if err != nil {
 			return err
 		}
+		defer l.Close()
+		// Non-TLS verify
+		err = l.Bind(username, password)
+		if err == nil {
+			return nil
+		}
+
+		// STARTTLS
+		err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		// STARTTLS verify
+		return l.Bind(username, password)
 	case "ldaps":
 		// TLS dial
 		l, err := ldap.DialTLS("tcp", uri, &tls.Config{InsecureSkipVerify: true})
-		if err == nil {
-			defer l.Close()
-			// TLS verify
-			return l.Bind(username, password)
-		} else {
+		if err != nil {
 			return err
 		}
+		defer l.Close()
+		// TLS verify
+		return l.Bind(username, password)
 	}
 
 	return fmt.Errorf("unknown ldap scheme %q", ldapURL.Scheme)
