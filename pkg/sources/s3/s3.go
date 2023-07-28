@@ -164,7 +164,7 @@ func (s *Source) newRoleClient(region string, roleArn string) (*s3.S3, error) {
 	
 	stsClient := sts.New(sess)
 	baseCredentials = stscreds.NewCredentialsWithClient(stsClient, roleArn, func(p *stscreds.AssumeRoleProvider) {
-		p.RoleSessionName = fmt.Sprint("trufflehog")
+		p.RoleSessionName = "trufflehog"
 	})
 
 	cfg.Credentials = baseCredentials
