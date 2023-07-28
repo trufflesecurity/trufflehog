@@ -14,12 +14,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	timeout time.Duration // Zero value means "default timeout"
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	defaultTimeout = 2 * time.Second
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(mongodb(\+srv)?://[\S]{3,50}:([\S]{3,88})@[-.%\w\/:]+)\b`)
 	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.
@@ -46,8 +49,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			timeout := s.timeout
+			if timeout == 0 {
+				timeout = defaultTimeout
+			}
 			func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 				client, err := mongo.Connect(ctx, options.Client().ApplyURI(resMatch))
 				if err != nil {
