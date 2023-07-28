@@ -126,7 +126,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
 		e.concurrency = numCPU
 	}
-	ctx.Logger().V(2).Info("engine started", "workers", e.concurrency)
+	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
 	// Limit number of concurrent goroutines dedicated to chunking a source.
 	e.sourcesWg.SetLimit(e.concurrency)
@@ -156,8 +156,8 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 
-	ctx.Logger().Info("loaded decoders", "count", len(e.decoders))
-	ctx.Logger().Info("loaded detectors",
+	ctx.Logger().V(3).Info("loaded decoders", "count", len(e.decoders))
+	ctx.Logger().V(3).Info("loaded detectors",
 		"total", len(e.detectors[true])+len(e.detectors[false]),
 		"verification_enabled", len(e.detectors[true]),
 		"verification_disabled", len(e.detectors[false]),
