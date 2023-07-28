@@ -70,6 +70,7 @@ type Source struct {
 	publicMap            map[string]source_metadatapb.Visibility
 	includePRComments    bool
 	includeIssueComments bool
+	includeGistComments  bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -217,6 +218,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
+	s.includeGistComments = s.conn.IncludeGistComments
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -967,7 +969,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	}
 
 	trimmedURL := removeURLAndSplit(repoURL.String())
-	if repoURL.Host == "gist.github.com" {
+	if repoURL.Host == "gist.github.com" && s.includeGistComments {
 		// GitHub Gist URL.
 		var gistId string
 		if len(trimmedURL) == 2 {
