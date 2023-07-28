@@ -2,6 +2,8 @@ package mongodb
 
 import (
 	"context"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 	"regexp"
 	"strings"
 	"time"
@@ -53,28 +55,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if timeout == 0 {
 				timeout = defaultTimeout
 			}
-			func() {
-				ctx, cancel := context.WithTimeout(context.Background(), timeout)
-				defer cancel()
-				client, err := mongo.Connect(ctx, options.Client().ApplyURI(resMatch))
-				if err != nil {
-					return
-				}
-				defer func() {
-					if err := client.Disconnect(ctx); err != nil {
-						return
-					}
-				}()
-				if err := client.Ping(ctx, readpref.Primary()); err != nil {
-					return
-				}
-				s1.Verified = true
-			}()
+			err := verifyUri(resMatch, timeout)
+			s1.Verified = err == nil
+			if !isErrDeterminate(err) {
+				s1.VerificationError = err
+			}
 		}
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func isErrDeterminate(err error) bool {
+	switch e := err.(type) {
+	case topology.ConnectionError:
+		switch e.Unwrap().(type) {
+		case *auth.Error:
+			return true
+		}
+	}
+
+	return false
+}
+
+func verifyUri(uri string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(ctx)
+	return client.Ping(ctx, readpref.Primary())
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

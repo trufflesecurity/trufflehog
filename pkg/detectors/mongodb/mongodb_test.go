@@ -84,7 +84,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_MongoDB,
-					Verified:     true,
+					Verified:     false,
 				},
 			},
 			wantErr:             false,
@@ -104,8 +104,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MongoDB.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
