@@ -39,7 +39,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 		args                args
 		want                []detectors.Result
 		wantErr             bool
-		wantVerificationErr error
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
@@ -74,6 +74,23 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found, would be verified but for connection timeout",
+			s:    Scanner{timeout: 1 * time.Microsecond},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_MongoDB,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -98,6 +115,9 @@ func TestMongoDB_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationErr = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "VerificationError")
 			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
