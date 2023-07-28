@@ -6,6 +6,7 @@ package mongodb
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,6 +80,23 @@ func TestMongoDB_FromChunk(t *testing.T) {
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_MongoDB,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, bad host",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within", strings.ReplaceAll(secret, ".mongodb.net", ".mongodb.net.bad"))),
 				verify: true,
 			},
 			want: []detectors.Result{
