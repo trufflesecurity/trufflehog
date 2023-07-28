@@ -248,6 +248,7 @@ message GoogleDrive {
   string timestamp = 4;
   bool shared = 5;
   string last_modified_by = 6;
+  string path = 7;
 }
 
 message AzureRepos {
