@@ -420,7 +420,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = ParseFailure
 		}
 
-		if currentDiff.Content.Len() > c.maxDiffSize {
+		if currentDiff != nil && currentDiff.Content.Len() > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
 			))
