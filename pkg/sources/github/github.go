@@ -554,28 +554,13 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		return nil, errors.New(err)
 	}
 
-	// This client is used for most APIs.
-	itr, err := ghinstallation.New(
-		s.httpClient.Transport,
-		appID,
-		installationID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, errors.New(err)
-	}
-	itr.BaseURL = apiEndpoint
-
-	originalTransport := s.httpClient.Transport
-	s.httpClient.Transport = itr
-	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
-	if err != nil {
-		return nil, errors.New(err)
-	}
-
 	// This client is required to create installation tokens for cloning.
 	// Otherwise, the required JWT is not in the request for the token :/
+	// This client uses the source's original HTTP transport, so make sure
+	// to build it before modifying that transport (such as is done during
+	// the creation of the other API client below).
 	appItr, err := ghinstallation.NewAppsTransport(
-		originalTransport,
+		s.httpClient.Transport,
 		appID,
 		[]byte(app.PrivateKey))
 	if err != nil {
@@ -587,6 +572,23 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	instHttpClient := common.RetryableHttpClientTimeout(60)
 	instHttpClient.Transport = appItr
 	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHttpClient)
+	if err != nil {
+		return nil, errors.New(err)
+	}
+
+	// This client is used for most APIs.
+	itr, err := ghinstallation.New(
+		s.httpClient.Transport,
+		appID,
+		installationID,
+		[]byte(app.PrivateKey))
+	if err != nil {
+		return nil, errors.New(err)
+	}
+	itr.BaseURL = apiEndpoint
+
+	s.httpClient.Transport = itr
+	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
 	if err != nil {
 		return nil, errors.New(err)
 	}
