@@ -34,11 +34,12 @@ func TestMongoDB_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr error
 	}{
 		{
 			name: "found, verified",
@@ -98,7 +99,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "VerificationError")
 			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
 				t.Errorf("MongoDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
