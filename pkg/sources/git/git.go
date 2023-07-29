@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -56,7 +57,7 @@ type Git struct {
 }
 
 type metrics struct {
-	commitsScanned int
+	commitsScanned uint64
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
@@ -344,8 +345,8 @@ func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
-func (s *Git) CommitsScanned() int {
-	return s.metrics.commitsScanned
+func (s *Git) CommitsScanned() uint64 {
+	return atomic.LoadUint64(&s.metrics.commitsScanned)
 }
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
@@ -380,7 +381,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 		depth++
-		s.metrics.commitsScanned++
+		atomic.AddUint64(&s.metrics.commitsScanned, 1)
 		logger.V(5).Info("scanning commit", "commit", commit.Hash)
 		for _, diff := range commit.Diffs {
 			if !scanOptions.Filter.Pass(diff.PathB) {
