@@ -13,7 +13,6 @@ const (
 	providerGithub    provider = "Github"
 	providerGitlab    provider = "Gitlab"
 	providerBitbucket provider = "Bitbucket"
-	providerAzure     provider = "Azure"
 )
 
 func NormalizeBitbucketRepo(repoURL string) (string, error) {
@@ -30,10 +29,6 @@ func NormalizeGerritProject(project string) (string, error) {
 
 func NormalizeGithubRepo(repoURL string) (string, error) {
 	return NormalizeOrgRepoURL(providerGithub, repoURL)
-}
-
-func NormalizeAzureRepo(repoURL string) (string, error) {
-	return NormalizeOrgRepoURL(providerAzure, repoURL)
 }
 
 func NormalizeGitlabRepo(repoURL string) (string, error) {
@@ -90,8 +85,6 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 	}
 
 	// If we're here it's probably a provider repo without ".git" at the end, so add it and return
-	if provider != providerAzure {
-		parsed.Path += ".git"
-	}
+	parsed.Path += ".git"
 	return parsed.String(), nil
 }
