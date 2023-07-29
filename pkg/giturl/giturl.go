@@ -90,7 +90,7 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 	}
 
 	// If we're here it's probably a provider repo without ".git" at the end, so add it and return
-	if provider != "Azure" {
+	if provider != providerAzure {
 		parsed.Path += ".git"
 	}
 	return parsed.String(), nil
