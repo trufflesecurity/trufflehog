@@ -316,6 +316,19 @@ func run(state overseer.State) {
 		return true
 	}
 
+	// Set how the engine will print its results.
+	var printer engine.Printer
+	switch {
+	case *jsonLegacy:
+		printer = new(output.LegacyJSONPrinter)
+	case *jsonOut:
+		printer = new(output.JSONPrinter)
+	case *gitHubActionsFormat:
+		printer = new(output.GitHubActionsPrinter)
+	default:
+		printer = new(output.PlainPrinter)
+	}
+
 	e := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
@@ -325,6 +338,8 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
+		engine.WithOnlyVerified(*onlyVerified),
+		engine.WithPrinter(printer),
 	)
 
 	var repoPath string
@@ -475,88 +490,26 @@ func run(state overseer.State) {
 			logFatal(err, "Failed to scan Docker.")
 		}
 	}
-	// asynchronously wait for scanning to finish and cleanup
-	go e.Finish(ctx, logFatal)
 
 	if !*jsonLegacy && !*jsonOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
-	// NOTE: this loop will terminate when the results channel is closed in
-	// e.Finish()
-	foundResults := false
+	// Wait for all workers to finish.
+	e.Finish(ctx, logFatal)
 
-	const notifierWorkerMultiplier = 2
-	maxNotifierWorkers := 1
-	if numWorkers := e.Concurrency / notifierWorkerMultiplier; numWorkers > 0 {
-		maxNotifierWorkers = int(numWorkers)
-	}
-	ctx.Logger().Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
-	for worker := 0; worker < maxNotifierWorkers; worker++ {
-		e.WgNotifier.Add(1)
-		go func() {
-			ctx := context.WithValue(ctx, "notifier_worker_id", engine.RandomID(5))
-			defer common.Recover(ctx)
-			defer e.WgNotifier.Done()
-
-			for r := range e.ResultsChan() {
-				if *onlyVerified && !r.Verified {
-					continue
-				}
-				foundResults = true
-
-				var err error
-				switch {
-				case *jsonLegacy:
-					err = output.PrintLegacyJSON(ctx, &r)
-				case *jsonOut:
-					err = output.PrintJSON(&r)
-				case *gitHubActionsFormat:
-					err = output.PrintGitHubActionsOutput(&r)
-				default:
-					err = output.PrintPlainOutput(&r)
-				}
-				if err != nil {
-					logFatal(err, "error printing results")
-				}
-			}
-
-			// e.notifySecrets(ctx)
-		}()
-	}
-
-	e.WgNotifier.Wait()
-	// for r := range e.ResultsChan() {
-	// 	if *onlyVerified && !r.Verified {
-	// 		continue
-	// 	}
-	// 	foundResults = true
-	//
-	// 	var err error
-	// 	switch {
-	// 	case *jsonLegacy:
-	// 		err = output.PrintLegacyJSON(ctx, &r)
-	// 	case *jsonOut:
-	// 		err = output.PrintJSON(&r)
-	// 	case *gitHubActionsFormat:
-	// 		err = output.PrintGitHubActionsOutput(&r)
-	// 	default:
-	// 		err = output.PrintPlainOutput(&r)
-	// 	}
-	// 	if err != nil {
-	// 		logFatal(err, "error printing results")
-	// 	}
-	// }
-	logger.V(2).Info("finished scanning",
+	logger.Info("finished scanning",
 		"chunks", e.ChunksScanned(),
 		"bytes", e.BytesScanned(),
+		"verified-secrets", e.Metrics.VerifiedSecretsFound,
+		"unverified-secrets", e.Metrics.UnverifiedSecretsFound,
 	)
 
 	if *printAvgDetectorTime {
 		printAverageDetectorTime(e)
 	}
 
-	if foundResults && *fail {
+	if e.HasFoundResults() && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}

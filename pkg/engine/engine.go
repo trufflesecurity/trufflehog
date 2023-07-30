@@ -27,21 +27,32 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+type runtimeMetrics struct {
+	bytesScanned           uint64
+	chunksScanned          uint64
+	VerifiedSecretsFound   uint64
+	UnverifiedSecretsFound uint64
+	detectorAvgTime        sync.Map
+}
+
+// Printer is used to format found results and output them to the user. Ex JSON, plain text, etc.
+type Printer interface {
+	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
+}
+
 type Engine struct {
-	Concurrency     int
-	chunks          chan *sources.Chunk
-	results         chan detectors.ResultWithMetadata
-	decoders        []decoders.Decoder
-	detectors       map[bool][]detectors.Detector
-	chunksScanned   uint64
-	bytesScanned    uint64
-	detectorAvgTime sync.Map
-	sourcesWg       *errgroup.Group
-	workersWg       sync.WaitGroup
+	Concurrency int
+	chunks      chan *sources.Chunk
+	results     chan detectors.ResultWithMetadata
+	decoders    []decoders.Decoder
+	detectors   map[bool][]detectors.Detector
+	sourcesWg   *errgroup.Group
+	workersWg   sync.WaitGroup
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
 	filterUnverified bool
+	onlyVerified     bool
 
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words (keywords from the rules in the config)
@@ -51,6 +62,17 @@ type Engine struct {
 	// notifyChan           chan detectors.ResultWithMetadata
 	wgDetectorWorkers sync.WaitGroup
 	WgNotifier        sync.WaitGroup
+
+	// Runtime Metrics.
+	Metrics runtimeMetrics
+
+	// foundResults is set to true if any results are found.
+	foundResults uint32
+
+	// printer provides a method for formatting and outputting search results.
+	// The specific implementation (e.g., JSON, plain text)
+	// should be set during initialization based on user preference or program requirements.
+	printer Printer
 }
 
 type EngineOption func(*Engine)
@@ -90,6 +112,14 @@ func WithFilterUnverified(filter bool) EngineOption {
 	}
 }
 
+// WithOnlyVerified sets the onlyVerified flag on the engine. If set to true,
+// the engine will only print verified results.
+func WithOnlyVerified(onlyVerified bool) EngineOption {
+	return func(e *Engine) {
+		e.onlyVerified = onlyVerified
+	}
+}
+
 // WithFilterDetectors applies a filter to the configured list of detectors. If
 // the filterFunc returns true, the detector will be included for scanning.
 // This option applies to the existing list of detectors configured, so the
@@ -105,6 +135,13 @@ func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption 
 	}
 }
 
+// WithPrinter sets the Printer on the engine.
+func WithPrinter(printer Printer) EngineOption {
+	return func(e *Engine) {
+		e.printer = printer
+	}
+}
+
 func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors.Detector) []detectors.Detector {
 	var output []detectors.Detector
 	for _, detector := range input {
@@ -115,18 +152,26 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 	return output
 }
 
+func (e *Engine) setFoundResults() {
+	atomic.StoreUint32(&e.foundResults, 1)
+}
+
+// HasFoundResults returns true if any results are found.
+func (e *Engine) HasFoundResults() bool {
+	return atomic.LoadUint32(&e.foundResults) == 1
+}
+
 const defaultChannelBuffer = 1
 
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
 		chunks:               make(chan *sources.Chunk, defaultChannelBuffer),
 		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
-		// notifyChan:           make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
-		results:           make(chan detectors.ResultWithMetadata),
-		detectorAvgTime:   sync.Map{},
-		sourcesWg:         &errgroup.Group{},
-		wgDetectorWorkers: sync.WaitGroup{},
-		WgNotifier:        sync.WaitGroup{},
+		results:              make(chan detectors.ResultWithMetadata),
+		sourcesWg:            &errgroup.Group{},
+		wgDetectorWorkers:    sync.WaitGroup{},
+		WgNotifier:           sync.WaitGroup{},
+		Metrics:              runtimeMetrics{detectorAvgTime: sync.Map{}},
 	}
 
 	for _, option := range options {
@@ -215,21 +260,21 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}()
 	}
 
-	// const notifierWorkerMultiplier = 2
-	// maxNotifierWorkers := 1
-	// if numWorkers := e.concurrency / notifierWorkerMultiplier; numWorkers > 0 {
-	// 	maxNotifierWorkers = int(numWorkers)
-	// }
-	// ctx.Logger().Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
-	// for worker := 0; worker < maxNotifierWorkers; worker++ {
-	// 	e.wgNotifier.Add(1)
-	// 	go func() {
-	// 		ctx := context.WithValue(ctx, "notifier_worker_id", RandomID(5))
-	// 		defer common.Recover(ctx)
-	// 		defer e.wgNotifier.Done()
-	// 		e.notifySecrets(ctx)
-	// 	}()
-	// }
+	const notifierWorkerMultiplier = 2
+	maxNotifierWorkers := 1
+	if numWorkers := e.Concurrency / notifierWorkerMultiplier; numWorkers > 0 {
+		maxNotifierWorkers = int(numWorkers)
+	}
+	ctx.Logger().Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
+	for worker := 0; worker < maxNotifierWorkers; worker++ {
+		e.WgNotifier.Add(1)
+		go func() {
+			ctx := context.WithValue(ctx, "notifier_worker_id", RandomID(5))
+			defer common.Recover(ctx)
+			defer e.WgNotifier.Done()
+			e.notifyResults(ctx)
+		}()
+	}
 
 	// Start the workers.
 	// for i := 0; i < e.concurrency; i++ {
@@ -262,25 +307,20 @@ func RandomID(length int) string {
 // more sources may be scanned by the engine.
 func (e *Engine) Finish(ctx context.Context, logFunc func(error, string, ...any)) {
 	defer common.RecoverWithExit(ctx)
-	// wait for the sources to finish putting chunks onto the chunks channel
+	// Wait for the sources to finish putting chunks onto the chunks channel.
 	sourceErr := e.sourcesWg.Wait()
 	if sourceErr != nil {
 		logFunc(sourceErr, "error occurred while collecting chunks")
 	}
 
-	close(e.chunks)
-	// wait for the workers to finish processing all of the chunks and putting
-	// results onto the results channel
-	e.workersWg.Wait()
-	close(e.detectableChunksChan)
-	e.wgDetectorWorkers.Wait()
+	close(e.chunks) // Source workers are done.
 
-	// TODO: re-evaluate whether this is needed and investigate why if so
-	//
-	// not entirely sure why results don't get processed without this pause
-	// since we've put all results on the channel at this point.
-	time.Sleep(time.Second)
-	close(e.results)
+	e.workersWg.Wait() // Wait for the workers to finish scanning chunks.
+	close(e.detectableChunksChan)
+	e.wgDetectorWorkers.Wait() // Wait for the detector workers to finish detecting chunks.
+
+	close(e.results)    // Detector workers are done, close the results channel and call it a day.
+	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
 }
 
 func (e *Engine) ChunksChan() chan *sources.Chunk {
@@ -292,11 +332,11 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 }
 
 func (e *Engine) ChunksScanned() uint64 {
-	return e.chunksScanned
+	return e.Metrics.chunksScanned
 }
 
 func (e *Engine) BytesScanned() uint64 {
-	return e.bytesScanned
+	return e.Metrics.bytesScanned
 }
 
 func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
@@ -318,7 +358,7 @@ func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
-	e.detectorAvgTime.Range(func(k, v interface{}) bool {
+	e.Metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
 		key, ok := k.(string)
 		if !ok {
 			logger.Info("expected DetectorAvgTime key to be a string")
@@ -351,7 +391,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 		for chunk := range sources.Chunker(originalChunk) {
 			var chunkResults []detectors.ResultWithMetadata
 			matchedKeywords := make(map[string]struct{})
-			atomic.AddUint64(&e.bytesScanned, uint64(len(chunk.Data)))
+			atomic.AddUint64(&e.Metrics.bytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
@@ -458,7 +498,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 			}
 			e.dedupeAndSend(chunkResults)
 		}
-		atomic.AddUint64(&e.chunksScanned, 1)
+		atomic.AddUint64(&e.Metrics.chunksScanned, 1)
 	}
 	wgDetect.Wait()
 }
@@ -506,33 +546,24 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 	e.results <- secret
 }
 
-// func (e *Engine) notifySecrets(ctx context.Context) {
-// 	for secret := range e.notifyChan {
-// 		ctx := context.WithValues(ctx,
-// 			"secret_type", secret.DetectorType.String(),
-// 			"source_type", secret.SourceType.String(),
-// 			"source_id", secret.SourceID,
-// 			"source_name", secret.SourceName,
-// 		)
-//
-// 		ctx.Logger().V(1).Info("received secret for notification")
-//
-// 		if len(secret.Raw) == 0 {
-// 			ctx.Logger().V(1).Info("empty raw secret")
-// 		}
-//
-// 		e.results <- secret
-//
-// 		// e.dedupeAndSend(secret)
-//
-// 		// if secret.Verified {
-// 		// 	atomic.AddUint64(&p.metrics.verifiedSecretsFound, 1)
-// 		// } else {
-// 		// 	atomic.AddUint64(&p.metrics.unverifiedSecretsFound, 1)
-// 		// }
-// 	}
-// 	ctx.Logger().V(1).Info("shutting down notifier worker")
-// }
+func (e *Engine) notifyResults(ctx context.Context) {
+	for r := range e.ResultsChan() {
+		if e.onlyVerified && !r.Verified {
+			continue
+		}
+		e.setFoundResults()
+
+		if r.Verified {
+			atomic.AddUint64(&e.Metrics.VerifiedSecretsFound, 1)
+		} else {
+			atomic.AddUint64(&e.Metrics.UnverifiedSecretsFound, 1)
+		}
+
+		if err := e.printer.Print(ctx, &r); err != nil {
+			// logFatal(err, "error printing results")
+		}
+	}
+}
 
 // SupportsLineNumbers determines if a line number can be found for a source type.
 func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
