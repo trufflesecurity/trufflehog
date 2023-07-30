@@ -192,10 +192,11 @@ const (
 	cacheSize            = 1000
 )
 
+// Start the engine with options.
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	cache, err := lru.New(cacheSize)
 	if err != nil {
-		panic(err)
+		common.LogFatalFunc(ctx.Logger())
 	}
 
 	e := &Engine{
@@ -460,64 +461,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							decoder:  decoderType,
 							wgDoneFn: wgDetect.Done,
 						}
-
-						// start := time.Now()
-						//
-						// results, err := func() ([]detectors.Result, error) {
-						// 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-						// 	defer cancel()
-						// 	defer common.Recover(ctx)
-						// 	return detector.FromData(ctx, verify, decoded.Data)
-						// }()
-						// if err != nil {
-						// 	ctx.Logger().Error(err, "could not scan chunk",
-						// 		"source_type", decoded.SourceType.String(),
-						// 		"metadata", decoded.SourceMetadata,
-						// 	)
-						// 	continue
-						// }
-						//
-						// if e.filterUnverified {
-						// 	results = detectors.CleanResults(results)
-						// }
-						// for _, result := range results {
-						// 	resultChunk := chunk
-						// 	ignoreLinePresent := false
-						// 	if SupportsLineNumbers(chunk.SourceType) {
-						// 		copyChunk := *chunk
-						// 		copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
-						// 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
-						// 			copyChunk.SourceMetadata = copyMetaData
-						// 		}
-						// 		fragStart, mdLine := FragmentFirstLine(&copyChunk)
-						// 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
-						// 		resultChunk = &copyChunk
-						// 	}
-						// 	if ignoreLinePresent {
-						// 		continue
-						// 	}
-						// 	result.DecoderType = decoderType
-						// 	chunkResults = append(chunkResults, detectors.CopyMetadata(resultChunk, result))
-						//
-						// }
-						// if len(results) > 0 {
-						// 	elapsed := time.Since(start)
-						// 	detectorName := results[0].DetectorType.String()
-						// 	avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
-						// 	var avgTime []time.Duration
-						// 	if ok {
-						// 		avgTime, ok = avgTimeI.([]time.Duration)
-						// 		if !ok {
-						// 			continue
-						// 		}
-						// 	}
-						// 	avgTime = append(avgTime, elapsed)
-						// 	e.detectorAvgTime.Store(detectorName, avgTime)
-						// }
 					}
 				}
 			}
-			// e.dedupeAndSend(chunkResults)
 		}
 		atomic.AddUint64(&e.metrics.chunksScanned, 1)
 	}
@@ -609,7 +555,7 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		}
 
 		if err := e.printer.Print(ctx, &r); err != nil {
-			// logFatal(err, "error printing results")
+			common.LogFatalFunc(ctx.Logger())
 		}
 	}
 }

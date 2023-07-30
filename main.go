@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/felixge/fgprof"
-	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -163,7 +162,7 @@ func main() {
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 	defer func() { _ = sync() }()
-	logFatal := logFatalFunc(logger)
+	logFatal := common.LogFatalFunc(logger)
 
 	updateCfg := overseer.Config{
 		Program:       run,
@@ -189,7 +188,7 @@ func main() {
 func run(state overseer.State) {
 	ctx := context.Background()
 	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
+	logFatal := common.LogFatalFunc(logger)
 
 	logger.V(2).Info(fmt.Sprintf("trufflehog %s", version.BuildVersion))
 
@@ -540,19 +539,6 @@ func printAverageDetectorTime(e *engine.Engine) {
 		}
 		avgDuration := total / time.Duration(len(durations))
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
-	}
-}
-
-// logFatalFunc returns a log.Fatal style function. Calling the returned
-// function will terminate the program without cleanup.
-func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
-	return func(err error, message string, keyAndVals ...any) {
-		logger.Error(err, message, keyAndVals...)
-		if err != nil {
-			os.Exit(1)
-			return
-		}
-		os.Exit(0)
 	}
 }
 

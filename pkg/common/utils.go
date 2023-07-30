@@ -6,7 +6,10 @@ import (
 	"crypto/rand"
 	"io"
 	"math/big"
+	"os"
 	"strings"
+
+	"github.com/go-logr/logr"
 )
 
 func AddStringSliceItem(item string, slice *[]string) {
@@ -63,4 +66,17 @@ func RandomID(length int) string {
 	}
 
 	return string(b)
+}
+
+// LogFatalFunc returns a log.Fatal style function. Calling the returned
+// function will terminate the program without cleanup.
+func LogFatalFunc(logger logr.Logger) func(error, string, ...any) {
+	return func(err error, message string, keyAndVals ...any) {
+		logger.Error(err, message, keyAndVals...)
+		if err != nil {
+			os.Exit(1)
+			return
+		}
+		os.Exit(0)
+	}
 }
