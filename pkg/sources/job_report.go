@@ -36,12 +36,6 @@ type JobReportHook interface {
 	// unit. The unit will be nil if the source does not support
 	// enumeration.
 	ReportChunk(JobReportRef, SourceUnit, *Chunk)
-	// ReportChunkError is called when an error is encountered during
-	// chunking of a unit. The unit will be nil if the source does not
-	// support enumeration.
-	// TODO: We could probably use ReportError with a custom error type
-	// like we do with Fatal.
-	ReportChunkError(JobReportRef, SourceUnit, error)
 	// Finish marks the job as done.
 	Finish(JobReportRef)
 }
@@ -77,6 +71,18 @@ type Fatal struct{ error }
 func (f Fatal) Error() string { return fmt.Sprintf("fatal: %s", f.error.Error()) }
 func (f Fatal) Unwrap() error { return f.error }
 
+// ChunkError is a custom error type for errors encountered during chunking of
+// a specific unit.
+type ChunkError struct {
+	unit SourceUnit
+	err  error
+}
+
+func (f ChunkError) Error() string {
+	return fmt.Sprintf("error chunking unit %q: %s", f.unit.SourceUnitID(), f.err.Error())
+}
+func (f ChunkError) Unwrap() error { return f.err }
+
 // JobReport aggregates information about a run of a Source.
 type JobReport struct {
 	// Unique identifiers for this job.
@@ -100,7 +106,6 @@ type JobReportMetrics struct {
 	FinishedUnits   uint64
 	TotalChunks     uint64
 	Errors          []error
-	ChunkErrors     map[string][]error
 	DoneEnumerating bool
 }
 
@@ -204,26 +209,6 @@ func (jr *JobReport) ReportError(err error) {
 	jr.executeHooks(func(hook JobReportHook) { hook.ReportError(jr.Ref(), err) })
 }
 
-// AddChunkError adds a non-nil error to the aggregate of errors encountered
-// during chunking.
-func (jr *JobReport) ReportChunkError(unit SourceUnit, err error) {
-	if err == nil {
-		return
-	}
-	id := ""
-	if unit != nil {
-		id = unit.SourceUnitID()
-	}
-	jr.metricsLock.Lock()
-	if jr.metrics.ChunkErrors == nil {
-		jr.metrics.ChunkErrors = make(map[string][]error)
-	}
-	jr.metrics.ChunkErrors[id] = append(jr.metrics.ChunkErrors[id], err)
-	jr.metricsLock.Unlock()
-
-	jr.executeHooks(func(hook JobReportHook) { hook.ReportChunkError(jr.Ref(), unit, err) })
-}
-
 // Ref provides a read-only reference to the JobReport.
 func (jr *JobReport) Ref() JobReportRef {
 	return JobReportRef{
@@ -241,27 +226,37 @@ func (m JobReportMetrics) EnumerationError() error {
 
 // ChunkErrors joins all errors encountered during chunking.
 func (m JobReportMetrics) ChunkError() error {
-	// Check if we only have errors without unit information.
-	if errs, ok := m.ChunkErrors[""]; ok && len(m.ChunkErrors) == 1 {
-		return errors.Join(errs...)
-	}
-
-	aggregate := make([]error, 0, len(m.ChunkErrors))
-	for id, errs := range m.ChunkErrors {
-		err := fmt.Errorf("unit %q\n%w\n", id, errors.Join(errs...))
-		aggregate = append(aggregate, err)
+	var aggregate []error
+	for _, err := range m.Errors {
+		var chunkErr ChunkError
+		if ok := errors.As(err, &chunkErr); ok {
+			aggregate = append(aggregate, err)
+		}
 	}
 	return errors.Join(aggregate...)
 }
 
 // FatalError returns the first Fatal error, if any, encountered in the scan.
 func (m JobReportMetrics) FatalError() error {
-	var err Fatal
-	aggregateErrors := errors.Join(m.EnumerationError(), m.ChunkError())
-	if found := errors.As(aggregateErrors, &err); found {
-		return err
+	for _, err := range m.Errors {
+		var fatalErr Fatal
+		if found := errors.As(err, &fatalErr); found {
+			return fatalErr
+		}
 	}
 	return nil
+}
+
+// FatalErrors returns all of the encountered fatal errors joined together.
+func (m JobReportMetrics) FatalErrors() error {
+	var aggregate []error
+	for _, err := range m.Errors {
+		var fatalErr Fatal
+		if found := errors.As(err, &fatalErr); found {
+			aggregate = append(aggregate, fatalErr)
+		}
+	}
+	return errors.Join(aggregate...)
 }
 
 func (m JobReportMetrics) PercentComplete() int {

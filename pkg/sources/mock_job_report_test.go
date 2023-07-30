@@ -94,18 +94,6 @@ func (mr *MockJobReportHookMockRecorder) ReportChunk(arg0, arg1, arg2 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportChunk", reflect.TypeOf((*MockJobReportHook)(nil).ReportChunk), arg0, arg1, arg2)
 }
 
-// ReportChunkError mocks base method.
-func (m *MockJobReportHook) ReportChunkError(arg0 JobReportRef, arg1 SourceUnit, arg2 error) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ReportChunkError", arg0, arg1, arg2)
-}
-
-// ReportChunkError indicates an expected call of ReportChunkError.
-func (mr *MockJobReportHookMockRecorder) ReportChunkError(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportChunkError", reflect.TypeOf((*MockJobReportHook)(nil).ReportChunkError), arg0, arg1, arg2)
-}
-
 // ReportError mocks base method.
 func (m *MockJobReportHook) ReportError(arg0 JobReportRef, arg1 error) {
 	m.ctrl.T.Helper()

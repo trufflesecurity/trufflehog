@@ -115,33 +115,27 @@ func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.
 }
 
 // Run blocks until a resource is available to run the source, then
-// synchronously runs it.
+// synchronously runs it. The first fatal error, if any, will be returned.
 func (s *SourceManager) Run(ctx context.Context, handle handle) (JobReportRef, error) {
-	// Do preflight checks before waiting on the pool.
-	if err := s.preflightChecks(ctx, handle); err != nil {
-		return JobReportRef{}, err
-	}
-	// Get a Job ID.
-	jobID, err := s.api.GetJobID(ctx, int64(handle))
+	report, err := s.asyncRun(ctx, handle)
 	if err != nil {
-		return JobReportRef{SourceID: int64(handle)}, err
+		return report, err
 	}
-	// Start a report for this job.
-	report := NewJobReport(int64(handle), jobID, WithHooks(s.hooks...))
-	ch := make(chan error)
-	s.pool.Go(func() error {
-		defer common.Recover(ctx)
-		// Set the named return values.
-		ch <- s.run(ctx, handle, jobID, report)
-		return nil
-	})
-	return report.Ref(), <-ch
+	<-report.Done()
+	return report, report.Snapshot().FatalError()
 }
 
 // ScheduleRun blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is stored and accessible via the
 // JobReportRef as it becomes available.
 func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) (JobReportRef, error) {
+	return s.asyncRun(ctx, handle)
+}
+
+// asyncRun is a helper method to asynchronously run the Source. It calls out
+// to the API to get a job ID for this run, creates a report, then waits for an
+// available goroutine to asynchronously run it.
+func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobReportRef, error) {
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx, handle); err != nil {
 		return JobReportRef{}, err
@@ -248,7 +242,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 	defer wg.Wait()
 	defer close(ch)
 	if err := source.Chunks(ctx, ch); err != nil {
-		report.ReportChunkError(nil, Fatal{err})
+		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
 	return nil
@@ -376,6 +370,6 @@ func (s *mgrChunkReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
 }
 
 func (s *mgrChunkReporter) ChunkErr(ctx context.Context, err error) error {
-	s.report.ReportChunkError(s.unit, err)
+	s.report.ReportError(ChunkError{s.unit, err})
 	return nil
 }

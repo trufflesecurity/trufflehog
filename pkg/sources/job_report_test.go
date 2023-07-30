@@ -17,21 +17,21 @@ func TestJobReportFatalErrors(t *testing.T) {
 	jr.ReportError(fmt.Errorf("oh no"))
 	assert.Greater(t, len(jr.Snapshot().Errors), 0)
 	assert.NoError(t, jr.Snapshot().FatalError())
-	assert.Equal(t, 0, len(jr.Snapshot().ChunkErrors))
+	assert.NoError(t, jr.Snapshot().ChunkError())
 
 	// Add a fatal error and make sure we can test comparison.
 	err := fmt.Errorf("fatal error")
 	jr.ReportError(Fatal{err})
 	assert.Greater(t, len(jr.Snapshot().Errors), 0)
 	assert.Error(t, jr.Snapshot().FatalError())
-	assert.Equal(t, 0, len(jr.Snapshot().ChunkErrors))
+	assert.NoError(t, jr.Snapshot().ChunkError())
 	assert.True(t, errors.Is(jr.Snapshot().FatalError(), err))
 
 	// Add another fatal error and test we still return the first.
 	jr.ReportError(Fatal{fmt.Errorf("second fatal error")})
 	assert.Greater(t, len(jr.Snapshot().Errors), 0)
 	assert.Error(t, jr.Snapshot().FatalError())
-	assert.Equal(t, 0, len(jr.Snapshot().ChunkErrors))
+	assert.NoError(t, jr.Snapshot().ChunkError())
 	assert.True(t, errors.Is(jr.Snapshot().FatalError(), err))
 }
 
@@ -72,7 +72,6 @@ func TestJobReportHook(t *testing.T) {
 	// ReportError(JobReportRef, error)
 	// ReportUnit(JobReportRef, SourceUnit)
 	// ReportChunk(JobReportRef, SourceUnit, *Chunk)
-	// ReportChunkError(JobReportRef, SourceUnit, error)
 	// Finish(JobReportRef)
 
 	startTime := time.Now()
@@ -84,7 +83,6 @@ func TestJobReportHook(t *testing.T) {
 	reportErr := fmt.Errorf("reporting error")
 	reportUnit := CommonSourceUnit{"reporting unit"}
 	reportChunk := &Chunk{Data: []byte("reporting chunk")}
-	reportChunkErr := fmt.Errorf("oops")
 
 	hook.EXPECT().Start(gomock.Any(), startTime)
 	hook.EXPECT().End(gomock.Any(), endTime)
@@ -95,7 +93,6 @@ func TestJobReportHook(t *testing.T) {
 	hook.EXPECT().ReportError(gomock.Any(), reportErr)
 	hook.EXPECT().ReportUnit(gomock.Any(), reportUnit)
 	hook.EXPECT().ReportChunk(gomock.Any(), reportUnit, reportChunk)
-	hook.EXPECT().ReportChunkError(gomock.Any(), reportUnit, reportChunkErr)
 	hook.EXPECT().Finish(gomock.Any())
 
 	jr.Start(startTime)
@@ -107,6 +104,5 @@ func TestJobReportHook(t *testing.T) {
 	jr.ReportError(reportErr)
 	jr.ReportUnit(reportUnit)
 	jr.ReportChunk(reportUnit, reportChunk)
-	jr.ReportChunkError(reportUnit, reportChunkErr)
 	jr.Finish()
 }
