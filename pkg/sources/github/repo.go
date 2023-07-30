@@ -50,12 +50,15 @@ func (s *Source) cloneRepo(
 
 	case *sourcespb.GitHub_Token:
 		// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
+		s.userMu.Lock()
 		if s.githubUser == "" || s.githubToken == "" {
 			s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
 			if err != nil {
+				s.userMu.Unlock()
 				return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
 			}
 		}
+		s.userMu.Unlock()
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
 		if err != nil {
 			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
