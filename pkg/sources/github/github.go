@@ -699,7 +699,6 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
-				return nil
 			}
 
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
