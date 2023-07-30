@@ -2,7 +2,9 @@ package engine
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"reflect"
 	"runtime"
 	"strings"
@@ -26,7 +28,7 @@ import (
 )
 
 type Engine struct {
-	concurrency     int
+	Concurrency     int
 	chunks          chan *sources.Chunk
 	results         chan detectors.ResultWithMetadata
 	decoders        []decoders.Decoder
@@ -44,13 +46,18 @@ type Engine struct {
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words (keywords from the rules in the config)
 	prefilter ahocorasick.Trie
+
+	detectableChunksChan chan detectableChunk
+	// notifyChan           chan detectors.ResultWithMetadata
+	wgDetectorWorkers sync.WaitGroup
+	WgNotifier        sync.WaitGroup
 }
 
 type EngineOption func(*Engine)
 
 func WithConcurrency(concurrency int) EngineOption {
 	return func(e *Engine) {
-		e.concurrency = concurrency
+		e.Concurrency = concurrency
 	}
 }
 
@@ -108,12 +115,18 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 	return output
 }
 
+const defaultChannelBuffer = 1
+
 func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
-		chunks:          make(chan *sources.Chunk),
-		results:         make(chan detectors.ResultWithMetadata),
-		detectorAvgTime: sync.Map{},
-		sourcesWg:       &errgroup.Group{},
+		chunks:               make(chan *sources.Chunk, defaultChannelBuffer),
+		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
+		// notifyChan:           make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
+		results:           make(chan detectors.ResultWithMetadata),
+		detectorAvgTime:   sync.Map{},
+		sourcesWg:         &errgroup.Group{},
+		wgDetectorWorkers: sync.WaitGroup{},
+		WgNotifier:        sync.WaitGroup{},
 	}
 
 	for _, option := range options {
@@ -121,15 +134,15 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	// Set defaults.
-	if e.concurrency == 0 {
+	if e.Concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
-		e.concurrency = numCPU
+		e.Concurrency = numCPU
 	}
-	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
+	ctx.Logger().V(3).Info("engine started", "workers", e.Concurrency)
 
 	// Limit number of concurrent goroutines dedicated to chunking a source.
-	e.sourcesWg.SetLimit(e.concurrency)
+	e.sourcesWg.SetLimit(e.Concurrency)
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
@@ -178,17 +191,70 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}
 	}
 
-	// Start the workers.
-	for i := 0; i < e.concurrency; i++ {
+	ctx.Logger().Info(fmt.Sprintf("starting %d scanner workers", e.Concurrency))
+	// Run the Secret scanner workers and Notifier pipelines.
+	for worker := uint64(0); worker < uint64(e.Concurrency); worker++ {
 		e.workersWg.Add(1)
 		go func() {
+			ctx := context.WithValue(ctx, "secret_worker_id", RandomID(5))
 			defer common.Recover(ctx)
 			defer e.workersWg.Done()
 			e.detectorWorker(ctx)
 		}()
 	}
 
+	const detectorWorkerMultiplier = 50
+	ctx.Logger().Info(fmt.Sprintf("starting %d detector workers", e.Concurrency*detectorWorkerMultiplier))
+	for worker := uint64(0); worker < uint64(e.Concurrency*detectorWorkerMultiplier); worker++ {
+		e.wgDetectorWorkers.Add(1)
+		go func() {
+			ctx := context.WithValue(ctx, "detector_worker_id", RandomID(5))
+			defer common.Recover(ctx)
+			defer e.wgDetectorWorkers.Done()
+			e.detectChunks(ctx)
+		}()
+	}
+
+	// const notifierWorkerMultiplier = 2
+	// maxNotifierWorkers := 1
+	// if numWorkers := e.concurrency / notifierWorkerMultiplier; numWorkers > 0 {
+	// 	maxNotifierWorkers = int(numWorkers)
+	// }
+	// ctx.Logger().Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
+	// for worker := 0; worker < maxNotifierWorkers; worker++ {
+	// 	e.wgNotifier.Add(1)
+	// 	go func() {
+	// 		ctx := context.WithValue(ctx, "notifier_worker_id", RandomID(5))
+	// 		defer common.Recover(ctx)
+	// 		defer e.wgNotifier.Done()
+	// 		e.notifySecrets(ctx)
+	// 	}()
+	// }
+
+	// Start the workers.
+	// for i := 0; i < e.concurrency; i++ {
+	// 	e.workersWg.Add(1)
+	// 	go func() {
+	// 		defer common.Recover(ctx)
+	// 		defer e.workersWg.Done()
+	// 		e.detectorWorker(ctx)
+	// 	}()
+	// }
+
 	return e
+}
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+// RandomID returns a random string of the given length.
+func RandomID(length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		randInt, _ := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		b[i] = letters[randInt.Int64()]
+	}
+
+	return string(b)
 }
 
 // Finish waits for running sources to complete and workers to finish scanning
@@ -206,6 +272,8 @@ func (e *Engine) Finish(ctx context.Context, logFunc func(error, string, ...any)
 	// wait for the workers to finish processing all of the chunks and putting
 	// results onto the results channel
 	e.workersWg.Wait()
+	close(e.detectableChunksChan)
+	e.wgDetectorWorkers.Wait()
 
 	// TODO: re-evaluate whether this is needed and investigate why if so
 	//
@@ -268,7 +336,17 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	return avgTime
 }
 
+// detectableChunk is a decoded chunk that is ready to be scanned by its detector.
+type detectableChunk struct {
+	detector detectors.Detector
+	chunk    sources.Chunk
+	decoder  detectorspb.DecoderType
+	wgDoneFn func()
+}
+
 func (e *Engine) detectorWorker(ctx context.Context) {
+	var wgDetect sync.WaitGroup
+
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
 			var chunkResults []detectors.ResultWithMetadata
@@ -313,59 +391,68 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 							continue
 						}
 
-						start := time.Now()
-
-						results, err := func() ([]detectors.Result, error) {
-							ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-							defer cancel()
-							defer common.Recover(ctx)
-							return detector.FromData(ctx, verify, decoded.Data)
-						}()
-						if err != nil {
-							ctx.Logger().Error(err, "could not scan chunk",
-								"source_type", decoded.SourceType.String(),
-								"metadata", decoded.SourceMetadata,
-							)
-							continue
+						decoded.Verify = verify
+						wgDetect.Add(1)
+						e.detectableChunksChan <- detectableChunk{
+							chunk:    *decoded,
+							detector: detector,
+							decoder:  decoderType,
+							wgDoneFn: wgDetect.Done,
 						}
 
-						if e.filterUnverified {
-							results = detectors.CleanResults(results)
-						}
-						for _, result := range results {
-							resultChunk := chunk
-							ignoreLinePresent := false
-							if SupportsLineNumbers(chunk.SourceType) {
-								copyChunk := *chunk
-								copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
-								if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
-									copyChunk.SourceMetadata = copyMetaData
-								}
-								fragStart, mdLine := FragmentFirstLine(&copyChunk)
-								ignoreLinePresent = SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
-								resultChunk = &copyChunk
-							}
-							if ignoreLinePresent {
-								continue
-							}
-							result.DecoderType = decoderType
-							chunkResults = append(chunkResults, detectors.CopyMetadata(resultChunk, result))
-
-						}
-						if len(results) > 0 {
-							elapsed := time.Since(start)
-							detectorName := results[0].DetectorType.String()
-							avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
-							var avgTime []time.Duration
-							if ok {
-								avgTime, ok = avgTimeI.([]time.Duration)
-								if !ok {
-									continue
-								}
-							}
-							avgTime = append(avgTime, elapsed)
-							e.detectorAvgTime.Store(detectorName, avgTime)
-						}
+						// start := time.Now()
+						//
+						// results, err := func() ([]detectors.Result, error) {
+						// 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+						// 	defer cancel()
+						// 	defer common.Recover(ctx)
+						// 	return detector.FromData(ctx, verify, decoded.Data)
+						// }()
+						// if err != nil {
+						// 	ctx.Logger().Error(err, "could not scan chunk",
+						// 		"source_type", decoded.SourceType.String(),
+						// 		"metadata", decoded.SourceMetadata,
+						// 	)
+						// 	continue
+						// }
+						//
+						// if e.filterUnverified {
+						// 	results = detectors.CleanResults(results)
+						// }
+						// for _, result := range results {
+						// 	resultChunk := chunk
+						// 	ignoreLinePresent := false
+						// 	if SupportsLineNumbers(chunk.SourceType) {
+						// 		copyChunk := *chunk
+						// 		copyMetaDataClone := proto.Clone(chunk.SourceMetadata)
+						// 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
+						// 			copyChunk.SourceMetadata = copyMetaData
+						// 		}
+						// 		fragStart, mdLine := FragmentFirstLine(&copyChunk)
+						// 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &result, fragStart, mdLine)
+						// 		resultChunk = &copyChunk
+						// 	}
+						// 	if ignoreLinePresent {
+						// 		continue
+						// 	}
+						// 	result.DecoderType = decoderType
+						// 	chunkResults = append(chunkResults, detectors.CopyMetadata(resultChunk, result))
+						//
+						// }
+						// if len(results) > 0 {
+						// 	elapsed := time.Since(start)
+						// 	detectorName := results[0].DetectorType.String()
+						// 	avgTimeI, ok := e.detectorAvgTime.Load(detectorName)
+						// 	var avgTime []time.Duration
+						// 	if ok {
+						// 		avgTime, ok = avgTimeI.([]time.Duration)
+						// 		if !ok {
+						// 			continue
+						// 		}
+						// 	}
+						// 	avgTime = append(avgTime, elapsed)
+						// 	e.detectorAvgTime.Store(detectorName, avgTime)
+						// }
 					}
 				}
 			}
@@ -373,7 +460,79 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 		}
 		atomic.AddUint64(&e.chunksScanned, 1)
 	}
+	wgDetect.Wait()
 }
+
+func (e *Engine) detectChunks(ctx context.Context) {
+	for data := range e.detectableChunksChan {
+		e.detectChunk(ctx, data)
+	}
+}
+
+func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer common.Recover(ctx)
+	defer cancel()
+
+	results, err := data.detector.FromData(ctx, data.chunk.Verify, data.chunk.Data)
+	if err != nil {
+		ctx.Logger().Error(err, "error scanning chunk")
+	}
+
+	if e.filterUnverified {
+		results = detectors.CleanResults(results)
+	}
+
+	for _, res := range results {
+		e.processResult(ctx, data, res)
+	}
+	data.wgDoneFn()
+}
+
+func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
+	if SupportsLineNumbers(data.chunk.SourceType) {
+		copyChunk := data.chunk
+		copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
+		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
+			copyChunk.SourceMetadata = copyMetaData
+		}
+		fragStart, mdLine := FragmentFirstLine(&copyChunk)
+		SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+		data.chunk = copyChunk
+	}
+
+	secret := detectors.CopyMetadata(&data.chunk, res)
+	secret.DecoderType = data.decoder
+	e.results <- secret
+}
+
+// func (e *Engine) notifySecrets(ctx context.Context) {
+// 	for secret := range e.notifyChan {
+// 		ctx := context.WithValues(ctx,
+// 			"secret_type", secret.DetectorType.String(),
+// 			"source_type", secret.SourceType.String(),
+// 			"source_id", secret.SourceID,
+// 			"source_name", secret.SourceName,
+// 		)
+//
+// 		ctx.Logger().V(1).Info("received secret for notification")
+//
+// 		if len(secret.Raw) == 0 {
+// 			ctx.Logger().V(1).Info("empty raw secret")
+// 		}
+//
+// 		e.results <- secret
+//
+// 		// e.dedupeAndSend(secret)
+//
+// 		// if secret.Verified {
+// 		// 	atomic.AddUint64(&p.metrics.verifiedSecretsFound, 1)
+// 		// } else {
+// 		// 	atomic.AddUint64(&p.metrics.unverifiedSecretsFound, 1)
+// 		// }
+// 	}
+// 	ctx.Logger().V(1).Info("shutting down notifier worker")
+// }
 
 // SupportsLineNumbers determines if a line number can be found for a source type.
 func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {

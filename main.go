@@ -485,27 +485,68 @@ func run(state overseer.State) {
 	// NOTE: this loop will terminate when the results channel is closed in
 	// e.Finish()
 	foundResults := false
-	for r := range e.ResultsChan() {
-		if *onlyVerified && !r.Verified {
-			continue
-		}
-		foundResults = true
 
-		var err error
-		switch {
-		case *jsonLegacy:
-			err = output.PrintLegacyJSON(ctx, &r)
-		case *jsonOut:
-			err = output.PrintJSON(&r)
-		case *gitHubActionsFormat:
-			err = output.PrintGitHubActionsOutput(&r)
-		default:
-			err = output.PrintPlainOutput(&r)
-		}
-		if err != nil {
-			logFatal(err, "error printing results")
-		}
+	const notifierWorkerMultiplier = 2
+	maxNotifierWorkers := 1
+	if numWorkers := e.Concurrency / notifierWorkerMultiplier; numWorkers > 0 {
+		maxNotifierWorkers = int(numWorkers)
 	}
+	ctx.Logger().Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
+	for worker := 0; worker < maxNotifierWorkers; worker++ {
+		e.WgNotifier.Add(1)
+		go func() {
+			ctx := context.WithValue(ctx, "notifier_worker_id", engine.RandomID(5))
+			defer common.Recover(ctx)
+			defer e.WgNotifier.Done()
+
+			for r := range e.ResultsChan() {
+				if *onlyVerified && !r.Verified {
+					continue
+				}
+				foundResults = true
+
+				var err error
+				switch {
+				case *jsonLegacy:
+					err = output.PrintLegacyJSON(ctx, &r)
+				case *jsonOut:
+					err = output.PrintJSON(&r)
+				case *gitHubActionsFormat:
+					err = output.PrintGitHubActionsOutput(&r)
+				default:
+					err = output.PrintPlainOutput(&r)
+				}
+				if err != nil {
+					logFatal(err, "error printing results")
+				}
+			}
+
+			// e.notifySecrets(ctx)
+		}()
+	}
+
+	e.WgNotifier.Wait()
+	// for r := range e.ResultsChan() {
+	// 	if *onlyVerified && !r.Verified {
+	// 		continue
+	// 	}
+	// 	foundResults = true
+	//
+	// 	var err error
+	// 	switch {
+	// 	case *jsonLegacy:
+	// 		err = output.PrintLegacyJSON(ctx, &r)
+	// 	case *jsonOut:
+	// 		err = output.PrintJSON(&r)
+	// 	case *gitHubActionsFormat:
+	// 		err = output.PrintGitHubActionsOutput(&r)
+	// 	default:
+	// 		err = output.PrintPlainOutput(&r)
+	// 	}
+	// 	if err != nil {
+	// 		logFatal(err, "error printing results")
+	// 	}
+	// }
 	logger.V(2).Info("finished scanning",
 		"chunks", e.ChunksScanned(),
 		"bytes", e.BytesScanned(),
