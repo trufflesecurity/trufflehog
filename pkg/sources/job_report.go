@@ -1,5 +1,7 @@
 package sources
 
+//go:generate mockgen --source=./job_report.go --destination=mock_job_report_test.go --package=sources
+
 import (
 	"context"
 	"errors"
@@ -9,29 +11,62 @@ import (
 	"time"
 )
 
-type JobReportInspector interface {
-	JobReporter
-	JobInspector
+type JobReportHook interface {
+	// Start and End marks the overall start and end time for this job.
+	Start(JobReportRef, time.Time)
+	End(JobReportRef, time.Time)
+	// StartEnumerating and EndEnumerating marks the start and end time for
+	// calling the source's Enumerate method. If the source does not
+	// support enumeration these methods will never be called.
+	StartEnumerating(JobReportRef, time.Time)
+	EndEnumerating(JobReportRef, time.Time)
+	// StartUnitChunking and EndUnitChunking marks the start and end time
+	// for calling the source's ChunkUnit method for a given unit. If the
+	// source does not support enumeration these methods will never be
+	// called.
+	StartUnitChunking(JobReportRef, SourceUnit, time.Time)
+	EndUnitChunking(JobReportRef, SourceUnit, time.Time)
+	// ReportError is called when any general error is encountered, usually
+	// from enumeration.
+	ReportError(JobReportRef, error)
+	// ReportUnit is called when a unit has been enumerated. If the source
+	// does not support enumeration this method will never be called.
+	ReportUnit(JobReportRef, SourceUnit)
+	// ReportChunk is called when a chunk has been produced for the given
+	// unit. The unit will be nil if the source does not support
+	// enumeration.
+	ReportChunk(JobReportRef, SourceUnit, *Chunk)
+	// ReportChunkError is called when an error is encountered during
+	// chunking of a unit. The unit will be nil if the source does not
+	// support enumeration.
+	// TODO: We could probably use ReportError with a custom error type
+	// like we do with Fatal.
+	ReportChunkError(JobReportRef, SourceUnit, error)
+	// Finish marks the job as done.
+	Finish(JobReportRef)
 }
 
-type JobReporter interface {
-	Start(time.Time)
-	End(time.Time)
-	StartUnitChunking(SourceUnit, time.Time)
-	EndUnitChunking(SourceUnit, time.Time)
-	Finish()
-	ReportError(error)
-	ReportUnit(SourceUnit)
-	ReportChunk(SourceUnit, *Chunk)
-	ReportChunkError(SourceUnit, error)
+// JobReportRef is a wrapper of a JobReport for read-only access to its state.
+type JobReportRef struct {
+	SourceID  int64
+	JobID     int64
+	jobReport *JobReport
 }
 
-type JobInspector interface {
-	ProducedChunks() uint64
-	Complete() (uint64, int, bool)
-	FatalError() error
-	Errors() error
-	Done() <-chan struct{}
+// Snapshot returns a snapshot of the job's current metrics.
+func (r *JobReportRef) Snapshot() JobReportMetrics {
+	if r.jobReport == nil {
+		return JobReportMetrics{}
+	}
+	return r.jobReport.Snapshot()
+}
+
+// Done returns a channel that will block until the job has completed.
+func (r *JobReportRef) Done() <-chan struct{} {
+	if r.jobReport == nil {
+		return nil
+	}
+	return r.jobReport.Done()
 }
 
 // Fatal is a wrapper around error to differentiate non-fatal errors from fatal
@@ -44,59 +79,116 @@ func (f Fatal) Unwrap() error { return f.error }
 
 // JobReport aggregates information about a run of a Source.
 type JobReport struct {
-	// Tracks whether the job is finished or not.
-	ctx    context.Context
-	cancel context.CancelFunc
 	// Unique identifiers for this job.
 	SourceID int64
 	JobID    int64
+	// Tracks whether the job is finished or not.
+	ctx    context.Context
+	cancel context.CancelFunc
 	// Metrics.
+	metrics     JobReportMetrics
+	metricsLock sync.Mutex
+	// Coarse grained hooks for adding extra functionality when events trigger.
+	hooks []JobReportHook
+}
+
+// JobReportMetrics tracks the metrics of a job.
+type JobReportMetrics struct {
 	StartTime       time.Time
 	EndTime         time.Time
 	TotalUnits      uint64
 	FinishedUnits   uint64
 	TotalChunks     uint64
-	errors          ScanErrors
-	chunkErrors     map[string][]error
-	chunkErrorsLock sync.Mutex
-	doneEnumerating bool
+	Errors          []error
+	ChunkErrors     map[string][]error
+	DoneEnumerating bool
 }
 
-func NewJobReport(sourceID, jobID int64) *JobReport {
+// WithHooks adds hooks to be called when an event triggers.
+func WithHooks(hooks ...JobReportHook) func(*JobReport) {
+	return func(jr *JobReport) { jr.hooks = append(jr.hooks, hooks...) }
+}
+
+// NewJobReport creates a new job report for the given source and job ID.
+func NewJobReport(sourceID, jobID int64, opts ...func(*JobReport)) *JobReport {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &JobReport{
+	jr := &JobReport{
 		SourceID: sourceID,
 		JobID:    jobID,
 		ctx:      ctx,
 		cancel:   cancel,
 	}
+	for _, opt := range opts {
+		opt(jr)
+	}
+	return jr
 }
 
-func (jr *JobReport) SetStart(start time.Time) { jr.StartTime = start }
-func (jr *JobReport) SetEnd(end time.Time)     { jr.EndTime = end }
-func (jr *JobReport) Finish()                  { jr.cancel() }
-func (jr *JobReport) FinishEnumerating()       { jr.doneEnumerating = true }
-func (jr *JobReport) Done() <-chan struct{}    { return jr.ctx.Done() }
+// executeHooks is a helper method to execute all the hooks for the given
+// closure.
+func (jr *JobReport) executeHooks(todo func(hook JobReportHook)) {
+	for _, hook := range jr.hooks {
+		// TODO: Non-blocking?
+		todo(hook)
+	}
+}
+
+// TODO: Comment all this mess. They are mostly implementing JobReportHook but
+// without the JobReportRef parameter.
+func (jr *JobReport) Start(start time.Time) {
+	jr.metricsLock.Lock()
+	jr.metrics.StartTime = start
+	jr.metricsLock.Unlock()
+
+	jr.executeHooks(func(hook JobReportHook) { hook.Start(jr.Ref(), start) })
+}
+func (jr *JobReport) End(end time.Time) {
+	jr.metricsLock.Lock()
+	jr.metrics.EndTime = end
+	jr.metricsLock.Unlock()
+
+	jr.executeHooks(func(hook JobReportHook) { hook.End(jr.Ref(), end) })
+}
+func (jr *JobReport) Finish() {
+	jr.cancel()
+	jr.executeHooks(func(hook JobReportHook) { hook.Finish(jr.Ref()) })
+}
+func (jr *JobReport) Done() <-chan struct{} { return jr.ctx.Done() }
 func (jr *JobReport) ReportUnit(unit SourceUnit) {
-	atomic.AddUint64(&jr.TotalUnits, 1)
+	atomic.AddUint64(&jr.metrics.TotalUnits, 1)
+	jr.executeHooks(func(hook JobReportHook) { hook.ReportUnit(jr.Ref(), unit) })
 }
 func (jr *JobReport) ReportChunk(unit SourceUnit, chunk *Chunk) {
-	atomic.AddUint64(&jr.TotalChunks, 1)
+	atomic.AddUint64(&jr.metrics.TotalChunks, 1)
+	jr.executeHooks(func(hook JobReportHook) { hook.ReportChunk(jr.Ref(), unit, chunk) })
 }
-func (jr *JobReport) ProducedChunks() uint64 {
-	return atomic.LoadUint64(&jr.TotalChunks)
+func (jr *JobReport) StartUnitChunking(unit SourceUnit, start time.Time) {
+	// TODO: Record time.
+	jr.executeHooks(func(hook JobReportHook) { hook.StartUnitChunking(jr.Ref(), unit, start) })
 }
-func (jr *JobReport) Complete() (uint64, int, bool) {
-	num := atomic.LoadUint64(&jr.FinishedUnits)
-	den := atomic.LoadUint64(&jr.TotalUnits)
-	if num == 0 || den == 0 {
-		return den, 0, !jr.doneEnumerating
-	}
-	return den, int(num * 100 / den), !jr.doneEnumerating
-}
-func (jr *JobReport) StartUnitChunking(unit SourceUnit, start time.Time) {}
 func (jr *JobReport) EndUnitChunking(unit SourceUnit, end time.Time) {
-	atomic.AddUint64(&jr.FinishedUnits, 1)
+	// TODO: Record time.
+	atomic.AddUint64(&jr.metrics.FinishedUnits, 1)
+	jr.executeHooks(func(hook JobReportHook) { hook.EndUnitChunking(jr.Ref(), unit, end) })
+}
+func (jr *JobReport) StartEnumerating(start time.Time) {
+	// TODO: Record time.
+	jr.executeHooks(func(hook JobReportHook) { hook.StartEnumerating(jr.Ref(), start) })
+}
+func (jr *JobReport) EndEnumerating(end time.Time) {
+	jr.metricsLock.Lock()
+	// TODO: Record time.
+	jr.metrics.DoneEnumerating = true
+	jr.metricsLock.Unlock()
+
+	jr.executeHooks(func(hook JobReportHook) { hook.EndEnumerating(jr.Ref(), end) })
+}
+
+// Snapshot safely gets the job's current metrics.
+func (jr *JobReport) Snapshot() JobReportMetrics {
+	jr.metricsLock.Lock()
+	defer jr.metricsLock.Unlock()
+	return jr.metrics
 }
 
 // ReportError adds a non-nil error to the aggregate of errors
@@ -105,7 +197,11 @@ func (jr *JobReport) ReportError(err error) {
 	if err == nil {
 		return
 	}
-	jr.errors.Add(err)
+	jr.metricsLock.Lock()
+	jr.metrics.Errors = append(jr.metrics.Errors, err)
+	jr.metricsLock.Unlock()
+
+	jr.executeHooks(func(hook JobReportHook) { hook.ReportError(jr.Ref(), err) })
 }
 
 // AddChunkError adds a non-nil error to the aggregate of errors encountered
@@ -118,37 +214,40 @@ func (jr *JobReport) ReportChunkError(unit SourceUnit, err error) {
 	if unit != nil {
 		id = unit.SourceUnitID()
 	}
-	jr.chunkErrorsLock.Lock()
-	defer jr.chunkErrorsLock.Unlock()
-	if jr.chunkErrors == nil {
-		jr.chunkErrors = make(map[string][]error)
+	jr.metricsLock.Lock()
+	if jr.metrics.ChunkErrors == nil {
+		jr.metrics.ChunkErrors = make(map[string][]error)
 	}
-	jr.chunkErrors[id] = append(jr.chunkErrors[id], err)
+	jr.metrics.ChunkErrors[id] = append(jr.metrics.ChunkErrors[id], err)
+	jr.metricsLock.Unlock()
+
+	jr.executeHooks(func(hook JobReportHook) { hook.ReportChunkError(jr.Ref(), unit, err) })
 }
 
-// Errors joins all aggregated errors into one. If there were no errors, nil is
-// returned. errors.Is can be used to check for specific errors.
-func (jr *JobReport) Errors() error {
-	return errors.Join(jr.EnumerationErrors(), jr.ChunkErrors())
+// Ref provides a read-only reference to the JobReport.
+func (jr *JobReport) Ref() JobReportRef {
+	return JobReportRef{
+		SourceID:  jr.SourceID,
+		JobID:     jr.JobID,
+		jobReport: jr,
+	}
 }
 
 // EnumerationErrors joins all errors encountered during initialization or
 // enumeration.
-func (jr *JobReport) EnumerationErrors() error {
-	return jr.errors.Errors()
+func (m JobReportMetrics) EnumerationError() error {
+	return errors.Join(m.Errors...)
 }
 
 // ChunkErrors joins all errors encountered during chunking.
-func (jr *JobReport) ChunkErrors() error {
-	jr.chunkErrorsLock.Lock()
-	defer jr.chunkErrorsLock.Unlock()
+func (m JobReportMetrics) ChunkError() error {
 	// Check if we only have errors without unit information.
-	if errs, ok := jr.chunkErrors[""]; ok && len(jr.chunkErrors) == 1 {
+	if errs, ok := m.ChunkErrors[""]; ok && len(m.ChunkErrors) == 1 {
 		return errors.Join(errs...)
 	}
 
-	aggregate := make([]error, 0, len(jr.chunkErrors))
-	for id, errs := range jr.chunkErrors {
+	aggregate := make([]error, 0, len(m.ChunkErrors))
+	for id, errs := range m.ChunkErrors {
 		err := fmt.Errorf("unit %q\n%w\n", id, errors.Join(errs...))
 		aggregate = append(aggregate, err)
 	}
@@ -156,10 +255,20 @@ func (jr *JobReport) ChunkErrors() error {
 }
 
 // FatalError returns the first Fatal error, if any, encountered in the scan.
-func (jr *JobReport) FatalError() error {
+func (m JobReportMetrics) FatalError() error {
 	var err Fatal
-	if found := errors.As(jr.Errors(), &err); found {
+	aggregateErrors := errors.Join(m.EnumerationError(), m.ChunkError())
+	if found := errors.As(aggregateErrors, &err); found {
 		return err
 	}
 	return nil
+}
+
+func (m JobReportMetrics) PercentComplete() int {
+	num := m.FinishedUnits
+	den := m.TotalUnits
+	if num == 0 && den == 0 {
+		return 0
+	}
+	return int(num * 100 / den)
 }

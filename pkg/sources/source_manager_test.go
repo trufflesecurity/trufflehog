@@ -155,12 +155,12 @@ func TestSourceManagerError(t *testing.T) {
 	}
 	// Scheduling a run should not fail, but the error should surface in
 	// Wait().
-	inspector, err := mgr.ScheduleRun(context.Background(), handle)
+	ref, err := mgr.ScheduleRun(context.Background(), handle)
 	if err != nil {
 		t.Fatalf("unexpected error scheduling run: %v", err)
 	}
-	<-inspector.Done()
-	if err := inspector.FatalError(); err == nil {
+	<-ref.Done()
+	if err := ref.Snapshot().FatalError(); err == nil {
 		t.Fatalf("expected wait to fail")
 	}
 }
@@ -177,18 +177,15 @@ func TestSourceManagerReport(t *testing.T) {
 			t.Fatalf("unexpected error enrolling source: %v", err)
 		}
 		// Synchronously run the source.
-		report, err := mgr.Run(context.Background(), handle)
+		ref, err := mgr.Run(context.Background(), handle)
 		if err != nil {
 			t.Fatalf("unexpected error running source: %v", err)
 		}
-		if report == nil {
-			t.Fatalf("expected a report")
+		if errs := ref.Snapshot().Errors; len(errs) > 0 {
+			t.Fatalf("unexpected errors in report: %v", errs)
 		}
-		if err := report.Errors(); err != nil {
-			t.Fatalf("unexpected error in report: %v", err)
-		}
-		if report.ProducedChunks() != 4 {
-			t.Fatalf("expected report to have 4 chunks, got: %d", report.ProducedChunks())
+		if count := ref.Snapshot().TotalChunks; count != 4 {
+			t.Fatalf("expected report to have 4 chunks, got: %d", count)
 		}
 	}
 }
