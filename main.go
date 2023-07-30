@@ -339,6 +339,7 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
 		engine.WithOnlyVerified(*onlyVerified),
+		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 	)
 
@@ -498,11 +499,12 @@ func run(state overseer.State) {
 	// Wait for all workers to finish.
 	e.Finish(ctx, logFatal)
 
+	// Print results.
 	logger.Info("finished scanning",
 		"chunks", e.ChunksScanned(),
 		"bytes", e.BytesScanned(),
-		"verified-secrets", e.Metrics.VerifiedSecretsFound,
-		"unverified-secrets", e.Metrics.UnverifiedSecretsFound,
+		"verified-secrets", e.VerifiedResults(),
+		"unverified-secrets", e.UnverifiedResults(),
 	)
 
 	if *printAvgDetectorTime {

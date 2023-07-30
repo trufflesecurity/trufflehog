@@ -2,9 +2,7 @@ package engine
 
 import (
 	"bytes"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"reflect"
 	"runtime"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"time"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
@@ -30,8 +29,8 @@ import (
 type runtimeMetrics struct {
 	bytesScanned           uint64
 	chunksScanned          uint64
-	VerifiedSecretsFound   uint64
-	UnverifiedSecretsFound uint64
+	verifiedSecretsFound   uint64
+	unverifiedSecretsFound uint64
 	detectorAvgTime        sync.Map
 }
 
@@ -51,8 +50,9 @@ type Engine struct {
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
-	filterUnverified bool
-	onlyVerified     bool
+	filterUnverified     bool
+	onlyVerified         bool
+	printAvgDetectorTime bool
 
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words (keywords from the rules in the config)
@@ -63,8 +63,8 @@ type Engine struct {
 	wgDetectorWorkers sync.WaitGroup
 	WgNotifier        sync.WaitGroup
 
-	// Runtime Metrics.
-	Metrics runtimeMetrics
+	// Runtime metrics.
+	metrics runtimeMetrics
 
 	// foundResults is set to true if any results are found.
 	foundResults uint32
@@ -73,6 +73,10 @@ type Engine struct {
 	// The specific implementation (e.g., JSON, plain text)
 	// should be set during initialization based on user preference or program requirements.
 	printer Printer
+
+	// dedupeCache is used to deduplicate results by comparing the
+	// detector type, raw result, and source metadata
+	dedupeCache *lru.Cache
 }
 
 type EngineOption func(*Engine)
@@ -120,6 +124,18 @@ func WithOnlyVerified(onlyVerified bool) EngineOption {
 	}
 }
 
+// WithPrintAvgDetectorTime sets the printAvgDetectorTime flag on the engine. If set to
+// true, the engine will print the average time taken by each detector.
+// This option allows us measure the time taken for each detector ONLY if
+// the engine is configured to print the results.
+// Calculating the average time taken by each detector is an expensive operation
+// and should be avoided unless specified by the user.
+func WithPrintAvgDetectorTime(printAvgDetectorTime bool) EngineOption {
+	return func(e *Engine) {
+		e.printAvgDetectorTime = printAvgDetectorTime
+	}
+}
+
 // WithFilterDetectors applies a filter to the configured list of detectors. If
 // the filterFunc returns true, the detector will be included for scanning.
 // This option applies to the existing list of detectors configured, so the
@@ -161,9 +177,27 @@ func (e *Engine) HasFoundResults() bool {
 	return atomic.LoadUint32(&e.foundResults) == 1
 }
 
-const defaultChannelBuffer = 1
+// GetScanMetrics returns the runtime metrics for the scan.
+func (e *Engine) GetScanMetrics() runtimeMetrics {
+	return runtimeMetrics{
+		bytesScanned:           e.metrics.bytesScanned,
+		chunksScanned:          e.metrics.chunksScanned,
+		verifiedSecretsFound:   e.metrics.verifiedSecretsFound,
+		unverifiedSecretsFound: e.metrics.unverifiedSecretsFound,
+	}
+}
+
+const (
+	defaultChannelBuffer = 1
+	cacheSize            = 1000
+)
 
 func Start(ctx context.Context, options ...EngineOption) *Engine {
+	cache, err := lru.New(cacheSize)
+	if err != nil {
+		panic(err)
+	}
+
 	e := &Engine{
 		chunks:               make(chan *sources.Chunk, defaultChannelBuffer),
 		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
@@ -171,7 +205,8 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		sourcesWg:            &errgroup.Group{},
 		wgDetectorWorkers:    sync.WaitGroup{},
 		WgNotifier:           sync.WaitGroup{},
-		Metrics:              runtimeMetrics{detectorAvgTime: sync.Map{}},
+		metrics:              runtimeMetrics{detectorAvgTime: sync.Map{}},
+		dedupeCache:          cache,
 	}
 
 	for _, option := range options {
@@ -241,7 +276,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for worker := uint64(0); worker < uint64(e.Concurrency); worker++ {
 		e.workersWg.Add(1)
 		go func() {
-			ctx := context.WithValue(ctx, "secret_worker_id", RandomID(5))
+			ctx := context.WithValue(ctx, "secret_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.workersWg.Done()
 			e.detectorWorker(ctx)
@@ -253,7 +288,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for worker := uint64(0); worker < uint64(e.Concurrency*detectorWorkerMultiplier); worker++ {
 		e.wgDetectorWorkers.Add(1)
 		go func() {
-			ctx := context.WithValue(ctx, "detector_worker_id", RandomID(5))
+			ctx := context.WithValue(ctx, "detector_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.wgDetectorWorkers.Done()
 			e.detectChunks(ctx)
@@ -269,37 +304,14 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	for worker := 0; worker < maxNotifierWorkers; worker++ {
 		e.WgNotifier.Add(1)
 		go func() {
-			ctx := context.WithValue(ctx, "notifier_worker_id", RandomID(5))
+			ctx := context.WithValue(ctx, "notifier_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.WgNotifier.Done()
 			e.notifyResults(ctx)
 		}()
 	}
 
-	// Start the workers.
-	// for i := 0; i < e.concurrency; i++ {
-	// 	e.workersWg.Add(1)
-	// 	go func() {
-	// 		defer common.Recover(ctx)
-	// 		defer e.workersWg.Done()
-	// 		e.detectorWorker(ctx)
-	// 	}()
-	// }
-
 	return e
-}
-
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-// RandomID returns a random string of the given length.
-func RandomID(length int) string {
-	b := make([]rune, length)
-	for i := range b {
-		randInt, _ := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		b[i] = letters[randInt.Int64()]
-	}
-
-	return string(b)
 }
 
 // Finish waits for running sources to complete and workers to finish scanning
@@ -332,11 +344,21 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 }
 
 func (e *Engine) ChunksScanned() uint64 {
-	return e.Metrics.chunksScanned
+	return e.metrics.chunksScanned
 }
 
 func (e *Engine) BytesScanned() uint64 {
-	return e.Metrics.bytesScanned
+	return e.metrics.bytesScanned
+}
+
+// VerifiedResults returns the number of verified secrets found.
+func (e *Engine) VerifiedResults() uint64 {
+	return e.metrics.verifiedSecretsFound
+}
+
+// UnverifiedResults returns the number of unverified secrets found.
+func (e *Engine) UnverifiedResults() uint64 {
+	return e.metrics.unverifiedSecretsFound
 }
 
 func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
@@ -358,7 +380,7 @@ func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
-	e.Metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
+	e.metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
 		key, ok := k.(string)
 		if !ok {
 			logger.Info("expected DetectorAvgTime key to be a string")
@@ -389,9 +411,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
-			var chunkResults []detectors.ResultWithMetadata
 			matchedKeywords := make(map[string]struct{})
-			atomic.AddUint64(&e.Metrics.bytesScanned, uint64(len(chunk.Data)))
+			atomic.AddUint64(&e.metrics.bytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
@@ -496,9 +517,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					}
 				}
 			}
-			e.dedupeAndSend(chunkResults)
+			// e.dedupeAndSend(chunkResults)
 		}
-		atomic.AddUint64(&e.Metrics.chunksScanned, 1)
+		atomic.AddUint64(&e.metrics.chunksScanned, 1)
 	}
 	wgDetect.Wait()
 }
@@ -510,6 +531,10 @@ func (e *Engine) detectChunks(ctx context.Context) {
 }
 
 func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
+	var start time.Time
+	if e.printAvgDetectorTime {
+		start = time.Now()
+	}
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer common.Recover(ctx)
 	defer cancel()
@@ -517,6 +542,20 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	results, err := data.detector.FromData(ctx, data.chunk.Verify, data.chunk.Data)
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
+	}
+	if e.printAvgDetectorTime && len(results) > 0 {
+		elapsed := time.Since(start)
+		detectorName := results[0].DetectorType.String()
+		avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
+		var avgTime []time.Duration
+		if ok {
+			avgTime, ok = avgTimeI.([]time.Duration)
+			if !ok {
+				return
+			}
+		}
+		avgTime = append(avgTime, elapsed)
+		e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 	}
 
 	if e.filterUnverified {
@@ -530,6 +569,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 }
 
 func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
+	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
 		copyChunk := data.chunk
 		copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
@@ -537,8 +577,11 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 			copyChunk.SourceMetadata = copyMetaData
 		}
 		fragStart, mdLine := FragmentFirstLine(&copyChunk)
-		SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
 		data.chunk = copyChunk
+	}
+	if ignoreLinePresent {
+		return
 	}
 
 	secret := detectors.CopyMetadata(&data.chunk, res)
@@ -553,10 +596,16 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		}
 		e.setFoundResults()
 
+		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
+		if _, ok := e.dedupeCache.Get(key); ok {
+			continue
+		}
+		e.dedupeCache.Add(key, struct{}{})
+
 		if r.Verified {
-			atomic.AddUint64(&e.Metrics.VerifiedSecretsFound, 1)
+			atomic.AddUint64(&e.metrics.verifiedSecretsFound, 1)
 		} else {
-			atomic.AddUint64(&e.Metrics.UnverifiedSecretsFound, 1)
+			atomic.AddUint64(&e.metrics.unverifiedSecretsFound, 1)
 		}
 
 		if err := e.printer.Print(ctx, &r); err != nil {
