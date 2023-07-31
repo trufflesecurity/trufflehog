@@ -65,7 +65,7 @@ func (s *Source) cloneRepo(
 func (s *Source) getUserAndToken(ctx context.Context, repoURL string, installationClient *github.Client) error {
 	// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
 	s.userMu.Lock()
-	defer s.mu.Unlock()
+	defer s.userMu.Unlock()
 	if s.githubUser == "" || s.githubToken == "" {
 		var err error
 		s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
