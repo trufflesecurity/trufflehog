@@ -90,7 +90,7 @@ func (s *Source) setScanOptions(base, head string) {
 	s.scanOptMu.Lock()
 	defer s.scanOptMu.Unlock()
 	s.scanOptions.BaseHash = base
-	s.scanOptions.BaseHash = head
+	s.scanOptions.HeadHash = head
 }
 
 // Ensure the Source satisfies the interfaces at compile time
