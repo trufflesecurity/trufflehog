@@ -364,22 +364,7 @@ func (e *Engine) UnverifiedResults() uint64 {
 	return e.metrics.unverifiedSecretsFound
 }
 
-func (e *Engine) dedupeAndSend(chunkResults []detectors.ResultWithMetadata) {
-	dedupeMap := make(map[string]struct{})
-	for _, result := range chunkResults {
-		// dedupe by comparing the detector type, raw result, and source metadata
-		// NOTE: in order for the PLAIN decoder to maintain precedence, make sure UTF8 is the first decoder in the
-		// default decoders list
-		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
-		if _, ok := dedupeMap[key]; ok {
-			continue
-		}
-		dedupeMap[key] = struct{}{}
-		e.results <- result
-	}
-
-}
-
+// DetectorAvgTime returns the average time taken by each detector.
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
@@ -511,12 +496,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	for _, res := range results {
-		e.processResult(ctx, data, res)
+		e.processResult(data, res)
 	}
 	data.wgDoneFn()
 }
 
-func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
+func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
 		copyChunk := data.chunk
