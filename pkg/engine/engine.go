@@ -40,7 +40,7 @@ type Printer interface {
 }
 
 type Engine struct {
-	Concurrency int
+	concurrency uint8
 	chunks      chan *sources.Chunk
 	results     chan detectors.ResultWithMetadata
 	decoders    []decoders.Decoder
@@ -81,9 +81,9 @@ type Engine struct {
 
 type EngineOption func(*Engine)
 
-func WithConcurrency(concurrency int) EngineOption {
+func WithConcurrency(concurrency uint8) EngineOption {
 	return func(e *Engine) {
-		e.Concurrency = concurrency
+		e.concurrency = concurrency
 	}
 }
 
@@ -189,7 +189,8 @@ func (e *Engine) GetScanMetrics() runtimeMetrics {
 
 const (
 	defaultChannelBuffer = 1
-	cacheSize            = 1000
+	// TODO (ahrav): Determine the optimal cache size.
+	cacheSize = 512 // number of entries in the LRU cache
 )
 
 // Start the engine with options.
@@ -215,15 +216,15 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	// Set defaults.
-	if e.Concurrency == 0 {
+	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
-		e.Concurrency = numCPU
+		e.concurrency = uint8(numCPU)
 	}
-	ctx.Logger().V(3).Info("engine started", "workers", e.Concurrency)
+	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
 	// Limit number of concurrent goroutines dedicated to chunking a source.
-	e.sourcesWg.SetLimit(e.Concurrency)
+	e.sourcesWg.SetLimit(int(e.concurrency))
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
@@ -272,9 +273,9 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}
 	}
 
-	ctx.Logger().Info(fmt.Sprintf("starting %d scanner workers", e.Concurrency))
+	ctx.Logger().V(2).Info(fmt.Sprintf("starting %d scanner workers", e.concurrency))
 	// Run the Secret scanner workers and Notifier pipelines.
-	for worker := uint64(0); worker < uint64(e.Concurrency); worker++ {
+	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.workersWg.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "secret_worker_id", common.RandomID(5))
@@ -285,8 +286,8 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	const detectorWorkerMultiplier = 50
-	ctx.Logger().Info(fmt.Sprintf("starting %d detector workers", e.Concurrency*detectorWorkerMultiplier))
-	for worker := uint64(0); worker < uint64(e.Concurrency*detectorWorkerMultiplier); worker++ {
+	ctx.Logger().V(2).Info(fmt.Sprintf("starting %d detector workers", e.concurrency*detectorWorkerMultiplier))
+	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
 		e.wgDetectorWorkers.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "detector_worker_id", common.RandomID(5))
@@ -296,12 +297,13 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}()
 	}
 
-	const notifierWorkerMultiplier = 2
+	// We want 1/4th of the notifier workers as the number of scanner workers.
+	const notifierWorkerRatio = 4
 	maxNotifierWorkers := 1
-	if numWorkers := e.Concurrency / notifierWorkerMultiplier; numWorkers > 0 {
+	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
 		maxNotifierWorkers = int(numWorkers)
 	}
-	ctx.Logger().Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
+	ctx.Logger().V(2).Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
 	for worker := 0; worker < maxNotifierWorkers; worker++ {
 		e.WgNotifier.Add(1)
 		go func() {

@@ -329,7 +329,7 @@ func run(state overseer.State) {
 	}
 
 	e := engine.Start(ctx,
-		engine.WithConcurrency(*concurrency),
+		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
