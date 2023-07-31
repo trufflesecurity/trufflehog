@@ -7,12 +7,20 @@ import (
 	"github.com/pkg/errors"
 )
 
+type provider string
+
+const (
+	providerGithub    provider = "Github"
+	providerGitlab    provider = "Gitlab"
+	providerBitbucket provider = "Bitbucket"
+)
+
 func NormalizeBitbucketRepo(repoURL string) (string, error) {
 	if !strings.HasPrefix(repoURL, "https") {
 		return "", errors.New("Bitbucket requires https repo urls: e.g. https://bitbucket.org/org/repo.git")
 	}
 
-	return NormalizeOrgRepoURL("Bitbucket", repoURL)
+	return NormalizeOrgRepoURL(providerBitbucket, repoURL)
 }
 
 func NormalizeGerritProject(project string) (string, error) {
@@ -20,7 +28,7 @@ func NormalizeGerritProject(project string) (string, error) {
 }
 
 func NormalizeGithubRepo(repoURL string) (string, error) {
-	return NormalizeOrgRepoURL("Github", repoURL)
+	return NormalizeOrgRepoURL(providerGithub, repoURL)
 }
 
 func NormalizeGitlabRepo(repoURL string) (string, error) {
@@ -28,12 +36,12 @@ func NormalizeGitlabRepo(repoURL string) (string, error) {
 		return "", errors.New("Gitlab requires http/https repo urls: e.g. https://gitlab.com/org/repo.git")
 	}
 
-	return NormalizeOrgRepoURL("Gitlab", repoURL)
+	return NormalizeOrgRepoURL(providerGitlab, repoURL)
 }
 
 // NormalizeOrgRepoURL attempts to normalize repos for any provider using the example.com/org/repo style.
 // e.g. %s, Gitlab and Bitbucket
-func NormalizeOrgRepoURL(provider, repoURL string) (string, error) {
+func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 	if strings.HasSuffix(repoURL, ".git") {
 		return repoURL, nil
 	}
