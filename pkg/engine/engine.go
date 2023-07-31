@@ -563,7 +563,7 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		}
 
 		if err := e.printer.Print(ctx, &r); err != nil {
-			// common.LogFatalFunc(ctx.Logger())
+			ctx.Logger().Error(err, "error printing result")
 		}
 	}
 }
