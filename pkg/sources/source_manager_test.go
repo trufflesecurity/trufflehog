@@ -102,7 +102,7 @@ func TestSourceManagerRun(t *testing.T) {
 		t.Fatalf("unexpected error enrolling source: %v", err)
 	}
 	for i := 0; i < 3; i++ {
-		if err := mgr.Run(context.Background(), handle); err != nil {
+		if _, err := mgr.Run(context.Background(), handle); err != nil {
 			t.Fatalf("unexpected error running source: %v", err)
 		}
 		chunk, err := tryRead(mgr.Chunks())
@@ -127,20 +127,18 @@ func TestSourceManagerWait(t *testing.T) {
 		t.Fatalf("unexpected error enrolling source: %v", err)
 	}
 	// Asynchronously run the source.
-	if err := mgr.ScheduleRun(context.Background(), handle); err != nil {
+	if _, err := mgr.ScheduleRun(context.Background(), handle); err != nil {
 		t.Fatalf("unexpected error scheduling run: %v", err)
 	}
 	// Read the 1 chunk we're expecting so Waiting completes.
 	<-mgr.Chunks()
 	// Wait for all resources to complete.
-	if err := mgr.Wait(); err != nil {
-		t.Fatalf("unexpected error waiting: %v", err)
-	}
+	mgr.Wait()
 	// Enroll and run should return an error now.
 	if _, err := enrollDummy(mgr, &counterChunker{count: 1}); err == nil {
 		t.Fatalf("expected enroll to fail")
 	}
-	if err := mgr.ScheduleRun(context.Background(), handle); err == nil {
+	if _, err := mgr.ScheduleRun(context.Background(), handle); err == nil {
 		t.Fatalf("expected scheduling run to fail")
 	}
 }
@@ -152,15 +150,17 @@ func TestSourceManagerError(t *testing.T) {
 		t.Fatalf("unexpected error enrolling source: %v", err)
 	}
 	// A synchronous run should fail.
-	if err := mgr.Run(context.Background(), handle); err == nil {
+	if _, err := mgr.Run(context.Background(), handle); err == nil {
 		t.Fatalf("expected run to fail")
 	}
 	// Scheduling a run should not fail, but the error should surface in
 	// Wait().
-	if err := mgr.ScheduleRun(context.Background(), handle); err != nil {
+	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	if err != nil {
 		t.Fatalf("unexpected error scheduling run: %v", err)
 	}
-	if err := mgr.Wait(); err == nil {
+	<-ref.Done()
+	if err := ref.Snapshot().FatalError(); err == nil {
 		t.Fatalf("expected wait to fail")
 	}
 }
@@ -177,18 +177,15 @@ func TestSourceManagerReport(t *testing.T) {
 			t.Fatalf("unexpected error enrolling source: %v", err)
 		}
 		// Synchronously run the source.
-		if err := mgr.Run(context.Background(), handle); err != nil {
+		ref, err := mgr.Run(context.Background(), handle)
+		if err != nil {
 			t.Fatalf("unexpected error running source: %v", err)
 		}
-		report := mgr.Report(handle)
-		if report == nil {
-			t.Fatalf("expected a report")
+		if errs := ref.Snapshot().Errors; len(errs) > 0 {
+			t.Fatalf("unexpected errors in report: %v", errs)
 		}
-		if err := report.Errors(); err != nil {
-			t.Fatalf("unexpected error in report: %v", err)
-		}
-		if report.TotalChunks != 4 {
-			t.Fatalf("expected report to have 4 chunks, got: %d", report.TotalChunks)
+		if count := ref.Snapshot().TotalChunks; count != 4 {
+			t.Fatalf("expected report to have 4 chunks, got: %d", count)
 		}
 	}
 }
