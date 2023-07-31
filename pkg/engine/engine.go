@@ -176,10 +176,6 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 	return output
 }
 
-func (e *Engine) setFoundResults() {
-	atomic.StoreUint32(&e.numFoundResults, 1)
-}
-
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
 	return atomic.LoadUint32(&e.numFoundResults) > 0
