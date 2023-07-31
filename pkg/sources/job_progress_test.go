@@ -106,3 +106,12 @@ func TestJobProgressHook(t *testing.T) {
 	jp.ReportChunk(reportUnit, reportChunk)
 	jp.Finish()
 }
+
+func TestJobProgressDone(t *testing.T) {
+	ref := JobProgressRef{}
+	select {
+	case <-ref.Done():
+	default:
+		assert.FailNow(t, "done should not block for a nil job")
+	}
+}

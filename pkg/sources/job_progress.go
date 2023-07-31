@@ -58,7 +58,10 @@ func (r *JobProgressRef) Snapshot() JobProgressMetrics {
 // Done returns a channel that will block until the job has completed.
 func (r *JobProgressRef) Done() <-chan struct{} {
 	if r.jobProgress == nil {
-		return nil
+		// Return a closed channel so it does not block.
+		ch := make(chan struct{})
+		close(ch)
+		return ch
 	}
 	return r.jobProgress.Done()
 }
