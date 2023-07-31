@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/felixge/fgprof"
+	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -162,7 +162,7 @@ func main() {
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 	defer func() { _ = sync() }()
-	logFatal := common.LogFatalFunc(logger)
+	logFatal := logFatalFunc(logger)
 
 	updateCfg := overseer.Config{
 		Program:       run,
@@ -188,7 +188,7 @@ func main() {
 func run(state overseer.State) {
 	ctx := context.Background()
 	logger := ctx.Logger()
-	logFatal := common.LogFatalFunc(logger)
+	logFatal := logFatalFunc(logger)
 
 	logger.V(2).Info(fmt.Sprintf("trufflehog %s", version.BuildVersion))
 
@@ -328,7 +328,7 @@ func run(state overseer.State) {
 		printer = new(output.PlainPrinter)
 	}
 
-	e := engine.Start(ctx,
+	e, err := engine.Start(ctx,
 		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
@@ -341,6 +341,9 @@ func run(state overseer.State) {
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 	)
+	if err != nil {
+		logFatal(err, "error initializing engine")
+	}
 
 	var repoPath string
 	var remote bool
@@ -498,12 +501,13 @@ func run(state overseer.State) {
 	// Wait for all workers to finish.
 	e.Finish(ctx, logFatal)
 
+	metrics := e.GetMetrics()
 	// Print results.
 	logger.Info("finished scanning",
-		"chunks", e.ChunksScanned(),
-		"bytes", e.BytesScanned(),
-		"verified-secrets", e.VerifiedResults(),
-		"unverified-secrets", e.UnverifiedResults(),
+		"chunks", metrics.ChunksScanned,
+		"bytes", metrics.BytesScanned,
+		"verified_secrets", metrics.VerifiedSecretsFound,
+		"unverified_secrets", metrics.UnverifiedSecretsFound,
 	)
 
 	if *printAvgDetectorTime {
@@ -513,6 +517,19 @@ func run(state overseer.State) {
 	if e.HasFoundResults() && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
+	}
+}
+
+// logFatalFunc returns a log.Fatal style function. Calling the returned
+// function will terminate the program without cleanup.
+func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+	return func(err error, message string, keyAndVals ...any) {
+		logger.Error(err, message, keyAndVals...)
+		if err != nil {
+			os.Exit(1)
+			return
+		}
+		os.Exit(0)
 	}
 }
 
@@ -532,13 +549,8 @@ func commaSeparatedToSlice(s []string) []string {
 
 func printAverageDetectorTime(e *engine.Engine) {
 	fmt.Fprintln(os.Stderr, "Average detector time is the measurement of average time spent on each detector when results are returned.")
-	for detectorName, durations := range e.DetectorAvgTime() {
-		var total time.Duration
-		for _, d := range durations {
-			total += d
-		}
-		avgDuration := total / time.Duration(len(durations))
-		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
+	for detectorName, duration := range e.GetDetectorsMetrics() {
+		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
 }
 

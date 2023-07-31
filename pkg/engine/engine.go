@@ -20,18 +20,27 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+// Metrics for the scan engine for external consumption.
+type Metrics struct {
+	BytesScanned           uint64
+	ChunksScanned          uint64
+	VerifiedSecretsFound   uint64
+	UnverifiedSecretsFound uint64
+	AvgDetectorTime        map[string]time.Duration
+}
+
+// runtimeMetrics for the scan engine for internal use by the engine.
 type runtimeMetrics struct {
-	bytesScanned           uint64
-	chunksScanned          uint64
-	verifiedSecretsFound   uint64
-	unverifiedSecretsFound uint64
-	detectorAvgTime        sync.Map
+	mu sync.RWMutex
+	Metrics
+	detectorAvgTime sync.Map
 }
 
 // Printer is used to format found results and output them to the user. Ex JSON, plain text, etc.
@@ -59,14 +68,13 @@ type Engine struct {
 	prefilter ahocorasick.Trie
 
 	detectableChunksChan chan detectableChunk
-	// notifyChan           chan detectors.ResultWithMetadata
-	wgDetectorWorkers sync.WaitGroup
-	WgNotifier        sync.WaitGroup
+	wgDetectorWorkers    sync.WaitGroup
+	WgNotifier           sync.WaitGroup
 
 	// Runtime metrics.
 	metrics runtimeMetrics
 
-	// foundResults is set to true if any results are found.
+	// foundResults is used to keep track of the number of results found.
 	foundResults uint32
 
 	// printer provides a method for formatting and outputting search results.
@@ -126,7 +134,7 @@ func WithOnlyVerified(onlyVerified bool) EngineOption {
 
 // WithPrintAvgDetectorTime sets the printAvgDetectorTime flag on the engine. If set to
 // true, the engine will print the average time taken by each detector.
-// This option allows us measure the time taken for each detector ONLY if
+// This option allows us to measure the time taken for each detector ONLY if
 // the engine is configured to print the results.
 // Calculating the average time taken by each detector is an expensive operation
 // and should be avoided unless specified by the user.
@@ -177,18 +185,74 @@ func (e *Engine) HasFoundResults() bool {
 	return atomic.LoadUint32(&e.foundResults) == 1
 }
 
-// GetScanMetrics returns the runtime metrics for the scan.
-func (e *Engine) GetScanMetrics() runtimeMetrics {
-	return runtimeMetrics{
-		bytesScanned:           e.metrics.bytesScanned,
-		chunksScanned:          e.metrics.chunksScanned,
-		verifiedSecretsFound:   e.metrics.verifiedSecretsFound,
-		unverifiedSecretsFound: e.metrics.unverifiedSecretsFound,
+// GetMetrics returns a copy of Metrics.
+// It's safe for concurrent use, and the caller can't modify the original data.
+func (e *Engine) GetMetrics() Metrics {
+	e.metrics.mu.RLock()
+	defer e.metrics.mu.RUnlock()
+
+	result := Metrics{
+		BytesScanned:           e.metrics.BytesScanned,
+		ChunksScanned:          e.metrics.ChunksScanned,
+		VerifiedSecretsFound:   e.metrics.VerifiedSecretsFound,
+		UnverifiedSecretsFound: e.metrics.UnverifiedSecretsFound,
+		AvgDetectorTime:        map[string]time.Duration{},
 	}
+
+	for detectorName, durations := range e.DetectorAvgTime() {
+		var total time.Duration
+		for _, d := range durations {
+			total += d
+		}
+		avgDuration := total / time.Duration(len(durations))
+		result.AvgDetectorTime[detectorName] = avgDuration
+	}
+
+	return result
+}
+
+// GetDetectorsMetrics returns a copy of the average time taken by each detector.
+func (e *Engine) GetDetectorsMetrics() map[string]time.Duration {
+	e.metrics.mu.RLock()
+	defer e.metrics.mu.RUnlock()
+
+	result := make(map[string]time.Duration, len(DefaultDetectors()))
+	for detectorName, durations := range e.DetectorAvgTime() {
+		var total time.Duration
+		for _, d := range durations {
+			total += d
+		}
+		avgDuration := total / time.Duration(len(durations))
+		result[detectorName] = avgDuration
+	}
+
+	return result
+}
+
+// DetectorAvgTime returns the average time taken by each detector.
+func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
+	logger := context.Background().Logger()
+	avgTime := map[string][]time.Duration{}
+	e.metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
+		key, ok := k.(string)
+		if !ok {
+			logger.Info("expected detectorAvgTime key to be a string")
+			return true
+		}
+
+		value, ok := v.([]time.Duration)
+		if !ok {
+			logger.Info("expected detectorAvgTime value to be []time.Duration")
+			return true
+		}
+		avgTime[key] = value
+		return true
+	})
+	return avgTime
 }
 
 // Start the engine with options.
-func Start(ctx context.Context, options ...EngineOption) *Engine {
+func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	const (
 		defaultChannelBuffer = 1
 		// TODO (ahrav): Determine the optimal cache size.
@@ -197,7 +261,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 
 	cache, err := lru.New(cacheSize)
 	if err != nil {
-		common.LogFatalFunc(ctx.Logger())
+		return nil, fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
 
 	e := &Engine{
@@ -205,10 +269,8 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
 		results:              make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
 		sourcesWg:            &errgroup.Group{},
-		wgDetectorWorkers:    sync.WaitGroup{},
-		WgNotifier:           sync.WaitGroup{},
-		metrics:              runtimeMetrics{detectorAvgTime: sync.Map{}},
 		dedupeCache:          cache,
+		printer:              new(output.PlainPrinter), // default printer
 	}
 
 	for _, option := range options {
@@ -273,7 +335,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}
 	}
 
-	ctx.Logger().V(2).Info(fmt.Sprintf("starting %d scanner workers", e.concurrency))
+	ctx.Logger().V(2).Info("starting scanner workers", "count", e.concurrency)
 	// Run the Secret scanner workers and Notifier pipelines.
 	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.workersWg.Add(1)
@@ -286,7 +348,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	}
 
 	const detectorWorkerMultiplier = 50
-	ctx.Logger().V(2).Info(fmt.Sprintf("starting %d detector workers", e.concurrency*detectorWorkerMultiplier))
+	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
 		e.wgDetectorWorkers.Add(1)
 		go func() {
@@ -303,7 +365,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
 		maxNotifierWorkers = int(numWorkers)
 	}
-	ctx.Logger().V(2).Info(fmt.Sprintf("starting %d notifier workers", maxNotifierWorkers))
+	ctx.Logger().V(2).Info("starting notifier workers", "count", maxNotifierWorkers)
 	for worker := 0; worker < maxNotifierWorkers; worker++ {
 		e.WgNotifier.Add(1)
 		go func() {
@@ -314,7 +376,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		}()
 	}
 
-	return e
+	return e, nil
 }
 
 // Finish waits for running sources to complete and workers to finish scanning
@@ -346,46 +408,6 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 	return e.results
 }
 
-func (e *Engine) ChunksScanned() uint64 {
-	return e.metrics.chunksScanned
-}
-
-func (e *Engine) BytesScanned() uint64 {
-	return e.metrics.bytesScanned
-}
-
-// VerifiedResults returns the number of verified secrets found.
-func (e *Engine) VerifiedResults() uint64 {
-	return e.metrics.verifiedSecretsFound
-}
-
-// UnverifiedResults returns the number of unverified secrets found.
-func (e *Engine) UnverifiedResults() uint64 {
-	return e.metrics.unverifiedSecretsFound
-}
-
-// DetectorAvgTime returns the average time taken by each detector.
-func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
-	logger := context.Background().Logger()
-	avgTime := map[string][]time.Duration{}
-	e.metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
-		key, ok := k.(string)
-		if !ok {
-			logger.Info("expected DetectorAvgTime key to be a string")
-			return true
-		}
-
-		value, ok := v.([]time.Duration)
-		if !ok {
-			logger.Info("expected DetectorAvgTime value to be []time.Duration")
-			return true
-		}
-		avgTime[key] = value
-		return true
-	})
-	return avgTime
-}
-
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
 	detector detectors.Detector
@@ -400,7 +422,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	for originalChunk := range e.chunks {
 		for chunk := range sources.Chunker(originalChunk) {
 			matchedKeywords := make(map[string]struct{})
-			atomic.AddUint64(&e.metrics.bytesScanned, uint64(len(chunk.Data)))
+			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
 				switch decoder.(type) {
@@ -452,7 +474,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 			}
 		}
-		atomic.AddUint64(&e.metrics.chunksScanned, 1)
+		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
 	wgDetect.Wait()
 }
@@ -536,13 +558,13 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		e.dedupeCache.Add(key, struct{}{})
 
 		if r.Verified {
-			atomic.AddUint64(&e.metrics.verifiedSecretsFound, 1)
+			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
 		} else {
-			atomic.AddUint64(&e.metrics.unverifiedSecretsFound, 1)
+			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
 		}
 
 		if err := e.printer.Print(ctx, &r); err != nil {
-			common.LogFatalFunc(ctx.Logger())
+			// common.LogFatalFunc(ctx.Logger())
 		}
 	}
 }

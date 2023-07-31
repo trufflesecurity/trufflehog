@@ -65,12 +65,13 @@ func TestGitEngine(t *testing.T) {
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
-			e := Start(ctx,
+			e, err := Start(ctx,
 				WithConcurrency(1),
 				WithDecoders(decoders.DefaultDecoders()...),
 				WithDetectors(true, DefaultDetectors()...),
 				WithPrinter(new(discardPrinter)),
 			)
+			assert.Nil(t, err)
 
 			cfg := sources.GitConfig{
 				RepoPath: path,
@@ -120,11 +121,13 @@ func BenchmarkGitEngine(b *testing.B) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	e := Start(ctx,
+	e, err := Start(ctx,
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(false, DefaultDetectors()...),
 	)
+	assert.Nil(b, err)
+
 	go func() {
 		resultCount := 0
 		for range e.ResultsChan() {
