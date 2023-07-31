@@ -256,6 +256,8 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		unitCh: make(chan SourceUnit),
 		report: report,
 	}
+	// Create a function that will save the first error encountered (if
+	// any) and discard the rest.
 	fatalErr := make(chan error, 1)
 	catchFirstFatal := func(err error) {
 		select {
