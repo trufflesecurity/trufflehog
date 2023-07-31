@@ -73,10 +73,12 @@ func isErrDeterminate(err error) bool {
 		switch e.Unwrap().(type) {
 		case *auth.Error:
 			return true
+		default:
+			return false
 		}
+	default:
+		return false
 	}
-
-	return false
 }
 
 func verifyUri(uri string, timeout time.Duration) error {
