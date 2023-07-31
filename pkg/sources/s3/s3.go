@@ -143,20 +143,6 @@ func (s *Source) newRoleClient(region string, roleArn string) (*s3.S3, error) {
 
 	var baseCredentials *credentials.Credentials
 
-	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.S3_SessionToken:
-		baseCredentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
-	case *sourcespb.S3_AccessKey:
-		baseCredentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
-	case *sourcespb.S3_Unauthenticated:
-		baseCredentials = credentials.AnonymousCredentials
-	case *sourcespb.S3_CloudEnvironment:
-		// Nothing needs to be done!
-	default:
-		return nil, errors.Errorf("invalid configuration given for %s source", s.name)
-	}
-
-
 	sess, err := session.NewSession(cfg)
 	if err != nil {
 		return nil, err
