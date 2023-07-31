@@ -5,13 +5,17 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 var dedupeCache = make(map[string]struct{})
 
-func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
+// GitHubActionsPrinter is a printer that prints results in GitHub Actions format.
+type GitHubActionsPrinter struct{}
+
+func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := gitHubActionsOutputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),

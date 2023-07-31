@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
@@ -323,8 +322,21 @@ func run(state overseer.State) {
 		return true
 	}
 
-	e := engine.Start(ctx,
-		engine.WithConcurrency(*concurrency),
+	// Set how the engine will print its results.
+	var printer engine.Printer
+	switch {
+	case *jsonLegacy:
+		printer = new(output.LegacyJSONPrinter)
+	case *jsonOut:
+		printer = new(output.JSONPrinter)
+	case *gitHubActionsFormat:
+		printer = new(output.GitHubActionsPrinter)
+	default:
+		printer = new(output.PlainPrinter)
+	}
+
+	e, err := engine.Start(ctx,
+		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
 		engine.WithDetectors(!*noVerification, conf.Detectors...),
@@ -332,7 +344,13 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
+		engine.WithOnlyVerified(*onlyVerified),
+		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
+		engine.WithPrinter(printer),
 	)
+	if err != nil {
+		logFatal(err, "error initializing engine")
+	}
 
 	var repoPath string
 	var remote bool
@@ -482,49 +500,45 @@ func run(state overseer.State) {
 			logFatal(err, "Failed to scan Docker.")
 		}
 	}
-	// asynchronously wait for scanning to finish and cleanup
-	go e.Finish(ctx, logFatal)
 
 	if !*jsonLegacy && !*jsonOut {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
-	// NOTE: this loop will terminate when the results channel is closed in
-	// e.Finish()
-	foundResults := false
-	for r := range e.ResultsChan() {
-		if *onlyVerified && !r.Verified {
-			continue
-		}
-		foundResults = true
-
-		var err error
-		switch {
-		case *jsonLegacy:
-			err = output.PrintLegacyJSON(ctx, &r)
-		case *jsonOut:
-			err = output.PrintJSON(&r)
-		case *gitHubActionsFormat:
-			err = output.PrintGitHubActionsOutput(&r)
-		default:
-			err = output.PrintPlainOutput(&r)
-		}
-		if err != nil {
-			logFatal(err, "error printing results")
-		}
+	// Wait for all workers to finish.
+	if err = e.Finish(ctx); err != nil {
+		logFatal(err, "engine failed to finish execution")
 	}
-	logger.V(2).Info("finished scanning",
-		"chunks", e.ChunksScanned(),
-		"bytes", e.BytesScanned(),
+
+	metrics := e.GetMetrics()
+	// Print results.
+	logger.Info("finished scanning",
+		"chunks", metrics.ChunksScanned,
+		"bytes", metrics.BytesScanned,
+		"verified_secrets", metrics.VerifiedSecretsFound,
+		"unverified_secrets", metrics.UnverifiedSecretsFound,
 	)
 
 	if *printAvgDetectorTime {
 		printAverageDetectorTime(e)
 	}
 
-	if foundResults && *fail {
+	if e.HasFoundResults() && *fail {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
+	}
+}
+
+// logFatalFunc returns a log.Fatal style function. Calling the returned
+// function will terminate the program without cleanup.
+func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
+	return func(err error, message string, keyAndVals ...any) {
+		logger.Error(err, message, keyAndVals...)
+		if err != nil {
+			os.Exit(1)
+			return
+		}
+		os.Exit(0)
 	}
 }
 
@@ -544,26 +558,8 @@ func commaSeparatedToSlice(s []string) []string {
 
 func printAverageDetectorTime(e *engine.Engine) {
 	fmt.Fprintln(os.Stderr, "Average detector time is the measurement of average time spent on each detector when results are returned.")
-	for detectorName, durations := range e.DetectorAvgTime() {
-		var total time.Duration
-		for _, d := range durations {
-			total += d
-		}
-		avgDuration := total / time.Duration(len(durations))
-		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, avgDuration)
-	}
-}
-
-// logFatalFunc returns a log.Fatal style function. Calling the returned
-// function will terminate the program without cleanup.
-func logFatalFunc(logger logr.Logger) func(error, string, ...any) {
-	return func(err error, message string, keyAndVals ...any) {
-		logger.Error(err, message, keyAndVals...)
-		if err != nil {
-			os.Exit(1)
-			return
-		}
-		os.Exit(0)
+	for detectorName, duration := range e.GetDetectorsMetrics() {
+		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
 }
 

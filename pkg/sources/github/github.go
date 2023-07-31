@@ -44,30 +44,38 @@ const (
 )
 
 type Source struct {
-	name                 string
-	githubUser           string
-	githubToken          string
-	sourceID             int64
-	jobID                int64
-	verify               bool
-	repos                []string
-	members              []string
-	orgsCache            cache.Cache
-	filteredRepoCache    *filteredRepoCache
-	memberCache          map[string]struct{}
-	repoSizes            repoSize
-	totalRepoSize        int // total size in bytes of all repos
-	git                  *git.Git
-	scanOptions          *git.ScanOptions
-	httpClient           *http.Client
-	log                  logr.Logger
-	conn                 *sourcespb.GitHub
-	jobPool              *errgroup.Group
-	resumeInfoMutex      sync.Mutex
-	resumeInfoSlice      []string
-	apiClient            *github.Client
-	mu                   sync.Mutex
-	publicMap            map[string]source_metadatapb.Visibility
+	name string
+	// Protects the user and token.
+	userMu      sync.Mutex
+	githubUser  string
+	githubToken string
+
+	sourceID          int64
+	jobID             int64
+	verify            bool
+	repos             []string
+	members           []string
+	orgsCache         cache.Cache
+	filteredRepoCache *filteredRepoCache
+	memberCache       map[string]struct{}
+	repoSizes         repoSize
+	totalRepoSize     int // total size in bytes of all repos
+	git               *git.Git
+
+	scanOptMu   sync.Mutex // protects the scanOptions
+	scanOptions *git.ScanOptions
+
+	httpClient      *http.Client
+	log             logr.Logger
+	conn            *sourcespb.GitHub
+	jobPool         *errgroup.Group
+	resumeInfoMutex sync.Mutex
+	resumeInfoSlice []string
+	apiClient       *github.Client
+
+	mu        sync.Mutex // protects the visibility maps
+	publicMap map[string]source_metadatapb.Visibility
+
 	includePRComments    bool
 	includeIssueComments bool
 	includeGistComments  bool
@@ -77,6 +85,13 @@ type Source struct {
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
+}
+
+func (s *Source) setScanOptions(base, head string) {
+	s.scanOptMu.Lock()
+	defer s.scanOptMu.Unlock()
+	s.scanOptions.BaseHash = base
+	s.scanOptions.HeadHash = head
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -683,6 +698,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
 			if err != nil {
 				scanErrs.Add(err)
+				return nil
 			}
 
 			defer os.RemoveAll(path)
@@ -691,8 +707,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			s.scanOptions.BaseHash = s.conn.Base
-			s.scanOptions.HeadHash = s.conn.Head
+			s.setScanOptions(s.conn.Base, s.conn.Head)
 
 			repoSize := s.repoSizes.getRepo(repoURL)
 			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size", repoSize)
