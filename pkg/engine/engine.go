@@ -203,7 +203,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 	e := &Engine{
 		chunks:               make(chan *sources.Chunk, defaultChannelBuffer),
 		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
-		results:              make(chan detectors.ResultWithMetadata),
+		results:              make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
 		sourcesWg:            &errgroup.Group{},
 		wgDetectorWorkers:    sync.WaitGroup{},
 		WgNotifier:           sync.WaitGroup{},
