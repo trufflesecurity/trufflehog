@@ -74,8 +74,8 @@ type Engine struct {
 	// Runtime metrics.
 	metrics runtimeMetrics
 
-	// foundResults is used to keep track of the number of results found.
-	foundResults uint32
+	// numFoundResults is used to keep track of the number of results found.
+	numFoundResults uint32
 
 	// printer provides a method for formatting and outputting search results.
 	// The specific implementation (e.g., JSON, plain text)
@@ -177,12 +177,12 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 }
 
 func (e *Engine) setFoundResults() {
-	atomic.StoreUint32(&e.foundResults, 1)
+	atomic.StoreUint32(&e.numFoundResults, 1)
 }
 
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
-	return atomic.LoadUint32(&e.foundResults) == 1
+	return atomic.LoadUint32(&e.numFoundResults) > 0
 }
 
 // GetMetrics returns a copy of Metrics.
@@ -191,13 +191,8 @@ func (e *Engine) GetMetrics() Metrics {
 	e.metrics.mu.RLock()
 	defer e.metrics.mu.RUnlock()
 
-	result := Metrics{
-		BytesScanned:           e.metrics.BytesScanned,
-		ChunksScanned:          e.metrics.ChunksScanned,
-		VerifiedSecretsFound:   e.metrics.VerifiedSecretsFound,
-		UnverifiedSecretsFound: e.metrics.UnverifiedSecretsFound,
-		AvgDetectorTime:        map[string]time.Duration{},
-	}
+	result := e.metrics.Metrics
+	result.AvgDetectorTime = make(map[string]time.Duration, len(e.metrics.AvgDetectorTime))
 
 	for detectorName, durations := range e.DetectorAvgTime() {
 		var total time.Duration
@@ -548,7 +543,7 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		if e.onlyVerified && !r.Verified {
 			continue
 		}
-		e.setFoundResults()
+		atomic.AddUint32(&e.numFoundResults, 1)
 
 		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
 		if _, ok := e.dedupeCache.Get(key); ok {
