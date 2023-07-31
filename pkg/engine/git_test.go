@@ -85,7 +85,7 @@ func TestGitEngine(t *testing.T) {
 			}
 
 			// Wait for all the chunks to be processed.
-			e.Finish(ctx)
+			assert.Nil(t, e.Finish(ctx))
 			for result := range e.ResultsChan() {
 				switch meta := result.SourceMetadata.GetData().(type) {
 				case *source_metadatapb.MetaData_Git:
