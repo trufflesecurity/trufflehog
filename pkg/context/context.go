@@ -3,17 +3,25 @@ package context
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 )
 
 var (
 	// defaultLogger can be set via SetDefaultLogger.
-	defaultLogger logr.Logger = logr.Discard()
+	// It is initialized to write to stderr. To disable, you can call
+	// SetDefaultLogger with logr.Discard().
+	defaultLogger logr.Logger
 )
+
+func init() {
+	defaultLogger, _ = log.New("context", log.WithConsoleSink(os.Stderr))
+}
 
 // Context wraps context.Context and includes an additional Logger() method.
 type Context interface {
@@ -136,7 +144,9 @@ func AddLogger(parent context.Context) Context {
 }
 
 // SetupDefaultLogger sets the package-level global default logger that will be
-// used for Background and TODO contexts.
+// used for Background and TODO contexts. On startup, the default logger will
+// be configured to output logs to stderr. Use logr.Discard() to disable all
+// logs from Contexts.
 func SetDefaultLogger(l logr.Logger) {
 	defaultLogger = l
 }
