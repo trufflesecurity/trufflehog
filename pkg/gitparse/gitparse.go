@@ -237,7 +237,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	outReader := bufio.NewReader(stdOut)
 	var (
 		currentCommit *Commit
-		currentDiff   *Diff
+		currentDiff   Diff
 
 		totalLogSize int
 	)
@@ -260,8 +260,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = CommitLine
 
 			// If there is a currentDiff, add it to currentCommit.
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				currentCommit.Size += currentDiff.Content.Len()
 			}
 			// If there is a currentCommit, send it to the channel.
@@ -270,7 +270,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = &Diff{}
+			currentDiff = Diff{}
 			currentCommit = &Commit{
 				Message: strings.Builder{},
 			}
@@ -309,8 +309,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if currentCommit == nil {
 				currentCommit = &Commit{}
 			}
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
 				totalSize := 0
 				for _, diff := range currentCommit.Diffs {
@@ -331,7 +331,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = &Diff{}
+			currentDiff = Diff{}
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -354,15 +354,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isHunkLineNumberLine(isStaged, latestState, line):
 			latestState = HunkLineNumberLine
 
-			// TODO: Is it still necessary to check whether the currentDiff is nil?
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 			}
-			newDiff := &Diff{
+			currentDiff = Diff{
 				PathB: currentDiff.PathB,
 			}
-
-			currentDiff = newDiff
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -420,14 +417,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = ParseFailure
 		}
 
-		if currentDiff != nil && currentDiff.Content.Len() > c.maxDiffSize {
+		if currentDiff.Content.Len() > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
 			))
 			break
 		}
 	}
-	cleanupParse(currentCommit, currentDiff, commitChan, &totalLogSize)
+	cleanupParse(currentCommit, &currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
