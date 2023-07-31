@@ -499,7 +499,9 @@ func run(state overseer.State) {
 	}
 
 	// Wait for all workers to finish.
-	e.Finish(ctx, logFatal)
+	if err = e.Finish(ctx); err != nil {
+		logFatal(err, "engine failed to finish execution")
+	}
 
 	metrics := e.GetMetrics()
 	// Print results.

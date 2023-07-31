@@ -382,13 +382,10 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 // Finish waits for running sources to complete and workers to finish scanning
 // chunks before closing their respective channels. Once Finish is called, no
 // more sources may be scanned by the engine.
-func (e *Engine) Finish(ctx context.Context, logFunc func(error, string, ...any)) {
+func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
 	// Wait for the sources to finish putting chunks onto the chunks channel.
-	sourceErr := e.sourcesWg.Wait()
-	if sourceErr != nil {
-		logFunc(sourceErr, "error occurred while collecting chunks")
-	}
+	err := e.sourcesWg.Wait()
 
 	close(e.chunks) // Source workers are done.
 
@@ -398,6 +395,8 @@ func (e *Engine) Finish(ctx context.Context, logFunc func(error, string, ...any)
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
+
+	return err
 }
 
 func (e *Engine) ChunksChan() chan *sources.Chunk {
