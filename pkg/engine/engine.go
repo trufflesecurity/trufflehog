@@ -187,14 +187,14 @@ func (e *Engine) GetScanMetrics() runtimeMetrics {
 	}
 }
 
-const (
-	defaultChannelBuffer = 1
-	// TODO (ahrav): Determine the optimal cache size.
-	cacheSize = 512 // number of entries in the LRU cache
-)
-
 // Start the engine with options.
 func Start(ctx context.Context, options ...EngineOption) *Engine {
+	const (
+		defaultChannelBuffer = 1
+		// TODO (ahrav): Determine the optimal cache size.
+		cacheSize = 512 // number of entries in the LRU cache
+	)
+
 	cache, err := lru.New(cacheSize)
 	if err != nil {
 		common.LogFatalFunc(ctx.Logger())
