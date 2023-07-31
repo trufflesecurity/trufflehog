@@ -23,7 +23,7 @@ type SourceInitFunc func(ctx context.Context, sourceID int64, jobID int64) (Sour
 
 type SourceManager struct {
 	api   apiClient
-	hooks []JobReportHook
+	hooks []JobProgressHook
 	// Map of handle to source initializer.
 	handles     map[handle]SourceInitFunc
 	handlesLock sync.Mutex
@@ -47,12 +47,12 @@ type apiClient interface {
 }
 
 // WithAPI adds an API client to the manager for tracking jobs and progress. If
-// the API is also a JobReportHook, it will be added to the list of event hooks.
+// the API is also a JobProgressHook, it will be added to the list of event hooks.
 func WithAPI(api apiClient) func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.api = api }
 }
 
-func WithReportHook(hook JobReportHook) func(*SourceManager) {
+func WithReportHook(hook JobProgressHook) func(*SourceManager) {
 	return func(mgr *SourceManager) {
 		mgr.hooks = append(mgr.hooks, hook)
 	}
@@ -116,7 +116,7 @@ func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.
 
 // Run blocks until a resource is available to run the source, then
 // synchronously runs it. The first fatal error, if any, will be returned.
-func (s *SourceManager) Run(ctx context.Context, handle handle) (JobReportRef, error) {
+func (s *SourceManager) Run(ctx context.Context, handle handle) (JobProgressRef, error) {
 	report, err := s.asyncRun(ctx, handle)
 	if err != nil {
 		return report, err
@@ -127,26 +127,26 @@ func (s *SourceManager) Run(ctx context.Context, handle handle) (JobReportRef, e
 
 // ScheduleRun blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is stored and accessible via the
-// JobReportRef as it becomes available.
-func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) (JobReportRef, error) {
+// JobProgressRef as it becomes available.
+func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) (JobProgressRef, error) {
 	return s.asyncRun(ctx, handle)
 }
 
 // asyncRun is a helper method to asynchronously run the Source. It calls out
 // to the API to get a job ID for this run, creates a report, then waits for an
 // available goroutine to asynchronously run it.
-func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobReportRef, error) {
+func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgressRef, error) {
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx, handle); err != nil {
-		return JobReportRef{}, err
+		return JobProgressRef{}, err
 	}
 	// Get a Job ID.
 	jobID, err := s.api.GetJobID(ctx, int64(handle))
 	if err != nil {
-		return JobReportRef{SourceID: int64(handle)}, err
+		return JobProgressRef{SourceID: int64(handle)}, err
 	}
 	// Start a report for this job.
-	report := NewJobReport(int64(handle), jobID, WithHooks(s.hooks...))
+	report := NewJobProgress(int64(handle), jobID, WithHooks(s.hooks...))
 	s.pool.Go(func() error {
 		defer common.Recover(ctx)
 		_ = s.run(ctx, handle, jobID, report)
@@ -194,8 +194,8 @@ func (s *SourceManager) preflightChecks(ctx context.Context, handle handle) erro
 
 // run is a helper method to sychronously run the source. It does not check for
 // acquired resources. An error is returned if there was a fatal error during
-// the run. This information is also recorded in the JobReport.
-func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, report *JobReport) error {
+// the run. This information is also recorded in the JobProgress.
+func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, report *JobProgress) error {
 	defer report.Finish()
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
@@ -222,7 +222,7 @@ func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, rep
 
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
-func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, source Source, report *JobReport) error {
+func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, source Source, report *JobProgress) error {
 	// Introspect on the chunks we get from the Chunks method.
 	ch := make(chan *Chunk)
 	var wg sync.WaitGroup
@@ -251,7 +251,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 // runWithUnits is a helper method to run a Source that is also a
 // SourceUnitEnumChunker. This allows better introspection of what is getting
 // scanned and any errors encountered.
-func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source SourceUnitEnumChunker, report *JobReport) error {
+func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source SourceUnitEnumChunker, report *JobProgress) error {
 	unitReporter := &mgrUnitReporter{
 		unitCh: make(chan SourceUnit),
 		report: report,
@@ -346,7 +346,7 @@ func (api *headlessAPI) GetJobID(ctx context.Context, id int64) (int64, error) {
 // mgrUnitReporter implements the UnitReporter interface.
 type mgrUnitReporter struct {
 	unitCh chan SourceUnit
-	report *JobReport
+	report *JobProgress
 }
 
 func (s *mgrUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
@@ -362,7 +362,7 @@ func (s *mgrUnitReporter) UnitErr(ctx context.Context, err error) error {
 type mgrChunkReporter struct {
 	unit    SourceUnit
 	chunkCh chan *Chunk
-	report  *JobReport
+	report  *JobProgress
 }
 
 func (s *mgrChunkReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
