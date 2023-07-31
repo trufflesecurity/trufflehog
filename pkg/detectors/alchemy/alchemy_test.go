@@ -104,7 +104,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantStatusHttpClient(404)},
+			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),

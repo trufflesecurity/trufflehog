@@ -185,6 +185,7 @@ message GitHub {
   repeated string includeRepos = 12;
   bool includePullRequestComments = 14;
   bool includeIssueComments = 15;
+  bool includeGistComments = 16;
 }
 
 message GoogleDrive {

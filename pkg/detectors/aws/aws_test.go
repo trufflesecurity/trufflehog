@@ -17,6 +17,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
+
 func TestAWS_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -69,7 +71,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified",
-			s:    scanner{},
+			s:    scanner{verificationClient: unverifiedSecretClient},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
@@ -163,7 +165,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified, with leading +",
-			s:    scanner{},
+			s:    scanner{verificationClient: unverifiedSecretClient},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", "+HaNv9cTwheDKGJaws/+BMF2GgybQgBWdhcOOdfF", id)), // the secret would satisfy the regex but not pass validation
@@ -194,9 +196,45 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for http timeout",
-			s:    scanner{},
+			s:    scanner{verificationClient: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
-				ctx:    timeoutContext(1 * time.Microsecond),
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: true,
+		},
+		{
+			name: "found, unverified due to unexpected http response status",
+			s:    scanner{verificationClient: common.ConstantResponseHttpClient(500, "internal server error")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: true,
+		},
+		{
+			name: "found, unverified due to unexpected 403 response reason",
+			s:    scanner{verificationClient: common.ConstantResponseHttpClient(403, `{"Error": {"Code": "SignatureDoesNotMatch"} }`)},
+			args: args{
+				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
 				verify: true,
 			},
@@ -224,7 +262,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError != nil) != tt.wantVerificationError {
-					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationError)
+					t.Fatalf("wantVerificationError %v, verification error = %v", tt.wantVerificationError, got[i].VerificationError)
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "VerificationError")
@@ -248,9 +286,4 @@ func BenchmarkFromData(benchmark *testing.B) {
 			}
 		})
 	}
-}
-
-func timeoutContext(timeout time.Duration) context.Context {
-	c, _ := context.WithTimeout(context.Background(), timeout)
-	return c
 }
