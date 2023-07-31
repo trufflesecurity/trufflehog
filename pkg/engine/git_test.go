@@ -84,11 +84,8 @@ func TestGitEngine(t *testing.T) {
 				return
 			}
 
-			logFatalFunc := func(_ error, _ string, _ ...any) {
-				t.Fatalf("error logging function should not have been called")
-			}
 			// Wait for all the chunks to be processed.
-			e.Finish(ctx, logFatalFunc)
+			e.Finish(ctx)
 			for result := range e.ResultsChan() {
 				switch meta := result.SourceMetadata.GetData().(type) {
 				case *source_metadatapb.MetaData_Git:
@@ -104,7 +101,8 @@ func TestGitEngine(t *testing.T) {
 				}
 
 			}
-			assert.Equal(t, len(tTest.expected), int(e.VerifiedResults())+int(e.UnverifiedResults()))
+			metrics := e.GetMetrics()
+			assert.Equal(t, len(tTest.expected), int(metrics.VerifiedSecretsFound)+int(metrics.UnverifiedSecretsFound))
 		})
 	}
 }
@@ -146,8 +144,5 @@ func BenchmarkGitEngine(b *testing.B) {
 			return
 		}
 	}
-	logFatalFunc := func(_ error, _ string, _ ...any) {
-		b.Fatalf("error logging function should not have been called")
-	}
-	e.Finish(ctx, logFatalFunc)
+	assert.Nil(b, e.Finish(ctx))
 }
