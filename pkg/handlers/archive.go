@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/mholt/archiver/v4"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type ctxKey int
@@ -52,14 +54,14 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 }
 
 // FromFile extracts the files from an archive.
-func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]byte) {
-	archiveChan := make(chan ([]byte), 512)
+func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ChunkOpt {
+	archiveChan := make(chan ChunkOpt, 512)
 	go func() {
 		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
 		logger := logContext.AddLogger(ctx).Logger()
 		defer cancel()
 		defer close(archiveChan)
-		err := d.openArchive(ctx, 0, data, archiveChan)
+		err := d.openArchive(ctx, nil, data, archiveChan)
 		if err != nil {
 			if errors.Is(err, archiver.ErrNoMatch) {
 				return
@@ -71,18 +73,21 @@ func (d *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]
 }
 
 // openArchive takes a reader and extracts the contents up to the maximum depth.
-func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan ([]byte)) error {
-	if depth >= maxDepth {
+func (d *Archive) openArchive(ctx context.Context, depth []string, reader io.Reader, archiveChan chan ChunkOpt) error {
+	if len(depth) >= maxDepth {
 		return fmt.Errorf("max archive depth reached")
 	}
 	format, reader, err := archiver.Identify("", reader)
 	if err != nil {
-		if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
+		if errors.Is(err, archiver.ErrNoMatch) && len(depth) > 0 {
 			chunkSize := 10 * 1024
 			for {
-				chunk := make([]byte, chunkSize)
-				n, _ := reader.Read(chunk)
-				archiveChan <- chunk
+				data := make([]byte, chunkSize)
+				n, _ := reader.Read(data)
+				archiveChan <- func(chunk *sources.Chunk) {
+					chunk.Data = data
+					chunk.HandleMetadata = map[string]string{"archive path": strings.Join(depth, " > ")}
+				}
 				if n < chunkSize {
 					break
 				}
@@ -102,9 +107,9 @@ func (d *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 			return err
 		}
 		newReader := bytes.NewReader(fileBytes)
-		return d.openArchive(ctx, depth+1, newReader, archiveChan)
+		return d.openArchive(ctx, append(depth, "decompressed"), newReader, archiveChan)
 	case archiver.Extractor:
-		err := archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, d.extractorHandler(archiveChan))
+		err := archive.Extract(context.WithValue(ctx, depthKey, depth), reader, nil, d.extractorHandler(archiveChan))
 		if err != nil {
 			return err
 		}
@@ -129,12 +134,12 @@ func (d *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, 
 }
 
 // extractorHandler is applied to each file in an archiver.Extractor file.
-func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Context, archiver.File) error {
+func (d *Archive) extractorHandler(archiveChan chan ChunkOpt) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, f archiver.File) error {
 		logger := logContext.AddLogger(ctx).Logger()
 		logger.V(5).Info("Handling extracted file.", "filename", f.Name())
-		depth := 0
-		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
+		var depth []string
+		if ctxDepth, ok := ctx.Value(depthKey).([]string); ok {
 			depth = ctxDepth
 		}
 
@@ -148,7 +153,7 @@ func (d *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Conte
 		}
 		fileContent := bytes.NewReader(fileBytes)
 
-		err = d.openArchive(ctx, depth, fileContent, archiveChan)
+		err = d.openArchive(ctx, append(depth, f.Name()), fileContent, archiveChan)
 		if err != nil {
 			return err
 		}

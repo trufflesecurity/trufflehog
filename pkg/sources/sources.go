@@ -21,7 +21,8 @@ type Chunk struct {
 	SourceType sourcespb.SourceType
 	// SourceMetadata holds the context of where the Chunk was found.
 	SourceMetadata *source_metadatapb.MetaData
-
+	// HandleMetadata holds the metadata from a handler if one was used.
+	HandleMetadata map[string]string
 	// Data is the data to decode and scan.
 	Data []byte
 	// Verify specifies whether any secrets in the Chunk should be verified.
