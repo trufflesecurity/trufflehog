@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -17,6 +19,13 @@ type expResult struct {
 	B          string
 	LineNumber int64
 	Verified   bool
+}
+
+type discardPrinter struct{}
+
+func (p *discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) error {
+	// This method intentionally does nothing.
+	return nil
 }
 
 func TestGitEngine(t *testing.T) {
@@ -60,10 +69,8 @@ func TestGitEngine(t *testing.T) {
 				WithConcurrency(1),
 				WithDecoders(decoders.DefaultDecoders()...),
 				WithDetectors(true, DefaultDetectors()...),
+				WithPrinter(new(discardPrinter)),
 			)
-			// Make the channels buffered so Finish returns.
-			e.chunks = make(chan *sources.Chunk, 10)
-			e.results = make(chan detectors.ResultWithMetadata, 10)
 
 			cfg := sources.GitConfig{
 				RepoPath: path,
@@ -81,7 +88,6 @@ func TestGitEngine(t *testing.T) {
 			}
 			// Wait for all the chunks to be processed.
 			e.Finish(ctx, logFatalFunc)
-			resultCount := 0
 			for result := range e.ResultsChan() {
 				switch meta := result.SourceMetadata.GetData().(type) {
 				case *source_metadatapb.MetaData_Git:
@@ -95,12 +101,9 @@ func TestGitEngine(t *testing.T) {
 						t.Errorf("%s: unexpected verification. Got: %v, Expected: %v", tName, result.Verified, tTest.expected[meta.Git.Commit].Verified)
 					}
 				}
-				resultCount++
 
 			}
-			if resultCount != len(tTest.expected) {
-				t.Errorf("%s: unexpected number of results. Got: %d, Expected: %d", tName, resultCount, len(tTest.expected))
-			}
+			assert.Equal(t, len(tTest.expected), int(e.VerifiedResults())+int(e.UnverifiedResults()))
 		})
 	}
 }
