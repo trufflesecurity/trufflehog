@@ -88,7 +88,9 @@ func verifyUri(uri string, timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
-	defer client.Disconnect(ctx)
+	defer func() {
+		_ = client.Disconnect(ctx)
+	}()
 	return client.Ping(ctx, readpref.Primary())
 }
 
