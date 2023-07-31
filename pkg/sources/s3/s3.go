@@ -222,7 +222,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		        	s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 
 		        	s.log.Info("Scanning bucket", "bucket", bucket)
-		        	region, err := s3manager.GetBucketRegionWithClient(context.Background(), client, bucket)
+		        	region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
 		        	if err != nil {
 		        		s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
 		        		continue
@@ -293,7 +293,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		        	s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 
 		        	s.log.Info("Scanning bucket", "bucket", bucket)
-		        	region, err := s3manager.GetBucketRegionWithClient(context.Background(), client, bucket)
+		        	region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
 		        	if err != nil {
 		        		s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
 		        		continue
