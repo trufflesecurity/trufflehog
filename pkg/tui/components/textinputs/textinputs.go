@@ -6,19 +6,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	blurredStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	cursorStyle         = focusedStyle.Copy()
-	noStyle             = lipgloss.NewStyle()
-	helpStyle           = blurredStyle.Copy()
-	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+	focusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	blurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	noStyle      = lipgloss.NewStyle()
+	helpStyle    = blurredStyle.Copy()
+	// cursorStyle         = focusedStyle.Copy()
+	// cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
 	focusedButton     = focusedStyle.Copy().Render("[ Next ]")
 	blurredButton     = fmt.Sprintf("[ %s ]", blurredStyle.Render("Next"))
@@ -36,7 +35,7 @@ type Model struct {
 	focusIndex int
 	inputs     []textinput.Model
 	configs    []InputConfig
-	cursorMode cursor.Mode
+	// cursorMode cursor.Mode
 	skipButton bool
 }
 

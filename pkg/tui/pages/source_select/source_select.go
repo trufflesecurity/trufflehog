@@ -10,7 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 // TODO: Review light theme styling
@@ -46,10 +45,6 @@ type (
 		keys         *listKeyMap
 		delegateKeys *delegateKeyMap
 		selector     *selector.Selector
-	}
-	sourceSelectMsg struct {
-		selection string
-		cmd       *kingpin.CmdModel
 	}
 )
 
