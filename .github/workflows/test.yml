@@ -52,8 +52,8 @@ jobs:
         service_account: 'github-ci-external@trufflehog-testing.iam.gserviceaccount.com'
     - name: Test
       run: make test-detectors
-      continue-on-error: true  
-  test-fork:
+      continue-on-error: true
+  test-community:
     if: ${{ github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     permissions:
@@ -67,4 +67,4 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     - name: Test
-      run: make test-forks
+      run: make test-community
