@@ -49,18 +49,18 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 	return chunkChan
 }
 
-type chunkerConfig struct {
+type chunkReaderConfig struct {
 	chunkSize int
 	totalSize int
 	peekSize  int
 }
 
 // ConfigOption is a function that configures a chunker.
-type ConfigOption func(*chunkerConfig)
+type ConfigOption func(*chunkReaderConfig)
 
 // WithChunkSize sets the chunk size.
 func WithChunkSize(size int) ConfigOption {
-	return func(c *chunkerConfig) {
+	return func(c *chunkReaderConfig) {
 		c.chunkSize = size
 	}
 }
@@ -68,14 +68,14 @@ func WithChunkSize(size int) ConfigOption {
 // WithTotalChunkSize sets the total chunk size.
 // This is the chunk size plus the peek size.
 func WithTotalChunkSize(size int) ConfigOption {
-	return func(c *chunkerConfig) {
+	return func(c *chunkReaderConfig) {
 		c.totalSize = size
 	}
 }
 
 // WithPeekSize sets the peek size.
 func WithPeekSize(size int) ConfigOption {
-	return func(c *chunkerConfig) {
+	return func(c *chunkReaderConfig) {
 		c.peekSize = size
 	}
 }
@@ -92,9 +92,9 @@ func NewChunkReader(opts ...ConfigOption) ChunkReader {
 	return createReaderFn(config)
 }
 
-func applyOptions(opts []ConfigOption) *chunkerConfig {
+func applyOptions(opts []ConfigOption) *chunkReaderConfig {
 	// Set defaults.
-	config := &chunkerConfig{
+	config := &chunkReaderConfig{
 		chunkSize: ChunkSize,      // default
 		totalSize: TotalChunkSize, // default
 		peekSize:  PeekSize,       // default
@@ -107,13 +107,13 @@ func applyOptions(opts []ConfigOption) *chunkerConfig {
 	return config
 }
 
-func createReaderFn(config *chunkerConfig) ChunkReader {
+func createReaderFn(config *chunkReaderConfig) ChunkReader {
 	return func(ctx context.Context, reader io.Reader) (<-chan []byte, <-chan error) {
 		return readInChunks(ctx, reader, config)
 	}
 }
 
-func readInChunks(ctx context.Context, reader io.Reader, config *chunkerConfig) (<-chan []byte, <-chan error) {
+func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConfig) (<-chan []byte, <-chan error) {
 	const channelSize = 1
 	chunkReader := bufio.NewReaderSize(reader, config.chunkSize)
 	dataChan := make(chan []byte, channelSize)
