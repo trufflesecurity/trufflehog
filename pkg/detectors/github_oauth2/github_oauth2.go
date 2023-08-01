@@ -31,16 +31,6 @@ const (
 	githubBadVerificationCodeError = "bad_verification_code"
 )
 
-// TODO: Add secret context?? Information about access, ownership etc
-type userRes struct {
-	Login     string `json:"login"`
-	Type      string `json:"type"`
-	SiteAdmin bool   `json:"site_admin"`
-	Name      string `json:"name"`
-	Company   string `json:"company"`
-	UserURL   string `json:"html_url"`
-}
-
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
