@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					err := verifyLDAP(ctx, username[1], password[1], ldapURL)
+					err := verifyLDAP(username[1], password[1], ldapURL)
 					s1.Verified = err == nil
 					if !isErrDeterminate(err) {
 						s1.VerificationError = err
@@ -95,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			err := verifyLDAP(ctx, username, password, ldapURL)
+			err := verifyLDAP(username, password, ldapURL)
 			s1.Verified = err == nil
 			if !isErrDeterminate(err) {
 				s1.VerificationError = err
@@ -120,7 +120,7 @@ func isErrDeterminate(err error) bool {
 	return true
 }
 
-func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL) error {
+func verifyLDAP(username, password string, ldapURL *url.URL) error {
 	// Tests with non-TLS, TLS, and STARTTLS
 
 	ldap.DefaultTimeout = 5 * time.Second
