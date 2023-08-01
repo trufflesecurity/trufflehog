@@ -35,8 +35,8 @@ var (
 	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
 
 	// Oauth2 client ID and secret
-	oauth2ClientIDPat     = regexp.MustCompile(`\b([a-f0-9]{20})\b`)
-	oauth2ClientSecretPat = regexp.MustCompile(`\b([a-f0-9]{40})\b`)
+	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{20})\b`)
+	oauth2ClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{40})\b`)
 )
 
 const (
@@ -79,6 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Github,
 				Raw:          []byte(idMatch[1]),
+				RawV2:        []byte(idMatch[1] + secretMatch[1]),
 			}
 
 			config := &clientcredentials.Config{
