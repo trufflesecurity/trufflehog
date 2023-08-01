@@ -117,12 +117,12 @@ func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.
 // Run blocks until a resource is available to run the source, then
 // synchronously runs it. The first fatal error, if any, will be returned.
 func (s *SourceManager) Run(ctx context.Context, handle handle) (JobProgressRef, error) {
-	report, err := s.asyncRun(ctx, handle)
+	progress, err := s.asyncRun(ctx, handle)
 	if err != nil {
-		return report, err
+		return progress, err
 	}
-	<-report.Done()
-	return report, report.Snapshot().FatalError()
+	<-progress.Done()
+	return progress, progress.Snapshot().FatalError()
 }
 
 // ScheduleRun blocks until a resource is available to run the source, then
@@ -133,8 +133,8 @@ func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) (JobProg
 }
 
 // asyncRun is a helper method to asynchronously run the Source. It calls out
-// to the API to get a job ID for this run, creates a report, then waits for an
-// available goroutine to asynchronously run it.
+// to the API to get a job ID for this run, creates a JobProgress object, then
+// waits for an available goroutine to asynchronously run it.
 func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgressRef, error) {
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx, handle); err != nil {
@@ -145,14 +145,13 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 	if err != nil {
 		return JobProgressRef{SourceID: int64(handle)}, err
 	}
-	// Start a report for this job.
-	report := NewJobProgress(int64(handle), jobID, WithHooks(s.hooks...))
+	// Create a JobProgress object for tracking progress.
+	progress := NewJobProgress(int64(handle), jobID, WithHooks(s.hooks...))
 	s.pool.Go(func() error {
 		defer common.Recover(ctx)
-		_ = s.run(ctx, handle, jobID, report)
-		return nil
+		return s.run(ctx, handle, jobID, progress)
 	})
-	return report.Ref(), nil
+	return progress.Ref(), nil
 }
 
 // Chunks returns the read only channel of all the chunks produced by all of
@@ -165,17 +164,16 @@ func (s *SourceManager) Chunks() <-chan *Chunk {
 // returned by Chunks(). The manager should not be reused after calling this
 // method. This current implementation is not thread safe and should only be
 // called by one thread.
-func (s *SourceManager) Wait() {
+func (s *SourceManager) Wait() error {
 	// Check if the manager has been Waited.
 	if s.done {
-		return
+		return s.pool.Wait()
 	}
 	defer close(s.outputChunks)
 	defer func() { s.done = true }()
 
-	// We are only using the errgroup for limiting concurrency.
-	// TODO: Maybe switch to using a semaphore.Weighted.
-	_ = s.pool.Wait()
+	// Return the first error returned by run.
+	return s.pool.Wait()
 }
 
 // preflightChecks is a helper method to check the Manager or the context isn't

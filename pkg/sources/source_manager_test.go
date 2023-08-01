@@ -133,7 +133,9 @@ func TestSourceManagerWait(t *testing.T) {
 	// Read the 1 chunk we're expecting so Waiting completes.
 	<-mgr.Chunks()
 	// Wait for all resources to complete.
-	mgr.Wait()
+	if err := mgr.Wait(); err != nil {
+		t.Fatalf("unexpected error waiting: %v", err)
+	}
 	// Enroll and run should return an error now.
 	if _, err := enrollDummy(mgr, &counterChunker{count: 1}); err == nil {
 		t.Fatalf("expected enroll to fail")
@@ -159,9 +161,11 @@ func TestSourceManagerError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error scheduling run: %v", err)
 	}
-	<-ref.Done()
-	if err := ref.Snapshot().FatalError(); err == nil {
+	if err := mgr.Wait(); err == nil {
 		t.Fatalf("expected wait to fail")
+	}
+	if err := ref.Snapshot().FatalError(); err == nil {
+		t.Fatalf("expected reference to have a fatal error")
 	}
 }
 

@@ -12,7 +12,6 @@ import (
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
 	lru "github.com/hashicorp/golang-lru"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -69,10 +68,9 @@ type Engine struct {
 	prefilter ahocorasick.Trie
 
 	// Engine synchronization primitives.
-	chunks               chan *sources.Chunk
+	sourceManager        *sources.SourceManager
 	results              chan detectors.ResultWithMetadata
 	detectableChunksChan chan detectableChunk
-	sourcesWg            *errgroup.Group
 	workersWg            sync.WaitGroup
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
@@ -273,10 +271,8 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	}
 
 	e := &Engine{
-		chunks:               make(chan *sources.Chunk, defaultChannelBuffer),
 		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
 		results:              make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
-		sourcesWg:            &errgroup.Group{},
 		dedupeCache:          cache,
 		printer:              new(output.PlainPrinter), // default printer
 		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
@@ -294,8 +290,11 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	}
 	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
-	// Limit number of concurrent goroutines dedicated to chunking a source.
-	e.sourcesWg.SetLimit(int(e.concurrency))
+	// Create SourceManager.
+	e.sourceManager = sources.NewManager(
+		sources.WithConcurrency(int(e.concurrency)),
+		sources.WithConcurrentUnits(int(e.concurrency)),
+	)
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
@@ -394,9 +393,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
 	// Wait for the sources to finish putting chunks onto the chunks channel.
-	err := e.sourcesWg.Wait()
-
-	close(e.chunks) // Source workers are done.
+	err := e.sourceManager.Wait()
 
 	e.workersWg.Wait() // Wait for the workers to finish scanning chunks.
 	close(e.detectableChunksChan)
@@ -410,8 +407,8 @@ func (e *Engine) Finish(ctx context.Context) error {
 	return err
 }
 
-func (e *Engine) ChunksChan() chan *sources.Chunk {
-	return e.chunks
+func (e *Engine) ChunksChan() <-chan *sources.Chunk {
+	return e.sourceManager.Chunks()
 }
 
 func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
@@ -429,7 +426,7 @@ type detectableChunk struct {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
-	for originalChunk := range e.chunks {
+	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
