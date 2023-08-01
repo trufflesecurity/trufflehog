@@ -932,6 +932,7 @@ enum DetectorType {
   Dockerhub = 921;
   TrufflehogEnterprise = 922;
   EnvoyApiKey = 923;
+  GitHubOauth2 = 924;
 }
 
 message Result {
