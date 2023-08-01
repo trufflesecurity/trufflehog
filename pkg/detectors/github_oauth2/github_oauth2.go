@@ -15,10 +15,8 @@ type Scanner struct{ detectors.EndpointSetter }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
-func (Scanner) Version() int            { return 2 }
 func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
 
 var (
