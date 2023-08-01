@@ -214,7 +214,9 @@ func TestErrCallstackTimeoutCancel(t *testing.T) {
 }
 
 func TestRace(t *testing.T) {
-	_, cancel := WithCancel(Background())
+	ctx, cancel := WithCancel(Background())
 	go cancel()
+	go func() { _ = ctx.Err() }()
 	cancel()
+	_ = ctx.Err()
 }

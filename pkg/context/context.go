@@ -48,9 +48,11 @@ func (l logCtx) Logger() logr.Logger {
 }
 
 func (l logCtx) Err() error {
+	l.errLock.Lock()
 	if l.err != nil && *l.err != nil {
 		return *l.err
 	}
+	l.errLock.Unlock()
 	return l.Context.Err()
 }
 
@@ -160,8 +162,6 @@ func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.
 		ctx.errLock = &sync.Mutex{}
 	}
 	return ctx, func() {
-		ctx.errLock.Lock()
-		defer ctx.errLock.Unlock()
 		// We must check Err() before calling f() since f() sets the error.
 		// If there's already an error, do nothing special.
 		if ctx.Err() != nil {
@@ -170,9 +170,12 @@ func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.
 		}
 		f()
 		// Set the error with the stacktrace if the err pointer is non-nil.
+		err := ctx.Err()
+		ctx.errLock.Lock()
+		defer ctx.errLock.Unlock()
 		*ctx.err = fmt.Errorf(
 			"%w (canceled at %v\n%s)",
-			ctx.Err(), time.Now(), string(debug.Stack()),
+			err, time.Now(), string(debug.Stack()),
 		)
 	}
 }
