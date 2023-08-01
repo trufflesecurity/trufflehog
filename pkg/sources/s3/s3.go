@@ -147,7 +147,7 @@ func (s *Source) newRoleClient(region string, roleArn string) (*s3.S3, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stsClient := sts.New(sess)
 	baseCredentials = stscreds.NewCredentialsWithClient(stsClient, roleArn, func(p *stscreds.AssumeRoleProvider) {
 		p.RoleSessionName = "trufflehog"
@@ -157,7 +157,7 @@ func (s *Source) newRoleClient(region string, roleArn string) (*s3.S3, error) {
 
 	sess, err = session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
-		Config: *cfg,
+		Config:            *cfg,
 	})
 
 	if err != nil {
@@ -168,164 +168,111 @@ func (s *Source) newRoleClient(region string, roleArn string) (*s3.S3, error) {
 	return s3.New(sess), nil
 }
 
+// IAM identity needs s3:ListBuckets permission
+func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
+	if len(s.conn.Buckets) > 0 {
+		return s.conn.Buckets, nil
+	}
+
+	res, err := client.ListBuckets(&s3.ListBucketsInput{})
+	if err != nil {
+		return nil, fmt.Errorf("could not list s3 buckets: %w", err)
+	}
+
+	var bucketsToScan []string
+	for _, bucket := range res.Buckets {
+		bucketsToScan = append(bucketsToScan, *bucket.Name)
+	}
+	return bucketsToScan, nil
+}
+
+func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bucketsToScan []string, chunksChan chan *sources.Chunk) error {
+	const defaultAWSRegion = "us-east-1"
+	objectCount := uint64(0)
+
+	for i, bucket := range bucketsToScan {
+		if common.IsDone(ctx) {
+			return nil
+		}
+
+		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
+		s.log.Info("Scanning bucket", "bucket", bucket)
+		region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
+		if err != nil {
+			s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
+			continue
+		}
+
+		var regionalClient *s3.S3
+		if region != defaultAWSRegion {
+			if role != "" {
+				regionalClient, err = s.newRoleClient(region, role)
+			} else {
+				regionalClient, err = s.newClient(region)
+			}
+			if err != nil {
+				s.log.Error(err, "could not make regional s3 client")
+			}
+		} else {
+			regionalClient = client
+		}
+
+		errorCount := sync.Map{}
+
+		err = regionalClient.ListObjectsV2PagesWithContext(
+			ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
+			func(page *s3.ListObjectsV2Output, last bool) bool {
+				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
+				return true
+			})
+
+		if err != nil {
+			return fmt.Errorf(
+				"could not list objects in s3 bucket: bucket %s: %w",
+				bucket,
+				err)
+		}
+	}
+	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
+	return nil
+}
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	const defaultAWSRegion = "us-east-1"
 
 	if len(s.conn.Roles) > 0 {
 		for _, role := range s.conn.Roles {
-			
-		        client, err := s.newRoleClient(defaultAWSRegion, role)
-		        if err != nil {
-		        	return errors.WrapPrefix(err, "could not create s3 client", 0)
-		        }
+			client, err := s.newRoleClient(defaultAWSRegion, role)
+			if err != nil {
+				return errors.WrapPrefix(err, "could not create s3 client", 0)
+			}
 
-		        var bucketsToScan []string
+			bucketsToScan, err := s.getBucketsToScan(client)
+			if err != nil {
+				return err
+			}
 
-		        switch s.conn.GetCredential().(type) {
-		        case *sourcespb.S3_AccessKey, *sourcespb.S3_SessionToken, *sourcespb.S3_CloudEnvironment:
-		        	if len(s.conn.Buckets) == 0 {
-		        		res, err := client.ListBuckets(&s3.ListBucketsInput{})
-		        		if err != nil {
-		        			return fmt.Errorf("could not list s3 buckets: %w", err)
-		        		}
-		        		buckets := res.Buckets
-		        		for _, bucket := range buckets {
-		        			bucketsToScan = append(bucketsToScan, *bucket.Name)
-		        		}
-		        	} else {
-		        		bucketsToScan = s.conn.Buckets
-		        	}
-		        case *sourcespb.S3_Unauthenticated:
-		        	if len(s.conn.Buckets) == 0 {
-		        		res, err := client.ListBuckets(&s3.ListBucketsInput{})
-		        		if err != nil {
-		        			return fmt.Errorf("could not list s3 buckets: %w", err)
-		        		}
-		        		buckets := res.Buckets
-		        		for _, bucket := range buckets {
-		        			bucketsToScan = append(bucketsToScan, *bucket.Name)
-		        		}
-		        	} else {
-		        		bucketsToScan = s.conn.Buckets
-				}
-		        default:
-		        	return errors.Errorf("invalid configuration given for %s source", s.name)
-		        }
-
-		        objectCount := uint64(0)
-		        for i, bucket := range bucketsToScan {
-		        	if common.IsDone(ctx) {
-		        		return nil
-		        	}
-
-		        	s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
-
-		        	s.log.Info("Scanning bucket", "bucket", bucket)
-		        	region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
-		        	if err != nil {
-		        		s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
-		        		continue
-		        	}
-		        	var regionalClient *s3.S3
-		        	if region != defaultAWSRegion {
-		        		regionalClient, err = s.newRoleClient(region, role)
-		        		if err != nil {
-		        			s.log.Error(err, "could not make regional s3 client")
-		        		}
-		        	} else {
-		        		regionalClient = client
-		        	}
-
-		        	errorCount := sync.Map{}
-
-		        	err = regionalClient.ListObjectsV2PagesWithContext(
-		        		ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
-		        		func(page *s3.ListObjectsV2Output, last bool) bool {
-		        			s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
-		        			return true
-		        		})
-
-		        	if err != nil {
-		        		return fmt.Errorf(
-		        			"could not list objects in s3 bucket: bucket %s: %w",
-		        			bucket,
-		        			err)
-		        	}
-		        }
-		        s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
+			if err := s.scanBuckets(ctx, client, role, bucketsToScan, chunksChan); err != nil {
+				return err
+			}
 		}
-        } else {
+	} else {
+		client, err := s.newClient(defaultAWSRegion)
+		if err != nil {
+			return errors.WrapPrefix(err, "could not create s3 client", 0)
+		}
 
-		        client, err := s.newClient(defaultAWSRegion)
-		        if err != nil {
-		        	return errors.WrapPrefix(err, "could not create s3 client", 0)
-		        }
+		bucketsToScan, err := s.getBucketsToScan(client)
+		if err != nil {
+			return err
+		}
 
-		        var bucketsToScan []string
-
-		        switch s.conn.GetCredential().(type) {
-		        case *sourcespb.S3_AccessKey, *sourcespb.S3_SessionToken, *sourcespb.S3_CloudEnvironment:
-		        	if len(s.conn.Buckets) == 0 {
-		        		res, err := client.ListBuckets(&s3.ListBucketsInput{})
-		        		if err != nil {
-		        			return fmt.Errorf("could not list s3 buckets: %w", err)
-		        		}
-		        		buckets := res.Buckets
-		        		for _, bucket := range buckets {
-		        			bucketsToScan = append(bucketsToScan, *bucket.Name)
-		        		}
-		        	} else {
-		        		bucketsToScan = s.conn.Buckets
-		        	}
-		        case *sourcespb.S3_Unauthenticated:
-		        	bucketsToScan = s.conn.Buckets
-		        default:
-		        	return errors.Errorf("invalid configuration given for %s source", s.name)
-		        }
-
-		        objectCount := uint64(0)
-		        for i, bucket := range bucketsToScan {
-		        	if common.IsDone(ctx) {
-		        		return nil
-		        	}
-
-		        	s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
-
-		        	s.log.Info("Scanning bucket", "bucket", bucket)
-		        	region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
-		        	if err != nil {
-		        		s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
-		        		continue
-		        	}
-		        	var regionalClient *s3.S3
-		        	if region != defaultAWSRegion {
-		        		regionalClient, err = s.newClient(region)
-		        		if err != nil {
-		        			s.log.Error(err, "could not make regional s3 client")
-		        		}
-		        	} else {
-		        		regionalClient = client
-		        	}
-
-		        	errorCount := sync.Map{}
-
-		        	err = regionalClient.ListObjectsV2PagesWithContext(
-		        		ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
-		        		func(page *s3.ListObjectsV2Output, last bool) bool {
-		        			s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
-		        			return true
-		        		})
-
-		        	if err != nil {
-		        		return fmt.Errorf(
-		        			"could not list objects in s3 bucket: bucket %s: %w",
-		        			bucket,
-		        			err)
-		        	}
-		        }
-		        s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
+		if err := s.scanBuckets(ctx, client, "", bucketsToScan, chunksChan); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
