@@ -2,10 +2,7 @@ package context
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"runtime/debug"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -37,23 +34,12 @@ type CancelFunc = context.CancelFunc
 type logCtx struct {
 	// Embed context.Context to get all methods for free.
 	context.Context
-	log     logr.Logger
-	err     *error
-	errLock *sync.Mutex
+	log logr.Logger
 }
 
 // Logger returns a structured logger.
 func (l logCtx) Logger() logr.Logger {
 	return l.log
-}
-
-func (l logCtx) Err() error {
-	l.errLock.Lock()
-	if l.err != nil && *l.err != nil {
-		return *l.err
-	}
-	l.errLock.Unlock()
-	return l.Context.Err()
 }
 
 // Background returns context.Background with a default logger.
@@ -79,7 +65,7 @@ func WithCancel(parent Context) (Context, context.CancelFunc) {
 		log:     parent.Logger(),
 		Context: ctx,
 	}
-	return captureCancelCallstack(lCtx, cancel)
+	return lCtx, cancel
 }
 
 // WithDeadline returns context.WithDeadline with the log object propagated and
@@ -90,7 +76,7 @@ func WithDeadline(parent Context, d time.Time) (Context, context.CancelFunc) {
 		log:     parent.Logger().WithValues("deadline", d),
 		Context: ctx,
 	}
-	return captureCancelCallstack(lCtx, cancel)
+	return lCtx, cancel
 }
 
 // WithTimeout returns context.WithTimeout with the log object propagated and
@@ -101,7 +87,7 @@ func WithTimeout(parent Context, timeout time.Duration) (Context, context.Cancel
 		log:     parent.Logger().WithValues("timeout", timeout),
 		Context: ctx,
 	}
-	return captureCancelCallstack(lCtx, cancel)
+	return lCtx, cancel
 }
 
 // WithValue returns context.WithValue with the log object propagated and
@@ -151,31 +137,4 @@ func AddLogger(parent context.Context) Context {
 // logs from Contexts.
 func SetDefaultLogger(l logr.Logger) {
 	defaultLogger = l
-}
-
-// captureCancelCallstack is a helper function to capture the callstack where
-// the cancel function was first called.
-func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.CancelFunc) {
-	if ctx.err == nil {
-		var err error
-		ctx.err = &err
-		ctx.errLock = &sync.Mutex{}
-	}
-	return ctx, func() {
-		// We must check Err() before calling f() since f() sets the error.
-		// If there's already an error, do nothing special.
-		if ctx.Err() != nil {
-			f()
-			return
-		}
-		f()
-		// Set the error with the stacktrace if the err pointer is non-nil.
-		err := ctx.Err()
-		ctx.errLock.Lock()
-		defer ctx.errLock.Unlock()
-		*ctx.err = fmt.Errorf(
-			"%w (canceled at %v\n%s)",
-			err, time.Now(), string(debug.Stack()),
-		)
-	}
 }

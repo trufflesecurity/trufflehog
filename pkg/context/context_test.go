@@ -170,49 +170,6 @@ func TestDefaultLogger(t *testing.T) {
 	ctx.Logger().Info("this shouldn't panic")
 }
 
-func TestErrCallstack(t *testing.T) {
-	c, cancel := WithCancel(Background())
-	ctx := c.(logCtx)
-	cancel()
-	select {
-	case <-ctx.Done():
-		assert.Contains(t, ctx.Err().Error(), "TestErrCallstack")
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "context should be done")
-	}
-}
-
-func TestErrCallstackTimeout(t *testing.T) {
-	ctx, cancel := WithTimeout(Background(), 10*time.Millisecond)
-	defer cancel()
-
-	select {
-	case <-ctx.Done():
-		// Deadline exceeded errors will not have a callstack from the cancel
-		// function.
-		assert.NotContains(t, ctx.Err().Error(), "TestErrCallstackTimeout")
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "context should be done")
-	}
-}
-
-func TestErrCallstackTimeoutCancel(t *testing.T) {
-	ctx, cancel := WithTimeout(Background(), 10*time.Millisecond)
-
-	var err error
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "context should be done")
-	}
-
-	// Calling cancel after deadline exceeded should not overwrite the original
-	// error.
-	cancel()
-	assert.Equal(t, err, ctx.Err())
-}
-
 func TestRace(t *testing.T) {
 	ctx, cancel := WithCancel(Background())
 	go cancel()
