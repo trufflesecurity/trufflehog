@@ -7,6 +7,6 @@ If possible try to keep PRs scoped to one feature, and add tests for new feature
 Explain the purpose of the PR.
 
 ### Checklist:
-* [ ] Does your PR pass tests (`make test-community`)?
-* [ ] Have you lint your code locally prior to submission (`make lint` this requires [golangci-lint](https://golangci-lint.run/usage/install/#local-installation))?
+* [ ] Tests passing (`make test-community`)?
+* [ ] Lint passing (`make lint` this requires [golangci-lint](https://golangci-lint.run/usage/install/#local-installation))?
 

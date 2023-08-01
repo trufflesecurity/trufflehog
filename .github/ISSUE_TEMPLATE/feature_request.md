@@ -31,7 +31,8 @@ What should the output include? --->
 Information about referencing Github Issues: https://help.github.com/articles/basic-writing-and-formatting-syntax/#referencing-issues-and-pull-requests
 
 Are there any other GitHub issues (open or closed) or pull requests that should be linked here? Vendor blog posts or documentation? For example:
---->
 
 * #0000
+--->
+
 
