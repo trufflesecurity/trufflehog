@@ -81,6 +81,9 @@ func WithPeekSize(size int) ConfigOption {
 }
 
 // ChunkReader reads chunks from a reader and returns a channel of chunks and a channel of errors.
+// The channel of chunks is closed when the reader is closed.
+// This should be used whenever a large amount of data is read from a reader.
+// Ex: reading attachments, archives, etc.
 type ChunkReader func(ctx context.Context, reader io.Reader) (<-chan []byte, <-chan error)
 
 // NewChunkReader returns a ChunkReader with the given options.
