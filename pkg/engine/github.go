@@ -1,13 +1,10 @@
 package engine
 
 import (
-	"fmt"
-
 	gogit "github.com/go-git/go-git/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -17,8 +14,6 @@ import (
 
 // ScanGitHub scans Github with the provided options.
 func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
-	source := github.Source{}
-
 	connection := sourcespb.GitHub{
 		Endpoint:      c.Endpoint,
 		Organizations: c.Orgs,
@@ -42,31 +37,25 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		return err
 	}
 
-	ctx = context.WithValues(ctx,
-		"source_type", source.Type().String(),
-		"source_name", "github",
-	)
-	err = source.Init(ctx, "trufflehog - github", 0, 0, false, &conn, c.Concurrency)
-	if err != nil {
-		ctx.Logger().Error(err, "failed to initialize github source")
-		return err
-	}
-
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
 		git.ScanOptionLogOptions(logOptions),
 	}
 	scanOptions := git.NewScanOptions(opts...)
-	source.WithScanOptions(scanOptions)
 
-	e.sourcesWg.Go(func() error {
-		defer common.RecoverWithExit(ctx)
-		err := source.Chunks(ctx, e.ChunksChan())
-		if err != nil {
-			return fmt.Errorf("could not scan github: %w", err)
-		}
-		return nil
-	})
-	return nil
+	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - github", new(github.Source).Type(),
+		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
+			githubSource := github.Source{}
+			if err := githubSource.Init(ctx, "trufflehog - github", jobID, sourceID, true, &conn, c.Concurrency); err != nil {
+				return nil, err
+			}
+			githubSource.WithScanOptions(scanOptions)
+			return &githubSource, nil
+		})
+	if err != nil {
+		return err
+	}
+	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	return err
 }
