@@ -38,6 +38,7 @@ var (
 	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
 	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
 	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
 	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
@@ -161,6 +162,12 @@ func main() {
 	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
+
+	if *localDev {
+		run(overseer.State{})
+		os.Exit(0)
+	}
+
 	defer func() { _ = sync() }()
 	logFatal := logFatalFunc(logger)
 
