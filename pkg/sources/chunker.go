@@ -36,7 +36,7 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 			chunkBytes = chunkBytes[:ChunkSize]
 			n, err := reader.Read(chunkBytes)
 			if n > 0 {
-				peekData, _ := reader.Peek(len(chunkBytes) - n)
+				peekData, _ := reader.Peek(TotalChunkSize - n)
 				chunkBytes = append(chunkBytes[:n], peekData...)
 				chunk.Data = chunkBytes
 				chunkChan <- &chunk
@@ -128,7 +128,7 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 			chunkBytes = chunkBytes[:config.chunkSize]
 			n, err := chunkReader.Read(chunkBytes)
 			if n > 0 {
-				peekData, _ := chunkReader.Peek(len(chunkBytes) - n)
+				peekData, _ := chunkReader.Peek(config.totalSize - n)
 				chunkBytes = append(chunkBytes[:n], peekData...)
 				dataChan <- chunkBytes
 			}
