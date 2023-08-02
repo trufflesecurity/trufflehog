@@ -291,6 +291,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		report.StartEnumerating(time.Now())
 		defer func() { report.EndEnumerating(time.Now()) }()
 		defer close(unitReporter.unitCh)
+		ctx.Logger().V(2).Info("enumerating source")
 		if err := source.Enumerate(ctx, unitReporter); err != nil {
 			report.ReportError(Fatal{err})
 			catchFirstFatal(Fatal{err})
@@ -316,6 +317,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 			// TODO: Catch panics and add to report.
 			defer close(chunkReporter.chunkCh)
 			ctx := context.WithValue(ctx, "unit", unit.SourceUnitID())
+			ctx.Logger().V(3).Info("chunking unit")
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 				report.ReportError(Fatal{err})
 				catchFirstFatal(Fatal{err})
