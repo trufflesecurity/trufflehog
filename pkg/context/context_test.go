@@ -158,7 +158,7 @@ func TestWithValues(t *testing.T) {
 	assert.NotContains(t, logs[6], `what does this do?`)
 }
 
-func TestDiscardLogger(t *testing.T) {
+func TestDefaultLogger(t *testing.T) {
 	var panicked bool
 	defer func() {
 		if r := recover(); r != nil {

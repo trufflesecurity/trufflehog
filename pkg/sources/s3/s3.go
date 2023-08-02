@@ -297,19 +297,19 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 		// ignore large files
 		if *obj.Size > s.maxObjectSize {
 			s.log.V(3).Info("Skipping %d byte file (over maxObjectSize limit)", "object", *obj.Key)
-			return
+			continue
 		}
 
 		// file empty file
 		if *obj.Size == 0 {
 			s.log.V(5).Info("Skipping 0 byte file", "object", *obj.Key)
-			return
+			continue
 		}
 
 		// skip incompatible extensions
 		if common.SkipFile(*obj.Key) {
 			s.log.V(5).Info("Skipping file with incompatible extension", "object", *obj.Key)
-			return
+			continue
 		}
 
 		s.jobPool.Go(func() error {
