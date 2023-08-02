@@ -22,8 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	idPat  = regexp.MustCompile(`\b([A-Za-z0-9_\.]{7}-[A-Za-z0-9_\.]{72})\b`)
-	keyPat = regexp.MustCompile(`\b([A-Za-z0-9_\.]{69}-[A-Za-z0-9_\.]{10})\b`)
+	idPat  = regexp.MustCompile(`\b([A-Za-z0-9_\.]{7}-[A-Za-z0-9_\.]{72}|[A-Za-z0-9_\.]{5}-[A-Za-z0-9_\.]{34})\b`)
+	keyPat = regexp.MustCompile(`\b([A-Za-z0-9_\.\-]{40,80})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
