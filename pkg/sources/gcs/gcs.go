@@ -342,13 +342,12 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		},
 	}
 
-	reader, err := diskbufferreader.New(o)
 	data, err := s.readObjectData(ctx, o, chunkSkel)
 	if err != nil {
 		return fmt.Errorf("error reading object data: %w", err)
 	}
-	defer reader.Close()
 
+	// If data is nil, it means that the file was handled by a handler.
 	if data == nil {
 		return nil
 	}
