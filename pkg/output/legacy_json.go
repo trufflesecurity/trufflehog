@@ -19,7 +19,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func PrintLegacyJSON(ctx context.Context, r *detectors.ResultWithMetadata) error {
+// LegacyJSONPrinter is a printer that prints results in legacy JSON format for backwards compatibility.
+type LegacyJSONPrinter struct{}
+
+func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
 	var repo string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
@@ -41,7 +44,7 @@ func PrintLegacyJSON(ctx context.Context, r *detectors.ResultWithMetadata) error
 		defer os.RemoveAll(repoPath)
 	}
 
-	legacy, err := ConvertToLegacyJSON(r, repoPath)
+	legacy, err := convertToLegacyJSON(r, repoPath)
 	if err != nil {
 		return fmt.Errorf("could not convert to legacy JSON: %w", err)
 	}
@@ -53,7 +56,7 @@ func PrintLegacyJSON(ctx context.Context, r *detectors.ResultWithMetadata) error
 	return nil
 }
 
-func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*LegacyJSONOutput, error) {
+func convertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*LegacyJSONOutput, error) {
 	var source LegacyJSONCompatibleSource
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:

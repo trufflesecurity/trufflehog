@@ -62,14 +62,30 @@ If you think that something should be included outside of these guidelines, plea
    1. Add the test secret to GCP Secrets. See [managing test secrets](#managing-test-secrets)
    2. Update the pattern regex and keywords. Try iterating with [regex101.com](http://regex101.com/).
    3. Update the verifier code to use a non-destructive API call that can determine whether the secret is valid or not.
+      * Make sure you understand [verification indeterminacy](#verification-indeterminacy).
    4. Update the tests with these test cases at minimum:
       1. Found and verified (using a credential loaded from GCP Secrets)
-      2. Found and unverified
-      3. Not found
-      4. Any false positive cases that you come across
+      2. Found and unverified (determinately, i.e. the secret is invalid)
+      3. Found and unverified (indeterminately due to timeout)
+      4. Found and unverified (indeterminately due to an unexpected API response)
+      5. Not found
+      6. Any false positive cases that you come across
    5. Create a merge request for review. CI tests must be passing.
 
 ## Addendum
+
+### Verification indeterminacy
+
+There are two types of reasons that secret verification can fail:
+* The candidate secret is not actually a valid secret.
+* Something went wrong in the process unrelated to the candidate secret, such as a transient network error or an unexpected API response.
+
+In Trufflehog parlance, the first type of verification response is called _determinate_ and the second type is called _indeterminate_. Verification code should distinguish between the two by returning an error object in the result struct **only** for indeterminate failures. In general, a verifier should return an error (indicating an indeterminate failure) in all cases that haven't been explicitly identified as determinate failure states.
+
+For example, consider a hypothetical authentication endpoint that returns `200 OK` for valid credentials and `403 Forbidden` for invalid credentials. The verifier for this endpoint could make an HTTP request and use the response status code to decide what to return:
+* A `200` response would indicate that verification succeeded. (Or maybe any `2xx` response.)
+* A `403` response would indicate that verification failed **determinately** and no error object should be returned.
+* Any other response would indicate that verification failed **indeterminately** and an error object should be returned.
 
 ### Managing Test Secrets
 

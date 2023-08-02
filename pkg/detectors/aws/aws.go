@@ -18,7 +18,8 @@ import (
 )
 
 type scanner struct {
-	skipIDs map[string]struct{}
+	verificationClient *http.Client
+	skipIDs            map[string]struct{}
 }
 
 func New(opts ...func(*scanner)) *scanner {
@@ -48,7 +49,7 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 var _ detectors.Detector = (*scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultVerificationClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -123,8 +124,9 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				host := "sts.amazonaws.com"
 				region := "us-east-1"
 				endpoint := "https://sts.amazonaws.com"
-				datestamp := time.Now().UTC().Format("20060102")
-				amzDate := time.Now().UTC().Format("20060102T150405Z0700")
+				now := time.Now().UTC()
+				datestamp := now.Format("20060102")
+				amzDate := now.Format("20060102T150405Z0700")
 
 				req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 				if err != nil {
@@ -171,6 +173,10 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
 				req.URL.RawQuery = params.Encode()
 
+				client := s.verificationClient
+				if client == nil {
+					client = defaultVerificationClient
+				}
 				res, err := client.Do(req)
 				if err == nil {
 
@@ -194,7 +200,25 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							continue
 						}
 
-						if res.StatusCode != 403 {
+						if res.StatusCode == 403 {
+							var body awsErrorResponseBody
+							err = json.NewDecoder(res.Body).Decode(&body)
+							res.Body.Close()
+							if err == nil {
+								// All instances of the code I've seen in the wild are PascalCased but this check is
+								// case-insensitive out of an abundance of caution
+								if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
+									// determinate failure - nothing to do
+								} else {
+									// We see a surprising number of false-negative signature mismatch errors here
+									// (The official SDK somehow elicits even more than just making the request
+									// ourselves)
+									s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
+								}
+							} else {
+								s1.VerificationError = fmt.Errorf("couldn't parse the sts response body (%v)", err)
+							}
+						} else {
 							s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 						}
 					}
@@ -243,6 +267,15 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 		out = append(out, r)
 	}
 	return out
+}
+
+type awsError struct {
+	Code    string `json:"Code"`
+	Message string `json:"Message"`
+}
+
+type awsErrorResponseBody struct {
+	Error awsError `json:"Error"`
 }
 
 type identityRes struct {

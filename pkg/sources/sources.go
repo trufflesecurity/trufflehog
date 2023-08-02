@@ -44,6 +44,13 @@ type Source interface {
 	GetProgress() *Progress
 }
 
+// SourceUnitEnumChunker are the two required interfaces to support enumerating
+// and chunking of units.
+type SourceUnitEnumChunker interface {
+	SourceUnitEnumerator
+	SourceUnitChunker
+}
+
 // SourceUnitUnmarshaller defines an optional interface a Source can implement
 // to support units coming from an external source.
 type SourceUnitUnmarshaller interface {
