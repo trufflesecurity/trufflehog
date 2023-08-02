@@ -15,9 +15,6 @@ type Scanner struct{ detectors.EndpointSetter }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.EndpointCustomizer = (*Scanner)(nil)
-
-func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
 
 var (
 	// Oauth2 client ID and secret
