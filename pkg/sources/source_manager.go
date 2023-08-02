@@ -21,11 +21,18 @@ type handle int64
 // initialized Source.
 type SourceInitFunc func(ctx context.Context, sourceID int64, jobID int64) (Source, error)
 
+// sourceInfo is an aggregate struct to store source information provided on
+// initialization.
+type sourceInfo struct {
+	initFunc SourceInitFunc
+	name     string
+}
+
 type SourceManager struct {
 	api   apiClient
 	hooks []JobProgressHook
 	// Map of handle to source initializer.
-	handles     map[handle]SourceInitFunc
+	handles     map[handle]sourceInfo
 	handlesLock sync.Mutex
 	// Pool limiting the amount of concurrent sources running.
 	pool            errgroup.Group
@@ -85,7 +92,7 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	mgr := SourceManager{
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
-		handles:      make(map[handle]SourceInitFunc),
+		handles:      make(map[handle]sourceInfo),
 		outputChunks: make(chan *Chunk),
 	}
 	for _, opt := range opts {
@@ -110,7 +117,10 @@ func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.
 		// TODO: smartly handle this?
 		return 0, fmt.Errorf("handle ID '%d' already in use", handleID)
 	}
-	s.handles[handleID] = f
+	s.handles[handleID] = sourceInfo{
+		initFunc: f,
+		name:     name,
+	}
 	return handleID, nil
 }
 
@@ -141,6 +151,7 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 		return JobProgressRef{}, err
 	}
 	// Get a Job ID.
+	ctx = context.WithValue(ctx, "source_id", int64(handle))
 	jobID, err := s.api.GetJobID(ctx, int64(handle))
 	if err != nil {
 		return JobProgressRef{SourceID: int64(handle)}, err
@@ -148,6 +159,10 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 	// Create a JobProgress object for tracking progress.
 	progress := NewJobProgress(int64(handle), jobID, WithHooks(s.hooks...))
 	s.pool.Go(func() error {
+		ctx := context.WithValues(ctx,
+			"job_id", jobID,
+			"source_manager_worker_id", common.RandomID(5),
+		)
 		defer common.Recover(ctx)
 		return s.run(ctx, handle, jobID, progress)
 	})
@@ -184,7 +199,7 @@ func (s *SourceManager) preflightChecks(ctx context.Context, handle handle) erro
 		return fmt.Errorf("manager is done")
 	}
 	// Check the handle is valid.
-	if _, ok := s.getInitFunc(handle); !ok {
+	if _, ok := s.getSourceInfo(handle); !ok {
 		return fmt.Errorf("unrecognized handle")
 	}
 	return ctx.Err()
@@ -199,18 +214,22 @@ func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, rep
 	defer func() { report.End(time.Now()) }()
 
 	// Initialize the source.
-	initFunc, ok := s.getInitFunc(handle)
+	sourceInfo, ok := s.getSourceInfo(handle)
 	if !ok {
 		// Shouldn't happen due to preflight checks.
 		err := fmt.Errorf("unrecognized handle")
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
-	source, err := initFunc(ctx, int64(handle), jobID)
+	source, err := sourceInfo.initFunc(ctx, int64(handle), jobID)
 	if err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
+	ctx = context.WithValues(ctx,
+		"source_type", source.Type().String(),
+		"source_name", sourceInfo.name,
+	)
 	// Check for the preferred method of tracking source units.
 	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits {
 		return s.runWithUnits(ctx, handle, enumChunker, report)
@@ -296,6 +315,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 			report.StartUnitChunking(unit, time.Now())
 			// TODO: Catch panics and add to report.
 			defer close(chunkReporter.chunkCh)
+			ctx := context.WithValue(ctx, "unit", unit.SourceUnitID())
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 				report.ReportError(Fatal{err})
 				catchFirstFatal(Fatal{err})
@@ -324,9 +344,9 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 	}
 }
 
-// getInitFunc is a helper method for safe concurrent access to the
+// getSourceInfo is a helper method for safe concurrent access to the
 // map[handle]SourceInitFunc map.
-func (s *SourceManager) getInitFunc(handle handle) (SourceInitFunc, bool) {
+func (s *SourceManager) getSourceInfo(handle handle) (sourceInfo, bool) {
 	s.handlesLock.Lock()
 	defer s.handlesLock.Unlock()
 	f, ok := s.handles[handle]
