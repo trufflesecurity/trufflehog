@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -103,10 +102,14 @@ type JobProgress struct {
 
 // JobProgressMetrics tracks the metrics of a job.
 type JobProgressMetrics struct {
-	StartTime       time.Time
-	EndTime         time.Time
-	TotalUnits      uint64
-	FinishedUnits   uint64
+	StartTime time.Time
+	EndTime   time.Time
+	// Total number of units found by the Source.
+	TotalUnits uint64
+	// Total number of units that have finished chunking.
+	FinishedUnits uint64
+	// Total number of chunks produced. This metric updates before the
+	// chunk is sent on the output channel.
 	TotalChunks     uint64
 	Errors          []error
 	DoneEnumerating bool
@@ -163,11 +166,15 @@ func (jp *JobProgress) Finish() {
 }
 func (jp *JobProgress) Done() <-chan struct{} { return jp.ctx.Done() }
 func (jp *JobProgress) ReportUnit(unit SourceUnit) {
-	atomic.AddUint64(&jp.metrics.TotalUnits, 1)
+	jp.metricsLock.Lock()
+	jp.metrics.TotalUnits++
+	jp.metricsLock.Unlock()
 	jp.executeHooks(func(hook JobProgressHook) { hook.ReportUnit(jp.Ref(), unit) })
 }
 func (jp *JobProgress) ReportChunk(unit SourceUnit, chunk *Chunk) {
-	atomic.AddUint64(&jp.metrics.TotalChunks, 1)
+	jp.metricsLock.Lock()
+	jp.metrics.TotalChunks++
+	jp.metricsLock.Unlock()
 	jp.executeHooks(func(hook JobProgressHook) { hook.ReportChunk(jp.Ref(), unit, chunk) })
 }
 func (jp *JobProgress) StartUnitChunking(unit SourceUnit, start time.Time) {
@@ -176,7 +183,9 @@ func (jp *JobProgress) StartUnitChunking(unit SourceUnit, start time.Time) {
 }
 func (jp *JobProgress) EndUnitChunking(unit SourceUnit, end time.Time) {
 	// TODO: Record time.
-	atomic.AddUint64(&jp.metrics.FinishedUnits, 1)
+	jp.metricsLock.Lock()
+	jp.metrics.FinishedUnits++
+	jp.metricsLock.Unlock()
 	jp.executeHooks(func(hook JobProgressHook) { hook.EndUnitChunking(jp.Ref(), unit, end) })
 }
 func (jp *JobProgress) StartEnumerating(start time.Time) {
@@ -196,7 +205,12 @@ func (jp *JobProgress) EndEnumerating(end time.Time) {
 func (jp *JobProgress) Snapshot() JobProgressMetrics {
 	jp.metricsLock.Lock()
 	defer jp.metricsLock.Unlock()
-	return jp.metrics
+
+	metrics := jp.metrics
+	metrics.Errors = make([]error, len(metrics.Errors))
+	copy(metrics.Errors, jp.metrics.Errors)
+
+	return metrics
 }
 
 // ReportError adds a non-nil error to the aggregate of errors

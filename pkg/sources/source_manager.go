@@ -230,7 +230,10 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 		defer wg.Done()
 		for chunk := range ch {
 			report.ReportChunk(nil, chunk)
-			_ = common.CancellableWrite(ctx, s.outputChunks, chunk)
+			if err := common.CancellableWrite(ctx, s.outputChunks, chunk); err != nil {
+				report.ReportError(Fatal{err})
+				return
+			}
 		}
 	}()
 	// Don't return from this function until the goroutine has finished
@@ -305,8 +308,10 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 			defer wg.Done()
 			defer func() { report.EndUnitChunking(unit, time.Now()) }()
 			for chunk := range chunkReporter.chunkCh {
-				report.ReportChunk(chunkReporter.unit, chunk)
-				_ = common.CancellableWrite(ctx, s.outputChunks, chunk)
+				if err := common.CancellableWrite(ctx, s.outputChunks, chunk); err != nil {
+					report.ReportError(Fatal{err})
+					return
+				}
 			}
 		}()
 	}
@@ -350,6 +355,7 @@ type mgrUnitReporter struct {
 }
 
 func (s *mgrUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
+	s.report.ReportUnit(unit)
 	return common.CancellableWrite(ctx, s.unitCh, unit)
 }
 
@@ -366,6 +372,7 @@ type mgrChunkReporter struct {
 }
 
 func (s *mgrChunkReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
+	s.report.ReportChunk(s.unit, &chunk)
 	return common.CancellableWrite(ctx, s.chunkCh, &chunk)
 }
 
