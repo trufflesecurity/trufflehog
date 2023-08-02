@@ -24,10 +24,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 		return err
 	}
 
-	fileSystemSource := filesystem.Source{}
-	fileSystemSource.WithFilter(c.Filter)
-
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - filesystem", fileSystemSource.Type(),
+	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - filesystem", new(filesystem.Source).Type(),
 		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
 			fileSystemSource := filesystem.Source{}
 			fileSystemSource.WithFilter(c.Filter)
