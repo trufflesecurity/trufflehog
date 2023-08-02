@@ -556,6 +556,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterwritekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saucelabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scalewaykey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_oauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scalr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapeowl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scraperapi"
@@ -1530,6 +1531,7 @@ func DefaultDetectors() []detectors.Detector {
 		dockerhub.Scanner{},
 		couchbase.Scanner{},
 		envoyapikey.Scanner{},
+		github_oauth2.Scanner{},
 	}
 
 }
