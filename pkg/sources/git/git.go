@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -923,27 +924,14 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	}
 	reader.Stop()
 
-	chunkReader := sources.NewChunkReader()
-	dataCh, errCh := chunkReader(ctx, reader)
-	for data := range dataCh {
-		chunk := *chunkSkel
-		chunk.Data = data
-		select {
-		case <-ctx.Done(): // priority to context cancellation
-			return ctx.Err()
-		default:
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case chunksChan <- chunkSkel:
-			}
-
-		}
-	}
-	if err := <-errCh; err != nil {
-		ctx.Logger().Error(err, "Error reading chunk.")
+	chunkData, err := io.ReadAll(reader)
+	if err != nil {
 		return err
 	}
+
+	chunk := *chunkSkel
+	chunk.Data = chunkData
+	chunksChan <- &chunk
 
 	return nil
 }
