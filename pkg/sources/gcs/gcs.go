@@ -342,43 +342,48 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		},
 	}
 
-	reader, err := diskbufferreader.New(o)
+	data, err := s.readObjectData(ctx, o, chunkSkel)
 	if err != nil {
-		return fmt.Errorf("error creating disk buffer reader: %w", err)
+		return fmt.Errorf("error reading object data: %w", err)
 	}
-	defer reader.Close()
 
-	if handlers.HandleFile(ctx, reader, chunkSkel, s.chunksCh) {
-		ctx.Logger().V(3).Info("File was handled", "name", s.name, "bucket", o.bucket, "object", o.name)
+	// If data is nil, it means that the file was handled by a handler.
+	if data == nil {
 		return nil
 	}
 
-	if err := reader.Reset(); err != nil {
-		return fmt.Errorf("error resetting reader: %w", err)
-	}
+	chunkSkel.Data = data
 
-	reader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	dataCh, errCh := chunkReader(ctx, reader)
-	for data := range dataCh {
-		chunkSkel.Data = data
-		select {
-		case <-ctx.Done(): // priority to context cancellation
-			return ctx.Err()
-		default:
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case s.chunksCh <- chunkSkel:
-			}
-
-		}
-	}
-	if err := <-errCh; err != nil {
-		s.log.Error(err, "Error reading chunk.")
-		return err
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case s.chunksCh <- chunkSkel:
 	}
 
 	return nil
+}
+
+func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) ([]byte, error) {
+	reader, err := diskbufferreader.New(o)
+	if err != nil {
+		return nil, fmt.Errorf("error creating disk buffer reader: %w", err)
+	}
+	defer reader.Close()
+
+	if handlers.HandleFile(ctx, reader, chunk, s.chunksCh) {
+		ctx.Logger().V(3).Info("File was handled", "name", s.name, "bucket", o.bucket, "object", o.name)
+		return nil, nil
+	}
+
+	if err := reader.Reset(); err != nil {
+		return nil, fmt.Errorf("error resetting reader: %w", err)
+	}
+
+	reader.Stop()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("error reading object: %w", err)
+	}
+
+	return data, nil
 }
