@@ -160,7 +160,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
-	ctx.Logger().V(1).Info("Git source finished scanning", "repo_count", totalRepos)
+	ctx.Logger().V(1).Info("Git source finished scanning", "repo_count", totalRepos, "commits_scanned", s.git.metrics.commitsScanned)
 	s.SetProgressComplete(
 		totalRepos, totalRepos,
 		fmt.Sprintf("Completed scanning source %s", s.name), "",
