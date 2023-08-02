@@ -292,7 +292,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 
 	// Create SourceManager.
 	e.sourceManager = sources.NewManager(
-		sources.WithConcurrency(int(e.concurrency)),
+		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
 	)
 

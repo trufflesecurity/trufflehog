@@ -65,8 +65,8 @@ func WithReportHook(hook JobProgressHook) func(*SourceManager) {
 	}
 }
 
-// WithConcurrency limits the concurrent number of sources a manager can run.
-func WithConcurrency(concurrency int) func(*SourceManager) {
+// WithConcurrentSources limits the concurrent number of sources a manager can run.
+func WithConcurrentSources(concurrency int) func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.pool.SetLimit(concurrency) }
 }
 
