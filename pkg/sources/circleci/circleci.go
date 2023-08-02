@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync/atomic"
 
@@ -218,7 +219,7 @@ func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]bu
 	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkAction(_ context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
 	req, err := http.NewRequest("GET", act.OutputURL, nil)
 	if err != nil {
 		return err
@@ -228,46 +229,34 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 		return err
 	}
 	defer res.Body.Close()
+	logOutput, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
 
 	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 
-	chunkReader := sources.NewChunkReader()
-	dataCh, errCh := chunkReader(ctx, res.Body)
-	for data := range dataCh {
-		chunk := &sources.Chunk{
-			SourceType: s.Type(),
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			Data:       removeCircleSha1Line(data),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Circleci{
-					Circleci: &source_metadatapb.CircleCI{
-						VcsType:     proj.VCS,
-						Username:    proj.Username,
-						Repository:  proj.RepoName,
-						BuildNumber: int64(bld.BuildNum),
-						BuildStep:   stepName,
-						Link:        linkURL,
-					},
+	chunk := &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		Data:       removeCircleSha1Line(logOutput),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Circleci{
+				Circleci: &source_metadatapb.CircleCI{
+					VcsType:     proj.VCS,
+					Username:    proj.Username,
+					Repository:  proj.RepoName,
+					BuildNumber: int64(bld.BuildNum),
+					BuildStep:   stepName,
+					Link:        linkURL,
 				},
 			},
-			Verify: s.verify,
-		}
-		select {
-		case <-ctx.Done(): // priority to context cancellation
-			return ctx.Err()
-		default:
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case chunksChan <- chunk:
-			}
-		}
+		},
+		Verify: s.verify,
 	}
-	if err := <-errCh; err != nil {
-		ctx.Logger().Error(err, "Error reading chunk.")
-		return nil
-	}
+
+	chunksChan <- chunk
 
 	return nil
 }

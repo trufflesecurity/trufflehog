@@ -65,14 +65,6 @@ func WithChunkSize(size int) ConfigOption {
 	}
 }
 
-// WithTotalChunkSize sets the total chunk size.
-// This is the chunk size plus the peek size.
-func WithTotalChunkSize(size int) ConfigOption {
-	return func(c *chunkReaderConfig) {
-		c.totalSize = size
-	}
-}
-
 // WithPeekSize sets the peek size.
 func WithPeekSize(size int) ConfigOption {
 	return func(c *chunkReaderConfig) {
@@ -97,12 +89,13 @@ func applyOptions(opts []ConfigOption) *chunkReaderConfig {
 	config := &chunkReaderConfig{
 		chunkSize: ChunkSize,      // default
 		totalSize: TotalChunkSize, // default
-		peekSize:  PeekSize,       // default
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
+
+	config.totalSize = config.chunkSize + config.peekSize
 
 	return config
 }

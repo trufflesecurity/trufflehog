@@ -73,7 +73,6 @@ func TestNewChunkedReader(t *testing.T) {
 		input      string
 		chunkSize  int
 		peekSize   int
-		totalSize  int
 		wantChunks []string
 		wantErr    bool
 	}{
@@ -82,7 +81,6 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      "example input",
 			chunkSize:  ChunkSize,
 			peekSize:   PeekSize,
-			totalSize:  TotalChunkSize,
 			wantChunks: []string{"example input"},
 			wantErr:    false,
 		},
@@ -91,7 +89,6 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      "",
 			chunkSize:  1024,
 			peekSize:   512,
-			totalSize:  1024 + 512,
 			wantChunks: []string{},
 			wantErr:    false,
 		},
@@ -100,7 +97,6 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      "small data",
 			chunkSize:  1024,
 			peekSize:   512,
-			totalSize:  1024 + 512,
 			wantChunks: []string{"small data"},
 			wantErr:    false,
 		},
@@ -109,7 +105,6 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      strings.Repeat("a", 1024),
 			chunkSize:  1024,
 			peekSize:   512,
-			totalSize:  1024 + 512,
 			wantChunks: []string{strings.Repeat("a", 1024)},
 			wantErr:    false,
 		},
@@ -118,8 +113,7 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      strings.Repeat("a", 1536),
 			chunkSize:  1024,
 			peekSize:   512,
-			totalSize:  1024 + 512,
-			wantChunks: []string{strings.Repeat("a", 1024), strings.Repeat("a", 512)},
+			wantChunks: []string{strings.Repeat("a", 1536), strings.Repeat("a", 512)},
 			wantErr:    false,
 		},
 		{
@@ -127,8 +121,7 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      strings.Repeat("a", 1300),
 			chunkSize:  1024,
 			peekSize:   512,
-			totalSize:  1024 + 512,
-			wantChunks: []string{strings.Repeat("a", 1024), strings.Repeat("a", 276)},
+			wantChunks: []string{strings.Repeat("a", 1300), strings.Repeat("a", 276)},
 			wantErr:    false,
 		},
 		{
@@ -136,7 +129,6 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      strings.Repeat("a", 512),
 			chunkSize:  1024,
 			peekSize:   512,
-			totalSize:  1024 + 512,
 			wantChunks: []string{strings.Repeat("a", 512)},
 			wantErr:    false,
 		},
@@ -145,7 +137,6 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      strings.Repeat("a", 2048),
 			chunkSize:  1024,
 			peekSize:   1024,
-			totalSize:  1024 + 1024,
 			wantChunks: []string{strings.Repeat("a", 2048), strings.Repeat("a", 1024)},
 			wantErr:    false,
 		},
@@ -154,7 +145,6 @@ func TestNewChunkedReader(t *testing.T) {
 			input:      strings.Repeat("a", 4096),
 			chunkSize:  1024,
 			peekSize:   1024,
-			totalSize:  1024 + 1024,
 			wantChunks: []string{strings.Repeat("a", 2048), strings.Repeat("a", 2048), strings.Repeat("a", 2048), strings.Repeat("a", 1024)},
 			wantErr:    false,
 		},
@@ -162,7 +152,7 @@ func TestNewChunkedReader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			readerFunc := NewChunkReader(WithChunkSize(tt.chunkSize), WithPeekSize(tt.peekSize), WithTotalChunkSize(tt.totalSize))
+			readerFunc := NewChunkReader(WithChunkSize(tt.chunkSize), WithPeekSize(tt.peekSize))
 			reader := strings.NewReader(tt.input)
 			ctx := context.Background()
 			dataChan, errChan := readerFunc(ctx, reader)
