@@ -204,7 +204,7 @@ func (e *Engine) GetMetrics() Metrics {
 		result.AvgDetectorTime[detectorName] = avgDuration
 	}
 
-	result.ScanDuration = e.metrics.ScanDuration
+	result.ScanDuration = e.metrics.getScanDuration()
 
 	return result
 }
