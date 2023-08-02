@@ -49,12 +49,8 @@ func (s *Source) cloneRepo(
 		}
 
 	case *sourcespb.GitHub_Token:
-		// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
-		if s.githubUser == "" || s.githubToken == "" {
-			s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
-			if err != nil {
-				return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-			}
+		if err := s.getUserAndToken(ctx, repoURL, installationClient); err != nil {
+			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
 		}
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
 		if err != nil {
@@ -64,6 +60,20 @@ func (s *Source) cloneRepo(
 		return "", nil, fmt.Errorf("unhandled credential type for repo %s", repoURL)
 	}
 	return path, repo, nil
+}
+
+func (s *Source) getUserAndToken(ctx context.Context, repoURL string, installationClient *github.Client) error {
+	// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
+	s.userMu.Lock()
+	defer s.userMu.Unlock()
+	if s.githubUser == "" || s.githubToken == "" {
+		var err error
+		s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
+		if err != nil {
+			return fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
+		}
+	}
+	return nil
 }
 
 func (s *Source) userAndToken(ctx context.Context, installationClient *github.Client) (string, string, error) {

@@ -10,6 +10,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
@@ -20,7 +21,10 @@ var (
 	whitePrinter  = color.New(color.FgWhite)
 )
 
-func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
+// PlainPrinter is a printer that prints results in plain text format.
+type PlainPrinter struct{}
+
+func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),

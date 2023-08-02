@@ -248,6 +248,21 @@ message GoogleDrive {
   string timestamp = 4;
   bool shared = 5;
   string last_modified_by = 6;
+  string path = 7;
+}
+
+message AzureRepos {
+  string link = 1;
+  string username = 2;
+  string repository = 3;
+  string commit = 4;
+  string email = 5;
+  string file = 6;
+  string timestamp = 7;
+  int64 line = 8;
+  Visibility visibility = 9;
+  string project = 10;
+  string organization = 11;
 }
 
 message MetaData {
@@ -278,5 +293,6 @@ message MetaData {
     PublicEventMonitoring publicEventMonitoring = 24;
     SharePoint sharepoint = 25;
     GoogleDrive googleDrive = 26;
+    AzureRepos azureRepos = 27;
   }
 }
