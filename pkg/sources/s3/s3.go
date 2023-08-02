@@ -339,7 +339,16 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			dataCh, errCh := chunkReader(ctx, reader)
 			for data := range dataCh {
 				chunk.Data = data
-				chunksChan <- &chunk
+				select {
+				case <-ctx.Done(): // priority to context cancellation
+					return ctx.Err()
+				default:
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case chunksChan <- &chunk:
+					}
+				}
 			}
 			if err := <-errCh; err != nil {
 				s.log.Error(err, "Error reading chunk.")
