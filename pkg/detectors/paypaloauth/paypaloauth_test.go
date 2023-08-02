@@ -52,6 +52,10 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_PaypalOauth,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -64,6 +68,10 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_PaypalOauth,
 					Verified:     false,
