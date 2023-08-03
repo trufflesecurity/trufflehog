@@ -5,9 +5,10 @@ package ftp
 
 import (
 	"context"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -19,11 +20,12 @@ func TestFTP_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "bad scheme",
@@ -72,6 +74,25 @@ func TestFTP_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "bad host",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				// https://dlptest.com/ftp-test/
+				data:   []byte("ftp://dlpuser:rNrKYTX9g7z3RgJRmxWuGHbeu@ftp.dlptest.com.badhost"),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_FTP,
+					Verified:     false,
+					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com.badhost",
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
 			name: "blocked FP",
 			s:    Scanner{},
 			args: args{
@@ -95,9 +116,14 @@ func TestFTP_FromChunk(t *testing.T) {
 			// }
 			for i := range got {
 				got[i].Raw = nil
+
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "VerificationError")
+			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
+				t.Errorf("FTP.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

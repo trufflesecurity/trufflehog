@@ -2,6 +2,8 @@ package ftp
 
 import (
 	"context"
+	"errors"
+	"net/textproto"
 	"net/url"
 	"regexp"
 	"strings"
@@ -12,6 +14,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
+
+// https://datatracker.ietf.org/doc/html/rfc959
+const ftpNotLoggedIn = 530
 
 type Scanner struct{}
 
@@ -90,7 +95,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func isErrDeterminate(e error) bool {
-	return true
+	ftpErr := &textproto.Error{}
+	return errors.As(e, &ftpErr)
 }
 
 func verifyFTP(ctx context.Context, u *url.URL) error {
