@@ -65,7 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			s.Verified = verifyFTP(ctx, parsedURL)
+			verificationErr := verifyFTP(ctx, parsedURL)
+			s.Verified = verificationErr == nil
+			if isErrDeterminate(verificationErr) {
+				s.VerificationError = verificationErr
+			}
 		}
 
 		if !s.Verified {
@@ -85,7 +89,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyFTP(ctx context.Context, u *url.URL) bool {
+func isErrDeterminate(e error) bool {
+	return true
+}
+
+func verifyFTP(ctx context.Context, u *url.URL) error {
 	host := u.Host
 	if !strings.Contains(host, ":") {
 		host = host + ":21"
@@ -93,13 +101,11 @@ func verifyFTP(ctx context.Context, u *url.URL) bool {
 
 	c, err := ftp.Dial(host, ftp.DialWithTimeout(5*time.Second))
 	if err != nil {
-		return false
+		return err
 	}
 
 	password, _ := u.User.Password()
-	err = c.Login(u.User.Username(), password)
-
-	return err == nil
+	return c.Login(u.User.Username(), password)
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
