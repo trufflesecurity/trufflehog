@@ -18,13 +18,17 @@ import (
 // https://datatracker.ietf.org/doc/html/rfc959
 const ftpNotLoggedIn = 530
 
-type Scanner struct{}
+type Scanner struct {
+	// Verification timeout. Defaults to 5 seconds if unset.
+	verificationTimeout time.Duration
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	defaultVerificationTimeout = 5 * time.Second
+	keyPat                     = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -63,32 +67,36 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		rawURL.Path = ""
 		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
 
-		s := detectors.Result{
+		r := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FTP,
 			Raw:          []byte(rawURL.String()),
 			Redacted:     redact,
 		}
 
 		if verify {
-			verificationErr := verifyFTP(ctx, parsedURL)
-			s.Verified = verificationErr == nil
+			timeout := s.verificationTimeout
+			if timeout == 0 {
+				timeout = defaultVerificationTimeout
+			}
+			verificationErr := verifyFTP(timeout, parsedURL)
+			r.Verified = verificationErr == nil
 			if !isErrDeterminate(verificationErr) {
-				s.VerificationError = verificationErr
+				r.VerificationError = verificationErr
 			}
 		}
 
-		if !s.Verified {
+		if !r.Verified {
 			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
 			if strings.HasPrefix(password, "$") {
 				continue
 			}
 		}
 
-		if detectors.IsKnownFalsePositive(string(s.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
+		if detectors.IsKnownFalsePositive(string(r.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
 			continue
 		}
 
-		results = append(results, s)
+		results = append(results, r)
 	}
 
 	return results, nil
@@ -99,13 +107,13 @@ func isErrDeterminate(e error) bool {
 	return errors.As(e, &ftpErr)
 }
 
-func verifyFTP(ctx context.Context, u *url.URL) error {
+func verifyFTP(timeout time.Duration, u *url.URL) error {
 	host := u.Host
 	if !strings.Contains(host, ":") {
 		host = host + ":21"
 	}
 
-	c, err := ftp.Dial(host, ftp.DialWithTimeout(5*time.Second))
+	c, err := ftp.Dial(host, ftp.DialWithTimeout(timeout))
 	if err != nil {
 		return err
 	}
