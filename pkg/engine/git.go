@@ -24,27 +24,6 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 		git.ScanOptionLogOptions(logOptions),
 	}
 
-	options := &gogit.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
-	}
-	if c.Bare {
-		options.DetectDotGit = false
-		options.EnableDotGitCommonDir = false
-	}
-
-	repo, err := gogit.PlainOpenWithOptions(c.RepoPath, options)
-	if err != nil {
-		return fmt.Errorf("could not open repo: %s: %w", c.RepoPath, err)
-	}
-
-	// Try to scan even if people mark repo as bare while it's not
-	conf, err := repo.Config()
-	if err != nil {
-		return fmt.Errorf("could not get repo config: %w", err)
-	}
-	opts = append(opts, git.ScanOptionBare(conf.Core.IsBare))
-
 	if c.MaxDepth != 0 {
 		opts = append(opts, git.ScanOptionMaxDepth(int64(c.MaxDepth)))
 	}
@@ -56,6 +35,9 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	}
 	if c.ExcludeGlobs != nil {
 		opts = append(opts, git.ScanOptionExcludeGlobs(c.ExcludeGlobs))
+	}
+	if c.Bare {
+		opts = append(opts, git.ScanOptionBare(c.Bare))
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
