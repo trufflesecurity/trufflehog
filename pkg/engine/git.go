@@ -67,8 +67,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 		Directories: []string{c.RepoPath},
 	}
 	var conn anypb.Any
-	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
-	if err != nil {
+	if err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{}); err != nil {
 		ctx.Logger().Error(err, "failed to marshal git connection")
 		return err
 	}
