@@ -15,8 +15,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-// https://datatracker.ietf.org/doc/html/rfc959
-const ftpNotLoggedIn = 530
+const (
+	// https://datatracker.ietf.org/doc/html/rfc959
+	ftpNotLoggedIn = 530
+
+	defaultVerificationTimeout = 5 * time.Second
+)
 
 type Scanner struct {
 	// Verification timeout. Defaults to 5 seconds if unset.
@@ -27,8 +31,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultVerificationTimeout = 5 * time.Second
-	keyPat                     = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
