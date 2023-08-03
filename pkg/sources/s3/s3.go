@@ -344,7 +344,6 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 					continue
 				}
 				if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
-					s.log.Error(err, "error writing chunk.")
 					return err
 				}
 			}

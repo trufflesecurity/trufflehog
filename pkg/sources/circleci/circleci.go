@@ -255,11 +255,9 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 		}
 		chunk.Data = data.Bytes()
 		if err := data.Error(); err != nil {
-			ctx.Logger().Error(err, "error reading chunk.")
 			return err
 		}
 		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
-			ctx.Logger().Error(err, "error writing chunk.")
 			return err
 		}
 	}
