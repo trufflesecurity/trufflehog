@@ -75,8 +75,8 @@ func WithPeekSize(size int) ConfigOption {
 // ChunkResult is the output unit of a ChunkReader,
 // it contains the data and error of a chunk.
 type ChunkResult struct {
-	data  []byte
-	error error
+	data []byte
+	err  error
 }
 
 // Bytes for a ChunkResult.
@@ -86,7 +86,7 @@ func (cr ChunkResult) Bytes() []byte {
 
 // Error for a ChunkResult.
 func (cr ChunkResult) Error() error {
-	return cr.error
+	return cr.err
 }
 
 // ChunkReader reads chunks from a reader and returns a channel of chunks and a channel of errors.
@@ -146,7 +146,7 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
 					ctx.Logger().Error(err, "error reading chunk")
-					chunkRes.error = err
+					chunkRes.err = err
 					chunkResultChan <- chunkRes
 				}
 				return
