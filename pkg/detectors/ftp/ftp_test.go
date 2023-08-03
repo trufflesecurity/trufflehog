@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -93,6 +94,25 @@ func TestFTP_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
+			name: "timeout",
+			s:    Scanner{verificationTimeout: 1 * time.Microsecond},
+			args: args{
+				ctx: context.Background(),
+				// https://dlptest.com/ftp-test/
+				data:   []byte("ftp://dlpuser:rNrKYTX9g7z3RgJRmxWuGHbeu@ftp.dlptest.com"),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_FTP,
+					Verified:     false,
+					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
 			name: "blocked FP",
 			s:    Scanner{},
 			args: args{
@@ -105,8 +125,7 @@ func TestFTP_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("URI.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
