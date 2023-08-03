@@ -519,6 +519,7 @@ func run(state overseer.State) {
 		"bytes", metrics.BytesScanned,
 		"verified_secrets", metrics.VerifiedSecretsFound,
 		"unverified_secrets", metrics.UnverifiedSecretsFound,
+		"scan_duration", metrics.ScanDuration.String(),
 	)
 
 	if *printAvgDetectorTime {

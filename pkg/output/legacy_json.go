@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -20,7 +21,7 @@ import (
 )
 
 // LegacyJSONPrinter is a printer that prints results in legacy JSON format for backwards compatibility.
-type LegacyJSONPrinter struct{}
+type LegacyJSONPrinter struct{ mu sync.Mutex }
 
 func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
 	var repo string
@@ -52,7 +53,10 @@ func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMe
 	if err != nil {
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
+
+	p.mu.Lock()
 	fmt.Println(string(out))
+	p.mu.Unlock()
 	return nil
 }
 
