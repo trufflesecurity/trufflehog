@@ -115,6 +115,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
+	if s.scanOptions == nil {
+		s.scanOptions = &ScanOptions{}
+	}
 
 	var conn sourcespb.Git
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
