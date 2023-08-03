@@ -241,7 +241,7 @@ func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, rep
 // job reporting.
 func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, source Source, report *JobProgress) error {
 	// Introspect on the chunks we get from the Chunks method.
-	ch := make(chan *Chunk)
+	ch := make(chan *Chunk, 1)
 	var wg sync.WaitGroup
 	// Consume chunks and export chunks.
 	wg.Add(1)
@@ -249,10 +249,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 		defer wg.Done()
 		for chunk := range ch {
 			report.ReportChunk(nil, chunk)
-			if err := common.CancellableWrite(ctx, s.outputChunks, chunk); err != nil {
-				report.ReportError(Fatal{err})
-				return
-			}
+			s.outputChunks <- chunk
 		}
 	}()
 	// Don't return from this function until the goroutine has finished
@@ -273,7 +270,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 // scanned and any errors encountered.
 func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source SourceUnitEnumChunker, report *JobProgress) error {
 	unitReporter := &mgrUnitReporter{
-		unitCh: make(chan SourceUnit),
+		unitCh: make(chan SourceUnit, 1),
 		report: report,
 	}
 	// Create a function that will save the first error encountered (if
@@ -308,7 +305,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		unit := unit
 		chunkReporter := &mgrChunkReporter{
 			unit:    unit,
-			chunkCh: make(chan *Chunk),
+			chunkCh: make(chan *Chunk, 1),
 			report:  report,
 		}
 		// Consume units and produce chunks.
@@ -330,10 +327,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 			defer wg.Done()
 			defer func() { report.EndUnitChunking(unit, time.Now()) }()
 			for chunk := range chunkReporter.chunkCh {
-				if err := common.CancellableWrite(ctx, s.outputChunks, chunk); err != nil {
-					report.ReportError(Fatal{err})
-					return
-				}
+				s.outputChunks <- chunk
 			}
 		}()
 	}
