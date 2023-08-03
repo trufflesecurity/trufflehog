@@ -36,6 +36,9 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	if c.ExcludeGlobs != nil {
 		opts = append(opts, git.ScanOptionExcludeGlobs(c.ExcludeGlobs))
 	}
+	if c.Bare {
+		opts = append(opts, git.ScanOptionBare(c.Bare))
+	}
 	scanOptions := git.NewScanOptions(opts...)
 
 	connection := &sourcespb.Git{
@@ -46,8 +49,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 		Directories: []string{c.RepoPath},
 	}
 	var conn anypb.Any
-	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
-	if err != nil {
+	if err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{}); err != nil {
 		ctx.Logger().Error(err, "failed to marshal git connection")
 		return err
 	}

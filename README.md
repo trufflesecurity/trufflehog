@@ -263,9 +263,9 @@ jobs:
           extra_args: --debug --only-verified
 ```
 
-# Precommit Hook
+# Pre-commit Hook
 
-Trufflehog can be used in a precommit hook to prevent credentials from leaking before they ever leave your computer.
+Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
 
 ```yaml

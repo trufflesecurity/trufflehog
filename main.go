@@ -66,6 +66,7 @@ var (
 	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
 	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	gitScanBare         = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
 	_                   = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
@@ -377,6 +378,7 @@ func run(state overseer.State) {
 			HeadRef:      *gitScanBranch,
 			BaseRef:      *gitScanSinceCommit,
 			MaxDepth:     *gitScanMaxDepth,
+			Bare:         *gitScanBare,
 			Filter:       filter,
 			ExcludeGlobs: excludedGlobs,
 		}

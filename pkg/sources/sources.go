@@ -141,6 +141,8 @@ type GitConfig struct {
 	BaseRef string
 	// MaxDepth is the maximum depth to scan the source.
 	MaxDepth int
+	// Bare is an indicator to handle bare repositories properly.
+	Bare bool
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// ExcludeGlobs is a list of globs to exclude from the scan.

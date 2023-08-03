@@ -251,12 +251,12 @@ func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) e
 		if len(gitDir) == 0 {
 			continue
 		}
-		if strings.HasSuffix(gitDir, "git") {
+		if !s.scanOptions.Bare && strings.HasSuffix(gitDir, "git") {
 			// TODO: Figure out why we skip directories ending in "git".
 			continue
 		}
 		// try paths instead of url
-		repo, err := RepoFromPath(gitDir)
+		repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
 		if err != nil {
 			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
 			continue
@@ -278,10 +278,11 @@ func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) e
 	return nil
 }
 
-func RepoFromPath(path string) (*git.Repository, error) {
-	options := &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
+func RepoFromPath(path string, isBare bool) (*git.Repository, error) {
+	options := &git.PlainOpenOptions{}
+	if !isBare {
+		options.DetectDotGit = true
+		options.EnableDotGitCommonDir = true
 	}
 	return git.PlainOpenWithOptions(path, options)
 }
@@ -393,7 +394,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return err
 	}
 
-	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs)
+	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -621,8 +622,10 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
-	if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
-		ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+	if !scanOptions.Bare {
+		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
+			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+		}
 	}
 
 	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp
