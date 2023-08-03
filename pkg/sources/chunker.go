@@ -87,8 +87,8 @@ func NewChunkReader(opts ...ConfigOption) ChunkReader {
 func applyOptions(opts []ConfigOption) *chunkReaderConfig {
 	// Set defaults.
 	config := &chunkReaderConfig{
-		chunkSize: ChunkSize,      // default
-		totalSize: TotalChunkSize, // default
+		chunkSize: ChunkSize, // default
+		peekSize:  PeekSize,  // default
 	}
 
 	for _, opt := range opts {

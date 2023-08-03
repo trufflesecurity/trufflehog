@@ -34,6 +34,9 @@ type Metrics struct {
 	VerifiedSecretsFound   uint64
 	UnverifiedSecretsFound uint64
 	AvgDetectorTime        map[string]time.Duration
+
+	scanStartTime time.Time
+	ScanDuration  time.Duration
 }
 
 // runtimeMetrics for the scan engine for internal use by the engine.
@@ -44,18 +47,16 @@ type runtimeMetrics struct {
 }
 
 // Printer is used to format found results and output them to the user. Ex JSON, plain text, etc.
+// Please note printer implementations SHOULD BE thread safe.
 type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
 type Engine struct {
+	// CLI flags.
 	concurrency uint8
-	chunks      chan *sources.Chunk
-	results     chan detectors.ResultWithMetadata
 	decoders    []decoders.Decoder
 	detectors   map[bool][]detectors.Detector
-	sourcesWg   *errgroup.Group
-	workersWg   sync.WaitGroup
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
@@ -67,13 +68,17 @@ type Engine struct {
 	// matching given a set of words (keywords from the rules in the config)
 	prefilter ahocorasick.Trie
 
+	// Engine synchronization primitives.
+	chunks               chan *sources.Chunk
+	results              chan detectors.ResultWithMetadata
 	detectableChunksChan chan detectableChunk
+	sourcesWg            *errgroup.Group
+	workersWg            sync.WaitGroup
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
 
-	// Runtime metrics.
+	// Runtime information.
 	metrics runtimeMetrics
-
 	// numFoundResults is used to keep track of the number of results found.
 	numFoundResults uint32
 
@@ -199,6 +204,8 @@ func (e *Engine) GetMetrics() Metrics {
 		result.AvgDetectorTime[detectorName] = avgDuration
 	}
 
+	result.ScanDuration = e.metrics.getScanDuration()
+
 	return result
 }
 
@@ -218,6 +225,16 @@ func (e *Engine) GetDetectorsMetrics() map[string]time.Duration {
 	}
 
 	return result
+}
+
+// getScanDuration returns the duration of the scan.
+// If the scan is still running, it returns the time since the scan started.
+func (m *Metrics) getScanDuration() time.Duration {
+	if m.ScanDuration == 0 {
+		return time.Since(m.scanStartTime)
+	}
+
+	return m.ScanDuration
 }
 
 // DetectorAvgTime returns the average time taken by each detector.
@@ -262,6 +279,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		sourcesWg:            &errgroup.Group{},
 		dedupeCache:          cache,
 		printer:              new(output.PlainPrinter), // default printer
+		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
 	}
 
 	for _, option := range options {
@@ -386,6 +404,8 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
+
+	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
 	return err
 }
