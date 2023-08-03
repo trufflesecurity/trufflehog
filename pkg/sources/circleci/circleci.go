@@ -232,13 +232,13 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 
 	chunkReader := sources.NewChunkReader()
-	dataCh, errCh := chunkReader(ctx, res.Body)
-	for data := range dataCh {
+	chunkResChan := chunkReader(ctx, res.Body)
+	for data := range chunkResChan {
 		chunk := &sources.Chunk{
 			SourceType: s.Type(),
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
-			Data:       removeCircleSha1Line(data),
+			Data:       removeCircleSha1Line(data.Bytes()),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Circleci{
 					Circleci: &source_metadatapb.CircleCI{
@@ -253,20 +253,15 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 			},
 			Verify: s.verify,
 		}
-		select {
-		case <-ctx.Done(): // priority to context cancellation
-			return ctx.Err()
-		default:
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case chunksChan <- chunk:
-			}
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			ctx.Logger().Error(err, "error reading chunk.")
+			return err
 		}
-	}
-	if err := <-errCh; err != nil {
-		ctx.Logger().Error(err, "Error reading chunk.")
-		return nil
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			ctx.Logger().Error(err, "error writing chunk.")
+			return err
+		}
 	}
 
 	return nil

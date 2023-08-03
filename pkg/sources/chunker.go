@@ -72,11 +72,28 @@ func WithPeekSize(size int) ConfigOption {
 	}
 }
 
+// ChunkResult is the output unit of a ChunkReader,
+// it contains the data and error of a chunk.
+type ChunkResult struct {
+	data  []byte
+	error error
+}
+
+// Bytes for a ChunkResult.
+func (cr ChunkResult) Bytes() []byte {
+	return cr.data
+}
+
+// Error for a ChunkResult.
+func (cr ChunkResult) Error() error {
+	return cr.error
+}
+
 // ChunkReader reads chunks from a reader and returns a channel of chunks and a channel of errors.
 // The channel of chunks is closed when the reader is closed.
 // This should be used whenever a large amount of data is read from a reader.
 // Ex: reading attachments, archives, etc.
-type ChunkReader func(ctx context.Context, reader io.Reader) (<-chan []byte, <-chan error)
+type ChunkReader func(ctx context.Context, reader io.Reader) <-chan ChunkResult
 
 // NewChunkReader returns a ChunkReader with the given options.
 func NewChunkReader(opts ...ConfigOption) ChunkReader {
@@ -101,39 +118,40 @@ func applyOptions(opts []ConfigOption) *chunkReaderConfig {
 }
 
 func createReaderFn(config *chunkReaderConfig) ChunkReader {
-	return func(ctx context.Context, reader io.Reader) (<-chan []byte, <-chan error) {
+	return func(ctx context.Context, reader io.Reader) <-chan ChunkResult {
 		return readInChunks(ctx, reader, config)
 	}
 }
 
-func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConfig) (<-chan []byte, <-chan error) {
+func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConfig) <-chan ChunkResult {
 	const channelSize = 1
 	chunkReader := bufio.NewReaderSize(reader, config.chunkSize)
-	dataChan := make(chan []byte, channelSize)
-	errChan := make(chan error, channelSize)
+	chunkResultChan := make(chan ChunkResult, channelSize)
 
 	go func() {
-		defer close(dataChan)
-		defer close(errChan)
+		defer close(chunkResultChan)
 
 		for {
+			chunkRes := ChunkResult{}
 			chunkBytes := make([]byte, config.totalSize)
 			chunkBytes = chunkBytes[:config.chunkSize]
 			n, err := chunkReader.Read(chunkBytes)
 			if n > 0 {
 				peekData, _ := chunkReader.Peek(config.totalSize - n)
 				chunkBytes = append(chunkBytes[:n], peekData...)
-				dataChan <- chunkBytes
+				chunkRes.data = chunkBytes
+				chunkResultChan <- chunkRes
 			}
 
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
 					ctx.Logger().Error(err, "error reading chunk")
-					errChan <- err
+					chunkRes.error = err
+					chunkResultChan <- chunkRes
 				}
 				return
 			}
 		}
 	}()
-	return dataChan, errChan
+	return chunkResultChan
 }

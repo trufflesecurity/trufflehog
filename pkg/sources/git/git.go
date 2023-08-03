@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -924,25 +925,16 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	reader.Stop()
 
 	chunkReader := sources.NewChunkReader()
-	dataCh, errCh := chunkReader(ctx, reader)
-	for data := range dataCh {
+	chunkResChan := chunkReader(ctx, reader)
+	for data := range chunkResChan {
 		chunk := *chunkSkel
-		chunk.Data = data
-		select {
-		case <-ctx.Done(): // priority to context cancellation
-			return ctx.Err()
-		default:
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case chunksChan <- chunkSkel:
-			}
-
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
 		}
-	}
-	if err := <-errCh; err != nil {
-		ctx.Logger().Error(err, "Error reading chunk.")
-		return err
+		if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -155,27 +155,44 @@ func TestNewChunkedReader(t *testing.T) {
 			readerFunc := NewChunkReader(WithChunkSize(tt.chunkSize), WithPeekSize(tt.peekSize))
 			reader := strings.NewReader(tt.input)
 			ctx := context.Background()
-			dataChan, errChan := readerFunc(ctx, reader)
+			chunkResChan := readerFunc(ctx, reader)
 
+			var err error
 			chunks := make([]string, 0)
-			for data := range dataChan {
-				chunks = append(chunks, string(data))
+			for data := range chunkResChan {
+				chunks = append(chunks, string(data.Bytes()))
+				err = data.Error()
 			}
 
 			assert.Equal(t, tt.wantChunks, chunks, "Chunks do not match")
-
-			select {
-			case err := <-errChan:
-				if tt.wantErr {
-					assert.Error(t, err, "Expected an error")
-				} else {
-					assert.NoError(t, err, "Unexpected error")
-				}
-			default:
-				if tt.wantErr {
-					assert.Fail(t, "Expected error but got none")
-				}
+			if tt.wantErr {
+				assert.Error(t, err, "Expected an error")
+			} else {
+				assert.NoError(t, err, "Unexpected error")
 			}
 		})
+	}
+}
+
+func BenchmarkChunkReader(b *testing.B) {
+	var bigChunk = make([]byte, 1<<24) // 16MB
+
+	reader := bytes.NewReader(bigChunk)
+	chunkReader := NewChunkReader(WithChunkSize(ChunkSize), WithPeekSize(PeekSize))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		chunkResChan := chunkReader(context.Background(), reader)
+
+		// Drain the channel.
+		for range chunkResChan {
+		}
+
+		b.StopTimer()
+		_, err := reader.Seek(0, 0)
+		assert.Nil(b, err)
 	}
 }

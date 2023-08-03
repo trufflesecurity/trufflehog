@@ -336,23 +336,17 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 
 			chunk := *chunkSkel
 			chunkReader := sources.NewChunkReader()
-			dataCh, errCh := chunkReader(ctx, reader)
-			for data := range dataCh {
-				chunk.Data = data
-				select {
-				case <-ctx.Done(): // priority to context cancellation
-					return ctx.Err()
-				default:
-					select {
-					case <-ctx.Done():
-						return ctx.Err()
-					case chunksChan <- &chunk:
-					}
+			chunkResChan := chunkReader(ctx, reader)
+			for data := range chunkResChan {
+				chunk.Data = data.Bytes()
+				if err := data.Error(); err != nil {
+					s.log.Error(err, "error reading chunk.")
+					continue
 				}
-			}
-			if err := <-errCh; err != nil {
-				s.log.Error(err, "Error reading chunk.")
-				return nil
+				if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+					s.log.Error(err, "error writing chunk.")
+					return err
+				}
 			}
 
 			atomic.AddUint64(objectCount, 1)
