@@ -104,7 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func isErrDeterminate(e error) bool {
 	ftpErr := &textproto.Error{}
-	return errors.As(e, &ftpErr)
+	return errors.As(e, &ftpErr) && ftpErr.Code == ftpNotLoggedIn
 }
 
 func verifyFTP(timeout time.Duration, u *url.URL) error {
