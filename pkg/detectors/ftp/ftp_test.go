@@ -48,7 +48,7 @@ func TestFTP_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FTP,
 					Verified:     true,
-					Redacted:     "ftp://dlpuser:*************************@ftp.dlptest.com",
+					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
 			},
 			wantErr: false,
@@ -66,7 +66,7 @@ func TestFTP_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FTP,
 					Verified:     false,
-					Redacted:     "ftp://dlpuser:*******@ftp.dlptest.com",
+					Redacted:     "ftp://dlpuser:********@ftp.dlptest.com",
 				},
 			},
 			wantErr: false,
