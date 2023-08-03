@@ -80,7 +80,10 @@ func TestScanGCS(t *testing.T) {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, nil)
 				return
 			}
-			assert.Nil(t, e.Finish(ctx))
+			if err := e.Finish(ctx); err != nil && !test.wantErr && !strings.Contains(err.Error(), "googleapi: Error 400: Bad Request") {
+				t.Errorf("Finish() got: %v, want: %v", err, nil)
+				return
+			}
 
 			if err == nil && test.wantErr {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, "error")

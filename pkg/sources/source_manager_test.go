@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -39,10 +41,14 @@ type counterChunker struct {
 	count        int
 }
 
-func (c *counterChunker) Chunks(_ context.Context, ch chan *Chunk) error {
+func (c *counterChunker) Chunks(ctx context.Context, ch chan *Chunk) error {
 	for i := 0; i < c.count; i++ {
-		ch <- &Chunk{Data: []byte{c.chunkCounter}}
-		c.chunkCounter++
+		select {
+		case ch <- &Chunk{Data: []byte{c.chunkCounter}}:
+			c.chunkCounter++
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return nil
 }
@@ -98,71 +104,50 @@ func tryRead(ch <-chan *Chunk) (*Chunk, error) {
 func TestSourceManagerRun(t *testing.T) {
 	mgr := NewManager(WithBufferedOutput(8))
 	handle, err := enrollDummy(mgr, &counterChunker{count: 1})
-	if err != nil {
-		t.Fatalf("unexpected error enrolling source: %v", err)
-	}
+	assert.NoError(t, err)
 	for i := 0; i < 3; i++ {
-		if _, err := mgr.Run(context.Background(), handle); err != nil {
-			t.Fatalf("unexpected error running source: %v", err)
-		}
+		_, err = mgr.Run(context.Background(), handle)
+		assert.NoError(t, err)
 		chunk, err := tryRead(mgr.Chunks())
-		if err != nil {
-			t.Fatalf("reading chunk failed: %v", err)
-		}
-		if chunk.Data[0] != byte(i) {
-			t.Fatalf("unexpected chunk value, wanted %v, got: %v", chunk.Data[0], i)
-		}
-
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{byte(i)}, chunk.Data)
 		// The Chunks channel should be empty now.
-		if chunk, err := tryRead(mgr.Chunks()); err == nil {
-			t.Fatalf("unexpected chunk found: %+v", chunk)
-		}
+		_, err = tryRead(mgr.Chunks())
+		assert.Error(t, err)
 	}
 }
 
 func TestSourceManagerWait(t *testing.T) {
 	mgr := NewManager()
 	handle, err := enrollDummy(mgr, &counterChunker{count: 1})
-	if err != nil {
-		t.Fatalf("unexpected error enrolling source: %v", err)
-	}
+	assert.NoError(t, err)
 	// Asynchronously run the source.
-	if _, err := mgr.ScheduleRun(context.Background(), handle); err != nil {
-		t.Fatalf("unexpected error scheduling run: %v", err)
-	}
+	_, err = mgr.ScheduleRun(context.Background(), handle)
+	assert.NoError(t, err)
 	// Read the 1 chunk we're expecting so Waiting completes.
 	<-mgr.Chunks()
 	// Wait for all resources to complete.
-	mgr.Wait()
+	assert.NoError(t, mgr.Wait())
 	// Enroll and run should return an error now.
-	if _, err := enrollDummy(mgr, &counterChunker{count: 1}); err == nil {
-		t.Fatalf("expected enroll to fail")
-	}
-	if _, err := mgr.ScheduleRun(context.Background(), handle); err == nil {
-		t.Fatalf("expected scheduling run to fail")
-	}
+	_, err = enrollDummy(mgr, &counterChunker{count: 1})
+	assert.Error(t, err)
+	_, err = mgr.ScheduleRun(context.Background(), handle)
+	assert.Error(t, err)
 }
 
 func TestSourceManagerError(t *testing.T) {
 	mgr := NewManager()
 	handle, err := enrollDummy(mgr, errorChunker{fmt.Errorf("oops")})
-	if err != nil {
-		t.Fatalf("unexpected error enrolling source: %v", err)
-	}
+	assert.NoError(t, err)
 	// A synchronous run should fail.
-	if _, err := mgr.Run(context.Background(), handle); err == nil {
-		t.Fatalf("expected run to fail")
-	}
+	_, err = mgr.Run(context.Background(), handle)
+	assert.Error(t, err)
 	// Scheduling a run should not fail, but the error should surface in
 	// Wait().
 	ref, err := mgr.ScheduleRun(context.Background(), handle)
-	if err != nil {
-		t.Fatalf("unexpected error scheduling run: %v", err)
-	}
-	<-ref.Done()
-	if err := ref.Snapshot().FatalError(); err == nil {
-		t.Fatalf("expected wait to fail")
-	}
+	assert.NoError(t, err)
+	assert.Error(t, mgr.Wait())
+	assert.Error(t, ref.Snapshot().FatalError())
 }
 
 func TestSourceManagerReport(t *testing.T) {
@@ -173,19 +158,90 @@ func TestSourceManagerReport(t *testing.T) {
 	} {
 		mgr := NewManager(opts...)
 		handle, err := enrollDummy(mgr, &counterChunker{count: 4})
-		if err != nil {
-			t.Fatalf("unexpected error enrolling source: %v", err)
-		}
+		assert.NoError(t, err)
 		// Synchronously run the source.
 		ref, err := mgr.Run(context.Background(), handle)
-		if err != nil {
-			t.Fatalf("unexpected error running source: %v", err)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(ref.Snapshot().Errors))
+		assert.Equal(t, uint64(4), ref.Snapshot().TotalChunks)
+	}
+}
+
+type unitChunk struct {
+	unit   string
+	output string
+	err    string
+}
+
+type unitChunker struct{ steps []unitChunk }
+
+func (c *unitChunker) Chunks(ctx context.Context, ch chan *Chunk) error {
+	for _, step := range c.steps {
+		if step.err != "" {
+			continue
 		}
-		if errs := ref.Snapshot().Errors; len(errs) > 0 {
-			t.Fatalf("unexpected errors in report: %v", errs)
-		}
-		if count := ref.Snapshot().TotalChunks; count != 4 {
-			t.Fatalf("expected report to have 4 chunks, got: %d", count)
+		if err := common.CancellableWrite(ctx, ch, &Chunk{Data: []byte(step.output)}); err != nil {
+			return err
 		}
 	}
+	return nil
+}
+func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
+	for _, step := range c.steps {
+		if err := rep.UnitOk(ctx, CommonSourceUnit{step.unit}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkReporter) error {
+	for _, step := range c.steps {
+		if unit.SourceUnitID() != step.unit {
+			continue
+		}
+		if step.err != "" {
+			if err := rep.ChunkErr(ctx, fmt.Errorf(step.err)); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := rep.ChunkOk(ctx, Chunk{Data: []byte(step.output)}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func TestSourceManagerNonFatalError(t *testing.T) {
+	input := []unitChunk{
+		{unit: "one", output: "bar"},
+		{unit: "two", err: "oh no"},
+		{unit: "three", err: "not again"},
+	}
+	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+	handle, err := enrollDummy(mgr, &unitChunker{input})
+	assert.NoError(t, err)
+	ref, err := mgr.Run(context.Background(), handle)
+	assert.NoError(t, err)
+	report := ref.Snapshot()
+	assert.Equal(t, len(input), int(report.TotalUnits))
+	assert.Equal(t, len(input), int(report.FinishedUnits))
+	assert.Equal(t, 1, int(report.TotalChunks))
+	assert.Equal(t, 2, len(report.Errors))
+	assert.True(t, report.DoneEnumerating)
+}
+
+func TestSourceManagerContextCancelled(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8))
+	handle, err := enrollDummy(mgr, &counterChunker{count: 100})
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ref, err := mgr.ScheduleRun(ctx, handle)
+	assert.NoError(t, err)
+
+	cancel()
+	<-ref.Done()
+	report := ref.Snapshot()
+	assert.Error(t, report.FatalError())
 }
