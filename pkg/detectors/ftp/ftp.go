@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			verificationErr := verifyFTP(ctx, parsedURL)
 			s.Verified = verificationErr == nil
-			if isErrDeterminate(verificationErr) {
+			if !isErrDeterminate(verificationErr) {
 				s.VerificationError = verificationErr
 			}
 		}
