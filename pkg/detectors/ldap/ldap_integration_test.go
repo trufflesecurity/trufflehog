@@ -7,13 +7,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -60,11 +61,12 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found with URI and separate user+password usage, verified",
@@ -153,6 +155,26 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "inaccessible host",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				data: []byte(`
+		ldap://badhost:1389
+		binddn="cn=admin,dc=example,dc=org"
+		pass="P@55w0rd"`),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LDAP,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -176,9 +198,12 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Ldap.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -205,7 +230,7 @@ func startOpenLDAP() error {
 		return nil
 	case <-time.After(30 * time.Second):
 		stopOpenLDAP()
-		return errors.New("timeout waiting for postgres database to be ready")
+		return errors.New("timeout waiting for ldap service to be ready")
 	}
 }
 
