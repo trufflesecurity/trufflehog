@@ -172,6 +172,8 @@ type GithubConfig struct {
 	IncludeRepos []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+	// MaxDepth is the maximum depth to scan the source.
+	MaxDepth int
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
