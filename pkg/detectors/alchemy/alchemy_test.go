@@ -133,7 +133,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationErr)
+					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
 				}
 				got[i].VerificationError = nil
 			}
