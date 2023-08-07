@@ -6,10 +6,11 @@ package salesforce
 import (
 	"context"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -137,13 +138,13 @@ func TestSalesforce_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationErr)
+					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
 				}
-				got[i].VerificationError = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Salesforce.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
