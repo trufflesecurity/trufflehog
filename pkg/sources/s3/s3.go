@@ -199,7 +199,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 		s.log.Info("Scanning bucket", "bucket", bucket)
 		region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
 		if err != nil {
-			s.log.Error(err, "could not get s3 region for bucket", "bucket", bucket)
+			s.log.Error(err, "could not get s3 region for bucket", "bucket: ", bucket)
 			continue
 		}
 
@@ -227,10 +227,8 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 			})
 
 		if err != nil {
-			return fmt.Errorf(
-				"could not list objects in s3 bucket: bucket %s: %w",
-				bucket,
-				err)
+			s.log.Error(err, "could not list objects in s3 bucket", "bucket: ", bucket)
+			continue
 		}
 	}
 	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
