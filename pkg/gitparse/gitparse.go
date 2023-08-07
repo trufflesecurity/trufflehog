@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -49,6 +50,49 @@ type Parser struct {
 	maxDiffSize   int
 	maxCommitSize int
 	dateFormat    string
+}
+
+type ParseState int
+
+const (
+	Initial ParseState = iota
+	CommitLine
+	MergeLine
+	AuthorLine
+	DateLine
+	MessageStartLine
+	MessageLine
+	MessageEndLine
+	DiffLine
+	ModeLine
+	IndexLine
+	FromFileLine
+	ToFileLine
+	BinaryFileLine
+	HunkLineNumberLine
+	HunkContentLine
+	ParseFailure
+)
+
+func (state ParseState) String() string {
+	return [...]string{
+		"Initial",
+		"CommitLine",
+		"MergeLine",
+		"AuthorLine",
+		"DateLine",
+		"MessageStartLine",
+		"MessageLine",
+		"MessageEndLine",
+		"DiffLine",
+		"ModeLine",
+		"IndexLine",
+		"FromFileLine",
+		"ToFileLine",
+		"BinaryFileLine",
+		"HunkLineNumberLine",
+		"HunkContentLine",
+	}[state]
 }
 
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
@@ -117,7 +161,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string) (chan Commit, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -134,10 +178,24 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	cmd := exec.Command("git", args...)
 	absPath, err := filepath.Abs(source)
 	if err == nil {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+		if !isBare {
+			cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+		} else {
+			cmd.Env = append(cmd.Env,
+				"GIT_DIR="+absPath,
+			)
+			// We need those variables to handle incoming commits
+			// while using trufflehog in pre-receive hooks
+			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
+				cmd.Env = append(cmd.Env, "GIT_OBJECT_DIRECTORY="+dir)
+			}
+			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
+				cmd.Env = append(cmd.Env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+			}
+		}
 	}
 
-	return c.executeCommand(ctx, cmd)
+	return c.executeCommand(ctx, cmd, false)
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
@@ -152,11 +210,11 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan Commit, error)
 		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
 	}
 
-	return c.executeCommand(ctx, cmd)
+	return c.executeCommand(ctx, cmd, true)
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
-func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit, error) {
+func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan Commit, error) {
 	commitChan := make(chan Commit, 64)
 
 	stdOut, err := cmd.StdoutPipe()
@@ -181,7 +239,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	}()
 
 	go func() {
-		c.FromReader(ctx, stdOut, commitChan)
+		c.FromReader(ctx, stdOut, commitChan, isStaged)
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
@@ -190,14 +248,15 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd) (chan Commit
 	return commitChan, nil
 }
 
-func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit) {
+func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan chan Commit, isStaged bool) {
 	outReader := bufio.NewReader(stdOut)
 	var (
-		currentCommit        *Commit
-		currentDiff          *Diff
-		recentlyPassedAuthor bool
-		totalLogSize         int
+		currentCommit *Commit
+		currentDiff   Diff
+
+		totalLogSize int
 	)
+	var latestState = Initial
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -205,15 +264,19 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		if common.IsDone(ctx) {
 			break
 		}
+
 		line, err := outReader.ReadBytes([]byte("\n")[0])
 		if err != nil && len(line) == 0 {
 			break
 		}
+
 		switch {
-		case isCommitLine(line):
+		case isCommitLine(isStaged, latestState, line):
+			latestState = CommitLine
+
 			// If there is a currentDiff, add it to currentCommit.
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				currentCommit.Size += currentDiff.Content.Len()
 			}
 			// If there is a currentCommit, send it to the channel.
@@ -222,7 +285,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = &Diff{}
+			currentDiff = Diff{}
 			currentCommit = &Commit{
 				Message: strings.Builder{},
 			}
@@ -230,22 +293,39 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
 			}
-		case isAuthorLine(line):
+		case isMergeLine(isStaged, latestState, line):
+			latestState = MergeLine
+		case isAuthorLine(isStaged, latestState, line):
+			latestState = AuthorLine
+
 			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
-			recentlyPassedAuthor = true
-		case isDateLine(line):
+		case isDateLine(isStaged, latestState, line):
+			latestState = DateLine
+
 			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
 			if err != nil {
 				ctx.Logger().V(2).Info("Could not parse date from git stream.", "error", err)
 			}
 			currentCommit.Date = date
-		case isDiffLine(line):
+		case isMessageStartLine(isStaged, latestState, line):
+			latestState = MessageStartLine
+			// NoOp
+		case isMessageLine(isStaged, latestState, line):
+			latestState = MessageLine
+
+			currentCommit.Message.Write(line[4:])
+		case isMessageEndLine(isStaged, latestState, line):
+			latestState = MessageEndLine
+			// NoOp
+		case isDiffLine(isStaged, latestState, line):
+			latestState = DiffLine
+
 			// This should never be nil, but check in case the stdin stream is messed up.
 			if currentCommit == nil {
 				currentCommit = &Commit{}
 			}
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
 				totalSize := 0
 				for _, diff := range currentCommit.Diffs {
@@ -266,36 +346,35 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = &Diff{}
-		case isModeLine(line):
+			currentDiff = Diff{}
+		case isModeLine(isStaged, latestState, line):
+			latestState = ModeLine
 			// NoOp
-		case isIndexLine(line):
-			recentlyPassedAuthor = false
+		case isIndexLine(isStaged, latestState, line):
+			latestState = IndexLine
 			// NoOp
-		case isPlusFileLine(line):
-			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
-		case isMinusFileLine(line):
-			// NoOp
-		case isPlusDiffLine(line):
-			currentDiff.Content.Write(line[1:])
-		case isMinusDiffLine(line):
-			// NoOp. We only care about additions.
-		case (isMessageLine(line) && recentlyPassedAuthor):
-			currentCommit.Message.Write(line[4:])
-		case isContextDiffLine(line):
-			currentDiff.Content.Write([]byte("\n"))
-		case isBinaryLine(line):
+		case isBinaryLine(isStaged, latestState, line):
+			latestState = BinaryFileLine
+
 			currentDiff.IsBinary = true
 			currentDiff.PathB = pathFromBinaryLine(line)
-		case isLineNumberDiffLine(line):
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+		case isFromFileLine(isStaged, latestState, line):
+			latestState = FromFileLine
+			// NoOp
+		case isToFileLine(isStaged, latestState, line):
+			latestState = ToFileLine
+
+			// TODO: Is this fix still required?
+			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
+		case isHunkLineNumberLine(isStaged, latestState, line):
+			latestState = HunkLineNumberLine
+
+			if currentDiff.Content.Len() > 0 {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 			}
-			newDiff := &Diff{
+			currentDiff = Diff{
 				PathB: currentDiff.PathB,
 			}
-
-			currentDiff = newDiff
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -305,7 +384,54 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentDiff.LineStart = lineStart
 				}
 			}
+		case isHunkContextLine(isStaged, latestState, line):
+			if latestState != HunkContentLine {
+				latestState = HunkContentLine
+			}
+			// TODO: Why do we care about this? It creates empty lines in the diff. If there are no plusLines, it's just newlines.
+			currentDiff.Content.Write([]byte("\n"))
+		case isHunkPlusLine(isStaged, latestState, line):
+			if latestState != HunkContentLine {
+				latestState = HunkContentLine
+			}
+
+			currentDiff.Content.Write(line[1:])
+		case isHunkMinusLine(isStaged, latestState, line):
+			if latestState != HunkContentLine {
+				latestState = HunkContentLine
+			}
+			// NoOp. We only care about additions.
+		case isHunkNewlineWarningLine(isStaged, latestState, line):
+			if latestState != HunkContentLine {
+				latestState = HunkContentLine
+			}
+			// NoOp
+		case isHunkEmptyLine(isStaged, latestState, line):
+			if latestState != HunkContentLine {
+				latestState = HunkContentLine
+			}
+			// NoOp
+		case isCommitSeparatorLine(isStaged, latestState, line):
+			// NoOp
+		default:
+			// Skip ahead until we find the next diff or commit.
+			if latestState == ParseFailure {
+				continue
+			}
+
+			// Here be dragons...
+			// Build an informative error message.
+			var err error
+			if currentCommit != nil && currentCommit.Hash != "" {
+				err = fmt.Errorf(`failed to parse line "%s" after state "%s" (commit=%s)`, line, latestState, currentCommit.Hash)
+			} else {
+				err = fmt.Errorf(`failed to parse line "%s" after state "%s"`, line, latestState)
+			}
+			ctx.Logger().V(2).Error(err, "Recovering at the latest commit or diff...\n")
+
+			latestState = ParseFailure
 		}
+
 		if currentDiff.Content.Len() > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
@@ -313,130 +439,157 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 	}
-	cleanupParse(currentCommit, currentDiff, commitChan, &totalLogSize)
+	cleanupParse(currentCommit, &currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
 
-func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
-	if currentDiff != nil && currentDiff.Content.Len() > 0 {
-		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != CommitLine {
+		return false
 	}
-	if currentCommit != nil {
-		commitChan <- *currentCommit
-		if totalLogSize != nil {
-			*totalLogSize += currentCommit.Size
-		}
-	}
-}
-
-// Date:   Tue Aug 10 15:20:40 2021 +0100
-func isDateLine(line []byte) bool {
-	if len(line) > 7 && bytes.Equal(line[:5], []byte("Date:")) {
-		return true
-	}
-	return false
-}
-
-// Author: Bill Rich <bill.rich@trufflesec.com>
-func isAuthorLine(line []byte) bool {
-	if len(line) > 8 && bytes.Equal(line[:7], []byte("Author:")) {
+	if len(line) > 6 && bytes.Equal(line[:6], []byte("Merge:")) {
 		return true
 	}
 	return false
 }
 
 // commit 7a95bbf0199e280a0e42dbb1d1a3f56cdd0f6e05
-func isCommitLine(line []byte) bool {
-	if len(line) > 7 && bytes.Equal(line[:6], []byte("commit")) {
+func isCommitLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || !(latestState == Initial ||
+		latestState == MessageStartLine ||
+		latestState == MessageEndLine ||
+		latestState == ModeLine ||
+		latestState == IndexLine ||
+		latestState == BinaryFileLine ||
+		latestState == ToFileLine ||
+		latestState == HunkContentLine ||
+		latestState == ParseFailure) {
+		return false
+	}
+
+	if len(line) > 7 && bytes.Equal(line[:7], []byte("commit ")) {
 		return true
 	}
 	return false
 }
 
-// diff --git a/internal/addrs/move_endpoint_module.go b/internal/addrs/move_endpoint_module.go
-func isDiffLine(line []byte) bool {
-	if len(line) > 5 && bytes.Equal(line[:4], []byte("diff")) {
+// Author: Bill Rich <bill.rich@trufflesec.com>
+func isAuthorLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || !(latestState == CommitLine || latestState == MergeLine) {
+		return false
+	}
+	if len(line) > 8 && bytes.Equal(line[:7], []byte("Author:")) {
 		return true
 	}
 	return false
 }
 
-// index 1ed6fbee1..aea1e643a 100644
-func isIndexLine(line []byte) bool {
-	if len(line) > 6 && bytes.Equal(line[:5], []byte("index")) {
+// Date:   Tue Aug 10 15:20:40 2021 +0100
+func isDateLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != AuthorLine {
+		return false
+	}
+	if len(line) > 7 && bytes.Equal(line[:5], []byte("Date:")) {
 		return true
 	}
 	return false
 }
 
-// new file mode 100644
-func isModeLine(line []byte) bool {
-	if len(line) > 13 && bytes.Equal(line[:13], []byte("new file mode")) {
-		return true
+// Line directly after Date with only a newline.
+func isMessageStartLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != DateLine {
+		return false
 	}
-	return false
-}
-
-// --- a/internal/addrs/move_endpoint_module.go
-func isMinusFileLine(line []byte) bool {
-	if len(line) >= 6 && bytes.Equal(line[:3], []byte("---")) {
-		return true
-	}
-	return false
-}
-
-// +++ b/internal/addrs/move_endpoint_module.go
-func isPlusFileLine(line []byte) bool {
-	if len(line) >= 6 && bytes.Equal(line[:4], []byte("+++ ")) {
-		return true
-	}
-	return false
-}
-
-// +fmt.Println("ok")
-func isPlusDiffLine(line []byte) bool {
-	if len(line) >= 1 && bytes.Equal(line[:1], []byte("+")) {
-		return true
-	}
-	return false
-}
-
-// -fmt.Println("ok")
-func isMinusDiffLine(line []byte) bool {
-	if len(line) >= 1 && bytes.Equal(line[:1], []byte("-")) {
-		return true
-	}
-	return false
-}
-
-// fmt.Println("ok")
-func isContextDiffLine(line []byte) bool {
-	if len(line) >= 1 && bytes.Equal(line[:1], []byte(" ")) {
+	// TODO: Improve the implementation of this and isMessageEndLine
+	if len(strings.TrimRight(string(line[:]), "\r\n")) == 0 {
 		return true
 	}
 	return false
 }
 
 // Line that starts with 4 spaces
-func isMessageLine(line []byte) bool {
+func isMessageLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || !(latestState == MessageStartLine || latestState == MessageLine) {
+		return false
+	}
 	if len(line) > 4 && bytes.Equal(line[:4], []byte("    ")) {
 		return true
 	}
 	return false
 }
 
-// Binary files /dev/null and b/plugin.sig differ
-func isBinaryLine(line []byte) bool {
-	if len(line) > 7 && bytes.Equal(line[:6], []byte("Binary")) {
+// Line directly after MessageLine with only a newline.
+func isMessageEndLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != MessageLine {
+		return false
+	}
+	if len(strings.TrimRight(string(line[:]), "\r\n")) == 0 {
 		return true
 	}
 	return false
 }
 
-// @@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)
-func isLineNumberDiffLine(line []byte) bool {
-	if len(line) >= 8 && bytes.Equal(line[:2], []byte("@@")) {
+// diff --git a/internal/addrs/move_endpoint_module.go b/internal/addrs/move_endpoint_module.go
+func isDiffLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == MessageStartLine || // Empty commit messages can go from MessageStart->Diff
+		latestState == MessageEndLine ||
+		latestState == BinaryFileLine ||
+		latestState == IndexLine ||
+		latestState == HunkContentLine ||
+		latestState == ParseFailure) {
+		if latestState == Initial && !isStaged {
+			return false
+		}
+	}
+	if len(line) > 11 && bytes.Equal(line[:11], []byte("diff --git ")) {
+		return true
+	}
+	return false
+}
+
+// old mode 100644
+// new mode 100755
+// new file mode 100644
+// similarity index 100%
+// rename from old.txt
+// rename to new.txt
+// deleted file mode 100644
+func isModeLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == DiffLine || latestState == ModeLine) {
+		return false
+	}
+	// This could probably be better written.
+	if (len(line) > 17 && bytes.Equal(line[:17], []byte("deleted file mode"))) ||
+		(len(line) > 16 && bytes.Equal(line[:16], []byte("similarity index"))) ||
+		(len(line) > 13 && bytes.Equal(line[:13], []byte("new file mode"))) ||
+		(len(line) > 11 && bytes.Equal(line[:11], []byte("rename from"))) ||
+		(len(line) > 9 && bytes.Equal(line[:9], []byte("rename to"))) ||
+		(len(line) > 8 && bytes.Equal(line[:8], []byte("old mode"))) ||
+		(len(line) > 8 && bytes.Equal(line[:8], []byte("new mode"))) {
+		return true
+	}
+	return false
+}
+
+// index 1ed6fbee1..aea1e643a 100644
+// index 00000000..e69de29b
+func isIndexLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == DiffLine || latestState == ModeLine) {
+		return false
+	}
+	if len(line) > 6 && bytes.Equal(line[:6], []byte("index ")) {
+		return true
+	}
+	return false
+}
+
+// Binary files /dev/null and b/plugin.sig differ
+func isBinaryLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if latestState != IndexLine {
+		return false
+	}
+	if len(line) > 7 && bytes.Equal(line[:6], []byte("Binary")) {
 		return true
 	}
 	return false
@@ -452,4 +605,118 @@ func pathFromBinaryLine(line []byte) string {
 	}
 	bRaw := sbytes[1]
 	return string(bRaw[:len(bRaw)-7]) // drop the "b/" and " differ"
+}
+
+// --- a/internal/addrs/move_endpoint_module.go
+func isFromFileLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if latestState != IndexLine {
+		return false
+	}
+	if len(line) >= 6 && bytes.Equal(line[:4], []byte("--- ")) {
+		return true
+	}
+	return false
+}
+
+// +++ b/internal/addrs/move_endpoint_module.go
+func isToFileLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if latestState != FromFileLine {
+		return false
+	}
+	if len(line) >= 6 && bytes.Equal(line[:4], []byte("+++ ")) {
+		return true
+	}
+	return false
+}
+
+// @@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)
+func isHunkLineNumberLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == ToFileLine || latestState == HunkContentLine) {
+		return false
+	}
+	if len(line) >= 8 && bytes.Equal(line[:2], []byte("@@")) {
+		return true
+	}
+	return false
+}
+
+// fmt.Println("ok")
+// (There's a space before `fmt` that gets removed by the formatter.)
+func isHunkContextLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+		return false
+	}
+	if len(line) >= 1 && bytes.Equal(line[:1], []byte(" ")) {
+		return true
+	}
+	return false
+}
+
+// +fmt.Println("ok")
+func isHunkPlusLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+		return false
+	}
+	if len(line) >= 1 && bytes.Equal(line[:1], []byte("+")) {
+		return true
+	}
+	return false
+}
+
+// -fmt.Println("ok")
+func isHunkMinusLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+		return false
+	}
+	if len(line) >= 1 && bytes.Equal(line[:1], []byte("-")) {
+		return true
+	}
+	return false
+}
+
+// \ No newline at end of file
+func isHunkNewlineWarningLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if latestState != HunkContentLine {
+		return false
+	}
+	if len(line) >= 27 && bytes.Equal(line[:27], []byte("\\ No newline at end of file")) {
+		return true
+	}
+	return false
+}
+
+// Newline after hunk, or an empty line, e.g.
+// +}
+//
+// commit 00920984e3435057f09cee5468850f7546dfa637 (tag: v3.42.0)
+func isHunkEmptyLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if !(latestState == HunkLineNumberLine || latestState == HunkContentLine) {
+		return false
+	}
+	// TODO: Can this also be `\n\r`?
+	if len(line) == 1 && bytes.Equal(line[:1], []byte("\n")) {
+		return true
+	}
+	return false
+}
+
+func isCommitSeparatorLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if (latestState == ModeLine || latestState == IndexLine || latestState == BinaryFileLine || latestState == ToFileLine) &&
+		len(line) == 1 && bytes.Equal(line[:1], []byte("\n")) {
+		return true
+	}
+	return false
+}
+
+func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
+	// Ignore empty or binary diffs (this condition may be redundant).
+	if currentDiff != nil && currentDiff.Content.Len() > 0 {
+		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+	}
+	if currentCommit != nil {
+		commitChan <- *currentCommit
+		if totalLogSize != nil {
+			*totalLogSize += currentCommit.Size
+		}
+	}
 }

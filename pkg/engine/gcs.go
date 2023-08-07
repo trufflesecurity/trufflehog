@@ -6,7 +6,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -45,23 +44,19 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 		return fmt.Errorf("failed to marshal GCS connection: %w", err)
 	}
 
-	source := gcs.Source{}
-	ctx = context.WithValues(ctx,
-		"source_type", source.Type().String(),
-		"source_name", "gcs",
-	)
-	if err = source.Init(ctx, "trufflehog - GCS", 0, 0, true, &conn, int(c.Concurrency)); err != nil {
-		return fmt.Errorf("failed to initialize GCS source: %w", err)
+	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - gcs", new(gcs.Source).Type(),
+		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
+			gcsSource := gcs.Source{}
+			if err := gcsSource.Init(ctx, "trufflehog - gcs", jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
+				return nil, err
+			}
+			return &gcsSource, nil
+		})
+	if err != nil {
+		return err
 	}
-
-	e.sourcesWg.Go(func() error {
-		defer common.RecoverWithExit(ctx)
-		if err := source.Chunks(ctx, e.ChunksChan()); err != nil {
-			return fmt.Errorf("could not scan GCS: %w", err)
-		}
-		return nil
-	})
-	return nil
+	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	return err
 }
 
 func isAuthValid(ctx context.Context, c sources.GCSConfig, connection *sourcespb.GCS) bool {

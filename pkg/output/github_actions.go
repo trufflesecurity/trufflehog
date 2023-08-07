@@ -4,14 +4,19 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sync"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 var dedupeCache = make(map[string]struct{})
 
-func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
+// GitHubActionsPrinter is a printer that prints results in GitHub Actions format.
+type GitHubActionsPrinter struct{ mu sync.Mutex }
+
+func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := gitHubActionsOutputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),
@@ -52,6 +57,8 @@ func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
 	}
 	dedupeCache[key] = struct{}{}
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	message := fmt.Sprintf("Found %s %s result 🐷🔑\n", verifiedStatus, out.DetectorType)
 	if r.Result.DecoderType != detectorspb.DecoderType_PLAIN {
 		message = fmt.Sprintf("Found %s %s result with %s encoding 🐷🔑\n", verifiedStatus, out.DetectorType, out.DecoderType)

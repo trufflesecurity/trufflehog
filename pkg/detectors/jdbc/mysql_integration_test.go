@@ -21,45 +21,54 @@ const (
 )
 
 func TestMySQL(t *testing.T) {
+	type result struct {
+		parseErr        bool
+		pingOk          bool
+		pingDeterminate bool
+	}
 	tests := []struct {
-		input    string
-		wantErr  bool
-		wantPing bool
+		input string
+		want  result
 	}{
 		{
-			input:   "",
-			wantErr: true,
+			input: "",
+			want:  result{parseErr: true},
 		},
 		{
-			input:    "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPing: true,
+			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:    "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPing: false,
+			input: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:    "//" + mysqlUser + ":wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			wantPing: false,
+			input: "//" + mysqlUser + ":wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
+			want:  result{pingOk: false, pingDeterminate: true},
 		},
 		{
-			input:    "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/",
-			wantPing: true,
+			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/",
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
-			input:    "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/wrongDB",
-			wantPing: true,
+			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/wrongDB",
+			want:  result{pingOk: true, pingDeterminate: true},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			j, err := parseMySQL(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
+
+			if err != nil {
+				got := result{parseErr: true}
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantPing, j.ping(context.Background()))
+
+			pr := j.ping(context.Background())
+
+			got := result{pingOk: pr.err == nil, pingDeterminate: pr.determinate}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

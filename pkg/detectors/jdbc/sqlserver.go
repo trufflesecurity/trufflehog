@@ -3,9 +3,8 @@ package jdbc
 import (
 	"context"
 	"errors"
+	mssql "github.com/denisenkom/go-mssqldb"
 	"strings"
-
-	_ "github.com/denisenkom/go-mssqldb"
 )
 
 type sqlServerJDBC struct {
@@ -13,11 +12,25 @@ type sqlServerJDBC struct {
 	params map[string]string
 }
 
-func (s *sqlServerJDBC) ping(ctx context.Context) bool {
-	return ping(ctx, "mssql",
-		s.conn,
+func (s *sqlServerJDBC) ping(ctx context.Context) pingResult {
+	return ping(ctx, "mssql", isSqlServerErrorDeterminate,
 		joinKeyValues(s.params, ";"),
+		s.conn,
 		"sqlserver://"+s.conn)
+}
+
+func isSqlServerErrorDeterminate(err error) bool {
+	// Error numbers from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
+	if mssqlError, isMssqlError := err.(mssql.Error); isMssqlError {
+		switch mssqlError.Number {
+		case 18456:
+			// Login failed
+			// This is a determinate failure iff we tried to use a real user
+			return mssqlError.Message != "login error: Login failed for user ''."
+		}
+	}
+
+	return false
 }
 
 func parseSqlServer(subname string) (jdbc, error) {

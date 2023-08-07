@@ -14,12 +14,18 @@ type sqliteJDBC struct {
 	testing  bool
 }
 
-func (s *sqliteJDBC) ping(ctx context.Context) bool {
+var cannotVerifySqliteError error = errors.New("sqlite credentials cannot be verified")
+
+func (s *sqliteJDBC) ping(ctx context.Context) pingResult {
 	if !s.testing {
 		// sqlite is not a networked database, so we cannot verify
-		return false
+		return pingResult{cannotVerifySqliteError, true}
 	}
-	return ping(ctx, "sqlite3", s.filename)
+	return ping(ctx, "sqlite3", isSqliteErrorDeterminate, s.filename)
+}
+
+func isSqliteErrorDeterminate(err error) bool {
+	return true
 }
 
 func parseSqlite(subname string) (jdbc, error) {

@@ -43,6 +43,7 @@ enum SourceType {
   SOURCE_TYPE_GOOGLE_DRIVE = 28;
   SOURCE_TYPE_SHAREPOINT = 29;
   SOURCE_TYPE_GCS_UNAUTHED = 30;
+  SOURCE_TYPE_AZURE_REPOS = 31;
 }
 
 message LocalSource {
@@ -184,6 +185,7 @@ message GitHub {
   repeated string includeRepos = 12;
   bool includePullRequestComments = 14;
   bool includeIssueComments = 15;
+  bool includeGistComments = 16;
 }
 
 message GoogleDrive {
@@ -312,4 +314,20 @@ message Sharepoint {
     credentials.Oauth2 oauth = 1;
   }
   string site_url = 2;
+}
+
+message AzureRepos {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+    credentials.Oauth2 oauth = 3;
+  }
+  repeated string repositories = 4;
+  repeated string organizations = 5;
+  repeated string projects = 6;
+  bool includeForks = 7;
+  repeated string ignoreRepos = 8;
+  repeated string includeRepos = 9;
+  repeated string includeProjects = 10;
+  repeated string ignoreProjects = 11;
 }

@@ -3,9 +3,8 @@ package jdbc
 import (
 	"context"
 	"errors"
+	"github.com/go-sql-driver/mysql"
 	"strings"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 type mysqlJDBC struct {
@@ -16,8 +15,8 @@ type mysqlJDBC struct {
 	params   string
 }
 
-func (s *mysqlJDBC) ping(ctx context.Context) bool {
-	return ping(ctx, "mysql",
+func (s *mysqlJDBC) ping(ctx context.Context) pingResult {
+	return ping(ctx, "mysql", isMySQLErrorDeterminate,
 		s.conn,
 		buildMySQLConnectionString(s.host, s.database, s.userPass, s.params),
 		buildMySQLConnectionString(s.host, "", s.userPass, s.params))
@@ -32,6 +31,22 @@ func buildMySQLConnectionString(host, database, userPass, params string) string 
 		conn = conn + "?" + params
 	}
 	return conn
+}
+
+func isMySQLErrorDeterminate(err error) bool {
+	// MySQL error numbers from https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html
+	if mySQLErr, isMySQLErr := err.(*mysql.MySQLError); isMySQLErr {
+		switch mySQLErr.Number {
+		case 1044:
+			// User access denied to a particular database
+			return false // "Indeterminate" so that other connection variations will be tried
+		case 1045:
+			// User access denied
+			return true
+		}
+	}
+
+	return false
 }
 
 func parseMySQL(subname string) (jdbc, error) {

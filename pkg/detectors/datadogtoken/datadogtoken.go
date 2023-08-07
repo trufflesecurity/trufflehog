@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
+	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
 	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
 )
 
@@ -34,24 +34,28 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
 	apiMatches := apiPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, apiMatch := range apiMatches {
+		if len(apiMatch) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
-		for _, apimatch := range apiMatches {
-			if len(apimatch) != 2 {
+		resApiMatch := strings.TrimSpace(apiMatch[1])
+		appIncluded := false
+		for _, appMatch := range appMatches {
+			if len(appMatch) != 2 {
 				continue
 			}
-			resApiMatch := strings.TrimSpace(apimatch[1])
+			resAppMatch := strings.TrimSpace(appMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_DatadogToken,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resApiMatch),
+				Raw:          []byte(resAppMatch),
+				RawV2:        []byte(resAppMatch + resApiMatch),
+				ExtraData: map[string]string{
+					"Type": "Application+APIKey",
+				},
 			}
 
 			if verify {
@@ -62,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("DD-API-KEY", resApiMatch)
-				req.Header.Add("DD-APPLICATION-KEY", resMatch)
+				req.Header.Add("DD-APPLICATION-KEY", resAppMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
@@ -70,16 +74,49 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive(resApiMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
 				}
 			}
-
+			appIncluded = true
 			results = append(results, s1)
 		}
 
+		if !appIncluded {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_DatadogToken,
+				Raw:          []byte(resApiMatch),
+				RawV2:        []byte(resApiMatch),
+				ExtraData: map[string]string{
+					"Type": "APIKeyOnly",
+				},
+			}
+
+			if verify {
+
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.datadoghq.com/api/v1/validate", nil)
+				if err != nil {
+					continue
+				}
+				req.Header.Add("Content-Type", "application/json")
+				req.Header.Add("DD-API-KEY", resApiMatch)
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else {
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+						if detectors.IsKnownFalsePositive(resApiMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
+					}
+				}
+			}
+			results = append(results, s1)
+		}
 	}
 
 	return results, nil

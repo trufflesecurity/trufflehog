@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -199,6 +201,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -221,7 +224,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticemail"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enablex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enigma"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etsyapikey"
@@ -554,6 +556,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterwritekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saucelabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scalewaykey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_oauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scalr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapeowl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scraperapi"
@@ -1525,8 +1528,10 @@ func DefaultDetectors() []detectors.Detector {
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
 		opsgenie.Scanner{},
+		dockerhub.Scanner{},
 		couchbase.Scanner{},
 		envoyapikey.Scanner{},
+		github_oauth2.Scanner{},
 	}
 
 }
