@@ -52,7 +52,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		for _, token := range tokenMatches {
 			if len(token) != 1 {
-				fmt.Printf("len of token: %v\n", len(token))
 				continue
 			}
 
@@ -95,7 +94,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
 						s1.Verified = true
 					} else if res.StatusCode == 401 {
-						// The secret is determinately not verified (nothing to do)
 						s1.Verified = false
 					} else {
 						s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
