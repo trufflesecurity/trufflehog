@@ -19,12 +19,19 @@ import (
 func TestSalesforce_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SALESFORCE")
-	inactiveSecret := testSecrets.MustGetField("SALESFORCE_INACTIVE")
+	instance := testSecrets.MustGetField("SALESFORCE_INSTANCE")
+	// Salesforce secrets are not valid for long, so we may need to regenerate them.
+	// Steps to regenerate:
+	// 1. Install Salesforce CLI
+	// 2. Authenticate with `sfdx org web login`. This will open a browser window. Use the credentials in the detection test accounts 1Pass vault.
+	// 3. Run `sfdx org display --targetusername zubairkhan@trufflesec.com`to obtain new token.
+	// Source: https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/quickstart_oauth.htm
+	token := testSecrets.MustGetField("SALESFORCE_TOKEN")
+	inactiveToken := testSecrets.MustGetField("SALESFORCE_INACTIVE_TOKEN")
 
 	type args struct {
 		ctx    context.Context
@@ -44,7 +51,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforce secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a salesforce secret within %s for %s", token, instance)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -61,7 +68,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforce secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a salesforce secret %s within but not valid for %s", inactiveToken, instance)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -90,7 +97,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforce secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a salesforce secret within %s for %s", token, instance)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -107,7 +114,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforce secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a salesforce secret within %s for %s", token, instance)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -125,7 +132,6 @@ func TestSalesforce_FromChunk(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Salesforce.FromData() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
@@ -133,6 +139,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					fmt.Printf("where the fuck is the error")
 					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationErr)
 				}
 				got[i].VerificationError = nil

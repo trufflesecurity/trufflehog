@@ -12,6 +12,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+const (
+	currentVersion = "58.0" // current Salesforce version
+)
+
 type Scanner struct {
 	client *http.Client
 }
@@ -22,7 +26,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesforce"}) + `\b([0-9a-zA-Z]{23}_[0-9a-zA-Z]{8})\b`)
+	accessTokenPat = regexp.MustCompile(`\b00[a-zA-Z0-9]{13}![a-zA-Z0-9_.]{96}\b`)
+	instancePat    = regexp.MustCompile(`\bhttps://[0-9a-zA-Z-\.]{1,100}\.my\.salesforce\.com\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,49 +40,74 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	instanceMatches := instancePat.FindAllStringSubmatch(dataStr, -1)
+	tokenMatches := accessTokenPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, instance := range instanceMatches {
+		if len(instance) != 1 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Salesforce,
-			Raw:          []byte(resMatch),
-		}
+		instanceMatch := strings.TrimSpace(instance[0])
 
-		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.salesforce.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
-			if err != nil {
+		for _, token := range tokenMatches {
+			if len(token) != 1 {
+				fmt.Printf("len of token: %v\n", len(token))
 				continue
 			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
-				}
-			} else {
-				s1.VerificationError = err
+
+			tokenMatch := strings.TrimSpace(token[0])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Salesforce,
+				Raw:          []byte(tokenMatch),
 			}
-		}
 
-		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
-		}
+			if verify {
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
 
-		results = append(results, s1)
+				// https://trufflesecurity2-dev-ed.develop.my.salesforce.com/services/data/v39.0/query?q=SELECT+name+from+Account
+				req, err := http.NewRequestWithContext(ctx, "GET", instanceMatch+"/services/data/v"+fmt.Sprint(currentVersion)+"/query?q=SELECT+name+from+Account", nil)
+				req.Header.Set("Authorization", "Bearer "+tokenMatch)
+				if err != nil {
+					continue
+				}
+
+				res, err := client.Do(req)
+
+				if err != nil {
+					// End execution, append Detector Result if request fails to prevent panic on response body checks
+					s1.VerificationError = err
+					results = append(results, s1)
+					continue
+				}
+
+				verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "records")
+				if err != nil {
+					return nil, err
+				}
+
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
+						s1.Verified = true
+					} else if res.StatusCode == 401 {
+						// The secret is determinately not verified (nothing to do)
+						s1.Verified = false
+					} else {
+						s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+					}
+				} else {
+					s1.VerificationError = err
+				}
+			}
+
+			results = append(results, s1)
+
+		}
 	}
 
 	return results, nil
