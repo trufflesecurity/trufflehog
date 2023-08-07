@@ -82,6 +82,7 @@ var (
 	githubExcludeRepos     = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	githubScanMaxDepth     = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -405,6 +406,7 @@ func run(state overseer.State) {
 			Repos:          *githubScanRepos,
 			Orgs:           *githubScanOrgs,
 			Filter:         filter,
+			MaxDepth:       *githubScanMaxDepth,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")
