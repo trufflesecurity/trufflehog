@@ -31,7 +31,7 @@ func (w Item) String() string {
 	case ViewOSSProject:
 		return "View open-source project"
 	case EnterpriseInquire:
-		return "Inquire about Trufflehog Enterprise"
+		return "Inquire about TruffleHog Enterprise"
 	case Quit:
 		return "Quit"
 	}
