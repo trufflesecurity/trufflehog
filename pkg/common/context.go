@@ -16,9 +16,14 @@ func IsDone(ctx context.Context) bool {
 // write would succeed, either operation will be performed randomly.
 func CancellableWrite[T any](ctx context.Context, ch chan<- T, item T) error {
 	select {
-	case ch <- item:
-		return nil
-	case <-ctx.Done():
+	case <-ctx.Done(): // priority to context cancellation
 		return ctx.Err()
+	default:
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case ch <- item:
+			return nil
+		}
 	}
 }

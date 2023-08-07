@@ -3,14 +3,19 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
-func PrintJSON(r *detectors.ResultWithMetadata) error {
+// JSONPrinter is a printer that prints results in JSON format.
+type JSONPrinter struct{ mu sync.Mutex }
+
+func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	v := &struct {
 		// SourceMetadata contains source-specific contextual information.
 		SourceMetadata *source_metadatapb.MetaData
@@ -56,6 +61,9 @@ func PrintJSON(r *detectors.ResultWithMetadata) error {
 	if err != nil {
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
+
+	p.mu.Lock()
 	fmt.Println(string(out))
+	p.mu.Unlock()
 	return nil
 }

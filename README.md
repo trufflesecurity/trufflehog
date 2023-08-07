@@ -8,7 +8,6 @@
 
 <div align="center">
 
-[![CI Status](https://github.com/trufflesecurity/trufflehog/actions/workflows/release.yml/badge.svg)](https://github.com/trufflesecurity/trufflehog/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/trufflesecurity/trufflehog/v3)](https://goreportcard.com/report/github.com/trufflesecurity/trufflehog/v3)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-brightgreen)](/LICENSE)
 [![Total Detectors](https://img.shields.io/github/directory-file-count/trufflesecurity/truffleHog/pkg/detectors?label=Total%20Detectors&type=dir)](/pkg/detectors)
@@ -264,9 +263,9 @@ jobs:
           extra_args: --debug --only-verified
 ```
 
-# Precommit Hook
+# Pre-commit Hook
 
-Trufflehog can be used in a precommit hook to prevent credentials from leaking before they ever leave your computer.
+Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
 
 ```yaml

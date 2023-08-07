@@ -929,8 +929,10 @@ enum DetectorType {
   Prefect = 918;
   Docusign = 919;
   Couchbase = 920;
-  EnvoyApiKey = 921;
+  Dockerhub = 921;
   TrufflehogEnterprise = 922;
+  EnvoyApiKey = 923;
+  GitHubOauth2 = 924;
 }
 
 message Result {

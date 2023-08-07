@@ -223,6 +223,77 @@ func TestSource_ScanComments(t *testing.T) {
 	}
 }
 
+func TestSource_ScanChunks(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	// For the personal access token test.
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	type init struct {
+		name       string
+		verify     bool
+		connection *sourcespb.GitHub
+	}
+	tests := []struct {
+		name       string
+		init       init
+		wantChunks int
+	}{
+		{
+			name: "token authenticated, 4 repos",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{
+						"https://github.com/truffle-test-integration-org/another-test-repo.git",
+						"https://github.com/trufflesecurity/trufflehog.git",
+						"https://github.com/Akash-goyal-github/Inventory-Management-System.git",
+						"https://github.com/R1ck404/Crypto-Exchange-Example.git",
+						"https://github.com/Stability-AI/generative-models.git",
+						"https://github.com/bloomberg/blazingmq.git",
+						"https://github.com/Kong/kong.git",
+					},
+					Credential: &sourcespb.GitHub_Token{Token: githubToken},
+				},
+			},
+			wantChunks: 20000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			assert.Nil(t, err)
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh)
+				assert.Nil(t, err)
+			}()
+
+			i := 0
+			for range chunksCh {
+				i++
+			}
+			assert.GreaterOrEqual(t, i, tt.wantChunks)
+		})
+	}
+}
+
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
@@ -20,7 +22,10 @@ var (
 	whitePrinter  = color.New(color.FgWhite)
 )
 
-func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
+// PlainPrinter is a printer that prints results in plain text format.
+type PlainPrinter struct{ mu sync.Mutex }
+
+func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),
@@ -35,6 +40,8 @@ func PrintPlainOutput(r *detectors.ResultWithMetadata) error {
 	}
 
 	printer := greenPrinter
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if out.Verified {
 		yellowPrinter.Print("Found verified result 🐷🔑\n")

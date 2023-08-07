@@ -39,7 +39,7 @@ func TestParseSqlite(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.True(t, j.ping(context.Background()))
+				assert.True(t, j.ping(context.Background()).err == nil)
 			}
 		})
 	}
