@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -26,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -930,14 +930,18 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	}
 	reader.Stop()
 
-	chunkData, err := io.ReadAll(reader)
-	if err != nil {
-		return err
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, reader)
+	for data := range chunkResChan {
+		chunk := *chunkSkel
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
+		}
+		if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+			return err
+		}
 	}
-
-	chunk := *chunkSkel
-	chunk.Data = chunkData
-	chunksChan <- &chunk
 
 	return nil
 }

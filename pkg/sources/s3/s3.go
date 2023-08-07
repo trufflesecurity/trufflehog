@@ -2,7 +2,6 @@ package s3
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -336,16 +335,21 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			reader.Stop()
 
 			chunk := *chunkSkel
-			chunkData, err := io.ReadAll(reader)
-			if err != nil {
-				s.log.Error(err, "Could not read file data.")
-				return nil
+			chunkReader := sources.NewChunkReader()
+			chunkResChan := chunkReader(ctx, reader)
+			for data := range chunkResChan {
+				chunk.Data = data.Bytes()
+				if err := data.Error(); err != nil {
+					s.log.Error(err, "error reading chunk.")
+					continue
+				}
+				if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+					return err
+				}
 			}
+
 			atomic.AddUint64(objectCount, 1)
 			s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
-			chunk.Data = chunkData
-			chunksChan <- &chunk
-
 			nErr, ok = errorCount.Load(prefix)
 			if !ok {
 				nErr = 0
