@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				req, err := http.NewRequestWithContext(ctx, "GET", instanceMatch+"/services/data/v"+fmt.Sprint(currentVersion)+"/query?q=SELECT+name+from+Account", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", instanceMatch+"/services/data/v"+currentVersion+"/query?q=SELECT+name+from+Account", nil)
 				req.Header.Set("Authorization", "Bearer "+tokenMatch)
 				if err != nil {
 					continue
