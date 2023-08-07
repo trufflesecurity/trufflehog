@@ -68,7 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				// https://trufflesecurity2-dev-ed.develop.my.salesforce.com/services/data/v39.0/query?q=SELECT+name+from+Account
 				req, err := http.NewRequestWithContext(ctx, "GET", instanceMatch+"/services/data/v"+fmt.Sprint(currentVersion)+"/query?q=SELECT+name+from+Account", nil)
 				req.Header.Set("Authorization", "Bearer "+tokenMatch)
 				if err != nil {
