@@ -139,7 +139,6 @@ func TestSalesforce_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					fmt.Printf("where the fuck is the error")
 					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationErr)
 				}
 				got[i].VerificationError = nil
