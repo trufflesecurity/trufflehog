@@ -221,7 +221,7 @@ func NewParser(options ...Option) *Parser {
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan *Diff, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool, sinceDate string) (chan *Diff, error) {
 	args := []string{
 		"-C", source,
 		"log",
@@ -241,6 +241,10 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	}
 	for _, glob := range excludedGlobs {
 		args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
+	}
+	if sinceDate != "" {
+		args = append(args, fmt.Sprintf("--after=%s", sinceDate))
+		ctx.Logger().V(2).Info("limit log parse by date", "Since Date: ", sinceDate)
 	}
 
 	cmd := exec.Command("git", args...)

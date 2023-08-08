@@ -78,6 +78,7 @@ var (
 	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	gitScanBare         = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
+	gitScanSinceDate    = gitScan.Flag("since", "Scan commits more recent than a specific date.").String()
 	_                   = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
@@ -98,6 +99,7 @@ var (
 	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue descriptions and comments in scan.").Bool()
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
+	githubScanSinceDate     = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -475,6 +477,7 @@ func run(state overseer.State) {
 			MaxDepth:         *gitScanMaxDepth,
 			Bare:             *gitScanBare,
 			ExcludeGlobs:     *gitScanExcludeGlobs,
+			SinceDate:        *gitScanSinceDate,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Git.")
@@ -503,6 +506,7 @@ func run(state overseer.State) {
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
+			SinceDate:                  *githubScanSinceDate,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")

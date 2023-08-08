@@ -49,8 +49,12 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		git.ScanOptionLogOptions(logOptions),
 	}
 
-	if c.MaxDepth != 0 {
-		opts = append(opts, git.ScanOptionMaxDepth(int64(c.MaxDepth)))
+	// if c.MaxDepth != 0 {
+	// 	opts = append(opts, git.ScanOptionMaxDepth(int64(c.MaxDepth)))
+	// }
+
+	if len(c.SinceDate) > 0 {
+		opts = append(opts, git.ScanOptionSinceDate(c.SinceDate))
 	}
 
 	scanOptions := git.NewScanOptions(opts...)

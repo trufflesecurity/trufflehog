@@ -192,6 +192,7 @@ type GitConfig struct {
 	ExcludeGlobs string
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
+	SinceDate string
 }
 
 // GithubConfig defines the optional configuration for a github source.
@@ -226,6 +227,8 @@ type GithubConfig struct {
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
+	// SinceDate indicates the last X days commits to scan
+	SinceDate string
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
