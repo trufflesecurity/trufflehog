@@ -148,6 +148,8 @@ type GitConfig struct {
 	// ExcludeGlobs is a list of globs to exclude from the scan.
 	// This differs from the Filter exclusions as ExcludeGlobs is applied at the `git log -p` level
 	ExcludeGlobs []string
+
+	SinceDate string
 }
 
 // GithubConfig defines the optional configuration for a github source.
@@ -173,7 +175,8 @@ type GithubConfig struct {
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// MaxDepth is the maximum depth to scan the source.
-	MaxDepth int
+	// MaxDepth int
+	SinceDate string
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.

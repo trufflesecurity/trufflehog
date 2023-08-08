@@ -67,6 +67,7 @@ var (
 	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
 	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	gitScanBare         = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
+	gitScanSinceDate    = gitScan.Flag("since", "Scan commits more recent than a specific date.").String()
 	_                   = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
@@ -82,7 +83,8 @@ var (
 	githubExcludeRepos     = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	githubScanMaxDepth     = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	// githubScanMaxDepth     = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	githubScanSinceDate = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -382,6 +384,7 @@ func run(state overseer.State) {
 			Bare:         *gitScanBare,
 			Filter:       filter,
 			ExcludeGlobs: excludedGlobs,
+			SinceDate:    *gitScanSinceDate,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Git.")
@@ -406,7 +409,8 @@ func run(state overseer.State) {
 			Repos:          *githubScanRepos,
 			Orgs:           *githubScanOrgs,
 			Filter:         filter,
-			MaxDepth:       *githubScanMaxDepth,
+			// MaxDepth:       *githubScanMaxDepth,
+			SinceDate: *githubScanSinceDate,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")
