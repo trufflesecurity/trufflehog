@@ -97,7 +97,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	if isSelected {
 		title += " "
 	}
-	updatedStr := fmt.Sprintf(" Updated")
+	updatedStr := " Updated"
 	if m.Width()-styles.Base.GetHorizontalFrameSize()-lipgloss.Width(updatedStr)-lipgloss.Width(title) <= 0 {
 		updatedStr = ""
 	}
