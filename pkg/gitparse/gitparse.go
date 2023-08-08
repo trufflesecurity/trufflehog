@@ -161,7 +161,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan Commit, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool, sinceDate string) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -173,6 +173,10 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	}
 	for _, glob := range excludedGlobs {
 		args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
+	}
+	if sinceDate != "" {
+		args = append(args, fmt.Sprintf("--after=%s", sinceDate))
+		ctx.Logger().V(2).Info("limit log parse by date", "Since Date: ", sinceDate)
 	}
 
 	cmd := exec.Command("git", args...)
