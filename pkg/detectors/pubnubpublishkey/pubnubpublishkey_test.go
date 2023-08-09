@@ -75,7 +75,7 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified but for timeout",
-			s:    Scanner{},
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a pubnub secret %s within pubnub %s", pub, sub)),
@@ -84,10 +84,28 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
-					Verified:     true,
+					Verified:     false,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, valid but unexpected api response",
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a pubnub secret %s within pubnub %s", pub, sub)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
