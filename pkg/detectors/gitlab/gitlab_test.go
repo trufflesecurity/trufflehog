@@ -31,11 +31,12 @@ func TestGitlab_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found",
@@ -86,6 +87,40 @@ func TestGitlab_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found, would be verified but for timeout",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found and valid but unexpected api response",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -108,6 +143,9 @@ func TestGitlab_FromChunk(t *testing.T) {
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatal("no raw secret present")
+				}
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
