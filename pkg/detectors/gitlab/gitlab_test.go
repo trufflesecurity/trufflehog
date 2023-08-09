@@ -88,7 +88,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified but for timeout",
-			s:    Scanner{},
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
@@ -105,7 +105,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found and valid but unexpected api response",
-			s:    Scanner{},
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
