@@ -13,6 +13,7 @@ import (
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
+	"github.com/mattn/go-isatty"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
@@ -145,6 +147,18 @@ func init() {
 	}
 
 	cli.Version("trufflehog " + version.BuildVersion)
+
+	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
+		args := tui.Run()
+		if len(args) == 0 {
+			os.Exit(0)
+		}
+
+		// Overwrite the Args slice so overseer works properly.
+		os.Args = os.Args[:1]
+		os.Args = append(os.Args, args...)
+	}
+
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
 	switch {
