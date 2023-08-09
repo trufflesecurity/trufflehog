@@ -34,11 +34,12 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
@@ -94,6 +95,9 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
