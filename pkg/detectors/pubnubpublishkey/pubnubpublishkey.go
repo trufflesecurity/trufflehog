@@ -2,6 +2,7 @@ package pubnubpublishkey
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -71,7 +72,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
+					} else if res.StatusCode == 400 || res.StatusCode == 403 {
+						// 403 is suggested by the API docs (https://www.pubnub.com/docs/sdks/rest-api/send-signal-to-channel)
+						// 400 is what actually seems to be coming back for invalid credentials
+						// There's nothing to do here, because zero values of Result are what we want
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
+				} else {
+					s1.VerificationError = err
 				}
 			}
 			// This function will check false positives for common test words, but also it will make sure the key
