@@ -595,17 +595,17 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	lines := bytes.Split(chunk.Data, []byte("\n"))
-	for i, line := range lines {
-		if bytes.Contains(line, result.Raw) {
-			// if the line contains the ignore tag, we should ignore the result
-			if bytes.Contains(line, []byte(ignoreTag)) {
-				return int64(i), true
-			}
-			return int64(i), false
-		}
+	before, after, found := bytes.Cut(chunk.Data, result.Raw)
+	if !found {
+		return 0, false
 	}
-	return 0, false
+	lineNumber := int64(len(bytes.Split(before, []byte("\n")))) - 1
+	// if the line contains the ignore tag, we should ignore the result
+	endLine := bytes.Index(after, []byte("\n"))
+	if endLine != -1 && bytes.Contains(after[:endLine], []byte(ignoreTag)) {
+		return lineNumber, true
+	}
+	return lineNumber, false
 }
 
 // FragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
