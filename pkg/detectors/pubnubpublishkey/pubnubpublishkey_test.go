@@ -74,6 +74,22 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found, would be verified but for timeout",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a pubnub secret %s within pubnub %s", pub, sub)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{

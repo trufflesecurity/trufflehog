@@ -11,13 +11,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	pubPat = regexp.MustCompile(`\b(pub-c-[0-9a-z]{8}-[0-9a-z]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
@@ -59,6 +61,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://ps.pndsn.com/signal/"+resMatch+"/"+ressubMatch+"/0/ch1/0/%22typing_on%22?uuid=user-123", nil)
 				if err != nil {
 					continue
+				}
+				client := s.client
+				if client == nil {
+					client = defaultClient
 				}
 				res, err := client.Do(req)
 				if err == nil {
