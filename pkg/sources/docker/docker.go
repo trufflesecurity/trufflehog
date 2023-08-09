@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
@@ -21,6 +20,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+
+	"github.com/google/go-containerregistry/pkg/name"
 )
 
 type Source struct {
@@ -84,6 +85,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		var img v1.Image
 		var err error
 		var base, tag string
+		var hasDigest bool
+		var imageName name.Reference
 
 		if strings.HasPrefix(image, "file://") {
 			image = strings.TrimPrefix(image, "file://")
@@ -93,10 +96,18 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				return err
 			}
 		} else {
-			base, tag = baseAndTagFromImage(image)
-			imageName, err := name.NewTag(image)
-			if err != nil {
-				return err
+			base, tag, hasDigest = baseAndTagFromImage(image)
+
+			if hasDigest {
+				imageName, err = name.NewDigest(image)
+				if err != nil {
+					return err
+				}
+			} else {
+				imageName, err = name.NewTag(image)
+				if err != nil {
+					return err
+				}
 			}
 
 			img, err = remote.Image(imageName, remoteOpts...)
@@ -194,10 +205,20 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	return nil
 }
 
-func baseAndTagFromImage(image string) (base, tag string) {
+func baseAndTagFromImage(image string) (base, tag string, hasDigest bool) {
 	regRepoDelimiter := "/"
 	tagDelim := ":"
-	parts := strings.Split(image, tagDelim)
+	digestDelim := "@"
+
+	// Split on digest first, if present.
+	parts := strings.SplitN(image, digestDelim, 2)
+	if len(parts) > 1 {
+		base = parts[0]
+		tag = parts[1]
+		hasDigest = true
+		return
+	}
+	parts = strings.Split(image, tagDelim)
 	// Verify that we aren't confusing a tag for a hostname w/ port for the purposes of weak validation.
 	if len(parts) > 1 && !strings.Contains(parts[len(parts)-1], regRepoDelimiter) {
 		base = strings.Join(parts[:len(parts)-1], tagDelim)
