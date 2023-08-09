@@ -84,6 +84,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// 401 is bad key
 					if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
 						secret.Verified = true
+					} else if res.StatusCode == http.StatusUnauthorized {
+						// Nothing to do; zero values of Result are the ones we want
+					} else {
+						secret.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
 				}
 			}
