@@ -25,6 +25,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	DetectorsV2 "github.com/trufflesecurity/trufflehog/v3/pkg/v2Detectors"
 )
 
 type Engine struct {
@@ -48,7 +49,7 @@ type Engine struct {
 	prefilter ahocorasick.AhoCorasick
 
 	// v2 detection engine map, key is the length of characters in the secret capture group
-	v2Detectors map[int]detectors.Detector
+	v2Detector DetectorsV2.DetectorBuckets
 }
 
 type EngineOption func(*Engine)
@@ -118,6 +119,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		chunks:          make(chan *sources.Chunk),
 		results:         make(chan detectors.ResultWithMetadata),
 		detectorAvgTime: sync.Map{},
+		v2Detector:      *DetectorsV2.NewDetectorBuckets(),
 	}
 
 	for _, option := range options {
@@ -291,7 +293,16 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						fmt.Println("error: ", err)
 					}
 					for _, token := range iterator.Tokens() {
-						if token.Type == chroma.LiteralString && len(token.Value) > 8 {
+						if token.Type == chroma.LiteralString || token.Type == chroma.Comment {
+							for _, v2D := range e.v2Detector.GetDetectors(len(token.Value)) {
+								for _, v2 := range v2D.Credentials {
+									if len(token.Value) >= v2.CharacterRange.Min {
+										if v2.Regex.MatchString(token.Value) {
+											fmt.Println("cred: ", v2D.Name, "regex:", v2.Regex.String(), "string: ", token.Value)
+										}
+									}
+								}
+							}
 						}
 					}
 				}
