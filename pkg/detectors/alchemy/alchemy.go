@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 				}
 			} else {
 				s1.VerificationError = err
