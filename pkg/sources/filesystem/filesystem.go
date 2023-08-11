@@ -22,13 +22,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const (
-	// These buffer sizes are mainly driven by our largest credential size, which is GCP @ ~2.25KB.
-	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize = 10 * 1024 // 10KB
-	PeekSize   = 3 * 1024  // 3KB
-)
-
 type Source struct {
 	name     string
 	sourceId int64
