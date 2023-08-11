@@ -43,6 +43,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	instanceMatches := instancePat.FindAllStringSubmatch(dataStr, -1)
 	tokenMatches := accessTokenPat.FindAllStringSubmatch(dataStr, -1)
 
+	fmt.Printf("instanceMatches: %v\n", instanceMatches)
+
 	for _, instance := range instanceMatches {
 		if len(instance) != 1 {
 			continue
@@ -73,9 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Set("Authorization", "Bearer "+tokenMatch)
-				if err != nil {
-					continue
-				}
 
 				res, err := client.Do(req)
 
@@ -91,18 +90,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					return nil, err
 				}
 
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
-						s1.Verified = true
-					} else if res.StatusCode == 401 {
-						s1.Verified = false
-					} else {
-						s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
-					}
+				defer res.Body.Close()
+				if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
+					s1.Verified = true
+				} else if res.StatusCode >= 200 && res.StatusCode < 300 && !verifiedBodyResponse {
+					s1.Verified = false
+				} else if res.StatusCode == 401 {
+					s1.Verified = false
 				} else {
-					s1.VerificationError = err
+					s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 				}
+
 			}
 
 			results = append(results, s1)
