@@ -73,6 +73,17 @@ func TestFragmentLineOffset(t *testing.T) {
 			expectedLine: 3,
 			ignore:       true,
 		},
+		{
+			name: "ignore on last line",
+			chunk: &sources.Chunk{
+				Data: []byte("line1\nline2\nline3\nsecret here // trufflehog:ignore"),
+			},
+			result: &detectors.Result{
+				Raw: []byte("secret here"),
+			},
+			expectedLine: 3,
+			ignore:       true,
+		},
 	}
 
 	for _, tt := range tests {
