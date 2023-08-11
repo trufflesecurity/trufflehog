@@ -82,11 +82,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// 200 means good key and has `read_user` scope
 					// 403 means good key but not the right scope
 					// 401 is bad key
-					if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
+					switch res.StatusCode {
+					case http.StatusOK:
 						secret.Verified = true
-					} else if res.StatusCode == http.StatusUnauthorized {
-						// Nothing to do; zero values of Result are the ones we want
-					} else {
+					case http.StatusForbidden:
+						// Good key but not the right scope
+						secret.Verified = true
+					case http.StatusUnauthorized:
+						// Nothing to do; zero values are the ones we want
+					default:
 						secret.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
 				} else {
