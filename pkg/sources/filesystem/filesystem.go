@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/fs"
@@ -187,34 +186,33 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	reReader.Stop()
 
-	for {
-		chunkBytes := make([]byte, BufferSize)
-		reader := bufio.NewReaderSize(reReader, BufferSize)
-		n, err := reader.Read(chunkBytes)
-		if err != nil && !errors.Is(err, io.EOF) {
-			break
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, reReader)
+	for data := range chunkResChan {
+		if err := data.Error(); err != nil {
+			s.log.Error(err, "error reading chunk.")
+			continue
 		}
-		peekData, _ := reader.Peek(PeekSize)
-		if n > 0 {
-			chunksChan <- &sources.Chunk{
-				SourceType: s.Type(),
-				SourceName: s.name,
-				SourceID:   s.SourceID(),
-				Data:       append(chunkBytes[:n], peekData...),
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Filesystem{
-						Filesystem: &source_metadatapb.Filesystem{
-							File: sanitizer.UTF8(path),
-						},
+
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			Data:       data.Bytes(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Filesystem{
+					Filesystem: &source_metadatapb.Filesystem{
+						File: sanitizer.UTF8(path),
 					},
 				},
-				Verify: s.verify,
-			}
+			},
+			Verify: s.verify,
 		}
-		if errors.Is(err, io.EOF) {
-			break
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
