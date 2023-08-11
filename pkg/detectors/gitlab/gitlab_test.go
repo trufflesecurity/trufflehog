@@ -121,6 +121,22 @@ func TestGitlab_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
+			name: "found, good key but wrong scope",
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
