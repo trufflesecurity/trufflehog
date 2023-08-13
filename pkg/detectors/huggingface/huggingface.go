@@ -38,10 +38,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
+		if len(match) != 1 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := strings.TrimSpace(match[0])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HuggingFace,
@@ -53,10 +53,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.huggingface.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://huggingface.co/api/whoami-v2", nil)
 			if err != nil {
 				continue
 			}
+
+			req.Header.Set("Authorization", "Bearer "+resMatch)
+
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
