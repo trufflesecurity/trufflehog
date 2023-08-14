@@ -1,10 +1,14 @@
 package filesystem
 
 import (
+	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -77,4 +81,42 @@ func TestSource_Scan(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestScanFile(t *testing.T) {
+	tmpfile, err := os.CreateTemp("", "example.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	chunkSize := sources.ChunkSize
+	secretPart1 := "SECRET"
+	secretPart2 := "SPLIT"
+	// Split the secret into two parts and pad the rest of the chunk with A's.
+	data := strings.Repeat("A", chunkSize-len(secretPart1)) + secretPart1 + secretPart2 + strings.Repeat("A", chunkSize-len(secretPart2))
+
+	_, err = tmpfile.Write([]byte(data))
+	assert.Nil(t, err)
+
+	err = tmpfile.Close()
+	assert.Nil(t, err)
+
+	source := &Source{}
+	chunksChan := make(chan *sources.Chunk, 2)
+
+	ctx := context.WithLogger(context.Background(), logr.Discard())
+	go func() {
+		defer close(chunksChan)
+		err = source.scanFile(ctx, tmpfile.Name(), chunksChan)
+		assert.Nil(t, err)
+	}()
+
+	// Read from the channel and validate the secrets.
+	foundSecret := ""
+	for chunkCh := range chunksChan {
+		foundSecret += string(chunkCh.Data)
+	}
+
+	assert.Contains(t, foundSecret, secretPart1+secretPart2)
 }
