@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
@@ -22,13 +21,12 @@ import (
 )
 
 const (
-	sqlServerPass     = "P@ssw0rd!"
-	sqlServerUser     = "sa"
-	sqlServerDatabase = "Demo"
+	sqlServerPass = "P@ssw0rd!"
+	sqlServerUser = "sa"
 )
 
 func TestSQLServerIntegration_FromChunk(t *testing.T) {
-	secret := "Server=localhost;Initial Catalog=Demo;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"
+	secret := "Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"
 	inactiveSecret := "Server=localhost;User ID=sa;Password=123"
 
 	type args struct {
@@ -37,12 +35,11 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name     string
-		s        Scanner
-		args     args
-		want     []detectors.Result
-		wantErr  bool
-		mockFunc func()
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
 	}{
 		{
 			name: "found, verified",
@@ -55,16 +52,12 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Redacted:     "sqlserver://sa:********@localhost?database=Demo&disableRetry=false",
+					Raw:          []byte("P@ssw0rd!"),
+					Redacted:     "sqlserver://sa:********@localhost?database=master&disableRetry=false",
 					Verified:     true,
 				},
 			},
 			wantErr: false,
-			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
-					return true, nil
-				}
-			},
 		},
 		{
 			name: "found, unverified",
@@ -77,16 +70,12 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
+					Raw:          []byte("123 within but not valid"),
 					Redacted:     "sqlserver://sa:********@localhost?disableRetry=false",
 					Verified:     false,
 				},
 			},
 			wantErr: false,
-			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
-					return false, nil
-				}
-			},
 		},
 		{
 			name: "not found, in XML, missing password param (pwd is not valid)",
@@ -98,49 +87,24 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: false,
-			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
-					return true, nil
-				}
-			},
 		},
 		{
 			name: "found, verified, in XML",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(`<add name="test db" value="SERVER=server_name;DATABASE=testdb;user=username;password=badpassword;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
+				data:   []byte(`<add name="test db" value="SERVER=server_name;DATABASE=master;user=username;password=P@ssw0rd!;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Redacted:     "sqlserver://username:********@server_name?database=testdb&disableRetry=false",
+					Redacted:     "sqlserver://username:********@server_name?database=master&disableRetry=false",
+					Raw:          []byte("P@ssw0rd!"),
 					Verified:     true,
 				},
 			},
 			wantErr: false,
-			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
-					if config.Host != "server_name" {
-						return false, errors.New("invalid host")
-					}
-
-					if config.User != "username" {
-						return false, errors.New("invalid database")
-					}
-
-					if config.Password != "badpassword" {
-						return false, errors.New("invalid password")
-					}
-
-					if config.Database != "testdb" {
-						return false, errors.New("invalid database")
-					}
-
-					return true, nil
-				}
-			},
 		},
 		{
 			name: "not found",
@@ -150,9 +114,8 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:     nil,
-			wantErr:  false,
-			mockFunc: func() {},
+			want:    nil,
+			wantErr: false,
 		},
 	}
 
@@ -175,7 +138,7 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("SQLServer.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
