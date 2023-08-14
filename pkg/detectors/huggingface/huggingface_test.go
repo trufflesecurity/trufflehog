@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package alchemy
+package huggingface
 
 import (
 	"context"
@@ -17,15 +17,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAlchemy_FromChunk(t *testing.T) {
+func TestHuggingface_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ALCHEMY")
-	inactiveSecret := testSecrets.MustGetField("ALCHEMY_INACTIVE")
+	secret := testSecrets.MustGetField("HUGGINGFACE")
+	inactiveSecret := testSecrets.MustGetField("HUGGINGFACE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,12 +45,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a huggingface secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Alchemy,
+					DetectorType: detectorspb.DetectorType_HuggingFace,
 					Verified:     true,
 				},
 			},
@@ -62,12 +62,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a huggingface secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Alchemy,
+					DetectorType: detectorspb.DetectorType_HuggingFace,
 					Verified:     false,
 				},
 			},
@@ -91,12 +91,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a huggingface secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Alchemy,
+					DetectorType: detectorspb.DetectorType_HuggingFace,
 					Verified:     false,
 				},
 			},
@@ -108,12 +108,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a huggingface secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Alchemy,
+					DetectorType: detectorspb.DetectorType_HuggingFace,
 					Verified:     false,
 				},
 			},
@@ -125,7 +125,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Alchemy.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Huggingface.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -133,12 +133,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+					t.Fatalf(" wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Alchemy.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Huggingface.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
