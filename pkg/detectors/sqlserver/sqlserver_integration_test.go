@@ -20,11 +20,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-const (
-	sqlServerPass = "P@ssw0rd!"
-	sqlServerUser = "sa"
-)
-
 func TestSQLServerIntegration_FromChunk(t *testing.T) {
 	secret := "Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"
 	inactiveSecret := "Server=localhost;User ID=sa;Password=123"
@@ -93,13 +88,13 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(`<add name="test db" value="SERVER=server_name;DATABASE=master;user=username;password=P@ssw0rd!;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
+				data:   []byte(`<add name="test db" value="SERVER=localhost;DATABASE=master;user=sa;password=P@ssw0rd!;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Redacted:     "sqlserver://username:********@server_name?database=master&disableRetry=false",
+					Redacted:     "sqlserver://sa:********@localhost?database=master&disableRetry=false",
 					Raw:          []byte("P@ssw0rd!"),
 					Verified:     true,
 				},
@@ -169,7 +164,7 @@ func startSqlServer() error {
 	cmd := exec.Command(
 		"docker", "run", "--rm", "-p", "1433:1433",
 		"-e", "ACCEPT_EULA=1",
-		"-e", "MSSQL_SA_PASSWORD="+sqlServerPass,
+		"-e", "MSSQL_SA_PASSWORD=P@ssw0rd!",
 		"-d", "mcr.microsoft.com/azure-sql-edge",
 	)
 	out, err := cmd.Output()
