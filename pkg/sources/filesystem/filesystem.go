@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -20,6 +22,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/docker"
 )
 
 type Source struct {
@@ -150,6 +153,35 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
+
+	// Check if file is a tarball, if so, check if it is a Docker image.
+	// If it is a Docker image, then pass it off to the Docker scanner.
+	if filepath.Ext(path) == ".tar" {
+		_, err := tarball.ImageFromPath(path, nil)
+		if err == nil {
+			logger.V(3).Info("Docker image detected in tarball: " + path)
+			//scan with docker scanner
+			dockerConn := sourcespb.Docker{
+				Images: []string{"file://" + path},
+				Credential: &sourcespb.Docker_DockerKeychain{
+					DockerKeychain: true,
+				},
+			}
+			anyConn, err := anypb.New(&dockerConn)
+			if err != nil {
+				logger.V(3).Info("error marshalling Docker connection", "error", err)
+			}
+			dockerSource := docker.Source{}
+			if err := dockerSource.Init(ctx, "trufflehog - docker", s.jobId, s.sourceId, s.verify, anyConn, runtime.NumCPU()); err != nil {
+				return err
+			}
+			if err := dockerSource.Chunks(ctx, chunksChan); err != nil {
+				return err
+			}
+
+			return nil
+		}
+	}
 
 	reReader, err := diskbufferreader.New(inputFile)
 	if err != nil {
