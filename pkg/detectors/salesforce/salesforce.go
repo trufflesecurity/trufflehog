@@ -86,9 +86,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "records")
-				if err != nil {
-					return nil, err
-				}
 
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
@@ -98,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else if res.StatusCode == 401 {
 					s1.Verified = false
 				} else {
-					s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+					s1.VerificationError = fmt.Errorf("request to %v returned status %d with error %+v", res.Request.URL, res.StatusCode, err)
 				}
 
 			}
