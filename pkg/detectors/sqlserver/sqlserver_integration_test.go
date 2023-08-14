@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"strings"
 	"testing"
@@ -21,33 +20,32 @@ import (
 )
 
 func TestSQLServerIntegration_FromChunk(t *testing.T) {
-	secret := "Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"
-	inactiveSecret := "Server=localhost;User ID=sa;Password=123"
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sqlserver secret %s within", secret)),
+				data:   []byte("Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
 					Raw:          []byte("P@ssw0rd!"),
+					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@localhost?database=master&disableRetry=false"),
 					Redacted:     "sqlserver://sa:********@localhost?database=master&disableRetry=false",
 					Verified:     true,
 				},
@@ -59,13 +57,14 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sqlserver secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte("Server=localhost;User ID=sa;Password=123"),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Raw:          []byte("123 within but not valid"),
+					Raw:          []byte("123"),
+					RawV2:        []byte("sqlserver://sa:123@localhost?disableRetry=false"),
 					Redacted:     "sqlserver://sa:********@localhost?disableRetry=false",
 					Verified:     false,
 				},
@@ -96,10 +95,31 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_SQLServer,
 					Redacted:     "sqlserver://sa:********@localhost?database=master&disableRetry=false",
 					Raw:          []byte("P@ssw0rd!"),
+					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@localhost?database=master&disableRetry=false"),
 					Verified:     true,
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "found, unreachable host",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("Server=unreachablehost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SQLServer,
+					Raw:          []byte("P@ssw0rd!"),
+					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@unreachablehost?database=master&disableRetry=false"),
+					Redacted:     "sqlserver://sa:********@unreachablehost?database=master&disableRetry=false",
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
@@ -131,8 +151,11 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("SQLServer.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
