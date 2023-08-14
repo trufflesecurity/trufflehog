@@ -1,5 +1,5 @@
-//go:build detectors
-// +build detectors
+//go:build detectors && integration
+// +build detectors,integration
 
 package sqlserver
 
