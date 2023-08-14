@@ -1,4 +1,4 @@
-package alchemy
+package huggingface
 
 import (
 	"context"
@@ -22,29 +22,29 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alchemy"}) + `\b([0-9a-zA-Z]{23}_[0-9a-zA-Z]{8})\b`)
+	keyPat = regexp.MustCompile(`\bhf_[a-zA-Z]{34}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"alchemy"}
+	return []string{"huggingface", "hugging_face", "hf"} // Huggingface docs occasionally use "hf" instead of "huggingface"
 }
 
-// FromData will find and optionally verify Alchemy secrets in a given set of bytes.
+// FromData will find and optionally verify Huggingface secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
+		if len(match) != 1 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := strings.TrimSpace(match[0])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Alchemy,
+			DetectorType: detectorspb.DetectorType_HuggingFace,
 			Raw:          []byte(resMatch),
 		}
 
@@ -53,10 +53,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.alchemy.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://huggingface.co/api/whoami-v2", nil)
 			if err != nil {
 				continue
 			}
+
+			req.Header.Set("Authorization", "Bearer "+resMatch)
+
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -84,5 +87,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Alchemy
+	return detectorspb.DetectorType_HuggingFace
 }

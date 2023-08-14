@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/users", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/alerts", nil)
 			if err != nil {
 				continue
 			}

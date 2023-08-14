@@ -6,10 +6,10 @@ package gitlab
 import (
 	"context"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
-
-	"github.com/kylelemons/godebug/pretty"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -31,11 +31,12 @@ func TestGitlab_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found",
@@ -86,6 +87,56 @@ func TestGitlab_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found, would be verified but for timeout",
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found and valid but unexpected api response",
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, good key but wrong scope",
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -99,8 +150,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Gitlab.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -109,9 +159,12 @@ func TestGitlab_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatal("no raw secret present")
 				}
-				got[i].Raw = nil
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -933,6 +933,8 @@ enum DetectorType {
   TrufflehogEnterprise = 922;
   EnvoyApiKey = 923;
   GitHubOauth2 = 924;
+  // 925 reserved for Salesforce
+  HuggingFace = 926;
 }
 
 message Result {
