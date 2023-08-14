@@ -21,7 +21,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.21'
     - name: Checkout code
       uses: actions/checkout@v3
     - id: 'auth'
@@ -42,7 +42,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.21'
     - name: Checkout code
       uses: actions/checkout@v3
     - id: 'auth'
@@ -63,7 +63,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.21'
     - name: Checkout code
       uses: actions/checkout@v3
     - name: Test
