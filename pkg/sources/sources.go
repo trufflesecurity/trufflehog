@@ -240,7 +240,7 @@ type Progress struct {
 // Validator is an interface for validating a source. Sources can optionally implement this interface to validate
 // their configuration.
 type Validator interface {
-	Validate() []error
+	Validate(context.Context) []error
 }
 
 // SetProgressComplete sets job progress information for a running job based on the highest level objects in the source.

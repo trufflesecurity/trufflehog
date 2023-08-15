@@ -273,30 +273,45 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
-// ValidateGithubConfig is used by enterprise CLI to validate the Github config file.
-func (s *Source) ValidateGithubConfig(ctx context.Context, apiEndpoint string) (bool, error) {
+// Validate is used by enterprise CLI to validate the Github config file.
+func (s *Source) Validate(ctx context.Context) []error {
+	var errs []error
+	apiEndpoint := s.conn.Endpoint
+
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_BasicAuth:
-		if err := s.enumerateBasicAuth(ctx, apiEndpoint, cred.BasicAuth); err != nil {
-			return true, err
+		s.httpClient.Transport = &github.BasicAuthTransport{
+			Username: cred.BasicAuth.Username,
+			Password: cred.BasicAuth.Password,
+		}
+		_, err := createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, err)
 		}
 	case *sourcespb.GitHub_Unauthenticated:
 		_, err := createGitHubClient(s.httpClient, apiEndpoint)
 		if err != nil {
-			return false, err
+			errs = append(errs, err)
 		}
 	case *sourcespb.GitHub_Token:
-		if err := s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
-			return false, err
+		s.githubToken = cred.Token
+
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: s.githubToken},
+		)
+		s.httpClient.Transport = &oauth2.Transport{
+			Base:   s.httpClient.Transport,
+			Source: oauth2.ReuseTokenSource(nil, ts),
 		}
-	case *sourcespb.GitHub_GithubApp:
-		if _, err := s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
-			return false, err
+
+		_, err := createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, err)
 		}
 	default:
-		return false, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
 	}
-	return true, nil
+	return errs
 }
 
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
