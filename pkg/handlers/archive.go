@@ -267,12 +267,12 @@ func (a *Archive) HandleSpecialized(ctx context.Context, reader io.Reader) (io.R
 		if err := ensureToolsForMimeType(mimeType); err != nil {
 			return nil, false, err
 		}
-		reader, err = extractDebContent(ctx, reader)
+		reader, err = a.extractDebContent(ctx, reader)
 	case rpmMimeType:
 		if err := ensureToolsForMimeType(mimeType); err != nil {
 			return nil, false, err
 		}
-		reader, err = extractRpmContent(ctx, reader)
+		reader, err = a.extractRpmContent(ctx, reader)
 	default:
 		return reader, false, nil
 	}
@@ -288,8 +288,8 @@ func (a *Archive) HandleSpecialized(ctx context.Context, reader io.Reader) (io.R
 // It handles the extraction process by using the 'ar' command and manages temporary
 // files and directories for the operation.
 // The caller is responsible for closing the returned reader.
-func extractDebContent(_ context.Context, file io.Reader) (io.ReadCloser, error) {
-	tempEnv, err := createTempEnv(file)
+func (a *Archive) extractDebContent(ctx context.Context, file io.Reader) (io.ReadCloser, error) {
+	tempEnv, err := a.createTempEnv(ctx, file)
 	if err != nil {
 		return nil, err
 	}
@@ -325,8 +325,8 @@ func extractDebContent(_ context.Context, file io.Reader) (io.ReadCloser, error)
 // It handles the extraction process by using the 'rpm2cpio' and 'cpio' commands and manages temporary
 // files and directories for the operation.
 // The caller is responsible for closing the returned reader.
-func extractRpmContent(_ context.Context, file io.Reader) (io.ReadCloser, error) {
-	tempEnv, err := createTempEnv(file)
+func (a *Archive) extractRpmContent(ctx context.Context, file io.Reader) (io.ReadCloser, error) {
+	tempEnv, err := a.createTempEnv(ctx, file)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ type tempEnv struct {
 // createTempEnv creates a temporary file and a temporary directory for extracting archives.
 // The caller is responsible for removing these temporary resources
 // (both the file and directory) when they are no longer needed.
-func createTempEnv(file io.Reader) (tempEnv, error) {
+func (a *Archive) createTempEnv(ctx context.Context, file io.Reader) (tempEnv, error) {
 	tempFile, err := os.CreateTemp("", "tmp")
 	if err != nil {
 		return tempEnv{}, fmt.Errorf("unable to create temporary file: %w", err)
@@ -378,8 +378,13 @@ func createTempEnv(file io.Reader) (tempEnv, error) {
 		return tempEnv{}, fmt.Errorf("unable to create temporary directory: %w", err)
 	}
 
-	if _, err = io.Copy(tempFile, file); err != nil {
-		return tempEnv{}, fmt.Errorf("unable to copy content to temporary file: %w", err)
+	b, err := a.ReadToMax(ctx, file)
+	if err != nil {
+		return tempEnv{}, err
+	}
+
+	if _, err = tempFile.Write(b); err != nil {
+		return tempEnv{}, fmt.Errorf("unable to write to temporary file: %w", err)
 	}
 
 	return tempEnv{tempFile: tempFile, tempFileName: tempFile.Name(), extractPath: extractPath}, nil
