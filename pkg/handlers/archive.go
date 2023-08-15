@@ -60,8 +60,8 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 }
 
 // FromFile extracts the files from an archive.
-func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]byte) {
-	archiveChan := make(chan ([]byte), 512)
+func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []byte {
+	archiveChan := make(chan []byte, 512)
 	go func() {
 		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
 		logger := logContext.AddLogger(ctx).Logger()
@@ -79,7 +79,7 @@ func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan ([]
 }
 
 // openArchive takes a reader and extracts the contents up to the maximum depth.
-func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan ([]byte)) error {
+func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
 	if depth >= maxDepth {
 		return fmt.Errorf("max archive depth reached")
 	}
@@ -137,7 +137,7 @@ func (a *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, 
 }
 
 // extractorHandler is applied to each file in an archiver.Extractor file.
-func (a *Archive) extractorHandler(archiveChan chan ([]byte)) func(context.Context, archiver.File) error {
+func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, f archiver.File) error {
 		logger := logContext.AddLogger(ctx).Logger()
 		logger.V(5).Info("Handling extracted file.", "filename", f.Name())
