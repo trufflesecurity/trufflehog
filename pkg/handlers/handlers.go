@@ -13,39 +13,59 @@ func DefaultHandlers() []Handler {
 	}
 }
 
+// SpecializedHandler defines the interface for handlers that can process specialized archives.
+// It includes a method to handle specialized archives and determine if the file is of a special type.
+type SpecializedHandler interface {
+	// HandleSpecialized examines the provided file reader within the context and determines if it is a specialized archive.
+	// It returns a reader with any necessary modifications, a boolean indicating if the file was specialized,
+	// and an error if something went wrong during processing.
+	HandleSpecialized(context.Context, io.Reader) (io.Reader, bool, error)
+}
+
 type Handler interface {
 	FromFile(context.Context, io.Reader) chan ([]byte)
 	IsFiletype(context.Context, io.Reader) (io.Reader, bool)
 	New()
 }
 
-func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan (*sources.Chunk)) bool {
-	// Find a handler for this file.
-	var handler Handler
+// HandleFile processes a given file by selecting an appropriate handler from DefaultHandlers.
+// It first checks if the handler implements SpecializedHandler for any special processing,
+// then falls back to regular file type handling. If successful, it reads the file in chunks,
+// packages them in the provided chunk skeleton, and sends them to chunksChan.
+// The function returns true if processing was successful and false otherwise.
+// Context is used for cancellation, and the caller is responsible for canceling it if needed.
+func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
 	for _, h := range DefaultHandlers() {
 		h.New()
+		var (
+			isSpecial bool
+			err       error
+		)
+
+		// Check if the handler implements SpecializedHandler and process accordingly.
+		if specialHandler, ok := h.(SpecializedHandler); ok {
+			if file, isSpecial, err = specialHandler.HandleSpecialized(ctx, file); isSpecial && err == nil {
+				return handleChunks(ctx, h.FromFile(ctx, file), chunkSkel, chunksChan)
+			}
+		}
+
 		var isType bool
 		if file, isType = h.IsFiletype(ctx, file); isType {
-			handler = h
-			break
+			return handleChunks(ctx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 		}
 	}
-	if handler == nil {
-		return false
-	}
+	return false
+}
 
-	// Process the file and read all []byte chunks from handlerChan.
-	handlerChan := handler.FromFile(ctx, file)
+func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
 	for {
 		select {
 		case data, open := <-handlerChan:
 			if !open {
-				// We finished reading everything from handlerChan.
 				return true
 			}
 			chunk := *chunkSkel
 			chunk.Data = data
-			// Send data on chunksChan.
 			select {
 			case chunksChan <- &chunk:
 			case <-ctx.Done():
