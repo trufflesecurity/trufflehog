@@ -213,6 +213,34 @@ const (
 	rpmMimeType = "application/x-rpm"
 )
 
+// Define a map of mime types to corresponding command-line tools
+var mimeTools = map[string][]string{
+	arMimeType:  {"ar"},
+	rpmMimeType: {"rpm2cpio", "cpio"},
+}
+
+// Check if the command-line tool is installed.
+func isToolInstalled(tool string) bool {
+	_, err := exec.LookPath(tool)
+	return err == nil
+}
+
+// Ensure all tools are available for given mime type.
+func ensureToolsForMimeType(mimeType string) error {
+	tools, exists := mimeTools[mimeType]
+	if !exists {
+		return fmt.Errorf("unsupported mime type")
+	}
+
+	for _, tool := range tools {
+		if !isToolInstalled(tool) {
+			return fmt.Errorf("Required tool " + tool + " is not installed")
+		}
+	}
+
+	return nil
+}
+
 // HandleSpecialized takes a file path and an io.Reader representing the input file,
 // and processes it based on its extension, such as handling Debian (.deb) and RPM (.rpm) packages.
 // It returns an io.Reader that can be used to read the processed content of the file,
@@ -236,8 +264,14 @@ func (a *Archive) HandleSpecialized(ctx context.Context, reader io.Reader) (io.R
 
 	switch mimeType := kind.MIME.Value; mimeType {
 	case arMimeType: // includes .deb files
+		if err := ensureToolsForMimeType(mimeType); err != nil {
+			return nil, false, err
+		}
 		reader, err = extractDebContent(ctx, reader)
 	case rpmMimeType:
+		if err := ensureToolsForMimeType(mimeType); err != nil {
+			return nil, false, err
+		}
 		reader, err = extractRpmContent(ctx, reader)
 	default:
 		return reader, false, nil
