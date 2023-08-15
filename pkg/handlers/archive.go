@@ -31,6 +31,9 @@ var (
 	maxTimeout = time.Duration(30) * time.Second
 )
 
+// Ensure the Archive satisfies the interfaces at compile time.
+var _ SpecializedHandler = (*Archive)(nil)
+
 // Archive is a handler for extracting and decompressing archives.
 type Archive struct {
 	size int
