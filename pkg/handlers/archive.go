@@ -297,9 +297,9 @@ func (a *Archive) extractDebContent(ctx context.Context, file io.Reader) (io.Rea
 		return nil, err
 	}
 
-	handler := func(ctx context.Context, env tempEnv, file os.DirEntry) (string, error) {
-		if strings.HasPrefix(file.Name(), "data.tar.") {
-			return file.Name(), nil
+	handler := func(ctx context.Context, env tempEnv, file string) (string, error) {
+		if strings.HasPrefix(file, "data.tar.") {
+			return file, nil
 		}
 		return a.handleNestedFileMIME(ctx, env, file)
 	}
@@ -336,9 +336,9 @@ func (a *Archive) extractRpmContent(ctx context.Context, file io.Reader) (io.Rea
 		return nil, err
 	}
 
-	handler := func(ctx context.Context, env tempEnv, file os.DirEntry) (string, error) {
-		if strings.HasSuffix(file.Name(), ".tar.gz") {
-			return file.Name(), nil
+	handler := func(ctx context.Context, env tempEnv, file string) (string, error) {
+		if strings.HasSuffix(file, ".tar.gz") {
+			return file, nil
 		}
 		return a.handleNestedFileMIME(ctx, env, file)
 	}
@@ -351,8 +351,7 @@ func (a *Archive) extractRpmContent(ctx context.Context, file io.Reader) (io.Rea
 	return openDataArchive(tmpEnv.extractPath, dataArchiveName)
 }
 
-func (a *Archive) handleNestedFileMIME(ctx context.Context, tempEnv tempEnv, file os.DirEntry) (string, error) {
-	fileName := file.Name()
+func (a *Archive) handleNestedFileMIME(ctx context.Context, tempEnv tempEnv, fileName string) (string, error) {
 	nestedFile, err := os.Open(filepath.Join(tempEnv.extractPath, fileName))
 	if err != nil {
 		return "", err
@@ -406,7 +405,7 @@ func determineMimeType(reader io.Reader) (string, io.Reader, error) {
 // of the data archive it finds. This centralizes the logic for handling specialized files such as .deb and .rpm
 // by using the appropriate handling function passed as an argument. This design allows for flexibility and reuse
 // of this function across various extraction processes in the package.
-func (a *Archive) handleExtractedFiles(ctx context.Context, env tempEnv, handleFile func(context.Context, tempEnv, os.DirEntry) (string, error)) (string, error) {
+func (a *Archive) handleExtractedFiles(ctx context.Context, env tempEnv, handleFile func(context.Context, tempEnv, string) (string, error)) (string, error) {
 	extractedFiles, err := os.ReadDir(env.extractPath)
 	if err != nil {
 		return "", fmt.Errorf("unable to read extracted directory: %w", err)
@@ -414,7 +413,7 @@ func (a *Archive) handleExtractedFiles(ctx context.Context, env tempEnv, handleF
 
 	var dataArchiveName string
 	for _, file := range extractedFiles {
-		name, err := handleFile(ctx, env, file)
+		name, err := handleFile(ctx, env, file.Name())
 		if err != nil {
 			return "", err
 		}
@@ -425,16 +424,6 @@ func (a *Archive) handleExtractedFiles(ctx context.Context, env tempEnv, handleF
 	}
 
 	return dataArchiveName, nil
-}
-
-func (a *Archive) handleNestedFile(ctx context.Context, env tempEnv, fileName string) (string, error) {
-	nestedFile, err := os.Open(filepath.Join(env.extractPath, fileName))
-	if err != nil {
-		return "", err
-	}
-	a.currentDepth++
-	_, _, err = a.HandleSpecialized(ctx, nestedFile)
-	return "", err
 }
 
 type tempEnv struct {
