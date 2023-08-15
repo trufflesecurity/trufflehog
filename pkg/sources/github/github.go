@@ -273,6 +273,32 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
+// ValidateGithubConfig is used by enterprise CLI to validate the Github config file.
+func (s *Source) ValidateGithubConfig(ctx context.Context, apiEndpoint string) (bool, error) {
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_BasicAuth:
+		if err := s.enumerateBasicAuth(ctx, apiEndpoint, cred.BasicAuth); err != nil {
+			return true, err
+		}
+	case *sourcespb.GitHub_Unauthenticated:
+		_, err := createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			return false, err
+		}
+	case *sourcespb.GitHub_Token:
+		if err := s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
+			return false, err
+		}
+	case *sourcespb.GitHub_GithubApp:
+		if _, err := s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
+			return false, err
+		}
+	default:
+		return false, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+	}
+	return true, nil
+}
+
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
 	s.mu.Lock()
 	visibility, ok := s.publicMap[repoURL]
