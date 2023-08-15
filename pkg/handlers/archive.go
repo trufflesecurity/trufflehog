@@ -401,6 +401,11 @@ func determineMimeType(reader io.Reader) (string, io.Reader, error) {
 	return kind.MIME.Value, reader, nil
 }
 
+// handleExtractedFiles processes each file in the extracted directory using a provided handler function.
+// The function iterates through the files, applying the handleFile function to each, and returns the name
+// of the data archive it finds. This centralizes the logic for handling specialized files such as .deb and .rpm
+// by using the appropriate handling function passed as an argument. This design allows for flexibility and reuse
+// of this function across various extraction processes in the package.
 func (a *Archive) handleExtractedFiles(ctx context.Context, tempEnv tempEnv, handleFile func(context.Context, tempEnv, os.DirEntry) (string, error)) (string, error) {
 	extractedFiles, err := os.ReadDir(tempEnv.extractPath)
 	if err != nil {
