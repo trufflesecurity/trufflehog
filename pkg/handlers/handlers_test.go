@@ -26,3 +26,20 @@ func TestExtractDebContent(t *testing.T) {
 	expectedLength := 1015582
 	assert.Equal(t, expectedLength, len(string(content)))
 }
+
+func TestExtractRPMContent(t *testing.T) {
+	// Open the sample .rpm file from the testdata folder.
+	file, err := os.Open("testdata/test.rpm")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx := context.Background()
+
+	reader, err := extractRpmContent(ctx, file)
+	assert.Nil(t, err)
+
+	content, err := io.ReadAll(reader)
+	assert.Nil(t, err)
+	expectedLength := 1822720
+	assert.Equal(t, expectedLength, len(string(content)))
+}

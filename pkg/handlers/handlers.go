@@ -82,7 +82,7 @@ func HandleSpecializedArchives(ctx logContext.Context, path string, inputFile io
 	case debFileExtension:
 		reader, err = extractDebContent(ctx, inputFile)
 	case rpmFileExtension:
-		// TODO: Implement RPM extraction.
+		reader, err = extractRpmContent(ctx, inputFile)
 	default:
 		reader = inputFile
 	}
@@ -92,41 +92,27 @@ func HandleSpecializedArchives(ctx logContext.Context, path string, inputFile io
 	return reader, nil
 }
 
-// extractDebContent takes a .deb file as an io.Reader, extracts its contents
-// into a temporary directory, and returns a reader for the extracted data archive.
+// extractDebContent takes a .deb file as an io.ReadCloser, extracts its contents
+// into a temporary directory, and returns a ReadCloser for the extracted data archive.
 // It handles the extraction process by using the 'ar' command and manages temporary
 // files and directories for the operation.
 // The caller is responsible for closing the returned reader.
-func extractDebContent(ctx logContext.Context, file io.Reader) (io.ReadCloser, error) {
-	// Create a temporary file to write the .deb content.
-	tempFile, err := os.CreateTemp("", "debfile")
+func extractDebContent(_ logContext.Context, file io.ReadCloser) (io.ReadCloser, error) {
+	tempEnv, err := createTempEnv(file)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create temporary file: %w", err)
+		return nil, err
 	}
-	defer os.Remove(tempFile.Name())
+	defer os.Remove(tempEnv.tempFileName)
+	defer os.RemoveAll(tempEnv.extractPath)
 
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
-		return nil, fmt.Errorf("unable to handle temporary file: %w", err)
-	}
-	tempFile.Close()
-
-	extractPath, err := os.MkdirTemp("", "deb_extract")
-	if err != nil {
-		return nil, fmt.Errorf("unable to create temporary directory: %w", err)
-	}
-	defer os.RemoveAll(extractPath)
-
-	cmd := exec.Command("ar", "x", tempFile.Name())
-	cmd.Dir = extractPath
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("unable to extract .deb file: %w; ar error: %s", err, stderr.String())
+	cmd := exec.Command("ar", "x", tempEnv.tempFile.Name())
+	cmd.Dir = tempEnv.extractPath
+	if err := executeCommand(cmd); err != nil {
+		return nil, err
 	}
 
 	// List the content of the extraction directory.
-	extractedFiles, err := os.ReadDir(extractPath)
+	extractedFiles, err := os.ReadDir(tempEnv.extractPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read extracted directory: %w", err)
 	}
@@ -142,6 +128,85 @@ func extractDebContent(ctx logContext.Context, file io.Reader) (io.ReadCloser, e
 		}
 	}
 
+	return openDataArchive(tempEnv.extractPath, dataArchiveName)
+}
+
+// extractRpmContent takes an .rpm file as an io.ReadCloser, extracts its contents
+// into a temporary directory, and returns a ReadCloser for the extracted data archive.
+// It handles the extraction process by using the 'rpm2cpio' and 'cpio' commands and manages temporary
+// files and directories for the operation.
+// The caller is responsible for closing the returned reader.
+func extractRpmContent(ctx logContext.Context, file io.ReadCloser) (io.ReadCloser, error) {
+	tempEnv, err := createTempEnv(file)
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tempEnv.tempFileName)
+	defer os.RemoveAll(tempEnv.extractPath)
+
+	// Use rpm2cpio to convert the RPM file to a cpio archive and then extract it using cpio command.
+	cmd := exec.Command("sh", "-c", "rpm2cpio "+tempEnv.tempFile.Name()+" | cpio -id")
+	cmd.Dir = tempEnv.extractPath
+	if err := executeCommand(cmd); err != nil {
+		return nil, err
+	}
+
+	// List the content of the extraction directory.
+	extractedFiles, err := os.ReadDir(tempEnv.extractPath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read extracted directory: %w", err)
+	}
+
+	var dataArchiveName string
+	// Determine the correct data archive name.
+	for _, file := range extractedFiles {
+		if strings.HasSuffix(file.Name(), ".tar.gz") {
+			dataArchiveName = file.Name()
+			break
+		}
+	}
+
+	return openDataArchive(tempEnv.extractPath, dataArchiveName)
+}
+
+type tempEnv struct {
+	tempFile     *os.File
+	tempFileName string
+	extractPath  string
+}
+
+// createTempEnv creates a temporary file and a temporary directory for extracting archives.
+// The caller is responsible for removing these temporary resources
+// (both the file and directory) when they are no longer needed.
+func createTempEnv(file io.ReadCloser) (tempEnv, error) {
+	tempFile, err := os.CreateTemp("", "tmp")
+	if err != nil {
+		return tempEnv{}, fmt.Errorf("unable to create temporary file: %w", err)
+	}
+
+	extractPath, err := os.MkdirTemp("", "tmp_archive")
+	if err != nil {
+		return tempEnv{}, fmt.Errorf("unable to create temporary directory: %w", err)
+	}
+
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		return tempEnv{}, fmt.Errorf("unable to copy content to temporary file: %w", err)
+	}
+
+	return tempEnv{tempFile: tempFile, tempFileName: tempFile.Name(), extractPath: extractPath}, nil
+}
+
+func executeCommand(cmd *exec.Cmd) error {
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("unable to execute command: %w; error: %s", err, stderr.String())
+	}
+	return nil
+}
+
+func openDataArchive(extractPath string, dataArchiveName string) (io.ReadCloser, error) {
 	dataArchivePath := filepath.Join(extractPath, dataArchiveName)
 	dataFile, err := os.Open(dataArchivePath)
 	if err != nil {
