@@ -117,10 +117,8 @@ func extractDebContent(_ logContext.Context, file io.ReadCloser) (io.ReadCloser,
 		return nil, fmt.Errorf("unable to read extracted directory: %w", err)
 	}
 
-	const defaultDataArchiveName = "data.tar.gz"
-
 	// Determine the correct data archive name. (e.g., data.tar.gz, data.tar.xz)
-	dataArchiveName := defaultDataArchiveName
+	var dataArchiveName string
 	for _, file := range extractedFiles {
 		if strings.HasPrefix(file.Name(), "data.tar.") {
 			dataArchiveName = file.Name() // Use the actual name if different
@@ -189,8 +187,7 @@ func createTempEnv(file io.ReadCloser) (tempEnv, error) {
 		return tempEnv{}, fmt.Errorf("unable to create temporary directory: %w", err)
 	}
 
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
+	if _, err = io.Copy(tempFile, file); err != nil {
 		return tempEnv{}, fmt.Errorf("unable to copy content to temporary file: %w", err)
 	}
 
