@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -121,4 +123,38 @@ func TestHandleFile(t *testing.T) {
 	assert.Equal(t, 0, len(ch))
 	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, ch))
 	assert.Equal(t, 1, len(ch))
+}
+
+func TestExtractDebContent(t *testing.T) {
+	// Open the sample .deb file from the testdata folder.
+	file, err := os.Open("testdata/test.deb")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx := context.Background()
+
+	reader, err := extractDebContent(ctx, file)
+	assert.Nil(t, err)
+
+	content, err := io.ReadAll(reader)
+	assert.Nil(t, err)
+	expectedLength := 1015582
+	assert.Equal(t, expectedLength, len(string(content)))
+}
+
+func TestExtractRPMContent(t *testing.T) {
+	// Open the sample .rpm file from the testdata folder.
+	file, err := os.Open("testdata/test.rpm")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx := context.Background()
+
+	reader, err := extractRpmContent(ctx, file)
+	assert.Nil(t, err)
+
+	content, err := io.ReadAll(reader)
+	assert.Nil(t, err)
+	expectedLength := 1822720
+	assert.Equal(t, expectedLength, len(string(content)))
 }
