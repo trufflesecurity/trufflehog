@@ -151,7 +151,13 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
 
-	reReader, err := diskbufferreader.New(inputFile)
+	reader, err := handlers.HandleSpecializedArchives(ctx, path, inputFile)
+	if err != nil {
+		return fmt.Errorf("unable to handle specialized archives: %w", err)
+	}
+	defer reader.Close()
+
+	reReader, err := diskbufferreader.New(reader)
 	if err != nil {
 		return fmt.Errorf("could not create re-readable reader: %w", err)
 	}
