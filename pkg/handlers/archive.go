@@ -119,7 +119,7 @@ func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 }
 
 // IsFiletype returns true if the provided reader is an archive.
-func (s *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, bool) {
+func (a *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, bool) {
 	format, readerB, err := archiver.Identify("", reader)
 	if err != nil {
 		return readerB, false
@@ -206,7 +206,7 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 }
 
 const (
-	debMimeType = "application/x-unix-archive"
+	arMimeType  = "application/x-unix-archive"
 	rpmMimeType = "application/x-rpm"
 )
 
@@ -232,7 +232,7 @@ func (a *Archive) HandleSpecialized(ctx context.Context, reader io.Reader) (io.R
 	}
 
 	switch mimeType := kind.MIME.Value; mimeType {
-	case debMimeType:
+	case arMimeType: // includes .deb files
 		reader, err = extractDebContent(ctx, reader)
 	case rpmMimeType:
 		reader, err = extractRpmContent(ctx, reader)
