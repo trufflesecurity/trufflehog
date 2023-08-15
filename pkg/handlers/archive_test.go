@@ -132,8 +132,9 @@ func TestExtractDebContent(t *testing.T) {
 	defer file.Close()
 
 	ctx := context.Background()
+	a := &Archive{}
 
-	reader, err := extractDebContent(ctx, file)
+	reader, err := a.extractDebContent(ctx, file)
 	assert.Nil(t, err)
 
 	content, err := io.ReadAll(reader)
@@ -149,8 +150,9 @@ func TestExtractRPMContent(t *testing.T) {
 	defer file.Close()
 
 	ctx := context.Background()
+	a := &Archive{}
 
-	reader, err := extractRpmContent(ctx, file)
+	reader, err := a.extractRpmContent(ctx, file)
 	assert.Nil(t, err)
 
 	content, err := io.ReadAll(reader)

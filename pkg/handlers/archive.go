@@ -36,7 +36,8 @@ var _ SpecializedHandler = (*Archive)(nil)
 
 // Archive is a handler for extracting and decompressing archives.
 type Archive struct {
-	size int
+	size         int
+	currentDepth int
 }
 
 // New sets a default maximum size and current size counter.
@@ -247,22 +248,12 @@ func ensureToolsForMimeType(mimeType string) error {
 // and an error if any issues occurred during processing.
 // The caller is responsible for closing the returned reader.
 func (a *Archive) HandleSpecialized(ctx context.Context, reader io.Reader) (io.Reader, bool, error) {
-	buffer := make([]byte, 512)
-	n, err := reader.Read(buffer)
+	mimeType, reader, err := determineMimeType(reader)
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+		return nil, false, err
 	}
 
-	// Create a new reader that starts with the buffer we just read
-	// and continues with the rest of the original reader.
-	reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
-
-	kind, err := filetype.Match(buffer)
-	if err != nil {
-		return nil, false, fmt.Errorf("unable to determine file type: %w", err)
-	}
-
-	switch mimeType := kind.MIME.Value; mimeType {
+	switch mimeType {
 	case arMimeType: // includes .deb files
 		if err := ensureToolsForMimeType(mimeType); err != nil {
 			return nil, false, err
@@ -278,7 +269,7 @@ func (a *Archive) HandleSpecialized(ctx context.Context, reader io.Reader) (io.R
 	}
 
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to extract file with MIME type %s: %w", kind.MIME.Value, err)
+		return nil, false, fmt.Errorf("unable to extract file with MIME type %s: %w", mimeType, err)
 	}
 	return reader, true, nil
 }
@@ -289,35 +280,36 @@ func (a *Archive) HandleSpecialized(ctx context.Context, reader io.Reader) (io.R
 // files and directories for the operation.
 // The caller is responsible for closing the returned reader.
 func (a *Archive) extractDebContent(ctx context.Context, file io.Reader) (io.ReadCloser, error) {
-	tempEnv, err := a.createTempEnv(ctx, file)
+	if a.currentDepth >= maxDepth {
+		return nil, fmt.Errorf("max archive depth reached")
+	}
+
+	tmpEnv, err := a.createTempEnv(ctx, file)
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tempEnv.tempFileName)
-	defer os.RemoveAll(tempEnv.extractPath)
+	defer os.Remove(tmpEnv.tempFileName)
+	defer os.RemoveAll(tmpEnv.extractPath)
 
-	cmd := exec.Command("ar", "x", tempEnv.tempFile.Name())
-	cmd.Dir = tempEnv.extractPath
+	cmd := exec.Command("ar", "x", tmpEnv.tempFile.Name())
+	cmd.Dir = tmpEnv.extractPath
 	if err := executeCommand(cmd); err != nil {
 		return nil, err
 	}
 
-	// List the content of the extraction directory.
-	extractedFiles, err := os.ReadDir(tempEnv.extractPath)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read extracted directory: %w", err)
-	}
-
-	// Determine the correct data archive name. (e.g., data.tar.gz, data.tar.xz)
-	var dataArchiveName string
-	for _, file := range extractedFiles {
+	handler := func(ctx context.Context, tempEnv tempEnv, file os.DirEntry) (string, error) {
 		if strings.HasPrefix(file.Name(), "data.tar.") {
-			dataArchiveName = file.Name() // Use the actual name if different
-			break
+			return file.Name(), nil
 		}
+		return a.handleNestedFileMIME(ctx, tempEnv, file)
 	}
 
-	return openDataArchive(tempEnv.extractPath, dataArchiveName)
+	dataArchiveName, err := a.handleExtractedFiles(ctx, tmpEnv, handler)
+	if err != nil {
+		return nil, err
+	}
+
+	return openDataArchive(tmpEnv.extractPath, dataArchiveName)
 }
 
 // extractRpmContent takes an .rpm file as an io.Reader, extracts its contents
@@ -326,36 +318,116 @@ func (a *Archive) extractDebContent(ctx context.Context, file io.Reader) (io.Rea
 // files and directories for the operation.
 // The caller is responsible for closing the returned reader.
 func (a *Archive) extractRpmContent(ctx context.Context, file io.Reader) (io.ReadCloser, error) {
-	tempEnv, err := a.createTempEnv(ctx, file)
+	if a.currentDepth >= maxDepth {
+		return nil, fmt.Errorf("max archive depth reached")
+	}
+
+	tmpEnv, err := a.createTempEnv(ctx, file)
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tempEnv.tempFileName)
-	defer os.RemoveAll(tempEnv.extractPath)
+	defer os.Remove(tmpEnv.tempFileName)
+	defer os.RemoveAll(tmpEnv.extractPath)
 
 	// Use rpm2cpio to convert the RPM file to a cpio archive and then extract it using cpio command.
-	cmd := exec.Command("sh", "-c", "rpm2cpio "+tempEnv.tempFile.Name()+" | cpio -id")
-	cmd.Dir = tempEnv.extractPath
+	cmd := exec.Command("sh", "-c", "rpm2cpio "+tmpEnv.tempFile.Name()+" | cpio -id")
+	cmd.Dir = tmpEnv.extractPath
 	if err := executeCommand(cmd); err != nil {
 		return nil, err
 	}
 
-	// List the content of the extraction directory.
+	handler := func(ctx context.Context, tempEnv tempEnv, file os.DirEntry) (string, error) {
+		if strings.HasSuffix(file.Name(), ".tar.gz") {
+			return file.Name(), nil
+		}
+		return a.handleNestedFileMIME(ctx, tempEnv, file)
+	}
+
+	dataArchiveName, err := a.handleExtractedFiles(ctx, tmpEnv, handler)
+	if err != nil {
+		return nil, err
+	}
+
+	return openDataArchive(tmpEnv.extractPath, dataArchiveName)
+}
+
+func (a *Archive) handleNestedFileMIME(ctx context.Context, tempEnv tempEnv, file os.DirEntry) (string, error) {
+	fileName := file.Name()
+	nestedFile, err := os.Open(filepath.Join(tempEnv.extractPath, fileName))
+	if err != nil {
+		return "", err
+	}
+	defer nestedFile.Close()
+
+	mimeType, reader, err := determineMimeType(nestedFile)
+	if err != nil {
+		return "", err
+	}
+
+	switch mimeType {
+	case arMimeType:
+		_, _, err = a.HandleSpecialized(ctx, reader)
+	case rpmMimeType:
+		_, _, err = a.HandleSpecialized(ctx, reader)
+	default:
+		return "", nil
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return fileName, nil
+}
+
+// determineMimeType reads from the provided reader to detect the MIME type.
+// It returns the detected MIME type and a new reader that includes the read portion.
+func determineMimeType(reader io.Reader) (string, io.Reader, error) {
+	buffer := make([]byte, 512)
+	n, err := reader.Read(buffer)
+	if err != nil {
+		return "", nil, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	// Create a new reader that starts with the buffer we just read
+	// and continues with the rest of the original reader.
+	reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
+
+	kind, err := filetype.Match(buffer)
+	if err != nil {
+		return "", nil, fmt.Errorf("unable to determine file type: %w", err)
+	}
+
+	return kind.MIME.Value, reader, nil
+}
+
+func (a *Archive) handleExtractedFiles(ctx context.Context, tempEnv tempEnv, handleFile func(context.Context, tempEnv, os.DirEntry) (string, error)) (string, error) {
 	extractedFiles, err := os.ReadDir(tempEnv.extractPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read extracted directory: %w", err)
+		return "", fmt.Errorf("unable to read extracted directory: %w", err)
 	}
 
 	var dataArchiveName string
-	// Determine the correct data archive name.
 	for _, file := range extractedFiles {
-		if strings.HasSuffix(file.Name(), ".tar.gz") {
-			dataArchiveName = file.Name()
+		if name, err := handleFile(ctx, tempEnv, file); err != nil {
+			return "", err
+		} else if name != "" {
+			dataArchiveName = name
 			break
 		}
 	}
 
-	return openDataArchive(tempEnv.extractPath, dataArchiveName)
+	return dataArchiveName, nil
+}
+
+func (a *Archive) handleNestedFile(ctx context.Context, tempEnv tempEnv, fileName string) (string, error) {
+	nestedFile, err := os.Open(filepath.Join(tempEnv.extractPath, fileName))
+	if err != nil {
+		return "", err
+	}
+	a.currentDepth++
+	_, _, err = a.HandleSpecialized(ctx, nestedFile)
+	return "", err
 }
 
 type tempEnv struct {
