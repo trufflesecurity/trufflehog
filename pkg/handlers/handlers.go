@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 
+	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
+
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -45,8 +47,13 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 		)
 
 		// Check if the handler implements SpecializedHandler and process accordingly.
+		reReader, err := diskbufferreader.New(file)
+		if err != nil {
+			aCtx.Logger().Error(err, "error creating re-reader reader")
+			return false
+		}
 		if specialHandler, ok := h.(SpecializedHandler); ok {
-			if file, isSpecial, err = specialHandler.HandleSpecialized(aCtx, file); isSpecial && err == nil {
+			if file, isSpecial, err = specialHandler.HandleSpecialized(aCtx, reReader); isSpecial && err == nil {
 				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 			}
 			if err != nil {
@@ -54,8 +61,12 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 			}
 		}
 
+		if err := reReader.Reset(); err != nil {
+			aCtx.Logger().Error(err, "error resetting re-reader")
+			return false
+		}
 		var isType bool
-		if file, isType = h.IsFiletype(aCtx, file); isType {
+		if file, isType = h.IsFiletype(aCtx, reReader); isType {
 			return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 		}
 	}
