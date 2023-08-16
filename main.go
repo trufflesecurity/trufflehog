@@ -412,16 +412,19 @@ func run(state overseer.State) {
 		}
 
 		cfg := sources.GithubConfig{
-			Endpoint:       *githubScanEndpoint,
-			Token:          *githubScanToken,
-			IncludeForks:   *githubIncludeForks,
-			IncludeMembers: *githubIncludeMembers,
-			Concurrency:    *concurrency,
-			ExcludeRepos:   *githubExcludeRepos,
-			IncludeRepos:   *githubIncludeRepos,
-			Repos:          *githubScanRepos,
-			Orgs:           *githubScanOrgs,
-			Filter:         filter,
+			Endpoint:                   *githubScanEndpoint,
+			Token:                      *githubScanToken,
+			IncludeForks:               *githubIncludeForks,
+			IncludeMembers:             *githubIncludeMembers,
+			Concurrency:                *concurrency,
+			ExcludeRepos:               *githubExcludeRepos,
+			IncludeRepos:               *githubIncludeRepos,
+			Repos:                      *githubScanRepos,
+			Orgs:                       *githubScanOrgs,
+			IncludeIssueComments:       *githubScanIssueComments,
+			IncludePullRequestComments: *githubScanPRComments,
+			IncludeGistComments:        *githubScanGistComments,
+			Filter:                     filter,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")
