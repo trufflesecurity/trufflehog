@@ -978,8 +978,6 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 }
 
 func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning comments", "repository", repoPath)
-
 	// Support ssh and https URLs
 	repoURL, err := git.GitURLParse(repoPath)
 	if err != nil {
@@ -988,6 +986,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 
 	trimmedURL := removeURLAndSplit(repoURL.String())
 	if repoURL.Host == "gist.github.com" && s.includeGistComments {
+		s.log.Info("scanning github gist comments", "repository", repoPath)
 		// GitHub Gist URL.
 		var gistId string
 		if len(trimmedURL) == 2 {
@@ -1036,6 +1035,8 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 
 		if s.includeIssueComments {
 
+			s.log.Info("scanning github issue comments", "repository", repoPath)
+
 			issueOpts := &github.IssueListCommentsOptions{
 				Sort:      &sortType,
 				Direction: &directionType,
@@ -1070,6 +1071,8 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 		}
 
 		if s.includePRComments {
+			s.log.Info("scanning github pull request comments", "repository", repoPath)
+
 			prOpts := &github.PullRequestListCommentsOptions{
 				Sort:      sortType,
 				Direction: directionType,
