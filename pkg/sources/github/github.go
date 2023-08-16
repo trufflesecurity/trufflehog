@@ -1071,7 +1071,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 		}
 
 		if s.includePRComments {
-			s.log.Info("scanning PR comments", "repository", repoPath)
+			s.log.Info("scanning github pull request comments", "repository", repoPath)
 
 			prOpts := &github.PullRequestListCommentsOptions{
 				Sort:      sortType,
