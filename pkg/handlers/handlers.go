@@ -52,6 +52,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 			aCtx.Logger().Error(err, "error creating re-reader reader")
 			return false
 		}
+		defer reReader.Close()
 		if specialHandler, ok := h.(SpecializedHandler); ok {
 			if file, isSpecial, err = specialHandler.HandleSpecialized(aCtx, reReader); isSpecial && err == nil {
 				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
@@ -65,6 +66,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 			aCtx.Logger().Error(err, "error resetting re-reader")
 			return false
 		}
+		reReader.Stop()
 		var isType bool
 		if file, isType = h.IsFiletype(aCtx, reReader); isType {
 			return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
