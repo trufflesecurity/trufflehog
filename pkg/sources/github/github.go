@@ -316,13 +316,20 @@ func (s *Source) Validate(ctx context.Context) []error {
 		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
 	}
 
-	// Run a simple query to check if the client is valid
-	_, _, err = ghClient.Users.Get(ctx, "")
-	if err != nil {
-		errs = append(errs, err)
+	// Run a simple query to check if the client is actually valid
+	if ghClient != nil {
+		err = checkGitHubConnection(ctx, ghClient)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	return errs
+}
+
+func checkGitHubConnection(ctx context.Context, client *github.Client) error {
+	_, _, err := client.Users.Get(ctx, "")
+	return err
 }
 
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
