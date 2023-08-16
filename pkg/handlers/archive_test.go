@@ -12,6 +12,7 @@ import (
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/stretchr/testify/assert"
 
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -131,7 +132,7 @@ func TestExtractDebContent(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := context.Background()
+	ctx := logContext.AddLogger(context.Background())
 	a := &Archive{}
 
 	reader, err := a.extractDebContent(ctx, file)
@@ -149,7 +150,7 @@ func TestExtractRPMContent(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := context.Background()
+	ctx := logContext.AddLogger(context.Background())
 	a := &Archive{}
 
 	reader, err := a.extractRpmContent(ctx, file)
