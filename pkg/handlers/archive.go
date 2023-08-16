@@ -246,6 +246,7 @@ func ensureToolsForMimeType(mimeType string) error {
 // and processes it based on its extension, such as handling Debian (.deb) and RPM (.rpm) packages.
 // It returns an io.Reader that can be used to read the processed content of the file,
 // and an error if any issues occurred during processing.
+// If the file is specialized, the returned boolean is true with no error.
 // The caller is responsible for closing the returned reader.
 func (a *Archive) HandleSpecialized(ctx logContext.Context, reader io.Reader) (io.Reader, bool, error) {
 	mimeType, reader, err := determineMimeType(reader)

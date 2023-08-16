@@ -55,11 +55,12 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 		// Check if the handler implements SpecializedHandler and process accordingly.
 		if specialHandler, ok := h.(SpecializedHandler); ok {
 			file, isSpecial, err := specialHandler.HandleSpecialized(aCtx, reReader)
-			if isSpecial && err == nil {
+			if isSpecial {
 				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 			}
+
 			if err != nil {
-				aCtx.Logger().Error(err, "error processing specialized file")
+				aCtx.Logger().Error(err, "error hendling specialized file")
 			}
 		}
 
