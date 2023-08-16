@@ -334,15 +334,15 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			}
 			reader.Stop()
 
-			chunk := *chunkSkel
 			chunkReader := sources.NewChunkReader()
 			chunkResChan := chunkReader(ctx, reader)
 			for data := range chunkResChan {
-				chunk.Data = data.Bytes()
 				if err := data.Error(); err != nil {
 					s.log.Error(err, "error reading chunk.")
 					continue
 				}
+				chunk := *chunkSkel
+				chunk.Data = data.Bytes()
 				if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
 					return err
 				}
