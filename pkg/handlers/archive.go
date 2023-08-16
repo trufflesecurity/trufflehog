@@ -458,7 +458,7 @@ func (a *Archive) createTempEnv(ctx context.Context, file io.Reader) (tempEnv, e
 	return tempEnv{tempFile: tempFile, tempFileName: tempFile.Name(), extractPath: extractPath}, nil
 }
 
-func executeCommand(ctx logContext.Context, cmd *exec.Cmd) error {
+func executeCommand(cmd *exec.Cmd) error {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
