@@ -275,7 +275,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 // Validate is used by enterprise CLI to validate the Github config file.
 func (s *Source) Validate(ctx context.Context) []error {
-	var errs []error
+	var (
+		errs     []error
+		ghClient *github.Client
+		err      error
+	)
 	apiEndpoint := s.conn.Endpoint
 
 	switch cred := s.conn.GetCredential().(type) {
@@ -284,12 +288,12 @@ func (s *Source) Validate(ctx context.Context) []error {
 			Username: cred.BasicAuth.Username,
 			Password: cred.BasicAuth.Password,
 		}
-		_, err := createGitHubClient(s.httpClient, apiEndpoint)
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
 		if err != nil {
 			errs = append(errs, err)
 		}
 	case *sourcespb.GitHub_Unauthenticated:
-		_, err := createGitHubClient(s.httpClient, apiEndpoint)
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -304,13 +308,20 @@ func (s *Source) Validate(ctx context.Context) []error {
 			Source: oauth2.ReuseTokenSource(nil, ts),
 		}
 
-		_, err := createGitHubClient(s.httpClient, apiEndpoint)
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
 		if err != nil {
 			errs = append(errs, err)
 		}
 	default:
 		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
 	}
+
+	// Run a simple query to check if the client is valid
+	_, _, err = ghClient.Users.Get(ctx, "")
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	return errs
 }
 
