@@ -41,20 +41,21 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 	aCtx := logContext.AddLogger(ctx)
 	for _, h := range DefaultHandlers() {
 		h.New()
-		var (
-			isSpecial bool
-			err       error
-		)
 
-		// Check if the handler implements SpecializedHandler and process accordingly.
+		// The re-reader is used to reset the file reader after checking if the handler implements SpecializedHandler.
+		// This is necessary because the archive pkg doesn't correctly determine the file type when using
+		// an io.MultiReader, which is used by the SpecializedHandler.
 		reReader, err := diskbufferreader.New(file)
 		if err != nil {
 			aCtx.Logger().Error(err, "error creating re-reader reader")
 			return false
 		}
 		defer reReader.Close()
+
+		// Check if the handler implements SpecializedHandler and process accordingly.
 		if specialHandler, ok := h.(SpecializedHandler); ok {
-			if file, isSpecial, err = specialHandler.HandleSpecialized(aCtx, reReader); isSpecial && err == nil {
+			file, isSpecial, err := specialHandler.HandleSpecialized(aCtx, reReader)
+			if isSpecial && err == nil {
 				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 			}
 			if err != nil {
