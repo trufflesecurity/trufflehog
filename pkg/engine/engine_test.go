@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -50,6 +51,39 @@ func TestFragmentLineOffset(t *testing.T) {
 			expectedLine: 4,
 			ignore:       false,
 		},
+		{
+			name: "match on consecutive lines",
+			chunk: &sources.Chunk{
+				Data: []byte("line1\nline2\ntrufflehog:ignore\nline4\nsecret\nhere\nline6"),
+			},
+			result: &detectors.Result{
+				Raw: []byte("secret\nhere"),
+			},
+			expectedLine: 4,
+			ignore:       false,
+		},
+		{
+			name: "ignore on last consecutive lines",
+			chunk: &sources.Chunk{
+				Data: []byte("line1\nline2\nline3\nsecret\nhere // trufflehog:ignore\nline5"),
+			},
+			result: &detectors.Result{
+				Raw: []byte("secret\nhere"),
+			},
+			expectedLine: 3,
+			ignore:       true,
+		},
+		{
+			name: "ignore on last line",
+			chunk: &sources.Chunk{
+				Data: []byte("line1\nline2\nline3\nsecret here // trufflehog:ignore"),
+			},
+			result: &detectors.Result{
+				Raw: []byte("secret here"),
+			},
+			expectedLine: 3,
+			ignore:       true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -62,6 +96,43 @@ func TestFragmentLineOffset(t *testing.T) {
 				t.Errorf("Expected isIgnored to be %v, got %v", tt.ignore, isIgnored)
 			}
 		})
+	}
+}
+
+func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *detectors.Result) {
+	data := make([]byte, 0, 4096)
+	needle := []byte("needle")
+	for i := 0; i < totalLines; i++ {
+		if i != needleLine {
+			data = append(data, []byte(fmt.Sprintf("line%d\n", i))...)
+			continue
+		}
+		data = append(data, needle...)
+		data = append(data, '\n')
+	}
+	chunk := &sources.Chunk{Data: data}
+	result := &detectors.Result{Raw: needle}
+	return chunk, result
+}
+
+func BenchmarkFragmentLineOffsetStart(b *testing.B) {
+	chunk, result := setupFragmentLineOffsetBench(512, 2)
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
+	}
+}
+
+func BenchmarkFragmentLineOffsetMiddle(b *testing.B) {
+	chunk, result := setupFragmentLineOffsetBench(512, 256)
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
+	}
+}
+
+func BenchmarkFragmentLineOffsetEnd(b *testing.B) {
+	chunk, result := setupFragmentLineOffsetBench(512, 510)
+	for i := 0; i < b.N; i++ {
+		_, _ = FragmentLineOffset(chunk, result)
 	}
 }
 
