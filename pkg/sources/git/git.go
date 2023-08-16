@@ -819,8 +819,6 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string, s
 		}
 	default:
 		ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
-		ctx.Logger().V(1).Info("SINCE", "since", timestamp)
-
 		path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath, "--shallow-since", timestamp)
 		if err != nil {
 			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
