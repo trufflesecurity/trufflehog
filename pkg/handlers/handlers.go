@@ -60,7 +60,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 			}
 
 			if err != nil {
-				aCtx.Logger().Error(err, "error hendling specialized file")
+				aCtx.Logger().Error(err, "error handling file")
 			}
 		}
 
