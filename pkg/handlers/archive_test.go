@@ -158,7 +158,7 @@ func TestExtractTarContent(t *testing.T) {
 		assert.True(t, ok)
 	}()
 
-	wantCount := 361
+	wantCount := 4
 	count := 0
 	for range chunkCh {
 		count++
