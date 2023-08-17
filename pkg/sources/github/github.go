@@ -1064,11 +1064,11 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 
 	}
 
-	if !s.includePRComments {
-		return nil
+	if s.includePRComments {
+		return s.processPRComments(ctx, repoInfo, chunksChan)
 	}
+	return nil
 
-	return s.processPRComments(ctx, repoInfo, chunksChan)
 }
 
 func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
