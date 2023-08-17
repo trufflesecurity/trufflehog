@@ -144,6 +144,28 @@ func TestExtractDebContent(t *testing.T) {
 	assert.Equal(t, expectedLength, len(string(content)))
 }
 
+func TestExtractTarContent(t *testing.T) {
+	file, err := os.Open("testdata/test.tgz")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx := context.Background()
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		ok := HandleFile(ctx, file, &sources.Chunk{}, chunkCh)
+		assert.True(t, ok)
+	}()
+
+	wantCount := 4
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
 func TestExtractRPMContent(t *testing.T) {
 	// Open the sample .rpm file from the testdata folder.
 	file, err := os.Open("testdata/test.rpm")
