@@ -26,7 +26,7 @@ type SpecializedHandler interface {
 }
 
 type Handler interface {
-	FromFile(context.Context, io.Reader) chan ([]byte)
+	FromFile(context.Context, io.Reader) chan []byte
 	IsFiletype(context.Context, io.Reader) (io.Reader, bool)
 	New()
 }
@@ -76,6 +76,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 			aCtx.Logger().Error(err, "error resetting re-reader")
 			return false
 		}
+		reReader.Stop()
 		return handleChunks(aCtx, h.FromFile(ctx, reReader), chunkSkel, chunksChan)
 	}
 
