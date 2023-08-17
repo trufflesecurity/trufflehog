@@ -1023,10 +1023,10 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 			}
 		}
 	}
-	return s.handleComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
+	return s.processRepoComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
 }
 
-func (s *Source) handleComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
+func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
 	// Normal repository URL (https://github.com/<owner>/<repo>).
 	if len(trimmedURL) < 3 {
 		return fmt.Errorf("url missing owner and/or repo: '%s'", repoURL.String())
