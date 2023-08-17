@@ -1022,90 +1022,92 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 				break
 			}
 		}
-	} else {
-		// Normal repository URL (https://github.com/<owner>/<repo>).
-		owner := trimmedURL[1]
-		repo := trimmedURL[2]
+	}
+	return s.handleComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
+}
 
-		var (
-			sortType      = "created"
-			directionType = "desc"
-			allComments   = 0
-		)
+func (s *Source) handleComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
+	// Normal repository URL (https://github.com/<owner>/<repo>).
+	if len(trimmedURL) < 3 {
+		return fmt.Errorf("url missing owner and/or repo: '%s'", repoURL.String())
+	}
+	owner := trimmedURL[1]
+	repo := trimmedURL[2]
 
-		if s.includeIssueComments {
+	var (
+		sortType      = "created"
+		directionType = "desc"
+		allComments   = 0
+	)
 
-			s.log.Info("scanning github issue comments", "repository", repoPath)
+	if s.includeIssueComments {
+		s.log.Info("scanning github issue comments", "repository", repoPath)
 
-			issueOpts := &github.IssueListCommentsOptions{
-				Sort:      &sortType,
-				Direction: &directionType,
-				ListOptions: github.ListOptions{
-					PerPage: defaultPagination,
-					Page:    1,
-				},
-			}
-
-			for {
-				issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
-				if s.handleRateLimit(err, resp) {
-					break
-				}
-
-				if err != nil {
-					return err
-				}
-
-				err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
-				if err != nil {
-					return err
-				}
-
-				issueOpts.ListOptions.Page++
-
-				if len(issueComments) < defaultPagination {
-					break
-				}
-			}
-
+		issueOpts := &github.IssueListCommentsOptions{
+			Sort:      &sortType,
+			Direction: &directionType,
+			ListOptions: github.ListOptions{
+				PerPage: defaultPagination,
+				Page:    1,
+			},
 		}
 
-		if s.includePRComments {
-			s.log.Info("scanning github pull request comments", "repository", repoPath)
-
-			prOpts := &github.PullRequestListCommentsOptions{
-				Sort:      sortType,
-				Direction: directionType,
-				ListOptions: github.ListOptions{
-					PerPage: defaultPagination,
-					Page:    1,
-				},
+		for {
+			issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
+			if s.handleRateLimit(err, resp) {
+				break
 			}
 
-			for {
-				prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
-				if s.handleRateLimit(err, resp) {
-					break
-				}
+			if err != nil {
+				return err
+			}
 
-				if err != nil {
-					return err
-				}
+			if err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath); err != nil {
+				return err
+			}
 
-				err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
-				if err != nil {
-					return err
-				}
+			issueOpts.ListOptions.Page++
 
-				prOpts.ListOptions.Page++
+			if len(issueComments) < defaultPagination {
+				break
+			}
+		}
 
-				if len(prComments) < defaultPagination {
-					break
-				}
+	}
+
+	if s.includePRComments {
+		s.log.Info("scanning github pull request comments", "repository", repoPath)
+
+		prOpts := &github.PullRequestListCommentsOptions{
+			Sort:      sortType,
+			Direction: directionType,
+			ListOptions: github.ListOptions{
+				PerPage: defaultPagination,
+				Page:    1,
+			},
+		}
+
+		for {
+			prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
+			if s.handleRateLimit(err, resp) {
+				break
+			}
+
+			if err != nil {
+				return err
+			}
+
+			if err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath); err != nil {
+				return err
+			}
+
+			prOpts.ListOptions.Page++
+
+			if len(prComments) < defaultPagination {
+				break
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -1189,7 +1191,7 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
 						// Fetching this information requires making an additional API call.
 						// We may want to include this in the future.
-						//Visibility: s.visibilityOf(ctx, repoPath),
+						// Visibility: s.visibilityOf(ctx, repoPath),
 					},
 				},
 			},
