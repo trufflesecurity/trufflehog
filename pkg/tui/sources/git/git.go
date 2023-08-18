@@ -16,7 +16,7 @@ func GetFields() gitCmdModel {
 		Label:       "Git URI",
 		Key:         "uri",
 		Required:    true,
-		Placeholder: "git@github.com:trufflesecurity/trufflehog.git.",
+		Placeholder: "git@github.com:trufflesecurity/trufflehog.git",
 	}
 
 	return gitCmdModel{textinputs.New([]textinputs.InputConfig{uri})}
@@ -28,9 +28,7 @@ func (m gitCmdModel) Cmd() string {
 
 	inputs := m.GetInputs()
 
-	if inputs["uri"] != "" {
-		command = append(command, inputs["uri"])
-	}
+	command = append(command, inputs["uri"].Value)
 
 	return strings.Join(command, " ")
 }

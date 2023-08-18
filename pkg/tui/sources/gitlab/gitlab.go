@@ -29,9 +29,7 @@ func (m gitlabCmdModel) Cmd() string {
 
 	inputs := m.GetInputs()
 
-	if inputs["token"] != "" {
-		command = append(command, "--token="+inputs["token"])
-	}
+	command = append(command, "--token="+inputs["token"].Value)
 
 	return strings.Join(command, " ")
 }
