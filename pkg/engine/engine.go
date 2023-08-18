@@ -12,7 +12,6 @@ import (
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
 	lru "github.com/hashicorp/golang-lru"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -34,6 +33,9 @@ type Metrics struct {
 	VerifiedSecretsFound   uint64
 	UnverifiedSecretsFound uint64
 	AvgDetectorTime        map[string]time.Duration
+
+	scanStartTime time.Time
+	ScanDuration  time.Duration
 }
 
 // runtimeMetrics for the scan engine for internal use by the engine.
@@ -44,18 +46,16 @@ type runtimeMetrics struct {
 }
 
 // Printer is used to format found results and output them to the user. Ex JSON, plain text, etc.
+// Please note printer implementations SHOULD BE thread safe.
 type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
 type Engine struct {
+	// CLI flags.
 	concurrency uint8
-	chunks      chan *sources.Chunk
-	results     chan detectors.ResultWithMetadata
 	decoders    []decoders.Decoder
 	detectors   map[bool][]detectors.Detector
-	sourcesWg   *errgroup.Group
-	workersWg   sync.WaitGroup
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
@@ -67,13 +67,16 @@ type Engine struct {
 	// matching given a set of words (keywords from the rules in the config)
 	prefilter ahocorasick.Trie
 
+	// Engine synchronization primitives.
+	sourceManager        *sources.SourceManager
+	results              chan detectors.ResultWithMetadata
 	detectableChunksChan chan detectableChunk
+	workersWg            sync.WaitGroup
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
 
-	// Runtime metrics.
+	// Runtime information.
 	metrics runtimeMetrics
-
 	// numFoundResults is used to keep track of the number of results found.
 	numFoundResults uint32
 
@@ -199,6 +202,8 @@ func (e *Engine) GetMetrics() Metrics {
 		result.AvgDetectorTime[detectorName] = avgDuration
 	}
 
+	result.ScanDuration = e.metrics.getScanDuration()
+
 	return result
 }
 
@@ -218,6 +223,16 @@ func (e *Engine) GetDetectorsMetrics() map[string]time.Duration {
 	}
 
 	return result
+}
+
+// getScanDuration returns the duration of the scan.
+// If the scan is still running, it returns the time since the scan started.
+func (m *Metrics) getScanDuration() time.Duration {
+	if m.ScanDuration == 0 {
+		return time.Since(m.scanStartTime)
+	}
+
+	return m.ScanDuration
 }
 
 // DetectorAvgTime returns the average time taken by each detector.
@@ -256,12 +271,11 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	}
 
 	e := &Engine{
-		chunks:               make(chan *sources.Chunk, defaultChannelBuffer),
 		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
 		results:              make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
-		sourcesWg:            &errgroup.Group{},
 		dedupeCache:          cache,
 		printer:              new(output.PlainPrinter), // default printer
+		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
 	}
 
 	for _, option := range options {
@@ -276,8 +290,11 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	}
 	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
-	// Limit number of concurrent goroutines dedicated to chunking a source.
-	e.sourcesWg.SetLimit(int(e.concurrency))
+	// Create SourceManager.
+	e.sourceManager = sources.NewManager(
+		sources.WithConcurrentSources(int(e.concurrency)),
+		sources.WithConcurrentUnits(int(e.concurrency)),
+	)
 
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
@@ -376,9 +393,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
 	// Wait for the sources to finish putting chunks onto the chunks channel.
-	err := e.sourcesWg.Wait()
-
-	close(e.chunks) // Source workers are done.
+	err := e.sourceManager.Wait()
 
 	e.workersWg.Wait() // Wait for the workers to finish scanning chunks.
 	close(e.detectableChunksChan)
@@ -387,15 +402,24 @@ func (e *Engine) Finish(ctx context.Context) error {
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
 
+	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
+
 	return err
 }
 
-func (e *Engine) ChunksChan() chan *sources.Chunk {
-	return e.chunks
+func (e *Engine) ChunksChan() <-chan *sources.Chunk {
+	return e.sourceManager.Chunks()
 }
 
 func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 	return e.results
+}
+
+// ScanChunk injects a chunk into the output stream of chunks to be scanned.
+// This method should rarely be used. TODO: Remove when dependencies no longer
+// rely on this functionality.
+func (e *Engine) ScanChunk(chunk *sources.Chunk) {
+	e.sourceManager.ScanChunk(chunk)
 }
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
@@ -409,7 +433,7 @@ type detectableChunk struct {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
-	for originalChunk := range e.chunks {
+	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
@@ -578,17 +602,20 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	lines := bytes.Split(chunk.Data, []byte("\n"))
-	for i, line := range lines {
-		if bytes.Contains(line, result.Raw) {
-			// if the line contains the ignore tag, we should ignore the result
-			if bytes.Contains(line, []byte(ignoreTag)) {
-				return int64(i), true
-			}
-			return int64(i), false
-		}
+	before, after, found := bytes.Cut(chunk.Data, result.Raw)
+	if !found {
+		return 0, false
 	}
-	return 0, false
+	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	// If the line contains the ignore tag, we should ignore the result.
+	endLine := bytes.Index(after, []byte("\n"))
+	if endLine == -1 {
+		endLine = len(after)
+	}
+	if bytes.Contains(after[:endLine], []byte(ignoreTag)) {
+		return lineNumber, true
+	}
+	return lineNumber, false
 }
 
 // FragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the

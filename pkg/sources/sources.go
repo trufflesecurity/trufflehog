@@ -141,6 +141,8 @@ type GitConfig struct {
 	BaseRef string
 	// MaxDepth is the maximum depth to scan the source.
 	MaxDepth int
+	// Bare is an indicator to handle bare repositories properly.
+	Bare bool
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// ExcludeGlobs is a list of globs to exclude from the scan.
@@ -170,6 +172,12 @@ type GithubConfig struct {
 	IncludeRepos []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+	// IncludeIssueComments indicates whether to include GitHub issue comments in the scan.
+	IncludeIssueComments,
+	// IncludePullRequestComments indicates whether to include GitHub pull request comments in the scan.
+	IncludePullRequestComments,
+	// IncludeGistComments indicates whether to include GitHub gist comments in the scan.
+	IncludeGistComments bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
@@ -205,6 +213,8 @@ type S3Config struct {
 	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
+	// Roles is the list of Roles to use.
+	Roles []string
 	// MaxObjectSize is the maximum object size to scan.
 	MaxObjectSize int64
 }

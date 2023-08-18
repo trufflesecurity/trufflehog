@@ -81,7 +81,7 @@ func TestSource_Token(t *testing.T) {
 }
 
 func TestSource_ScanComments(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	secret, err := common.GetTestSecret(ctx)
@@ -190,7 +190,7 @@ func TestSource_ScanComments(t *testing.T) {
 				return
 			}
 
-			chunksCh := make(chan *sources.Chunk, 5)
+			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
 				// Close the channel
 				defer close(chunksCh)

@@ -8,8 +8,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
@@ -706,6 +709,37 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 			if gotComplete != tc.wantComplete {
 				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
 			}
+		})
+	}
+}
+
+func TestProcessRepoComments(t *testing.T) {
+	tests := []struct {
+		name       string
+		trimmedURL []string
+		wantErr    bool
+	}{
+		{
+			name:       "URL with missing owner and/or repo",
+			trimmedURL: []string{"https://github.com/"},
+			wantErr:    true,
+		},
+		{
+			name:       "URL with complete owner and repo",
+			trimmedURL: []string{"https://github.com/", "owner", "repo"},
+			wantErr:    false,
+		},
+		// TODO: Add more test cases to cover other scenarios.
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Source{}
+			repoURL, _ := url.Parse(strings.Join(tt.trimmedURL, "/"))
+			chunksChan := make(chan *sources.Chunk)
+
+			err := s.processRepoComments(context.Background(), "repoPath", tt.trimmedURL, repoURL, chunksChan)
+			assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
 }

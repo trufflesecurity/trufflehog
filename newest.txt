@@ -1,0 +1,39 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilio
+BenchmarkFromData
+BenchmarkFromData/small
+BenchmarkFromData/small-8         	 6834206	       174.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6899049	       174.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6832052	       175.1 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6907274	       176.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 5807835	       185.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6880714	       174.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6863913	       176.3 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6900600	       174.4 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6869823	       174.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/small-8         	 6820802	       174.0 ns/op	      16 B/op	       1 allocs/op
+BenchmarkFromData/medium
+BenchmarkFromData/medium-8        	   59660	     20205 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59601	     21194 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   58342	     20113 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59606	     22125 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59839	     20212 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59560	     20201 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59577	     20179 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59361	     20211 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59622	     20167 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/medium-8        	   59832	     20160 ns/op	    5392 B/op	       2 allocs/op
+BenchmarkFromData/big
+BenchmarkFromData/big-8           	    2403	    494538 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2389	    496629 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2450	    495102 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2427	    495284 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2433	    495032 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2427	    494511 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2426	    495035 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2416	    493870 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2451	    493632 ns/op	  131088 B/op	       2 allocs/op
+BenchmarkFromData/big-8           	    2425	    500507 ns/op	  131088 B/op	       2 allocs/op
+PASS
+ok  	github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilio	40.806s

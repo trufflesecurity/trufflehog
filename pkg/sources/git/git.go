@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -26,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -115,6 +115,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
+	if s.scanOptions == nil {
+		s.scanOptions = &ScanOptions{}
+	}
 
 	var conn sourcespb.Git
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
@@ -251,12 +254,12 @@ func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) e
 		if len(gitDir) == 0 {
 			continue
 		}
-		if strings.HasSuffix(gitDir, "git") {
+		if !s.scanOptions.Bare && strings.HasSuffix(gitDir, "git") {
 			// TODO: Figure out why we skip directories ending in "git".
 			continue
 		}
 		// try paths instead of url
-		repo, err := RepoFromPath(gitDir)
+		repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
 		if err != nil {
 			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
 			continue
@@ -278,10 +281,11 @@ func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) e
 	return nil
 }
 
-func RepoFromPath(path string) (*git.Repository, error) {
-	options := &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
+func RepoFromPath(path string, isBare bool) (*git.Repository, error) {
+	options := &git.PlainOpenOptions{}
+	if !isBare {
+		options.DetectDotGit = true
+		options.EnableDotGitCommonDir = true
 	}
 	return git.PlainOpenWithOptions(path, options)
 }
@@ -393,7 +397,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return err
 	}
 
-	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs)
+	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -621,8 +625,10 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
-	if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
-		ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+	if !scanOptions.Bare {
+		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
+			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+		}
 	}
 
 	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp
@@ -634,7 +640,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	}
 
 	scanTime := time.Now().Unix() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime)
+	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime, "commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned))
 	return nil
 }
 
@@ -924,14 +930,18 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	}
 	reader.Stop()
 
-	chunkData, err := io.ReadAll(reader)
-	if err != nil {
-		return err
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, reader)
+	for data := range chunkResChan {
+		chunk := *chunkSkel
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
+		}
+		if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+			return err
+		}
 	}
-
-	chunk := *chunkSkel
-	chunk.Data = chunkData
-	chunksChan <- &chunk
 
 	return nil
 }

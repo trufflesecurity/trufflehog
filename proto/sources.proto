@@ -227,6 +227,7 @@ message S3 {
   }
   repeated string buckets = 3;
   int64 max_object_size = 6;
+  repeated string roles = 7;
 }
 
 message Slack {

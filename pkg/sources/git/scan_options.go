@@ -10,6 +10,7 @@ type ScanOptions struct {
 	BaseHash     string // When scanning a git.Log, this is the oldest/first commit.
 	HeadHash     string
 	MaxDepth     int64
+	Bare         bool
 	ExcludeGlobs []string
 	LogOptions   *git.LogOptions
 }
@@ -49,6 +50,12 @@ func ScanOptionExcludeGlobs(globs []string) ScanOption {
 func ScanOptionLogOptions(logOptions *git.LogOptions) ScanOption {
 	return func(scanOptions *ScanOptions) {
 		scanOptions.LogOptions = logOptions
+	}
+}
+
+func ScanOptionBare(bare bool) ScanOption {
+	return func(scanOptions *ScanOptions) {
+		scanOptions.Bare = bare
 	}
 }
 
