@@ -15,6 +15,7 @@ import (
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
 
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -38,6 +39,12 @@ var _ SpecializedHandler = (*Archive)(nil)
 type Archive struct {
 	size         int
 	currentDepth int
+}
+
+// DockerTarReader is a wrapper for io.Reader that also stores the temp filepath of the tar file.
+type DockerTarReader struct {
+	io.Reader
+	filepath string
 }
 
 // New sets a default maximum size and current size counter.
@@ -212,6 +219,7 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 const (
 	arMimeType  = "application/x-unix-archive"
 	rpmMimeType = "application/x-rpm"
+	tarMimeType = "application/x-tar"
 )
 
 // Define a map of mime types to corresponding command-line tools
@@ -265,6 +273,21 @@ func (a *Archive) HandleSpecialized(ctx logContext.Context, reader io.Reader) (i
 			return nil, false, err
 		}
 		reader, err = a.extractRpmContent(ctx, reader)
+	case tarMimeType:
+		//check if tar is a docker image
+		isImg, imgPath, err := a.isDockerImage(ctx, reader)
+		if err != nil {
+			return nil, false, err
+		}
+		if isImg {
+			// Build dockerReader
+			reader = DockerTarReader{
+				Reader:   reader,
+				filepath: imgPath,
+			}
+		} else {
+			return nil, false, nil
+		}
 	default:
 		return reader, false, nil
 	}
@@ -475,4 +498,20 @@ func openDataArchive(extractPath string, dataArchiveName string) (io.ReadCloser,
 		return nil, fmt.Errorf("unable to open file: %w", err)
 	}
 	return dataFile, nil
+}
+
+func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, filePath string, err error) {
+
+	tmpEnv, err := a.createTempEnv(ctx, file)
+	if err != nil {
+		return false, "", err
+	}
+	defer os.Remove(tmpEnv.tempFileName)
+	defer os.RemoveAll(tmpEnv.extractPath)
+
+	_, err = tarball.ImageFromPath(tmpEnv.tempFileName, nil)
+	if err != nil {
+		return false, "", nil
+	}
+	return true, tmpEnv.tempFileName, nil
 }
