@@ -7,7 +7,7 @@ import (
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 
-	truffleContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/docker"
@@ -26,7 +26,7 @@ type SpecializedHandler interface {
 	// HandleSpecialized examines the provided file reader within the context and determines if it is a specialized archive.
 	// It returns a reader with any necessary modifications, a boolean indicating if the file was specialized,
 	// and an error if something went wrong during processing.
-	HandleSpecialized(truffleContext.Context, io.Reader) (io.Reader, bool, error)
+	HandleSpecialized(logContext.Context, io.Reader) (io.Reader, bool, error)
 }
 
 type Handler interface {
@@ -41,8 +41,8 @@ type Handler interface {
 // packages them in the provided chunk skeleton, and sends them to chunksChan.
 // The function returns true if processing was successful and false otherwise.
 // Context is used for cancellation, and the caller is responsible for canceling it if needed.
-func HandleFile(ctx truffleContext.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
-	aCtx := truffleContext.AddLogger(ctx)
+func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+	aCtx := logContext.AddLogger(ctx)
 	for _, h := range DefaultHandlers() {
 		h.New()
 
@@ -103,8 +103,8 @@ func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sourc
 	}
 }
 
-func handleDockerTar(ctx truffleContext.Context, filePath string, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
-	// aCtx := truffleContext.AddLogger(ctx)
+func handleDockerTar(ctx logContext.Context, filePath string, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+	// aCtx := logContext.AddLogger(ctx)
 	// aCtx.logger.V(3).Info("Docker image detected in tarball: " + filePath)
 	//scan with docker scanner
 	dockerConn := sourcespb.Docker{
