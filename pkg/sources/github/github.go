@@ -310,7 +310,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 
 		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
 		}
 	default:
 		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
