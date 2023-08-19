@@ -107,7 +107,8 @@ func TestHandleFile(t *testing.T) {
 	ch := make(chan *sources.Chunk, 2)
 
 	// Context cancels the operation.
-	canceledCtx, cancel := context.WithCancel(context.Background())
+	ctx := logContext.AddLogger(context.Background())
+	canceledCtx, cancel := logContext.WithCancel(ctx)
 	cancel()
 	assert.False(t, HandleFile(canceledCtx, strings.NewReader("file"), &sources.Chunk{}, ch))
 
@@ -122,7 +123,7 @@ func TestHandleFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(ch))
-	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, ch))
+	assert.True(t, HandleFile(ctx, reader, &sources.Chunk{}, ch))
 	assert.Equal(t, 1, len(ch))
 }
 
