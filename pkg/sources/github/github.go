@@ -290,12 +290,12 @@ func (s *Source) Validate(ctx context.Context) []error {
 		}
 		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
 		}
 	case *sourcespb.GitHub_Unauthenticated:
 		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
 		}
 	case *sourcespb.GitHub_Token:
 		s.githubToken = cred.Token
