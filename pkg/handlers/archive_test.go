@@ -150,7 +150,7 @@ func TestExtractTarContent(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := context.Background()
+	ctx := logContext.AddLogger(context.Background())
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
