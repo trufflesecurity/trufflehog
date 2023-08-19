@@ -46,6 +46,11 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	if len(c.Buckets) > 0 {
 		connection.Buckets = c.Buckets
 	}
+
+	if len(c.Roles) > 0 {
+		connection.Roles = c.Roles
+	}
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {

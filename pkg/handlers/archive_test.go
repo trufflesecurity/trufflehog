@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -10,6 +12,7 @@ import (
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/stretchr/testify/assert"
 
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -121,4 +124,62 @@ func TestHandleFile(t *testing.T) {
 	assert.Equal(t, 0, len(ch))
 	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, ch))
 	assert.Equal(t, 1, len(ch))
+}
+
+func TestExtractDebContent(t *testing.T) {
+	// Open the sample .deb file from the testdata folder.
+	file, err := os.Open("testdata/test.deb")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx := logContext.AddLogger(context.Background())
+	a := &Archive{}
+
+	reader, err := a.extractDebContent(ctx, file)
+	assert.Nil(t, err)
+
+	content, err := io.ReadAll(reader)
+	assert.Nil(t, err)
+	expectedLength := 1015582
+	assert.Equal(t, expectedLength, len(string(content)))
+}
+
+func TestExtractTarContent(t *testing.T) {
+	file, err := os.Open("testdata/test.tgz")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx := context.Background()
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		ok := HandleFile(ctx, file, &sources.Chunk{}, chunkCh)
+		assert.True(t, ok)
+	}()
+
+	wantCount := 4
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestExtractRPMContent(t *testing.T) {
+	// Open the sample .rpm file from the testdata folder.
+	file, err := os.Open("testdata/test.rpm")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx := logContext.AddLogger(context.Background())
+	a := &Archive{}
+
+	reader, err := a.extractRpmContent(ctx, file)
+	assert.Nil(t, err)
+
+	content, err := io.ReadAll(reader)
+	assert.Nil(t, err)
+	expectedLength := 1822720
+	assert.Equal(t, expectedLength, len(string(content)))
 }

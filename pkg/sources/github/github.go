@@ -1036,9 +1036,9 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
 
-func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning comments", "repository", repoPath)
+const initialPage = 1 // page to start listing from
 
+func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
 	// Support ssh and https URLs
 	repoURL, err := git.GitURLParse(repoPath)
 	if err != nil {
@@ -1047,6 +1047,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 
 	trimmedURL := removeURLAndSplit(repoURL.String())
 	if repoURL.Host == "gist.github.com" && s.includeGistComments {
+		s.log.Info("scanning github gist comments", "repository", repoPath)
 		// GitHub Gist URL.
 		var gistId string
 		if len(trimmedURL) == 2 {
@@ -1061,7 +1062,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 
 		options := &github.ListOptions{
 			PerPage: defaultPagination,
-			Page:    1,
+			Page:    initialPage,
 		}
 		for {
 			comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistId, options)
@@ -1082,90 +1083,124 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 				break
 			}
 		}
-	} else {
-		// Normal repository URL (https://github.com/<owner>/<repo>).
-		owner := trimmedURL[1]
-		repo := trimmedURL[2]
+	}
+	return s.processRepoComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
+}
 
-		var (
-			sortType      = "created"
-			directionType = "desc"
-			allComments   = 0
-		)
+// Note: these can't be consts because the address is needed when using with the GitHub library.
+var (
+	// sortType defines the criteria for sorting comments.
+	// By default comments are sorted by their creation date.
+	sortType = "created"
+	// directionType defines the direction of sorting.
+	// "desc" means comments will be sorted in descending order, showing the latest comments first.
+	directionType = "desc"
+	// allComments is a placeholder for specifying the comment ID to start listing from.
+	// A value of 0 means that all comments will be listed.
+	allComments = 0
+)
 
-		if s.includeIssueComments {
+type repoInfo struct {
+	owner    string
+	repo     string
+	repoPath string
+}
 
-			issueOpts := &github.IssueListCommentsOptions{
-				Sort:      &sortType,
-				Direction: &directionType,
-				ListOptions: github.ListOptions{
-					PerPage: defaultPagination,
-					Page:    1,
-				},
-			}
+func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
+	// Normal repository URL (https://github.com/<owner>/<repo>).
+	if len(trimmedURL) < 3 {
+		return fmt.Errorf("url missing owner and/or repo: '%s'", repoURL.String())
+	}
+	owner := trimmedURL[1]
+	repo := trimmedURL[2]
 
-			for {
-				issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
-				if s.handleRateLimit(err, resp) {
-					break
-				}
+	repoInfo := repoInfo{owner: owner, repo: repo, repoPath: repoPath}
 
-				if err != nil {
-					return err
-				}
-
-				err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
-				if err != nil {
-					return err
-				}
-
-				issueOpts.ListOptions.Page++
-
-				if len(issueComments) < defaultPagination {
-					break
-				}
-			}
-
+	if s.includeIssueComments {
+		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
+			return err
 		}
 
-		if s.includePRComments {
-			prOpts := &github.PullRequestListCommentsOptions{
-				Sort:      sortType,
-				Direction: directionType,
-				ListOptions: github.ListOptions{
-					PerPage: defaultPagination,
-					Page:    1,
-				},
-			}
-
-			for {
-				prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
-				if s.handleRateLimit(err, resp) {
-					break
-				}
-
-				if err != nil {
-					return err
-				}
-
-				err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
-				if err != nil {
-					return err
-				}
-
-				prOpts.ListOptions.Page++
-
-				if len(prComments) < defaultPagination {
-					break
-				}
-			}
-		}
 	}
 
+	if s.includePRComments {
+		return s.processPRComments(ctx, repoInfo, chunksChan)
+	}
+	return nil
+
+}
+
+func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github issue comments", "repository", info.repoPath)
+
+	issueOpts := &github.IssueListCommentsOptions{
+		Sort:      &sortType,
+		Direction: &directionType,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
+	}
+
+	for {
+		issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, info.owner, info.repo, allComments, issueOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkIssueComments(ctx, info.repo, info.repoPath, issueComments, chunksChan); err != nil {
+			return err
+		}
+
+		issueOpts.ListOptions.Page++
+
+		if len(issueComments) < defaultPagination {
+			break
+		}
+	}
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments []*github.IssueComment, chunksChan chan *sources.Chunk, repoPath string) error {
+func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github pull request comments", "repository", info.repoPath)
+
+	prOpts := &github.PullRequestListCommentsOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
+	}
+
+	for {
+		prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, info.owner, info.repo, allComments, prOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkPullRequestComments(ctx, info.repo, prComments, chunksChan); err != nil {
+			return err
+		}
+
+		prOpts.ListOptions.Page++
+
+		if len(prComments) < defaultPagination {
+			break
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1197,7 +1232,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments [
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk, repoPath string) error {
+func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1245,7 +1280,7 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
 						// Fetching this information requires making an additional API call.
 						// We may want to include this in the future.
-						//Visibility: s.visibilityOf(ctx, repoPath),
+						// Visibility: s.visibilityOf(ctx, repoPath),
 					},
 				},
 			},

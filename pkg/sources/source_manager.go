@@ -191,6 +191,13 @@ func (s *SourceManager) Wait() error {
 	return s.pool.Wait()
 }
 
+// ScanChunk injects a chunk into the output stream of chunks to be scanned.
+// This method should rarely be used. TODO: Remove when dependencies no longer
+// rely on this functionality.
+func (s *SourceManager) ScanChunk(chunk *Chunk) {
+	s.outputChunks <- chunk
+}
+
 // preflightChecks is a helper method to check the Manager or the context isn't
 // done and that the handle is valid.
 func (s *SourceManager) preflightChecks(ctx context.Context, handle handle) error {

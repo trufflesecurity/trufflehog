@@ -73,17 +73,20 @@ var (
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
-	githubScan             = cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint     = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos        = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs         = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken        = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
-	githubIncludeForks     = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers   = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-	githubIncludeRepos     = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubExcludeRepos     = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
-	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	githubScan              = cli.Command("github", "Find credentials in GitHub repositories.")
+	githubScanEndpoint      = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos         = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs          = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken         = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubIncludeForks      = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers    = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
+	githubIncludeRepos      = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
+	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue comments in scan.").Bool()
+	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request comments in scan.").Bool()
+	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -102,10 +105,11 @@ var (
 	filesystemScanIncludePaths = filesystemScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	filesystemScanExcludePaths = filesystemScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 
-	s3Scan              = cli.Command("s3", "Find credentials in S3 buckets.")
-	s3ScanKey           = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
-	s3ScanSecret        = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
-	s3ScanSessionToken  = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
+	s3Scan    = cli.Command("s3", "Find credentials in S3 buckets.")
+	s3ScanKey = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
+	s3ScanRoleArns     = s3Scan.Flag("role-arn", "Specify the ARN of an IAM role to assume for scanning. You can repeat this flag.").Strings()
+	s3ScanSecret       = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
+	s3ScanSessionToken = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
 	s3ScanCloudEnv      = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
 	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
@@ -409,16 +413,19 @@ func run(state overseer.State) {
 		}
 
 		cfg := sources.GithubConfig{
-			Endpoint:       *githubScanEndpoint,
-			Token:          *githubScanToken,
-			IncludeForks:   *githubIncludeForks,
-			IncludeMembers: *githubIncludeMembers,
-			Concurrency:    *concurrency,
-			ExcludeRepos:   *githubExcludeRepos,
-			IncludeRepos:   *githubIncludeRepos,
-			Repos:          *githubScanRepos,
-			Orgs:           *githubScanOrgs,
-			Filter:         filter,
+			Endpoint:                   *githubScanEndpoint,
+			Token:                      *githubScanToken,
+			IncludeForks:               *githubIncludeForks,
+			IncludeMembers:             *githubIncludeMembers,
+			Concurrency:                *concurrency,
+			ExcludeRepos:               *githubExcludeRepos,
+			IncludeRepos:               *githubIncludeRepos,
+			Repos:                      *githubScanRepos,
+			Orgs:                       *githubScanOrgs,
+			IncludeIssueComments:       *githubScanIssueComments,
+			IncludePullRequestComments: *githubScanPRComments,
+			IncludeGistComments:        *githubScanGistComments,
+			Filter:                     filter,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")
@@ -462,6 +469,7 @@ func run(state overseer.State) {
 			Secret:        *s3ScanSecret,
 			SessionToken:  *s3ScanSessionToken,
 			Buckets:       *s3ScanBuckets,
+			Roles:	       *s3ScanRoleArns,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
 		}

@@ -21,7 +21,7 @@ func GetFields() githubCmdModel {
 		Key:         "org",
 		Required:    false,
 		Help:        "GitHub organization to scan.",
-		Placeholder: "https://github.com/trufflesecurity",
+		Placeholder: "trufflesecurity",
 	}
 
 	repo := textinputs.InputConfig{

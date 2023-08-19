@@ -415,6 +415,13 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 	return e.results
 }
 
+// ScanChunk injects a chunk into the output stream of chunks to be scanned.
+// This method should rarely be used. TODO: Remove when dependencies no longer
+// rely on this functionality.
+func (e *Engine) ScanChunk(chunk *sources.Chunk) {
+	e.sourceManager.ScanChunk(chunk)
+}
+
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
 	detector detectors.Detector
