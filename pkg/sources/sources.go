@@ -213,6 +213,8 @@ type S3Config struct {
 	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
+	// Roles is the list of Roles to use.
+	Roles []string
 	// MaxObjectSize is the maximum object size to scan.
 	MaxObjectSize int64
 }
