@@ -743,3 +743,22 @@ func TestProcessRepoComments(t *testing.T) {
 		})
 	}
 }
+
+func TestGetGistID(t *testing.T) {
+	tests := []struct {
+		trimmedURL []string
+		expected   string
+		err        bool
+	}{
+		{[]string{"https://gist.github.com", "12345"}, "12345", false},
+		{[]string{"https://gist.github.com", "owner", "12345"}, "12345", false},
+		{[]string{"https://gist.github.com"}, "", true},
+		{[]string{"https://gist.github.com", "owner", "12345", "extra"}, "", true},
+	}
+
+	for _, tt := range tests {
+		got, err := extractGistID(tt.trimmedURL)
+		assert.Equal(t, tt.err, err != nil)
+		assert.Equal(t, tt.expected, got)
+	}
+}
