@@ -988,44 +988,49 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 
 	trimmedURL := removeURLAndSplit(repoURL.String())
 	if repoURL.Host == "gist.github.com" && s.includeGistComments {
-		s.log.Info("scanning github gist comments", "repository", repoPath)
-		// GitHub Gist URL.
-		var gistId string
-		if len(trimmedURL) == 2 {
-			// https://gist.github.com/<id>
-			gistId = trimmedURL[1]
-		} else if len(trimmedURL) == 3 {
-			// https://gist.github.com/<owner>/<id>
-			gistId = trimmedURL[2]
-		} else {
-			return fmt.Errorf("failed to parse Gist URL: '%s'", repoURL.String())
-		}
-
-		options := &github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
-		}
-		for {
-			comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistId, options)
-			if s.handleRateLimit(err, resp) {
-				break
-			}
-			if err != nil {
-				return err
-			}
-
-			err = s.chunkGistComments(ctx, repoURL.String(), comments, chunksChan)
-			if err != nil {
-				return err
-			}
-
-			options.Page++
-			if len(comments) < options.PerPage {
-				break
-			}
-		}
+		return s.processGistComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
 	}
 	return s.processRepoComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
+}
+
+func (s *Source) processGistComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github gist comments", "repository", repoPath)
+	// GitHub Gist URL.
+	gistID, err := extractGistID(trimmedURL)
+	if err != nil {
+		return err
+	}
+
+	options := &github.ListOptions{
+		PerPage: defaultPagination,
+		Page:    initialPage,
+	}
+	for {
+		comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistID, options)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkGistComments(ctx, repoURL.String(), comments, chunksChan); err != nil {
+			return err
+		}
+
+		options.Page++
+		if len(comments) < options.PerPage {
+			break
+		}
+	}
+	return nil
+}
+
+func extractGistID(url []string) (string, error) {
+	if len(url) < 2 || len(url) > 3 {
+		return "", fmt.Errorf("failed to parse Gist URL: length of trimmedURL should be 2 or 3")
+	}
+	return url[len(url)-1], nil
 }
 
 // Note: these can't be consts because the address is needed when using with the GitHub library.
