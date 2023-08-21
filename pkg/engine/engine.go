@@ -143,7 +143,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 
 	// build ahocorasick prefilter for efficient string matching
 	// on keywords
-	keywords := []string{}
+	var keywords [][]byte
 	for _, d := range e.detectors[false] {
 		keywords = append(keywords, d.Keywords()...)
 	}
@@ -156,7 +156,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
 		MatchKind:            ahocorasick.LeftMostLongestMatch,
 		DFA:                  true,
 	})
-	e.prefilter = builder.Build(keywords)
+	e.prefilter = builder.BuildByte(keywords)
 
 	ctx.Logger().Info("loaded decoders", "count", len(e.decoders))
 	ctx.Logger().Info("loaded detectors",
@@ -305,7 +305,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					for _, detector := range detectorsSet {
 						chunkContainsKeyword := false
 						for _, kw := range detector.Keywords() {
-							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
+							if _, ok := matchedKeywords[strings.ToLower(string(kw))]; ok {
 								chunkContainsKeyword = true
 								break
 							}

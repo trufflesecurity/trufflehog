@@ -25,8 +25,8 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"abbysale"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("abbysale")}
 }
 
 // FromData will find and optionally verify Abbysale secrets in a given set of bytes.
