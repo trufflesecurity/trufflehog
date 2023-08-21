@@ -26,8 +26,8 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"alegra"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("alegra")}
 }
 
 // FromData will find and optionally verify Alegra secrets in a given set of bytes.
@@ -66,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(tokenPatMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
