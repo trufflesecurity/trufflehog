@@ -2,6 +2,7 @@ package launchdarkly
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -73,7 +74,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
+					} else if res.StatusCode == 401 {
+						// 401 is expected for an invalid token, so there is nothing to do here.
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
+				} else {
+					s1.VerificationError = err
 				}
 			} else {
 				// This is a server SDK key. Try to initialize using the SDK.
