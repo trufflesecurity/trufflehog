@@ -28,12 +28,18 @@ const (
 
 var (
 	maxDepth   = 5
-	maxSize    = 250 * 1024 * 1024 // 20MB
+	maxSize    = 250 * 1024 * 1024 * 400 // 20MB
 	maxTimeout = time.Duration(30) * time.Second
 )
 
 // Ensure the Archive satisfies the interfaces at compile time.
 var _ SpecializedHandler = (*Archive)(nil)
+
+type tempEnv struct {
+	tempFile     *os.File
+	tempFileName string
+	extractPath  string
+}
 
 // Archive is a handler for extracting and decompressing archives.
 type Archive struct {
@@ -44,7 +50,7 @@ type Archive struct {
 // DockerTarReader is a wrapper for io.Reader that also stores the temp filepath of the tar file.
 type DockerTarReader struct {
 	io.Reader
-	filepath string
+	tempEnv
 }
 
 // New sets a default maximum size and current size counter.
@@ -275,15 +281,15 @@ func (a *Archive) HandleSpecialized(ctx logContext.Context, reader io.Reader) (i
 		reader, err = a.extractRpmContent(ctx, reader)
 	case tarMimeType:
 		//check if tar is a docker image
-		isImg, imgPath, err := a.isDockerImage(ctx, reader)
+		isImg, tmpEnv, err := a.isDockerImage(ctx, reader)
 		if err != nil {
 			return nil, false, err
 		}
 		if isImg {
 			// Build dockerReader
 			reader = DockerTarReader{
-				Reader:   reader,
-				filepath: imgPath,
+				Reader:  reader,
+				tempEnv: tmpEnv,
 			}
 		} else {
 			return nil, false, nil
@@ -450,12 +456,6 @@ func (a *Archive) handleExtractedFiles(ctx logContext.Context, env tempEnv, hand
 	return dataArchiveName, nil
 }
 
-type tempEnv struct {
-	tempFile     *os.File
-	tempFileName string
-	extractPath  string
-}
-
 // createTempEnv creates a temporary file and a temporary directory for extracting archives.
 // The caller is responsible for removing these temporary resources
 // (both the file and directory) when they are no longer needed.
@@ -500,18 +500,17 @@ func openDataArchive(extractPath string, dataArchiveName string) (io.ReadCloser,
 	return dataFile, nil
 }
 
-func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, filePath string, err error) {
+func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, tmpEnv tempEnv, err error) {
 
-	tmpEnv, err := a.createTempEnv(ctx, file)
+	tmpEnv, err = a.createTempEnv(ctx, file)
 	if err != nil {
-		return false, "", err
+		return false, tempEnv{}, err
 	}
-	defer os.Remove(tmpEnv.tempFileName)
-	defer os.RemoveAll(tmpEnv.extractPath)
-
 	_, err = tarball.ImageFromPath(tmpEnv.tempFileName, nil)
 	if err != nil {
-		return false, "", nil
+		os.Remove(tmpEnv.tempFileName)
+		os.RemoveAll(tmpEnv.extractPath)
+		return false, tempEnv{}, nil
 	}
-	return true, tmpEnv.tempFileName, nil
+	return true, tmpEnv, nil
 }

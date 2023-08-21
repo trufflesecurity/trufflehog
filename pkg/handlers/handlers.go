@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"io"
+	"os"
 	"runtime"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -61,7 +62,7 @@ func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk
 			file, isSpecial, err := specialHandler.HandleSpecialized(aCtx, reReader)
 			if isSpecial {
 				if dockerTarReader, ok := file.(DockerTarReader); ok {
-					return handleDockerTar(ctx, dockerTarReader.filepath, chunkSkel, chunksChan)
+					return handleDockerTar(ctx, dockerTarReader.tempEnv, chunkSkel, chunksChan)
 				}
 				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 			}
@@ -109,12 +110,18 @@ func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sourc
 	}
 }
 
-func handleDockerTar(ctx logContext.Context, filePath string, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+func handleDockerTar(ctx logContext.Context, tmpEnv tempEnv, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
 	// aCtx := logContext.AddLogger(ctx)
 	// aCtx.logger.V(3).Info("Docker image detected in tarball: " + filePath)
 	//scan with docker scanner
+
+	// Known logging issue: it shows the tempFileName as the image name, but it really should say the .tar we're scanning
+
+	defer os.Remove(tmpEnv.tempFileName)
+	defer os.RemoveAll(tmpEnv.extractPath)
+
 	dockerConn := sourcespb.Docker{
-		Images: []string{"file://" + filePath},
+		Images: []string{"file://" + tmpEnv.tempFileName},
 		Credential: &sourcespb.Docker_DockerKeychain{
 			DockerKeychain: true,
 		},
