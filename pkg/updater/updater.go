@@ -16,20 +16,17 @@ import (
 	"github.com/jpillora/overseer/fetcher"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
 
-func Fetcher(version string, tui bool) fetcher.Interface {
-	return &OSS{
-		CurrentVersion: version,
-		TUI:            tui,
-	}
+func Fetcher(tui bool) fetcher.Interface {
+	return &OSS{TUI: tui}
 }
 
 type OSS struct {
-	Interval       time.Duration
-	CurrentVersion string
-	TUI            bool
-	Updated        bool
+	Interval time.Duration
+	TUI      bool
+	Updated  bool
 }
 
 // Init validates the provided config
@@ -60,7 +57,7 @@ func (g *OSS) Fetch() (io.Reader, error) {
 	data := &FormData{
 		OS:             runtime.GOOS,
 		Arch:           runtime.GOARCH,
-		CurrentVersion: g.CurrentVersion,
+		CurrentVersion: version.BuildVersion,
 		TUI:            g.TUI,
 		Timezone:       zone,
 		Binary:         "trufflehog",
