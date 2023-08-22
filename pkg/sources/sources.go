@@ -17,6 +17,8 @@ type Chunk struct {
 	SourceName string
 	// SourceID is the ID of the source that the Chunk originated from.
 	SourceID int64
+	// JobID is the ID of the job that the Chunk originated from.
+	JobID int64
 	// SourceType is the type of Source that produced the chunk.
 	SourceType sourcespb.SourceType
 	// SourceMetadata holds the context of where the Chunk was found.

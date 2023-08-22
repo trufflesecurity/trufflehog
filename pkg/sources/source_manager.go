@@ -6,10 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"golang.org/x/sync/errgroup"
 )
 
 // handle uniquely identifies a Source given to the manager to manage. If the
@@ -256,6 +257,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 		defer wg.Done()
 		for chunk := range ch {
 			report.ReportChunk(nil, chunk)
+			chunk.JobID = source.JobID()
 			s.outputChunks <- chunk
 		}
 	}()
