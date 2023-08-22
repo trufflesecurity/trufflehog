@@ -256,8 +256,8 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 	go func() {
 		defer wg.Done()
 		for chunk := range ch {
-			report.ReportChunk(nil, chunk)
 			chunk.JobID = source.JobID()
+			report.ReportChunk(nil, chunk)
 			s.outputChunks <- chunk
 		}
 	}()
