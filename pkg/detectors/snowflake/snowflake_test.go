@@ -96,45 +96,6 @@ func TestSnowflake_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
-		{
-			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"account":   "tuacoip-zt74995",
-						"databases": "SNOWFLAKE, SNOWFLAKE_SAMPLE_DATA",
-						"username":  "zubairkhan14",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
