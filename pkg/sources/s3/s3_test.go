@@ -58,6 +58,22 @@ func TestSource_Chunks(t *testing.T) {
 			wantErr:       false,
 			wantChunkData: `W2RlZmF1bHRdCmF3c19hY2Nlc3Nfa2V5X2lkID0gQUtJQTM1T0hYMkRTT1pHNjQ3TkgKYXdzX3NlY3JldF9hY2Nlc3Nfa2V5ID0gUXk5OVMrWkIvQ1dsRk50eFBBaWQ3Z0d6dnNyWGhCQjd1ckFDQUxwWgpvdXRwdXQgPSBqc29uCnJlZ2lvbiA9IHVzLWVhc3QtMg==`,
 		},
+		{
+			name: "gets chunks after assuming role",
+			init: init{
+				connection: &sourcespb.S3{
+					Roles: []string{"arn:aws:iam::619888638459:role/s3-test-assume-role"},
+					Credential: &sourcespb.S3_AccessKey{
+						AccessKey: &credentialspb.KeySecret{
+							Key:    s3key,
+							Secret: s3secret,
+						},
+					},
+				},
+			},
+			wantErr:       false,
+			wantChunkData: `W2RlZmF1bHRdCmF3c19hY2Nlc3Nfa2V5X2lkID0gQUtJQTM1T0hYMkRTT1pHNjQ3TkgKYXdzX3NlY3JldF9hY2Nlc3Nfa2V5ID0gUXk5OVMrWkIvQ1dsRk50eFBBaWQ3Z0d6dnNyWGhCQjd1ckFDQUxwWgpvdXRwdXQgPSBqc29uCnJlZ2lvbiA9IHVzLWVhc3QtMg==`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
