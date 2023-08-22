@@ -28,8 +28,6 @@ func TestSnowflake_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("SNOWFLAKE_PASS")
 	inactiveSecret := testSecrets.MustGetField("SNOWFLAKE_PASS_INACTIVE")
 
-	fmt.Println("secret: ", secret)
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
