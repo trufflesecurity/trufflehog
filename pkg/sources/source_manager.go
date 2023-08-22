@@ -19,7 +19,7 @@ type handle int64
 
 // SourceInitFunc is a function that takes a source and job ID and returns an
 // initialized Source.
-type SourceInitFunc func(ctx context.Context, sourceID int64, jobID int64) (Source, error)
+type SourceInitFunc func(ctx context.Context, jobID, sourceID int64) (Source, error)
 
 // sourceInfo is an aggregate struct to store source information provided on
 // initialization.
@@ -228,7 +228,7 @@ func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, rep
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
-	source, err := sourceInfo.initFunc(ctx, int64(handle), jobID)
+	source, err := sourceInfo.initFunc(ctx, jobID, int64(handle))
 	if err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
