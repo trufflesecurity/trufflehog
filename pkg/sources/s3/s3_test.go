@@ -52,7 +52,7 @@ func TestSource_Chunks(t *testing.T) {
 							Secret: s3secret,
 						},
 					},
-					Buckets: []string{"thog-tmp-test"},
+					Buckets: []string{"truffletestbucket-s3-tests"},
 				},
 			},
 			wantErr:       false,
