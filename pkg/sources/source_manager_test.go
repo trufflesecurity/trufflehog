@@ -245,3 +245,42 @@ func TestSourceManagerContextCancelled(t *testing.T) {
 	report := ref.Snapshot()
 	assert.Error(t, report.FatalError())
 }
+
+type DummyAPI struct {
+	registerSource func(context.Context, string, sourcespb.SourceType) (int64, error)
+	getJobID       func(context.Context, int64) (int64, error)
+}
+
+func (api DummyAPI) RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error) {
+	return api.registerSource(ctx, name, kind)
+}
+
+func (api DummyAPI) GetJobID(ctx context.Context, id int64) (int64, error) {
+	return api.getJobID(ctx, id)
+}
+
+func TestSourceManagerJobAndSourceIDs(t *testing.T) {
+	mgr := NewManager(WithAPI(DummyAPI{
+		registerSource: func(context.Context, string, sourcespb.SourceType) (int64, error) {
+			return 1337, nil
+		},
+		getJobID: func(context.Context, int64) (int64, error) {
+			return 9001, nil
+		},
+	}))
+	var (
+		initializedJobID    int64
+		initializedSourceID int64
+	)
+	handle, err := mgr.Enroll(context.Background(), "dummy", 1337,
+		func(ctx context.Context, jobID, sourceID int64) (Source, error) {
+			initializedJobID = jobID
+			initializedSourceID = sourceID
+			return nil, fmt.Errorf("ignore")
+		})
+	assert.NoError(t, err)
+
+	_, _ = mgr.Run(context.Background(), handle)
+	assert.Equal(t, int64(1337), initializedSourceID)
+	assert.Equal(t, int64(9001), initializedJobID)
+}
