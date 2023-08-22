@@ -8,7 +8,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -71,10 +70,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	accountMatches := accountIdentifierPat.FindAllStringSubmatch(dataStr, -1)
 
-	fmt.Println("accountMatches: ", accountMatches)
-	regexPat := detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z]{7})\b`
-	fmt.Println("regexPat", regexPat)
-
 	usernameRegexState := common.UsernameRegexCheck(usernameExclusionPat)
 	usernameMatches := usernameRegexState.Matches(data)
 
@@ -82,7 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passwordMatches := passwordRegexState.Matches(data)
 
 	for _, accountMatch := range accountMatches {
-		fmt.Println("accountMatch: ", accountMatch)
 		if len(accountMatch) != 2 {
 			continue
 		}
@@ -109,46 +103,50 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					config := &gosnowflake.Config{
+					_ = &gosnowflake.Config{
 						Account:  resAccountMatch,
 						User:     resUsernameMatch,
 						Password: resPasswordMatch,
 						Database: database,
 					}
 
-					fmt.Println("config: ", config)
 					// Open a connection to Snowflake
 					db, err := sql.Open("snowflake", uri) // Needs the snowflake driver from gosnowflake
+
 					if err != nil {
-						log.Fatal(err)
+						s1.VerificationError = fmt.Errorf("unable to open a connection to Snowflake %+v", err)
 					}
 					defer db.Close()
 
 					err = db.Ping()
 					if err != nil {
-						log.Fatal(err)
-					}
-
-					s1.Verified = true
-
-					rows, err := db.Query(retrieveAllDatabasesQuery)
-					if err != nil {
-						log.Fatal(err)
-					}
-					defer rows.Close()
-
-					var databases []string
-					for rows.Next() {
-						var name, createdOn, is_default, isCurrent, origin, owner, comment, option, retention_time, kind string
-						err := rows.Scan(&createdOn, &name, &is_default, &isCurrent, &origin, &owner, &comment, &option, &retention_time, &kind)
-						if err != nil {
-							log.Fatal(err)
+						if strings.Contains(err.Error(), "Incorrect username or password was specified") {
+							s1.Verified = false
 						}
-						databases = append(databases, name)
-					}
-					fmt.Println(databases)
-					s1.ExtraData["databases"] = strings.Join(databases, ", ")
+					} else {
+						rows, err := db.Query(retrieveAllDatabasesQuery)
+						if err != nil {
+							s1.VerificationError = fmt.Errorf("unable to query Snowflake to enrich secret ExtraData %+v", err)
+						}
+						defer rows.Close()
 
+						var databases []string
+						for rows.Next() {
+							var name, createdOn, isDefault, isCurrent, origin, owner, comment, option, retentionTime, kind string
+							err := rows.Scan(&createdOn, &name, &isDefault, &isCurrent, &origin, &owner, &comment, &option, &retentionTime, &kind)
+							if err != nil {
+								s1.VerificationError = fmt.Errorf("unable to finish querying Snowflake to enrich secret ExtraData %+v", err)
+							}
+							databases = append(databases, name)
+						}
+						s1.ExtraData["databases"] = strings.Join(databases, ", ")
+						s1.Verified = true
+					}
+				}
+
+				// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+				if !s1.Verified && detectors.IsKnownFalsePositive(resPasswordMatch, detectors.DefaultFalsePositives, true) {
+					continue
 				}
 
 				results = append(results, s1)

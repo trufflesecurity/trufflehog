@@ -59,7 +59,6 @@ func (r RegexState) Matches(data []byte) []string {
 // UsernameRegexCheck constructs an username usernameRegex pattern from a given pattern of excluded characters.
 func UsernameRegexCheck(pattern string) RegexState {
 	raw := fmt.Sprintf(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})\b`, pattern)
-	fmt.Printf("raw: %s \n", raw)
 
 	return RegexState{regexp.MustCompile(raw)}
 }
