@@ -28,7 +28,8 @@ var (
 	defaultSDKConfig = ldclient.Config{
 		Logging: ldcomponents.NoLogging(),
 	}
-	defaultSDKTimeout = 10 * time.Second
+	defaultSDKTimeout  = 10 * time.Second
+	invalidSDKKeyError = "SDK key contains invalid characters"
 
 	// Launchdarkly keys are UUIDv4s with either api- or sdk- prefixes.
 	// mob- keys are possible, but are not sensitive credentials.
@@ -87,10 +88,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				_, err := ldclient.MakeCustomClient(resMatch, defaultSDKConfig, defaultSDKTimeout)
 				if err == nil {
 					s1.Verified = true
-				} else if err == ldclient.ErrInitializationFailed {
+				} else if err == ldclient.ErrInitializationFailed || err.Error() == invalidSDKKeyError {
 					// If initialization fails, the key is not valid, so do nothing.
-				} else if err == ldclient.ErrInitializationTimeout {
-					// If initialization times out, we don't know if the key is valid.
+				} else {
+					// If the error isn't nil or known, then this is likely a timeout error: ldclient.ErrInitializationTimeout
+					// But any other error here means we don't know if this key is valid.
 					s1.VerificationError = err
 				}
 			}
