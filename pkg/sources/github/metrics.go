@@ -35,7 +35,7 @@ var (
 	githubReposScanned = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
-		Name:      "github_seconds_spent_rate_limited",
+		Name:      "github_repos_scanned",
 		Help:      "Total number of GitHub repositories scanned.",
 	},
 		[]string{"source_name"})
