@@ -416,6 +416,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		apiEndpoint = "https://api.github.com"
 	}
 
+	// Reset consumption and rate limit metrics on each run.
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Set(0)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
+	githubReposScanned.WithLabelValues(s.name).Set(0)
+
 	installationClient, err := s.enumerate(ctx, apiEndpoint)
 	if err != nil {
 		return err
@@ -451,6 +456,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	}
 
 	s.repos = s.filteredRepoCache.Values()
+	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
 
 	// We must sort the repos so we can resume later if necessary.
@@ -781,6 +787,8 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
+			githubReposScanned.WithLabelValues(s.name).Inc()
+
 			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
 				return nil
@@ -810,6 +818,8 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 		return false
 	}
 
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
+
 	if res != nil {
 		knownWait := true
 		remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
@@ -827,6 +837,7 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 				duration := time.Duration(waitTime+1) * time.Second
 				s.log.V(2).Info("rate limited", "resumeTime", time.Now().Add(duration).String())
 				time.Sleep(duration)
+				githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(duration.Seconds())
 				return true
 			}
 		}
