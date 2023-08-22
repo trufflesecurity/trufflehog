@@ -336,6 +336,9 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 			defer wg.Done()
 			defer func() { report.EndUnitChunking(unit, time.Now()) }()
 			for chunk := range chunkReporter.chunkCh {
+				if src, ok := source.(Source); ok {
+					chunk.JobID = src.JobID()
+				}
 				s.outputChunks <- chunk
 			}
 		}()
