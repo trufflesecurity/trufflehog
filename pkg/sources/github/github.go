@@ -273,6 +273,65 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
+// Validate is used by enterprise CLI to validate the Github config file.
+func (s *Source) Validate(ctx context.Context) []error {
+	var (
+		errs     []error
+		ghClient *github.Client
+		err      error
+	)
+	apiEndpoint := s.conn.Endpoint
+
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_BasicAuth:
+		s.httpClient.Transport = &github.BasicAuthTransport{
+			Username: cred.BasicAuth.Username,
+			Password: cred.BasicAuth.Password,
+		}
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	case *sourcespb.GitHub_Unauthenticated:
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	case *sourcespb.GitHub_Token:
+		s.githubToken = cred.Token
+
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: s.githubToken},
+		)
+		s.httpClient.Transport = &oauth2.Transport{
+			Base:   s.httpClient.Transport,
+			Source: oauth2.ReuseTokenSource(nil, ts),
+		}
+
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	default:
+		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+	}
+
+	// Run a simple query to check if the client is actually valid
+	if ghClient != nil {
+		err = checkGitHubConnection(ctx, ghClient)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func checkGitHubConnection(ctx context.Context, client *github.Client) error {
+	_, _, err := client.Users.Get(ctx, "")
+	return err
+}
+
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
 	s.mu.Lock()
 	visibility, ok := s.publicMap[repoURL]
