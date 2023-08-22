@@ -156,39 +156,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-//
-//	if verify {
-//		client := s.client
-//		if client == nil {
-//			client = defaultClient
-//		}
-//		req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.snowflake.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
-//		if err != nil {
-//			continue
-//		}
-//		res, err := client.Do(req)
-//		if err == nil {
-//			defer res.Body.Close()
-//			if res.StatusCode >= 200 && res.StatusCode < 300 {
-//				s1.Verified = true
-//			} else if res.StatusCode == 401 {
-//				// The secret is determinately not verified (nothing to do)
-//			} else {
-//				s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-//			}
-//		} else {
-//			s1.VerificationError = err
-//		}
-//	}
-//
-//	// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-//	if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-//		continue
-//	}
-//
-//	results = append(results, s1)
-//}
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Snowflake
 }
