@@ -18,17 +18,17 @@ import (
 )
 
 func TestSnowflake_FromChunk(t *testing.T) {
-	//ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	//defer cancel()
-	//testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
-	//if err != nil {
-	//	t.Fatalf("could not get test secrets from GCP: %s", err)
-	//}
-	//secret := testSecrets.MustGetField("SNOWFLAKE")
-	//inactiveSecret := testSecrets.MustGetField("SNOWFLAKE_INACTIVE")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
 
-	secret := "secret"
-	inactiveSecret := "fake_secret"
+	secret := testSecrets.MustGetField("SNOWFLAKE_PASS")
+	inactiveSecret := testSecrets.MustGetField("SNOWFLAKE_PASS_INACTIVE")
+
+	fmt.Println("secret: ", secret)
 
 	type args struct {
 		ctx    context.Context
@@ -48,13 +48,18 @@ func TestSnowflake_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a snowflake secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Snowflake,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"account":   "tuacoip-zt74995",
+						"databases": "SNOWFLAKE, SNOWFLAKE_SAMPLE_DATA",
+						"username":  "zubairkhan14",
+					},
 				},
 			},
 			wantErr:             false,
@@ -65,7 +70,7 @@ func TestSnowflake_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a snowflake secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
