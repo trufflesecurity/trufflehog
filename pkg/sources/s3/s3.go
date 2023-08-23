@@ -104,7 +104,7 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 	}
 }
 
-func (s *Source) newUnifiedClient(region, roleArn string) (*s3.S3, error) {
+func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg := aws.NewConfig()
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
 	cfg.Region = aws.String(region)
@@ -182,7 +182,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 
 		var regionalClient *s3.S3
 		if region != defaultAWSRegion {
-			regionalClient, err = s.newUnifiedClient(region, role)
+			regionalClient, err = s.newClient(region, role)
 			if err != nil {
 				s.log.Error(err, "could not make regional s3 client")
 				continue
@@ -219,7 +219,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	for _, role := range roles {
-		client, err := s.newUnifiedClient(defaultAWSRegion, role)
+		client, err := s.newClient(defaultAWSRegion, role)
 		if err != nil {
 			return errors.WrapPrefix(err, "could not create s3 client", 0)
 		}
