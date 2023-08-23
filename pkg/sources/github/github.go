@@ -273,6 +273,65 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	return nil
 }
 
+// Validate is used by enterprise CLI to validate the Github config file.
+func (s *Source) Validate(ctx context.Context) []error {
+	var (
+		errs     []error
+		ghClient *github.Client
+		err      error
+	)
+	apiEndpoint := s.conn.Endpoint
+
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_BasicAuth:
+		s.httpClient.Transport = &github.BasicAuthTransport{
+			Username: cred.BasicAuth.Username,
+			Password: cred.BasicAuth.Password,
+		}
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	case *sourcespb.GitHub_Unauthenticated:
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	case *sourcespb.GitHub_Token:
+		s.githubToken = cred.Token
+
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: s.githubToken},
+		)
+		s.httpClient.Transport = &oauth2.Transport{
+			Base:   s.httpClient.Transport,
+			Source: oauth2.ReuseTokenSource(nil, ts),
+		}
+
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	default:
+		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+	}
+
+	// Run a simple query to check if the client is actually valid
+	if ghClient != nil {
+		err = checkGitHubConnection(ctx, ghClient)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func checkGitHubConnection(ctx context.Context, client *github.Client) error {
+	_, _, err := client.Users.Get(ctx, "")
+	return err
+}
+
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
 	s.mu.Lock()
 	visibility, ok := s.publicMap[repoURL]
@@ -357,6 +416,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		apiEndpoint = "https://api.github.com"
 	}
 
+	// Reset consumption and rate limit metrics on each run.
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Set(0)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
+	githubReposScanned.WithLabelValues(s.name).Set(0)
+
 	installationClient, err := s.enumerate(ctx, apiEndpoint)
 	if err != nil {
 		return err
@@ -392,6 +456,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	}
 
 	s.repos = s.filteredRepoCache.Values()
+	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
 
 	// We must sort the repos so we can resume later if necessary.
@@ -722,6 +787,8 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
+			githubReposScanned.WithLabelValues(s.name).Inc()
+
 			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
 				return nil
@@ -751,6 +818,8 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 		return false
 	}
 
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
+
 	if res != nil {
 		knownWait := true
 		remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
@@ -768,6 +837,7 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 				duration := time.Duration(waitTime+1) * time.Second
 				s.log.V(2).Info("rate limited", "resumeTime", time.Now().Add(duration).String())
 				time.Sleep(duration)
+				githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(duration.Seconds())
 				return true
 			}
 		}
@@ -988,44 +1058,49 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 
 	trimmedURL := removeURLAndSplit(repoURL.String())
 	if repoURL.Host == "gist.github.com" && s.includeGistComments {
-		s.log.Info("scanning github gist comments", "repository", repoPath)
-		// GitHub Gist URL.
-		var gistId string
-		if len(trimmedURL) == 2 {
-			// https://gist.github.com/<id>
-			gistId = trimmedURL[1]
-		} else if len(trimmedURL) == 3 {
-			// https://gist.github.com/<owner>/<id>
-			gistId = trimmedURL[2]
-		} else {
-			return fmt.Errorf("failed to parse Gist URL: '%s'", repoURL.String())
-		}
-
-		options := &github.ListOptions{
-			PerPage: defaultPagination,
-			Page:    initialPage,
-		}
-		for {
-			comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistId, options)
-			if s.handleRateLimit(err, resp) {
-				break
-			}
-			if err != nil {
-				return err
-			}
-
-			err = s.chunkGistComments(ctx, repoURL.String(), comments, chunksChan)
-			if err != nil {
-				return err
-			}
-
-			options.Page++
-			if len(comments) < options.PerPage {
-				break
-			}
-		}
+		return s.processGistComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
 	}
 	return s.processRepoComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
+}
+
+func (s *Source) processGistComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github gist comments", "repository", repoPath)
+	// GitHub Gist URL.
+	gistID, err := extractGistID(trimmedURL)
+	if err != nil {
+		return err
+	}
+
+	options := &github.ListOptions{
+		PerPage: defaultPagination,
+		Page:    initialPage,
+	}
+	for {
+		comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistID, options)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkGistComments(ctx, repoURL.String(), comments, chunksChan); err != nil {
+			return err
+		}
+
+		options.Page++
+		if len(comments) < options.PerPage {
+			break
+		}
+	}
+	return nil
+}
+
+func extractGistID(url []string) (string, error) {
+	if len(url) < 2 || len(url) > 3 {
+		return "", fmt.Errorf("failed to parse Gist URL: length of trimmedURL should be 2 or 3")
+	}
+	return url[len(url)-1], nil
 }
 
 // Note: these can't be consts because the address is needed when using with the GitHub library.

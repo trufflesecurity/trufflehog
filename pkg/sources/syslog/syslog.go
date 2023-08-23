@@ -60,7 +60,7 @@ func NewSyslog(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceNam
 }
 
 // Validate validates the configuration of the source.
-func (s *Source) Validate() []error {
+func (s *Source) Validate(ctx context.Context) []error {
 	var errors []error
 
 	if s.conn.TlsCert != nilString || s.conn.TlsKey != nilString {

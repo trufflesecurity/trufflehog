@@ -52,7 +52,7 @@ func TestSource_Chunks(t *testing.T) {
 							Secret: s3secret,
 						},
 					},
-					Buckets: []string{"thog-tmp-test"},
+					Buckets: []string{"truffletestbucket-s3-tests"},
 				},
 			},
 			wantErr:       false,
@@ -77,7 +77,10 @@ func TestSource_Chunks(t *testing.T) {
 				return
 			}
 			chunksCh := make(chan *sources.Chunk)
+			var wg sync.WaitGroup
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
@@ -90,6 +93,7 @@ func TestSource_Chunks(t *testing.T) {
 			if diff := pretty.Compare(gotChunk.Data, wantData); diff != "" {
 				t.Errorf("%s: Source.Chunks() diff: (-got +want)\n%s", tt.name, diff)
 			}
+			wg.Wait()
 			assert.Equal(t, "", s.GetProgress().EncodedResumeInfo)
 			assert.Equal(t, int64(100), s.GetProgress().PercentComplete)
 		})

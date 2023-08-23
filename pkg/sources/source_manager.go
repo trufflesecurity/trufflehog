@@ -6,10 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"golang.org/x/sync/errgroup"
 )
 
 // handle uniquely identifies a Source given to the manager to manage. If the
@@ -19,7 +20,7 @@ type handle int64
 
 // SourceInitFunc is a function that takes a source and job ID and returns an
 // initialized Source.
-type SourceInitFunc func(ctx context.Context, sourceID int64, jobID int64) (Source, error)
+type SourceInitFunc func(ctx context.Context, jobID, sourceID int64) (Source, error)
 
 // sourceInfo is an aggregate struct to store source information provided on
 // initialization.
@@ -228,7 +229,7 @@ func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, rep
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
-	source, err := sourceInfo.initFunc(ctx, int64(handle), jobID)
+	source, err := sourceInfo.initFunc(ctx, jobID, int64(handle))
 	if err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
@@ -255,6 +256,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 	go func() {
 		defer wg.Done()
 		for chunk := range ch {
+			chunk.JobID = source.JobID()
 			report.ReportChunk(nil, chunk)
 			s.outputChunks <- chunk
 		}
@@ -334,6 +336,9 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 			defer wg.Done()
 			defer func() { report.EndUnitChunking(unit, time.Now()) }()
 			for chunk := range chunkReporter.chunkCh {
+				if src, ok := source.(Source); ok {
+					chunk.JobID = src.JobID()
+				}
 				s.outputChunks <- chunk
 			}
 		}()
