@@ -31,6 +31,7 @@ import (
 )
 
 const (
+	defaultAWSRegion     = "us-east-1"
 	defaultMaxObjectSize = 250 * 1024 * 1024 // 250 MiB
 	maxObjectSizeLimit   = 250 * 1024 * 1024 // 250 MiB
 )
@@ -164,7 +165,6 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 }
 
 func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bucketsToScan []string, chunksChan chan *sources.Chunk) error {
-	const defaultAWSRegion = "us-east-1"
 	objectCount := uint64(0)
 
 	for i, bucket := range bucketsToScan {
@@ -174,21 +174,12 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 
 		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 		s.log.Info("Scanning bucket", "bucket", bucket)
-		region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
-		if err != nil {
-			s.log.Error(err, "could not get s3 region for bucket", "bucket: ", bucket)
-			continue
-		}
 
-		var regionalClient *s3.S3
-		if region != defaultAWSRegion {
-			regionalClient, err = s.newClient(region, role)
-			if err != nil {
-				s.log.Error(err, "could not make regional s3 client")
-				continue
-			}
-		} else {
-			regionalClient = client
+		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
+		if err != nil {
+			s.log.Error(err, "could not get regional client for bucket",
+				"bucket", bucket)
+			continue
 		}
 
 		errorCount := sync.Map{}
@@ -201,7 +192,8 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 			})
 
 		if err != nil {
-			s.log.Error(err, "could not list objects in s3 bucket", "bucket: ", bucket)
+			s.log.Error(err, "could not list objects in s3 bucket",
+				"bucket", bucket)
 			continue
 		}
 	}
@@ -211,7 +203,6 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	const defaultAWSRegion = "us-east-1"
 
 	roles := s.conn.Roles
 	if len(roles) == 0 {
@@ -235,6 +226,24 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	return nil
+}
+
+func (s *Source) getRegionalClientForBucket(ctx context.Context, defaultRegionClient *s3.S3, role, bucket string) (*s3.S3, error) {
+	region, err := s3manager.GetBucketRegionWithClient(ctx, defaultRegionClient, bucket)
+	if err != nil {
+		return nil, errors.WrapPrefix(err, "could not get s3 region for bucket", 0)
+	}
+
+	if region == defaultAWSRegion {
+		return defaultRegionClient, nil
+	}
+
+	regionalClient, err := s.newClient(region, role)
+	if err != nil {
+		return nil, errors.WrapPrefix(err, "could not create regional s3 client", 0)
+	}
+
+	return regionalClient, nil
 }
 
 // pageChunker emits chunks onto the given channel from a page
