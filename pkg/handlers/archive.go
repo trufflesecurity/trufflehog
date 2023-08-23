@@ -28,7 +28,7 @@ const (
 
 var (
 	maxDepth   = 5
-	maxSize    = 250 * 1024 * 1024 * 8 // 2GB+
+	maxSize    = 250 * 1024 * 1024 // 20MB
 	maxTimeout = time.Duration(30) * time.Second
 )
 
