@@ -387,6 +387,33 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 	_ = s.jobPool.Wait()
 }
 
+func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleArn string, buckets []string, errs *[]error) {
+	if errs == nil {
+		panic("validateBucketAccess cannot populate a nil errors slice")
+	}
+
+	for _, bucket := range buckets {
+		if common.IsDone(ctx) {
+			return
+		}
+
+		regionalClient, err := s.getRegionalClientForBucket(ctx, client, roleArn, bucket)
+		if err != nil {
+			err = fmt.Errorf("could not get regional client for bucket %q: %w", bucket, err)
+			*errs = append(*errs, err)
+			continue
+		}
+
+		_, err = regionalClient.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
+		if err == nil {
+			return
+		}
+	}
+
+	err := fmt.Errorf("role %s could not list any objects in any buckets", roleArn)
+	*errs = append(*errs, err)
+}
+
 func (s *Source) visitRoles(ctx context.Context, f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error) error {
 	roles := s.conn.Roles
 	if len(roles) == 0 {
