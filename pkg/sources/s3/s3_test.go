@@ -60,6 +60,9 @@ func TestSource_Chunks(t *testing.T) {
 		},
 		{
 			name: "gets chunks after assuming role",
+			// This test will attempt to scan every bucket in the account, but the role policy blocks access to every
+			// one except the one we want. This results in errors in the test log output that shouldn't result in test
+			// failures.
 			init: init{
 				connection: &sourcespb.S3{
 					Roles: []string{"arn:aws:iam::619888638459:role/s3-test-assume-role"},
