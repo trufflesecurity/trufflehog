@@ -39,7 +39,7 @@ test-race:
 test-detectors:
 	CGO_ENABLED=0 go test -tags=detectors -timeout=5m $(shell go list ./... | grep pkg/detectors)
 
-test-forks:
+test-community:
 	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors | grep -v pkg/sources)
 
 bench:

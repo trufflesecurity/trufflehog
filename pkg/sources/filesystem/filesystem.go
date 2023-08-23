@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/fs"
@@ -21,13 +20,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-)
-
-const (
-	// These buffer sizes are mainly driven by our largest credential size, which is GCP @ ~2.25KB.
-	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize = 10 * 1024 // 10KB
-	PeekSize   = 3 * 1024  // 3KB
 )
 
 type Source struct {
@@ -187,34 +179,33 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	reReader.Stop()
 
-	for {
-		chunkBytes := make([]byte, BufferSize)
-		reader := bufio.NewReaderSize(reReader, BufferSize)
-		n, err := reader.Read(chunkBytes)
-		if err != nil && !errors.Is(err, io.EOF) {
-			break
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, reReader)
+	for data := range chunkResChan {
+		if err := data.Error(); err != nil {
+			s.log.Error(err, "error reading chunk.")
+			continue
 		}
-		peekData, _ := reader.Peek(PeekSize)
-		if n > 0 {
-			chunksChan <- &sources.Chunk{
-				SourceType: s.Type(),
-				SourceName: s.name,
-				SourceID:   s.SourceID(),
-				Data:       append(chunkBytes[:n], peekData...),
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Filesystem{
-						Filesystem: &source_metadatapb.Filesystem{
-							File: sanitizer.UTF8(path),
-						},
+
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			Data:       data.Bytes(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Filesystem{
+					Filesystem: &source_metadatapb.Filesystem{
+						File: sanitizer.UTF8(path),
 					},
 				},
-				Verify: s.verify,
-			}
+			},
+			Verify: s.verify,
 		}
-		if errors.Is(err, io.EOF) {
-			break
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 

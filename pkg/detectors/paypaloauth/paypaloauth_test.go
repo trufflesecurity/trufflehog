@@ -19,13 +19,16 @@ import (
 func TestPaypalOauth_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("PAYPALOAUTH_SECRET")
 	inactiveSecret := testSecrets.MustGetField("PAYPALOAUTH_SECRET_INACTIVE")
 	id := testSecrets.MustGetField("PAYPALOAUTH_CLIENTID")
+
+	newId := testSecrets.MustGetField("PAYPALOAUTH_NEW_INACTIVE_CLIENTID")
+	newSecret := testSecrets.MustGetField("PAYPALOAUTH_NEW_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -52,6 +55,10 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_PaypalOauth,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -64,6 +71,30 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					Verified:     false,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "new format, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a paypaloauth secret %s within %s but not valid", newSecret, newId)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_PaypalOauth,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_PaypalOauth,
 					Verified:     false,
@@ -109,6 +140,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

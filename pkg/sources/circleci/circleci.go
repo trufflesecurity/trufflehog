@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync/atomic"
 
@@ -219,7 +218,7 @@ func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]bu
 	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(_ context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
 	req, err := http.NewRequest("GET", act.OutputURL, nil)
 	if err != nil {
 		return err
@@ -229,34 +228,39 @@ func (s *Source) chunkAction(_ context.Context, proj project, bld build, act act
 		return err
 	}
 	defer res.Body.Close()
-	logOutput, err := io.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
 
 	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 
-	chunk := &sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		Data:       removeCircleSha1Line(logOutput),
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Circleci{
-				Circleci: &source_metadatapb.CircleCI{
-					VcsType:     proj.VCS,
-					Username:    proj.Username,
-					Repository:  proj.RepoName,
-					BuildNumber: int64(bld.BuildNum),
-					BuildStep:   stepName,
-					Link:        linkURL,
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, res.Body)
+	for data := range chunkResChan {
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			Data:       removeCircleSha1Line(data.Bytes()),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Circleci{
+					Circleci: &source_metadatapb.CircleCI{
+						VcsType:     proj.VCS,
+						Username:    proj.Username,
+						Repository:  proj.RepoName,
+						BuildNumber: int64(bld.BuildNum),
+						BuildStep:   stepName,
+						Link:        linkURL,
+					},
 				},
 			},
-		},
-		Verify: s.verify,
+			Verify: s.verify,
+		}
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
+		}
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
+		}
 	}
-
-	chunksChan <- chunk
 
 	return nil
 }

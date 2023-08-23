@@ -17,6 +17,8 @@ type Chunk struct {
 	SourceName string
 	// SourceID is the ID of the source that the Chunk originated from.
 	SourceID int64
+	// JobID is the ID of the job that the Chunk originated from.
+	JobID int64
 	// SourceType is the type of Source that produced the chunk.
 	SourceType sourcespb.SourceType
 	// SourceMetadata holds the context of where the Chunk was found.
@@ -42,6 +44,13 @@ type Source interface {
 	Chunks(ctx context.Context, chunksChan chan *Chunk) error
 	// GetProgress is the completion progress (percentage) for Scanned Source.
 	GetProgress() *Progress
+}
+
+// SourceUnitEnumChunker are the two required interfaces to support enumerating
+// and chunking of units.
+type SourceUnitEnumChunker interface {
+	SourceUnitEnumerator
+	SourceUnitChunker
 }
 
 // SourceUnitUnmarshaller defines an optional interface a Source can implement
@@ -134,6 +143,8 @@ type GitConfig struct {
 	BaseRef string
 	// MaxDepth is the maximum depth to scan the source.
 	MaxDepth int
+	// Bare is an indicator to handle bare repositories properly.
+	Bare bool
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// ExcludeGlobs is a list of globs to exclude from the scan.
@@ -163,6 +174,12 @@ type GithubConfig struct {
 	IncludeRepos []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+	// IncludeIssueComments indicates whether to include GitHub issue comments in the scan.
+	IncludeIssueComments,
+	// IncludePullRequestComments indicates whether to include GitHub pull request comments in the scan.
+	IncludePullRequestComments,
+	// IncludeGistComments indicates whether to include GitHub gist comments in the scan.
+	IncludeGistComments bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
@@ -198,6 +215,8 @@ type S3Config struct {
 	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
+	// Roles is the list of Roles to use.
+	Roles []string
 	// MaxObjectSize is the maximum object size to scan.
 	MaxObjectSize int64
 }
@@ -231,7 +250,7 @@ type Progress struct {
 // Validator is an interface for validating a source. Sources can optionally implement this interface to validate
 // their configuration.
 type Validator interface {
-	Validate() []error
+	Validate(ctx context.Context) []error
 }
 
 // SetProgressComplete sets job progress information for a running job based on the highest level objects in the source.

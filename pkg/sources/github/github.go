@@ -44,38 +44,54 @@ const (
 )
 
 type Source struct {
-	name                 string
-	githubUser           string
-	githubToken          string
-	sourceID             int64
-	jobID                int64
-	verify               bool
-	repos                []string
-	members              []string
-	orgsCache            cache.Cache
-	filteredRepoCache    *filteredRepoCache
-	memberCache          map[string]struct{}
-	repoSizes            repoSize
-	totalRepoSize        int // total size in bytes of all repos
-	git                  *git.Git
-	scanOptions          *git.ScanOptions
-	httpClient           *http.Client
-	log                  logr.Logger
-	conn                 *sourcespb.GitHub
-	jobPool              *errgroup.Group
-	resumeInfoMutex      sync.Mutex
-	resumeInfoSlice      []string
-	apiClient            *github.Client
-	mu                   sync.Mutex
-	publicMap            map[string]source_metadatapb.Visibility
+	name string
+	// Protects the user and token.
+	userMu      sync.Mutex
+	githubUser  string
+	githubToken string
+
+	sourceID          int64
+	jobID             int64
+	verify            bool
+	repos             []string
+	members           []string
+	orgsCache         cache.Cache
+	filteredRepoCache *filteredRepoCache
+	memberCache       map[string]struct{}
+	repoSizes         repoSize
+	totalRepoSize     int // total size of all repos in kb
+	git               *git.Git
+
+	scanOptMu   sync.Mutex // protects the scanOptions
+	scanOptions *git.ScanOptions
+
+	httpClient      *http.Client
+	log             logr.Logger
+	conn            *sourcespb.GitHub
+	jobPool         *errgroup.Group
+	resumeInfoMutex sync.Mutex
+	resumeInfoSlice []string
+	apiClient       *github.Client
+
+	mu        sync.Mutex // protects the visibility maps
+	publicMap map[string]source_metadatapb.Visibility
+
 	includePRComments    bool
 	includeIssueComments bool
+	includeGistComments  bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
+}
+
+func (s *Source) setScanOptions(base, head string) {
+	s.scanOptMu.Lock()
+	defer s.scanOptMu.Unlock()
+	s.scanOptions.BaseHash = base
+	s.scanOptions.HeadHash = head
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -100,7 +116,7 @@ func (s *Source) JobID() int64 {
 
 type repoSize struct {
 	mu        sync.RWMutex
-	repoSizes map[string]int // size in bytes of each repo
+	repoSizes map[string]int // size in kb of each repo
 }
 
 func (r *repoSize) addRepo(repo string, size int) {
@@ -217,6 +233,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
+	s.includeGistComments = s.conn.IncludeGistComments
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -254,6 +271,65 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 		})
 
 	return nil
+}
+
+// Validate is used by enterprise CLI to validate the Github config file.
+func (s *Source) Validate(ctx context.Context) []error {
+	var (
+		errs     []error
+		ghClient *github.Client
+		err      error
+	)
+	apiEndpoint := s.conn.Endpoint
+
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_BasicAuth:
+		s.httpClient.Transport = &github.BasicAuthTransport{
+			Username: cred.BasicAuth.Username,
+			Password: cred.BasicAuth.Password,
+		}
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	case *sourcespb.GitHub_Unauthenticated:
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	case *sourcespb.GitHub_Token:
+		s.githubToken = cred.Token
+
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: s.githubToken},
+		)
+		s.httpClient.Transport = &oauth2.Transport{
+			Base:   s.httpClient.Transport,
+			Source: oauth2.ReuseTokenSource(nil, ts),
+		}
+
+		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
+		}
+	default:
+		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+	}
+
+	// Run a simple query to check if the client is actually valid
+	if ghClient != nil {
+		err = checkGitHubConnection(ctx, ghClient)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func checkGitHubConnection(ctx context.Context, client *github.Client) error {
+	_, _, err := client.Users.Get(ctx, "")
+	return err
 }
 
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
@@ -340,6 +416,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		apiEndpoint = "https://api.github.com"
 	}
 
+	// Reset consumption and rate limit metrics on each run.
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Set(0)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
+	githubReposScanned.WithLabelValues(s.name).Set(0)
+
 	installationClient, err := s.enumerate(ctx, apiEndpoint)
 	if err != nil {
 		return err
@@ -356,11 +437,11 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_BasicAuth:
-		if err = s.enumerateBasicAuth(ctx, cred.BasicAuth); err != nil {
+		if err = s.enumerateBasicAuth(ctx, apiEndpoint, cred.BasicAuth); err != nil {
 			return nil, err
 		}
 	case *sourcespb.GitHub_Unauthenticated:
-		s.enumerateUnauthenticated(ctx)
+		s.enumerateUnauthenticated(ctx, apiEndpoint)
 	case *sourcespb.GitHub_Token:
 		if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
 			return nil, err
@@ -375,6 +456,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	}
 
 	s.repos = s.filteredRepoCache.Values()
+	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
 
 	// We must sort the repos so we can resume later if necessary.
@@ -382,11 +464,16 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	return installationClient, nil
 }
 
-func (s *Source) enumerateBasicAuth(ctx context.Context, basicAuth *credentialspb.BasicAuth) error {
-	s.apiClient = github.NewClient(&http.Client{Transport: &github.BasicAuthTransport{
+func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, basicAuth *credentialspb.BasicAuth) error {
+	s.httpClient.Transport = &github.BasicAuthTransport{
 		Username: basicAuth.Username,
 		Password: basicAuth.Password,
-	}})
+	}
+	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
+	if err != nil {
+		s.log.Error(err, "error creating GitHub client")
+	}
+	s.apiClient = ghClient
 
 	for _, org := range s.orgsCache.Keys() {
 		if err := s.getReposByOrg(ctx, org); err != nil {
@@ -397,8 +484,12 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, basicAuth *credentialsp
 	return nil
 }
 
-func (s *Source) enumerateUnauthenticated(ctx context.Context) {
-	s.apiClient = github.NewClient(s.httpClient)
+func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint string) {
+	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
+	if err != nil {
+		s.log.Error(err, "error creating GitHub client")
+	}
+	s.apiClient = ghClient
 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
 		s.log.Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
@@ -432,19 +523,14 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		Source: oauth2.ReuseTokenSource(nil, ts),
 	}
 
-	var err error
-	// If we're using public Github, make a regular client.
+	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
-	var isGHE bool
-	if apiEndpoint == "https://api.github.com" {
-		s.apiClient = github.NewClient(s.httpClient)
-	} else {
-		isGHE = true
-		s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
-		if err != nil {
-			return errors.New(err)
-		}
+	var isGHE bool = apiEndpoint != "https://api.github.com"
+	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
+	if err != nil {
+		s.log.Error(err, "error creating GitHub client")
 	}
+	s.apiClient = ghClient
 
 	// TODO: this should support scanning users too
 
@@ -550,6 +636,28 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		return nil, errors.New(err)
 	}
 
+	// This client is required to create installation tokens for cloning.
+	// Otherwise, the required JWT is not in the request for the token :/
+	// This client uses the source's original HTTP transport, so make sure
+	// to build it before modifying that transport (such as is done during
+	// the creation of the other API client below).
+	appItr, err := ghinstallation.NewAppsTransport(
+		s.httpClient.Transport,
+		appID,
+		[]byte(app.PrivateKey))
+	if err != nil {
+		return nil, errors.New(err)
+	}
+	appItr.BaseURL = apiEndpoint
+
+	// Does this need to be separate from |s.httpClient|?
+	instHttpClient := common.RetryableHttpClientTimeout(60)
+	instHttpClient.Transport = appItr
+	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHttpClient)
+	if err != nil {
+		return nil, errors.New(err)
+	}
+
 	// This client is used for most APIs.
 	itr, err := ghinstallation.New(
 		s.httpClient.Transport,
@@ -560,22 +668,9 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		return nil, errors.New(err)
 	}
 	itr.BaseURL = apiEndpoint
-	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: itr})
-	if err != nil {
-		return nil, errors.New(err)
-	}
 
-	// This client is required to create installation tokens for cloning.
-	// Otherwise, the required JWT is not in the request for the token :/
-	appItr, err := ghinstallation.NewAppsTransport(
-		s.httpClient.Transport,
-		appID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, errors.New(err)
-	}
-	appItr.BaseURL = apiEndpoint
-	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, &http.Client{Transport: appItr})
+	s.httpClient.Transport = itr
+	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
 	if err != nil {
 		return nil, errors.New(err)
 	}
@@ -606,6 +701,21 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	}
 
 	return installationClient, nil
+}
+
+func createGitHubClient(httpClient *http.Client, apiEndpoint string) (ghClient *github.Client, err error) {
+	// If we're using public GitHub, make a regular client.
+	// Otherwise, make an enterprise client.
+	if apiEndpoint == "https://api.github.com" {
+		ghClient = github.NewClient(httpClient)
+	} else {
+		ghClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
+		if err != nil {
+			return nil, errors.New(err)
+		}
+	}
+
+	return ghClient, err
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
@@ -653,6 +763,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
 			if err != nil {
 				scanErrs.Add(err)
+				return nil
 			}
 
 			defer os.RemoveAll(path)
@@ -661,26 +772,28 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			s.scanOptions.BaseHash = s.conn.Base
-			s.scanOptions.HeadHash = s.conn.Head
+			s.setScanOptions(s.conn.Base, s.conn.Head)
 
 			repoSize := s.repoSizes.getRepo(repoURL)
-			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size", repoSize)
+			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size_kb", repoSize)
 
 			now := time.Now()
 			defer func(start time.Time) {
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
 
+			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
+				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
+				return nil
+			}
+
+			githubReposScanned.WithLabelValues(s.name).Inc()
+
 			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
 				return nil
 			}
 
-			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
-				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
-				return nil
-			}
 			atomic.AddUint64(&scanned, 1)
 
 			return nil
@@ -705,6 +818,8 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 		return false
 	}
 
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
+
 	if res != nil {
 		knownWait := true
 		remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
@@ -722,6 +837,7 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 				duration := time.Duration(waitTime+1) * time.Second
 				s.log.V(2).Info("rate limited", "resumeTime", time.Now().Add(duration).String())
 				time.Sleep(duration)
+				githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(duration.Seconds())
 				return true
 			}
 		}
@@ -931,9 +1047,9 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
 
-func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning comments")
+const initialPage = 1 // page to start listing from
 
+func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
 	// Support ssh and https URLs
 	repoURL, err := git.GitURLParse(repoPath)
 	if err != nil {
@@ -941,87 +1057,166 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 	}
 
 	trimmedURL := removeURLAndSplit(repoURL.String())
+	if repoURL.Host == "gist.github.com" && s.includeGistComments {
+		return s.processGistComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
+	}
+	return s.processRepoComments(ctx, repoPath, trimmedURL, repoURL, chunksChan)
+}
+
+func (s *Source) processGistComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github gist comments", "repository", repoPath)
+	// GitHub Gist URL.
+	gistID, err := extractGistID(trimmedURL)
+	if err != nil {
+		return err
+	}
+
+	options := &github.ListOptions{
+		PerPage: defaultPagination,
+		Page:    initialPage,
+	}
+	for {
+		comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistID, options)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkGistComments(ctx, repoURL.String(), comments, chunksChan); err != nil {
+			return err
+		}
+
+		options.Page++
+		if len(comments) < options.PerPage {
+			break
+		}
+	}
+	return nil
+}
+
+func extractGistID(url []string) (string, error) {
+	if len(url) < 2 || len(url) > 3 {
+		return "", fmt.Errorf("failed to parse Gist URL: length of trimmedURL should be 2 or 3")
+	}
+	return url[len(url)-1], nil
+}
+
+// Note: these can't be consts because the address is needed when using with the GitHub library.
+var (
+	// sortType defines the criteria for sorting comments.
+	// By default comments are sorted by their creation date.
+	sortType = "created"
+	// directionType defines the direction of sorting.
+	// "desc" means comments will be sorted in descending order, showing the latest comments first.
+	directionType = "desc"
+	// allComments is a placeholder for specifying the comment ID to start listing from.
+	// A value of 0 means that all comments will be listed.
+	allComments = 0
+)
+
+type repoInfo struct {
+	owner    string
+	repo     string
+	repoPath string
+}
+
+func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
+	// Normal repository URL (https://github.com/<owner>/<repo>).
+	if len(trimmedURL) < 3 {
+		return fmt.Errorf("url missing owner and/or repo: '%s'", repoURL.String())
+	}
 	owner := trimmedURL[1]
 	repo := trimmedURL[2]
 
-	var (
-		sortType      = "created"
-		directionType = "desc"
-		allComments   = 0
-	)
+	repoInfo := repoInfo{owner: owner, repo: repo, repoPath: repoPath}
 
 	if s.includeIssueComments {
-
-		issueOpts := &github.IssueListCommentsOptions{
-			Sort:      &sortType,
-			Direction: &directionType,
-			ListOptions: github.ListOptions{
-				PerPage: defaultPagination,
-				Page:    1,
-			},
-		}
-
-		for {
-			issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, owner, repo, allComments, issueOpts)
-			if s.handleRateLimit(err, resp) {
-				break
-			}
-
-			if err != nil {
-				return err
-			}
-
-			err = s.chunkIssueComments(ctx, repo, issueComments, chunksChan, repoPath)
-			if err != nil {
-				return err
-			}
-
-			issueOpts.ListOptions.Page++
-
-			if len(issueComments) < defaultPagination {
-				break
-			}
+		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
+			return err
 		}
 
 	}
 
 	if s.includePRComments {
-		prOpts := &github.PullRequestListCommentsOptions{
-			Sort:      sortType,
-			Direction: directionType,
-			ListOptions: github.ListOptions{
-				PerPage: defaultPagination,
-				Page:    1,
-			},
-		}
+		return s.processPRComments(ctx, repoInfo, chunksChan)
+	}
+	return nil
 
-		for {
-			prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, owner, repo, allComments, prOpts)
-			if s.handleRateLimit(err, resp) {
-				break
-			}
+}
 
-			if err != nil {
-				return err
-			}
+func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github issue comments", "repository", info.repoPath)
 
-			err = s.chunkPullRequestComments(ctx, repo, prComments, chunksChan, repoPath)
-			if err != nil {
-				return err
-			}
-
-			prOpts.ListOptions.Page++
-
-			if len(prComments) < defaultPagination {
-				break
-			}
-		}
+	issueOpts := &github.IssueListCommentsOptions{
+		Sort:      &sortType,
+		Direction: &directionType,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
 	}
 
+	for {
+		issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, info.owner, info.repo, allComments, issueOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkIssueComments(ctx, info.repo, info.repoPath, issueComments, chunksChan); err != nil {
+			return err
+		}
+
+		issueOpts.ListOptions.Page++
+
+		if len(issueComments) < defaultPagination {
+			break
+		}
+	}
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments []*github.IssueComment, chunksChan chan *sources.Chunk, repoPath string) error {
+func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github pull request comments", "repository", info.repoPath)
+
+	prOpts := &github.PullRequestListCommentsOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
+	}
+
+	for {
+		prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, info.owner, info.repo, allComments, prOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkPullRequestComments(ctx, info.repo, prComments, chunksChan); err != nil {
+			return err
+		}
+
+		prOpts.ListOptions.Page++
+
+		if len(prComments) < defaultPagination {
+			break
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1053,7 +1248,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo string, comments [
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk, repoPath string) error {
+func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1068,6 +1263,40 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
 						Repository: sanitizer.UTF8(repo),
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
+	for _, comment := range comments {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(comment.GetURL()),
+						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(gistUrl),
+						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+						// Fetching this information requires making an additional API call.
+						// We may want to include this in the future.
+						// Visibility: s.visibilityOf(ctx, repoPath),
 					},
 				},
 			},

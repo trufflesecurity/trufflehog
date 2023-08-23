@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -17,6 +19,13 @@ type expResult struct {
 	B          string
 	LineNumber int64
 	Verified   bool
+}
+
+type discardPrinter struct{}
+
+func (p *discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) error {
+	// This method intentionally does nothing.
+	return nil
 }
 
 func TestGitEngine(t *testing.T) {
@@ -56,14 +65,13 @@ func TestGitEngine(t *testing.T) {
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
-			e := Start(ctx,
+			e, err := Start(ctx,
 				WithConcurrency(1),
 				WithDecoders(decoders.DefaultDecoders()...),
 				WithDetectors(true, DefaultDetectors()...),
+				WithPrinter(new(discardPrinter)),
 			)
-			// Make the channels buffered so Finish returns.
-			e.chunks = make(chan *sources.Chunk, 10)
-			e.results = make(chan detectors.ResultWithMetadata, 10)
+			assert.Nil(t, err)
 
 			cfg := sources.GitConfig{
 				RepoPath: path,
@@ -76,12 +84,8 @@ func TestGitEngine(t *testing.T) {
 				return
 			}
 
-			logFatalFunc := func(_ error, _ string, _ ...any) {
-				t.Fatalf("error logging function should not have been called")
-			}
 			// Wait for all the chunks to be processed.
-			e.Finish(ctx, logFatalFunc)
-			resultCount := 0
+			assert.Nil(t, e.Finish(ctx))
 			for result := range e.ResultsChan() {
 				switch meta := result.SourceMetadata.GetData().(type) {
 				case *source_metadatapb.MetaData_Git:
@@ -95,12 +99,10 @@ func TestGitEngine(t *testing.T) {
 						t.Errorf("%s: unexpected verification. Got: %v, Expected: %v", tName, result.Verified, tTest.expected[meta.Git.Commit].Verified)
 					}
 				}
-				resultCount++
 
 			}
-			if resultCount != len(tTest.expected) {
-				t.Errorf("%s: unexpected number of results. Got: %d, Expected: %d", tName, resultCount, len(tTest.expected))
-			}
+			metrics := e.GetMetrics()
+			assert.Equal(t, len(tTest.expected), int(metrics.VerifiedSecretsFound)+int(metrics.UnverifiedSecretsFound))
 		})
 	}
 }
@@ -117,11 +119,13 @@ func BenchmarkGitEngine(b *testing.B) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	e := Start(ctx,
+	e, err := Start(ctx,
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(false, DefaultDetectors()...),
 	)
+	assert.Nil(b, err)
+
 	go func() {
 		resultCount := 0
 		for range e.ResultsChan() {
@@ -140,8 +144,5 @@ func BenchmarkGitEngine(b *testing.B) {
 			return
 		}
 	}
-	logFatalFunc := func(_ error, _ string, _ ...any) {
-		b.Fatalf("error logging function should not have been called")
-	}
-	e.Finish(ctx, logFatalFunc)
+	assert.Nil(b, e.Finish(ctx))
 }

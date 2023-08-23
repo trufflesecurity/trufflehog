@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -12,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -41,7 +42,11 @@ type Source struct {
 	verify   bool
 	git      *Git
 	sources.Progress
-	conn *sourcespb.Git
+	conn        *sourcespb.Git
+	scanOptions *ScanOptions
+	// Kludge to preserve engine.ScanGit functionality which doesn't expect
+	// the scanning to clean up the directory.
+	preserveTempDirs bool
 }
 
 type Git struct {
@@ -51,7 +56,12 @@ type Git struct {
 	jobID              int64
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
+	metrics            metrics
 	concurrency        *semaphore.Weighted
+}
+
+type metrics struct {
+	commitsScanned uint64
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
@@ -86,12 +96,28 @@ func (s *Source) JobID() int64 {
 	return s.jobId
 }
 
+// WithScanOptions sets the scan options.
+func (s *Source) WithScanOptions(scanOptions *ScanOptions) {
+	s.scanOptions = scanOptions
+}
+
+// WithPreserveTempDirs sets whether to preserve temp directories when scanning
+// the provided list of s.conn.Directories. NOTE: This is *only* for
+// s.conn.Directories, not all temp directories created. This is also a kludge
+// and should be refactored away.
+func (s *Source) WithPreserveTempDirs(preserve bool) {
+	s.preserveTempDirs = preserve
+}
+
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
+	if s.scanOptions == nil {
+		s.scanOptions = &ScanOptions{}
+	}
 
 	var conn sourcespb.Git
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
@@ -129,8 +155,29 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	// TODO: refactor to remove duplicate code
+	if err := s.scanRepos(ctx, chunksChan); err != nil {
+		return err
+	}
+	if err := s.scanDirs(ctx, chunksChan); err != nil {
+		return err
+	}
+
 	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
+	ctx.Logger().V(1).Info("Git source finished scanning", "repo_count", totalRepos)
+	s.SetProgressComplete(
+		totalRepos, totalRepos,
+		fmt.Sprintf("Completed scanning source %s", s.name), "",
+	)
+	return nil
+}
+
+// scanRepos scans the configured repositories in s.conn.Repositories.
+func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	if len(s.conn.Repositories) == 0 {
+		return nil
+	}
+	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
+	// TODO: refactor to remove duplicate code
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.Git_BasicAuth:
 		user := cred.BasicAuth.Username
@@ -147,7 +194,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -166,7 +213,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -185,7 +232,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, NewScanOptions(), chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -195,48 +242,50 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	default:
 		return errors.New("invalid connection type for git source")
 	}
+	return nil
+}
 
+// scanDirs scans the configured directories in s.conn.Directories.
+func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
 	for i, gitDir := range s.conn.Directories {
 		s.SetProgressComplete(len(s.conn.Repositories)+i, totalRepos, fmt.Sprintf("Repo: %s", gitDir), "")
 
 		if len(gitDir) == 0 {
 			continue
 		}
-		if !strings.HasSuffix(gitDir, "git") {
-			// try paths instead of url
-			repo, err := RepoFromPath(gitDir)
-			if err != nil {
-				ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
-				continue
+		if !s.scanOptions.Bare && strings.HasSuffix(gitDir, "git") {
+			// TODO: Figure out why we skip directories ending in "git".
+			continue
+		}
+		// try paths instead of url
+		repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
+		if err != nil {
+			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+			continue
+		}
+
+		err = func(repoPath string) error {
+			if !s.preserveTempDirs && strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
+				defer os.RemoveAll(repoPath)
 			}
 
-			err = func(repoPath string) error {
-				if strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
-					defer os.RemoveAll(repoPath)
-				}
-
-				return s.git.ScanRepo(ctx, repo, repoPath, NewScanOptions(), chunksChan)
-			}(gitDir)
-			if err != nil {
-				ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
-				continue
-			}
+			return s.git.ScanRepo(ctx, repo, repoPath, s.scanOptions, chunksChan)
+		}(gitDir)
+		if err != nil {
+			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+			continue
 		}
 
 	}
-
-	ctx.Logger().V(1).Info("Git source finished scanning", "repo-count", totalRepos)
-	s.SetProgressComplete(
-		totalRepos, totalRepos,
-		fmt.Sprintf("Completed scanning source %s", s.name), "",
-	)
 	return nil
 }
 
-func RepoFromPath(path string) (*git.Repository, error) {
-	options := &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
+func RepoFromPath(path string, isBare bool) (*git.Repository, error) {
+	options := &git.PlainOpenOptions{}
+	if !isBare {
+		options.DetectDotGit = true
+		options.EnableDotGitCommonDir = true
 	}
 	return git.PlainOpenWithOptions(path, options)
 }
@@ -339,12 +388,16 @@ func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitUrl, args...)
 }
 
+func (s *Git) CommitsScanned() uint64 {
+	return atomic.LoadUint64(&s.metrics.commitsScanned)
+}
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
 	if err := GitCmdCheck(); err != nil {
 		return err
 	}
 
-	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs)
+	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -371,6 +424,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 		depth++
+		atomic.AddUint64(&s.metrics.commitsScanned, 1)
 		logger.V(5).Info("scanning commit", "commit", commit.Hash)
 		for _, diff := range commit.Diffs {
 			if !scanOptions.Filter.Pass(diff.PathB) {
@@ -571,8 +625,10 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
 		return err
 	}
-	if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
-		ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+	if !scanOptions.Bare {
+		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
+			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+		}
 	}
 
 	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp
@@ -584,7 +640,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	}
 
 	scanTime := time.Now().Unix() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime)
+	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime, "commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned))
 	return nil
 }
 
@@ -874,14 +930,18 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	}
 	reader.Stop()
 
-	chunkData, err := io.ReadAll(reader)
-	if err != nil {
-		return err
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, reader)
+	for data := range chunkResChan {
+		chunk := *chunkSkel
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
+		}
+		if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+			return err
+		}
 	}
-
-	chunk := *chunkSkel
-	chunk.Data = chunkData
-	chunksChan <- &chunk
 
 	return nil
 }
