@@ -213,24 +213,13 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	const defaultAWSRegion = "us-east-1"
 
-	if len(s.conn.Roles) > 0 {
-		for _, role := range s.conn.Roles {
-			client, err := s.newUnifiedClient(defaultAWSRegion, role)
-			if err != nil {
-				return errors.WrapPrefix(err, "could not create s3 client", 0)
-			}
+	roles := s.conn.Roles
+	if len(roles) == 0 {
+		roles = []string{""}
+	}
 
-			bucketsToScan, err := s.getBucketsToScan(client)
-			if err != nil {
-				return err
-			}
-
-			if err := s.scanBuckets(ctx, client, role, bucketsToScan, chunksChan); err != nil {
-				return err
-			}
-		}
-	} else {
-		client, err := s.newUnifiedClient(defaultAWSRegion, "")
+	for _, role := range roles {
+		client, err := s.newUnifiedClient(defaultAWSRegion, role)
 		if err != nil {
 			return errors.WrapPrefix(err, "could not create s3 client", 0)
 		}
@@ -240,7 +229,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			return err
 		}
 
-		if err := s.scanBuckets(ctx, client, "", bucketsToScan, chunksChan); err != nil {
+		if err := s.scanBuckets(ctx, client, role, bucketsToScan, chunksChan); err != nil {
 			return err
 		}
 	}
