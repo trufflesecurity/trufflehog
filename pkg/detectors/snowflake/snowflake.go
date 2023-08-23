@@ -14,7 +14,6 @@ import (
 )
 
 type Scanner struct {
-	context context.Context
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -109,11 +108,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 					defer db.Close()
 
-					if s.context == nil {
-						s.context = context.Background()
+					if ctx == nil {
+						ctx = context.Background()
 					}
 
-					err = db.PingContext(s.context)
+					err = db.PingContext(ctx)
 					if err != nil {
 						if strings.Contains(err.Error(), "Incorrect username or password was specified") {
 							s1.Verified = false

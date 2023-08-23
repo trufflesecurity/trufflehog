@@ -103,11 +103,9 @@ func TestSnowflake_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, indeterminate error (timeout)",
-			s: Scanner{
-				context: errorCtx,
-			},
+			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    errorCtx,
 				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", secret)),
 				verify: true,
 			},
