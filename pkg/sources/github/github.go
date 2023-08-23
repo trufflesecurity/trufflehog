@@ -775,7 +775,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			s.setScanOptions(s.conn.Base, s.conn.Head)
 
 			repoSize := s.repoSizes.getRepo(repoURL)
-			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size_bytes", repoSize)
+			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size_kb", repoSize)
 
 			now := time.Now()
 			defer func(start time.Time) {
