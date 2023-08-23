@@ -59,7 +59,7 @@ type Source struct {
 	filteredRepoCache *filteredRepoCache
 	memberCache       map[string]struct{}
 	repoSizes         repoSize
-	totalRepoSize     int // total size in bytes of all repos
+	totalRepoSize     int // total size of all repos in kb
 	git               *git.Git
 
 	scanOptMu   sync.Mutex // protects the scanOptions
@@ -116,7 +116,7 @@ func (s *Source) JobID() int64 {
 
 type repoSize struct {
 	mu        sync.RWMutex
-	repoSizes map[string]int // size in bytes of each repo
+	repoSizes map[string]int // size in kb of each repo
 }
 
 func (r *repoSize) addRepo(repo string, size int) {
@@ -775,7 +775,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			s.setScanOptions(s.conn.Base, s.conn.Head)
 
 			repoSize := s.repoSizes.getRepo(repoURL)
-			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size", repoSize)
+			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size_bytes", repoSize)
 
 			now := time.Now()
 			defer func(start time.Time) {
