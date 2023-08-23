@@ -139,10 +139,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	return nil
 }
 
-// func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.Chunk, sourceType sourcespb.SourceType, sourceName string, sourceId int64, verify bool, base string, tag string) error {
 func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk) error {
 
-	base, tag := baseAndTagFromSourceChunk(chunkSkel)
+	base, tag := chunkSkel.BaseTagForDockerImg()
 
 	logger := ctx.Logger().WithValues("image", base, "tag", tag)
 	logger.V(2).Info("scanning image")
@@ -201,7 +200,7 @@ func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.C
 			}
 
 			chunk := &sources.Chunk{
-				// This must be a Docker type or SetResultLineNumber from engine.go will throw a panic for certain sources
+				// This must be TYPE_DOCKER or SetResultLineNumber could panic
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_DOCKER,
 				SourceName: chunkSkel.SourceName,
 				SourceID:   chunkSkel.SourceID,
@@ -226,10 +225,10 @@ func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.C
 			}
 		}
 
-		dockerLayersScanned.WithLabelValues(sourceName).Inc()
+		dockerLayersScanned.WithLabelValues(chunkSkel.SourceName).Inc()
 	}
 
-	dockerImagesScanned.WithLabelValues(sourceName).Inc()
+	dockerImagesScanned.WithLabelValues(chunkSkel.SourceName).Inc()
 	return err
 }
 
@@ -283,43 +282,4 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	default:
 		return nil, fmt.Errorf("unknown credential type: %T", s.conn.Credential)
 	}
-}
-
-func baseAndTagFromSourceChunk(chunkSkel *sources.Chunk) (base string, tag string) {
-	switch chunkSkel.SourceType {
-	case sourcespb.SourceType_SOURCE_TYPE_DOCKER:
-		base = chunkSkel.SourceMetadata.GetDocker().GetImage()
-		tag = chunkSkel.SourceMetadata.GetDocker().GetTag()
-	case sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM:
-		base = chunkSkel.SourceMetadata.GetFilesystem().GetFile()
-	case sourcespb.SourceType_SOURCE_TYPE_S3:
-		bucket := chunkSkel.SourceMetadata.GetS3().GetBucket()
-		file := chunkSkel.SourceMetadata.GetS3().GetFile()
-		base = bucket + "/" + file
-	case sourcespb.SourceType_SOURCE_TYPE_GCS:
-		bucket := chunkSkel.SourceMetadata.GetGcs().GetBucket()
-		file := chunkSkel.SourceMetadata.GetGcs().GetFilename()
-		base = bucket + "/" + file
-	case sourcespb.SourceType_SOURCE_TYPE_SYSLOG:
-		host := chunkSkel.SourceMetadata.GetSyslog().GetHostname()
-		app := chunkSkel.SourceMetadata.GetSyslog().GetAppname()
-		base = host + "/" + app
-	case sourcespb.SourceType_SOURCE_TYPE_GIT:
-		repo := chunkSkel.SourceMetadata.GetGit().GetRepository()
-		file := chunkSkel.SourceMetadata.GetGit().GetFile()
-		base = repo + "/" + file
-	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
-		repo := chunkSkel.SourceMetadata.GetGitlab().GetRepository()
-		file := chunkSkel.SourceMetadata.GetGitlab().GetFile()
-		base = repo + "/" + file
-	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
-		repo := chunkSkel.SourceMetadata.GetGithub().GetRepository()
-		file := chunkSkel.SourceMetadata.GetGithub().GetFile()
-		base = repo + "/" + file
-	//case sourcespb.SourceType_SOURCE_TYPE_CIRCLECI // Use Default
-	default:
-		base = chunkSkel.SourceMetadata.String()
-		tag = ""
-	}
-	return base, tag
 }
