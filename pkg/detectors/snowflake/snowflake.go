@@ -104,7 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Open a connection to Snowflake
 					db, err := sql.Open("snowflake", uri) // Needs the snowflake driver from gosnowflake
 					if err != nil {
-						s1.VerificationError = fmt.Errorf("unable to open a connection to Snowflake %+v", err)
+						panic(err)
 					}
 					defer db.Close()
 
@@ -123,6 +123,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						rows, err := db.Query(retrieveAllDatabasesQuery)
 						if err != nil {
 							s1.VerificationError = fmt.Errorf("unable to query Snowflake to enrich secret ExtraData %+v", err)
+							continue
 						}
 						defer rows.Close()
 
