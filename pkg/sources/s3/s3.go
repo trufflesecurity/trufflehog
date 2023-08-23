@@ -189,6 +189,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 			}
 			if err != nil {
 				s.log.Error(err, "could not make regional s3 client")
+				continue
 			}
 		} else {
 			regionalClient = client
