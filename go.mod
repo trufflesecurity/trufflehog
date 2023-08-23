@@ -78,6 +78,7 @@ require (
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/h2non/gock.v1 v1.1.2
+	gotest.tools/v3 v3.0.3
 	sigs.k8s.io/yaml v1.3.0
 )
 

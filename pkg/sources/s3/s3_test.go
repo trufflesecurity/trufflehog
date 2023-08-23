@@ -10,13 +10,12 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Chunks(t *testing.T) {
@@ -35,6 +34,7 @@ func TestSource_Chunks(t *testing.T) {
 		name       string
 		verify     bool
 		connection *sourcespb.S3
+		setEnv     map[string]string
 	}
 	tests := []struct {
 		name          string
@@ -66,12 +66,10 @@ func TestSource_Chunks(t *testing.T) {
 			init: init{
 				connection: &sourcespb.S3{
 					Roles: []string{"arn:aws:iam::619888638459:role/s3-test-assume-role"},
-					Credential: &sourcespb.S3_AccessKey{
-						AccessKey: &credentialspb.KeySecret{
-							Key:    s3key,
-							Secret: s3secret,
-						},
-					},
+				},
+				setEnv: map[string]string{
+					"AWS_ACCESS_KEY_ID":     s3key,
+					"AWS_SECRET_ACCESS_KEY": s3secret,
 				},
 			},
 			wantErr:       false,
@@ -83,6 +81,10 @@ func TestSource_Chunks(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 			var cancelOnce sync.Once
 			defer cancelOnce.Do(cancel)
+
+			//for k, v := range tt.init.setEnv {
+			//	defer env.Patch(t, k, v)
+			//}
 
 			s := Source{}
 			conn, err := anypb.New(tt.init.connection)
