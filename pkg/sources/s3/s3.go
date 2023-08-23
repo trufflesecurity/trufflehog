@@ -104,22 +104,34 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 	}
 }
 
-func (s *Source) newClient(region string) (*s3.S3, error) {
+func (s *Source) newUnifiedClient(region, roleArn string) (*s3.S3, error) {
 	cfg := aws.NewConfig()
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
 	cfg.Region = aws.String(region)
 
-	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.S3_SessionToken:
-		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
-	case *sourcespb.S3_AccessKey:
-		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
-	case *sourcespb.S3_Unauthenticated:
-		cfg.Credentials = credentials.AnonymousCredentials
-	case *sourcespb.S3_CloudEnvironment:
-		// Nothing needs to be done!
-	default:
-		return nil, errors.Errorf("invalid configuration given for %s source", s.name)
+	if roleArn == "" {
+		switch cred := s.conn.GetCredential().(type) {
+		case *sourcespb.S3_SessionToken:
+			cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
+		case *sourcespb.S3_AccessKey:
+			cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
+		case *sourcespb.S3_Unauthenticated:
+			cfg.Credentials = credentials.AnonymousCredentials
+		case *sourcespb.S3_CloudEnvironment:
+			// Nothing needs to be done!
+		default:
+			return nil, errors.Errorf("invalid configuration given for %s source", s.name)
+		}
+	} else {
+		sess, err := session.NewSession(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		stsClient := sts.New(sess)
+		cfg.Credentials = stscreds.NewCredentialsWithClient(stsClient, roleArn, func(p *stscreds.AssumeRoleProvider) {
+			p.RoleSessionName = "trufflehog"
+		})
 	}
 
 	sess, err := session.NewSessionWithOptions(session.Options{
@@ -130,40 +142,6 @@ func (s *Source) newClient(region string) (*s3.S3, error) {
 		return nil, err
 	}
 
-	return s3.New(sess), nil
-}
-
-// Separate role assumption functionality into a different newClient function
-func (s *Source) newRoleClient(region string, roleArn string) (*s3.S3, error) {
-
-	cfg := aws.NewConfig()
-	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
-	cfg.Region = aws.String(region)
-
-	var baseCredentials *credentials.Credentials
-
-	sess, err := session.NewSession(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	stsClient := sts.New(sess)
-	baseCredentials = stscreds.NewCredentialsWithClient(stsClient, roleArn, func(p *stscreds.AssumeRoleProvider) {
-		p.RoleSessionName = "trufflehog"
-	})
-
-	cfg.Credentials = baseCredentials
-
-	sess, err = session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            *cfg,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Create and return the S3 client with the final configuration
 	return s3.New(sess), nil
 }
 
@@ -205,9 +183,9 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 		var regionalClient *s3.S3
 		if region != defaultAWSRegion {
 			if role != "" {
-				regionalClient, err = s.newRoleClient(region, role)
+				regionalClient, err = s.newUnifiedClient(region, role)
 			} else {
-				regionalClient, err = s.newClient(region)
+				regionalClient, err = s.newUnifiedClient(region, "")
 			}
 			if err != nil {
 				s.log.Error(err, "could not make regional s3 client")
@@ -240,7 +218,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	if len(s.conn.Roles) > 0 {
 		for _, role := range s.conn.Roles {
-			client, err := s.newRoleClient(defaultAWSRegion, role)
+			client, err := s.newUnifiedClient(defaultAWSRegion, role)
 			if err != nil {
 				return errors.WrapPrefix(err, "could not create s3 client", 0)
 			}
@@ -255,7 +233,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 		}
 	} else {
-		client, err := s.newClient(defaultAWSRegion)
+		client, err := s.newUnifiedClient(defaultAWSRegion, "")
 		if err != nil {
 			return errors.WrapPrefix(err, "could not create s3 client", 0)
 		}
