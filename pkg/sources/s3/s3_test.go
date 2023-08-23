@@ -16,6 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"google.golang.org/protobuf/types/known/anypb"
+	"gotest.tools/v3/env"
 )
 
 func TestSource_Chunks(t *testing.T) {
@@ -82,9 +83,9 @@ func TestSource_Chunks(t *testing.T) {
 			var cancelOnce sync.Once
 			defer cancelOnce.Do(cancel)
 
-			//for k, v := range tt.init.setEnv {
-			//	defer env.Patch(t, k, v)
-			//}
+			for k, v := range tt.init.setEnv {
+				env.Patch(t, k, v)
+			}
 
 			s := Source{}
 			conn, err := anypb.New(tt.init.connection)
