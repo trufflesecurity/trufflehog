@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
-
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -28,7 +28,7 @@ const (
 
 var (
 	maxDepth   = 5
-	maxSize    = 250 * 1024 * 1024 * 400 // 20MB
+	maxSize    = 250 * 1024 * 1024 * 8 // 2GB+
 	maxTimeout = time.Duration(30) * time.Second
 )
 
@@ -47,10 +47,12 @@ type Archive struct {
 	currentDepth int
 }
 
-// DockerTarReader is a wrapper for io.Reader that also stores the temp filepath of the tar file.
+// DockerTarReader is a wrapper for io.Reader that also stores the temp filepath and image of the tar file.
+// Temporary file path information needed for inner-workings of go-containerregistry Image methods.
 type DockerTarReader struct {
 	io.Reader
-	tempEnv
+	img    v1.Image
+	tmpEnv tempEnv
 }
 
 // New sets a default maximum size and current size counter.
@@ -281,15 +283,16 @@ func (a *Archive) HandleSpecialized(ctx logContext.Context, reader io.Reader) (i
 		reader, err = a.extractRpmContent(ctx, reader)
 	case tarMimeType:
 		//check if tar is a docker image
-		isImg, tmpEnv, err := a.isDockerImage(ctx, reader)
+		isImg, img, tmpEnv, err := a.isDockerImage(ctx, reader)
 		if err != nil {
 			return nil, false, err
 		}
 		if isImg {
-			// Build dockerReader
+			// Build dockerReader containing docker image
 			reader = DockerTarReader{
-				Reader:  reader,
-				tempEnv: tmpEnv,
+				Reader: reader,
+				img:    img,
+				tmpEnv: tmpEnv,
 			}
 		} else {
 			return nil, false, nil
@@ -500,17 +503,23 @@ func openDataArchive(extractPath string, dataArchiveName string) (io.ReadCloser,
 	return dataFile, nil
 }
 
-func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, tmpEnv tempEnv, err error) {
+// isDockerImage checks if a reader object is a docker image.
+// returns true if the tar file is a docker image, a tempEnv struct, and err values
+// Caller is responsible for removing temporary files and directories IF the file is a docker image.
+// The docker scanner requires a file path to the image, so we must leave the temporary file on disk
+// and then remove it after the scan is complete.
+func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, img v1.Image, tmpEnv tempEnv, err error) {
 
 	tmpEnv, err = a.createTempEnv(ctx, file)
 	if err != nil {
-		return false, tempEnv{}, err
+		return false, nil, tempEnv{}, err
 	}
-	_, err = tarball.ImageFromPath(tmpEnv.tempFileName, nil)
+
+	img, err = tarball.ImageFromPath(tmpEnv.tempFileName, nil)
 	if err != nil {
 		os.Remove(tmpEnv.tempFileName)
 		os.RemoveAll(tmpEnv.extractPath)
-		return false, tempEnv{}, nil
+		return false, nil, tempEnv{}, err
 	}
-	return true, tmpEnv, nil
+	return true, img, tmpEnv, nil
 }

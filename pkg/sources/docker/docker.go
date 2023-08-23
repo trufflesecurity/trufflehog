@@ -78,7 +78,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		return err
 	}
 
-	logger := ctx.Logger().WithValues("source_type", s.Type(), "source_name", s.name)
+	ctx.Logger().WithValues("source_type", s.Type(), "source_name", s.name)
 
 	for _, image := range s.conn.GetImages() {
 		var img v1.Image
@@ -115,93 +115,122 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			}
 		}
 
-		logger = logger.WithValues("image", base, "tag", tag)
-		logger.V(2).Info("scanning image")
-
-		layers, err := img.Layers()
+		chunkSkel := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Docker{
+					Docker: &source_metadatapb.Docker{
+						Image: base,
+						Tag:   tag,
+					},
+				},
+			},
+			Verify: s.verify,
+		}
+		err = ScanDockerImg(ctx, img, chunksChan, chunkSkel)
 		if err != nil {
 			return err
 		}
 
-		for _, layer := range layers {
-
-			digest, err := layer.Digest()
-			if err != nil {
-				return err
-			}
-
-			logger = logger.WithValues("layer", digest.String())
-			logger.V(2).Info("scanning layer")
-
-			rc, err := layer.Compressed()
-			if err != nil {
-				return err
-			}
-
-			defer rc.Close()
-
-			gzipReader, err := gzip.NewReader(rc)
-			if err != nil {
-				return err
-			}
-
-			defer gzipReader.Close()
-
-			tarReader := tar.NewReader(gzipReader)
-
-			for {
-				header, err := tarReader.Next()
-				if errors.Is(err, io.EOF) {
-					break // End of archive
-				}
-				if err != nil {
-					return err
-				}
-
-				// Skip files larger than FilesizeLimitBytes
-				if header.Size > FilesizeLimitBytes {
-					continue
-				}
-
-				file := bytes.NewBuffer(make([]byte, 0, header.Size))
-
-				_, err = io.Copy(file, tarReader)
-				if err != nil {
-					return err
-				}
-
-				chunk := &sources.Chunk{
-					SourceType: s.Type(),
-					SourceName: s.name,
-					SourceID:   s.SourceID(),
-					Data:       file.Bytes(),
-					SourceMetadata: &source_metadatapb.MetaData{
-						Data: &source_metadatapb.MetaData_Docker{
-							Docker: &source_metadatapb.Docker{
-								File:  "/" + header.Name, // Prepend /, because the file is relative to the root of the image
-								Image: base,
-								Tag:   tag,
-								Layer: digest.String(),
-							},
-						},
-					},
-					Verify: s.verify,
-				}
-
-				select {
-				case chunksChan <- chunk:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-
-			dockerLayersScanned.WithLabelValues(s.name).Inc()
-		}
-
-		dockerImagesScanned.WithLabelValues(s.name).Inc()
 	}
 
 	return nil
+}
+
+// func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.Chunk, sourceType sourcespb.SourceType, sourceName string, sourceId int64, verify bool, base string, tag string) error {
+func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk) error {
+
+	base, tag := baseAndTagFromSourceChunk(chunkSkel)
+
+	logger := ctx.Logger().WithValues("image", base, "tag", tag)
+	logger.V(2).Info("scanning image")
+
+	layers, err := img.Layers()
+
+	if err != nil {
+		return err
+	}
+
+	for _, layer := range layers {
+
+		digest, err := layer.Digest()
+		if err != nil {
+			return err
+		}
+
+		logger = logger.WithValues("layer", digest.String())
+		logger.V(2).Info("scanning layer")
+
+		rc, err := layer.Compressed()
+		if err != nil {
+			return err
+		}
+
+		defer rc.Close()
+
+		gzipReader, err := gzip.NewReader(rc)
+		if err != nil {
+			return err
+		}
+
+		defer gzipReader.Close()
+
+		tarReader := tar.NewReader(gzipReader)
+
+		for {
+			header, err := tarReader.Next()
+			if errors.Is(err, io.EOF) {
+				break // End of archive
+			}
+			if err != nil {
+				return err
+			}
+
+			// Skip files larger than FilesizeLimitBytes
+			if header.Size > FilesizeLimitBytes {
+				continue
+			}
+
+			file := bytes.NewBuffer(make([]byte, 0, header.Size))
+
+			_, err = io.Copy(file, tarReader)
+			if err != nil {
+				return err
+			}
+
+			chunk := &sources.Chunk{
+				// This must be a Docker type or SetResultLineNumber from engine.go will throw a panic for certain sources
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_DOCKER,
+				SourceName: chunkSkel.SourceName,
+				SourceID:   chunkSkel.SourceID,
+				Data:       file.Bytes(),
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Docker{
+						Docker: &source_metadatapb.Docker{
+							File:  "/" + header.Name, // Prepend /, because the file is relative to the root of the image
+							Image: base,
+							Tag:   tag,
+							Layer: digest.String(),
+						},
+					},
+				},
+				Verify: chunkSkel.Verify,
+			}
+
+			select {
+			case chunksChan <- chunk:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		dockerLayersScanned.WithLabelValues(sourceName).Inc()
+	}
+
+	dockerImagesScanned.WithLabelValues(sourceName).Inc()
+	return err
 }
 
 func baseAndTagFromImage(image string) (base, tag string, hasDigest bool) {
@@ -254,4 +283,43 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	default:
 		return nil, fmt.Errorf("unknown credential type: %T", s.conn.Credential)
 	}
+}
+
+func baseAndTagFromSourceChunk(chunkSkel *sources.Chunk) (base string, tag string) {
+	switch chunkSkel.SourceType {
+	case sourcespb.SourceType_SOURCE_TYPE_DOCKER:
+		base = chunkSkel.SourceMetadata.GetDocker().GetImage()
+		tag = chunkSkel.SourceMetadata.GetDocker().GetTag()
+	case sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM:
+		base = chunkSkel.SourceMetadata.GetFilesystem().GetFile()
+	case sourcespb.SourceType_SOURCE_TYPE_S3:
+		bucket := chunkSkel.SourceMetadata.GetS3().GetBucket()
+		file := chunkSkel.SourceMetadata.GetS3().GetFile()
+		base = bucket + "/" + file
+	case sourcespb.SourceType_SOURCE_TYPE_GCS:
+		bucket := chunkSkel.SourceMetadata.GetGcs().GetBucket()
+		file := chunkSkel.SourceMetadata.GetGcs().GetFilename()
+		base = bucket + "/" + file
+	case sourcespb.SourceType_SOURCE_TYPE_SYSLOG:
+		host := chunkSkel.SourceMetadata.GetSyslog().GetHostname()
+		app := chunkSkel.SourceMetadata.GetSyslog().GetAppname()
+		base = host + "/" + app
+	case sourcespb.SourceType_SOURCE_TYPE_GIT:
+		repo := chunkSkel.SourceMetadata.GetGit().GetRepository()
+		file := chunkSkel.SourceMetadata.GetGit().GetFile()
+		base = repo + "/" + file
+	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
+		repo := chunkSkel.SourceMetadata.GetGitlab().GetRepository()
+		file := chunkSkel.SourceMetadata.GetGitlab().GetFile()
+		base = repo + "/" + file
+	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
+		repo := chunkSkel.SourceMetadata.GetGithub().GetRepository()
+		file := chunkSkel.SourceMetadata.GetGithub().GetFile()
+		base = repo + "/" + file
+	//case sourcespb.SourceType_SOURCE_TYPE_CIRCLECI // Use Default
+	default:
+		base = chunkSkel.SourceMetadata.String()
+		tag = ""
+	}
+	return base, tag
 }

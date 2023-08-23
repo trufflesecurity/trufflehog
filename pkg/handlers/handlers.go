@@ -4,15 +4,12 @@ import (
 	"context"
 	"io"
 	"os"
-	"runtime"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/docker"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func DefaultHandlers() []Handler {
@@ -62,7 +59,14 @@ func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk
 			file, isSpecial, err := specialHandler.HandleSpecialized(aCtx, reReader)
 			if isSpecial {
 				if dockerTarReader, ok := file.(DockerTarReader); ok {
-					return handleDockerTar(ctx, dockerTarReader.tempEnv, chunkSkel, chunksChan)
+					// Clean up temporary files when done.
+					defer os.Remove(dockerTarReader.tmpEnv.tempFileName)
+					defer os.RemoveAll(dockerTarReader.tmpEnv.extractPath)
+					err = docker.ScanDockerImg(ctx, dockerTarReader.img, chunksChan, chunkSkel)
+					if err != nil {
+						return false
+					}
+					return true
 				}
 				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 			}
@@ -108,37 +112,4 @@ func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sourc
 			return false
 		}
 	}
-}
-
-func handleDockerTar(ctx logContext.Context, tmpEnv tempEnv, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
-	// aCtx := logContext.AddLogger(ctx)
-	// aCtx.logger.V(3).Info("Docker image detected in tarball: " + filePath)
-	//scan with docker scanner
-
-	// Known logging issue: it shows the tempFileName as the image name, but it really should say the .tar we're scanning
-
-	defer os.Remove(tmpEnv.tempFileName)
-	defer os.RemoveAll(tmpEnv.extractPath)
-
-	dockerConn := sourcespb.Docker{
-		Images: []string{"file://" + tmpEnv.tempFileName},
-		Credential: &sourcespb.Docker_DockerKeychain{
-			DockerKeychain: true,
-		},
-	}
-	anyConn, err := anypb.New(&dockerConn)
-	if err != nil {
-		// aCtx.logger.V(3).Info("error marshalling Docker connection", "error", err)
-		return false
-	}
-	dockerSource := docker.Source{}
-	if err := dockerSource.Init(ctx, "trufflehog - docker", 0, chunkSkel.SourceID, chunkSkel.Verify, anyConn, runtime.NumCPU()); err != nil {
-		// will need to pas this in later s.jobId
-		return false
-	}
-	if err := dockerSource.Chunks(ctx, chunksChan); err != nil {
-		return false
-	}
-	return true
-
 }
