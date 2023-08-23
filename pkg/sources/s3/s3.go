@@ -203,29 +203,11 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-
-	roles := s.conn.Roles
-	if len(roles) == 0 {
-		roles = []string{""}
+	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
+		return s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
 	}
 
-	for _, role := range roles {
-		client, err := s.newClient(defaultAWSRegion, role)
-		if err != nil {
-			return errors.WrapPrefix(err, "could not create s3 client", 0)
-		}
-
-		bucketsToScan, err := s.getBucketsToScan(client)
-		if err != nil {
-			return err
-		}
-
-		if err := s.scanBuckets(ctx, client, role, bucketsToScan, chunksChan); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return s.visitRoles(ctx, visitor)
 }
 
 func (s *Source) getRegionalClientForBucket(ctx context.Context, defaultRegionClient *s3.S3, role, bucket string) (*s3.S3, error) {
@@ -403,6 +385,31 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 	}
 
 	_ = s.jobPool.Wait()
+}
+
+func (s *Source) visitRoles(ctx context.Context, f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error) error {
+	roles := s.conn.Roles
+	if len(roles) == 0 {
+		roles = []string{""}
+	}
+
+	for _, role := range roles {
+		client, err := s.newClient(defaultAWSRegion, role)
+		if err != nil {
+			return errors.WrapPrefix(err, "could not create s3 client", 0)
+		}
+
+		bucketsToScan, err := s.getBucketsToScan(client)
+		if err != nil {
+			return err
+		}
+
+		if err := f(ctx, client, role, bucketsToScan); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // S3 links currently have the general format of:
