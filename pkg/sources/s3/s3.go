@@ -54,6 +54,7 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.Validator = (*Source)(nil)
 
 // Type returns the type of source
 func (s *Source) Type() sourcespb.SourceType {
@@ -92,6 +93,21 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
 	return nil
+}
+
+func (s *Source) Validate(ctx context.Context) []error {
+	var errors []error
+	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
+		s.validateBucketAccess(c, defaultRegionClient, roleArn, buckets, &errors)
+		return nil
+	}
+
+	err := s.visitRoles(ctx, visitor)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	return errors
 }
 
 // setMaxObjectSize sets the maximum size of objects that will be scanned. If
