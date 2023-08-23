@@ -133,7 +133,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							var name, createdOn, isDefault, isCurrent, origin, owner, comment, option, retentionTime, kind string
 							err := rows.Scan(&createdOn, &name, &isDefault, &isCurrent, &origin, &owner, &comment, &option, &retentionTime, &kind)
 							if err != nil {
-								s1.VerificationError = fmt.Errorf("unable to finish querying Snowflake to enrich secret ExtraData %+v", err)
+								s1.ExtraData["Snowflake Querying Error on a Valid Credential"] = fmt.Sprintf("unable to finish querying Snowflake to enrich secret ExtraData %+v", err)
 							}
 							databases = append(databases, name)
 						}
