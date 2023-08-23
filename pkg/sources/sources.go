@@ -28,7 +28,7 @@ type Chunk struct {
 	Verify bool
 }
 
-func (c *Chunk) BaseTagForDockerImg() (base string, tag string) {
+func (c *Chunk) BaseAndTagForDockerImg() (base string, tag string) {
 	switch c.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_DOCKER:
 		base = c.SourceMetadata.GetDocker().GetImage()
@@ -50,15 +50,15 @@ func (c *Chunk) BaseTagForDockerImg() (base string, tag string) {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
 		repo := c.SourceMetadata.GetGit().GetRepository()
 		file := c.SourceMetadata.GetGit().GetFile()
-		base = repo + "/" + file
+		base = file + " (repo: " + repo + ")"
 	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
 		repo := c.SourceMetadata.GetGitlab().GetRepository()
 		file := c.SourceMetadata.GetGitlab().GetFile()
-		base = repo + "/" + file
+		base = file + " (repo: " + repo + ")"
 	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
 		repo := c.SourceMetadata.GetGithub().GetRepository()
 		file := c.SourceMetadata.GetGithub().GetFile()
-		base = repo + "/" + file
+		base = file + " (repo: " + repo + ")"
 	default:
 		base = c.SourceMetadata.String()
 		tag = ""

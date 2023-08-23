@@ -141,7 +141,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk) error {
 
-	base, tag := chunkSkel.BaseTagForDockerImg()
+	base, tag := chunkSkel.BaseAndTagForDockerImg()
 
 	logger := ctx.Logger().WithValues("image", base, "tag", tag)
 	logger.V(2).Info("scanning image")
