@@ -182,11 +182,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 
 		var regionalClient *s3.S3
 		if region != defaultAWSRegion {
-			if role != "" {
-				regionalClient, err = s.newUnifiedClient(region, role)
-			} else {
-				regionalClient, err = s.newUnifiedClient(region, "")
-			}
+			regionalClient, err = s.newUnifiedClient(region, role)
 			if err != nil {
 				s.log.Error(err, "could not make regional s3 client")
 				continue
