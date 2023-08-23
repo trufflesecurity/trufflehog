@@ -28,6 +28,11 @@ func TestSnowflake_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("SNOWFLAKE_PASS")
 	inactiveSecret := testSecrets.MustGetField("SNOWFLAKE_PASS_INACTIVE")
 
+	// Create a context with a past deadline to simulate DeadlineExceeded error
+	pastTime := time.Now().Add(-time.Second) // Set the deadline in the past
+	errorCtx, cancel := context.WithDeadline(context.Background(), pastTime)
+	defer cancel()
+
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -95,6 +100,28 @@ func TestSnowflake_FromChunk(t *testing.T) {
 			want:                nil,
 			wantErr:             false,
 			wantVerificationErr: false,
+		},
+		{
+			name: "found, indeterminate error (timeout)",
+			s: Scanner{
+				context: errorCtx,
+			},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Snowflake,
+					ExtraData: map[string]string{
+						"account":  "tuacoip-zt74995",
+						"username": "zubairkhan14",
+					},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {

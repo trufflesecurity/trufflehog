@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/snowflakedb/gosnowflake"
+	_ "github.com/snowflakedb/gosnowflake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -13,7 +13,9 @@ import (
 	"unicode"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	context context.Context
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -100,25 +102,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					_ = &gosnowflake.Config{
-						Account:  resAccountMatch,
-						User:     resUsernameMatch,
-						Password: resPasswordMatch,
-						Database: database,
-					}
-
 					// Open a connection to Snowflake
 					db, err := sql.Open("snowflake", uri) // Needs the snowflake driver from gosnowflake
-
 					if err != nil {
 						s1.VerificationError = fmt.Errorf("unable to open a connection to Snowflake %+v", err)
 					}
 					defer db.Close()
 
-					err = db.Ping()
+					if s.context == nil {
+						s.context = context.Background()
+					}
+
+					err = db.PingContext(s.context)
 					if err != nil {
 						if strings.Contains(err.Error(), "Incorrect username or password was specified") {
 							s1.Verified = false
+						} else {
+							s1.VerificationError = err
 						}
 					} else {
 						rows, err := db.Query(retrieveAllDatabasesQuery)
@@ -137,7 +137,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							databases = append(databases, name)
 						}
 						s1.ExtraData["databases"] = strings.Join(databases, ", ")
-						s1.Verified = true
+
+						if s1.VerificationError == nil {
+							s1.Verified = true
+						}
 					}
 				}
 
@@ -147,6 +150,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				results = append(results, s1)
+
 			}
 		}
 	}
