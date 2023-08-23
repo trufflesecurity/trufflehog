@@ -87,7 +87,7 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a launchdarkly secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a launchdarkly secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
