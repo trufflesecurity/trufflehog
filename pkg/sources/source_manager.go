@@ -164,13 +164,15 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 		return JobProgressRef{SourceID: int64(handle), SourceName: sourceName}, err
 	}
 	// Create a JobProgress object for tracking progress.
-	progress := NewJobProgress(jobID, int64(handle), sourceName, WithHooks(s.hooks...))
+	ctx, cancel := context.WithCancel(ctx)
+	progress := NewJobProgress(jobID, int64(handle), sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	s.pool.Go(func() error {
 		ctx := context.WithValues(ctx,
 			"job_id", jobID,
 			"source_manager_worker_id", common.RandomID(5),
 		)
 		defer common.Recover(ctx)
+		defer cancel()
 		return s.run(ctx, handle, jobID, progress)
 	})
 	return progress.Ref(), nil

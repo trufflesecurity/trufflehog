@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -286,4 +287,33 @@ func TestSourceManagerJobAndSourceIDs(t *testing.T) {
 	assert.Equal(t, int64(9001), initializedJobID)
 	assert.Equal(t, int64(9001), ref.JobID)
 	assert.Equal(t, "dummy", ref.SourceName)
+}
+
+// Chunk method that has a custom callback for the Chunks method.
+type callbackChunker struct {
+	cb func(context.Context, chan *Chunk) error
+}
+
+func (c callbackChunker) Chunks(ctx context.Context, ch chan *Chunk) error           { return c.cb(ctx, ch) }
+func (c callbackChunker) Enumerate(context.Context, UnitReporter) error              { return nil }
+func (c callbackChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error { return nil }
+
+func TestSourceManagerCancelRun(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8))
+	var returnedErr error
+	handle, err := enrollDummy(mgr, callbackChunker{func(ctx context.Context, _ chan *Chunk) error {
+		// The context passed to Chunks should get cancelled when ref.CancelRun() is called.
+		<-ctx.Done()
+		returnedErr = fmt.Errorf("oh no: %w", ctx.Err())
+		return returnedErr
+	}})
+	assert.NoError(t, err)
+
+	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	assert.NoError(t, err)
+
+	ref.CancelRun()
+	<-ref.Done()
+	assert.Error(t, ref.Snapshot().FatalError())
+	assert.True(t, errors.Is(ref.Snapshot().FatalError(), returnedErr))
 }

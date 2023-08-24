@@ -40,6 +40,8 @@ type JobProgressHook interface {
 }
 
 // JobProgressRef is a wrapper of a JobProgress for read-only access to its state.
+// If the job supports it, the reference can also be used to cancel running via
+// CancelRun.
 type JobProgressRef struct {
 	JobID       int64
 	SourceID    int64
@@ -64,6 +66,16 @@ func (r *JobProgressRef) Done() <-chan struct{} {
 		return ch
 	}
 	return r.jobProgress.Done()
+}
+
+// CancelRun requests that the job this is referencing is cancelled and stops
+// running. This method will have no effect if the job does not allow
+// cancellation.
+func (r *JobProgressRef) CancelRun() {
+	if r.jobProgress == nil || r.jobProgress.jobCancel == nil {
+		return
+	}
+	r.jobProgress.jobCancel()
 }
 
 // Fatal is a wrapper around error to differentiate non-fatal errors from fatal
@@ -95,6 +107,8 @@ type JobProgress struct {
 	// Tracks whether the job is finished or not.
 	ctx    context.Context
 	cancel context.CancelFunc
+	// Requests to cancel the job.
+	jobCancel context.CancelFunc
 	// Metrics.
 	metrics     JobProgressMetrics
 	metricsLock sync.Mutex
@@ -133,6 +147,11 @@ type JobProgressMetrics struct {
 // WithHooks adds hooks to be called when an event triggers.
 func WithHooks(hooks ...JobProgressHook) func(*JobProgress) {
 	return func(jp *JobProgress) { jp.hooks = append(jp.hooks, hooks...) }
+}
+
+// WithCancel allows cancelling the job by the JobProgressRef.
+func WithCancel(cancel context.CancelFunc) func(*JobProgress) {
+	return func(jp *JobProgress) { jp.jobCancel = cancel }
 }
 
 // NewJobProgress creates a new job report for the given source and job ID.
