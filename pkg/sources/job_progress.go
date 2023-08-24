@@ -284,3 +284,16 @@ func (m JobProgressMetrics) PercentComplete() int {
 	}
 	return int(num * 100 / den)
 }
+
+// ElapsedTime is a convenience method that provides the elapsed time the job
+// has been running. If it hasn't started yet, 0 is returned. If it has
+// finished, the total time is returned.
+func (m JobProgressMetrics) ElapsedTime() time.Duration {
+	if m.StartTime.IsZero() {
+		return 0
+	}
+	if m.EndTime.IsZero() {
+		return time.Since(m.StartTime)
+	}
+	return m.EndTime.Sub(m.StartTime)
+}
