@@ -2,10 +2,9 @@ package detectors
 
 import (
 	"context"
+	"crypto/rand"
+	"math/big"
 	"net/url"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"unicode"
 
@@ -140,23 +139,30 @@ func KeyIsRandom(key string) bool {
 }
 
 func MustGetBenchmarkData() map[string][]byte {
-	_, filename, _, _ := runtime.Caller(0)
-	dir := filepath.Dir(filename)
-	small := make([]byte, 0)
-	medium, err := os.ReadFile(filepath.Join(dir, "detectors.go"))
-	if err != nil {
-		panic(err)
+	sizes := map[string]int{
+		"xsmall":  10,          // 10 bytes
+		"small":   100,         // 100 bytes
+		"medium":  1024,        // 1KB
+		"large":   10 * 1024,   // 10KB
+		"xlarge":  100 * 1024,  // 100KB
+		"xxlarge": 1024 * 1024, // 1MB
 	}
-	big := make([]byte, 0)
-	for i := 0; i < 25; i++ {
-		big = append(big, medium...)
+	data := make(map[string][]byte)
+
+	for key, size := range sizes {
+		// Generating a byte slice of a specific size with random data.
+		content := make([]byte, size)
+		for i := 0; i < size; i++ {
+			randomByte, err := rand.Int(rand.Reader, big.NewInt(256))
+			if err != nil {
+				panic(err)
+			}
+			content[i] = byte(randomByte.Int64())
+		}
+		data[key] = content
 	}
 
-	return map[string][]byte{
-		"small":  small,
-		"medium": medium,
-		"big":    big,
-	}
+	return data
 }
 
 func RedactURL(u url.URL) string {

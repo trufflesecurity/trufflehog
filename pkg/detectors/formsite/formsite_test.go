@@ -42,7 +42,7 @@ func TestFormsite_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within formsite server %s formsite user %s", secret,server,user)),
+				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within formsite server %s formsite user %s", secret, server, user)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -58,7 +58,7 @@ func TestFormsite_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within but not valid formsite server %s formsite user %s", inactiveSecret,server,user)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a formsite secret %s within but not valid formsite server %s formsite user %s", inactiveSecret, server, user)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -107,6 +107,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {
