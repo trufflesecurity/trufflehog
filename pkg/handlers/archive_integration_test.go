@@ -22,7 +22,8 @@ import (
 
 func TestFoundKeyInDockerTar(t *testing.T) {
 	// URI of the Docker image to clone
-	imageURI := "ghcr.io/joeleonjr/getting-started-app-with-canary-token:main"
+	// imageURI := "ghcr.io/joeleonjr/getting-started-app-with-canary-token:main"
+	imageURI := "trufflesecurity/secrets"
 
 	var imageName name.Reference
 	imageName, err := name.NewTag(imageURI)
