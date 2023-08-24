@@ -935,6 +935,7 @@ enum DetectorType {
   GitHubOauth2 = 924;
   Salesforce = 925;
   HuggingFace = 926;
+  Snowflake = 927;
 }
 
 message Result {
