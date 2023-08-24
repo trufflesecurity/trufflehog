@@ -115,7 +115,7 @@ func TestGenerateLink(t *testing.T) {
 		want string
 	}{
 		{
-			name: "test link gen",
+			name: "github link gen",
 			args: args{
 				repo:   "https://github.com/trufflesec-julian/confluence-go-api.git",
 				commit: "047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
@@ -124,7 +124,7 @@ func TestGenerateLink(t *testing.T) {
 			want: "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore",
 		},
 		{
-			name: "test link gen",
+			name: "github link gen with line",
 			args: args{
 				repo:   "https://github.com/trufflesec-julian/confluence-go-api.git",
 				commit: "047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
@@ -134,7 +134,7 @@ func TestGenerateLink(t *testing.T) {
 			want: "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore#L4",
 		},
 		{
-			name: "test link gen - no file",
+			name: "github link gen - no file",
 			args: args{
 				repo:   "https://github.com/trufflesec-julian/confluence-go-api.git",
 				commit: "047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
@@ -142,7 +142,7 @@ func TestGenerateLink(t *testing.T) {
 			want: "https://github.com/trufflesec-julian/confluence-go-api/commit/047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
 		},
 		{
-			name: "test Azure link gen",
+			name: "Azure link gen",
 			args: args{
 				repo:   "https://dev.azure.com/org/project/_git/repo",
 				commit: "abcdef",
@@ -151,7 +151,7 @@ func TestGenerateLink(t *testing.T) {
 			want: "https://dev.azure.com/org/project/_git/repo?path=main.go&version=GBabcdef",
 		},
 		{
-			name: "test Azure link gen with line",
+			name: "Azure link gen with line",
 			args: args{
 				repo:   "https://dev.azure.com/org/project/_git/repo",
 				commit: "abcdef",
