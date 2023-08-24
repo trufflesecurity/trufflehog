@@ -113,6 +113,7 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 
 // GenerateLink crafts a link to the specific file from a commit.
 // Supports GitHub, GitLab, Bitbucket, and Azure Repos.
+// If the provider supports hyperlinks to specific lines, the line number will be included.
 func GenerateLink(repo, commit, file string, line int64) string {
 	switch determineProvider(repo) {
 	case providerBitbucket:
