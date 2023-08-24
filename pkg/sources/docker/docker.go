@@ -140,20 +140,16 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk) error {
-
 	base, tag := chunkSkel.BaseAndTagForDockerImg()
 
 	logger := ctx.Logger().WithValues("image", base, "tag", tag)
 	logger.V(2).Info("scanning image")
 
 	layers, err := img.Layers()
-
 	if err != nil {
 		return err
 	}
-
 	for _, layer := range layers {
-
 		digest, err := layer.Digest()
 		if err != nil {
 			return err
@@ -229,7 +225,7 @@ func ScanDockerImg(ctx context.Context, img v1.Image, chunksChan chan *sources.C
 	}
 
 	dockerImagesScanned.WithLabelValues(chunkSkel.SourceName).Inc()
-	return err
+	return nil
 }
 
 func baseAndTagFromImage(image string) (base, tag string, hasDigest bool) {

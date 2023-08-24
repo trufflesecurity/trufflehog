@@ -30,6 +30,10 @@ type Chunk struct {
 	Verify bool
 }
 
+// BaseAndTagForDockerImg returns a base and tag value for a
+// docker image regardless of the source type. If the source type
+// is not a docker image, the base will be a filename/path from the source metadata.
+// The default is the entire source metadata string. Update for new source types.
 func (c *Chunk) BaseAndTagForDockerImg() (base string, tag string) {
 	switch c.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_DOCKER:

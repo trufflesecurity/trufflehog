@@ -60,8 +60,8 @@ func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk
 			if isSpecial {
 				if dockerTarReader, ok := file.(DockerTarReader); ok {
 					// Clean up temporary files when done.
-					defer os.Remove(dockerTarReader.tmpEnv.tempFileName)
 					defer os.RemoveAll(dockerTarReader.tmpEnv.extractPath)
+					defer os.Remove(dockerTarReader.tmpEnv.tempFileName)
 					err = docker.ScanDockerImg(ctx, dockerTarReader.img, chunksChan, chunkSkel)
 					return err == nil
 				}

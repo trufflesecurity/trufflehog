@@ -16,6 +16,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -35,10 +36,17 @@ var (
 // Ensure the Archive satisfies the interfaces at compile time.
 var _ SpecializedHandler = (*Archive)(nil)
 
+// tempEnv contains the temporary file and directory information for the archive.
 type tempEnv struct {
 	tempFile     *os.File
 	tempFileName string
 	extractPath  string
+}
+
+// dockerImageDetails contains the details of the Docker image and the temporary environment.
+type dockerImageDetails struct {
+	image v1.Image
+	temp  tempEnv
 }
 
 // Archive is a handler for extracting and decompressing archives.
@@ -283,19 +291,18 @@ func (a *Archive) HandleSpecialized(ctx logContext.Context, reader io.Reader) (i
 		reader, err = a.extractRpmContent(ctx, reader)
 	case tarMimeType:
 		//check if tar is a docker image
-		isImg, img, tmpEnv, err := a.isDockerImage(ctx, reader)
+		isImg, details, err := a.isDockerImage(ctx, reader)
 		if err != nil {
 			return nil, false, err
 		}
-		if isImg {
-			// Build dockerReader containing docker image
-			reader = DockerTarReader{
-				Reader: reader,
-				img:    img,
-				tmpEnv: tmpEnv,
-			}
-		} else {
+		if !isImg {
 			return nil, false, nil
+		}
+		// Build dockerReader containing docker image
+		reader = DockerTarReader{
+			Reader: reader,
+			img:    details.image,
+			tmpEnv: details.temp,
 		}
 	default:
 		return reader, false, nil
@@ -321,8 +328,8 @@ func (a *Archive) extractDebContent(ctx logContext.Context, file io.Reader) (io.
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpEnv.tempFileName)
 	defer os.RemoveAll(tmpEnv.extractPath)
+	defer os.Remove(tmpEnv.tempFileName)
 
 	cmd := exec.Command("ar", "x", tmpEnv.tempFile.Name())
 	cmd.Dir = tmpEnv.extractPath
@@ -359,8 +366,8 @@ func (a *Archive) extractRpmContent(ctx logContext.Context, file io.Reader) (io.
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpEnv.tempFileName)
 	defer os.RemoveAll(tmpEnv.extractPath)
+	defer os.Remove(tmpEnv.tempFileName)
 
 	// Use rpm2cpio to convert the RPM file to a cpio archive and then extract it using cpio command.
 	cmd := exec.Command("sh", "-c", "rpm2cpio "+tmpEnv.tempFile.Name()+" | cpio -id")
@@ -504,22 +511,20 @@ func openDataArchive(extractPath string, dataArchiveName string) (io.ReadCloser,
 }
 
 // isDockerImage checks if a reader object is a docker image.
-// returns true if the tar file is a docker image, a tempEnv struct, and err values
+// Returns true if the tar file is a docker image, dockerImageDetails, and error.
 // Caller is responsible for removing temporary files and directories IF the file is a docker image.
-// The docker scanner requires a file path to the image, so we must leave the temporary file on disk
-// and then remove it after the scan is complete.
-func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, img v1.Image, tmpEnv tempEnv, err error) {
-
-	tmpEnv, err = a.createTempEnv(ctx, file)
+// The docker scanner requires a file path to the image, so we must leave the temporary file on disk.
+func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, details dockerImageDetails, err error) {
+	tmpEnv, err := a.createTempEnv(ctx, file)
 	if err != nil {
-		return false, nil, tempEnv{}, err
+		return false, dockerImageDetails{}, err
 	}
 
-	img, err = tarball.ImageFromPath(tmpEnv.tempFileName, nil)
+	img, err := tarball.ImageFromPath(tmpEnv.tempFileName, nil)
 	if err != nil {
 		os.Remove(tmpEnv.tempFileName)
 		os.RemoveAll(tmpEnv.extractPath)
-		return false, nil, tempEnv{}, err
+		return false, dockerImageDetails{}, err
 	}
-	return true, img, tmpEnv, nil
+	return true, dockerImageDetails{image: img, temp: tmpEnv}, nil
 }
