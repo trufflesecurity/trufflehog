@@ -124,7 +124,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						rows, err := db.Query(retrieveAllDatabasesQuery)
 						if err != nil {
 							if err != nil {
-								s1.ExtraData["Snowflake Querying Error on a Valid Credential"] = fmt.Sprintf("unable to finish querying Snowflake to enrich secret ExtraData %+v", err)
+								s1.ExtraData["Snowflake Querying Error on a Valid Credential"] = fmt.Sprintf("unable to query Snowflake %+v", err)
 							}
 							continue
 						}
