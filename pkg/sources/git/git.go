@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -691,28 +690,6 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error)
 	}
 
 	return nil
-}
-
-// GenerateLink crafts a link to the specific file from a commit. This works in most major git providers (Github/Gitlab)
-func GenerateLink(repo, commit, file string, line int64) string {
-	// bitbucket links are commits not commit...
-	if strings.Contains(repo, "bitbucket.org/") {
-		return repo[:len(repo)-4] + "/commits/" + commit
-	}
-	var link string
-	if file == "" {
-		link = repo[:len(repo)-4] + "/commit/" + commit
-	} else {
-		link = repo[:len(repo)-4] + "/blob/" + commit + "/" + file
-
-		// Both GitHub and Gitlab support hyperlinking to a specific line with #L<number>, e.g.:
-		// https://github.com/trufflesecurity/trufflehog/blob/e856a6890d0da5a218f4f9283500b80043884641/go.mod#L169
-		// https://gitlab.com/pdftk-java/pdftk/-/blob/88559a08f34175b6fae76c40a88f0377f64a12d7/java/com/gitlab/pdftk_java/report.java#L893
-		if line > 0 && (strings.Contains(repo, "github") || strings.Contains(repo, "gitlab")) {
-			link += "#L" + strconv.FormatInt(line, 10)
-		}
-	}
-	return link
 }
 
 func stripPassword(u string) (string, error) {
