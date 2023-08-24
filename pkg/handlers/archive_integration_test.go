@@ -89,7 +89,7 @@ func TestFoundKeyInDockerTar(t *testing.T) {
 		HandleFile(ctx, reReader, chunkSkel, chunksChan)
 	}()
 
-	secret := "AKIA2OGYBAH6Q2PQJUGN"
+	secret := "AKIAXYZDQCEN4B6JSJQI"
 
 	// Read from the channel and validate the secrets.
 	foundSecret := ""
