@@ -27,6 +27,7 @@ var (
 const (
 	database                  = "SNOWFLAKE"
 	retrieveAllDatabasesQuery = "SHOW DATABASES"
+	timeout                   = 3
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -89,7 +90,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 
-				uri := fmt.Sprintf("%s:%s@%s/%s", resUsernameMatch, resPasswordMatch, resAccountMatch, database)
+				// Override default timeout of 60 seconds to 3 seconds to prevent long scan times/improve performance.
+				uri := fmt.Sprintf("%s:%s@%s/%s?loginTimeout=%d", resUsernameMatch, resPasswordMatch, resAccountMatch, database, timeout)
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Snowflake,
@@ -123,9 +125,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else {
 						rows, err := db.Query(retrieveAllDatabasesQuery)
 						if err != nil {
-							if err != nil {
-								s1.ExtraData["Snowflake Querying Error on a Valid Credential"] = fmt.Sprintf("unable to query Snowflake %+v", err)
-							}
+							s1.ExtraData["Snowflake Querying Error on a Valid Credential"] = fmt.Sprintf("unable to query Snowflake %+v", err)
 							continue
 						}
 						defer rows.Close()
