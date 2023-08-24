@@ -115,3 +115,14 @@ func TestJobProgressDone(t *testing.T) {
 		assert.FailNow(t, "done should not block for a nil job")
 	}
 }
+
+func TestJobProgressElapsedTime(t *testing.T) {
+	metrics := JobProgressMetrics{}
+	assert.Equal(t, time.Duration(0), metrics.ElapsedTime())
+
+	metrics.StartTime = time.Now()
+	assert.Greater(t, metrics.ElapsedTime(), time.Duration(0))
+
+	metrics.EndTime = metrics.StartTime.Add(1 * time.Hour)
+	assert.Equal(t, metrics.ElapsedTime(), 1*time.Hour)
+}
