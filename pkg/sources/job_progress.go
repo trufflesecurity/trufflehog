@@ -96,6 +96,8 @@ type JobProgress struct {
 	// Metrics.
 	metrics     JobProgressMetrics
 	metricsLock sync.Mutex
+	// Progress reported by the source.
+	progress *Progress
 	// Coarse grained hooks for adding extra functionality when events trigger.
 	hooks []JobProgressHook
 }
@@ -110,9 +112,20 @@ type JobProgressMetrics struct {
 	FinishedUnits uint64
 	// Total number of chunks produced. This metric updates before the
 	// chunk is sent on the output channel.
-	TotalChunks     uint64
-	Errors          []error
+	TotalChunks uint64
+	// All errors encountered.
+	Errors []error
+	// Set to true if the source supports enumeration and has finished
+	// enumerating. If the source does not support enumeration, this field
+	// is always false.
 	DoneEnumerating bool
+
+	// Progress information reported by the source.
+	SourcePercent           int64
+	SourceMessage           string
+	SourceEncodedResumeInfo string
+	SourceSectionsCompleted int32
+	SourceSectionsRemaining int32
 }
 
 // WithHooks adds hooks to be called when an event triggers.
@@ -133,6 +146,12 @@ func NewJobProgress(sourceID, jobID int64, opts ...func(*JobProgress)) *JobProgr
 		opt(jp)
 	}
 	return jp
+}
+
+// TrackProgress informs the JobProgress of a Progress object and safely
+// exposes its information in the Snapshots.
+func (jp *JobProgress) TrackProgress(progress *Progress) {
+	jp.progress = progress
 }
 
 // executeHooks is a helper method to execute all the hooks for the given
@@ -210,6 +229,16 @@ func (jp *JobProgress) Snapshot() JobProgressMetrics {
 	metrics.Errors = make([]error, len(metrics.Errors))
 	copy(metrics.Errors, jp.metrics.Errors)
 
+	if jp.progress != nil {
+		jp.progress.mut.Lock()
+		defer jp.progress.mut.Unlock()
+		metrics.SourcePercent = jp.progress.PercentComplete
+		metrics.SourceMessage = jp.progress.Message
+		metrics.SourceEncodedResumeInfo = jp.progress.EncodedResumeInfo
+		metrics.SourceSectionsCompleted = jp.progress.SectionsCompleted
+		metrics.SourceSectionsRemaining = jp.progress.SectionsRemaining
+	}
+
 	return metrics
 }
 
@@ -280,7 +309,9 @@ func (m JobProgressMetrics) PercentComplete() int {
 	num := m.FinishedUnits
 	den := m.TotalUnits
 	if num == 0 && den == 0 {
-		return 0
+		// Fallback to the source's self-reported percent complete if
+		// the unit information isn't available.
+		return int(m.SourcePercent)
 	}
 	return int(num * 100 / den)
 }

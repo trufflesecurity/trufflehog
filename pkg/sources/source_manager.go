@@ -234,6 +234,7 @@ func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, rep
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
+	report.TrackProgress(source.GetProgress())
 	ctx = context.WithValues(ctx,
 		"source_type", source.Type().String(),
 		"source_name", sourceInfo.name,
