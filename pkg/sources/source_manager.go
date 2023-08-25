@@ -151,14 +151,20 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 	if err := s.preflightChecks(ctx, handle); err != nil {
 		return JobProgressRef{}, err
 	}
+	// Get the name. Should never fail due to preflight checks.
+	sourceInfo, ok := s.getSourceInfo(handle)
+	if !ok {
+		return JobProgressRef{SourceID: int64(handle)}, fmt.Errorf("unrecognized handle")
+	}
+	sourceName := sourceInfo.name
 	// Get a Job ID.
 	ctx = context.WithValue(ctx, "source_id", int64(handle))
 	jobID, err := s.api.GetJobID(ctx, int64(handle))
 	if err != nil {
-		return JobProgressRef{SourceID: int64(handle)}, err
+		return JobProgressRef{SourceID: int64(handle), SourceName: sourceName}, err
 	}
 	// Create a JobProgress object for tracking progress.
-	progress := NewJobProgress(int64(handle), jobID, WithHooks(s.hooks...))
+	progress := NewJobProgress(jobID, int64(handle), sourceName, WithHooks(s.hooks...))
 	s.pool.Go(func() error {
 		ctx := context.WithValues(ctx,
 			"job_id", jobID,

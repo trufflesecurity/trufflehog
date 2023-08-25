@@ -41,8 +41,9 @@ type JobProgressHook interface {
 
 // JobProgressRef is a wrapper of a JobProgress for read-only access to its state.
 type JobProgressRef struct {
-	SourceID    int64
 	JobID       int64
+	SourceID    int64
+	SourceName  string
 	jobProgress *JobProgress
 }
 
@@ -88,8 +89,9 @@ func (f ChunkError) Unwrap() error { return f.err }
 // JobProgress aggregates information about a run of a Source.
 type JobProgress struct {
 	// Unique identifiers for this job.
-	SourceID int64
-	JobID    int64
+	JobID      int64
+	SourceID   int64
+	SourceName string
 	// Tracks whether the job is finished or not.
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -134,13 +136,14 @@ func WithHooks(hooks ...JobProgressHook) func(*JobProgress) {
 }
 
 // NewJobProgress creates a new job report for the given source and job ID.
-func NewJobProgress(sourceID, jobID int64, opts ...func(*JobProgress)) *JobProgress {
+func NewJobProgress(jobID, sourceID int64, sourceName string, opts ...func(*JobProgress)) *JobProgress {
 	ctx, cancel := context.WithCancel(context.Background())
 	jp := &JobProgress{
-		SourceID: sourceID,
-		JobID:    jobID,
-		ctx:      ctx,
-		cancel:   cancel,
+		JobID:      jobID,
+		SourceID:   sourceID,
+		SourceName: sourceName,
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 	for _, opt := range opts {
 		opt(jp)
@@ -260,6 +263,7 @@ func (jp *JobProgress) Ref() JobProgressRef {
 	return JobProgressRef{
 		SourceID:    jp.SourceID,
 		JobID:       jp.JobID,
+		SourceName:  jp.SourceName,
 		jobProgress: jp,
 	}
 }

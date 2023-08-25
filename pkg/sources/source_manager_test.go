@@ -280,7 +280,10 @@ func TestSourceManagerJobAndSourceIDs(t *testing.T) {
 		})
 	assert.NoError(t, err)
 
-	_, _ = mgr.Run(context.Background(), handle)
+	ref, _ := mgr.Run(context.Background(), handle)
 	assert.Equal(t, int64(1337), initializedSourceID)
+	assert.Equal(t, int64(1337), ref.SourceID)
 	assert.Equal(t, int64(9001), initializedJobID)
+	assert.Equal(t, int64(9001), ref.JobID)
+	assert.Equal(t, "dummy", ref.SourceName)
 }
