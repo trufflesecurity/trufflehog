@@ -10,14 +10,12 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/anypb"
-	"gotest.tools/v3/env"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Chunks(t *testing.T) {
@@ -85,7 +83,7 @@ func TestSource_Chunks(t *testing.T) {
 			defer cancelOnce.Do(cancel)
 
 			for k, v := range tt.init.setEnv {
-				env.Patch(t, k, v)
+				t.Setenv(k, v)
 			}
 
 			s := Source{}
