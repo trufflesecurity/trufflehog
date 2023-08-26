@@ -1,11 +1,11 @@
 package planviewleankit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,61 +14,53 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat       = regexp.MustCompile(detectors.PrefixRegex([]string{"planviewleankit", "planview"}) + `\b([0-9a-f]{128})\b`)
 	subDomainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"planviewleankit", "planview"}) + `(?:subdomain).\b([a-zA-Z][a-zA-Z0-9.-]{1,23}[a-zA-Z0-9])\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"planviewleankit", "planview"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("planviewleankit"), []byte("planview")}
 }
 
-// FromData will find and optionally verify PlanviewLeanKit secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	subdomainMatches := subDomainPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	subdomainMatches := subDomainPat.FindAllSubmatch(data, -1)
 
 	for _, subdomainMatch := range subdomainMatches {
 		if len(subdomainMatch) != 2 {
 			continue
 		}
-		resSubdomainMatch := strings.TrimSpace(subdomainMatch[1])
+		resSubdomainMatch := bytes.TrimSpace(subdomainMatch[1])
 
 		for _, match := range matches {
 			if len(match) != 2 {
 				continue
 			}
-			resMatch := strings.TrimSpace(match[1])
+			resMatch := bytes.TrimSpace(match[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PlanviewLeanKit,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
+				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s.leankit.com/io/account", string(resSubdomainMatch)), nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(resMatch)))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive([]byte(resMatch), detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}

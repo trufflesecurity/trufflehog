@@ -1,10 +1,10 @@
 package paydirtapp
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,34 +20,32 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"paydirtapp"}) + `\b([a-z0-9]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"paydirtapp"}) + `\b([0-9a-z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"paydirtapp"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("paydirtapp")}
 }
 
 // FromData will find and optionally verify paydirtapp secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Paydirtapp,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://paydirtapp.com/api/v1/clients?api_key="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://paydirtapp.com/api/v1/clients?api_key="+string(resMatch), nil)
 			if err != nil {
 				continue
 			}
@@ -70,7 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return results, nil
 }
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Paydirtapp
 }

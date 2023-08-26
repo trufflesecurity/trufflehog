@@ -1,12 +1,12 @@
 package plivo
 
 import (
+	"bytes"
 	"context"
 	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,38 +26,36 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"plivo"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("plivo")}
 }
 
-// FromData will find and optionally verify Plivo secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
+
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
 			}
-			id := strings.TrimSpace(idMatch[1])
+			id := bytes.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Plivo,
-				Redacted:     id,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + id),
+				Redacted:     string(id),
+				Raw:          resMatch,
+				RawV2:        append(resMatch, id...),
 			}
-			stringResMatch := fmt.Sprintf("%s:%s", id, resMatch)
+			stringResMatch := fmt.Sprintf("%s:%s", string(id), string(resMatch))
 			decodeSecret := b64.StdEncoding.EncodeToString([]byte(stringResMatch))
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.plivo.com/v1/Account/"+id+"/Number/", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.plivo.com/v1/Account/"+string(id)+"/Number/", nil)
 				if err != nil {
 					continue
 				}
