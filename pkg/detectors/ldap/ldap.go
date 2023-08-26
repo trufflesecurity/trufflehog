@@ -11,61 +11,52 @@ import (
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	uriPat = regexp.MustCompile(`\b(?i)ldaps?://[\S]+\b`)
-	// ldap://127.0.0.1:389
-	// ldap://127.0.0.1
-	// ldap://mydomain.test
-	// ldaps://[fe80:4049:92ff:fe44:4bd1]:5060
-	// ldap://[fe80::4bd1]:5060
-	// ldap://ds.example.com:389/dc=example,dc=com?givenName,sn,cn?sub?(uid=john.doe)
+	uriPat      = regexp.MustCompile(`\b(?i)ldaps?://[\S]+\b`)
 	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"user", "bind"}) + `["']([a-zA-Z=,]{4,150})["']`)
 	passwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pass"}) + `["']([\S]{4,48})["']`)
-
-	// https://learn.microsoft.com/en-us/windows/win32/api/iads/nf-iads-iadsopendsobject-opendsobject?redirectedfrom=MSDN
-	// I.E. Set ou = dso.OpenDSObject("LDAP://DC.business.com/OU=IT,DC=Business,DC=com", "Business\administrator", "Pa$$word01", 1)
-	iadPat = regexp.MustCompile(`OpenDSObject\(\"(?i)(ldaps?://[\S]+)\", ?\"([\S]+)\", ?\"([\S]+)\",[ \d]+\)`)
+	iadPat      = regexp.MustCompile(`OpenDSObject\(\"(?i)(ldaps?://[\S]+)\", ?\"([\S]+)\", ?\"([\S]+)\",[ \d]+\)`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"ldaps://", "ldap://"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{
+		[]byte("ldaps://"),
+		[]byte("ldap://"),
+	}
 }
 
-// FromData will find and optionally verify Ldap secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	// Check for matches in the URI + username + password format
-	uriMatches := uriPat.FindAllString(dataStr, -1)
+	uriMatches := uriPat.FindAllSubmatch(data, -1)
 	for _, uri := range uriMatches {
-		ldapURL, err := url.Parse(uri)
+		ldapURL, err := url.Parse(string(uri[0]))
 		if err != nil {
 			continue
 		}
 
-		usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
+		usernameMatches := usernamePat.FindAllSubmatch(data, -1)
 		for _, username := range usernameMatches {
-			passwordMatches := passwordPat.FindAllStringSubmatch(dataStr, -1)
+			if len(username) != 2 {
+				continue
+			}
+
+			passwordMatches := passwordPat.FindAllSubmatch(data, -1)
 			for _, password := range passwordMatches {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_LDAP,
-					Raw:          []byte(strings.Join([]string{ldapURL.String(), username[1], password[1]}, "\t")),
+					Raw:          []byte(strings.Join([]string{ldapURL.String(), string(username[1]), string(password[1])}, "\t")),
 				}
 
 				if verify {
-					verificationErr := verifyLDAP(username[1], password[1], ldapURL)
+					verificationErr := verifyLDAP(string(username[1]), string(password[1]), ldapURL)
 					s1.Verified = verificationErr == nil
 					if !isErrDeterminate(verificationErr) {
 						s1.VerificationError = verificationErr
@@ -78,24 +69,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	// Check for matches for the IAD library format
-	iadMatches := iadPat.FindAllStringSubmatch(dataStr, -1)
+	iadMatches := iadPat.FindAllSubmatch(data, -1)
 	for _, iad := range iadMatches {
 		uri := iad[1]
 		username := iad[2]
 		password := iad[3]
 
-		ldapURL, err := url.Parse(uri)
+		ldapURL, err := url.Parse(string(uri))
 		if err != nil {
 			continue
 		}
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LDAP,
-			Raw:          []byte(strings.Join([]string{ldapURL.String(), username, password}, "\t")),
+			Raw:          []byte(strings.Join([]string{ldapURL.String(), string(username), string(password)}, "\t")),
 		}
 
 		if verify {
-			verificationError := verifyLDAP(username, password, ldapURL)
+			verificationError := verifyLDAP(string(username), string(password), ldapURL)
 
 			s1.Verified = verificationError == nil
 			if !isErrDeterminate(verificationError) {
