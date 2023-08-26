@@ -1,12 +1,12 @@
 package okta
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -15,51 +15,35 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	domainPat = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b`)
 	tokenPat  = regexp.MustCompile(`\b00[a-zA-Z0-9_-]{40}\b`)
-	// TODO: Oauth client secrets
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"okta"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("okta")}
 }
 
-// FromData will find and optionally verify Okta secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	for _, tokenMatch := range tokenPat.FindAll(data, -1) {
-		token := string(tokenMatch)
-
 		for _, domainMatch := range domainPat.FindAll(data, -1) {
-			domain := string(domainMatch)
-
 			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Okta,
-				Raw:          []byte(token),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, token)),
+				Raw:          tokenMatch,
+				RawV2:        []byte(fmt.Sprintf("%s:%s", string(domainMatch), string(tokenMatch))),
 			}
 
 			if verify {
-				// curl -v -X GET \
-				// -H "Accept: application/json" \
-				// -H "Content-Type: application/json" \
-				// -H "Authorization: Bearer token" \
-				// "https://subdomain.okta.com/api/v1/users/me"
-				//
-
-				url := fmt.Sprintf("https://%s/api/v1/users/me", domain)
+				url := fmt.Sprintf("https://%s/api/v1/users/me", string(domainMatch))
 				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					return results, err
 				}
 				req.Header.Set("Accept", "application/json")
 				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Authorization", fmt.Sprintf("SSWS %s", token))
+				req.Header.Set("Authorization", fmt.Sprintf("SSWS %s", string(tokenMatch)))
 
 				resp, err := common.SaneHttpClient().Do(req)
 				if err != nil {
@@ -68,14 +52,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer resp.Body.Close()
 				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 					body, _ := io.ReadAll(resp.Body)
-					if strings.Contains(string(body), "activated") {
+					if bytes.Contains(body, []byte("activated")) {
 						s.Verified = true
 					}
 				}
 			}
 
 			if !s.Verified {
-				if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+				if detectors.IsKnownFalsePositive(s.Raw, detectors.DefaultFalsePositives, true) {
 					continue
 				}
 			}
