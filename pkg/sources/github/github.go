@@ -149,14 +149,14 @@ func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) 
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			s.log.V(1).Info("invalid include glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid include glob", "include_value", ig, "err", err)
 		}
 		includeGlobs = append(includeGlobs, g)
 	}
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			s.log.V(1).Info("invalid exclude glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
 		}
 		excludeGlobs = append(excludeGlobs, g)
 	}
