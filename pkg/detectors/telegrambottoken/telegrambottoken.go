@@ -1,11 +1,10 @@
 package telegrambottoken
 
 import (
+	"bytes"
 	"context"
-	//	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -27,30 +26,29 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"telegram"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("telegram")}
 }
 
 // FromData will find and optionally verify TelegramBotToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		key := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TelegramBotToken,
-			Raw:          []byte(key),
+			Raw:          resMatch,
 		}
 
 		if verify {
 			// https://core.telegram.org/bots/api#getme
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.telegram.org/bot"+key+"/getMe", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.telegram.org/bot"+string(resMatch)+"/getMe", nil)
 			if err != nil {
 				continue
 			}
@@ -60,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}

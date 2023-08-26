@@ -1,12 +1,12 @@
 package thinkific
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,40 +28,39 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"thinkific"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("thinkific")}
 }
 
 // FromData will find and optionally verify Thinkific secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	domainMatches := domainPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		for _, domainMatch := range domainMatches {
 
 			if len(domainMatch) != 2 {
 				continue
 			}
-			resDomainMatch := strings.TrimSpace(domainMatch[1])
+			resDomainMatch := bytes.TrimSpace(domainMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Thinkific,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
-				domainRes := fmt.Sprintf("%s-s-school", resDomainMatch)
+				domainRes := fmt.Sprintf("%s-s-school", string(resDomainMatch))
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.thinkific.com/api/public/v1/collections", nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("X-Auth-API-Key", resMatch)
+				req.Header.Add("X-Auth-API-Key", string(resMatch))
 				req.Header.Add("X-Auth-Subdomain", domainRes)
 				req.Header.Add("Content-Type", "application/json")
 				res, err := client.Do(req)
@@ -71,22 +70,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						continue
 					}
-					body := string(bodyBytes)
 
-					if strings.Contains(body, "API Access is not available") {
+					if bytes.Contains(bodyBytes, []byte("API Access is not available")) {
 						s1.Verified = true
 					} else {
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
-
 				}
 			}
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil

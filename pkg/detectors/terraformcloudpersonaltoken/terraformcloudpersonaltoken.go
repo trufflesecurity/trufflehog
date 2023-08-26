@@ -1,11 +1,11 @@
 package terraformcloudpersonaltoken
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,36 +14,29 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(`\b([A-Za-z0-9]{14}.atlasv1.[A-Za-z0-9]{67})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{".atlasv1."}) + `b([A-Za-z0-9]{14}.atlasv1.[A-Za-z0-9]{67})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{".atlasv1."}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte(".atlasv1.")}
 }
 
-// FromData will find and optionally verify TerraformCloudPersonalToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TerraformCloudPersonalToken,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -51,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(resMatch)))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -64,7 +57,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 		}
-
 		results = append(results, s1)
 	}
 
