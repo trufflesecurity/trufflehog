@@ -1,6 +1,7 @@
 package github
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,18 +25,9 @@ func (Scanner) Version() int            { return 2 }
 func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
 
 var (
-	// Oauth token
-	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
-	// Token type list:
-	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
-	// https://github.blog/changelog/2022-10-18-introducing-fine-grained-personal-access-tokens/
 	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
-
-	// TODO: Oauth2 client_id and client_secret
-	// https://developer.github.com/v3/#oauth2-keysecret
 )
 
-// TODO: Add secret context?? Information about access, ownership etc
 type userRes struct {
 	Login     string `json:"login"`
 	Type      string `json:"type"`
@@ -45,41 +37,35 @@ type userRes struct {
 	UserURL   string `json:"html_url"`
 }
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("ghp_"), []byte("gho_"), []byte("ghu_"), []byte("ghs_"), []byte("ghr_"), []byte("github_pat_")}
 }
 
-// FromData will find and optionally verify GitHub secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
-		// First match is entire regex, second is the first group.
 		if len(match) != 2 {
 			continue
 		}
 
-		token := match[1]
+		token := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
-			Raw:          []byte(token),
+			Raw:          token,
 		}
 
 		if verify {
 			client := common.SaneHttpClient()
-			// https://developer.github.com/v3/users/#get-the-authenticated-user
 			for _, url := range s.Endpoints(s.DefaultEndpoint()) {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/user", url), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/user", string(url)), nil)
 				if err != nil {
 					continue
 				}
 				req.Header.Add("Content-Type", "application/json; charset=utf-8")
-				req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
+				req.Header.Add("Authorization", fmt.Sprintf("token %s", string(token)))
 				res, err := client.Do(req)
 				if err == nil {
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
@@ -102,7 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(s1.Raw, detectors.DefaultFalsePositives, true) {
 			continue
 		}
 

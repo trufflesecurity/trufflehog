@@ -1,19 +1,20 @@
 package gcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"regexp"
 	"strings"
 
+	"golang.org/x/oauth2/google"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/oauth2/google"
 )
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -33,33 +34,20 @@ type gcpKey struct {
 	ClientX509CertURL       string `json:"client_x509_cert_url"`
 }
 
-func trimCarrots(s string) string {
-	s = strings.TrimPrefix(s, "<")
-	s = strings.TrimSuffix(s, ">")
-	return s
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("provider_x509")}
 }
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"provider_x509"}
-}
-
-// FromData will find and optionally verify GCP secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllString(dataStr, -1)
+	matches := keyPat.FindAll(data, -1)
 
 	for _, match := range matches {
-		key := match
-
-		key = strings.ReplaceAll(key, `,\\n`, `\n`)
-		key = strings.ReplaceAll(key, `\"\\n`, `\n`)
-		key = strings.ReplaceAll(key, `\\"`, `"`)
+		key := bytes.ReplaceAll(match, []byte(`,\n`), []byte(`\n`))
+		key = bytes.ReplaceAll(key, []byte(`"\n`), []byte(`\n`))
+		key = bytes.ReplaceAll(key, []byte(`\"`), []byte(`"`))
 
 		creds := gcpKey{}
-		err := json.Unmarshal([]byte(key), &creds)
+		err := json.Unmarshal(key, &creds)
 		if err != nil {
 			continue
 		}
@@ -68,15 +56,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if strings.Contains(creds.ClientEmail, `<mailto:`) {
 			creds.ClientEmail = strings.Split(strings.Split(creds.ClientEmail, `<mailto:`)[1], `|`)[0]
 		}
-		creds.AuthProviderX509CertURL = trimCarrots(creds.AuthProviderX509CertURL)
-		creds.AuthURI = trimCarrots(creds.AuthURI)
-		creds.ClientX509CertURL = trimCarrots(creds.ClientX509CertURL)
-		creds.TokenURI = trimCarrots(creds.TokenURI)
+		creds.AuthProviderX509CertURL = string(trimCarrots([]byte(creds.AuthProviderX509CertURL)))
+		creds.AuthURI = string(trimCarrots([]byte(creds.AuthURI)))
+		creds.ClientX509CertURL = string(trimCarrots([]byte(creds.ClientX509CertURL)))
+		creds.TokenURI = string(trimCarrots([]byte(creds.TokenURI)))
 
-		// Not sure why this might happen, but we've observed this with a verified cred
 		raw := []byte(creds.ClientEmail)
 		if len(raw) == 0 {
-			raw = []byte(key)
+			raw = key
 		}
 
 		credBytes, _ := json.Marshal(creds)
@@ -105,6 +92,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+func trimCarrots(s []byte) []byte {
+	s = bytes.TrimPrefix(s, []byte("<"))
+	s = bytes.TrimSuffix(s, []byte(">"))
+	return s
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

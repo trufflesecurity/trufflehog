@@ -5,10 +5,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/oauth2/github"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{ detectors.EndpointSetter }
@@ -28,8 +29,8 @@ const (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"github"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("github")}
 }
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
@@ -65,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = true
 			}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
+			if !s1.Verified && detectors.IsKnownFalsePositive(s1.Raw, detectors.DefaultFalsePositives, true) {
 				continue
 			}
 
