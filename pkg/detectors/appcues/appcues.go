@@ -1,11 +1,11 @@
 package appcues
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,64 +20,59 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"appcues"}) + `\b([a-z0-9-]{36})\b`)
 	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appcues"}) + `\b([a-z0-9-]{39})\b`)
 	idPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"appcues"}) + `\b([0-9]{5})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"appcues"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("appcues")}
 }
 
-// FromData will find and optionally verify Appcues secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := keyPat.FindAllSubmatch(data, -1)
+	userMatches := userPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
 
-	for _, match := range matches {
+	for _, match := range keyMatches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, userMatch := range userMatches {
 			if len(userMatch) != 2 {
 				continue
 			}
 
-			resUserMatch := strings.TrimSpace(userMatch[1])
+			resUserMatch := bytes.TrimSpace(userMatch[1])
 
 			for _, idMatch := range idMatches {
 				if len(idMatch) != 2 {
 					continue
 				}
 
-				resIdMatch := strings.TrimSpace(idMatch[1])
+				resIdMatch := bytes.TrimSpace(idMatch[1])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Appcues,
-					Raw:          []byte(resMatch),
-					RawV2:        []byte(resMatch + resUserMatch),
+					Raw:          resMatch,
+					RawV2:        append(resMatch, resUserMatch...),
 				}
+
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.appcues.com/v2/accounts/%s/flows", resIdMatch), nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.appcues.com/v2/accounts/%s/flows", string(resIdMatch)), nil)
 					if err != nil {
 						continue
 					}
-					req.SetBasicAuth(resUserMatch, resMatch)
+					req.SetBasicAuth(string(resUserMatch), string(resMatch))
 					res, err := client.Do(req)
 					if err == nil {
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 								continue
 							}

@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -19,7 +20,8 @@ import (
 
 type scanner struct {
 	verificationClient *http.Client
-	skipIDs            map[string]struct{}
+
+	skipIDs map[string]struct{}
 }
 
 func New(opts ...func(*scanner)) *scanner {
@@ -61,14 +63,13 @@ var (
 	falsePositiveSecretCheck = regexp.MustCompile(`[a-f0-9]{40}`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s scanner) Keywords() []string {
-	return []string{
-		"AKIA",
-		"ABIA",
-		"ACCA",
-		"ASIA",
+// Returning the keywords as byte arrays
+func (s scanner) Keywords() [][]byte {
+	return [][]byte{
+		[]byte("AKIA"),
+		[]byte("ABIA"),
+		[]byte("ACCA"),
+		[]byte("ASIA"),
 	}
 }
 
@@ -87,19 +88,17 @@ func GetHMAC(key []byte, data []byte) []byte {
 
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
 
 	for _, idMatch := range idMatches {
 		if len(idMatch) != 2 {
 			continue
 		}
-		resIDMatch := strings.TrimSpace(idMatch[1])
+		resIDMatch := bytes.TrimSpace(idMatch[1])
 
 		if s.skipIDs != nil {
-			if _, ok := s.skipIDs[resIDMatch]; ok {
+			if _, ok := s.skipIDs[string(resIDMatch)]; ok {
 				continue
 			}
 		}
@@ -108,13 +107,13 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecretMatch := strings.TrimSpace(secretMatch[1])
+			resSecretMatch := bytes.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AWS,
-				Raw:          []byte(resIDMatch),
-				Redacted:     resIDMatch,
-				RawV2:        []byte(resIDMatch + resSecretMatch),
+				Raw:          resIDMatch,
+				Redacted:     string(resIDMatch),
+				RawV2:        append(append([]byte(nil), resIDMatch...), resSecretMatch...),
 			}
 
 			if verify {
@@ -146,17 +145,17 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Action", "GetCallerIdentity")
 				params.Add("Version", "2011-06-15")
 				params.Add("X-Amz-Algorithm", algorithm)
-				params.Add("X-Amz-Credential", resIDMatch+"/"+credentialScope)
+				params.Add("X-Amz-Credential", string(resIDMatch)+"/"+credentialScope)
 				params.Add("X-Amz-Date", amzDate)
 				params.Add("X-Amz-Expires", "30")
 				params.Add("X-Amz-SignedHeaders", signedHeaders)
 
 				canonicalQuerystring := params.Encode()
 				payloadHash := GetHash("") // empty payload
-				canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
+				canonicalRequest := string(method) + "\n" + string(canonicalURI) + "\n" + string(canonicalQuerystring) + "\n" + string(canonicalHeaders) + "\n" + string(signedHeaders) + "\n" + string(payloadHash)
 
 				// TASK 2: CREATE THE STRING TO SIGN.
-				stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
+				stringToSign := string(algorithm) + "\n" + string(amzDate) + "\n" + string(credentialScope) + "\n" + string(GetHash(canonicalRequest))
 
 				// TASK 3: CALCULATE THE SIGNATURE.
 				// https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
@@ -228,7 +227,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			// If the result is unverified and matches something like a git hash, don't include it in the results.
-			if !s1.Verified && falsePositiveSecretCheck.MatchString(resSecretMatch) {
+			if !s1.Verified && falsePositiveSecretCheck.Match(resSecretMatch) {
 				continue
 			}
 
@@ -241,6 +240,157 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 	return awsCustomCleanResults(results), nil
 }
+
+// func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+// 	idMatches := idPat.FindAllSubmatch(data, -1)
+// 	secretMatches := secretPat.FindAllSubmatch(data, -1)
+//
+// 	for _, idMatch := range idMatches {
+// 		if len(idMatch) != 2 {
+// 			continue
+// 		}
+// 		resIDMatch := bytes.TrimSpace(idMatch[1])
+//
+// 		if s.skipIDs != nil {
+// 			if _, ok := s.skipIDs[string(resIDMatch)]; ok {
+// 				continue
+// 			}
+// 		}
+//
+// 		for _, secretMatch := range secretMatches {
+// 			if len(secretMatch) != 2 {
+// 				continue
+// 			}
+// 			resSecretMatch := bytes.TrimSpace(secretMatch[1])
+//
+// 			s1 := detectors.Result{
+// 				DetectorType: detectorspb.DetectorType_AWS,
+// 				Raw:          resIDMatch,
+// 				Redacted:     string(resIDMatch),
+// 				RawV2:        append(append([]byte(nil), resIDMatch...), resSecretMatch...),
+// 			}
+//
+// 			if verify {
+// 				// Each string operation is converted into byte operations
+//
+// 				method := []byte("GET")
+// 				service := []byte("sts")
+// 				host := []byte("sts.amazonaws.com")
+// 				region := []byte("us-east-1")
+// 				endpoint := []byte("https://sts.amazonaws.com")
+// 				datestamp := []byte(time.Now().UTC().Format("20060102"))
+// 				amzDate := []byte(time.Now().UTC().Format("20060102T150405Z0700"))
+//
+// 				req, err := http.NewRequestWithContext(ctx, string(method), string(endpoint), nil)
+// 				if err != nil {
+// 					continue
+// 				}
+// 				req.Header.Set("Accept", "application/json")
+//
+// 				// Byte operations for the subsequent string operations
+//
+// 				canonicalURI := []byte("/")
+// 				canonicalHeaders := []byte("host:" + string(host) + "\n")
+// 				signedHeaders := []byte("host")
+// 				algorithm := []byte("AWS4-HMAC-SHA256")
+// 				credentialScope := []byte(fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service))
+//
+// 				params := req.URL.Query()
+// 				params.Add("Action", "GetCallerIdentity")
+// 				params.Add("Version", "2011-06-15")
+// 				params.Add("X-Amz-Algorithm", string(algorithm))
+// 				params.Add("X-Amz-Credential", string(resIDMatch)+"/"+string(credentialScope))
+// 				params.Add("X-Amz-Date", string(amzDate))
+// 				params.Add("X-Amz-Expires", "30")
+// 				params.Add("X-Amz-SignedHeaders", string(signedHeaders))
+//
+// 				canonicalQuerystring := params.Encode()
+// 				payloadHash := GetHash([]byte("")) // empty payload
+// 				canonicalRequest := string(method) + "\n" + string(canonicalURI) + "\n" + string(canonicalQuerystring) + "\n" + string(canonicalHeaders) + "\n" + string(signedHeaders) + "\n" + string(payloadHash)
+//
+// 				// TASK 2: CREATE THE STRING TO SIGN.
+// 				stringToSign := string(algorithm) + "\n" + string(amzDate) + "\n" + string(credentialScope) + "\n" + string(GetHash([]byte(canonicalRequest)))
+//
+// 				hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", string(resSecretMatch))), datestamp)
+// 				hash = GetHMAC(hash, region)
+// 				hash = GetHMAC(hash, service)
+// 				hash = GetHMAC(hash, []byte("aws4_request"))
+//
+// 				signature2 := GetHMAC(hash, []byte(stringToSign)) // Get Signature HMAC SHA256
+// 				signature := hex.EncodeToString(signature2)
+//
+// 				params.Add("X-Amz-Signature", signature)
+// 				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
+// 				req.URL.RawQuery = params.Encode()
+//
+// 				client := s.verificationClient
+// 				if client == nil {
+// 					client = defaultVerificationClient
+// 				}
+// 				res, err := client.Do(req)
+// 				if err == nil {
+//
+// 					if res.StatusCode >= 200 && res.StatusCode < 300 {
+// 						identityInfo := identityRes{}
+// 						err := json.NewDecoder(res.Body).Decode(&identityInfo)
+// 						if err == nil {
+// 							s1.Verified = true
+// 							s1.ExtraData = map[string]string{
+// 								"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
+// 								"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
+// 								"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
+// 							}
+// 						} else {
+// 							s1.VerificationError = err
+// 						}
+// 						res.Body.Close()
+// 					} else {
+// 						// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
+// 						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+// 							continue
+// 						}
+//
+// 						if res.StatusCode == 403 {
+// 							var body awsErrorResponseBody
+// 							err = json.NewDecoder(res.Body).Decode(&body)
+// 							res.Body.Close()
+// 							if err == nil {
+// 								// All instances of the code I've seen in the wild are PascalCased but this check is
+// 								// case-insensitive out of an abundance of caution
+// 								if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
+// 									// determinate failure - nothing to do
+// 								} else {
+// 									// We see a surprising number of false-negative signature mismatch errors here
+// 									// (The official SDK somehow elicits even more than just making the request
+// 									// ourselves)
+// 									s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
+// 								}
+// 							} else {
+// 								s1.VerificationError = fmt.Errorf("couldn't parse the sts response body (%v)", err)
+// 							}
+// 						} else {
+// 							s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+// 						}
+// 					}
+// 				} else {
+// 					s1.VerificationError = err
+// 				}
+// 			}
+//
+// 			// If the result is unverified and matches something like a git hash, don't include it in the results.
+// 			if !s1.Verified && falsePositiveSecretCheck.Match(resSecretMatch) {
+// 				continue
+// 			}
+//
+// 			results = append(results, s1)
+// 			// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
+// 			if s1.Verified {
+// 				break
+// 			}
+// 		}
+// 	}
+// 	return awsCustomCleanResults(results), nil
+// }
 
 func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 	if len(results) == 0 {
