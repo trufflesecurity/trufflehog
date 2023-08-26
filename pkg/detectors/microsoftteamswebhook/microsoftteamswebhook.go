@@ -1,11 +1,11 @@
 package microsoftteamswebhook
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -15,41 +15,34 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClientTimeOut(5 * time.Second)
-
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(https:\/\/[a-zA-Z-0-9]+\.webhook\.office\.com\/webhookb2\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\@[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\/IncomingWebhook\/[a-zA-Z-0-9]{32}\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12})`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"webhook.office.com"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("webhook.office.com")}
 }
 
-// FromData will find and optionally verify MicrosoftTeamsWebhook secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
 
+		resMatch := bytes.TrimSpace(match[1])
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
+
 		if verify {
-			payload := strings.NewReader(`{'text':''}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
+			payload := bytes.NewReader([]byte("{'text':''}"))
+			req, err := http.NewRequestWithContext(ctx, "POST", string(resMatch), payload)
 			if err != nil {
 				continue
 			}
@@ -57,9 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				body, err := io.ReadAll(res.Body)
-				res.Body.Close()
+				defer res.Body.Close()
 				if err == nil {
-					if res.StatusCode >= 200 && strings.Contains(string(body), "Text is required") {
+					if res.StatusCode >= 200 && bytes.Contains(body, []byte("Text is required")) {
 						s1.Verified = true
 					}
 				}
