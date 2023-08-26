@@ -1,12 +1,12 @@
 package sumologickey
 
 import (
+	"bytes"
 	"context"
 	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,37 +21,35 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sumo"}) + `\b([A-Za-z0-9]{14})\b`)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sumo"}) + `\b([A-Za-z0-9]{64})\b`)
+	idPat  = regexp.MustCompile(string(detectors.PrefixRegex([]string{"sumo"})) + `\b([A-Za-z0-9]{14})\b`)
+	keyPat = regexp.MustCompile(string(detectors.PrefixRegex([]string{"sumo"})) + `\b([A-Za-z0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"sumologic"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("sumologic")}
 }
 
 // FromData will find and optionally verify SumoLogicKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, idMatch := range idMatches {
 		if len(idMatch) != 2 {
 			continue
 		}
-		resIdMatch := strings.TrimSpace(idMatch[1])
+		resIdMatch := bytes.TrimSpace(idMatch[1])
 		for _, match := range matches {
 			if len(match) != 2 {
 				continue
 			}
-			resMatch := strings.TrimSpace(match[1])
+			resMatch := bytes.TrimSpace(match[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SumoLogicKey,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
@@ -68,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
@@ -78,7 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil

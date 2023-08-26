@@ -1,6 +1,7 @@
 package strava
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
@@ -13,58 +14,51 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"strava"}) + `\b([0-9]{5})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"strava"}) + `\b([0-9a-z]{40})\b`)
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"strava"}) + `\b([0-9a-z]{40})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"strava"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("strava")}
 }
 
-// FromData will find and optionally verify Strava secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
+	keyMatches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range idMatches {
 		if len(match) != 2 {
 			continue
 		}
-		resId := strings.TrimSpace(match[1])
+		resId := bytes.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecret := strings.TrimSpace(secretMatch[1])
+			resSecret := bytes.TrimSpace(secretMatch[1])
 
 			for _, keyMatch := range keyMatches {
 				if len(keyMatch) != 2 {
 					continue
 				}
-				resKey := strings.TrimSpace(keyMatch[1])
+				resKey := bytes.TrimSpace(keyMatch[1])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Strava,
-					Raw:          []byte(resId),
-					RawV2:        []byte(resId + resSecret),
+					Raw:          resId,
+					RawV2:        append(resId, resSecret...),
 				}
 
 				if verify {
-					payload := strings.NewReader("grant_type=refresh_token&client_id=" + resId + "&client_secret=" + resSecret + "&refresh_token=" + resKey)
+					payload := strings.NewReader("grant_type=refresh_token&client_id=" + string(resId) + "&client_secret=" + string(resSecret) + "&refresh_token=" + string(resKey))
 
 					req, err := http.NewRequestWithContext(ctx, "POST", "https://www.strava.com/oauth/token", payload)
 					if err != nil {
@@ -77,7 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 							if detectors.IsKnownFalsePositive(resId, detectors.DefaultFalsePositives, true) {
 								continue
 							}
