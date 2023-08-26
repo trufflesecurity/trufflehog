@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"regexp"
 
-	mssql "github.com/denisenkom/go-mssqldb"
 	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
@@ -24,15 +23,15 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"sql", "database", "Data Source", "Server=", "Network address="}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("sql"), []byte("database"), []byte("Data Source"), []byte("Server="), []byte("Network address=")}
 }
 
-// FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
+// FromData will find and optionally verify secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	matches := pattern.FindAllStringSubmatch(string(data), -1)
+	matches := pattern.FindAllSubmatch(data, -1)
 	for _, match := range matches {
-		paramsUnsafe, _, err := msdsn.Parse(match[1])
+		paramsUnsafe, _, err := msdsn.Parse(string(match[1]))
 		if err != nil {
 			continue
 		}
@@ -50,15 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			verified, err := ping(paramsUnsafe)
-
-			detected.Verified = verified
-
-			if mssqlErr, isMssqlErr := err.(mssql.Error); isMssqlErr && mssqlErr.Number == 18456 {
-				// Login failed
-				// Number taken from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
-				// Nothing to do; determinate failure to verify
+			if err != nil {
 			} else {
-				detected.VerificationError = err
+				detected.Verified = verified
 			}
 		}
 

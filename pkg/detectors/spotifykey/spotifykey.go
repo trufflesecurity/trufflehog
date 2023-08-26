@@ -1,18 +1,16 @@
 package spotifykey
 
 import (
+	"bytes"
 	"context"
-	"golang.org/x/oauth2"
-
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"golang.org/x/oauth2/clientcredentials"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 type Scanner struct{}
@@ -26,55 +24,52 @@ var (
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"id"}) + `\b([A-Za-z0-9]{32})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"spotify"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("spotify")}
 }
 
-// FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, common.SaneHttpClient())
 
-	dataStr := string(data)
-
-	matches := secretPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	matches := secretPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
 			}
-			idresMatch := strings.TrimSpace(idMatch[1])
+			idresMatch := bytes.TrimSpace(idMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SpotifyKey,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
 				config := &clientcredentials.Config{
-					ClientID:     idresMatch,
-					ClientSecret: resMatch,
+					ClientID:     string(idresMatch),
+					ClientSecret: string(resMatch),
 					TokenURL:     "https://accounts.spotify.com/api/token",
 				}
 				token, err := config.Token(ctx)
 				if err == nil {
 					if token.Type() == "Bearer" {
 						s1.Verified = true
+					} else {
+						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+							continue
+						}
 					}
 				}
 			}
-
 			results = append(results, s1)
 		}
 
 	}
-
 	return results, nil
 }
 
