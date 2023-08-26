@@ -1,6 +1,7 @@
 package rechargepayments
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
@@ -16,9 +17,8 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	verifyURL = "https://api.rechargeapps.com/token_information"
+	verifyURL = []byte("https://api.rechargeapps.com/token_information")
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	tokenPats = map[string]*regexp.Regexp{
 		"Newer API Keys":        regexp.MustCompile(`\bsk(_test)?_(1|2|3|5|10)x[123]_[0-9a-fA-F]{64}\b`),
 		"Old API key (SHA-224)": regexp.MustCompile(`\b[0-9a-fA-F]{56}\b`),
@@ -26,47 +26,42 @@ var (
 	}
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"sk_1x1", "sk_1x3", "sk_2x1", "sk_2x2", "sk_3x3", "sk_5x3", "sk_10x3", "sk_test_1x1", "sk_test_1x3", "sk_test_2x1", "sk_test_2x2", "sk_test_3x3", "sk_test_5x3", "sk_test_10x3", "X-Recharge-Access-Token"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("sk_1x1"), []byte("sk_1x3"), []byte("sk_2x1"), []byte("sk_2x2"), []byte("sk_3x3"), []byte("sk_5x3"), []byte("sk_10x3"), []byte("sk_test_1x1"), []byte("sk_test_1x3"), []byte("sk_test_2x1"), []byte("sk_test_2x2"), []byte("sk_test_3x3"), []byte("sk_test_5x3"), []byte("sk_test_10x3"), []byte("X-Recharge-Access-Token")}
 }
 
-// FromData will find and optionally verify Recharge Payment secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
 	for _, tokenPat := range tokenPats {
-		tokens := tokenPat.FindAllString(dataStr, -1)
+		tokens := tokenPat.FindAll(data, -1)
 
 		for _, token := range tokens {
-			s := detectors.Result{
+			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_RechargePayments,
-				Raw:          []byte(token),
+				Raw:          bytes.TrimSpace(token),
 			}
 			if verify {
 				client := common.SaneHttpClient()
-				req, err := http.NewRequestWithContext(ctx, "GET", verifyURL, nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", string(verifyURL), nil)
 				if err != nil {
 					continue
 				}
 				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("X-Recharge-Access-Token", token)
+				req.Header.Add("X-Recharge-Access-Token", string(token))
 				res, err := client.Do(req)
 				if err == nil {
-					res.Body.Close() // The request body is unused.
+					defer res.Body.Close()
 
 					if res.StatusCode == http.StatusOK {
-						s.Verified = true
+						s1.Verified = true
 					}
 				}
 			}
 
-			if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+			if !s1.Verified && detectors.IsKnownFalsePositive(s1.Raw, detectors.DefaultFalsePositives, true) {
 				continue
 			}
 
-			results = append(results, s)
+			results = append(results, s1)
 		}
 	}
 
