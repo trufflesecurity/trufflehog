@@ -1,10 +1,10 @@
 package sentiment
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -13,51 +13,44 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	tokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sentiment"}) + `\b([a-zA-Z0-9]{20})\b`)
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"sentiment"}) + `\b([0-9]{17})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"sentiment"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("sentiment")}
 }
 
-// FromData will find and optionally verify Sentiment secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	tokenMatches := tokenPat.FindAllStringSubmatch(dataStr, -1)
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	tokenMatches := tokenPat.FindAllSubmatch(data, -1)
+	keyMatches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range tokenMatches {
 		if len(match) != 2 {
 			continue
 		}
 
-		tokenMatch := strings.TrimSpace(match[1])
+		tokenMatch := bytes.TrimSpace(match[1])
 
 		for _, secret := range keyMatches {
 			if len(secret) != 2 {
 				continue
 			}
 
-			keyMatch := strings.TrimSpace(secret[1])
+			keyMatch := bytes.TrimSpace(secret[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Sentiment,
-				Raw:          []byte(tokenMatch),
+				Raw:          tokenMatch,
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.sentimentinvestor.com/v4/parsed?symbol=AAPL&token="+tokenMatch+"&key="+keyMatch, nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.sentimentinvestor.com/v4/parsed?symbol=AAPL&token="+string(tokenMatch)+"&key="+string(keyMatch), nil)
 				if err != nil {
 					continue
 				}
@@ -68,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(tokenMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
