@@ -7,10 +7,9 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type Scanner struct{}
@@ -20,10 +19,10 @@ var _ detectors.Detector = Scanner{}
 
 var (
 	tokenPats = map[string]*regexp.Regexp{
-		"Slack Bot Token":               regexp.MustCompile(`xoxb\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
-		"Slack User Token":              regexp.MustCompile(`xoxp\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
-		"Slack Workspace Access Token":  regexp.MustCompile(`xoxa\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
-		"Slack Workspace Refresh Token": regexp.MustCompile(`xoxr\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack Bot Token":               regexp.MustCompile(`xoxb\-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack User Token":              regexp.MustCompile(`xoxp\-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack Workspace Access Token":  regexp.MustCompile(`xoxa\-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack Workspace Refresh Token": regexp.MustCompile(`xoxr\-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9\-]*`),
 	}
 	verifyURL = "https://slack.com/api/auth.test"
 )
@@ -41,21 +40,19 @@ type authRes struct {
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"xoxb-", "xoxp-", "xoxa-", "xoxr-"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("xoxb-"), []byte("xoxp-"), []byte("xoxa-"), []byte("xoxr-")}
 }
 
 // FromData will find and optionally verify Slack secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
 	for _, tokenPat := range tokenPats {
-		tokens := tokenPat.FindAllString(dataStr, -1)
+		tokens := tokenPat.FindAll(data, -1)
 
 		for _, token := range tokens {
 			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Slack,
-				Raw:          []byte(token),
+				Raw:          token,
 			}
 			if verify {
 				client := common.SaneHttpClient()
@@ -64,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Content-Type", "application/json; charset=utf-8")
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(token)))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
