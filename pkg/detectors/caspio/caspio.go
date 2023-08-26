@@ -1,11 +1,11 @@
 package caspio
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,47 +28,45 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"caspio"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("caspio")}
 }
 
 // FromData will find and optionally verify Caspio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
+	domainMatches := domainPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
 			}
 
-			resIdMatch := strings.TrimSpace(idMatch[1])
+			resIdMatch := bytes.TrimSpace(idMatch[1])
 
 			for _, domainMatch := range domainMatches {
 				if len(domainMatch) != 2 {
 					continue
 				}
 
-				resDomainMatch := strings.TrimSpace(domainMatch[1])
+				resDomainMatch := bytes.TrimSpace(domainMatch[1])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Caspio,
-					Raw:          []byte(resMatch),
-					RawV2:        []byte(resMatch + resIdMatch + resDomainMatch),
+					Raw:          resMatch,
+					RawV2:        append(append(resMatch, resIdMatch...), resDomainMatch...),
 				}
 
 				if verify {
-					payload := strings.NewReader(fmt.Sprintf(`grant_type=client_credentials&client_id=%s&client_secret=%s`, resIdMatch, resMatch))
-					req, err := http.NewRequest("POST", fmt.Sprintf("https://%s.caspio.com/oauth/token", resDomainMatch), payload)
+					payload := bytes.NewBuffer([]byte(fmt.Sprintf(`grant_type=client_credentials&client_id=%s&client_secret=%s`, string(resIdMatch), string(resMatch))))
+					req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://%s.caspio.com/oauth/token", string(resDomainMatch)), payload)
 					if err != nil {
 						continue
 					}
@@ -79,7 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 								continue
 							}
