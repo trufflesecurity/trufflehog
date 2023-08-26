@@ -1,6 +1,7 @@
 package privatekey
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -8,7 +9,6 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
-	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -16,17 +16,19 @@ import (
 var (
 	ErrNotSupported = errors.New("key type not supported")
 	ErrEncryptedKey = errors.New("key is encrypted")
+
+	protectedKeyErrMsg = []byte("private key is passphrase protected")
 )
 
-func FingerprintPEMKey(in []byte) (string, error) {
+func FingerprintPEMKey(in []byte) ([]byte, error) {
 	parsedKey, err := ssh.ParseRawPrivateKey(in)
-	if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
+	if err != nil && bytes.Contains([]byte(err.Error()), protectedKeyErrMsg) {
 		parsedKey, err = crack(in)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	} else if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var pubKey interface{}
@@ -37,19 +39,16 @@ func FingerprintPEMKey(in []byte) (string, error) {
 		pubKey = &privateKey.PublicKey
 	case *ed25519.PrivateKey:
 		pubKey = privateKey.Public()
-	// No fingerprinting support for DSA
-	// case *dsa.PrivateKey:
-	// 	pubKey = privateKey.PublicKey
 	default:
-		return "", ErrNotSupported
+		return nil, ErrNotSupported
 	}
 
 	publickeyBytes, err := x509.MarshalPKIXPublicKey(pubKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	publicKeyFingerprint := sha1.Sum(publickeyBytes)
 	publicKeyFingerprintInHex := hex.EncodeToString(publicKeyFingerprint[:])
-	return publicKeyFingerprintInHex, nil
+	return []byte(publicKeyFingerprintInHex), nil
 }

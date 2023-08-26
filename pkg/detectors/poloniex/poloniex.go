@@ -1,6 +1,7 @@
 package poloniex
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha512"
@@ -9,7 +10,6 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -25,40 +25,35 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"poloniex"}) + `\b([0-9A-Z]{8}-[0-9A-Z]{8}-[0-9A-Z]{8}-[0-9A-Z]{8})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"poloniex"}) + `\b([0-9a-f]{128})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"poloniex"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("poloniex")}
 }
 
-// FromData will find and optionally verify Poloniex secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecretMatch := strings.TrimSpace(secretMatch[1])
+			resSecretMatch := bytes.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Poloniex,
-				Raw:          []byte(resSecretMatch),
-				RawV2:        []byte(resMatch + resSecretMatch),
+				Raw:          resSecretMatch,
+				RawV2:        append(resMatch, resSecretMatch...),
 			}
 
 			if verify {
@@ -69,14 +64,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				payload.Add("command", "returnBalances")
 				payload.Add("nonce", timestamp)
 
-				signature := getPoloniexSignature(resSecretMatch, payload.Encode())
+				signature := getPoloniexSignature(string(resSecretMatch), payload.Encode())
 
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://poloniex.com/tradingApi", strings.NewReader(payload.Encode()))
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://poloniex.com/tradingApi", bytes.NewBufferString(payload.Encode()))
 				if err != nil {
 					continue
 				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.Header.Add("Key", resMatch)
+				req.Header.Add("Key", string(resMatch))
 				req.Header.Add("Sign", signature)
 				res, err := client.Do(req)
 				if err == nil {
@@ -84,7 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
