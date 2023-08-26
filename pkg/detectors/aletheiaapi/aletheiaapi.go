@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -40,6 +41,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			timeout := 10 * time.Second
+			client.Timeout = timeout
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.aletheiaapi.com/StockData?symbol=msft&summary=true", nil)
 			if err != nil {
 				continue
