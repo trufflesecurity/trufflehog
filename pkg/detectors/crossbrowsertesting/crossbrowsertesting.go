@@ -1,10 +1,10 @@
 package crossbrowsertesting
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,32 +26,30 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"crossbrowsertesting"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("crossbrowsertesting")}
 }
 
 // FromData will find and optionally verify CrossBrowserTesting secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idmatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	idmatches := idPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		for _, idmatch := range idmatches {
 			if len(idmatch) != 2 {
 				continue
 			}
-			resIdMatch := strings.TrimSpace(idmatch[1])
+			resIdMatch := bytes.TrimSpace(idmatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_CrossBrowserTesting,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          resMatch,
+				RawV2:        append(resMatch, resIdMatch...),
 			}
 
 			if verify {
@@ -59,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.SetBasicAuth(resIdMatch, resMatch)
+				req.SetBasicAuth(string(resIdMatch), string(resMatch))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
