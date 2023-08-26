@@ -8,11 +8,12 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/sync/errgroup"
 )
 
 // The maximum number of matches from one chunk. This const is used when
@@ -180,8 +181,12 @@ func (c *customRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 }
 
-func (c *customRegexWebhook) Keywords() []string {
-	return c.GetKeywords()
+func (c *customRegexWebhook) Keywords() [][]byte {
+	keywords := make([][]byte, 0, len(c.GetKeywords()))
+	for _, keyword := range c.GetKeywords() {
+		keywords = append(keywords, []byte(keyword))
+	}
+	return keywords
 }
 
 // productIndices produces a permutation of indices for each length. Example:
