@@ -1,12 +1,12 @@
 package tru
 
 import (
+	"bytes"
 	"context"
 	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -15,51 +15,45 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"tru"}) + `\b([0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
 	secrePat = regexp.MustCompile(detectors.PrefixRegex([]string{"tru"}) + `\b([0-9a-zA-Z.-_]{26})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"tru"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("tru")}
 }
 
-// FromData will find and optionally verify Tru secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secrePat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	secretMatches := secrePat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecret := strings.TrimSpace(secretMatch[1])
+			resSecret := bytes.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Tru,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resSecret),
+				Raw:          resMatch,
+				RawV2:        append(resMatch, resSecret...),
 			}
 
 			if verify {
-				data := fmt.Sprintf("%s:%s", resMatch, resSecret)
-				baseToken := b64.StdEncoding.EncodeToString([]byte(data))
-				payload := strings.NewReader("grant_type=client_credentials")
+				data := append(resMatch, byte(':'))
+				data = append(data, resSecret...)
+				baseToken := b64.StdEncoding.EncodeToString(data)
+				payload := bytes.NewBuffer([]byte("grant_type=client_credentials"))
 				req, err := http.NewRequestWithContext(ctx, "POST", "https://eu.api.tru.id/oauth2/v1/token", payload)
 				if err != nil {
 					continue
@@ -72,8 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive(bytes.TrimSpace(resMatch), detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
