@@ -1,14 +1,18 @@
 package detectors
 
 import (
+	"bytes"
 	_ "embed"
-	"strings"
 	"unicode"
 )
 
-var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
+// var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
+//
+// type FalsePositive string
 
-type FalsePositive string
+var DefaultFalsePositives = []FalsePositive{[]byte("example"), []byte("xxxxxx"), []byte("aaaaaa"), []byte("abcde"), []byte("00000"), []byte("sample"), []byte("www")}
+
+type FalsePositive []byte
 
 //go:embed "badlist.txt"
 var badList []byte
@@ -20,9 +24,9 @@ var wordList []byte
 var programmingBookWords []byte
 
 type Wordlists struct {
-	wordList             []string
-	badList              []string
-	programmingBookWords []string
+	wordList             [][]byte
+	badList              [][]byte
+	programmingBookWords [][]byte
 }
 
 var FalsePositiveWordlists = Wordlists{
@@ -34,10 +38,10 @@ var FalsePositiveWordlists = Wordlists{
 // IsKnownFalsePositives will not return a valid secret finding if any of the disqualifying conditions are met
 // Currently that includes: No number, english word in key, or matches common example pattens.
 // Only the secret key material should be passed into this function
-func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) bool {
-
+func IsKnownFalsePositive(match []byte, falsePositives []FalsePositive, wordCheck bool) bool {
+	matchLower := bytes.ToLower(match)
 	for _, fp := range falsePositives {
-		if strings.Contains(strings.ToLower(match), string(fp)) {
+		if bytes.Contains(matchLower, fp) {
 			return true
 		}
 	}
@@ -61,31 +65,31 @@ func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordChec
 	return false
 }
 
-func hasDictWord(wordList []string, token string) bool {
-	lower := strings.ToLower(token)
+func hasDictWord(wordList [][]byte, token []byte) bool {
+	lower := bytes.ToLower(token)
 	for _, word := range wordList {
-		if strings.Contains(lower, word) {
+		if bytes.Contains(lower, word) {
 			return true
 		}
 	}
 	return false
 }
 
-func HasDigit(key string) bool {
-	for _, ch := range key {
+func HasDigit(key []byte) bool {
+	for _, ch := range string(key) {
 		if unicode.IsDigit(ch) {
 			return true
 		}
 	}
-
 	return false
 }
 
-func bytesToCleanWordList(data []byte) []string {
-	words := []string{}
-	for _, word := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(word) != "" {
-			words = append(words, strings.TrimSpace(strings.ToLower(word)))
+func bytesToCleanWordList(data []byte) [][]byte {
+	words := [][]byte{}
+	for _, word := range bytes.Split(data, []byte("\n")) {
+		trimmedWord := bytes.TrimSpace(word)
+		if len(trimmedWord) != 0 {
+			words = append(words, bytes.ToLower(trimmedWord))
 		}
 	}
 	return words
