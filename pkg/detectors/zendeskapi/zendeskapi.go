@@ -1,12 +1,12 @@
 package zendeskapi
 
 import (
+	"bytes"
 	"context"
 	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -15,7 +15,6 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -26,38 +25,33 @@ var (
 	domain = regexp.MustCompile(`\b([a-zA-Z-0-9]{3,16}\.zendesk\.com)\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"zendesk"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("zendesk")}
 }
 
-// FromData will find and optionally verify ZendeskApi secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	tokens := token.FindAllStringSubmatch(dataStr, -1)
-	domains := domain.FindAllStringSubmatch(dataStr, -1)
-	emails := email.FindAllStringSubmatch(dataStr, -1)
+	tokens := token.FindAllSubmatch(data, -1)
+	domains := domain.FindAllSubmatch(data, -1)
+	emails := email.FindAllSubmatch(data, -1)
 
-	for _, token := range tokens {
-		if len(token) != 2 {
+	for _, matchToken := range tokens {
+		if len(matchToken) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(token[1])
+		resMatch := bytes.TrimSpace(matchToken[1])
 
-		var resDomain string
-		for _, domain := range domains {
-			if len(domain) != 2 {
+		for _, matchDomain := range domains {
+			if len(matchDomain) != 2 {
 				continue
 			}
-			resDomain = strings.TrimSpace(domain[1])
+			resDomain := bytes.TrimSpace(matchDomain[1])
 
-			for _, email := range emails {
-				if len(email) != 2 {
+			for _, matchEmail := range emails {
+				if len(matchEmail) != 2 {
 					continue
 				}
-				resEmail := strings.TrimSpace(email[1])
+				resEmail := bytes.TrimSpace(matchEmail[1])
 
 				if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 					continue
@@ -65,13 +59,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZendeskApi,
-					Raw:          []byte(resMatch),
+					Raw:          resMatch,
 				}
 
 				if verify {
-					data := fmt.Sprintf("%s/token:%s", resEmail, resMatch)
+					data := fmt.Sprintf("%s/token:%s", string(resEmail), string(resMatch))
 					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomain+"/api/v2/users.json", nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+string(resDomain)+"/api/v2/users.json", nil)
 					if err != nil {
 						continue
 					}
