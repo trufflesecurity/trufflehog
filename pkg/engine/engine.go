@@ -51,6 +51,8 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
+type DetectorSlice []detectorspb.DetectorType
+
 type Engine struct {
 	// CLI flags.
 	concurrency uint8
@@ -74,6 +76,10 @@ type Engine struct {
 	workersWg            sync.WaitGroup
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
+
+	detectorTypeToDetector map[detectorspb.DetectorType]detectors.Detector
+	keywordsToDetectors    map[string]DetectorSlice
+	detectorShouldVerify   map[detectorspb.DetectorType]bool
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -306,19 +312,29 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		e.detectors[false] = []detectors.Detector{}
 	}
 
+	// Build a mapping of detector type to detector and a mapping of
+	// keyword to detector type for efficient lookups during detection.
+	totalDetectorsCnt := len(e.detectors[true]) + len(e.detectors[false])
+	e.detectorTypeToDetector = make(map[detectorspb.DetectorType]detectors.Detector, totalDetectorsCnt)
+	e.keywordsToDetectors = make(map[string]DetectorSlice, totalDetectorsCnt)
+	e.detectorShouldVerify = make(map[detectorspb.DetectorType]bool, totalDetectorsCnt)
+
 	// build ahocorasick prefilter for efficient string matching
 	// on keywords
 	keywords := []string{}
-	for _, d := range e.detectors[false] {
-		for _, kw := range d.Keywords() {
-			keywords = append(keywords, strings.ToLower(kw))
+	for verify, detectorsSet := range e.detectors {
+		for _, d := range detectorsSet {
+			detectorType := d.Type()
+			e.detectorShouldVerify[detectorType] = verify
+			e.detectorTypeToDetector[detectorType] = d
+			for _, kw := range d.Keywords() {
+				kwLower := strings.ToLower(kw)
+				keywords = append(keywords, kwLower)
+				e.keywordsToDetectors[kwLower] = append(e.keywordsToDetectors[kwLower], detectorType)
+			}
 		}
 	}
-	for _, d := range e.detectors[true] {
-		for _, kw := range d.Keywords() {
-			keywords = append(keywords, strings.ToLower(kw))
-		}
-	}
+
 	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 
 	ctx.Logger().V(3).Info("loaded decoders", "count", len(e.decoders))
@@ -435,7 +451,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
-			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
 				var decoderType detectorspb.DecoderType
@@ -457,33 +472,24 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				// build a map of all keywords that were matched in the chunk
-				for _, m := range e.prefilter.MatchString(strings.ToLower(string(decoded.Data))) {
-					matchedKeywords[strings.ToLower(m.MatchString())] = struct{}{}
+				// Determine which detectors to run on the chunk
+				// based on the keywords in the chunk.
+				uniqueDetectors := make(map[detectorspb.DetectorType]detectors.Detector)
+				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Data))) {
+					matchedDetectors := e.keywordsToDetectors[strings.ToLower(match.MatchString())]
+					for _, d := range matchedDetectors {
+						uniqueDetectors[d] = e.detectorTypeToDetector[d]
+					}
 				}
 
-				for verify, detectorsSet := range e.detectors {
-					for _, detector := range detectorsSet {
-						chunkContainsKeyword := false
-						for _, kw := range detector.Keywords() {
-							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
-								chunkContainsKeyword = true
-								break
-							}
-						}
-
-						if !chunkContainsKeyword {
-							continue
-						}
-
-						decoded.Verify = verify
-						wgDetect.Add(1)
-						e.detectableChunksChan <- detectableChunk{
-							chunk:    *decoded,
-							detector: detector,
-							decoder:  decoderType,
-							wgDoneFn: wgDetect.Done,
-						}
+				for t, detector := range uniqueDetectors {
+					decoded.Verify = e.detectorShouldVerify[t]
+					wgDetect.Add(1)
+					e.detectableChunksChan <- detectableChunk{
+						chunk:    *decoded,
+						detector: detector,
+						decoder:  decoderType,
+						wgDoneFn: wgDetect.Done,
 					}
 				}
 			}
