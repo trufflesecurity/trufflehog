@@ -1,6 +1,7 @@
 package pusherchannelkey
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/md5"
@@ -10,7 +11,6 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,75 +20,66 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	appIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pusher"}) + `\b([0-9]{7})\b`)
-	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"key"}) + `\b([a-z0-9]{20})\b`)
-	// this is currently incorrect, should be a callback from the API
+	appIdPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"pusher"}) + `\b([0-9]{7})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"key"}) + `\b([a-z0-9]{20})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pusher"}) + `\b([a-z0-9]{20})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"pusher"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("pusher")}
 }
 
 const (
 	auth_version = "1.0"
 )
 
-// FromData will find and optionally verify PusherChannelKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	appMatches := appIdPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := keyPat.FindAllSubmatch(data, -1)
+	appMatches := appIdPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
 
 	for _, appMatch := range appMatches {
 		if len(appMatch) != 2 {
 			continue
 		}
-		resappMatch := strings.TrimSpace(appMatch[1])
+		resappMatch := bytes.TrimSpace(appMatch[1])
 
 		for _, keyMatch := range keyMatches {
 			if len(keyMatch) != 2 {
 				continue
 			}
-			reskeyMatch := strings.TrimSpace(keyMatch[1])
+			reskeyMatch := bytes.TrimSpace(keyMatch[1])
 
 			for _, secretMatch := range secretMatches {
 				if len(secretMatch) != 2 {
 					continue
 				}
-				ressecretMatch := strings.TrimSpace(secretMatch[1])
+				ressecretMatch := bytes.TrimSpace(secretMatch[1])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_PusherChannelKey,
-					Raw:          []byte(resappMatch),
-					RawV2:        []byte(resappMatch + reskeyMatch),
+					Raw:          resappMatch,
+					RawV2:        append(resappMatch, reskeyMatch...),
 				}
 
 				if verify {
 
 					method := "POST"
-					path := "/apps/" + resappMatch + "/events"
+					path := []byte("/apps/" + string(resappMatch) + "/events")
 
-					stringPayload := `{"channels":["my-channel"],"data":"{\"message\":\"hello world\"}","name":"my_event"}`
-					payload := strings.NewReader(stringPayload)
+					payload := []byte(`{"channels":["my-channel"],"data":"{\"message\":\"hello world\"}","name":"my_event"}`)
 					_bodyMD5 := md5.New()
-					_bodyMD5.Write([]byte(stringPayload))
+					_bodyMD5.Write(payload)
 					md5 := hex.EncodeToString(_bodyMD5.Sum(nil))
 
 					timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 					params := url.Values{
-						"auth_key":       {reskeyMatch},
+						"auth_key":       {string(reskeyMatch)},
 						"auth_timestamp": {timestamp},
 						"auth_version":   {auth_version},
 						"body_md5":       {md5},
@@ -96,12 +87,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					usecd, _ := url.QueryUnescape(params.Encode())
 
-					stringToSign := strings.Join([]string{method, path, usecd}, "\n")
-					signature := hex.EncodeToString(hmacBytes([]byte(stringToSign), []byte(ressecretMatch)))
+					stringToSign := bytes.Join([][]byte{[]byte(method), path, []byte(usecd)}, []byte("\n"))
+					signature := hex.EncodeToString(hmacBytes(stringToSign, ressecretMatch))
 
-					md5Str := "https://api-ap1.pusher.com/apps/" + resappMatch + "/events?auth_key=" + reskeyMatch + "&auth_signature=" + signature + "&auth_timestamp=" + timestamp + "&auth_version=1.0&body_md5=" + md5
+					md5Str := "https://api-ap1.pusher.com/apps/" + string(resappMatch) + "/events?auth_key=" + string(reskeyMatch) + "&auth_signature=" + signature + "&auth_timestamp=" + timestamp + "&auth_version=1.0&body_md5=" + md5
 
-					req, err := http.NewRequestWithContext(ctx, method, md5Str, payload)
+					req, err := http.NewRequestWithContext(ctx, method, md5Str, bytes.NewReader(payload))
 					if err != nil {
 						continue
 					}
@@ -112,7 +103,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 							if detectors.IsKnownFalsePositive(ressecretMatch, detectors.DefaultFalsePositives, true) {
 								continue
 							}

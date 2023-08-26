@@ -14,10 +14,8 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-// The (`) character adds secondary encoding to parsed strings by Golang which also allows for escape sequences
 var (
 	client = common.SaneHttpClient()
 
@@ -25,28 +23,24 @@ var (
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"razor|secret|rzp|key"}) + `([A-Za-z0-9]{20,50})`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"rzp_"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("rzp_")}
 }
 
-// FromData will find and optionally verify RazorPay secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllString(dataStr, -1)
+	keyMatches := keyPat.FindAll(data, -1)
 
 	for _, key := range keyMatches {
-		secMatches := secretPat.FindAllString(dataStr, -1)
+		secMatches := secretPat.FindAll(data, -1)
 
 		for _, secret := range secMatches {
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_RazorPay,
-				Raw:          []byte(key),
-				RawV2:        []byte(key + secret),
-				Redacted:     key,
+				Raw:          key,
+				RawV2:        append(key, secret...),
+				Redacted:     string(key),
 			}
 
 			if verify {
@@ -54,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.SetBasicAuth(key, secret)
+				req.SetBasicAuth(string(key), string(secret))
 				res, err := client.Do(req)
 				if err == nil {
 					bodyBytes, err := io.ReadAll(res.Body)
