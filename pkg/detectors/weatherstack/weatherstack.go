@@ -1,12 +1,12 @@
 package weatherstack
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -27,29 +27,28 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"weatherstack"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("weatherstack")}
 }
 
 // FromData will find and optionally verify Weatherstack secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WeatherStack,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.weatherstack.com/current?access_key=%s&query=LA", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.weatherstack.com/current?access_key=%s&query=LA", string(resMatch)), nil)
 			if err != nil {
 				continue
 			}
@@ -61,8 +60,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, `location`) || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
+				body := bodyBytes
+				validResponse := bytes.Contains(body, []byte(`location`)) || bytes.Contains(body, []byte(`"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`))
 				if (res.StatusCode >= 200 && res.StatusCode < 300) && validResponse {
 					s1.Verified = true
 				} else {

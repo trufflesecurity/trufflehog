@@ -1,10 +1,10 @@
 package wepay
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -13,48 +13,39 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-
 	appIDPat = regexp.MustCompile(`\b(\d{6})\b`)
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"wepay"}) + `\b([a-zA-Z0-9_?]{62})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"wepay"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("wepay")}
 }
 
-// FromData will find and optionally verify WePay secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	appIDmatches := appIDPat.FindAllSubmatch(data, -1)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	appIDmatches := appIDPat.FindAllStringSubmatch(dataStr, -1)
-
-	resAppIDMatch := ""
+	resAppIDMatch := []byte("")
 	for _, appIDMatch := range appIDmatches {
 		if len(appIDMatch) != 2 {
 			continue
 		}
-		resAppIDMatch = strings.TrimSpace(appIDMatch[1])
-
+		resAppIDMatch = bytes.TrimSpace(appIDMatch[1])
 	}
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WePay,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -62,8 +53,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("App-Token", resMatch)
-			req.Header.Add("App-Id", resAppIDMatch)
+			req.Header.Add("App-Token", string(resMatch))
+			req.Header.Add("App-Id", string(resAppIDMatch))
 			req.Header.Add("Api-Version", "3.0")
 			req.Header.Add("Accept", "application/json")
 			req.Header.Add("Unique-Key", "Unique-Key0")
@@ -74,7 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
