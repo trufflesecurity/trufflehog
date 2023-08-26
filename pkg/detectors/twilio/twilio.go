@@ -24,30 +24,28 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"sid"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("sid")}
 }
 
 // FromData will find and optionally verify Twilio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	identifierMatches := identifierPat.FindAllString(dataStr, -1)
+	identifierMatches := identifierPat.FindAll(data, -1)
 
 	if len(identifierMatches) == 0 {
 		return
 	}
 
-	keyMatches := keyPat.FindAllString(dataStr, -1)
-	sidMatches := sidPat.FindAllString(dataStr, -1)
+	keyMatches := keyPat.FindAll(data, -1)
+	sidMatches := sidPat.FindAll(data, -1)
 
 	for _, sid := range sidMatches {
 		for _, key := range keyMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Twilio,
-				Raw:          []byte(sid),
-				RawV2:        []byte(sid + key),
-				Redacted:     sid,
+				Raw:          sid,
+				RawV2:        append(append([]byte(nil), sid...), key...),
+				Redacted:     string(sid),
 			}
 
 			if verify {
@@ -58,10 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				req.Header.Add("Accept", "*/*")
-				req.SetBasicAuth(sid, key)
+				req.SetBasicAuth(string(sid), string(key))
 				res, err := client.Do(req)
 				if err == nil {
-					res.Body.Close() // The request body is unused.
+					res.Body.Close()
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
@@ -69,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
+			if !s1.Verified && detectors.IsKnownFalsePositive(s1.Raw, detectors.DefaultFalsePositives, true) {
 				continue
 			}
 

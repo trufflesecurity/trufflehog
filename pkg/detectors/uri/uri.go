@@ -1,6 +1,7 @@
 package uri
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/url"
@@ -26,39 +27,32 @@ var (
 	client = common.SaneHttpClient()
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"http"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("http")}
 }
 
-// FromData will find and optionally verify URI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
+		// do not convert the match[0] into a string.
 
 		if !s.allowKnownTestSites {
-			if strings.Contains(match[0], "httpbin.org") {
+			if bytes.Contains(match[0], []byte("httpbin.org")) {
 				continue
 			}
-			if strings.Contains(match[0], "httpwatch.com") {
+
+			if bytes.Contains(match[0], []byte("httpwatch.com")) {
 				continue
 			}
 		}
 
-		urlMatch := match[0]
 		password := match[1]
-
-		// Skip findings where the password only has "*" characters, this is a redacted password
-		// Also include the url encoded "*" characters: "%2A"
-		if strings.Trim(password, "*") == "" || strings.Trim(password, "%2A") == "" {
+		if bytes.Trim(password, "*") == nil || bytes.Trim(password, "%2A") == nil {
 			continue
 		}
 
-		parsedURL, err := url.Parse(urlMatch)
+		parsedURL, err := url.Parse(string(match[0]))
 		if err != nil {
 			continue
 		}
@@ -66,15 +60,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		rawURL, _ := url.Parse(urlMatch)
-		rawURLStr := rawURL.String()
-		// Removing the path causes possible deduplication issues if some paths have basic auth and some do not.
+		rawURL, _ := url.Parse(string(match[0]))
+
 		rawURL.Path = ""
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_URI,
 			Raw:          []byte(rawURL.String()),
-			RawV2:        []byte(rawURLStr),
+			RawV2:        match[0],
 			Redacted:     detectors.RedactURL(*rawURL),
 		}
 
@@ -82,14 +75,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s.Verified = verifyURL(ctx, parsedURL)
 		}
 
-		if !s.Verified {
-			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
-			if strings.HasPrefix(password, "$") {
-				continue
-			}
+		if bytes.HasPrefix(password, []byte("$")) {
+			continue
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
+		if !s.Verified && detectors.IsKnownFalsePositive(s.Raw, detectors.DefaultFalsePositives, false) {
 			continue
 		}
 
