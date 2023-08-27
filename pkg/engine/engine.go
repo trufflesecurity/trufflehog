@@ -268,47 +268,66 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	return avgTime
 }
 
-// detectorKey is used to identify a detector in the keywordsToDetectors map.
-// Multiple detectors can have the same detector type but different versions.
-// This allows us to identify a detector by its type and version.
-type detectorKey struct {
-	detectorType detectorspb.DetectorType
-	version      int
+// Start initializes and activates the engine's processing pipeline.
+// It sets up various default configurations, prepares lookup structures for
+// detectors, conducts basic sanity checks, and kickstarts all necessary workers.
+// Once started, the engine begins processing input data to identify secrets.
+func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
+	e := &Engine{}
+
+	if err := e.initialize(ctx, options...); err != nil {
+		return nil, err
+	}
+	e.setDefaults(ctx)
+	e.buildLookups(ctx)
+	e.sanityChecks(ctx)
+	e.startWorkers(ctx)
+
+	return e, nil
 }
 
-// Start the engine with options.
-func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
-	const (
-		defaultChannelBuffer = 1
-		// TODO (ahrav): Determine the optimal cache size.
-		cacheSize = 512 // number of entries in the LRU cache
-	)
+const defaultChannelBuffer = 1
+
+// initialize prepares the engine's internal structures. The LRU cache optimizes
+// deduplication efforts, allowing the engine to quickly check if a chunk has
+// been processed before, thereby saving computational overhead.
+func (e *Engine) initialize(ctx context.Context, options ...EngineOption) error {
+	// TODO (ahrav): Determine the optimal cache size.
+	const cacheSize = 512 // number of entries in the LRU cache
 
 	cache, err := lru.New(cacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize LRU cache: %w", err)
+		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
 
-	e := &Engine{
-		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
-		results:              make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
-		dedupeCache:          cache,
-		printer:              new(output.PlainPrinter), // default printer
-		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
-		uniqueDetectorsPool: sync.Pool{
-			New: func() any {
-				// TODO (ahrav): Determine the optimal capacity.
-				// Assuming an average of 2 detectors matched per chunk for initial capacity.
-				return make(map[detectorspb.DetectorType]detectorInfo, 2)
-			},
+	// Channels are used for communication between different parts of the engine,
+	// ensuring that data flows smoothly without race conditions.
+	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer)
+	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
+	e.dedupeCache = cache
+	e.printer = new(output.PlainPrinter)
+	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
+	// Pool optimizes memory usage by reusing maps instead of creating a new one
+	// for each chunk processed.
+	e.uniqueDetectorsPool = sync.Pool{
+		New: func() any {
+			// TODO (ahrav): Determine the optimal capacity.
+			return make(map[detectorspb.DetectorType]detectorInfo, 2)
 		},
 	}
 
 	for _, option := range options {
 		option(e)
 	}
+	ctx.Logger().V(4).Info("engine initialized")
 
-	// Set defaults.
+	return nil
+}
+
+// setDefaults ensures that if specific engine properties aren't provided,
+// they're set to reasonable default values. It makes the engine robust to
+// incomplete configuration.
+func (e *Engine) setDefaults(ctx context.Context) {
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
@@ -316,13 +335,13 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	}
 	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
-	// Create SourceManager.
 	e.sourceManager = sources.NewManager(
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
 		sources.WithBufferedOutput(defaultChannelBuffer),
 	)
 
+	// Default decoders handle common encoding formats.
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
 	}
@@ -332,7 +351,21 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		e.detectors[true] = DefaultDetectors()
 		e.detectors[false] = []detectors.Detector{}
 	}
+	ctx.Logger().V(4).Info("default engine options set")
+}
 
+// detectorKey is used to identify a detector in the keywordsToDetectors map.
+// Multiple detectors can have the same detector type but different versions.
+// This allows us to identify a detector by its type and version.
+type detectorKey struct {
+	detectorType detectorspb.DetectorType
+	version      int
+}
+
+// buildLookups prepares maps for fast detector lookups. Instead of scanning
+// through an array of detectors for every chunk, this lookup optimization
+// provides rapid access to relevant detectors using keywords.
+func (e *Engine) buildLookups(ctx context.Context) {
 	// Build a mapping of detector type to detector and a mapping of
 	// keyword to detector type for efficient lookups during detection.
 	e.detectorTypeToDetectorInfo = sync.Map{}
@@ -342,13 +375,13 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	var keywords []string
 	for verify, detectorsSet := range e.detectors {
 		for _, d := range detectorsSet {
+			// Classifying and versioning each detector helps manage them better.
 			detectorType := d.Type()
 			var version int
 
-			// Check if detector implements Versioner.
 			if v, ok := d.(detectors.Versioner); ok {
 				version = v.Version()
-			} // else, version remains 0.
+			}
 
 			key := detectorKey{detectorType: detectorType, version: version}
 
@@ -369,32 +402,31 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		}
 	}
 
+	// Trie-based searching helps in efficiently matching large sets of strings.
 	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
+}
 
-	ctx.Logger().V(3).Info("loaded decoders", "count", len(e.decoders))
-	ctx.Logger().V(3).Info("loaded detectors",
-		"total", len(e.detectors[true])+len(e.detectors[false]),
-		"verification_enabled", len(e.detectors[true]),
-		"verification_disabled", len(e.detectors[false]),
-	)
-
-	// Sanity check detectors for duplicate configuration. Only log in case
-	// a detector has been configured in a way that isn't represented by
-	// the DetectorID (type and version).
-	{
-		dets := append(e.detectors[true], e.detectors[false]...)
-		seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
-		for _, det := range dets {
-			id := config.GetDetectorID(det)
-			if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
-				ctx.Logger().Info("possible duplicate detector configured", "detector", id)
-			}
-			seenDetectors[id] = struct{}{}
+// Sanity check detectors for duplicate configuration. Only log in case
+// a detector has been configured in a way that isn't represented by
+// the DetectorID (type and version).
+func (e *Engine) sanityChecks(ctx context.Context) {
+	dets := append(e.detectors[true], e.detectors[false]...)
+	seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
+	for _, det := range dets {
+		id := config.GetDetectorID(det)
+		if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
+			ctx.Logger().Info("possible duplicate detector configured", "detector", id)
 		}
+		seenDetectors[id] = struct{}{}
 	}
+}
 
+// startWorkers initiates all necessary workers. Workers handle processing of
+// chunks concurrently. Separating the initialization of different types of
+// workers helps in scalability and makes it easier to diagnose issues.
+func (e *Engine) startWorkers(ctx context.Context) {
+	// Scanner workers process input data and extract chunks for detectors.
 	ctx.Logger().V(2).Info("starting scanner workers", "count", e.concurrency)
-	// Run the Secret scanner workers and Notifier pipelines.
 	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.workersWg.Add(1)
 		go func() {
@@ -405,6 +437,8 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		}()
 	}
 
+	// Detector workers apply keyword matching, regexes and API calls to
+	// detect secrets in chunks.
 	const detectorWorkerMultiplier = 50
 	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
@@ -417,6 +451,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		}()
 	}
 
+	// Notifier workers communicate detected issues to the user or any downstream systems.
 	// We want 1/4th of the notifier workers as the number of scanner workers.
 	const notifierWorkerRatio = 4
 	maxNotifierWorkers := 1
@@ -433,8 +468,6 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 			e.notifyResults(ctx)
 		}()
 	}
-
-	return e, nil
 }
 
 // Finish waits for running sources to complete and workers to finish scanning
