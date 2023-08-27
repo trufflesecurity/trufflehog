@@ -73,10 +73,9 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 }
 
 type imageInfo struct {
-	image      v1.Image
-	base       string
-	tag        string
-	remoteOpts []remote.Option
+	image v1.Image
+	base  string
+	tag   string
 }
 
 type layerInfo struct {
