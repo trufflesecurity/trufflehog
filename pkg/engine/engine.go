@@ -3,7 +3,6 @@ package engine
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -51,7 +50,11 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
-type DetectorSlice []detectorspb.DetectorType
+type detectorTypes []detectorspb.DetectorType
+type detectorInfo struct {
+	detectors.Detector
+	shouldVerify bool
+}
 
 type Engine struct {
 	// CLI flags.
@@ -77,9 +80,9 @@ type Engine struct {
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
 
-	detectorTypeToDetector map[detectorspb.DetectorType]detectors.Detector
-	keywordsToDetectors    map[string]DetectorSlice
-	detectorShouldVerify   map[detectorspb.DetectorType]bool
+	detectorTypeToDetectorInfo map[detectorspb.DetectorType]detectorInfo
+	keywordsToDetectors        map[string]detectorTypes
+	uniqueDetectorsPool        sync.Pool
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -245,7 +248,7 @@ func (m *Metrics) getScanDuration() time.Duration {
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
-	e.metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
+	e.metrics.detectorAvgTime.Range(func(k, v any) bool {
 		key, ok := k.(string)
 		if !ok {
 			logger.Info("expected detectorAvgTime key to be a string")
@@ -282,6 +285,13 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		dedupeCache:          cache,
 		printer:              new(output.PlainPrinter), // default printer
 		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
+		uniqueDetectorsPool: sync.Pool{
+			New: func() any {
+				// TODO (ahrav): Determine the optimal capacity.
+				// Assuming an average of 2 detectors matched per chunk for initial capacity.
+				return make(map[detectorspb.DetectorType]detectorInfo, 2)
+			},
+		},
 	}
 
 	for _, option := range options {
@@ -300,6 +310,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	e.sourceManager = sources.NewManager(
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithBufferedOutput(int(e.concurrency)),
 	)
 
 	if len(e.decoders) == 0 {
@@ -315,18 +326,15 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	// Build a mapping of detector type to detector and a mapping of
 	// keyword to detector type for efficient lookups during detection.
 	totalDetectorsCnt := len(e.detectors[true]) + len(e.detectors[false])
-	e.detectorTypeToDetector = make(map[detectorspb.DetectorType]detectors.Detector, totalDetectorsCnt)
-	e.keywordsToDetectors = make(map[string]DetectorSlice, totalDetectorsCnt)
-	e.detectorShouldVerify = make(map[detectorspb.DetectorType]bool, totalDetectorsCnt)
+	e.detectorTypeToDetectorInfo = make(map[detectorspb.DetectorType]detectorInfo, totalDetectorsCnt)
+	e.keywordsToDetectors = make(map[string]detectorTypes, totalDetectorsCnt)
 
-	// build ahocorasick prefilter for efficient string matching
-	// on keywords
-	keywords := []string{}
+	// Build ahocorasick prefilter for efficient string matching on keywords.
+	var keywords []string
 	for verify, detectorsSet := range e.detectors {
 		for _, d := range detectorsSet {
 			detectorType := d.Type()
-			e.detectorShouldVerify[detectorType] = verify
-			e.detectorTypeToDetector[detectorType] = d
+			e.detectorTypeToDetectorInfo[detectorType] = detectorInfo{Detector: d, shouldVerify: verify}
 			for _, kw := range d.Keywords() {
 				kwLower := strings.ToLower(kw)
 				keywords = append(keywords, kwLower)
@@ -448,55 +456,45 @@ type detectableChunk struct {
 
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
-
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
-				var decoderType detectorspb.DecoderType
-				switch decoder.(type) {
-				case *decoders.UTF8:
-					decoderType = detectorspb.DecoderType_PLAIN
-				case *decoders.Base64:
-					decoderType = detectorspb.DecoderType_BASE64
-				case *decoders.UTF16:
-					decoderType = detectorspb.DecoderType_UTF16
-				default:
-					ctx.Logger().Info("unknown decoder type", "type", reflect.TypeOf(decoder).String())
-					decoderType = detectorspb.DecoderType_UNKNOWN
-				}
-
 				decoded := decoder.FromChunk(chunk)
-
 				if decoded == nil {
+					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
 					continue
 				}
+				// Use sync.Pool to get a uniqueDetectors map.
+				// This avoids allocating a new map for each chunk.
+				uniqueDetectors := e.uniqueDetectorsPool.Get().(map[detectorspb.DetectorType]detectorInfo)
 
-				// Determine which detectors to run on the chunk
-				// based on the keywords in the chunk.
-				uniqueDetectors := make(map[detectorspb.DetectorType]detectors.Detector)
-				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Data))) {
-					matchedDetectors := e.keywordsToDetectors[strings.ToLower(match.MatchString())]
+				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Chunk.Data))) {
+					// Direct mapping of matched strings to their detectors.
+					matchedDetectors := e.keywordsToDetectors[string(match.Match())]
 					for _, d := range matchedDetectors {
-						uniqueDetectors[d] = e.detectorTypeToDetector[d]
+						uniqueDetectors[d] = e.detectorTypeToDetectorInfo[d]
 					}
 				}
 
-				for t, detector := range uniqueDetectors {
-					decoded.Verify = e.detectorShouldVerify[t]
+				for k, detector := range uniqueDetectors {
+					decoded.Verify = detector.shouldVerify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
-						chunk:    *decoded,
+						chunk:    *decoded.Chunk,
 						detector: detector,
-						decoder:  decoderType,
+						decoder:  decoded.DecoderType,
 						wgDoneFn: wgDetect.Done,
 					}
+					delete(uniqueDetectors, k) // Avoid bloating the map.
 				}
+				e.uniqueDetectorsPool.Put(uniqueDetectors)
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
 	wgDetect.Wait()
+	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
 func (e *Engine) detectChunks(ctx context.Context) {
