@@ -490,7 +490,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				for k, detector := range uniqueDetectors {
-					decoded.Verify = detector.shouldVerify
+					decoded.Chunk.Verify = detector.shouldVerify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
 						chunk:    *decoded.Chunk,
