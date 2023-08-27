@@ -50,7 +50,6 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
-type detectorTypes []detectorspb.DetectorType
 type detectorInfo struct {
 	detectors.Detector
 	shouldVerify bool
@@ -476,7 +475,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Chunk.Data))) {
 					// Direct mapping of matched strings to their detectors.
-					matchedDetectors, ok := e.keywordsToDetectors.Load(match.String())
+					matchedDetectors, ok := e.keywordsToDetectors.Load(match.MatchString())
 					if !ok {
 						continue
 					}
