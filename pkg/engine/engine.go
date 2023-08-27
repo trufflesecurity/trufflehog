@@ -50,9 +50,8 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
-type detectorInfo struct {
-	detectors.Detector
-	shouldVerify bool
+type uniqueDetectors struct {
+	pool *sync.Pool
 }
 
 type Engine struct {
@@ -84,7 +83,7 @@ type Engine struct {
 	// since the map is only written to during initialization.
 	detectorTypeToDetectorInfo sync.Map
 	keywordsToDetectors        sync.Map
-	uniqueDetectorsPool        sync.Pool
+	uniqueDetectorsPool        *uniqueDetectors
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -309,12 +308,7 @@ func (e *Engine) initialize(ctx context.Context, options ...EngineOption) error 
 	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
 	// Pool optimizes memory usage by reusing maps instead of creating a new one
 	// for each chunk processed.
-	e.uniqueDetectorsPool = sync.Pool{
-		New: func() any {
-			// TODO (ahrav): Determine the optimal capacity.
-			return make(map[detectorspb.DetectorType]detectorInfo, 2)
-		},
-	}
+	e.uniqueDetectorsPool = newUniqueDetectors()
 
 	for _, option := range options {
 		option(e)
@@ -322,6 +316,38 @@ func (e *Engine) initialize(ctx context.Context, options ...EngineOption) error 
 	ctx.Logger().V(4).Info("engine initialized")
 
 	return nil
+}
+
+// detectorInfo is used to store a detector and whether it should be verified.
+type detectorInfo struct {
+	detectors.Detector
+	shouldVerify bool
+}
+
+func newUniqueDetectors() *uniqueDetectors {
+	return &uniqueDetectors{
+		pool: &sync.Pool{
+			New: func() any {
+				return make(map[detectorspb.DetectorType]detectorInfo)
+			},
+		},
+	}
+}
+
+// get retrieves a unique detectors map from the pool.
+func (ud *uniqueDetectors) get() map[detectorspb.DetectorType]detectorInfo {
+	return ud.pool.Get().(map[detectorspb.DetectorType]detectorInfo)
+}
+
+// delete removes a detector type from the map.
+// Used in tandem with operations to prevent double iteration.
+func (ud *uniqueDetectors) delete(m map[detectorspb.DetectorType]detectorInfo, key detectorspb.DetectorType) {
+	delete(m, key)
+}
+
+// put cleans up and returns the unique detectors map to the pool.
+func (ud *uniqueDetectors) put(m map[detectorspb.DetectorType]detectorInfo) {
+	ud.pool.Put(m)
 }
 
 // setDefaults ensures that if specific engine properties aren't provided,
@@ -526,7 +552,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 				// Use sync.Pool to get a uniqueDetectors map.
 				// This avoids allocating a new map for each chunk.
-				uniqueDetectors := e.uniqueDetectorsPool.Get().(map[detectorspb.DetectorType]detectorInfo)
+				uniqueDetectors := e.uniqueDetectorsPool.get()
 				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Chunk.Data))) {
 					matchedKeys, ok := e.keywordsToDetectors.Load(match.MatchString())
 					if !ok {
@@ -551,9 +577,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						decoder:  decoded.DecoderType,
 						wgDoneFn: wgDetect.Done,
 					}
-					delete(uniqueDetectors, k) // Avoid bloating the map.
+					e.uniqueDetectorsPool.delete(uniqueDetectors, k) // Avoid bloating the map.
 				}
-				e.uniqueDetectorsPool.Put(uniqueDetectors)
+				e.uniqueDetectorsPool.put(uniqueDetectors)
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
