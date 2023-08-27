@@ -80,8 +80,8 @@ type Engine struct {
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
 
-	detectorTypeToDetectorInfo map[detectorspb.DetectorType]detectorInfo
-	keywordsToDetectors        map[string]detectorTypes
+	detectorTypeToDetectorInfo sync.Map
+	keywordsToDetectors        sync.Map
 	uniqueDetectorsPool        sync.Pool
 
 	// Runtime information.
@@ -325,20 +325,25 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 
 	// Build a mapping of detector type to detector and a mapping of
 	// keyword to detector type for efficient lookups during detection.
-	totalDetectorsCnt := len(e.detectors[true]) + len(e.detectors[false])
-	e.detectorTypeToDetectorInfo = make(map[detectorspb.DetectorType]detectorInfo, totalDetectorsCnt)
-	e.keywordsToDetectors = make(map[string]detectorTypes, totalDetectorsCnt)
+	e.detectorTypeToDetectorInfo = sync.Map{}
+	e.keywordsToDetectors = sync.Map{}
 
 	// Build ahocorasick prefilter for efficient string matching on keywords.
 	var keywords []string
 	for verify, detectorsSet := range e.detectors {
 		for _, d := range detectorsSet {
 			detectorType := d.Type()
-			e.detectorTypeToDetectorInfo[detectorType] = detectorInfo{Detector: d, shouldVerify: verify}
+			if _, ok := e.detectorTypeToDetectorInfo.Load(detectorType); !ok {
+				e.detectorTypeToDetectorInfo.Store(detectorType, detectorInfo{Detector: d, shouldVerify: verify})
+			}
 			for _, kw := range d.Keywords() {
 				kwLower := strings.ToLower(kw)
 				keywords = append(keywords, kwLower)
-				e.keywordsToDetectors[kwLower] = append(e.keywordsToDetectors[kwLower], detectorType)
+				if val, ok := e.keywordsToDetectors.Load(kwLower); !ok {
+					e.keywordsToDetectors.Store(kwLower, []detectorspb.DetectorType{detectorType})
+				} else {
+					e.keywordsToDetectors.Store(kwLower, append(val.([]detectorspb.DetectorType), detectorType))
+				}
 			}
 		}
 	}
@@ -471,9 +476,17 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Chunk.Data))) {
 					// Direct mapping of matched strings to their detectors.
-					matchedDetectors := e.keywordsToDetectors[string(match.Match())]
-					for _, d := range matchedDetectors {
-						uniqueDetectors[d] = e.detectorTypeToDetectorInfo[d]
+					matchedDetectors, ok := e.keywordsToDetectors.Load(match.String())
+					if !ok {
+						continue
+					}
+					for _, d := range matchedDetectors.([]detectorspb.DetectorType) {
+						val, ok := e.detectorTypeToDetectorInfo.Load(d)
+						if !ok {
+							ctx.Logger().Error(fmt.Errorf("expected detectorInfo, got %T", val), "failed to load detector", "detector", d)
+							continue
+						}
+						uniqueDetectors[d] = val.(detectorInfo)
 					}
 				}
 
