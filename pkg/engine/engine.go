@@ -54,6 +54,20 @@ type uniqueDetectors struct {
 	pool *sync.Pool
 }
 
+// detectorKey is used to identify a detector in the keywordsToDetectors map.
+// Multiple detectors can have the same detector type but different versions.
+// This allows us to identify a detector by its type and version.
+type detectorKey struct {
+	detectorType detectorspb.DetectorType
+	version      int
+}
+
+// detectorInfo is used to store a detector and whether it should be verified.
+type detectorInfo struct {
+	detectors.Detector
+	shouldVerify bool
+}
+
 type Engine struct {
 	// CLI flags.
 	concurrency uint8
@@ -78,11 +92,9 @@ type Engine struct {
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
 
-	// Data structures for efficient lookups during detection.
-	// sync.Map is used to avoid locking the map during lookups
-	// since the map is only written to during initialization.
-	detectorTypeToDetectorInfo sync.Map
-	keywordsToDetectors        sync.Map
+	// Maps for efficient lookups during detection.
+	detectorTypeToDetectorInfo map[detectorKey]detectorInfo
+	keywordsToDetectors        map[string][]detectorKey
 	uniqueDetectorsPool        *uniqueDetectors
 
 	// Runtime information.
@@ -319,12 +331,6 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	return nil
 }
 
-// detectorInfo is used to store a detector and whether it should be verified.
-type detectorInfo struct {
-	detectors.Detector
-	shouldVerify bool
-}
-
 func newUniqueDetectors() *uniqueDetectors {
 	return &uniqueDetectors{
 		pool: &sync.Pool{
@@ -385,8 +391,8 @@ func (e *Engine) setDefaults(ctx context.Context) {
 // through an array of detectors for every chunk, this lookup optimization
 // provides rapid access to relevant detectors using keywords.
 func (e *Engine) buildLookups(ctx context.Context) {
-	e.detectorTypeToDetectorInfo = sync.Map{}
-	e.keywordsToDetectors = sync.Map{}
+	e.detectorTypeToDetectorInfo = make(map[detectorKey]detectorInfo, len(e.detectors[true])+len(e.detectors[false]))
+	e.keywordsToDetectors = make(map[string][]detectorKey)
 
 	var keywords []string
 	for verify, detectorsSet := range e.detectors {
@@ -402,14 +408,6 @@ func (e *Engine) buildLookups(ctx context.Context) {
 	ctx.Logger().V(4).Info("engine lookups built")
 }
 
-// detectorKey is used to identify a detector in the keywordsToDetectors map.
-// Multiple detectors can have the same detector type but different versions.
-// This allows us to identify a detector by its type and version.
-type detectorKey struct {
-	detectorType detectorspb.DetectorType
-	version      int
-}
-
 // classifyDetector assigns a unique key for each detector. This key
 // based on type and version, ensures faster lookups and reduces
 // redundancy in our main detector store.
@@ -420,9 +418,7 @@ func (e *Engine) classifyDetector(d detectors.Detector, shouldVerify bool) detec
 		version = v.Version()
 	}
 	key := detectorKey{detectorType: detectorType, version: version}
-	if _, ok := e.detectorTypeToDetectorInfo.Load(key); !ok {
-		e.detectorTypeToDetectorInfo.Store(key, detectorInfo{Detector: d, shouldVerify: shouldVerify})
-	}
+	e.detectorTypeToDetectorInfo[key] = detectorInfo{Detector: d, shouldVerify: shouldVerify}
 	return key
 }
 
@@ -433,12 +429,7 @@ func (e *Engine) extractAndMapKeywords(d detectors.Detector, key detectorKey, ke
 	for _, kw := range d.Keywords() {
 		kwLower := strings.ToLower(kw)
 		keywords = append(keywords, kwLower)
-
-		if val, ok := e.keywordsToDetectors.Load(kwLower); !ok {
-			e.keywordsToDetectors.Store(kwLower, []detectorKey{key})
-		} else {
-			e.keywordsToDetectors.Store(kwLower, append(val.([]detectorKey), key))
-		}
+		e.keywordsToDetectors[kwLower] = append(e.keywordsToDetectors[kwLower], key)
 	}
 	return keywords
 }
@@ -572,17 +563,12 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				// This avoids allocating a new map for each chunk.
 				uniqueDetectors := e.uniqueDetectorsPool.get()
 				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Chunk.Data))) {
-					matchedKeys, ok := e.keywordsToDetectors.Load(match.MatchString())
+					matchedKeys, ok := e.keywordsToDetectors[match.MatchString()]
 					if !ok {
 						continue
 					}
-					for _, key := range matchedKeys.([]detectorKey) {
-						val, ok := e.detectorTypeToDetectorInfo.Load(key)
-						if !ok {
-							ctx.Logger().Error(fmt.Errorf("expected detectorInfo, got %T", val), "failed to load detector", "detector", key.detectorType, "version", key.version)
-							continue
-						}
-						uniqueDetectors[key.detectorType] = val.(detectorInfo)
+					for _, key := range matchedKeys {
+						uniqueDetectors[key.detectorType] = e.detectorTypeToDetectorInfo[key]
 					}
 				}
 
