@@ -172,7 +172,7 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 
 	res, err := client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
-		return nil, fmt.Errorf("could not list s3 buckets: %w", err)
+		return nil, err
 	}
 
 	var bucketsToScan []string
@@ -441,7 +441,7 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 		if roleArn == "" {
 			errors = append(errors, fmt.Errorf("could not list objects in any bucket"))
 		} else {
-			errors = append(errors, fmt.Errorf("role %s could not list objects in any bucket", roleArn))
+			errors = append(errors, fmt.Errorf("role %q could not list objects in any bucket", roleArn))
 		}
 	}
 
@@ -462,7 +462,7 @@ func (s *Source) visitRoles(ctx context.Context, f func(c context.Context, defau
 
 		bucketsToScan, err := s.getBucketsToScan(client)
 		if err != nil {
-			return err
+			return fmt.Errorf("role %q could not list any s3 buckets for scanning: %w", role, err)
 		}
 
 		f(ctx, client, role, bucketsToScan)
