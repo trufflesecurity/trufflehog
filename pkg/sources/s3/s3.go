@@ -425,6 +425,7 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, roleArn, bucket)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("could not get regional client for bucket %q: %w", bucket, err))
+			continue
 		}
 
 		_, err = regionalClient.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
@@ -432,7 +433,7 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 		if err == nil {
 			wasAbleToListAnyBucket = true
 		} else if shouldHaveAccessToAllBuckets {
-			errors = append(errors, fmt.Errorf("could not list objects in bucket %s: %w", bucket, err))
+			errors = append(errors, fmt.Errorf("could not list objects in bucket %q: %w", bucket, err))
 		}
 	}
 
