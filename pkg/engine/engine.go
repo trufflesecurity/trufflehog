@@ -381,6 +381,27 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	ctx.Logger().V(4).Info("default engine options set")
 }
 
+// buildLookups prepares maps for fast detector lookups. Instead of scanning
+// through an array of detectors for every chunk, this lookup optimization
+// provides rapid access to relevant detectors using keywords.
+func (e *Engine) buildLookups(ctx context.Context) {
+	e.detectorTypeToDetectorInfo = sync.Map{}
+	e.keywordsToDetectors = sync.Map{}
+
+	var keywords []string
+	for verify, detectorsSet := range e.detectors {
+		for _, d := range detectorsSet {
+			key := e.classifyDetector(d, verify)
+			keywords = e.extractAndMapKeywords(d, key, keywords)
+		}
+	}
+
+	// Implementing a trie aids in substring searches among the keywords.
+	// This is crucial when you have large sets of strings to search through.
+	e.buildTrie(keywords)
+	ctx.Logger().V(4).Info("engine lookups built")
+}
+
 // detectorKey is used to identify a detector in the keywordsToDetectors map.
 // Multiple detectors can have the same detector type but different versions.
 // This allows us to identify a detector by its type and version.
@@ -389,47 +410,43 @@ type detectorKey struct {
 	version      int
 }
 
-// buildLookups prepares maps for fast detector lookups. Instead of scanning
-// through an array of detectors for every chunk, this lookup optimization
-// provides rapid access to relevant detectors using keywords.
-func (e *Engine) buildLookups(ctx context.Context) {
-	// Build a mapping of detector type to detector and a mapping of
-	// keyword to detector type for efficient lookups during detection.
-	e.detectorTypeToDetectorInfo = sync.Map{}
-	e.keywordsToDetectors = sync.Map{}
+// classifyDetector assigns a unique key for each detector. This key
+// based on type and version, ensures faster lookups and reduces
+// redundancy in our main detector store.
+func (e *Engine) classifyDetector(d detectors.Detector, shouldVerify bool) detectorKey {
+	detectorType := d.Type()
+	var version int
+	if v, ok := d.(detectors.Versioner); ok {
+		version = v.Version()
+	}
+	key := detectorKey{detectorType: detectorType, version: version}
+	if _, ok := e.detectorTypeToDetectorInfo.Load(key); !ok {
+		e.detectorTypeToDetectorInfo.Store(key, detectorInfo{Detector: d, shouldVerify: shouldVerify})
+	}
+	return key
+}
 
-	// Build ahocorasick prefilter for efficient string matching on keywords.
-	var keywords []string
-	for verify, detectorsSet := range e.detectors {
-		for _, d := range detectorsSet {
-			// Classifying and versioning each detector helps manage them better.
-			detectorType := d.Type()
-			var version int
+// extractAndMapKeywords captures keywords associated with each detector
+// and maps them. This allows us to quickly determine which detectors
+// are relevant based on the presence of certain keywords.
+func (e *Engine) extractAndMapKeywords(d detectors.Detector, key detectorKey, keywords []string) []string {
+	for _, kw := range d.Keywords() {
+		kwLower := strings.ToLower(kw)
+		keywords = append(keywords, kwLower)
 
-			if v, ok := d.(detectors.Versioner); ok {
-				version = v.Version()
-			}
-
-			key := detectorKey{detectorType: detectorType, version: version}
-
-			if _, ok := e.detectorTypeToDetectorInfo.Load(key); !ok {
-				e.detectorTypeToDetectorInfo.Store(key, detectorInfo{Detector: d, shouldVerify: verify})
-			}
-
-			for _, kw := range d.Keywords() {
-				kwLower := strings.ToLower(kw)
-				keywords = append(keywords, kwLower)
-
-				if val, ok := e.keywordsToDetectors.Load(kwLower); !ok {
-					e.keywordsToDetectors.Store(kwLower, []detectorKey{key})
-				} else {
-					e.keywordsToDetectors.Store(kwLower, append(val.([]detectorKey), key))
-				}
-			}
+		if val, ok := e.keywordsToDetectors.Load(kwLower); !ok {
+			e.keywordsToDetectors.Store(kwLower, []detectorKey{key})
+		} else {
+			e.keywordsToDetectors.Store(kwLower, append(val.([]detectorKey), key))
 		}
 	}
+	return keywords
+}
 
-	// Trie-based searching helps in efficiently matching large sets of strings.
+// buildTrie uses the Ahocorasick algorithm to create a trie structure
+// for efficient keyword matching. This ensures that we can rapidly match
+// against a vast set of keywords without individually comparing each one.
+func (e *Engine) buildTrie(keywords []string) {
 	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 }
 
