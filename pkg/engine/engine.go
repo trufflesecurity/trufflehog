@@ -100,6 +100,7 @@ type Engine struct {
 	dedupeCache *lru.Cache
 }
 
+// EngineOption is used to configure the engine during initialization using functional options.
 type EngineOption func(*Engine)
 
 func WithConcurrency(concurrency uint8) EngineOption {
