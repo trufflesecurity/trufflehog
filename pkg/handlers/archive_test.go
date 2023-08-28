@@ -146,7 +146,7 @@ func TestReadToMax(t *testing.T) {
 		{
 			name:     "empty input",
 			input:    []byte(""),
-			expected: []byte(""),
+			expected: nil,
 		},
 	}
 
