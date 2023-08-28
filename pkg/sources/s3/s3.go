@@ -97,12 +97,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 
 func (s *Source) Validate(ctx context.Context) []error {
 	var errors []error
-	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
+	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) {
 		roleErrs := s.validateBucketAccess(c, defaultRegionClient, roleArn, buckets)
 		if len(roleErrs) > 0 {
 			errors = append(errors, roleErrs...)
 		}
-		return nil
 	}
 
 	err := s.visitRoles(ctx, visitor)
@@ -183,7 +182,7 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 	return bucketsToScan, nil
 }
 
-func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bucketsToScan []string, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bucketsToScan []string, chunksChan chan *sources.Chunk) {
 	objectCount := uint64(0)
 
 	logger := s.log
@@ -195,7 +194,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 		logger = logger.WithValues("bucket", bucket)
 
 		if common.IsDone(ctx) {
-			return nil
+			return
 		}
 
 		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
@@ -225,13 +224,12 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 		}
 	}
 	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
-	return nil
 }
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
-		return s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
+	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) {
+		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
 	}
 
 	return s.visitRoles(ctx, visitor)
@@ -449,7 +447,7 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 	return errors
 }
 
-func (s *Source) visitRoles(ctx context.Context, f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error) error {
+func (s *Source) visitRoles(ctx context.Context, f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string)) error {
 	roles := s.conn.Roles
 	if len(roles) == 0 {
 		roles = []string{""}
@@ -466,9 +464,7 @@ func (s *Source) visitRoles(ctx context.Context, f func(c context.Context, defau
 			return err
 		}
 
-		if err := f(ctx, client, role, bucketsToScan); err != nil {
-			return err
-		}
+		f(ctx, client, role, bucketsToScan)
 	}
 
 	return nil
