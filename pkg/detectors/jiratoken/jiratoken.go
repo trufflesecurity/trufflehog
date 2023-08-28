@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
+	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})$|\b([a-zA-Z0-9-]{24})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{5,24}\.[a-zA-Z-0-9]{3,16}\.[a-zA-Z-0-9]{3,16})\b`)
 	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`)
 )
