@@ -100,10 +100,10 @@ type Engine struct {
 	dedupeCache *lru.Cache
 }
 
-// EngineOption is used to configure the engine during initialization using functional options.
-type EngineOption func(*Engine)
+// Option is used to configure the engine during initialization using functional options.
+type Option func(*Engine)
 
-func WithConcurrency(concurrency uint8) EngineOption {
+func WithConcurrency(concurrency uint8) Option {
 	return func(e *Engine) {
 		e.concurrency = concurrency
 	}
@@ -111,7 +111,7 @@ func WithConcurrency(concurrency uint8) EngineOption {
 
 const ignoreTag = "trufflehog:ignore"
 
-func WithDetectors(verify bool, d ...detectors.Detector) EngineOption {
+func WithDetectors(verify bool, d ...detectors.Detector) Option {
 	return func(e *Engine) {
 		if e.detectors == nil {
 			e.detectors = make(map[bool][]detectors.Detector)
@@ -124,7 +124,7 @@ func WithDetectors(verify bool, d ...detectors.Detector) EngineOption {
 	}
 }
 
-func WithDecoders(decoders ...decoders.Decoder) EngineOption {
+func WithDecoders(decoders ...decoders.Decoder) Option {
 	return func(e *Engine) {
 		e.decoders = decoders
 	}
@@ -132,7 +132,7 @@ func WithDecoders(decoders ...decoders.Decoder) EngineOption {
 
 // WithFilterUnverified sets the filterUnverified flag on the engine. If set to
 // true, the engine will only return the first unverified result for a chunk for a detector.
-func WithFilterUnverified(filter bool) EngineOption {
+func WithFilterUnverified(filter bool) Option {
 	return func(e *Engine) {
 		e.filterUnverified = filter
 	}
@@ -140,7 +140,7 @@ func WithFilterUnverified(filter bool) EngineOption {
 
 // WithOnlyVerified sets the onlyVerified flag on the engine. If set to true,
 // the engine will only print verified results.
-func WithOnlyVerified(onlyVerified bool) EngineOption {
+func WithOnlyVerified(onlyVerified bool) Option {
 	return func(e *Engine) {
 		e.onlyVerified = onlyVerified
 	}
@@ -152,7 +152,7 @@ func WithOnlyVerified(onlyVerified bool) EngineOption {
 // the engine is configured to print the results.
 // Calculating the average time taken by each detector is an expensive operation
 // and should be avoided unless specified by the user.
-func WithPrintAvgDetectorTime(printAvgDetectorTime bool) EngineOption {
+func WithPrintAvgDetectorTime(printAvgDetectorTime bool) Option {
 	return func(e *Engine) {
 		e.printAvgDetectorTime = printAvgDetectorTime
 	}
@@ -162,7 +162,7 @@ func WithPrintAvgDetectorTime(printAvgDetectorTime bool) EngineOption {
 // the filterFunc returns true, the detector will be included for scanning.
 // This option applies to the existing list of detectors configured, so the
 // order this option appears matters. All filtering happens before scanning.
-func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption {
+func WithFilterDetectors(filterFunc func(detectors.Detector) bool) Option {
 	return func(e *Engine) {
 		// If no detectors are configured, do nothing.
 		if e.detectors == nil {
@@ -174,7 +174,7 @@ func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption 
 }
 
 // WithPrinter sets the Printer on the engine.
-func WithPrinter(printer Printer) EngineOption {
+func WithPrinter(printer Printer) Option {
 	return func(e *Engine) {
 		e.printer = printer
 	}
@@ -272,7 +272,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 // It sets up various default configurations, prepares lookup structures for
 // detectors, conducts basic sanity checks, and kickstarts all necessary workers.
 // Once started, the engine begins processing input data to identify secrets.
-func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
+func Start(ctx context.Context, options ...Option) (*Engine, error) {
 	e := &Engine{}
 
 	if err := e.initialize(ctx, options...); err != nil {
@@ -291,7 +291,7 @@ const defaultChannelBuffer = 1
 // initialize prepares the engine's internal structures. The LRU cache optimizes
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
-func (e *Engine) initialize(ctx context.Context, options ...EngineOption) error {
+func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// TODO (ahrav): Determine the optimal cache size.
 	const cacheSize = 512 // number of entries in the LRU cache
 
