@@ -171,11 +171,11 @@ func BenchmarkReadToMax(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StartTimer()
-		a.ReadToMax(context.Background(), reader)
+		_, _ = a.ReadToMax(context.Background(), reader)
 		b.StopTimer()
 
-		reader.Seek(0, 0) // Reset the reader position.
-		a.size = 0        // Reset archive size.
+		_, _ = reader.Seek(0, 0) // Reset the reader position.
+		a.size = 0               // Reset archive size.
 	}
 }
 
