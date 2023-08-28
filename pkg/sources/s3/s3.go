@@ -186,18 +186,24 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bucketsToScan []string, chunksChan chan *sources.Chunk) error {
 	objectCount := uint64(0)
 
+	logger := s.log
+	if role != "" {
+		logger = logger.WithValues("roleArn", role)
+	}
+
 	for i, bucket := range bucketsToScan {
+		logger = logger.WithValues("bucket", bucket)
+
 		if common.IsDone(ctx) {
 			return nil
 		}
 
 		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
-		s.log.Info("Scanning bucket", "bucket", bucket)
+		logger.Info("Scanning bucket")
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
 		if err != nil {
-			s.log.Error(err, "could not get regional client for bucket",
-				"bucket", bucket)
+			logger.Error(err, "could not get regional client for bucket")
 			continue
 		}
 
@@ -211,8 +217,10 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 			})
 
 		if err != nil {
-			s.log.Error(err, "could not list objects in s3 bucket",
-				"bucket", bucket)
+			// Note that this is expected most of the time when using roles, because the scanner tries to scan each
+			// bucket in the account using each configured role, and it is likely that a given role won't have access to
+			// a given bucket.
+			logger.Error(err, "could not list objects in bucket")
 			continue
 		}
 	}
