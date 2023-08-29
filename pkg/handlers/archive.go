@@ -191,14 +191,17 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 	}
 
 	var fileContent bytes.Buffer
+	// Wrap the reader with io.LimitedReader.
+	lr := &io.LimitedReader{R: reader, N: int64(maxSize)}
 	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
 	// for the method, due to the internal implementation of io.CopyBuffer, when
 	// *bytes.Buffer implements io.WriterTo or io.ReaderFrom, the provided buf
 	// is simply ignored. Thus, we can pass nil for the buf parameter.
-	_, err = io.CopyBuffer(&fileContent, reader, nil)
+	_, err = io.CopyBuffer(&fileContent, lr, nil)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
+
 	if fileContent.Len() >= maxSize {
 		logger.V(2).Info("Max archive size reached.")
 		return fileContent.Bytes()[:maxSize], nil
