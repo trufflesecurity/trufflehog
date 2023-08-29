@@ -295,7 +295,6 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 
 	if fileContent.Len() == maxSize {
 		logger.V(2).Info("Max archive size reached.")
-		return fileContent.Bytes()[:maxSize], nil
 	}
 
 	return fileContent.Bytes(), nil
