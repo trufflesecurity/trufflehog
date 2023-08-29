@@ -85,8 +85,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// If the request is successful and the login reason is not failed authentication, then the token is valid.
 						// This is because Jira returns a 200 status code even if the token is invalid.
 						// Jira returns a default dashboard page.
-						if (res.StatusCode >= 200 && res.StatusCode < 300) && res.Header.Get(loginReasonHeaderKey) != failedAuth {
-							s1.Verified = true
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							if res.Header.Get(loginReasonHeaderKey) != failedAuth {
+								s1.Verified = true
+							}
+						} else {
+							s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 						}
 					}
 				}
@@ -98,7 +102,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				results = append(results, s1)
-
 			}
 
 		}
