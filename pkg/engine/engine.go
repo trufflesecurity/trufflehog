@@ -516,7 +516,10 @@ type detectableChunk struct {
 
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
-	uniqueDetectors := make(map[detectorspb.DetectorType]detectorInfo, 3)
+
+	// Reuse the same map to avoid allocations.
+	const avgDetectorsPerChunk = 2
+	uniqueDetectors := make(map[detectorspb.DetectorType]detectorInfo, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
@@ -526,8 +529,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
 					continue
 				}
-				// Use sync.Pool to get a uniqueDetectors map.
-				// This avoids allocating a new map for each chunk.
+
 				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Chunk.Data))) {
 					matchedKeys, ok := e.keywordsToDetectors[match.MatchString()]
 					if !ok {
@@ -548,9 +550,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						wgDoneFn: wgDetect.Done,
 					}
 					delete(uniqueDetectors, k)
-					// e.uniqueDetectorsPool.delete(uniqueDetectors, k) // Avoid bloating the map.
 				}
-				// e.uniqueDetectorsPool.put(uniqueDetectors)
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
