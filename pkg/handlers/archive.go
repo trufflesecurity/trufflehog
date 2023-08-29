@@ -192,6 +192,7 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 
 	var fileContent bytes.Buffer
 	// Wrap the reader with io.LimitedReader.
+	// This is to prevent the reader from reading more than maxSize.
 	lr := &io.LimitedReader{R: reader, N: int64(maxSize)}
 	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
 	// for the method, due to the internal implementation of io.CopyBuffer, when
@@ -202,7 +203,7 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 		return nil, err
 	}
 
-	if fileContent.Len() >= maxSize {
+	if fileContent.Len() == maxSize {
 		logger.V(2).Info("Max archive size reached.")
 		return fileContent.Bytes()[:maxSize], nil
 	}
