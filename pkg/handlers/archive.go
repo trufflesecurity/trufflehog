@@ -187,17 +187,15 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 	}()
 
 	if common.IsDone(ctx) {
-		return nil, fmt.Errorf("context is done")
+		return nil, ctx.Err()
 	}
 
 	var fileContent bytes.Buffer
-	buf := make([]byte, defaultBufferSize)
 	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
 	// for the method, due to the internal implementation of io.CopyBuffer, when
 	// *bytes.Buffer implements io.WriterTo or io.ReaderFrom, the provided buf
-	// is simply ignored. Thus, adjusting buf's size won't change the effect
-	// or execution of the operation.
-	_, err = io.CopyBuffer(&fileContent, reader, buf)
+	// is simply ignored. Thus, we can pass nil for the buf parameter.
+	_, err = io.CopyBuffer(&fileContent, reader, nil)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
