@@ -22,7 +22,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshworks"}) + `\b([a-z0-9A-Z-]{22})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"freshworks"}) + `\b([a-zA-Z0-9-_]{2,20})\b`)
+	idPat  = regexp.MustCompile(`\b([^\/]+\.myfreshworks\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -52,10 +52,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Myfreshworks,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(resIdMatch + ":"+ resMatch),
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+"/crm/sales/api/sales_accounts/filters", nil)
 				if err != nil {
 					continue
 				}
