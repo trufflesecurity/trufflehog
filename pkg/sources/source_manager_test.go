@@ -14,8 +14,9 @@ import (
 
 // DummySource implements Source and is used for testing a SourceManager.
 type DummySource struct {
-	sourceID int64
-	jobID    int64
+	sourceID   int64
+	jobID      int64
+	initCalled bool
 	chunker
 }
 
@@ -23,6 +24,7 @@ func (d *DummySource) Type() sourcespb.SourceType { return 1337 }
 func (d *DummySource) SourceID() int64            { return d.sourceID }
 func (d *DummySource) JobID() int64               { return d.jobID }
 func (d *DummySource) Init(_ context.Context, _ string, jobID, sourceID int64, _ bool, _ *anypb.Any, _ int) error {
+	d.initCalled = true
 	d.sourceID = sourceID
 	d.jobID = jobID
 	return nil
@@ -339,4 +341,22 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 	end <- struct{}{} // Send end signal.
 	<-ref.Done()      // Wait for the job to finish.
 	assert.Equal(t, 1337, mgr.AvailableCapacity())
+}
+
+func TestSourceManagerRunOnce(t *testing.T) {
+	mgr := NewManager()
+	var chunksCalled bool
+	source := &DummySource{sourceID: 123, jobID: 456, chunker: callbackChunker{
+		func(context.Context, chan *Chunk) error {
+			chunksCalled = true
+			return nil
+		},
+	}}
+	ref, err := mgr.RunOnce(context.Background(), "test", source)
+	assert.NoError(t, err)
+	assert.Equal(t, source.jobID, ref.JobID)
+	assert.Equal(t, source.sourceID, ref.SourceID)
+	assert.Equal(t, "test", ref.SourceName)
+	assert.True(t, chunksCalled)
+	assert.False(t, source.initCalled)
 }
