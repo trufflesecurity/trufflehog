@@ -3,6 +3,7 @@ package context
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -176,4 +177,11 @@ func TestRace(t *testing.T) {
 	go func() { _ = ctx.Err() }()
 	cancel()
 	_ = ctx.Err()
+}
+
+func TestCause(t *testing.T) {
+	ctx, cancel := WithCancelCause(Background())
+	err := fmt.Errorf("oh no")
+	cancel(err)
+	assert.Equal(t, err, Cause(ctx))
 }
