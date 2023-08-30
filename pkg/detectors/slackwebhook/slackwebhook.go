@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -63,9 +65,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
+
 				if err == nil {
 					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 || () {
+					if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
 						s1.Verified = true
 					} else if res.StatusCode == 401 {
 						// The secret is determinately not verified (nothing to do)
@@ -74,9 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				} else {
 					s1.VerificationError = err
-				}
-				if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
-					s1.Verified = true
 				}
 			}
 		}
