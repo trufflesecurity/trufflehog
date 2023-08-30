@@ -34,7 +34,6 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Twilio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	fmt.Printf("scanner struct %+v \n", s)
 	dataStr := string(data)
 
 	identifierMatches := identifierPat.FindAllString(dataStr, -1)
@@ -46,9 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllString(dataStr, -1)
 	sidMatches := sidPat.FindAllString(dataStr, -1)
 
-	fmt.Println("keyMatches", keyMatches)
-	fmt.Println("sidMatches", sidMatches)
-
 	for _, sid := range sidMatches {
 		for _, key := range keyMatches {
 			s1 := detectors.Result{
@@ -58,12 +54,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     sid,
 			}
 
-			fmt.Println("s1 raw v2", string(s1.RawV2))
-
 			if verify {
-				fmt.Println("s.client", s.client)
 				client = s.client
-				fmt.Println("client", client)
 				if client == nil {
 					client = common.SaneHttpClient()
 				}

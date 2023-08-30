@@ -27,10 +27,6 @@ func TestTwilio_FromChunk(t *testing.T) {
 	secretInactive := testSecrets.MustGetField("TWILLIO_API_INACTIVE")
 	id := testSecrets.MustGetField("TWILLIO_ID")
 
-	// Create a context with a past deadline to simulate DeadlineExceeded error
-	pastTime := time.Now().Add(-time.Second) // Set the deadline in the past
-	errorCtx, cancel := context.WithDeadline(context.Background(), pastTime)
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -57,6 +53,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Twilio,
 					Verified:     true,
 					Redacted:     id,
+					RawV2:        []byte(id + secret),
 				},
 			},
 			wantErr: false,
@@ -74,6 +71,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Twilio,
 					Verified:     false,
 					Redacted:     id,
+					RawV2:        []byte(id + secretInactive),
 				},
 			},
 			wantErr: false,
@@ -93,7 +91,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(100 * time.Microsecond)},
 			args: args{
-				ctx:    errorCtx,
+				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
 				verify: true,
 			},
@@ -101,6 +99,8 @@ func TestTwilio_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Twilio,
 					Verified:     false,
+					Redacted:     id,
+					RawV2:        []byte(id + secret),
 				},
 			},
 			wantErr:             false,
@@ -110,7 +110,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			name: "found, verified but unexpected api surface",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
-				ctx:    errorCtx,
+				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
 				verify: true,
 			},
@@ -118,6 +118,8 @@ func TestTwilio_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Twilio,
 					Verified:     false,
+					Redacted:     id,
+					RawV2:        []byte(id + secret),
 				},
 			},
 			wantErr:             false,
