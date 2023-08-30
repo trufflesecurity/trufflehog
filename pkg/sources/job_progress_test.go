@@ -36,10 +36,10 @@ func TestJobProgressFatalErrors(t *testing.T) {
 }
 
 func TestJobProgressRef(t *testing.T) {
-	jp := NewJobProgress(123, 456)
+	jp := NewJobProgress(123, 456, "source name")
 	ref := jp.Ref()
-	assert.Equal(t, int64(123), ref.SourceID)
-	assert.Equal(t, int64(456), ref.JobID)
+	assert.Equal(t, int64(123), ref.JobID)
+	assert.Equal(t, int64(456), ref.SourceID)
 
 	// Test Done() blocks until Finish() is called.
 	select {
@@ -61,7 +61,7 @@ func TestJobProgressHook(t *testing.T) {
 	defer ctrl.Finish()
 
 	hook := NewMockJobProgressHook(ctrl)
-	jp := NewJobProgress(123, 456, WithHooks(hook))
+	jp := NewJobProgress(123, 456, "source name", WithHooks(hook))
 
 	// Start(JobProgressRef, time.Time)
 	// End(JobProgressRef, time.Time)
@@ -114,4 +114,15 @@ func TestJobProgressDone(t *testing.T) {
 	default:
 		assert.FailNow(t, "done should not block for a nil job")
 	}
+}
+
+func TestJobProgressElapsedTime(t *testing.T) {
+	metrics := JobProgressMetrics{}
+	assert.Equal(t, time.Duration(0), metrics.ElapsedTime())
+
+	metrics.StartTime = time.Now()
+	assert.Greater(t, metrics.ElapsedTime(), time.Duration(0))
+
+	metrics.EndTime = metrics.StartTime.Add(1 * time.Hour)
+	assert.Equal(t, metrics.ElapsedTime(), 1*time.Hour)
 }

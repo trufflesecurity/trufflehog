@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -280,7 +281,62 @@ func TestSourceManagerJobAndSourceIDs(t *testing.T) {
 		})
 	assert.NoError(t, err)
 
-	_, _ = mgr.Run(context.Background(), handle)
+	ref, _ := mgr.Run(context.Background(), handle)
 	assert.Equal(t, int64(1337), initializedSourceID)
+	assert.Equal(t, int64(1337), ref.SourceID)
 	assert.Equal(t, int64(9001), initializedJobID)
+	assert.Equal(t, int64(9001), ref.JobID)
+	assert.Equal(t, "dummy", ref.SourceName)
+}
+
+// Chunk method that has a custom callback for the Chunks method.
+type callbackChunker struct {
+	cb func(context.Context, chan *Chunk) error
+}
+
+func (c callbackChunker) Chunks(ctx context.Context, ch chan *Chunk) error           { return c.cb(ctx, ch) }
+func (c callbackChunker) Enumerate(context.Context, UnitReporter) error              { return nil }
+func (c callbackChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error { return nil }
+
+func TestSourceManagerCancelRun(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8))
+	var returnedErr error
+	handle, err := enrollDummy(mgr, callbackChunker{func(ctx context.Context, _ chan *Chunk) error {
+		// The context passed to Chunks should get cancelled when ref.CancelRun() is called.
+		<-ctx.Done()
+		returnedErr = fmt.Errorf("oh no: %w", ctx.Err())
+		return returnedErr
+	}})
+	assert.NoError(t, err)
+
+	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	assert.NoError(t, err)
+
+	cancelErr := fmt.Errorf("abort! abort!")
+	ref.CancelRun(cancelErr)
+	<-ref.Done()
+	assert.Error(t, ref.Snapshot().FatalError())
+	assert.True(t, errors.Is(ref.Snapshot().FatalError(), returnedErr))
+	assert.True(t, errors.Is(ref.Snapshot().FatalErrors(), cancelErr))
+}
+
+func TestSourceManagerAvailableCapacity(t *testing.T) {
+	mgr := NewManager(WithConcurrentSources(1337))
+	start, end := make(chan struct{}), make(chan struct{})
+	handle, err := enrollDummy(mgr, callbackChunker{func(context.Context, chan *Chunk) error {
+		start <- struct{}{} // Send start signal.
+		<-end               // Wait for end signal.
+		return nil
+	}})
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1337, mgr.AvailableCapacity())
+	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	assert.NoError(t, err)
+
+	<-start // Wait for start signal.
+	assert.Equal(t, 1336, mgr.AvailableCapacity())
+	end <- struct{}{} // Send end signal.
+	<-ref.Done()      // Wait for the job to finish.
+	assert.Equal(t, 1337, mgr.AvailableCapacity())
 }

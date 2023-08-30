@@ -127,7 +127,7 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 						File:       sanitizer.UTF8(file),
 						Email:      sanitizer.UTF8(email),
 						Repository: sanitizer.UTF8(repository),
-						Link:       git.GenerateLink(repository, commit, file, line),
+						Link:       giturl.GenerateLink(repository, commit, file, line),
 						Timestamp:  sanitizer.UTF8(timestamp),
 						Line:       line,
 					},

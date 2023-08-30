@@ -151,55 +151,6 @@ func TestSource_Scan(t *testing.T) {
 	}
 }
 
-func Test_generateLink(t *testing.T) {
-	type args struct {
-		repo   string
-		commit string
-		file   string
-		line   int64
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "test link gen",
-			args: args{
-				repo:   "https://github.com/trufflesec-julian/confluence-go-api.git",
-				commit: "047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
-				file:   ".gitignore",
-			},
-			want: "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore",
-		},
-		{
-			name: "test link gen",
-			args: args{
-				repo:   "https://github.com/trufflesec-julian/confluence-go-api.git",
-				commit: "047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
-				file:   ".gitignore",
-				line:   int64(4),
-			},
-			want: "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore#L4",
-		},
-		{
-			name: "test link gen - no file",
-			args: args{
-				repo:   "https://github.com/trufflesec-julian/confluence-go-api.git",
-				commit: "047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
-			},
-			want: "https://github.com/trufflesec-julian/confluence-go-api/commit/047b4a2ba42fc5b6c0bd535c5307434a666db5ec",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := GenerateLink(tt.args.repo, tt.args.commit, tt.args.file, tt.args.line); got != tt.want {
-				t.Errorf("generateLink() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 // We ran into an issue where upgrading a dependency caused the git patch chunking to break
 // So this test exists to make sure that when something changes, we know about it.
 func TestSource_Chunks_Integration(t *testing.T) {

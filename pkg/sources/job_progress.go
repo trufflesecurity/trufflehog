@@ -40,9 +40,12 @@ type JobProgressHook interface {
 }
 
 // JobProgressRef is a wrapper of a JobProgress for read-only access to its state.
+// If the job supports it, the reference can also be used to cancel running via
+// CancelRun.
 type JobProgressRef struct {
-	SourceID    int64
 	JobID       int64
+	SourceID    int64
+	SourceName  string
 	jobProgress *JobProgress
 }
 
@@ -63,6 +66,16 @@ func (r *JobProgressRef) Done() <-chan struct{} {
 		return ch
 	}
 	return r.jobProgress.Done()
+}
+
+// CancelRun requests that the job this is referencing is cancelled and stops
+// running. This method will have no effect if the job does not allow
+// cancellation.
+func (r *JobProgressRef) CancelRun(cause error) {
+	if r.jobProgress == nil || r.jobProgress.jobCancel == nil {
+		return
+	}
+	r.jobProgress.jobCancel(cause)
 }
 
 // Fatal is a wrapper around error to differentiate non-fatal errors from fatal
@@ -88,14 +101,19 @@ func (f ChunkError) Unwrap() error { return f.err }
 // JobProgress aggregates information about a run of a Source.
 type JobProgress struct {
 	// Unique identifiers for this job.
-	SourceID int64
-	JobID    int64
+	JobID      int64
+	SourceID   int64
+	SourceName string
 	// Tracks whether the job is finished or not.
 	ctx    context.Context
 	cancel context.CancelFunc
+	// Requests to cancel the job.
+	jobCancel context.CancelCauseFunc
 	// Metrics.
 	metrics     JobProgressMetrics
 	metricsLock sync.Mutex
+	// Progress reported by the source.
+	progress *Progress
 	// Coarse grained hooks for adding extra functionality when events trigger.
 	hooks []JobProgressHook
 }
@@ -110,9 +128,20 @@ type JobProgressMetrics struct {
 	FinishedUnits uint64
 	// Total number of chunks produced. This metric updates before the
 	// chunk is sent on the output channel.
-	TotalChunks     uint64
-	Errors          []error
+	TotalChunks uint64
+	// All errors encountered.
+	Errors []error
+	// Set to true if the source supports enumeration and has finished
+	// enumerating. If the source does not support enumeration, this field
+	// is always false.
 	DoneEnumerating bool
+
+	// Progress information reported by the source.
+	SourcePercent           int64
+	SourceMessage           string
+	SourceEncodedResumeInfo string
+	SourceSectionsCompleted int32
+	SourceSectionsRemaining int32
 }
 
 // WithHooks adds hooks to be called when an event triggers.
@@ -120,19 +149,31 @@ func WithHooks(hooks ...JobProgressHook) func(*JobProgress) {
 	return func(jp *JobProgress) { jp.hooks = append(jp.hooks, hooks...) }
 }
 
+// WithCancel allows cancelling the job by the JobProgressRef.
+func WithCancel(cancel context.CancelCauseFunc) func(*JobProgress) {
+	return func(jp *JobProgress) { jp.jobCancel = cancel }
+}
+
 // NewJobProgress creates a new job report for the given source and job ID.
-func NewJobProgress(sourceID, jobID int64, opts ...func(*JobProgress)) *JobProgress {
+func NewJobProgress(jobID, sourceID int64, sourceName string, opts ...func(*JobProgress)) *JobProgress {
 	ctx, cancel := context.WithCancel(context.Background())
 	jp := &JobProgress{
-		SourceID: sourceID,
-		JobID:    jobID,
-		ctx:      ctx,
-		cancel:   cancel,
+		JobID:      jobID,
+		SourceID:   sourceID,
+		SourceName: sourceName,
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 	for _, opt := range opts {
 		opt(jp)
 	}
 	return jp
+}
+
+// TrackProgress informs the JobProgress of a Progress object and safely
+// exposes its information in the Snapshots.
+func (jp *JobProgress) TrackProgress(progress *Progress) {
+	jp.progress = progress
 }
 
 // executeHooks is a helper method to execute all the hooks for the given
@@ -210,6 +251,16 @@ func (jp *JobProgress) Snapshot() JobProgressMetrics {
 	metrics.Errors = make([]error, len(metrics.Errors))
 	copy(metrics.Errors, jp.metrics.Errors)
 
+	if jp.progress != nil {
+		jp.progress.mut.Lock()
+		defer jp.progress.mut.Unlock()
+		metrics.SourcePercent = jp.progress.PercentComplete
+		metrics.SourceMessage = jp.progress.Message
+		metrics.SourceEncodedResumeInfo = jp.progress.EncodedResumeInfo
+		metrics.SourceSectionsCompleted = jp.progress.SectionsCompleted
+		metrics.SourceSectionsRemaining = jp.progress.SectionsRemaining
+	}
+
 	return metrics
 }
 
@@ -231,6 +282,7 @@ func (jp *JobProgress) Ref() JobProgressRef {
 	return JobProgressRef{
 		SourceID:    jp.SourceID,
 		JobID:       jp.JobID,
+		SourceName:  jp.SourceName,
 		jobProgress: jp,
 	}
 }
@@ -280,7 +332,22 @@ func (m JobProgressMetrics) PercentComplete() int {
 	num := m.FinishedUnits
 	den := m.TotalUnits
 	if num == 0 && den == 0 {
-		return 0
+		// Fallback to the source's self-reported percent complete if
+		// the unit information isn't available.
+		return int(m.SourcePercent)
 	}
 	return int(num * 100 / den)
+}
+
+// ElapsedTime is a convenience method that provides the elapsed time the job
+// has been running. If it hasn't started yet, 0 is returned. If it has
+// finished, the total time is returned.
+func (m JobProgressMetrics) ElapsedTime() time.Duration {
+	if m.StartTime.IsZero() {
+		return 0
+	}
+	if m.EndTime.IsZero() {
+		return time.Since(m.StartTime)
+	}
+	return m.EndTime.Sub(m.StartTime)
 }

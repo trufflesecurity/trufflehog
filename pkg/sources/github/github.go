@@ -29,6 +29,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -148,14 +149,16 @@ func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) 
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			s.log.V(1).Info("invalid include glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			continue
 		}
 		includeGlobs = append(includeGlobs, g)
 	}
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			s.log.V(1).Info("invalid exclude glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
 	}
@@ -261,7 +264,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 						File:       sanitizer.UTF8(file),
 						Email:      sanitizer.UTF8(email),
 						Repository: sanitizer.UTF8(repository),
-						Link:       git.GenerateLink(repository, commit, file, line),
+						Link:       giturl.GenerateLink(repository, commit, file, line),
 						Timestamp:  sanitizer.UTF8(timestamp),
 						Line:       line,
 						Visibility: s.visibilityOf(aCtx, repository),
@@ -1222,6 +1225,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, 
 		chunk := &sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
 			SourceType: s.Type(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
@@ -1255,6 +1259,7 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -1286,6 +1291,7 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{

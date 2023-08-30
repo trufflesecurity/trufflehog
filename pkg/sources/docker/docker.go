@@ -119,6 +119,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			SourceType: s.Type(),
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+      JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Docker{
 					Docker: &source_metadatapb.Docker{

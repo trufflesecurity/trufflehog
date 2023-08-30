@@ -2,6 +2,7 @@ package giturl
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -13,7 +14,28 @@ const (
 	providerGithub    provider = "Github"
 	providerGitlab    provider = "Gitlab"
 	providerBitbucket provider = "Bitbucket"
+	providerAzure     provider = "Azure"
+
+	urlGithub    = "github.com/"
+	urlGitlab    = "gitlab.com/"
+	urlBitbucket = "bitbucket.org/"
+	urlAzure     = "dev.azure.com/"
 )
+
+func determineProvider(repo string) provider {
+	switch {
+	case strings.Contains(repo, urlGithub):
+		return providerGithub
+	case strings.Contains(repo, urlGitlab):
+		return providerGitlab
+	case strings.Contains(repo, urlBitbucket):
+		return providerBitbucket
+	case strings.Contains(repo, urlAzure):
+		return providerAzure
+	default:
+		return ""
+	}
+}
 
 func NormalizeBitbucketRepo(repoURL string) (string, error) {
 	if !strings.HasPrefix(repoURL, "https") {
@@ -87,4 +109,36 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 	// If we're here it's probably a provider repo without ".git" at the end, so add it and return
 	parsed.Path += ".git"
 	return parsed.String(), nil
+}
+
+// GenerateLink crafts a link to the specific file from a commit.
+// Supports GitHub, GitLab, Bitbucket, and Azure Repos.
+// If the provider supports hyperlinks to specific lines, the line number will be included.
+func GenerateLink(repo, commit, file string, line int64) string {
+	switch determineProvider(repo) {
+	case providerBitbucket:
+		return repo[:len(repo)-4] + "/commits/" + commit
+
+	case providerGithub, providerGitlab:
+		var baseLink string
+		if file == "" {
+			baseLink = repo[:len(repo)-4] + "/commit/" + commit
+		} else {
+			baseLink = repo[:len(repo)-4] + "/blob/" + commit + "/" + file
+			if line > 0 {
+				baseLink += "#L" + strconv.FormatInt(line, 10)
+			}
+		}
+		return baseLink
+
+	case providerAzure:
+		baseLink := repo + "?path=" + file + "&version=GB" + commit
+		if line > 0 {
+			baseLink += "&line=" + strconv.FormatInt(line, 10)
+		}
+		return baseLink
+
+	default:
+		return ""
+	}
 }
