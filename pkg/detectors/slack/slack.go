@@ -68,6 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				req, err := http.NewRequestWithContext(ctx, "POST", verifyURL, nil)
 				if err != nil {
+					fmt.Println("err: ", err)
 					continue
 				}
 
@@ -75,16 +76,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 
 				res, err := client.Do(req)
-
-				fmt.Println("res", res)
-
 				if err == nil {
 					defer res.Body.Close()
 					var authResponse authRes
 					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
 						continue
 					}
-					s1.Verified = authResponse.Ok
+
+					if authResponse.Ok {
+						s1.Verified = true
+						// Slack API returns 200 even if the token is invalid. We need to check the error field.
+					} else if authResponse.Error == "invalid_auth" {
+						// The secret is determinately not verified (nothing to do)
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected error auth response %+v", authResponse.Error)
+					}
+				} else {
+					s1.VerificationError = err
 				}
 			}
 
