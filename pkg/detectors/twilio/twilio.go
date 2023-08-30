@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				client = s.client
 				if client == nil {
-					client = common.SaneHttpClient()
+					client = defaultClient
 				}
 
 				req, err := http.NewRequestWithContext(
