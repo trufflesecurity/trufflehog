@@ -238,6 +238,7 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 			SourceType: s.Type(),
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
 			Data:       removeCircleSha1Line(data.Bytes()),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Circleci{
