@@ -6,10 +6,10 @@ package twilio
 import (
 	"context"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
-
-	"github.com/kylelemons/godebug/pretty"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,6 +26,10 @@ func TestTwilio_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("TWILLIO_API")
 	secretInactive := testSecrets.MustGetField("TWILLIO_API_INACTIVE")
 	id := testSecrets.MustGetField("TWILLIO_ID")
+
+	// Create a context with a past deadline to simulate DeadlineExceeded error
+	pastTime := time.Now().Add(-time.Second) // Set the deadline in the past
+	errorCtx, cancel := context.WithDeadline(context.Background(), pastTime)
 
 	type args struct {
 		ctx    context.Context
@@ -89,7 +93,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(100 * time.Microsecond)},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    errorCtx,
 				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
 				verify: true,
 			},
@@ -106,7 +110,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 			name: "found, verified but unexpected api surface",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    errorCtx,
 				data:   []byte(fmt.Sprintf("You can find a twillio secret %s within awsId %s", secret, id)),
 				verify: true,
 			},
@@ -122,20 +126,21 @@ func TestTwilio_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Twilio.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
-				got[i].RawV2 = nil
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Twilio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
