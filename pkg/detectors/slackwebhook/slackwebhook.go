@@ -51,6 +51,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+
+			client := s.client
+			if client == nil {
+				client = common.SaneHttpClient()
+			}
+
 			payload := strings.NewReader(`{"text": ""}`)
 			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			if err != nil {
@@ -66,8 +72,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
+				fmt.Printf("res body %+v \n", res.Body)
+
 				if err == nil {
 					defer res.Body.Close()
+					fmt.Printf("res.StatusCode: %d\n", res.StatusCode)
 					if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
 						s1.Verified = true
 					} else if res.StatusCode == 401 || res.StatusCode == 403 {
