@@ -167,97 +167,6 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 	}
 }
 
-// limitedBytesReader is a custom reader that wraps another io.Reader
-// and limits the bytes read from it. Unlike io.LimitedReader, it retains
-// the performance optimization benefits of the WriteTo method present
-// in some underlying readers, especially bytes.Reader.
-type limitedBytesReader struct {
-	r    io.Reader // The wrapped reader
-	n    int64     // Maximum bytes allowed to be read
-	read int64     // Bytes read so far
-}
-
-// Read attempts to read up to len(p) bytes into p.
-// It respects the read limit set in the reader and adjusts the
-// bytes read if it would exceed the allowed maximum.
-func (l *limitedBytesReader) Read(p []byte) (n int, err error) {
-	if l.read == l.n { // If we have already read up to the limit
-		return 0, io.EOF
-	}
-
-	remaining := l.n - l.read
-	if remaining <= 0 {
-		return 0, io.EOF
-	}
-
-	if int64(len(p)) > remaining {
-		p = p[:remaining]
-	}
-
-	n, err = l.r.Read(p)
-	l.read += int64(n)
-	return
-}
-
-// WriteTo overrides the standard WriteTo to implement a byte limit while writing.
-// It provides a fast path when the underlying reader is a *bytes.Reader to avoid
-// extra allocations and retain the efficiency benefits of bytes.Reader's WriteTo.
-// For other reader types, it reads from the source and writes to the destination
-// while ensuring that it doesn't exceed the specified byte limit.
-//
-// The main reasons for this override are:
-//  1. Efficiency: By respecting the native WriteTo of a bytes.Reader, we avoid unnecessary
-//     allocations and data copying, making the write process faster.
-//  2. Safety: This method ensures we never write more than the preset byte limit, even if
-//     the underlying reader contains more data.
-func (l *limitedBytesReader) WriteTo(w io.Writer) (n int64, err error) {
-	switch reader := l.r.(type) {
-	case *bytes.Reader:
-		remaining := l.n - l.read
-		if remaining > int64(reader.Len()) {
-			remaining = int64(reader.Len())
-		}
-		data := make([]byte, remaining)
-		_, readErr := reader.ReadAt(data, l.read)
-		if readErr != nil && readErr != io.EOF {
-			return 0, readErr
-		}
-
-		nn, err := w.Write(data)
-		l.read += int64(nn)
-		return int64(nn), err
-	default:
-		const bufSize = 4096
-		buf := make([]byte, bufSize)
-		var totalWritten int64
-
-		for l.read < l.n {
-			remaining := l.n - l.read
-			if int64(bufSize) > remaining {
-				buf = buf[:remaining]
-			}
-
-			read, readErr := l.r.Read(buf)
-			if readErr != nil && readErr != io.EOF {
-				return totalWritten, readErr
-			}
-
-			nn, writeErr := w.Write(buf[:read])
-			totalWritten += int64(nn)
-
-			if writeErr != nil {
-				return totalWritten, writeErr
-			}
-
-			if readErr == io.EOF {
-				break
-			}
-		}
-
-		return totalWritten, nil
-	}
-}
-
 // ReadToMax reads up to the max size.
 func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte, err error) {
 	// Archiver v4 is in alpha and using an experimental version of
@@ -282,7 +191,8 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 	}
 
 	var fileContent bytes.Buffer
-	lr := &limitedBytesReader{r: reader, n: int64(maxSize)}
+	// Create a limited reader to ensure we don't read more than the max size.
+	lr := io.LimitReader(reader, int64(maxSize))
 
 	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
 	// for the method, due to the internal implementation of io.CopyBuffer, when
