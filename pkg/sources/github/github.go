@@ -1225,6 +1225,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, 
 		chunk := &sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
 			SourceType: s.Type(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
@@ -1258,6 +1259,7 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -1289,6 +1291,7 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
