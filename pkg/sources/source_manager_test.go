@@ -312,10 +312,12 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	ref, err := mgr.ScheduleRun(context.Background(), handle)
 	assert.NoError(t, err)
 
-	ref.CancelRun()
+	cancelErr := fmt.Errorf("abort! abort!")
+	ref.CancelRun(cancelErr)
 	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
 	assert.True(t, errors.Is(ref.Snapshot().FatalError(), returnedErr))
+	assert.True(t, errors.Is(ref.Snapshot().FatalErrors(), cancelErr))
 }
 
 func TestSourceManagerAvailableCapacity(t *testing.T) {
