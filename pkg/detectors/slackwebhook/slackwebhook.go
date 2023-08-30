@@ -2,6 +2,7 @@ package slackwebhook
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -62,6 +63,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 || () {
+						s1.Verified = true
+					} else if res.StatusCode == 401 {
+						// The secret is determinately not verified (nothing to do)
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					}
+				} else {
+					s1.VerificationError = err
+				}
 				if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
 					s1.Verified = true
 				}
