@@ -2,6 +2,7 @@ package slackwebhook
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -12,14 +13,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`)
 )
@@ -48,6 +50,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+
 			payload := strings.NewReader(`{"text": ""}`)
 			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			if err != nil {
@@ -62,9 +70,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
+
+				defer res.Body.Close()
+
+				if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
 					s1.Verified = true
+				} else if res.StatusCode == 401 || res.StatusCode == 403 {
+					// The secret is determinately not verified (nothing to do)
+				} else {
+					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 				}
+			} else {
+				s1.VerificationError = err
 			}
 		}
 
