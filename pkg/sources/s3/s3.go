@@ -376,6 +376,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				SourceType: s.Type(),
 				SourceName: s.name,
 				SourceID:   s.SourceID(),
+				JobID:      s.JobID(),
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_S3{
 						S3: &source_metadatapb.S3{

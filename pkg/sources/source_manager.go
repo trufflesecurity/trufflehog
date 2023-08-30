@@ -36,7 +36,10 @@ type SourceManager struct {
 	handles     map[handle]sourceInfo
 	handlesLock sync.Mutex
 	// Pool limiting the amount of concurrent sources running.
-	pool            errgroup.Group
+	pool                errgroup.Group
+	poolLimit           int
+	currentRunningCount int32
+	// Max number of units to scan concurrently per source.
 	concurrentUnits int
 	// Run the sources using source unit enumeration / chunking if available.
 	useSourceUnits bool
@@ -68,7 +71,10 @@ func WithReportHook(hook JobProgressHook) func(*SourceManager) {
 
 // WithConcurrentSources limits the concurrent number of sources a manager can run.
 func WithConcurrentSources(concurrency int) func(*SourceManager) {
-	return func(mgr *SourceManager) { mgr.pool.SetLimit(concurrency) }
+	return func(mgr *SourceManager) {
+		mgr.pool.SetLimit(concurrency)
+		mgr.poolLimit = concurrency
+	}
 }
 
 // WithBufferedOutput sets the size of the buffer used for the Chunks() channel.
@@ -167,6 +173,8 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 	ctx, cancel := context.WithCancel(ctx)
 	progress := NewJobProgress(jobID, int64(handle), sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	s.pool.Go(func() error {
+		atomic.AddInt32(&s.currentRunningCount, 1)
+		defer atomic.AddInt32(&s.currentRunningCount, -1)
 		ctx := context.WithValues(ctx,
 			"job_id", jobID,
 			"source_manager_worker_id", common.RandomID(5),
@@ -205,6 +213,16 @@ func (s *SourceManager) Wait() error {
 // rely on this functionality.
 func (s *SourceManager) ScanChunk(chunk *Chunk) {
 	s.outputChunks <- chunk
+}
+
+// AvailableCapacity returns the number of concurrent jobs the manager can
+// accommodate at this time. If there is no limit, -1 is returned.
+func (s *SourceManager) AvailableCapacity() int {
+	if s.poolLimit == 0 {
+		return -1
+	}
+	runCount := atomic.LoadInt32(&s.currentRunningCount)
+	return s.poolLimit - int(runCount)
 }
 
 // preflightChecks is a helper method to check the Manager or the context isn't
