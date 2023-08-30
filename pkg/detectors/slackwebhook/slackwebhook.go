@@ -21,6 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	client = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`)
 )
@@ -50,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 
-			client := s.client
+			client = s.client
 			if client == nil {
 				client = common.SaneHttpClient()
 			}
@@ -71,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				body := string(bodyBytes)
 
 				defer res.Body.Close()
-				fmt.Printf("res.StatusCode: %d\n", res.StatusCode)
+
 				if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
 					s1.Verified = true
 				} else if res.StatusCode == 401 || res.StatusCode == 403 {
