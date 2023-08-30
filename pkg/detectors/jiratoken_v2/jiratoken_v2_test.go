@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package jiratoken_old
+package jiratoken_v2
 
 import (
 	"context"
