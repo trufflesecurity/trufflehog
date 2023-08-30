@@ -68,7 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				req, err := http.NewRequestWithContext(ctx, "POST", verifyURL, nil)
 				if err != nil {
-					fmt.Println("err: ", err)
 					continue
 				}
 
