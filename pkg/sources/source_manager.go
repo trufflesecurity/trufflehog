@@ -170,7 +170,7 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 		return JobProgressRef{SourceID: int64(handle), SourceName: sourceName}, err
 	}
 	// Create a JobProgress object for tracking progress.
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancelCause(ctx)
 	progress := NewJobProgress(jobID, int64(handle), sourceName, WithHooks(s.hooks...), WithCancel(cancel))
 	s.pool.Go(func() error {
 		atomic.AddInt32(&s.currentRunningCount, 1)
@@ -180,7 +180,7 @@ func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgres
 			"source_manager_worker_id", common.RandomID(5),
 		)
 		defer common.Recover(ctx)
-		defer cancel()
+		defer cancel(nil)
 		return s.run(ctx, handle, jobID, progress)
 	})
 	return progress.Ref(), nil
@@ -246,6 +246,12 @@ func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, rep
 	defer report.Finish()
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
+
+	defer func() {
+		if err := context.Cause(ctx); err != nil {
+			report.ReportError(Fatal{err})
+		}
+	}()
 
 	// Initialize the source.
 	sourceInfo, ok := s.getSourceInfo(handle)
