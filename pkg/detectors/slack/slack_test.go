@@ -26,11 +26,6 @@ func TestSlack_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("SLACK")
 	secretInactive := testSecrets.MustGetField("SLACK_INACTIVE")
 
-	//// Create a context with a past deadline to simulate DeadlineExceeded error
-	//pastTime := time.Now().Add(-time.Second) // Set the deadline in the past
-	//errorCtx, cancel := context.WithDeadline(context.Background(), pastTime)
-	//defer cancel()
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
