@@ -5,6 +5,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -1540,6 +1541,7 @@ func DefaultDetectors() []detectors.Detector {
 		huggingface.Scanner{},
 		trufflehogenterprise.Scanner{},
 		salesforce.Scanner{},
+		sourcegraph.Scanner{},
 	}
 
 }
