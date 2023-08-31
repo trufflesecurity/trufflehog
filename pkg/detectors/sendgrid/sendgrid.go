@@ -13,13 +13,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sendgrid"}) + `(SG\.[\w\-_]{20,24}\.[\w\-_]{39,50})\b`)
 )
@@ -42,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		res := strings.TrimSpace(match[1])
 
-		s := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SendGrid,
 			Raw:          []byte(res),
 		}
@@ -51,6 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// there are a few endpoints we can check, but templates seems the least sensitive.
 			// 403 will be issued if the scope is wrong but the key is correct
 			baseURL := "https://api.sendgrid.com/v3/templates"
+
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
 
 			// test `read_user` scope
 			req, err := http.NewRequestWithContext(ctx, "GET", baseURL, nil)
@@ -67,16 +74,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// 403 means good key but not the right scope
 				// 401 is bad key
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					s.Verified = true
+					s1.Verified = true
+				} else if res.StatusCode != http.StatusUnauthorized {
+					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 				}
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
-		results = append(results, s)
+		results = append(results, s1)
 	}
 
 	return
