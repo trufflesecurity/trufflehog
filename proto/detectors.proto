@@ -936,6 +936,7 @@ enum DetectorType {
   Salesforce = 925;
   HuggingFace = 926;
   Snowflake = 927;
+  Sourcegraph = 928;
 }
 
 message Result {

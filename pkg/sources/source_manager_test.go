@@ -312,8 +312,31 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	ref, err := mgr.ScheduleRun(context.Background(), handle)
 	assert.NoError(t, err)
 
-	ref.CancelRun()
+	cancelErr := fmt.Errorf("abort! abort!")
+	ref.CancelRun(cancelErr)
 	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
 	assert.True(t, errors.Is(ref.Snapshot().FatalError(), returnedErr))
+	assert.True(t, errors.Is(ref.Snapshot().FatalErrors(), cancelErr))
+}
+
+func TestSourceManagerAvailableCapacity(t *testing.T) {
+	mgr := NewManager(WithConcurrentSources(1337))
+	start, end := make(chan struct{}), make(chan struct{})
+	handle, err := enrollDummy(mgr, callbackChunker{func(context.Context, chan *Chunk) error {
+		start <- struct{}{} // Send start signal.
+		<-end               // Wait for end signal.
+		return nil
+	}})
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1337, mgr.AvailableCapacity())
+	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	assert.NoError(t, err)
+
+	<-start // Wait for start signal.
+	assert.Equal(t, 1336, mgr.AvailableCapacity())
+	end <- struct{}{} // Send end signal.
+	<-ref.Done()      // Wait for the job to finish.
+	assert.Equal(t, 1337, mgr.AvailableCapacity())
 }

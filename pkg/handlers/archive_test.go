@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -124,6 +125,58 @@ func TestHandleFile(t *testing.T) {
 	assert.Equal(t, 0, len(ch))
 	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, ch))
 	assert.Equal(t, 1, len(ch))
+}
+
+func TestReadToMax(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected []byte
+	}{
+		{
+			name:     "read full content within maxSize",
+			input:    []byte("abcdefg"),
+			expected: []byte("abcdefg"),
+		},
+		{
+			name:     "read content larger than maxSize",
+			input:    make([]byte, maxSize+10), // this creates a byte slice 10 bytes larger than maxSize
+			expected: make([]byte, maxSize),
+		},
+		{
+			name:     "empty input",
+			input:    []byte(""),
+			expected: []byte(""),
+		},
+	}
+
+	a := &Archive{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := bytes.NewReader(tt.input)
+			output, err := a.ReadToMax(context.Background(), reader)
+			assert.Nil(t, err)
+
+			assert.Equal(t, tt.expected, output)
+		})
+	}
+}
+
+func BenchmarkReadToMax(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), 1024*1000) // 1MB of data.
+	reader := bytes.NewReader(data)
+	a := &Archive{}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		_, _ = a.ReadToMax(context.Background(), reader)
+		b.StopTimer()
+
+		_, _ = reader.Seek(0, 0) // Reset the reader position.
+		a.size = 0               // Reset archive size.
+	}
 }
 
 func TestExtractDebContent(t *testing.T) {
