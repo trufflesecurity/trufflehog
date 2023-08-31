@@ -28,9 +28,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sentry"}) + `\b([a-f0-9]{64})\b`)
 
-	// Errors.
-	errIndeterminate = fmt.Errorf("indeterminate verification state")
-	errUnauthorized  = fmt.Errorf("token unauthorized")
+	errUnauthorized = fmt.Errorf("token unauthorized")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -101,7 +99,7 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, errIndeterminate
+		return false, err
 	}
 	defer res.Body.Close()
 
