@@ -91,6 +91,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// Jira returns a default dashboard page.
 						if (res.StatusCode >= 200 && res.StatusCode < 300) && res.Header.Get(loginReasonHeaderKey) != failedAuth {
 							s1.Verified = true
+						} else {
+							s1.VerificationError = err
 						}
 					}
 				}
