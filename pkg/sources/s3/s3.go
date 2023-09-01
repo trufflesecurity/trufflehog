@@ -173,7 +173,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 		}
 
 		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
-		s.log.Info("Scanning bucket", "bucket", bucket)
+		s.log.V(3).Info("Scanning bucket", "bucket", bucket)
 		region, err := s3manager.GetBucketRegionWithClient(ctx, client, bucket)
 		if err != nil {
 			s.log.Error(err, "could not get s3 region for bucket", "bucket: ", bucket)
@@ -257,7 +257,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 
 		// ignore large files
 		if *obj.Size > s.maxObjectSize {
-			s.log.V(3).Info("Skipping %d byte file (over maxObjectSize limit)", "object", *obj.Key)
+			s.log.V(5).Info("Skipping %d byte file (over maxObjectSize limit)", "object", *obj.Key)
 			continue
 		}
 
