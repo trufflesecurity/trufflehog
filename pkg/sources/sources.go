@@ -30,6 +30,48 @@ type Chunk struct {
 	Verify bool
 }
 
+// BaseAndTagForDockerImg returns a base and tag value for a
+// docker image regardless of the source type. If the source type
+// is not a docker image, the base will be a filename/path from the source metadata.
+// The default is the entire source metadata string. Update for new source types.
+func (c *Chunk) BaseAndTagForDockerImg() (base string, tag string) {
+	switch c.SourceType {
+	case sourcespb.SourceType_SOURCE_TYPE_DOCKER:
+		base = c.SourceMetadata.GetDocker().GetImage()
+		tag = c.SourceMetadata.GetDocker().GetTag()
+	case sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM:
+		base = c.SourceMetadata.GetFilesystem().GetFile()
+	case sourcespb.SourceType_SOURCE_TYPE_S3:
+		bucket := c.SourceMetadata.GetS3().GetBucket()
+		file := c.SourceMetadata.GetS3().GetFile()
+		base = bucket + "/" + file
+	case sourcespb.SourceType_SOURCE_TYPE_GCS:
+		bucket := c.SourceMetadata.GetGcs().GetBucket()
+		file := c.SourceMetadata.GetGcs().GetFilename()
+		base = bucket + "/" + file
+	case sourcespb.SourceType_SOURCE_TYPE_SYSLOG:
+		host := c.SourceMetadata.GetSyslog().GetHostname()
+		app := c.SourceMetadata.GetSyslog().GetAppname()
+		base = host + "/" + app
+	case sourcespb.SourceType_SOURCE_TYPE_GIT:
+		repo := c.SourceMetadata.GetGit().GetRepository()
+		file := c.SourceMetadata.GetGit().GetFile()
+		base = file + " (repo: " + repo + ")"
+	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
+		repo := c.SourceMetadata.GetGitlab().GetRepository()
+		file := c.SourceMetadata.GetGitlab().GetFile()
+		base = file + " (repo: " + repo + ")"
+	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
+		repo := c.SourceMetadata.GetGithub().GetRepository()
+		file := c.SourceMetadata.GetGithub().GetFile()
+		base = file + " (repo: " + repo + ")"
+	default:
+		base = c.SourceMetadata.String()
+		tag = ""
+	}
+	return base, tag
+}
+
 // Source defines the interface required to implement a source chunker.
 type Source interface {
 	// Type returns the source type, used for matching against configuration and jobs.

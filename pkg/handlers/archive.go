@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
 
@@ -36,10 +38,31 @@ var (
 // Ensure the Archive satisfies the interfaces at compile time.
 var _ SpecializedHandler = (*Archive)(nil)
 
+// tempEnv contains the temporary file and directory information for the archive.
+type tempEnv struct {
+	tempFile     *os.File
+	tempFileName string
+	extractPath  string
+}
+
+// dockerImageDetails contains the details of the Docker image and the temporary environment.
+type dockerImageDetails struct {
+	image v1.Image
+	temp  tempEnv
+}
+
 // Archive is a handler for extracting and decompressing archives.
 type Archive struct {
 	size         int
 	currentDepth int
+}
+
+// DockerTarReader is a wrapper for io.Reader that also stores the temp filepath and image of the tar file.
+// Temporary file path information needed for inner-workings of go-containerregistry Image methods.
+type DockerTarReader struct {
+	io.Reader
+	img    v1.Image
+	tmpEnv tempEnv
 }
 
 // New sets a default maximum size and current size counter.
@@ -213,6 +236,7 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 const (
 	arMimeType  = "application/x-unix-archive"
 	rpmMimeType = "application/x-rpm"
+	tarMimeType = "application/x-tar"
 )
 
 // Define a map of mime types to corresponding command-line tools
@@ -266,6 +290,21 @@ func (a *Archive) HandleSpecialized(ctx logContext.Context, reader io.Reader) (i
 			return nil, false, err
 		}
 		reader, err = a.extractRpmContent(ctx, reader)
+	case tarMimeType:
+		//check if tar is a docker image
+		isImg, details, err := a.isDockerImage(ctx, reader)
+		if err != nil {
+			return nil, false, err
+		}
+		if !isImg {
+			return nil, false, nil
+		}
+		// Build dockerReader containing docker image
+		reader = DockerTarReader{
+			Reader: reader,
+			img:    details.image,
+			tmpEnv: details.temp,
+		}
 	default:
 		return reader, false, nil
 	}
@@ -290,8 +329,8 @@ func (a *Archive) extractDebContent(ctx logContext.Context, file io.Reader) (io.
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpEnv.tempFileName)
 	defer os.RemoveAll(tmpEnv.extractPath)
+	defer os.Remove(tmpEnv.tempFileName)
 
 	cmd := exec.Command("ar", "x", tmpEnv.tempFile.Name())
 	cmd.Dir = tmpEnv.extractPath
@@ -328,8 +367,8 @@ func (a *Archive) extractRpmContent(ctx logContext.Context, file io.Reader) (io.
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpEnv.tempFileName)
 	defer os.RemoveAll(tmpEnv.extractPath)
+	defer os.Remove(tmpEnv.tempFileName)
 
 	// Use rpm2cpio to convert the RPM file to a cpio archive and then extract it using cpio command.
 	cmd := exec.Command("sh", "-c", "rpm2cpio "+tmpEnv.tempFile.Name()+" | cpio -id")
@@ -428,12 +467,6 @@ func (a *Archive) handleExtractedFiles(ctx logContext.Context, env tempEnv, hand
 	return dataArchiveName, nil
 }
 
-type tempEnv struct {
-	tempFile     *os.File
-	tempFileName string
-	extractPath  string
-}
-
 // createTempEnv creates a temporary file and a temporary directory for extracting archives.
 // The caller is responsible for removing these temporary resources
 // (both the file and directory) when they are no longer needed.
@@ -476,4 +509,23 @@ func openDataArchive(extractPath string, dataArchiveName string) (io.ReadCloser,
 		return nil, fmt.Errorf("unable to open file: %w", err)
 	}
 	return dataFile, nil
+}
+
+// isDockerImage checks if a reader object is a docker image.
+// Returns true if the tar file is a docker image, dockerImageDetails, and error.
+// Caller is responsible for removing temporary files and directories IF the file is a docker image.
+// The docker scanner requires a file path to the image, so we must leave the temporary file on disk.
+func (a *Archive) isDockerImage(ctx context.Context, file io.Reader) (isImg bool, details dockerImageDetails, err error) {
+	tmpEnv, err := a.createTempEnv(ctx, file)
+	if err != nil {
+		return false, dockerImageDetails{}, err
+	}
+
+	img, err := tarball.ImageFromPath(tmpEnv.tempFileName, nil)
+	if err != nil {
+		os.Remove(tmpEnv.tempFileName)
+		os.RemoveAll(tmpEnv.extractPath)
+		return false, dockerImageDetails{}, err
+	}
+	return true, dockerImageDetails{image: img, temp: tmpEnv}, nil
 }

@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 	"io"
+	"os"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/docker"
 )
 
 func DefaultHandlers() []Handler {
@@ -37,7 +39,7 @@ type Handler interface {
 // packages them in the provided chunk skeleton, and sends them to chunksChan.
 // The function returns true if processing was successful and false otherwise.
 // Context is used for cancellation, and the caller is responsible for canceling it if needed.
-func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
 	aCtx := logContext.AddLogger(ctx)
 	for _, h := range DefaultHandlers() {
 		h.New()
@@ -56,9 +58,15 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 		if specialHandler, ok := h.(SpecializedHandler); ok {
 			file, isSpecial, err := specialHandler.HandleSpecialized(aCtx, reReader)
 			if isSpecial {
+				if dockerTarReader, ok := file.(DockerTarReader); ok {
+					// Clean up temporary files when done.
+					defer os.RemoveAll(dockerTarReader.tmpEnv.extractPath)
+					defer os.Remove(dockerTarReader.tmpEnv.tempFileName)
+					err = docker.ScanDockerImg(ctx, dockerTarReader.img, chunksChan, chunkSkel)
+					return err == nil
+				}
 				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
 			}
-
 			if err != nil {
 				aCtx.Logger().Error(err, "error handling file")
 			}
