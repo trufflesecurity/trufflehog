@@ -91,6 +91,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	workers := new(errgroup.Group)
 	workers.SetLimit(s.concurrency)
 
+	scanErrs := sources.NewScanErrors()
 	for _, image := range s.conn.GetImages() {
 		image := image
 		workers.Go(func() error {
@@ -100,7 +101,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 			imgInfo, err := s.processImage(ctx, image)
 			if err != nil {
-				return err
+				scanErrs.Add(err)
+				return nil
 			}
 
 			ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
@@ -108,12 +110,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 			layers, err := imgInfo.image.Layers()
 			if err != nil {
-				return err
+				scanErrs.Add(err)
+				return nil
 			}
 
 			for _, layer := range layers {
 				if err := s.processLayer(ctx, layer, imgInfo, chunksChan); err != nil {
-					return err
+					scanErrs.Add(err)
+					return nil
 				}
 				dockerLayersScanned.WithLabelValues(s.name).Inc()
 			}
@@ -124,6 +128,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 		})
 	}
 	_ = workers.Wait()
+	if scanErrs.Count() > 0 {
+		ctx.Logger().V(2).Info("scan errors", "errors", scanErrs.String())
+	}
 
 	return nil
 }
@@ -214,8 +221,6 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 			return err
 		}
 	}
-
-	dockerLayersScanned.WithLabelValues(s.name).Inc()
 
 	return nil
 }
