@@ -137,6 +137,23 @@ func TestSendbird_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
+		{
+			name: "found, verified but failed to decode json",
+			s:    Scanner{client: common.ConstantResponseHttpClient(400, `{`)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a sendbird application ID %s with sendbird secret %s within", appId, secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Sendbird,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -148,6 +165,9 @@ func TestSendbird_FromChunk(t *testing.T) {
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
