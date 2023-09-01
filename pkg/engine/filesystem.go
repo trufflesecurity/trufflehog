@@ -24,18 +24,14 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 		return err
 	}
 
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - filesystem", new(filesystem.Source).Type(),
-		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
-			fileSystemSource := filesystem.Source{}
-			fileSystemSource.WithFilter(c.Filter)
-			if err := fileSystemSource.Init(ctx, "trufflehog - filesystem", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-				return nil, err
-			}
-			return &fileSystemSource, nil
-		})
-	if err != nil {
+	sourceName := "trufflehog - filesystem"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, new(filesystem.Source).Type())
+
+	fileSystemSource := &filesystem.Source{}
+	fileSystemSource.WithFilter(c.Filter)
+	if err := fileSystemSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	_, err = e.sourceManager.ScheduleRun(ctx, sourceName, fileSystemSource)
 	return err
 }
