@@ -25,8 +25,8 @@ func TestJiraToken_FromChunk(t *testing.T) {
 	}
 	token := testSecrets.MustGetField("JIRA_V2_TOKEN")
 	inactiveToken := testSecrets.MustGetField("JIRA_V2_INACTIVE")
-	email := testSecrets.MustGetField("JIRA_EMAIL")
-	domain := testSecrets.MustGetField("JIRA_DOMAIN")
+	email := testSecrets.MustGetField("JIRA_V2_EMAIL")
+	domain := testSecrets.MustGetField("JIRA_V2_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
