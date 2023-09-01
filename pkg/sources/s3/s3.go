@@ -419,7 +419,7 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 
 	for _, bucket := range buckets {
 		if common.IsDone(ctx) {
-			return nil
+			return append(errors, ctx.Err())
 		}
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, roleArn, bucket)
