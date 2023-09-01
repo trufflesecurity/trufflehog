@@ -68,10 +68,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			default:
 				s1.VerificationError = verificationErr
 			}
+		}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 		results = append(results, s1)
 	}

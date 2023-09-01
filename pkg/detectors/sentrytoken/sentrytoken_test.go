@@ -109,7 +109,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, good key but wrong scope",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, respnseBody403)},
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, responseBody403)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
@@ -148,7 +148,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
+					t.Fatalf("wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
@@ -159,7 +159,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 	}
 }
 
-const respnseBody403 = `
+const responseBody403 = `
 [
   {
     "organization": {
