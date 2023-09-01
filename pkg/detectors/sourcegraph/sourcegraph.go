@@ -22,13 +22,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sourcegraph", "sg_token"}) + `\b(sgp_[a-z0-9]{40})\b`)
+	keyPat = regexp.MustCompile(`\b(sgp_[a-f0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sourcegraph", "sg_token"}
+	return []string{"sgp_"}
 }
 
 // FromData will find and optionally verify Sourcegraph secrets in a given set of bytes.
