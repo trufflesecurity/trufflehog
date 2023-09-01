@@ -191,7 +191,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 	}
 
 	for i, bucket := range bucketsToScan {
-		logger = logger.WithValues("bucket", bucket)
+		logger := logger.WithValues("bucket", bucket)
 
 		if common.IsDone(ctx) {
 			return
