@@ -216,11 +216,16 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 			})
 
 		if err != nil {
-			// Note that this is expected most of the time when using roles, because the scanner tries to scan each
-			// bucket in the account using each configured role, and it is likely that a given role won't have access to
-			// a given bucket.
-			logger.Error(err, "could not list objects in bucket")
-			continue
+			if role == "" {
+				logger.Error(err, "could not list objects in bucket")
+			} else {
+				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
+				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
+				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
+				// and therefore not an error.
+				logger.V(3).Info("could not list objects in bucket",
+					"err", err)
+			}
 		}
 	}
 	s.SetProgressComplete(len(bucketsToScan), len(bucketsToScan), fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount), "")
