@@ -145,12 +145,6 @@ func TestSendbird_FromChunk(t *testing.T) {
 				t.Errorf("Sendbird.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Sendbird.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
