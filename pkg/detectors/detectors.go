@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"math/big"
 	"net/url"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -25,6 +26,23 @@ type Detector interface {
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+}
+
+// ConditionalDetector is an optional interface that a detector can implement to
+// skip chunks based on specific criteria.
+type ConditionalDetector interface {
+	// ScanChunk determines whether the detector should run.
+	ScanChunk(chunk sources.Chunk) bool
+}
+
+// FilenameConditions is a set of common conditions to be used by ConditionalDetector.
+// (Using anonymous structs is weird, but Go has no concept of static members... https://stackoverflow.com/a/55390104)
+var FilenameConditions = struct {
+	// LockFiles are a common source of false-positives.
+	// https://github.com/trufflesecurity/trufflehog/issues/1460
+	LockFiles *regexp.Regexp
+}{
+	LockFiles: regexp.MustCompile(`(^|/)(package(-lock)?\.json|yarn\.lock)$`),
 }
 
 // Versioner is an optional interface that a detector can implement to

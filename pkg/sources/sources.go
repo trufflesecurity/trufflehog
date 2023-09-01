@@ -45,6 +45,14 @@ type Chunk struct {
 	Verify bool
 }
 
+// GitSourceMetadata defines a common interface for Git-based source metadata.
+// For example, this should match Git, Azure, Bitbucket, GitHub, and Gitlab.
+type GitSourceMetadata interface {
+	GetRepository() string
+	GetCommit() string
+	GetFile() string
+}
+
 // ChunkingTarget specifies criteria for a targeted chunking process.
 // Instead of collecting data indiscriminately, this struct allows the caller
 // to specify particular subsets of data they're interested in. This becomes
