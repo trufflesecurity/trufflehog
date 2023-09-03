@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,10 +20,8 @@ type Scanner struct{}
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-// The magic string T3BlbkFJ is the base64-encoded string: OpenAI
-var keyPat = regexp.MustCompile(`\b(sk-[[:alnum:]]{20}T3BlbkFJ[[:alnum:]]{20})\b`)
+var keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"T3BlbkFJ"}) + `(\bsk-[[:alnum:]]{20}T3BlbkFJ[[:alnum:]]{20}\b)`)
 
-// TODO: Add secret context?? Information about access, ownership etc
 type orgResponse struct {
 	Data []organization `json:"data"`
 }
@@ -37,48 +36,44 @@ type organization struct {
 	Role        string `json:"role"`
 }
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"T3BlbkFJ"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("T3BlbkFJ")}
 }
 
-// FromData will find and optionally verify OpenAI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
-		// First match is entire regex, second is the first group.
 		if len(match) != 2 {
 			continue
 		}
 
-		token := match[1]
+		token := bytes.TrimSpace(match[1])
+
+		redacted := append(append(token[:3], []byte("...")...), token[47:]...)
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_OpenAI,
-			Redacted:     token[:3] + "..." + token[47:],
-			Raw:          []byte(token),
+			Redacted:     string(redacted),
+			Raw:          token,
 		}
 
 		if verify {
 			client := common.SaneHttpClient()
-			// Undocumented API
-			// https://api.openai.com/v1/organizations
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.openai.com/v1/organizations", nil)
 			if err != nil {
 				continue
 			}
 			req.Header.Add("Content-Type", "application/json; charset=utf-8")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(token)))
+
 			res, err := client.Do(req)
+
 			if err == nil {
+				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					var orgs orgResponse
 					err = json.NewDecoder(res.Body).Decode(&orgs)
-					res.Body.Close()
 					if err == nil {
 						s1.Verified = true
 						org := orgs.Data[0]
@@ -97,7 +92,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
