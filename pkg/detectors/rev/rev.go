@@ -1,11 +1,11 @@
 package rev
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,45 +14,38 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	userKeyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"rev"}) + `\b([0-9a-zA-Z\/\+]{27}\=[ \r\n]{1})`)
 	clientKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"rev"}) + `\b([0-9a-zA-Z\-]{27}[ \r\n]{1})`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"rev"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("rev")}
 }
 
-// FromData will find and optionally verify Rev secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	userMatches := userKeyPat.FindAllStringSubmatch(dataStr, -1)
-	clientMatches := clientKeyPat.FindAllStringSubmatch(dataStr, -1)
+	userMatches := userKeyPat.FindAllSubmatch(data, -1)
+	clientMatches := clientKeyPat.FindAllSubmatch(data, -1)
 
 	for _, userMatch := range userMatches {
 		if len(userMatch) != 2 {
 			continue
 		}
-		resUserMatch := strings.TrimSpace(userMatch[1])
+		resUserMatch := bytes.TrimSpace(userMatch[1])
 
 		for _, clientMatch := range clientMatches {
 			if len(clientMatch) != 2 {
 				continue
 			}
-			resClientMatch := strings.TrimSpace(clientMatch[1])
+			resClientMatch := bytes.TrimSpace(clientMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Rev,
-				Raw:          []byte(resUserMatch),
+				Raw:          resUserMatch,
 			}
 
 			if verify {
@@ -60,14 +53,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Rev %s:%s", resClientMatch, resUserMatch))
+				req.Header.Add("Authorization", fmt.Sprintf("Rev %s:%s", string(resClientMatch), string(resUserMatch)))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resUserMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
