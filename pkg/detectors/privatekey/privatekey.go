@@ -17,30 +17,23 @@ type Scanner struct {
 	IncludeExpired bool
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	// TODO: add base64 encoded key support
 	client = common.RetryableHttpClient()
 	keyPat = regexp.MustCompile(`(?i)-----\s*?BEGIN[ A-Z0-9_-]*?PRIVATE KEY\s*?-----[\s\S]*?----\s*?END[ A-Z0-9_-]*? PRIVATE KEY\s*?-----`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"private key"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("private key")}
 }
 
-// FromData will find and optionally verify Privatekey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	results := []detectors.Result{}
-	dataStr := string(data)
 
-	matches := keyPat.FindAllString(dataStr, -1)
+	matches := keyPat.FindAll(data, -1)
 
 	for _, match := range matches {
-
 		token := normalize(match)
 
 		if len(token) < 64 {
@@ -49,8 +42,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 
 		secret := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PrivateKey,
-			Raw:          []byte(token),
-			Redacted:     token[0:64],
+			Raw:          token,
+			Redacted:     string(token[0:64]),
 		}
 
 		fingerprint, err := FingerprintPEMKey([]byte(token))
@@ -59,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
-			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
+			data, err := lookupFingerprint(string(fingerprint), s.IncludeExpired)
 			if err == nil {
 				secret.StructuredData = data
 				if data != nil {
@@ -91,7 +84,7 @@ func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (d
 		return
 	}
 
-	seen := map[string]struct{}{}
+	seen := make(map[string]struct{})
 	for _, r := range results.CertificateResults {
 		if _, ok := seen[r.CertificateFingerprint]; ok {
 			continue
