@@ -1,6 +1,7 @@
 package ftp
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/textproto"
@@ -27,35 +28,32 @@ type Scanner struct {
 	verificationTimeout time.Duration
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\bftp://\S{3,50}:(\S{3,50})@[-.%\w/:]+\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"ftp://"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("ftp://")}
 }
 
-// FromData will find and optionally verify URI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
-		urlMatch := match[0]
-		password := match[1]
-
-		// Skip findings where the password only has "*" characters, this is a redacted password
-		if strings.Trim(password, "*") == "" {
+		if len(match) < 2 {
 			continue
 		}
 
-		parsedURL, err := url.Parse(urlMatch)
+		password := bytes.TrimSpace(match[1])
+		trimmedPassword := bytes.Trim(password, "*")
+		if bytes.Equal(trimmedPassword, []byte("")) {
+			continue
+		}
+
+		urlMatch := bytes.TrimSpace(match[0])
+		parsedURL, err := url.Parse(string(urlMatch))
 		if err != nil {
 			continue
 		}
@@ -66,14 +64,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		rawURL, _ := url.Parse(urlMatch)
+		rawURL, _ := url.Parse(string(urlMatch))
 		rawURL.Path = ""
-		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
+		redactStarsBytes := bytes.Repeat([]byte("*"), len(password))
+		redact := bytes.Replace([]byte(rawURL.String()), password, redactStarsBytes, -1)
 
 		r := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FTP,
 			Raw:          []byte(rawURL.String()),
-			Redacted:     redact,
+			Redacted:     string(redact),
 		}
 
 		if verify {
@@ -90,12 +89,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if !r.Verified {
 			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
-			if strings.HasPrefix(password, "$") {
+			if bytes.HasPrefix(password, []byte("$")) {
 				continue
 			}
 		}
 
-		if detectors.IsKnownFalsePositive(string(r.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
+		if detectors.IsKnownFalsePositive(r.Raw, []detectors.FalsePositive{[]byte("@ftp.freebsd.org")}, false) {
 			continue
 		}
 
