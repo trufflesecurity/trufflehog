@@ -1,12 +1,12 @@
 package onedesk
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -23,40 +23,38 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	emailPat = regexp.MustCompile(`\b([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-z]+)\b`)
-	pwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"onedesk"}) + `\b([a-zA-Z0-9!=@#$%^]{8,64})`)
+	pwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"onedesk"}) + `\b([a-zA-Z0-9!=@#$%^]{8,64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"onedesk"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("onedesk")}
 }
 
 // FromData will find and optionally verify Onedesk secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := emailPat.FindAllStringSubmatch(dataStr, -1)
-	pwordMatches := pwordPat.FindAllStringSubmatch(dataStr, -1)
+	matches := emailPat.FindAllSubmatch(data, -1)
+	pwordMatches := pwordPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		for _, pwordMatch := range pwordMatches {
 			if len(pwordMatch) != 2 {
 				continue
 			}
-			resPword := strings.TrimSpace(pwordMatch[1])
+			resPword := bytes.TrimSpace(pwordMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Onedesk,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
-				payload := strings.NewReader(fmt.Sprintf(`{"email": "%s", "password": "%s"}`, resMatch, resPword))
+				payload := bytes.NewBufferString(fmt.Sprintf(`{"email": "%s", "password": "%s"}`, string(resMatch), string(resPword)))
 				req, err := http.NewRequestWithContext(ctx, "POST", "https://app.onedesk.com/rest/2.0/login/loginUser", payload)
 				if err != nil {
 					continue
@@ -69,8 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						continue
 					}
-					body := string(bodyBytes)
-					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, `"code":"SUCCESS"`) {
+					body := bodyBytes
+					if res.StatusCode >= 200 && res.StatusCode < 300 && bytes.Contains(body, []byte(`"code":"SUCCESS"`)) {
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
