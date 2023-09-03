@@ -1,10 +1,10 @@
 package adobeio
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,32 +26,31 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"adobe"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("adobe")}
 }
 
 // FromData will find and optionally verify AdobeIO secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	matches := keyPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
 			}
-			resIdMatch := strings.TrimSpace(idMatch[1])
+			resIdMatch := bytes.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AdobeIO,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          resMatch,
+				RawV2:        append(resMatch, resIdMatch...),
 			}
 
 			if verify {
@@ -59,15 +58,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.Header.Add("x-api-key", resMatch)
-				req.Header.Add("x-product", resIdMatch)
+				req.Header.Add("x-api-key", string(resMatch))
+				req.Header.Add("x-product", string(resIdMatch))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}

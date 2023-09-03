@@ -1,6 +1,7 @@
 package alibaba
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -20,21 +21,17 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b([a-zA-Z0-9]{30})\b`)
 	idPat  = regexp.MustCompile(`\b(LTAI[a-zA-Z0-9]{17,21})[\"';\s]*`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"LTAI"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("LTAI")}
 }
 
 func randString(n int) string {
@@ -53,6 +50,7 @@ func GetSignature(input, key string) string {
 	h.Write([]byte(input))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
+
 func buildStringToSign(method, input string) string {
 	filter := strings.Replace(input, "+", "%20", -1)
 	filter = strings.Replace(filter, "%7E", "~", -1)
@@ -61,29 +59,27 @@ func buildStringToSign(method, input string) string {
 	return filter
 }
 
-// FromData will find and optionally verify Alibaba secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
 			}
 
-			resIdMatch := strings.TrimSpace(idMatch[1])
+			resIdMatch := bytes.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Alibaba,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          resMatch,
+				RawV2:        append(resMatch, resIdMatch...),
 			}
 
 			if verify {
@@ -93,7 +89,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				dateISO := time.Now().UTC().Format("2006-01-02T15:04:05Z07:00")
 				params := req.URL.Query()
-				params.Add("AccessKeyId", resIdMatch)
+				params.Add("AccessKeyId", string(resIdMatch))
 				params.Add("Action", "DescribeRegions")
 				params.Add("Format", "JSON")
 				params.Add("SignatureMethod", "HMAC-SHA1")
@@ -103,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				params.Add("Version", "2014-05-26")
 
 				stringToSign := buildStringToSign(req.Method, params.Encode())
-				signature := GetSignature(stringToSign, resMatch+"&") // Get Signature HMAC SHA1
+				signature := GetSignature(stringToSign, string(resMatch)+"&") // Get Signature HMAC SHA1
 				params.Add("Signature", signature)
 				req.URL.RawQuery = params.Encode()
 
@@ -122,7 +118,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 			}
-
 			results = append(results, s1)
 		}
 	}

@@ -1,11 +1,10 @@
 package mapbox
 
 import (
+	"bytes"
 	"context"
-	// "log"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -25,33 +24,37 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"mapbox"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("mapbox")}
 }
 
 // FromData will find and optionally verify MapBox secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	idMatches := idPat.FindAllSubmatch(data, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
+		if len(match) != 2 {
+			continue
+		}
 
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
+
 		for i, idMatch := range idMatches {
 			if i == 11 {
 				if len(idMatch) != 2 {
 					continue
 				}
-				resId := strings.TrimSpace(idMatch[1])
+
+				resId := bytes.TrimSpace(idMatch[1])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_MapBox,
-					Raw:          []byte(resMatch),
+					Raw:          resMatch,
 				}
 
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", "https://api.mapbox.com/tokens/v2/"+resId+"?access_token="+resMatch, nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", "https://api.mapbox.com/tokens/v2/"+string(resId)+"?access_token="+string(resMatch), nil)
 					if err != nil {
 						continue
 					}
@@ -71,7 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 		}
-
 	}
 
 	return results, nil

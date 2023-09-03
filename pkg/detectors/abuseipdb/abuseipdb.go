@@ -1,12 +1,12 @@
 package abuseipdb
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	// "log"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -27,25 +27,23 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"abuseipdb"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("abuseipdb")}
 }
 
 // FromData will find and optionally verify AbuseIPDB secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AbuseIPDB,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -53,14 +51,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Key", resMatch)
+			req.Header.Add("Key", string(resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err == nil {
-					bodyString := string(bodyBytes)
-					validResponse := strings.Contains(bodyString, `ipAddress`)
-					// errCode := strings.Contains(bodyString, `AbuseIPDB APIv2 Server.`)
+					validResponse := bytes.Contains(bodyBytes, []byte(`ipAddress`))
 
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
@@ -70,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.Verified = false
 						}
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
@@ -78,6 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 		}
+
 		results = append(results, s1)
 	}
 

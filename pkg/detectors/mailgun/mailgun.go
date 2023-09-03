@@ -1,11 +1,11 @@
 package mailgun
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -27,27 +27,23 @@ var (
 	}
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"mailgun"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("mailgun")}
 }
 
-// FromData will find and optionally verify Mailgun secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
 	for _, tokenPat := range tokenPats {
-		matches := tokenPat.FindAllStringSubmatch(dataStr, -1)
+		matches := tokenPat.FindAllSubmatch(data, -1)
 		for _, match := range matches {
 			if len(match) != 2 {
 				continue
 			}
-			resMatch := strings.TrimSpace(match[1])
+			resMatch := bytes.TrimSpace(match[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Mailgun,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
@@ -55,10 +51,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				
-				// If resMatch has "key" prefix, use it as the username for basic auth.
-				if strings.HasPrefix(resMatch, "key-") {
-					req.SetBasicAuth("api", resMatch)
+
+				if bytes.HasPrefix(resMatch, []byte("key-")) {
+					req.SetBasicAuth("api", string(resMatch))
 				} else {
 					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", resMatch))
 				}
@@ -74,13 +69,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 					}
 				}
-
 			}
 
 			results = append(results, s1)
 		}
 	}
-
 	return results, nil
 }
 

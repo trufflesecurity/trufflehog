@@ -3,8 +3,9 @@ package jdbc
 import (
 	"context"
 	"errors"
-	mssql "github.com/denisenkom/go-mssqldb"
 	"strings"
+
+	mssql "github.com/denisenkom/go-mssqldb"
 )
 
 type sqlServerJDBC struct {

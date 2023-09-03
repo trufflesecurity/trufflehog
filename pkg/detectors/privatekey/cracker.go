@@ -18,7 +18,7 @@ func init() {
 }
 
 var (
-	ErrUncrackable = errors.New("unable to crack encryption")
+	ErrUncrackable = errors.New(string([]byte("unable to crack encryption")))
 )
 
 func crack(in []byte) (interface{}, error) {

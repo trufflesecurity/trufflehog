@@ -1,10 +1,10 @@
 package maxmindlicense
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -23,32 +23,27 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9A-Za-z]{16})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"maxmind", "geoip"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("maxmind"), []byte("geoip")}
 }
 
-// FromData will find and optionally verify MaxMindLicense secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := keyPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
 
 	for _, keyMatch := range keyMatches {
-		keyRes := strings.TrimSpace(keyMatch[1])
+		keyRes := bytes.TrimSpace(keyMatch[1])
 
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
 			}
-			idRes := strings.TrimSpace(idMatch[1])
+			idRes := bytes.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MaxMindLicense,
-				Redacted:     idRes,
-				Raw:          []byte(keyRes),
+				Redacted:     string(idRes),
+				Raw:          keyRes,
 			}
 
 			if verify {
@@ -56,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.SetBasicAuth(idRes, keyRes)
+				req.SetBasicAuth(string(idRes), string(keyRes))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()

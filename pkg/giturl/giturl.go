@@ -132,9 +132,9 @@ func GenerateLink(repo, commit, file string, line int64) string {
 		return baseLink
 
 	case providerAzure:
-		baseLink := repo + "?path=" + file + "&version=GB" + commit
+		baseLink := repo + "/commit/" + commit + "/" + file
 		if line > 0 {
-			baseLink += "&line=" + strconv.FormatInt(line, 10)
+			baseLink += "?line=" + strconv.FormatInt(line, 10)
 		}
 		return baseLink
 

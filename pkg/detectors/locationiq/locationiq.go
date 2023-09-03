@@ -1,10 +1,10 @@
 package locationiq
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -25,29 +25,27 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"locationiq"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("locationiq")}
 }
 
 // FromData will find and optionally verify LocationIQ secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LocationIQ,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://us1.locationiq.com/v1/reverse.php?key="+resMatch+"&lat=-37.870662&lon=144.9803321&format=json", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://us1.locationiq.com/v1/reverse.php?key="+string(resMatch)+"&lat=-37.870662&lon=144.9803321&format=json", nil)
 			if err != nil {
 				continue
 			}

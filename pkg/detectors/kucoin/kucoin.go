@@ -1,6 +1,7 @@
 package kucoin
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -8,7 +9,6 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -32,40 +32,39 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"kucoin"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("kucoin")}
 }
 
 // FromData will find and optionally verify KuCoin secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
-	passphraseMatches := passphrasePat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := keyPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
+	passphraseMatches := passphrasePat.FindAllSubmatch(data, -1)
 
 	for _, keyMatch := range keyMatches {
 		if len(keyMatch) != 2 {
 			continue
 		}
-		resKeyMatch := strings.TrimSpace(keyMatch[1])
+		resKeyMatch := bytes.TrimSpace(keyMatch[1])
 
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecretMatch := strings.TrimSpace(secretMatch[1])
+			resSecretMatch := bytes.TrimSpace(secretMatch[1])
 
 			for _, passphraseMatch := range passphraseMatches {
 				if len(passphraseMatch) != 2 {
 					continue
 				}
-				resPassphraseMatch := strings.TrimSpace(passphraseMatch[1])
+				resPassphraseMatch := bytes.TrimSpace(passphraseMatch[1])
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_KuCoin,
-					Raw:          []byte(resKeyMatch),
-					RawV2:        []byte(resKeyMatch + resPassphraseMatch),
+					Raw:          resKeyMatch,
+					RawV2:        append(resKeyMatch, resPassphraseMatch...),
 				}
 
 				if verify {
@@ -76,14 +75,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					bodyStr := ""
 					apiVersion := "2"
 
-					signature := getKucoinSignature(resSecretMatch, timestamp, method, endpoint, bodyStr)
-					passPhrase := getKucoinPassphrase(resSecretMatch, resPassphraseMatch)
+					signature := getKucoinSignature(string(resSecretMatch), timestamp, method, endpoint, bodyStr)
+					passPhrase := getKucoinPassphrase(string(resSecretMatch), string(resPassphraseMatch))
 
 					req, err := http.NewRequest(method, "https://api.kucoin.com"+endpoint, nil)
 					if err != nil {
 						continue
 					}
-					req.Header.Add("KC-API-KEY", resKeyMatch)
+					req.Header.Add("KC-API-KEY", string(resKeyMatch))
 					req.Header.Add("KC-API-SIGN", signature)
 					req.Header.Add("KC-API-TIMESTAMP", timestamp)
 					req.Header.Add("KC-API-PASSPHRASE", passPhrase)

@@ -1,6 +1,7 @@
 package fakejson
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -15,37 +16,31 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"fakejson"}) + `\b([a-zA-Z0-9]{22})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"fakejson"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("fakejson")}
 }
 
-// FromData will find and optionally verify FakeJSON secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FakeJSON,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -59,17 +54,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err == nil {
-					bodyString := string(bodyBytes)
-					validResponse := strings.Contains(bodyString, `"user_email":`)
+					validResponse := bytes.Contains(bodyBytes, []byte(`"user_email":`))
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						if validResponse {
-							s1.Verified = true
-						} else {
-							s1.Verified = false
-						}
+						s1.Verified = validResponse
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}

@@ -1,10 +1,11 @@
 package posthog
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -25,33 +26,32 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"phc_"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("phc_")}
 }
 
 // FromData will find and optionally verify AppPosthog secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PosthogApp,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
-			payload := strings.NewReader(` {
-				"api_key": "` + resMatch + `",
+			payload := fmt.Sprintf(` {
+				"api_key": "%s",
 				"distinct_id": "1234"
-				}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://app.posthog.com/decide/", payload)
+				}`, string(resMatch))
+
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://app.posthog.com/decide/", bytes.NewBufferString(payload))
 			if err != nil {
 				continue
 			}

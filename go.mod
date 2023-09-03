@@ -1,6 +1,6 @@
 module github.com/trufflesecurity/trufflehog/v3
 
-go 1.20
+go 1.21
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
@@ -50,6 +50,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
+	github.com/launchdarkly/go-server-sdk/v6 v6.1.0
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20221222153816-e95291e2243e
 	github.com/mattn/go-isatty v0.0.18
@@ -170,8 +171,8 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.5 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
-	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/gregjones/httpcache v0.0.0-20171119193500-2bcd89a1743f // indirect
+	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -192,7 +193,6 @@ require (
 	github.com/launchdarkly/go-sdk-events/v2 v2.0.1 // indirect
 	github.com/launchdarkly/go-semver v1.0.2 // indirect
 	github.com/launchdarkly/go-server-sdk-evaluation/v2 v2.0.2 // indirect
-	github.com/launchdarkly/go-server-sdk/v6 v6.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

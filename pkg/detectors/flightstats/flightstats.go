@@ -1,12 +1,11 @@
 package flightstats
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,36 +27,35 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"flightstats"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("flightstats")}
 }
 
 // FromData will find and optionally verify Flightstats secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	idMatches := idPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
 			}
-			resId := strings.TrimSpace(idMatch[1])
+			resId := bytes.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Flightstats,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", fmt.Sprintf("https://api.flightstats.com/flex/aircraft/rest/v1/json/availableFields?appId=%s&appKey=%s", resId, resMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.flightstats.com/flex/aircraft/rest/v1/json/availableFields?appId=%s&appKey=%s", string(resId), string(resMatch)), nil)
 				if err != nil {
 					continue
 				}
@@ -65,16 +63,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					body := string(bodyBytes)
-					validResponse := (res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, "id")) || (res.StatusCode == 403 && strings.Contains(body, "application is not active"))
-					if validResponse {
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}

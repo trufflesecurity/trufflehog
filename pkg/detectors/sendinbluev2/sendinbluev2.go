@@ -1,10 +1,10 @@
 package sendinbluev2
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,27 +22,22 @@ var (
 	keyPat = regexp.MustCompile(`\b(xkeysib\-[A-Za-z0-9_-]{81})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"xkeysib"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("xkeysib")}
 }
 
-// FromData will find and optionally verify SendinBlueV2 secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SendinBlueV2,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -50,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("api-key", resMatch)
+			req.Header.Add("api-key", string(resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

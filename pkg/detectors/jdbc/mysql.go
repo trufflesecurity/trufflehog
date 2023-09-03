@@ -3,8 +3,9 @@ package jdbc
 import (
 	"context"
 	"errors"
-	"github.com/go-sql-driver/mysql"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type mysqlJDBC struct {

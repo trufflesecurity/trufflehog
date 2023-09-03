@@ -1,31 +1,32 @@
 package privatekey
 
 import (
-	"strings"
+	"bytes"
 )
 
-func normalize(in string) string {
-	in = strings.ReplaceAll(in, `"`, "")
-	in = strings.ReplaceAll(in, `'`, "")
-	in = strings.ReplaceAll(in, "\t", "")
-	in = strings.ReplaceAll(in, `\t`, "")
-	in = strings.ReplaceAll(in, `\\t`, "")
-	in = strings.ReplaceAll(in, `\n`, "\n")
-	in = strings.ReplaceAll(in, `\\r\\n`, "\n")
-	in = strings.ReplaceAll(in, `\r\n`, "\n")
-	in = strings.ReplaceAll(in, "\r\n", "\n")
-	in = strings.ReplaceAll(in, `\\r`, "\n")
-	in = strings.ReplaceAll(in, "\r", "\n")
-	in = strings.ReplaceAll(in, `\r`, "\n")
-	in = strings.ReplaceAll(in, `\\n`, "\n")
-	in = strings.ReplaceAll(in, `\n\n`, "\n")
-	in = strings.ReplaceAll(in, "\n\n", "\n")
-	in = strings.ReplaceAll(in, `\\`, "\n")
+func normalize(in []byte) []byte {
+	in = bytes.ReplaceAll(in, []byte(`"`), []byte(""))
+	in = bytes.ReplaceAll(in, []byte(`'`), []byte(""))
+	in = bytes.ReplaceAll(in, []byte("\t"), []byte(""))
+	in = bytes.ReplaceAll(in, []byte(`\t`), []byte(""))
+	in = bytes.ReplaceAll(in, []byte(`\\t`), []byte(""))
+	in = bytes.ReplaceAll(in, []byte(`\n`), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte(`\\r\\n`), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte(`\r\n`), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte("\r\n"), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte(`\\r`), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte("\r"), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte(`\r`), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte(`\\n`), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte(`\n\n`), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte("\n\n"), []byte("\n"))
+	in = bytes.ReplaceAll(in, []byte(`\\`), []byte("\n"))
 
-	cleaned := strings.Builder{}
-	parts := strings.Split(in, "\n")
+	cleaned := bytes.Buffer{}
+	parts := bytes.Split(in, []byte("\n"))
 	for _, line := range parts {
-		cleaned.WriteString(strings.TrimSpace(line) + "\n")
+		cleaned.Write(bytes.TrimSpace(line))
+		cleaned.WriteByte('\n')
 	}
-	return cleaned.String()
+	return cleaned.Bytes()
 }

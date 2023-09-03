@@ -1,6 +1,7 @@
 package gitlabv2
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -27,15 +28,14 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"glpat-"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("glpat-")}
 }
 
 // FromData will find and optionally verify Gitlab secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		secret := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitlab,
-			Raw:          []byte(match[1]),
+			Raw:          bytes.TrimSpace(match[1]),
 		}
 
 		if verify {
@@ -55,11 +55,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := common.SaneHttpClient()
 			for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
 				// test `read_user` scope
-				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api/v4/user", baseURL), nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(match[1])))
 				res, err := client.Do(req)
 				if err == nil {
 					res.Body.Close() // The request body is unused.
@@ -75,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		}
 
-		if !secret.Verified && detectors.IsKnownFalsePositive(string(secret.Raw), detectors.DefaultFalsePositives, true) {
+		if !secret.Verified && detectors.IsKnownFalsePositive(secret.Raw, detectors.DefaultFalsePositives, true) {
 			continue
 		}
 

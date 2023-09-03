@@ -1,12 +1,12 @@
 package freshdesk
 
 import (
+	"bytes"
 	"context"
 	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,37 +28,36 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"freshdesk"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("freshdesk")}
 }
 
 // FromData will find and optionally verify Freshdesk secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	urlMatches := urlPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, urlMatch := range urlMatches {
 			if len(urlMatch) != 2 {
 				continue
 			}
-			resURL := strings.TrimSpace(urlMatch[1])
+			resURL := bytes.TrimSpace(urlMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Freshdesk,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
-				data := fmt.Sprintf("%s:X", resMatch)
+				data := fmt.Sprintf("%s:X", string(resMatch))
 				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v2/tickets", resURL), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v2/tickets", string(resURL)), nil)
 				if err != nil {
 					continue
 				}

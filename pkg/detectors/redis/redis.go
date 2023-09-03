@@ -1,48 +1,40 @@
 package redis
 
 import (
+	"bytes"
 	"context"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/go-redis/redis"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\bredis://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"redis"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("redis")}
 }
 
-// FromData will find and optionally verify URI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
-		urlMatch := match[0]
-		password := match[1]
+		urlMatch := bytes.TrimSpace(match[0])
+		password := bytes.TrimSpace(match[1])
 
-		// Skip findings where the password only has "*" characters, this is a redacted password
-		if strings.Trim(password, "*") == "" {
+		if bytes.Equal(password, []byte("*")) {
 			continue
 		}
 
-		parsedURL, err := url.Parse(urlMatch)
+		parsedURL, err := url.Parse(string(urlMatch))
 		if err != nil {
 			continue
 		}
@@ -50,26 +42,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "********", -1))
+		redact := bytes.Replace(urlMatch, password, []byte("********"), -1)
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Redis,
-			Raw:          []byte(urlMatch),
-			Redacted:     redact,
+			Raw:          urlMatch,
+			Redacted:     string(redact),
 		}
 
 		if verify {
 			s.Verified = verifyRedis(ctx, parsedURL)
 		}
 
-		if !s.Verified {
-			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
-			if strings.HasPrefix(password, "$") {
-				continue
-			}
+		if !s.Verified && bytes.HasPrefix(password, []byte("$")) {
+			continue
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
+		if !s.Verified && detectors.IsKnownFalsePositive(s.Raw, detectors.DefaultFalsePositives, false) {
 			continue
 		}
 

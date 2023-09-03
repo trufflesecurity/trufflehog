@@ -1,6 +1,7 @@
 package gengo
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
@@ -11,7 +12,6 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -35,41 +35,39 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"gengo"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("gengo")}
 }
 
 // FromData will find and optionally verify Gengo secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecretMatch := strings.TrimSpace(secretMatch[1])
+			resSecretMatch := bytes.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Gengo,
-				Raw:          []byte(resSecretMatch),
-				RawV2:        []byte(resMatch + resSecretMatch),
+				Raw:          resSecretMatch,
+				RawV2:        append(resMatch, resSecretMatch...),
 			}
 
 			if verify {
-
 				timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-				signature := getGengoSignature(timestamp, resSecretMatch)
+				signature := getGengoSignature(timestamp, string(resSecretMatch))
 
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.gengo.com/v2/account/me?ts=%s&api_key=%s&api_sig=%s", timestamp, resMatch, signature), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.gengo.com/v2/account/me?ts=%s&api_key=%s&api_sig=%s", timestamp, string(resMatch), signature), nil)
 				if err != nil {
 					continue
 				}
@@ -77,30 +75,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					body, errBody := io.ReadAll(res.Body)
-
-					if errBody == nil {
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						var response Response
-						if err := json.Unmarshal(body, &response); err != nil {
-							continue
-						}
+						body, errBody := io.ReadAll(res.Body)
 
-						if res.StatusCode >= 200 && res.StatusCode < 300 && response.OpStat == "ok" {
+						if errBody == nil && json.Unmarshal(body, &response) == nil && response.OpStat == "ok" {
 							s1.Verified = true
 						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
-
-							if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+							if detectors.IsKnownFalsePositive(match[1], detectors.DefaultFalsePositives, true) || detectors.IsKnownFalsePositive(secretMatch[1], detectors.DefaultFalsePositives, true) {
 								continue
 							}
 						}
 					}
 				}
 			}
-
 			results = append(results, s1)
 		}
 	}
@@ -113,7 +101,6 @@ type Response struct {
 }
 
 func getGengoSignature(timeStamp string, secret string) string {
-
 	mac := hmac.New(sha1.New, []byte(secret))
 	mac.Write([]byte(timeStamp))
 	macsum := mac.Sum(nil)

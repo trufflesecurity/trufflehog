@@ -1,12 +1,13 @@
 package freshbooks
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
-	"strings"
+
+	"io"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,35 +29,33 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"freshbooks"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("freshbooks")}
 }
 
 // FromData will find and optionally verify Freshbooks secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	uriMatches := uriPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	uriMatches := uriPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 		for _, uriMatch := range uriMatches {
 			if len(uriMatch) != 2 {
 				continue
 			}
-			resURI := strings.TrimSpace(uriMatch[1])
+			resURI := bytes.TrimSpace(uriMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Freshbooks,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf(`https://auth.freshbooks.com/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code`, resMatch, resURI), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf(`https://auth.freshbooks.com/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code`, string(resMatch), string(resURI)), nil)
 				if err != nil {
 					continue
 				}
@@ -67,11 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						continue
 					}
-					body := string(bodyBytes)
-					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, "Log In to FreshBooks") {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && bytes.Contains(bodyBytes, []byte("Log In to FreshBooks")) {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
