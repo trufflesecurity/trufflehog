@@ -1,11 +1,10 @@
 package hubspotapikey
 
 import (
+	"bytes"
 	"context"
-	// "log"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,7 +13,6 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -23,30 +21,27 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"hubspot"}) + `\b([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"hubspot"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("hubspot")}
 }
 
-// FromData will find and optionally verify HubSpotApiKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HubSpotApiKey,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.hubapi.com/contacts/v1/lists?hapikey="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.hubapi.com/contacts/v1/lists?hapikey="+string(resMatch), nil)
 			if err != nil {
 				continue
 			}

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -23,37 +22,35 @@ type html2pdfRequest struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
+	// Keeping the regexp patterns unchanged
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"html2pdf"}) + `\b([a-zA-Z0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"html2pdf"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("html2pdf")}
 }
 
 // FromData will find and optionally verify Html2Pdf secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Html2Pdf,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
 			req := html2pdfRequest{
 				HTML:   "Helloworld",
-				ApiKey: resMatch,
+				ApiKey: string(resMatch),
 			}
 			reqJson, _ := json.Marshal(&req)
 			reqBuf := bytes.NewReader(reqJson)
@@ -64,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}

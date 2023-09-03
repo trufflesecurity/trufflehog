@@ -1,11 +1,11 @@
 package huggingface
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -27,21 +27,19 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"huggingface", "hugging_face", "hf"} // Huggingface docs occasionally use "hf" instead of "huggingface"
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("huggingface"), []byte("hugging_face"), []byte("hf")}
 }
 
 // FromData will find and optionally verify Huggingface secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 1 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[0])
+		resMatch := bytes.TrimSpace(match[0])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HuggingFace,
@@ -58,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 
-			req.Header.Set("Authorization", "Bearer "+resMatch)
+			req.Header.Set("Authorization", "Bearer "+string(resMatch))
 
 			res, err := client.Do(req)
 			if err == nil {
