@@ -1,11 +1,11 @@
 package airtableapikey
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,42 +26,40 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"airtable"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("airtable")}
 }
 
 // FromData will find and optionally verify AirtableApiKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	appMatches := appPat.FindAllSubmatch(data, -1)
+	keyMatches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, keyMatch := range keyMatches {
 		if len(keyMatch) != 2 {
 			continue
 		}
-		keyRes := strings.TrimSpace(keyMatch[1])
+		keyRes := bytes.TrimSpace(keyMatch[1])
 
 		for _, appMatch := range appMatches {
 			if len(appMatch) != 2 {
 				continue
 			}
-			appRes := strings.TrimSpace(appMatch[1])
+			appRes := bytes.TrimSpace(appMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AirtableApiKey,
-				Redacted:     appRes,
-				Raw:          []byte(keyRes),
-				RawV2:        []byte(keyRes + appRes),
+				Redacted:     string(appRes),
+				Raw:          keyRes,
+				RawV2:        append(keyRes, appRes...),
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.airtable.com/v0/"+appRes+"/Projects", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.airtable.com/v0/"+string(appRes)+"/Projects", nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", keyRes))
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(keyRes)))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
