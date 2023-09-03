@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type Scanner struct{}
@@ -21,54 +20,52 @@ var (
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"circle"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("circle")}
 }
 
 // FromData will find and optionally verify Circle secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
-
+		if len(match) < 2 {
+			continue
+		}
 		token := match[1]
 
-		s := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Circle,
-			Raw:          []byte(token),
+			Raw:          token,
 		}
 
 		if verify {
 			client := common.SaneHttpClient()
-			// https://circleci.com/docs/api/#authentication
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://circleci.com/api/v2/me", nil)
 			if err != nil {
 				continue
 			}
 			req.Header.Add("Accept", "application/json;")
-			req.Header.Add("Circle-Token", token)
+			req.Header.Add("Circle-Token", string(token))
 			res, err := client.Do(req)
-			if err == nil {
+			if err == nil && res != nil {
 				defer res.Body.Close()
-			}
-			if res != nil && res.StatusCode >= 200 && res.StatusCode < 300 {
-				s.Verified = true
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					s1.Verified = true
+				}
 			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified {
+			if detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
 				continue
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, s1)
 	}
 
-	return
+	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

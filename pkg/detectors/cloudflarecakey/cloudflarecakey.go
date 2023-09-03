@@ -1,12 +1,10 @@
 package cloudflarecakey
 
 import (
+	"bytes"
 	"context"
-	// "fmt"
-	// "log"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -15,32 +13,25 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b(v[A-Za-z0-9._-]{173,})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"cloudflare"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("cloudflare")}
 }
 
-// FromData will find and optionally verify CloudflareCaKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 			continue
@@ -48,7 +39,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CloudflareCaKey,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -57,9 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("user-agent", "curl/7.68.0") // pretend to be from curl so we do not wait 100+ seconds -> nice try did not work
+			req.Header.Add("user-agent", "curl/7.68.0")
 
-			req.Header.Add("X-Auth-User-Service-Key", resMatch)
+			req.Header.Add("X-Auth-User-Service-Key", string(resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
