@@ -1,11 +1,11 @@
 package commodities
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -15,42 +15,35 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"commodities"}) + `\b([a-zA-Z0-9]{60})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"commodities"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("commodities")}
 }
 
-// FromData will find and optionally verify Commodities secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Commodities,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
 			client.Timeout = 5 * time.Second
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://commodities-api.com/api/latest?access_key="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", string(bytes.Split(resMatch, []byte("="))[0]), nil)
 			if err != nil {
 				continue
 			}
@@ -60,8 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				bodyString := string(bodyBytes)
-				validResponse := strings.Contains(bodyString, `"success":true`)
+				validResponse := bytes.Contains(bodyBytes, []byte(`"success":true`))
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					if validResponse {
@@ -70,7 +62,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = false
 					}
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
