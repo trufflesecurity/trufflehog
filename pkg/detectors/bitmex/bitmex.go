@@ -1,6 +1,7 @@
 package bitmex
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -9,7 +10,6 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -19,46 +19,40 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + `([ \r\n]{1}[0-9a-zA-Z\-\_]{24}[ \r\n]{1})`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + `([ \r\n]{1}[0-9a-zA-Z\-\_]{48}[ \r\n]{1})`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + string([]byte{32, 13, 10}) + `[0-9a-zA-Z\-\_]{24}` + string([]byte{32, 13, 10}))
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + string([]byte{32, 13, 10}) + `[0-9a-zA-Z\-\_]{48}` + string([]byte{32, 13, 10}))
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"bitmex"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("bitmex")}
 }
 
-// FromData will find and optionally verify Bitmex secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecretMatch := strings.TrimSpace(secretMatch[1])
+			resSecretMatch := bytes.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Bitmex,
-				Raw:          []byte(resSecretMatch),
-				RawV2:        []byte(resMatch + resSecretMatch),
+				Raw:          resSecretMatch,
+				RawV2:        append(resMatch, resSecretMatch...),
 			}
 
 			if verify {
@@ -68,14 +62,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				path := "/api/v1/user"
 				payload := url.Values{}
 
-				signature := getBitmexSignature(timestamp, resSecretMatch, action, path, payload.Encode())
+				signature := getBitmexSignature(timestamp, string(resSecretMatch), action, path, payload.Encode())
 
-				req, err := http.NewRequestWithContext(ctx, action, "https://www.bitmex.com"+path, strings.NewReader(payload.Encode()))
+				req, err := http.NewRequestWithContext(ctx, action, "https://www.bitmex.com"+path, bytes.NewReader([]byte(payload.Encode())))
+
 				if err != nil {
 					continue
 				}
 				req.Header.Add("api-expires", timestamp)
-				req.Header.Add("api-key", resMatch)
+				req.Header.Add("api-key", string(resMatch))
 				req.Header.Add("api-signature", signature)
 				res, err := client.Do(req)
 				if err == nil {
@@ -83,7 +78,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -31,35 +30,33 @@ var (
 	tenantIDPat = mustFmtPat("tenant_id", idPatFmt)
 
 	// TODO: support old patterns
-	secretPatFmt    = `(?i)(%s).{0,20}([a-z0-9_\.\-~]{34})`
+	secretPatFmt    = `(?i)(%s).{0,20}([a-z0-9_.\-~]{34})`
 	clientSecretPat = mustFmtPat("client_secret", secretPatFmt)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"azure"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("azure")}
 }
 
 // FromData will find and optionally verify Azure secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	clientSecretMatches := clientSecretPat.FindAllSubmatch(data, -1)
 
-	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
 	for _, clientSecret := range clientSecretMatches {
-		tenantIDMatches := tenantIDPat.FindAllStringSubmatch(dataStr, -1)
+		tenantIDMatches := tenantIDPat.FindAllSubmatch(data, -1)
 		for _, tenantID := range tenantIDMatches {
-			clientIDMatches := clientIDPat.FindAllStringSubmatch(dataStr, -1)
+			clientIDMatches := clientIDPat.FindAllSubmatch(data, -1)
 			for _, clientID := range clientIDMatches {
 				s := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Azure,
-					Raw:          []byte(clientSecret[2]),
-					RawV2:        []byte(clientID[2] + clientSecret[2] + tenantID[2]),
-					Redacted:     clientID[2],
+					Raw:          clientSecret[2],
+					RawV2:        append(clientID[2], append(clientSecret[2], tenantID[2]...)...),
+					Redacted:     string(clientID[2]),
 				}
 
 				if verify {
-					cred := auth.NewClientCredentialsConfig(clientID[2], clientSecret[2], tenantID[2])
+					cred := auth.NewClientCredentialsConfig(string(clientID[2]), string(clientSecret[2]), string(tenantID[2]))
 					token, err := cred.ServicePrincipalToken()
 					if err != nil {
 						continue
@@ -71,10 +68,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if !s.Verified {
-					if detectors.IsKnownFalsePositive(s.Redacted, detectors.DefaultFalsePositives, true) {
+					if detectors.IsKnownFalsePositive([]byte(s.Redacted), detectors.DefaultFalsePositives, true) {
 						continue
 					}
-					if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
+					if detectors.IsKnownFalsePositive(s.Raw, detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}
