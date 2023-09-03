@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/couchbase/gocb/v2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -17,7 +18,6 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
@@ -26,13 +26,14 @@ var (
 	connectionStringPat = regexp.MustCompile(`\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
 	usernamePat         = `?()/\+=\s\n`
 	passwordPat         = `^<>;.*&|£\n\s`
-	//passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
+	// passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
 	// passwordPat = regexp.MustCompile(`(?im)(?:pass|pwd)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:?()/\+=\s\n]{4,40})\b`)
 )
 
-func meetsCouchbasePasswordRequirements(password string) (string, bool) {
+func meetsCouchbasePasswordRequirements(password []byte) ([]byte, bool) {
 	var hasLower, hasUpper, hasNumber, hasSpecialChar bool
-	for _, char := range password {
+	passwordStr := string(password)
+	for _, char := range passwordStr {
 		switch {
 		case unicode.IsLower(char):
 			hasLower = true
@@ -49,16 +50,13 @@ func meetsCouchbasePasswordRequirements(password string) (string, bool) {
 		}
 	}
 
-	return "", false
+	return nil, false
 }
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"couchbase://", "couchbases://"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("couchbase://"), []byte("couchbases://")}
 }
 
-// FromData will find and optionally verify Couchbase secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -83,7 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, resUsernameMatch := range usernameMatches {
 
 			for _, resPasswordMatch := range passwordMatches {
-				_, metPasswordRequirements := meetsCouchbasePasswordRequirements(resPasswordMatch)
+				_, metPasswordRequirements := meetsCouchbasePasswordRequirements([]byte(resPasswordMatch))
 
 				if !metPasswordRequirements {
 					continue
@@ -132,7 +130,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								break
 							} else {
 								// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-								if detectors.IsKnownFalsePositive(resPasswordMatch, detectors.DefaultFalsePositives, true) {
+								if detectors.IsKnownFalsePositive([]byte(resPasswordMatch), detectors.DefaultFalsePositives, true) {
 									continue
 								}
 							}
