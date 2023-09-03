@@ -1,13 +1,13 @@
 package fastlypersonaltoken
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -16,19 +16,15 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"fastly"}) + `\b([A-Za-z0-9_-]{32})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"fastly"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("fastly")}
 }
 
 type fastlyUserRes struct {
@@ -39,21 +35,18 @@ type fastlyUserRes struct {
 	Locked               bool   `json:"locked"`
 }
 
-// FromData will find and optionally verify FastlyPersonalToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -61,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Fastly-Key", resMatch)
+			req.Header.Add("Fastly-Key", string(resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
@@ -84,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						"two_factor_auth_enabled": fmt.Sprintf("%t", userRes.TwoFactorAuthEnabled),
 					}
 				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					if detectors.IsKnownFalsePositive([]byte(resMatch), detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}
