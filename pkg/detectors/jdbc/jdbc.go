@@ -52,20 +52,18 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"jdbc"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("jdbc")}
 }
 
 // FromData will find and optionally verify Jdbc secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 matchLoop:
 	for _, match := range matches {
 		if len(s.ignorePatterns) != 0 {
 			for _, ignore := range s.ignorePatterns {
-				if ignore.MatchString(match[0]) {
+				if ignore.Match(match[0]) {
 					continue matchLoop
 				}
 			}
@@ -75,12 +73,12 @@ matchLoop:
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_JDBC,
 			Raw:          []byte(jdbcConn),
-			Redacted:     tryRedactAnonymousJDBC(jdbcConn),
+			Redacted:     tryRedactAnonymousJDBC(string(jdbcConn)),
 		}
 
 		if verify {
 			s.Verified = false
-			j, err := newJDBC(jdbcConn)
+			j, err := newJDBC(string(jdbcConn))
 			if err != nil {
 				continue
 			}
@@ -97,7 +95,7 @@ matchLoop:
 			// TODO: specialized redaction
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
+		if !s.Verified && detectors.IsKnownFalsePositive(s.Raw, detectors.DefaultFalsePositives, false) {
 			continue
 		}
 
