@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -37,32 +36,27 @@ var (
 	secretPat = regexp.MustCompile(`[A-Za-z0-9]{27,28}`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"master-", "account-"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("master-"), []byte("account-")}
 }
 
-// FromData will find and optionally verify Gemini secrets in a given set of bytes.
 func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	idMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := keyPat.FindAllSubmatch(data, -1)
+	secretMatches := secretPat.FindAllSubmatch(data, -1)
 
 	for _, match := range idMatches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
-			resSecretMatch := strings.TrimSpace(secretMatch[0])
+			resSecretMatch := bytes.TrimSpace(secretMatch[0])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Gemini,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resSecretMatch),
+				Raw:          resMatch,
+				RawV2:        append(resMatch, resSecretMatch...),
 			}
 
 			if verify {
@@ -77,7 +71,7 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive([]byte(resSecretMatch), detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
@@ -90,7 +84,7 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 	return results, nil
 }
 
-func constructRequest(secret, keyID string) (*http.Request, error) {
+func constructRequest(secret, keyID []byte) (*http.Request, error) {
 	req, err := http.NewRequest("POST", baseURL+accountDetail, &bytes.Buffer{})
 	if err != nil {
 		return nil, err
@@ -101,9 +95,8 @@ func constructRequest(secret, keyID string) (*http.Request, error) {
 		"nonce":   time.Now().UnixNano(),
 	}
 
-	acct := strings.Split(keyID, "-")
-	// Not entirely sure how to handle master account keys where one of the accounts is named "primary".
-	if len(acct) > 1 && acct[0] == "master" {
+	acct := bytes.Split(keyID, []byte("-"))
+	if len(acct) > 1 && string(acct[0]) == "master" {
 		params["account"] = account
 	}
 
@@ -118,7 +111,7 @@ func constructRequest(secret, keyID string) (*http.Request, error) {
 	req.Header = http.Header{
 		"Content-Type":       {"text/plain"},
 		"Content-Length":     {"0"},
-		"X-GEMINI-APIKEY":    {keyID},
+		"X-GEMINI-APIKEY":    {string(keyID)},
 		"X-GEMINI-PAYLOAD":   {payload},
 		"X-GEMINI-SIGNATURE": {signature},
 		"Cache-Control":      {"no-cache"},
@@ -126,8 +119,8 @@ func constructRequest(secret, keyID string) (*http.Request, error) {
 	return req, err
 }
 
-func constructSignature(payload string, resSecretMatch string) string {
-	h := hmac.New(sha512.New384, []byte(resSecretMatch))
+func constructSignature(payload string, resSecretMatch []byte) string {
+	h := hmac.New(sha512.New384, resSecretMatch)
 	h.Write([]byte(payload))
 	signature := hex.EncodeToString(h.Sum(nil))
 	return signature
