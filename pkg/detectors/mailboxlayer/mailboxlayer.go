@@ -1,11 +1,11 @@
 package mailboxlayer
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,29 +26,27 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"mailboxlayer"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("mailboxlayer")}
 }
 
 // FromData will find and optionally verify Mailboxplayer secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mailboxlayer,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://apilayer.net/api/check?access_key="+resMatch+"&email=support@email.com", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://apilayer.net/api/check?access_key="+string(resMatch)+"&email=support@email.com", nil)
 			if err != nil {
 				continue
 			}
@@ -59,17 +57,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, `email`) || strings.Contains(body, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
-
-				// if client_id and client_secret is valid -> 403 {"error":"invalid_grant","error_description":"Invalid authorization code"}
-				// if invalid -> 401 {"error":"access_denied","error_description":"Unauthorized"}
-				// ingenious!
+				validResponse := bytes.Contains(bodyBytes, []byte(`email`)) || bytes.Contains(bodyBytes, []byte(`"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`))
 
 				if validResponse {
 					s1.Verified = true
 				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {
 						continue
 					}
 				}
