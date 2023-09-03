@@ -1,12 +1,12 @@
 package dyspatch
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -15,37 +15,34 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"dyspatch"}) + `\b([A-Z0-9]{52})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"dyspatch"}) + `\b([A-Za-z0-9]{52})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"dyspatch"}
+// Keywords are used for pre-filtering chunks.
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("dyspatch")}
 }
 
 // FromData will find and optionally verify Dyspatch secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Dyspatch,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
@@ -62,8 +59,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, "limited_usage") || strings.Contains(body, "data")
+				limitedUsage := bytes.Contains(bodyBytes, []byte("limited_usage"))
+				data := bytes.Contains(bodyBytes, []byte("data"))
+
+				validResponse := limitedUsage || data
 
 				if validResponse {
 					s1.Verified = true
@@ -72,7 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						continue
 					}
 				}
-
 			}
 		}
 

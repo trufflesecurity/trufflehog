@@ -1,11 +1,11 @@
 package facebookoauth
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,51 +14,43 @@ import (
 
 type Scanner struct{}
 
-// Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	apiIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"facebook"}) + `\b([0-9]{15,18})\b`) // not actually sure of the upper bound
+	apiIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"facebook"}) + `\b([0-9]{15,18})\b`)
 	apiSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"facebook"}) + `\b([A-Za-z0-9]{32})\b`)
 )
 
-// Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"facebook"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("facebook")}
 }
 
-// FromData will find and optionally verify FacebookOAuth secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	apiIdMatches := apiIdPat.FindAllStringSubmatch(dataStr, -1)
-	apiSecretMatches := apiSecretPat.FindAllStringSubmatch(dataStr, -1)
+	apiIdMatches := apiIdPat.FindAllSubmatch(data, -1)
+	apiSecretMatches := apiSecretPat.FindAllSubmatch(data, -1)
 
 	for _, apiIdMatch := range apiIdMatches {
 		if len(apiIdMatch) != 2 {
 			continue
 		}
-		apiIdRes := strings.TrimSpace(apiIdMatch[1])
+		apiIdRes := bytes.TrimSpace(apiIdMatch[1])
 
 		for _, apiSecretMatch := range apiSecretMatches {
 			if len(apiSecretMatch) != 2 {
 				continue
 			}
-			apiSecretRes := strings.TrimSpace(apiSecretMatch[1])
+			apiSecretRes := bytes.TrimSpace(apiSecretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_FacebookOAuth,
-				Redacted:     apiIdRes,
-				Raw:          []byte(apiSecretRes),
-				RawV2:        []byte(apiIdRes + apiSecretRes),
+				Redacted:     string(apiIdRes),
+				Raw:          apiSecretRes,
+				RawV2:        append(apiIdRes, apiSecretRes...),
 			}
 
 			if verify {
-				// thanks https://stackoverflow.com/questions/15621471/validate-a-facebook-app-id-and-app-secret
 				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://graph.facebook.com/%s?fields=roles&access_token=%s|%s", apiIdRes, apiIdRes, apiSecretRes), nil)
 				if err != nil {
 					continue
