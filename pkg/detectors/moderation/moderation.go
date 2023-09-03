@@ -1,11 +1,11 @@
 package moderation
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -27,36 +27,34 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"moderation"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("moderation")}
 }
 
 // FromData will find and optionally verify Moderation secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := bytes.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Moderation,
-			Raw:          []byte(resMatch),
+			Raw:          resMatch,
 		}
 
 		if verify {
 			timeout := 5 * time.Second
 			client.Timeout = timeout
-			payload := strings.NewReader(`{"value": "This is an english text"}`)
+			payload := bytes.NewReader([]byte(`{"value": "This is an english text"}`))
 			req, err := http.NewRequestWithContext(ctx, "POST", "https://moderationapi.com/api/v1/analyze/language", payload)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(resMatch)))
 			req.Header.Add("Content-type", "application/json")
 			res, err := client.Do(req)
 

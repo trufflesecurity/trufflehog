@@ -1,12 +1,12 @@
 package metaapi
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,32 +28,29 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"metaapi", "meta-api"}
+func (s Scanner) Keywords() [][]byte {
+	return [][]byte{[]byte("metaapi"), []byte("meta-api")}
 }
 
-// FromData will find and optionally verify MetaAPI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	spellMatches := spellPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllSubmatch(data, -1)
+	spellMatches := spellPat.FindAllSubmatch(data, -1)
 
 	for _, spellMatch := range spellMatches {
 		if len(spellMatch) != 2 {
 			continue
 		}
-		resSpellMatch := strings.TrimSpace(spellMatch[1])
+		resSpellMatch := bytes.TrimSpace(spellMatch[1])
 
 		for _, match := range matches {
 			if len(match) != 2 {
 				continue
 			}
-			resMatch := strings.TrimSpace(match[1])
+			resMatch := bytes.TrimSpace(match[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MetaAPI,
-				Raw:          []byte(resMatch),
+				Raw:          resMatch,
 			}
 
 			if verify {
@@ -62,16 +59,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("apikey", resMatch)
+				req.Header.Add("apikey", string(resMatch))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
 					body, errBody := io.ReadAll(res.Body)
 
 					if errBody == nil {
-						bodyStr := string(body)
-
-						if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(bodyStr, `"success":true`) {
+						if res.StatusCode >= 200 && res.StatusCode < 300 && bytes.Contains(body, []byte(`"success":true`)) {
 							s1.Verified = true
 						} else {
 							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
