@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pagerduty"}) + `\b([a-z]{1}\+[a-zA-Z]{9}\-[a-z]{2}\-[a-z0-9]{5})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pagerduty"}) + `\b([a-zA-Z0-9_+-]{20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
