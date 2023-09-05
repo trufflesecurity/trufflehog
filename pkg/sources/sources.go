@@ -46,6 +46,16 @@ type Source interface {
 	GetProgress() *Progress
 }
 
+// TargetedChunker allows for querying and selecting specific chunks of data with intent.
+// While the general chunking process might obtain data indiscriminately, there are use-cases where
+// a more focused or targeted approach is beneficial. For instance, when wanting to verify or recheck
+// specific data points without processing the entire dataset. This interface provides the method to
+// achieve that targeted chunking, allowing for efficient and intentional data processing.
+type TargetedChunker interface {
+	// TargetChunks retrieves specific chunks of the data which are then sent over the chunksChan.
+	TargetChunks(ctx context.Context, conn *anypb.Any, chunksChan chan *Chunk) error
+}
+
 // SourceUnitEnumChunker are the two required interfaces to support enumerating
 // and chunking of units.
 type SourceUnitEnumChunker interface {
