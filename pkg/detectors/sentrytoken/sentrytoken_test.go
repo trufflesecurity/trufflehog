@@ -141,6 +141,23 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
+			name: "found, account deactivated",
+			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseEnmpty)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SentryToken,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -193,6 +210,7 @@ const (
 ]
 `
 	reponseAccountDeactivated = `{"datail": "Authentication credentials were not provided"}`
+	responseEnmpty            = `[]`
 )
 
 func BenchmarkFromData(benchmark *testing.B) {
