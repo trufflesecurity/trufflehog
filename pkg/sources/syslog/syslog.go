@@ -182,7 +182,7 @@ func (s *Source) verifyConnectionConfig() error {
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	switch {
 	case s.conn.TlsCert != nilString || s.conn.TlsKey != nilString:
 		cert, err := tls.X509KeyPair([]byte(s.conn.TlsCert), []byte(s.conn.TlsKey))

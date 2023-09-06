@@ -248,7 +248,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	persistableCache := s.setupCache(ctx)
 
 	objectCh, err := s.gcsManager.ListObjects(ctx)
