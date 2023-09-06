@@ -13,16 +13,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int            { return 1 }
+func (Scanner) Version() int { return 1 }
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
@@ -73,6 +75,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
+					client := s.client
+					if client == nil {
+						client = defaultClient
+					}
+
 					data := fmt.Sprintf("%s:%s", resEmail, resToken)
 					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomain+"/rest/api/3/dashboard", nil)
@@ -88,9 +95,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// If the request is successful and the login reason is not failed authentication, then the token is valid.
 						// This is because Jira returns a 200 status code even if the token is invalid.
 						// Jira returns a default dashboard page.
-						if (res.StatusCode >= 200 && res.StatusCode < 300) && res.Header.Get(loginReasonHeaderKey) != failedAuth {
-							s1.Verified = true
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							if res.Header.Get(loginReasonHeaderKey) != failedAuth {
+								s1.Verified = true
+							}
+						} else {
+							s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 						}
+					} else {
+						s1.VerificationError = err
 					}
 				}
 
