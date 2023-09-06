@@ -177,6 +177,82 @@ func TestSource_Scan(t *testing.T) {
 	}
 }
 
+func TestSource_Validate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+	token := secret.MustGetField("GITLAB_TOKEN")
+	basicUser := secret.MustGetField("GITLAB_USER")
+	basicPass := secret.MustGetField("GITLAB_PASS")
+
+	tests := []struct {
+		name         string
+		connection   *sourcespb.GitLab
+		wantErrCount int
+	}{
+		{
+			name:         "failure to create oauth client",
+			wantErrCount: 1,
+		},
+		{
+			name:         "failure to create basic auth client",
+			wantErrCount: 1,
+		},
+		{
+			name:         "failure to create token client",
+			wantErrCount: 1,
+		},
+		{
+			name:         "client could not authenticate",
+			wantErrCount: 1,
+		},
+		{
+			name:         "bad repo urls (bad protocol, could not parse, no path, 2 parts no org, 3 parts no org, no trailing slash",
+			wantErrCount: 6,
+		},
+		{
+			name:         "could not list user projects", // will require scope juggling, maybe not possible
+			wantErrCount: 1,
+		},
+		{
+			name:         "could not list groups", // will require scope juggling, maybe not possible
+			wantErrCount: 1,
+		},
+		{
+			name:         "could not list a group's projects", // will require scope juggling, maybe not possible
+			wantErrCount: 1,
+		},
+		{
+			name:         "could not compile ignore glob(s)",
+			wantErrCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.name, 0, 0, false, conn, 1)
+			if err != nil {
+				t.Fatalf("Source.Init() error: %v", err)
+			}
+
+			errs := s.Validate(ctx)
+
+			assert.Equal(t, tt.wantErrCount, len(errs))
+		})
+	}
+}
+
 func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 	tests := []struct {
 		startingResumeInfoSlice []string

@@ -53,6 +53,7 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.Validator = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -185,6 +186,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	slices.Sort(s.repos)
 
 	return s.scanRepos(ctx, chunksChan)
+}
+
+func (s *Source) Validate(ctx context.Context) []error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (s *Source) newClient() (*gitlab.Client, error) {
