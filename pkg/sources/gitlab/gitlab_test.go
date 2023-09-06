@@ -181,11 +181,11 @@ func TestSource_Validate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	_, err := common.GetTestSecret(ctx)
+	secret, err := common.GetTestSecret(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	//token := secret.MustGetField("GITLAB_TOKEN")
+	token := secret.MustGetField("GITLAB_TOKEN")
 	//basicUser := secret.MustGetField("GITLAB_USER")
 	//basicPass := secret.MustGetField("GITLAB_PASS")
 
@@ -201,7 +201,6 @@ func TestSource_Validate(t *testing.T) {
 		{
 			name: "basic auth did not authenticate",
 			connection: &sourcespb.GitLab{
-				Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
 				Credential: &sourcespb.GitLab_BasicAuth{
 					BasicAuth: &credentialspb.BasicAuth{
 						Username: "bad-user",
@@ -225,21 +224,35 @@ func TestSource_Validate(t *testing.T) {
 		//	wantErrCount: 1,
 		//},
 		{
-			name:         "bad repo urls (bad protocol, could not parse, no path, 2 parts no org, 3 parts no org, no trailing slash",
+			name: "bad repo urls",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy",  // valid
+					"https://gitlab.com/testermctestface/testy/", // trailing slash
+					"ssh://gitlab.com/testermctestface/testy",    // bad protocol
+					"https://gitlab.com",                         // no path
+					"https://gitlab.com/",                        // no org name
+					"https://gitlab.com//testy",                  // no org name
+					"https://gitlab.com/testermctestface/",       // no repo name
+				},
+			},
 			wantErrCount: 6,
 		},
-		{
-			name:         "could not list user projects", // will require scope juggling, maybe not possible
-			wantErrCount: 1,
-		},
-		{
-			name:         "could not list groups", // will require scope juggling, maybe not possible
-			wantErrCount: 1,
-		},
-		{
-			name:         "could not list a group's projects", // will require scope juggling, maybe not possible
-			wantErrCount: 1,
-		},
+		//{
+		//	name:         "could not list user projects", // will require scope juggling, maybe not possible
+		//	wantErrCount: 1,
+		//},
+		//{
+		//	name:         "could not list groups", // will require scope juggling, maybe not possible
+		//	wantErrCount: 1,
+		//},
+		//{
+		//	name:         "could not list a group's projects", // will require scope juggling, maybe not possible
+		//	wantErrCount: 1,
+		//},
 		{
 			name:         "could not compile ignore glob(s)",
 			wantErrCount: 2,
