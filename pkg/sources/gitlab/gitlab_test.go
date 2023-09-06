@@ -219,10 +219,6 @@ func TestSource_Validate(t *testing.T) {
 			},
 			wantErrCount: 1,
 		},
-		//{
-		//	name:         "client could not authenticate",
-		//	wantErrCount: 1,
-		//},
 		{
 			name: "bad repo urls",
 			connection: &sourcespb.GitLab{
@@ -254,7 +250,17 @@ func TestSource_Validate(t *testing.T) {
 		//	wantErrCount: 1,
 		//},
 		{
-			name:         "could not compile ignore glob(s)",
+			name: "could not compile ignore glob(s)",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IgnoreRepos: []string{
+					"tes1188/*-gitlab",
+					"[",    // glob doesn't compile
+					"[a-]", // glob doesn't compile
+				},
+			},
 			wantErrCount: 2,
 		},
 	}

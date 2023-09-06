@@ -204,7 +204,14 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return errs
 	}
 
-	return []error{}
+	for _, ignore := range s.ignoreRepos {
+		_, err := glob.Compile(ignore)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
 }
 
 func (s *Source) newClient() (*gitlab.Client, error) {
