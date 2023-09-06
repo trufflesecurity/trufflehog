@@ -76,9 +76,9 @@ func (c *counterChunker) ChunkUnit(ctx context.Context, unit SourceUnit, reporte
 // Chunk method that always returns an error.
 type errorChunker struct{ error }
 
-func (c errorChunker) Chunks(context.Context, chan *Chunk, _ ...ChunkingTarget) error { return c }
-func (c errorChunker) Enumerate(context.Context, UnitReporter) error                  { return c }
-func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error     { return c }
+func (c errorChunker) Chunks(context.Context, chan *Chunk, ...ChunkingTarget) error { return c }
+func (c errorChunker) Enumerate(context.Context, UnitReporter) error                { return c }
+func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error   { return c }
 
 // enrollDummy is a helper function to enroll a DummySource with a SourceManager.
 func enrollDummy(mgr *SourceManager, chunkMethod chunker) (handle, error) {
