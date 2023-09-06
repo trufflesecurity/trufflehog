@@ -193,6 +193,7 @@ func TestSource_Validate(t *testing.T) {
 		name         string
 		connection   *sourcespb.GitLab
 		wantErrCount int
+		wantErrs     []string
 	}{
 		//{
 		//	name:         "oauth did not authenticate",
@@ -228,7 +229,7 @@ func TestSource_Validate(t *testing.T) {
 				Repositories: []string{
 					"https://gitlab.com/testermctestface/testy",  // valid
 					"https://gitlab.com/testermctestface/testy/", // trailing slash
-					"ssh://gitlab.com/testermctestface/testy",    // bad protocol
+					"ssh:git@gitlab.com/testermctestface/testy",  // bad protocol
 					"https://gitlab.com",                         // no path
 					"https://gitlab.com/",                        // no org name
 					"https://gitlab.com//testy",                  // no org name
