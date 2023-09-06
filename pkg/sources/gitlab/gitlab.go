@@ -189,8 +189,19 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
-	//TODO implement me
-	panic("implement me")
+	var errs []error
+
+	apiClient, err := s.newClient()
+	if err != nil {
+		return []error{err}
+	}
+
+	_, _, err = apiClient.Users.CurrentUser()
+	if err != nil {
+		return []error{err}
+	}
+
+	return errs
 }
 
 func (s *Source) newClient() (*gitlab.Client, error) {

@@ -181,35 +181,49 @@ func TestSource_Validate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	secret, err := common.GetTestSecret(ctx)
+	_, err := common.GetTestSecret(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	token := secret.MustGetField("GITLAB_TOKEN")
-	basicUser := secret.MustGetField("GITLAB_USER")
-	basicPass := secret.MustGetField("GITLAB_PASS")
+	//token := secret.MustGetField("GITLAB_TOKEN")
+	//basicUser := secret.MustGetField("GITLAB_USER")
+	//basicPass := secret.MustGetField("GITLAB_PASS")
 
 	tests := []struct {
 		name         string
 		connection   *sourcespb.GitLab
 		wantErrCount int
 	}{
+		//{
+		//	name:         "oauth did not authenticate",
+		//	wantErrCount: 1,
+		//},
 		{
-			name:         "failure to create oauth client",
+			name: "basic auth did not authenticate",
+			connection: &sourcespb.GitLab{
+				Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
+				Credential: &sourcespb.GitLab_BasicAuth{
+					BasicAuth: &credentialspb.BasicAuth{
+						Username: "bad-user",
+						Password: "bad-password",
+					},
+				},
+			},
 			wantErrCount: 1,
 		},
 		{
-			name:         "failure to create basic auth client",
+			name: "token did not authenticate",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: "bad-token",
+				},
+			},
 			wantErrCount: 1,
 		},
-		{
-			name:         "failure to create token client",
-			wantErrCount: 1,
-		},
-		{
-			name:         "client could not authenticate",
-			wantErrCount: 1,
-		},
+		//{
+		//	name:         "client could not authenticate",
+		//	wantErrCount: 1,
+		//},
 		{
 			name:         "bad repo urls (bad protocol, could not parse, no path, 2 parts no org, 3 parts no org, no trailing slash",
 			wantErrCount: 6,
