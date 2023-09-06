@@ -30,6 +30,16 @@ type Chunk struct {
 	Verify bool
 }
 
+// ChunkingTarget specifies criteria for a targeted chunking process.
+// Instead of collecting data indiscriminately, this struct allows the caller
+// to specify particular subsets of data they're interested in. This becomes
+// especially useful when one needs to verify or recheck specific data points
+// without processing the entire dataset.
+type ChunkingTarget struct {
+	// QueryCriteria represents specific parameters or conditions to target the chunking process.
+	QueryCriteria *anypb.Any
+}
+
 // Source defines the interface required to implement a source chunker.
 type Source interface {
 	// Type returns the source type, used for matching against configuration and jobs.
@@ -40,20 +50,14 @@ type Source interface {
 	JobID() int64
 	// Init initializes the source.
 	Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error
-	// Chunks emits data over a channel that is decoded and scanned for secrets.
-	Chunks(ctx context.Context, chunksChan chan *Chunk) error
+	// Chunks emits data over a channel which is then decoded and scanned for secrets.
+	// By default, data is obtained indiscriminately. However, by providing one or more
+	// ChunkingTarget parameters, the caller can direct the function to retrieve
+	// specific chunks of data. This targeted approach allows for efficient and
+	// intentional data processing, beneficial when verifying or rechecking specific data points.
+	Chunks(ctx context.Context, chunksChan chan *Chunk, targets ...ChunkingTarget) error
 	// GetProgress is the completion progress (percentage) for Scanned Source.
 	GetProgress() *Progress
-}
-
-// TargetedChunker allows for querying and selecting specific chunks of data with intent.
-// While the general chunking process might obtain data indiscriminately, there are use-cases where
-// a more focused or targeted approach is beneficial. For instance, when wanting to verify or recheck
-// specific data points without processing the entire dataset. This interface provides the method to
-// achieve that targeted chunking, allowing for efficient and intentional data processing.
-type TargetedChunker interface {
-	// TargetChunks retrieves specific chunks of the data which are then sent over the chunksChan.
-	TargetChunks(ctx context.Context, conn *anypb.Any, chunksChan chan *Chunk) error
 }
 
 // SourceUnitEnumChunker are the two required interfaces to support enumerating
