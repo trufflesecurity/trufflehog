@@ -937,6 +937,7 @@ enum DetectorType {
   HuggingFace = 926;
   Snowflake = 927;
   Sourcegraph = 928;
+  Tailscale = 929;
 }
 
 message Result {
