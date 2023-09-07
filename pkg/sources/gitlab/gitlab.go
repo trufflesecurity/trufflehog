@@ -147,9 +147,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		return errors.New(err)
 	}
 	// Get repo within target.
-	repos, errs := s.getRepos()
+	repos, errs := normalizeRepos(s.repos)
 	for _, repoErr := range errs {
-		ctx.Logger().Info("error getting repo", "error", repoErr)
+		ctx.Logger().Info("error normalizing repo", "error", repoErr)
 	}
 
 	// End early if we had errors getting specified repos but none were validated.
@@ -200,7 +200,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return []error{errors.WrapPrefix(err, msg, 0)}
 	}
 
-	explicitlyConfiguredRepos, errs := s.getRepos()
+	explicitlyConfiguredRepos, errs := normalizeRepos(s.repos)
 
 	if len(explicitlyConfiguredRepos) > 0 {
 		user := s.user
@@ -375,25 +375,6 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 	return projectList, nil
 }
 
-func (s *Source) getRepos() ([]string, []error) {
-	if len(s.repos) == 0 {
-		return nil, nil
-	}
-
-	var validRepos []string
-	var errs []error
-	for _, prj := range s.repos {
-		repo, err := giturl.NormalizeGitlabRepo(prj)
-		if err != nil {
-			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
-			continue
-		}
-
-		validRepos = append(validRepos, repo)
-	}
-	return validRepos, errs
-}
-
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
@@ -497,4 +478,19 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
+}
+
+func normalizeRepos(repos []string) ([]string, []error) {
+	var validRepos []string
+	var errs []error
+	for _, prj := range repos {
+		repo, err := giturl.NormalizeGitlabRepo(prj)
+		if err != nil {
+			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+			continue
+		}
+
+		validRepos = append(validRepos, repo)
+	}
+	return validRepos, errs
 }
