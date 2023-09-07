@@ -68,6 +68,7 @@ func New(c common.Common) *SourceSelect {
 		OssItem("Filesystem", "Scan your filesystem by selecting what directories to scan."),
 		OssItem("AWS S3", "Scan Amazon S3 buckets."),
 		OssItem("CircleCI", "Scan CircleCI, a CI/CD platform."),
+		OssItem("Trello", "Scan Trello, a ticket system."),
 		OssItem("Syslog", "Scan syslog, event data logs."),
 		OssItem("Docker", "Scan a Docker instance, a containerized application."),
 		OssItem("GCS (Google Cloud Storage)", "Scan a Google Cloud Storage instance."),

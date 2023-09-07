@@ -60,6 +60,7 @@ const (
 	SourceType_SOURCE_TYPE_SHAREPOINT                 SourceType = 29
 	SourceType_SOURCE_TYPE_GCS_UNAUTHED               SourceType = 30
 	SourceType_SOURCE_TYPE_AZURE_REPOS                SourceType = 31
+	SourceType_SOURCE_TYPE_TRELLO                     SourceType = 32
 )
 
 // Enum value maps for SourceType.
@@ -97,6 +98,7 @@ var (
 		29: "SOURCE_TYPE_SHAREPOINT",
 		30: "SOURCE_TYPE_GCS_UNAUTHED",
 		31: "SOURCE_TYPE_AZURE_REPOS",
+		32: "SOURCE_TYPE_AZURE_TRELLO",
 	}
 	SourceType_value = map[string]int32{
 		"SOURCE_TYPE_AZURE_STORAGE":              0,
@@ -131,6 +133,7 @@ var (
 		"SOURCE_TYPE_SHAREPOINT":                 29,
 		"SOURCE_TYPE_GCS_UNAUTHED":               30,
 		"SOURCE_TYPE_AZURE_REPOS":                31,
+		"SOURCE_TYPE_AZURE_TRELLO":                32,
 	}
 )
 
@@ -522,6 +525,80 @@ func (*Bitbucket_Token) isBitbucket_Credential() {}
 func (*Bitbucket_Oauth) isBitbucket_Credential() {}
 
 func (*Bitbucket_BasicAuth) isBitbucket_Credential() {}
+
+type Trello struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Auth *Trello_TrelloAuth `protobuf:"bytes,1,opt,name=auth,proto3,oneof"`
+	Boards []string `protobuf:"bytes,2,rep,name=boards,proto3" json:"boards,omitempty"`
+}
+
+type Trello_TrelloAuth struct {
+	ApiKey string `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3,oneof"`
+	Token  string `protobuf:"bytes,2,opt,name=token,proto3,oneof"`
+}
+
+func (x *Trello) Reset() {
+	*x = Trello{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_sources_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Trello) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Trello) ProtoMessage() {}
+
+func (x *Trello) ProtoReflect() protoreflect.Message {
+	mi := &file_sources_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+// Deprecated: Use Trello.ProtoReflect.Descriptor instead.
+func (*Trello) Descriptor() ([]byte, []int) {
+	return file_sources_proto_rawDescGZIP(), []int{4}  // Assuming Trello is the 5th message in source.proto file
+}
+
+func (x *Trello) GetAuth() *Trello_TrelloAuth {
+	if x != nil {
+		return x.Auth
+	}
+	return nil
+}
+
+func (t *Trello_TrelloAuth) GetApiKey() string {
+	if t != nil && t.ApiKey != nil {
+		return t.ApiKey
+	}
+	return ""
+}
+
+func (t *Trello_TrelloAuth) GetToken() string {
+	if t != nil && t.Token != nil {
+		return t.Token
+	}
+	return ""
+}
+
+func (x *Trello) GetBoards() []string {
+	if x != nil {
+		return x.Boards
+	}
+	return nil
+}
+
 
 type CircleCI struct {
 	state         protoimpl.MessageState
@@ -3693,6 +3770,7 @@ var file_sources_proto_goTypes = []interface{}{
 	(*SlackRealtime)(nil),                       // 28: sources.SlackRealtime
 	(*Sharepoint)(nil),                          // 29: sources.Sharepoint
 	(*AzureRepos)(nil),                          // 30: sources.AzureRepos
+	(*Trello)(nil),                              // 45: sources.Trello
 	(*durationpb.Duration)(nil),                 // 31: google.protobuf.Duration
 	(*anypb.Any)(nil),                           // 32: google.protobuf.Any
 	(*credentialspb.BasicAuth)(nil),             // 33: credentials.BasicAuth
@@ -4226,13 +4304,16 @@ func file_sources_proto_init() {
 		(*AzureRepos_Token)(nil),
 		(*AzureRepos_Oauth)(nil),
 	}
+	file_sources_proto_msgTypes[29].OneofWrappers = []interface{}{
+		(*Trello_TrelloAuth)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_sources_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   29,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

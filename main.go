@@ -136,6 +136,12 @@ var (
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 
+	trelloScan      = cli.Command("trello", "Scan Trello")
+	trelloApiKey    = trelloScan.Flag("apiKey", "Trello API Key. Can also be provided with environment variable").Envar("TRELLO_API_KEY").Required().String()
+	trelloToken     = trelloScan.Flag("token", "Trello token. Can also be provided with environment variable").Envar("TRELLO_TOKEN").Required().String()
+	trelloBoardIDs  = trelloScan.Flag("boardIDs", "Trello board IDs to scan. Can also be provided with environment variable").Envar("TRELLO_BOARD_IDS").Required().Strings()
+
+
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
 )
@@ -491,6 +497,10 @@ func run(state overseer.State) {
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logFatal(err, "Failed to scan CircleCI.")
+		}
+	case trelloScan.FullCommand():
+		if err := e.ScanTrello(ctx, *trelloBoardIDs, *trelloApiKey, *trelloToken); err != nil {
+			logFatal(err, "Failed to scan Trello.")
 		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{

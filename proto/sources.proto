@@ -44,6 +44,7 @@ enum SourceType {
   SOURCE_TYPE_SHAREPOINT = 29;
   SOURCE_TYPE_GCS_UNAUTHED = 30;
   SOURCE_TYPE_AZURE_REPOS = 31;
+  SOURCE_TYPE_TRELLO = 32;
 }
 
 message LocalSource {
@@ -264,6 +265,17 @@ message Jenkins {
     credentials.Header header = 3;
   }
 }
+
+message Trello {
+  message TrelloAuth {
+    string api_key = 1;
+    string token = 2;
+  }
+
+  TrelloAuth auth = 1;
+  repeated string boards = 2;
+}
+
 
 message Teams {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];

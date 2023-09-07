@@ -186,6 +186,17 @@ message Test {
   string file = 1;
 }
 
+message Trello {
+  string board_id = 1;
+  string card_id = 2;
+  string list_id = 3;
+  string action_id = 4;
+  string user_id = 5;
+  string username = 6;
+  string timestamp = 7;
+  string link = 8;
+}
+
 message Jenkins {
   string project_name = 1;
   int64 build_number = 2;
@@ -294,5 +305,6 @@ message MetaData {
     SharePoint sharepoint = 25;
     GoogleDrive googleDrive = 26;
     AzureRepos azureRepos = 27;
+    Trello trello = 28;
   }
 }
