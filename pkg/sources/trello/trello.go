@@ -92,6 +92,63 @@ type board struct {
 	URL   string `json:"url"`
 }
 
+type card struct {
+	Name  string `json:"name"`
+	Desc  string `json:"desc"`
+	ID    string `json:"id"`
+	URL   string `json:"url"`
+}
+
+type action struct {
+	Type string `json:"type"`
+	Data struct {
+		Text string `json:"text"`
+	} `json:"data"`
+}
+
+// Add these two methods to Source
+func (s *Source) getCards(_ context.Context, boardID string) ([]card, error) {
+	reqURL := fmt.Sprintf("%sboards/%s/cards?key=%s&token=%s", baseURL, boardID, s.apiKey, s.token)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	res, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var cards []card
+	if err := json.NewDecoder(res.Body).Decode(&cards); err != nil {
+		return nil, err
+	}
+
+	return cards, nil
+}
+
+func (s *Source) getComments(_ context.Context, cardID string) ([]action, error) {
+	reqURL := fmt.Sprintf("%scards/%s/actions?key=%s&token=%s", baseURL, cardID, s.apiKey, s.token)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	res, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var actions []action
+	if err := json.NewDecoder(res.Body).Decode(&actions); err != nil {
+		return nil, err
+	}
+
+	return actions, nil
+}
+
 func (s *Source) getBoard(_ context.Context, boardID string) (*board, error) {
 	reqURL := fmt.Sprintf("%sboards/%s?key=%s&token=%s", baseURL, boardID, s.apiKey, s.token)
 	req, err := http.NewRequest("GET", reqURL, nil)
@@ -114,26 +171,65 @@ func (s *Source) getBoard(_ context.Context, boardID string) (*board, error) {
 }
 
 func (s *Source) chunkBoard(ctx context.Context, board *board, chunksChan chan *sources.Chunk) error {
-	// We are just chunking the board's description here
-	data := []byte(board.Desc)
+	err := s.chunkItem(ctx, chunksChan, board.ID, board.Desc, board.URL, source_metadatapb.ItemType_ITEM_TYPE_BOARD, board.Name)
+	if err != nil {
+		return err
+	}
+
+	cards, err := s.getCards(ctx, board.ID)
+	if err != nil {
+		return err
+	}
+
+	for _, card := range cards {
+		err := s.chunkItem(ctx, chunksChan, card.ID, card.Desc, card.URL, source_metadatapb.ItemType_ITEM_TYPE_CARD, card.Name)
+		if err != nil {
+			return err
+		}
+
+		comments, err := s.getComments(ctx, card.ID)
+		if err != nil {
+			return err
+		}
+
+		for _, comment := range comments {
+			if comment.Type != "commentCard" {
+				continue
+			}
+
+			err := s.chunkItem(ctx, chunksChan, card.ID, comment.Data.Text, card.URL, source_metadatapb.ItemType_ITEM_TYPE_COMMENT, "")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) chunkItem(ctx context.Context, chunksChan chan *sources.Chunk, id, text, url string, itemType source_metadatapb.ItemType, name string) error {
+	data := []byte(text)
 
 	chunk := &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		JobID:      s.JobID(),
+		SourceID:   s.sourceId,
+		JobID:      s.jobId,
 		Data:       data,
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Trello{
 				Trello: &source_metadatapb.Trello{
-					BoardName: board.Name,
-					BoardID: board.ID,
-					BoardURL: board.URL,
+					Id:   id,
+					Url:  url,
+					Type: itemType,
+					Name: name
 				},
 			},
 		},
 		Verify: s.verify,
 	}
+
+	atomic.AddInt64(&s.scannedBytes, int64(len(data)))
 
 	if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
 		return err
@@ -141,4 +237,3 @@ func (s *Source) chunkBoard(ctx context.Context, board *board, chunksChan chan *
 
 	return nil
 }
-
