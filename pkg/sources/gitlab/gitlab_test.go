@@ -195,10 +195,6 @@ func TestSource_Validate(t *testing.T) {
 		wantErrCount int
 		wantErrs     []string
 	}{
-		//{
-		//	name:         "oauth did not authenticate",
-		//	wantErrCount: 1,
-		//},
 		{
 			name: "basic auth did not authenticate",
 			connection: &sourcespb.GitLab{
