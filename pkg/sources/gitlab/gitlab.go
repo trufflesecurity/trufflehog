@@ -196,7 +196,8 @@ func (s *Source) Validate(ctx context.Context) []error {
 
 	_, _, err = apiClient.Users.CurrentUser()
 	if err != nil {
-		return []error{err}
+		msg := fmt.Sprintf("gitlab authentication failed using method %v", s.authMethod)
+		return []error{errors.WrapPrefix(err, msg, 0)}
 	}
 
 	_, errs := s.getRepos()
@@ -207,7 +208,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 	for _, ignore := range s.ignoreRepos {
 		_, err := glob.Compile(ignore)
 		if err != nil {
-			msg := fmt.Sprintf("could not compile ignore repo pattern %q", ignore)
+			msg := fmt.Sprintf("could not compile ignore repo pattern %v", ignore)
 			errs = append(errs, errors.WrapPrefix(err, msg, 0))
 		}
 	}
