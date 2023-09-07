@@ -186,6 +186,7 @@ func TestSource_Validate(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
+	tokenWrongScope := secret.MustGetField("GITLAB_TOKEN_WRONG_SCOPE")
 
 	tests := []struct {
 		name         string
@@ -232,18 +233,15 @@ func TestSource_Validate(t *testing.T) {
 			},
 			wantErrCount: 6,
 		},
-		//{
-		//	name:         "could not list user projects", // will require scope juggling, maybe not possible
-		//	wantErrCount: 1,
-		//},
-		//{
-		//	name:         "could not list groups", // will require scope juggling, maybe not possible
-		//	wantErrCount: 1,
-		//},
-		//{
-		//	name:         "could not list a group's projects", // will require scope juggling, maybe not possible
-		//	wantErrCount: 1,
-		//},
+		{
+			name: "token does not have permission to list projects",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: tokenWrongScope,
+				},
+			},
+			wantErrCount: 1,
+		},
 		{
 			name: "could not compile ignore glob(s)",
 			connection: &sourcespb.GitLab{
