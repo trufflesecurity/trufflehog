@@ -232,6 +232,11 @@ func (s *Source) Validate(ctx context.Context) []error {
 		}
 	}
 
+	_, err = s.getAllProjects(ctx, apiClient)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	return errs
 }
 

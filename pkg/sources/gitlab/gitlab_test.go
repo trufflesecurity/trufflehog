@@ -186,8 +186,6 @@ func TestSource_Validate(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 	token := secret.MustGetField("GITLAB_TOKEN")
-	//basicUser := secret.MustGetField("GITLAB_USER")
-	//basicPass := secret.MustGetField("GITLAB_PASS")
 
 	tests := []struct {
 		name         string
