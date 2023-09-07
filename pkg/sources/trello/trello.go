@@ -86,13 +86,59 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 type board struct {
-    // Your board's struct definition
+	Name  string `json:"name"`
+	Desc  string `json:"desc"`
+	ID    string `json:"id"`
+	URL   string `json:"url"`
 }
 
 func (s *Source) getBoard(_ context.Context, boardID string) (*board, error) {
-	// Your APi Call Logic for fetching the board by the given ID
+	reqURL := fmt.Sprintf("%sboards/%s?key=%s&token=%s", baseURL, boardID, s.apiKey, s.token)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	res, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var b board
+	if err := json.NewDecoder(res.Body).Decode(&b); err != nil {
+		return nil, err
+	}
+
+	return &b, nil
 }
 
 func (s *Source) chunkBoard(ctx context.Context, board *board, chunksChan chan *sources.Chunk) error {
-	// Your logic for chunking a board
+	// We are just chunking the board's description here
+	data := []byte(board.Desc)
+
+	chunk := &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
+		Data:       data,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Trello{
+				Trello: &source_metadatapb.Trello{
+					BoardName: board.Name,
+					BoardID: board.ID,
+					BoardURL: board.URL,
+				},
+			},
+		},
+		Verify: s.verify,
+	}
+
+	if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+		return err
+	}
+
+	return nil
 }
+
