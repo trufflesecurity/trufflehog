@@ -207,7 +207,8 @@ func (s *Source) Validate(ctx context.Context) []error {
 	for _, ignore := range s.ignoreRepos {
 		_, err := glob.Compile(ignore)
 		if err != nil {
-			errs = append(errs, err)
+			msg := fmt.Sprintf("could not compile ignore repo pattern %q", ignore)
+			errs = append(errs, errors.WrapPrefix(err, msg, 0))
 		}
 	}
 
