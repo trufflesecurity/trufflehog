@@ -260,6 +260,20 @@ func TestSource_Validate(t *testing.T) {
 			},
 			wantErrCount: 2,
 		},
+		{
+			name: "repositories do not exist or are not accessible",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy",
+					"https://gitlab.com/testermctestface/doesn't-exist",
+					"https://gitlab.com/testermctestface/also-doesn't-exist",
+				},
+			},
+			wantErrCount: 2,
+		},
 	}
 
 	for _, tt := range tests {

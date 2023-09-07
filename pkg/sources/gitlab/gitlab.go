@@ -200,7 +200,26 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return []error{errors.WrapPrefix(err, msg, 0)}
 	}
 
-	_, errs := s.getRepos()
+	explicitlyConfiguredRepos, errs := s.getRepos()
+
+	if len(explicitlyConfiguredRepos) > 0 {
+		user := s.user
+		if user == "" {
+			user = "placeholder"
+		}
+
+		// We only check reachability for explicitly configured repositories. The purpose of source validation is to
+		// help users validate their configuration files, and Gitlab telling us about repositories that it won't let us
+		// access isn't a local configuration issue.
+		for _, r := range explicitlyConfiguredRepos {
+			if err := git.PingRepoUsingToken(ctx, s.token, r, user); err != nil {
+				msg := fmt.Sprintf("could not reach git repository %q", r)
+				err = errors.WrapPrefix(err, msg, 0)
+				errs = append(errs, err)
+			}
+		}
+	}
+
 	if len(errs) > 0 {
 		return errs
 	}

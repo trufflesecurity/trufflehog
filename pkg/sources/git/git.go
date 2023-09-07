@@ -370,6 +370,32 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 	return clonePath, repo, nil
 }
 
+// PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
+// that a repo actually exists and is reachable.
+//
+// Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
+func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
+	if err := GitCmdCheck(); err != nil {
+		return err
+	}
+	lsUrl, err := GitURLParse(gitUrl)
+	if err != nil {
+		return err
+	}
+	if lsUrl.User == nil {
+		lsUrl.User = url.UserPassword(user, token)
+	}
+
+	// We don't actually care about any refs on the remote, we just care whether can can list them at all. So we query
+	// only for a ref that we know won't exist to minimize the search time on the remote. (By default, ls-remote exits
+	// with 0 even if it doesn't find any matching refs.)
+	fakeRef := "TRUFFLEHOG_CHECK_GIT_REMOTE_URL_REACHABILITY"
+	gitArgs := []string{"ls-remote", lsUrl.String(), "--quiet", fakeRef}
+	cmd := exec.Command("git", gitArgs...)
+	_, err = cmd.CombinedOutput()
+	return err
+}
+
 // CloneRepoUsingToken clones a repo using a provided token.
 func CloneRepoUsingToken(ctx context.Context, token, gitUrl, user string, args ...string) (string, *git.Repository, error) {
 	userInfo := url.UserPassword(user, token)
