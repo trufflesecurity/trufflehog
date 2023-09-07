@@ -163,9 +163,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err != nil {
 			return fmt.Errorf("error getting all projects: %v", err)
 		}
+
+		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
+			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
+		})
+
 		// Turn projects into URLs for Git cloner.
 		for _, prj := range projects {
-			if s.ignoreRepo(ctx, prj.PathWithNamespace) {
+			if ignoreRepo(prj.PathWithNamespace) {
 				continue
 			}
 
@@ -220,17 +225,15 @@ func (s *Source) Validate(ctx context.Context) []error {
 		}
 	}
 
+	// todo: sort out whether to check ignore globs if repos are explicitly configured
 	if len(errs) > 0 {
 		return errs
 	}
 
-	for _, ignore := range s.ignoreRepos {
-		_, err := glob.Compile(ignore)
-		if err != nil {
-			msg := fmt.Sprintf("could not compile ignore repo pattern %v", ignore)
-			errs = append(errs, errors.WrapPrefix(err, msg, 0))
-		}
-	}
+	_ = buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
+		msg := fmt.Sprintf("could not compile ignore repo pattern %q", pattern)
+		errs = append(errs, errors.WrapPrefix(err, msg, 0))
+	})
 
 	_, err = s.getAllProjects(ctx, apiClient)
 	if err != nil {
@@ -445,21 +448,6 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	return nil
 }
 
-func (s *Source) ignoreRepo(ctx context.Context, r string) bool {
-	for _, ignore := range s.ignoreRepos {
-		g, err := glob.Compile(ignore)
-		if err != nil {
-			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", ignore)
-			continue
-		}
-		if g.Match(r) {
-			ctx.Logger().V(2).Info("Ignoring repo", "repo", r)
-			return true
-		}
-	}
-	return false
-}
-
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
 func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string) {
 	s.resumeInfoMutex.Lock()
@@ -478,6 +466,30 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
+}
+
+func buildIgnorer(patterns []string, onCompileErr func(err error, pattern string)) func(repo string) bool {
+	var globs []glob.Glob
+
+	for _, pattern := range patterns {
+		g, err := glob.Compile(pattern)
+		if err != nil {
+			onCompileErr(err, pattern)
+			continue
+		}
+		globs = append(globs, g)
+	}
+
+	f := func(repo string) bool {
+		for _, g := range globs {
+			if g.Match(repo) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return f
 }
 
 func normalizeRepos(repos []string) ([]string, []error) {
