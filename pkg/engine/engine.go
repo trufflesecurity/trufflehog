@@ -57,9 +57,8 @@ type Printer interface {
 // is consistent and that there are no race conditions when checking or updating
 // the status of the termination.
 type terminationSignal struct {
-	// exitChan is maintained for potential future uses or expansions where asynchronous
-	// checks might be needed. For the current logic, it's not actively used.
-	exitChan chan struct{}
+	// isTerminated indicates the signal state (true if the engine is terminated).
+	isTerminated bool
 	// isFailFast indicates if the engine is in fail-fast mode.
 	isFailFast bool
 	// mutex is used to protect access to isFailFast and to synchronize
@@ -74,16 +73,7 @@ type terminationSignal struct {
 // newTerminationSignal initializes a new terminationSignal.
 // The failFast argument determines the initial state.
 func newTerminationSignal(failFast bool) *terminationSignal {
-	// We only need to initialize the exitChan if failFast is enabled.
-	var exitChan chan struct{}
-	if failFast {
-		exitChan = make(chan struct{})
-	}
-
-	ts := &terminationSignal{
-		isFailFast: failFast,
-		exitChan:   exitChan,
-	}
+	ts := &terminationSignal{isFailFast: failFast}
 	// Initialize the condition variable with the mutex.
 	ts.failFastCondition = sync.NewCond(&ts.mutex)
 	return ts
@@ -95,13 +85,17 @@ func newTerminationSignal(failFast bool) *terminationSignal {
 func (t *terminationSignal) signalFinish() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+	t.isTerminated = true
 
-	if t.exitChan != nil {
-		close(t.exitChan)
-		// Setting exitChan to nil to prevent inadvertent double close in future calls.
-		t.exitChan = nil
-	}
 	t.failFastCondition.Signal() // Signal the condition to unblock Finish.
+}
+
+func (t *terminationSignal) wait() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	for !t.isTerminated {
+		t.failFastCondition.Wait()
+	}
 }
 
 type Engine struct {
@@ -466,15 +460,12 @@ func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
 
 	// Handle the fail-fast termination signal.
-	if e.termSignal.exitChan != nil {
-		<-e.termSignal.exitChan
-	}
-
 	e.termSignal.mutex.Lock()
 	isFailFast := e.termSignal.isFailFast
 	e.termSignal.mutex.Unlock()
 
 	if isFailFast {
+		e.termSignal.wait()
 		return fmt.Errorf("terminated early due to fail-fast flag after printing the first result")
 	}
 
@@ -497,14 +488,9 @@ func (e *Engine) Finish(ctx context.Context) error {
 // This can be used, for example, to determine if the engine
 // terminated early due to the fail-fast feature being activated.
 func (e *Engine) IsTerminated() bool {
-	select {
-	case <-e.termSignal.exitChan:
-		// The channel was closed indicating a termination signal.
-		return true
-	default:
-		// The channel is still open, so no termination signal was sent.
-		return false
-	}
+	e.termSignal.mutex.Lock()
+	defer e.termSignal.mutex.Unlock()
+	return e.termSignal.isTerminated
 }
 
 func (e *Engine) ChunksChan() <-chan *sources.Chunk {
@@ -684,7 +670,6 @@ func (e *Engine) processRegularResults(ctx context.Context) {
 	for r := range e.ResultsChan() {
 		e.processSingleResult(ctx, &r)
 	}
-	e.termSignal.signalFinish()
 }
 
 func (e *Engine) processSingleResult(ctx context.Context, r *detectors.ResultWithMetadata) {
@@ -709,12 +694,6 @@ func (e *Engine) processSingleResult(ctx context.Context, r *detectors.ResultWit
 
 	if err := e.printer.Print(ctx, r); err != nil {
 		ctx.Logger().Error(err, "error printing result")
-	}
-
-	select {
-	case <-e.termSignal.exitChan:
-		return
-	default:
 	}
 }
 
