@@ -433,22 +433,15 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		}()
 	}
 
-	// We want 1/4th of the notifier workers as the number of scanner workers.
-	const notifierWorkerRatio = 4
-	maxNotifierWorkers := 1
-	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
-		maxNotifierWorkers = int(numWorkers)
-	}
-	ctx.Logger().V(2).Info("starting notifier workers", "count", maxNotifierWorkers)
-	for worker := 0; worker < maxNotifierWorkers; worker++ {
-		e.WgNotifier.Add(1)
-		go func() {
-			ctx := context.WithValue(ctx, "notifier_worker_id", common.RandomID(5))
-			defer common.Recover(ctx)
-			defer e.WgNotifier.Done()
-			e.notifyResults(ctx)
-		}()
-	}
+	// We want only one notifier worker.
+	ctx.Logger().V(2).Info("starting notifier worker")
+	e.WgNotifier.Add(1)
+	go func() {
+		ctx := context.WithValue(ctx, "notifier_worker_id", common.RandomID(5))
+		defer common.Recover(ctx)
+		defer e.WgNotifier.Done()
+		e.notifyResults(ctx)
+	}()
 
 	return e, nil
 }
@@ -460,11 +453,7 @@ func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
 
 	// Handle the fail-fast termination signal.
-	e.termSignal.mutex.Lock()
-	isFailFast := e.termSignal.isFailFast
-	e.termSignal.mutex.Unlock()
-
-	if isFailFast {
+	if e.termSignal.isFailFast {
 		e.termSignal.wait()
 		return fmt.Errorf("terminated early due to fail-fast flag after printing the first result")
 	}
@@ -645,11 +634,7 @@ func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 }
 
 func (e *Engine) notifyResults(ctx context.Context) {
-	e.termSignal.mutex.Lock()
-	isFailFast := e.termSignal.isFailFast
-	e.termSignal.mutex.Unlock()
-
-	if isFailFast {
+	if e.termSignal.isFailFast {
 		e.processResultsWithFailFast(ctx)
 	} else {
 		e.processRegularResults(ctx)
