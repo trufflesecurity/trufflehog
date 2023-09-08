@@ -51,6 +51,58 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
+// terminationSignal provides a mechanism to safely signal a termination
+// event across different goroutines. It uses a combination of a condition variable
+// and a mutex to enable safe signaling and waiting, ensuring that the signaling
+// is consistent and that there are no race conditions when checking or updating
+// the status of the termination.
+type terminationSignal struct {
+	// exitChan is maintained for potential future uses or expansions where asynchronous
+	// checks might be needed. For the current logic, it's not actively used.
+	exitChan chan struct{}
+	// isFailFast indicates if the engine is in fail-fast mode.
+	isFailFast bool
+	// mutex is used to protect access to isFailFast and to synchronize
+	// the condition variable.
+	mutex sync.Mutex
+	// failFastCondition is a condition variable that's signaled when
+	// a fail-fast event occurs. It's used in Finish to wait for or
+	// react to this signal.
+	failFastCondition *sync.Cond
+}
+
+// newTerminationSignal initializes a new terminationSignal.
+// The failFast argument determines the initial state.
+func newTerminationSignal(failFast bool) *terminationSignal {
+	// We only need to initialize the exitChan if failFast is enabled.
+	var exitChan chan struct{}
+	if failFast {
+		exitChan = make(chan struct{})
+	}
+
+	ts := &terminationSignal{
+		isFailFast: failFast,
+		exitChan:   exitChan,
+	}
+	// Initialize the condition variable with the mutex.
+	ts.failFastCondition = sync.NewCond(&ts.mutex)
+	return ts
+}
+
+// signalFinish signals that the engine has finished its work.
+// It uses the condition variable to notify any waiting goroutines
+// (e.g., the Finish method).
+func (t *terminationSignal) signalFinish() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	if t.exitChan != nil {
+		close(t.exitChan)
+		t.exitChan = nil // Set to nil to prevent double close
+	}
+	t.failFastCondition.Signal() // Signal the condition to unblock Finish.
+}
+
 type Engine struct {
 	// CLI flags.
 	concurrency uint8
@@ -74,6 +126,11 @@ type Engine struct {
 	workersWg            sync.WaitGroup
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
+	// termSignal is used to signal the engine to terminate.
+	// It is used to implement the fail-fast feature,
+	// where the engine will terminate scanning as soon as
+	// the first potential secret is detected.
+	termSignal *terminationSignal
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -166,6 +223,19 @@ func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption 
 func WithPrinter(printer Printer) EngineOption {
 	return func(e *Engine) {
 		e.printer = printer
+	}
+}
+
+// WithFailFast returns an EngineOption that configures the engine's termination behavior.
+// If 'failFast' is enabled, the engine will terminate scanning upon detecting the first potential secret.
+// This mode is valuable in contexts like CI/CD pipelines or preliminary scans where
+// immediate feedback is more important than a comprehensive review. In the non-failFast mode,
+// the engine continues its operation without waiting for a result.
+// The boolean parameter 'failFast' dictates the termination behavior.
+func WithFailFast(failFast bool) EngineOption {
+	return func(e *Engine) {
+		// Configure the termination signal with the desired mode (failFast or not).
+		e.termSignal = newTerminationSignal(failFast)
 	}
 }
 
@@ -392,6 +462,20 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 // more sources may be scanned by the engine.
 func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
+
+	// Handle the fail-fast termination signal.
+	if e.termSignal.exitChan != nil {
+		<-e.termSignal.exitChan
+	}
+
+	e.termSignal.mutex.Lock()
+	isFailFast := e.termSignal.isFailFast
+	e.termSignal.mutex.Unlock()
+
+	if isFailFast {
+		return fmt.Errorf("terminated early due to fail-fast flag after printing the first result")
+	}
+
 	// Wait for the sources to finish putting chunks onto the chunks channel.
 	err := e.sourceManager.Wait()
 
@@ -405,6 +489,20 @@ func (e *Engine) Finish(ctx context.Context) error {
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
 	return err
+}
+
+// IsTerminated checks if the engine received a termination signal.
+// This can be used, for example, to determine if the engine
+// terminated early due to the fail-fast feature being activated.
+func (e *Engine) IsTerminated() bool {
+	select {
+	case <-e.termSignal.exitChan:
+		// The channel was closed indicating a termination signal.
+		return true
+	default:
+		// The channel is still open, so no termination signal was sent.
+		return false
+	}
 }
 
 func (e *Engine) ChunksChan() <-chan *sources.Chunk {
@@ -579,6 +677,18 @@ func (e *Engine) notifyResults(ctx context.Context) {
 
 		if err := e.printer.Print(ctx, &r); err != nil {
 			ctx.Logger().Error(err, "error printing result")
+		}
+
+		// If fail-fast is enabled, signal finish after processing the first result
+		if e.termSignal.isFailFast {
+			e.termSignal.signalFinish()
+			return
+		}
+
+		select {
+		case <-e.termSignal.exitChan:
+			return
+		default:
 		}
 	}
 }
