@@ -347,6 +347,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		dedupeCache:          cache,
 		printer:              new(output.PlainPrinter), // default printer
 		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
+		termSignal:           &terminationSignal{},
 	}
 
 	for _, option := range options {
@@ -658,39 +659,62 @@ func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 }
 
 func (e *Engine) notifyResults(ctx context.Context) {
+	e.termSignal.mutex.Lock()
+	isFailFast := e.termSignal.isFailFast
+	e.termSignal.mutex.Unlock()
+
+	if isFailFast {
+		e.processResultsWithFailFast(ctx)
+	} else {
+		e.processRegularResults(ctx)
+	}
+}
+
+func (e *Engine) processResultsWithFailFast(ctx context.Context) {
 	for r := range e.ResultsChan() {
-		if e.onlyVerified && !r.Verified {
-			continue
-		}
-		atomic.AddUint32(&e.numFoundResults, 1)
+		e.processSingleResult(ctx, &r)
 
-		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
-		if _, ok := e.dedupeCache.Get(key); ok {
-			continue
-		}
-		e.dedupeCache.Add(key, struct{}{})
+		// If fail-fast is enabled, signal finish after processing the first result.
+		e.termSignal.signalFinish()
+		return
+	}
+}
 
-		if r.Verified {
-			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
-		} else {
-			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
-		}
+func (e *Engine) processRegularResults(ctx context.Context) {
+	for r := range e.ResultsChan() {
+		e.processSingleResult(ctx, &r)
+	}
+	e.termSignal.signalFinish()
+}
 
-		if err := e.printer.Print(ctx, &r); err != nil {
-			ctx.Logger().Error(err, "error printing result")
-		}
+func (e *Engine) processSingleResult(ctx context.Context, r *detectors.ResultWithMetadata) {
+	if e.onlyVerified && !r.Verified {
+		return
+	}
 
-		// If fail-fast is enabled, signal finish after processing the first result
-		if e.termSignal.isFailFast {
-			e.termSignal.signalFinish()
-			return
-		}
+	atomic.AddUint32(&e.numFoundResults, 1)
 
-		select {
-		case <-e.termSignal.exitChan:
-			return
-		default:
-		}
+	key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
+	if _, ok := e.dedupeCache.Get(key); ok {
+		return
+	}
+
+	e.dedupeCache.Add(key, struct{}{})
+
+	if r.Verified {
+		atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
+	} else {
+		atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
+	}
+
+	if err := e.printer.Print(ctx, r); err != nil {
+		ctx.Logger().Error(err, "error printing result")
+	}
+
+	select {
+	case <-e.termSignal.exitChan:
+		return
+	default:
 	}
 }
 
