@@ -104,8 +104,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		//fmt.Printf("=========== the number of secret matches %d", len(secretMatches))
-
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
@@ -124,7 +122,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, s1)
-			//fmt.Printf("%+v\n", results)
 			// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
 			if s1.Verified {
 				break
