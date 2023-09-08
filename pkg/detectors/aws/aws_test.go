@@ -42,7 +42,6 @@ func TestAWS_FromChunk(t *testing.T) {
 	tests := []struct {
 		name                  string
 		s                     scanner
-		sleepBefore           time.Duration // One of these tests needs to ensure that AWS's signature cache is empty before running
 		args                  args
 		want                  []detectors.Result
 		wantErr               bool
@@ -250,9 +249,8 @@ func TestAWS_FromChunk(t *testing.T) {
 			wantVerificationError: true,
 		},
 		{
-			name:        "verified secret checked directly after unverified secret with same key id",
-			s:           scanner{},
-			sleepBefore: 6 * time.Second, // AWS's signature cache appears to expire after 5 seconds
+			name: "verified secret checked directly after unverified secret with same key id",
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("%s\n%s\n%s", inactiveSecret, id, secret)),
@@ -275,7 +273,6 @@ func TestAWS_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			time.Sleep(tt.sleepBefore)
 			s := tt.s
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
