@@ -254,12 +254,12 @@ func executeRequest(client *http.Client, req *http.Request, r *detectors.Result,
 				if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
 					// determinate failure - nothing to do
 				} else if strings.EqualFold(body.Error.Code, "SignatureDoesNotMatch") && retryOnSignatureMismatch {
-					// Based on experimentation, we've inferred this about the SigV4 process: When you make two
-					// GetCallerIdentity calls within five seconds, if you use the same key ID for both, AWS will expect
-					// you to sign them with the same secret. Within those five seconds, any requests against the
-					// original key ID that are signed with a different secret will be rejected with a signature
-					// mismatch error. However, when this rejection happens, AWS appears to evict whatever it's caching,
-					// so repeating the exact same request will generate the expected result.
+					// From experimentation, we've inferred this about the SigV4 process: When you make two
+					// GetCallerIdentity calls within five seconds that use the same key ID AWS will expect you to sign
+					// them with the same secret. Within those five seconds, any requests against the original key ID
+					// that are signed with a different secret will be rejected with a signature mismatch error.
+					// However, when this rejection happens, AWS appears to evict whatever it's caching, so repeating
+					// the exact same request will generate the expected result.
 					executeRequest(client, req, r, false)
 				} else {
 					r.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
