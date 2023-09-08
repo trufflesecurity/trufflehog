@@ -145,7 +145,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return awsCustomCleanResults(results), nil
 }
 
-func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) (verified bool, extraData map[string]string, verificationErr error) {
+func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) (bool, map[string]string, error) {
 	// REQUEST VALUES.
 	method := "GET"
 	service := "sts"
@@ -158,8 +158,7 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {
-		verificationErr = err
-		return
+		return false, nil, err
 	}
 	req.Header.Set("Accept", "application/json")
 
@@ -215,14 +214,14 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			err := json.NewDecoder(res.Body).Decode(&identityInfo)
 			res.Body.Close()
 			if err == nil {
-				verified = true
-				extraData = map[string]string{
+				extraData := map[string]string{
 					"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
 					"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 					"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
 				}
+				return true, extraData, nil
 			} else {
-				verificationErr = err
+				return false, nil, err
 			}
 		} else {
 			if res.StatusCode == 403 {
@@ -251,22 +250,20 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 					// All instances of the code I've seen in the wild are PascalCased but this check is
 					// case-insensitive out of an abundance of caution
 					if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
-						// determinate failure - nothing to do
+						return false, nil, nil
 					} else {
-						verificationErr = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
+						return false, nil, fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
 					}
 				} else {
-					verificationErr = fmt.Errorf("couldn't parse the sts response body (%v)", err)
+					return false, nil, fmt.Errorf("couldn't parse the sts response body (%v)", err)
 				}
 			} else {
-				verificationErr = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+				return false, nil, fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 			}
 		}
 	} else {
-		verificationErr = err
+		return false, nil, err
 	}
-
-	return
 }
 
 func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
