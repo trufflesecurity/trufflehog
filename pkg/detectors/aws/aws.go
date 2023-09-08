@@ -220,7 +220,6 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			}
 			res.Body.Close()
 		} else {
-
 			if res.StatusCode == 403 {
 				// Experimentation has indicated that if you make two GetCallerIdentity requests within five seconds
 				// that share a key ID but are signed with different secrets the second one will be rejected with a 403
