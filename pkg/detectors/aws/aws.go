@@ -110,7 +110,19 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
-			s1 := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Raw:          []byte(resIDMatch),
+				Redacted:     resIDMatch,
+				RawV2:        []byte(resIDMatch + resSecretMatch),
+			}
+
+			if verify {
+				verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
+				s1.Verified = verified
+				s1.ExtraData = extraData
+				s1.VerificationError = verificationErr
+			}
 
 			if !s1.Verified {
 				// Unverified results that contain common test words are probably not secrets
@@ -133,14 +145,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return awsCustomCleanResults(results), nil
 }
 
-func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) detectors.Result {
-	s1 := detectors.Result{
-		DetectorType: detectorspb.DetectorType_AWS,
-		Raw:          []byte(resIDMatch),
-		Redacted:     resIDMatch,
-		RawV2:        []byte(resIDMatch + resSecretMatch),
-	}
-
+func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) (verified bool, extraData map[string]string, verificationErr error) {
 	// REQUEST VALUES.
 	method := "GET"
 	service := "sts"
@@ -153,8 +158,8 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {
-		s1.VerificationError = err
-		return s1
+		verificationErr = err
+		return
 	}
 	req.Header.Set("Accept", "application/json")
 
@@ -208,17 +213,17 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
 			identityInfo := identityRes{}
 			err := json.NewDecoder(res.Body).Decode(&identityInfo)
+			res.Body.Close()
 			if err == nil {
-				s1.Verified = true
-				s1.ExtraData = map[string]string{
+				verified = true
+				extraData = map[string]string{
 					"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
 					"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 					"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
 				}
 			} else {
-				s1.VerificationError = err
+				verificationErr = err
 			}
-			res.Body.Close()
 		} else {
 			if res.StatusCode == 403 {
 				// Experimentation has indicated that if you make two GetCallerIdentity requests within five seconds
@@ -248,20 +253,20 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 					if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
 						// determinate failure - nothing to do
 					} else {
-						s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
+						verificationErr = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
 					}
 				} else {
-					s1.VerificationError = fmt.Errorf("couldn't parse the sts response body (%v)", err)
+					verificationErr = fmt.Errorf("couldn't parse the sts response body (%v)", err)
 				}
 			} else {
-				s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+				verificationErr = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 			}
 		}
 	} else {
-		s1.VerificationError = err
+		verificationErr = err
 	}
 
-	return s1
+	return
 }
 
 func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
