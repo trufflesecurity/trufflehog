@@ -230,7 +230,7 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			// valid. Since this is exactly our access pattern, we need to work around it.
 			//
 			// Fortunately, experimentation has also revealed a workaround: simply resubmit the second request. The
-			// response to the resubmission will be as expected. But there's a caveat: You can't have closed the body o
+			// response to the resubmission will be as expected. But there's a caveat: You can't have closed the body of
 			// the response to the original second request, or read to its end, or the resubmission will also yield a
 			// SignatureDoesNotMatch. For this reason, we have to re-request all 403s. We can't re-request only
 			// SignatureDoesNotMatch responses, because we can only tell whether a given 403 is a SignatureDoesNotMatch
