@@ -111,8 +111,9 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
-			// We would have continued, so don't do anything else here
-			if s1.DetectorType != detectorspb.DetectorType_AWS {
+
+			// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
+			if !s1.Verified && detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
 				continue
 			}
 
@@ -151,7 +152,8 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {
-		return detectors.Result{}
+		s1.VerificationError = err
+		return s1
 	}
 	req.Header.Set("Accept", "application/json")
 
@@ -217,10 +219,6 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			}
 			res.Body.Close()
 		} else {
-			// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
-			if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-				return detectors.Result{}
-			}
 
 			if res.StatusCode == 403 {
 				// Experimentation has indicated that if you make two GetCallerIdentity requests within five seconds
