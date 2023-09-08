@@ -112,14 +112,15 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			s1 := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 
-			// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
-			// If the result is unverified and matches something like a git hash, don't include it in the results.
-			if !s1.Verified && falsePositiveSecretCheck.MatchString(resSecretMatch) {
-				continue
+			if !s1.Verified {
+				// Unverified results that contain common test words are probably not secrets
+				if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+					continue
+				}
+				// Unverified results that look like hashes are probably not secrets
+				if falsePositiveSecretCheck.MatchString(resSecretMatch) {
+					continue
+				}
 			}
 
 			results = append(results, s1)
