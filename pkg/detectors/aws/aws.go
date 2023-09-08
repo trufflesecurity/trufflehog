@@ -104,84 +104,17 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
+		//fmt.Printf("=========== the number of secret matches %d", len(secretMatches))
+
 		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AWS,
-				Raw:          []byte(resIDMatch),
-				Redacted:     resIDMatch,
-				RawV2:        []byte(resIDMatch + resSecretMatch),
-			}
-
-			if verify {
-				// REQUEST VALUES.
-				method := "GET"
-				service := "sts"
-				host := "sts.amazonaws.com"
-				region := "us-east-1"
-				endpoint := "https://sts.amazonaws.com"
-				now := time.Now().UTC()
-				datestamp := now.Format("20060102")
-				amzDate := now.Format("20060102T150405Z0700")
-
-				req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Set("Accept", "application/json")
-
-				// TASK 1: CREATE A CANONICAL REQUEST.
-				// http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-				canonicalURI := "/"
-				canonicalHeaders := "host:" + host + "\n"
-				signedHeaders := "host"
-				algorithm := "AWS4-HMAC-SHA256"
-				credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
-
-				params := req.URL.Query()
-				params.Add("Action", "GetCallerIdentity")
-				params.Add("Version", "2011-06-15")
-				params.Add("X-Amz-Algorithm", algorithm)
-				params.Add("X-Amz-Credential", resIDMatch+"/"+credentialScope)
-				params.Add("X-Amz-Date", amzDate)
-				params.Add("X-Amz-Expires", "30")
-				params.Add("X-Amz-SignedHeaders", signedHeaders)
-
-				canonicalQuerystring := params.Encode()
-				payloadHash := GetHash("") // empty payload
-				canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
-
-				// TASK 2: CREATE THE STRING TO SIGN.
-				stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
-
-				// TASK 3: CALCULATE THE SIGNATURE.
-				// https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
-				hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resSecretMatch)), []byte(datestamp))
-				hash = GetHMAC(hash, []byte(region))
-				hash = GetHMAC(hash, []byte(service))
-				hash = GetHMAC(hash, []byte("aws4_request"))
-
-				signature2 := GetHMAC(hash, []byte(stringToSign)) // Get Signature HMAC SHA256
-				signature := hex.EncodeToString(signature2)
-
-				// TASK 4: ADD SIGNING INFORMATION TO THE REQUEST.
-				params.Add("X-Amz-Signature", signature)
-				req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
-				req.URL.RawQuery = params.Encode()
-
-				client := s.verificationClient
-				if client == nil {
-					client = defaultVerificationClient
-				}
-
-				executeRequest(client, req, &s1, true)
-			}
-
-			if !s1.Verified && detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+			s1 := s.verifyMatch(ctx, resIDMatch, resSecretMatch, 1)
+			// We would have continued, so don't do anything else here
+			if s1.DetectorType != detectorspb.DetectorType_AWS {
 				continue
 			}
 
@@ -191,6 +124,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, s1)
+			//fmt.Printf("%+v\n", results)
 			// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
 			if s1.Verified {
 				break
@@ -198,6 +132,138 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 	return awsCustomCleanResults(results), nil
+}
+
+func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryNumber int) detectors.Result {
+	s1 := detectors.Result{
+		DetectorType: detectorspb.DetectorType_AWS,
+		Raw:          []byte(resIDMatch),
+		Redacted:     resIDMatch,
+		RawV2:        []byte(resIDMatch + resSecretMatch),
+	}
+
+	// REQUEST VALUES.
+	method := "GET"
+	service := "sts"
+	host := "sts.amazonaws.com"
+	region := "us-east-1"
+	endpoint := "https://sts.amazonaws.com"
+	now := time.Now().UTC()
+	datestamp := now.Format("20060102")
+	amzDate := now.Format("20060102T150405Z0700")
+
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
+	if err != nil {
+		return detectors.Result{}
+	}
+	req.Header.Set("Accept", "application/json")
+
+	// TASK 1: CREATE A CANONICAL REQUEST.
+	// http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
+	canonicalURI := "/"
+	canonicalHeaders := "host:" + host + "\n"
+	signedHeaders := "host"
+	algorithm := "AWS4-HMAC-SHA256"
+	credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
+
+	params := req.URL.Query()
+	params.Add("Action", "GetCallerIdentity")
+	params.Add("Version", "2011-06-15")
+	params.Add("X-Amz-Algorithm", algorithm)
+	params.Add("X-Amz-Credential", resIDMatch+"/"+credentialScope)
+	params.Add("X-Amz-Date", amzDate)
+	params.Add("X-Amz-Expires", "30")
+	params.Add("X-Amz-SignedHeaders", signedHeaders)
+
+	canonicalQuerystring := params.Encode()
+	payloadHash := GetHash("") // empty payload
+	canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
+
+	// TASK 2: CREATE THE STRING TO SIGN.
+	stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
+
+	// TASK 3: CALCULATE THE SIGNATURE.
+	// https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
+	hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resSecretMatch)), []byte(datestamp))
+	hash = GetHMAC(hash, []byte(region))
+	hash = GetHMAC(hash, []byte(service))
+	hash = GetHMAC(hash, []byte("aws4_request"))
+
+	signature2 := GetHMAC(hash, []byte(stringToSign)) // Get Signature HMAC SHA256
+	signature := hex.EncodeToString(signature2)
+
+	// TASK 4: ADD SIGNING INFORMATION TO THE REQUEST.
+	params.Add("X-Amz-Signature", signature)
+	req.Header.Add("Content-type", "application/x-www-form-urlencoded; charset=utf-8")
+	req.URL.RawQuery = params.Encode()
+
+	client := s.verificationClient
+	if client == nil {
+		client = defaultVerificationClient
+	}
+
+	res, err := client.Do(req)
+	if err == nil {
+
+		if res.StatusCode >= 200 && res.StatusCode < 300 {
+			identityInfo := identityRes{}
+			err := json.NewDecoder(res.Body).Decode(&identityInfo)
+			if err == nil {
+				s1.Verified = true
+				s1.ExtraData = map[string]string{
+					"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
+					"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
+					"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
+				}
+			} else {
+				s1.VerificationError = err
+			}
+			res.Body.Close()
+		} else {
+			// This function will check false positives for common test words, but also it will make sure the key appears "random" enough to be a real key.
+			if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+				return detectors.Result{}
+			}
+
+			if res.StatusCode == 403 {
+				// There is a really weird case where making a request with an invalid secret will prevent a valid secret
+				// from correctly validating. But only for the first request made with the valid secret.
+				// So if we see a 403, it could be an accidental invalidation.
+				// So resend the request just in case.
+				if retryNumber < 2 {
+					//return s.verifyMatch(ctx, resIDMatch, resSecretMatch, retryNumber + 1)
+					fmt.Printf("======================= retry at retryNumber %d\n", retryNumber)
+					// literally do the same request again
+					//res, _ = client.Do(req)
+					return s.verifyMatch(ctx, resIDMatch, resSecretMatch, 2)
+					//fmt.Printf("=========================  response status %d\n", res.StatusCode)
+				}
+				var body awsErrorResponseBody
+				err = json.NewDecoder(res.Body).Decode(&body)
+				res.Body.Close()
+				if err == nil {
+					// All instances of the code I've seen in the wild are PascalCased but this check is
+					// case-insensitive out of an abundance of caution
+					if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
+						// determinate failure - nothing to do
+					} else {
+						// We see a surprising number of false-negative signature mismatch errors here
+						// (The official SDK somehow elicits even more than just making the request
+						// ourselves)
+						s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
+					}
+				} else {
+					s1.VerificationError = fmt.Errorf("couldn't parse the sts response body (%v)", err)
+				}
+			} else {
+				s1.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+			}
+		}
+	} else {
+		s1.VerificationError = err
+	}
+
+	return s1
 }
 
 func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
@@ -225,54 +291,6 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 		out = append(out, r)
 	}
 	return out
-}
-
-func executeRequest(client *http.Client, req *http.Request, r *detectors.Result, retryOnSignatureMismatch bool) {
-	res, err := client.Do(req)
-	if err == nil {
-		if res.StatusCode >= 200 && res.StatusCode < 300 {
-			identityInfo := identityRes{}
-			err := json.NewDecoder(res.Body).Decode(&identityInfo)
-			if err == nil {
-				r.Verified = true
-				r.ExtraData = map[string]string{
-					"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
-					"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
-					"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
-				}
-			} else {
-				r.VerificationError = err
-			}
-			res.Body.Close()
-		} else if res.StatusCode == 403 {
-			var body awsErrorResponseBody
-			err = json.NewDecoder(res.Body).Decode(&body)
-			res.Body.Close()
-			if err == nil {
-				// All instances of the code I've seen in the wild are PascalCased but this check is
-				// case-insensitive out of an abundance of caution
-				if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
-					// determinate failure - nothing to do
-				} else if strings.EqualFold(body.Error.Code, "SignatureDoesNotMatch") && retryOnSignatureMismatch {
-					// From experimentation, we've inferred this about the SigV4 process: When you make two
-					// GetCallerIdentity calls within five seconds that use the same key ID AWS will expect you to sign
-					// them with the same secret. Within those five seconds, any requests against the original key ID
-					// that are signed with a different secret will be rejected with a signature mismatch error.
-					// However, when this rejection happens, AWS appears to evict whatever it's caching, so repeating
-					// the exact same request will generate the expected result.
-					executeRequest(client, req, r, false)
-				} else {
-					r.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
-				}
-			} else {
-				r.VerificationError = fmt.Errorf("couldn't parse the sts response body (%v)", err)
-			}
-		} else {
-			r.VerificationError = fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
-		}
-	} else {
-		r.VerificationError = err
-	}
 }
 
 type awsError struct {
