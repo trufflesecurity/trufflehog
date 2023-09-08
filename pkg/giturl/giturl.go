@@ -119,7 +119,18 @@ func GenerateLink(repo, commit, file string, line int64) string {
 	case providerBitbucket:
 		return repo[:len(repo)-4] + "/commits/" + commit
 
+	case providerAzure:
+		baseLink := repo + "/commit/" + commit + "/" + file
+		if line > 0 {
+			baseLink += "?line=" + strconv.FormatInt(line, 10)
+		}
+		return baseLink
+
 	case providerGithub, providerGitlab:
+		// If the provider name isn't one of the cloud defaults, it is probably an on-prem github or gitlab.
+		// So do the same thing.
+		fallthrough
+	default:
 		var baseLink string
 		if file == "" {
 			baseLink = repo[:len(repo)-4] + "/commit/" + commit
@@ -130,15 +141,5 @@ func GenerateLink(repo, commit, file string, line int64) string {
 			}
 		}
 		return baseLink
-
-	case providerAzure:
-		baseLink := repo + "/commit/" + commit + "/" + file
-		if line > 0 {
-			baseLink += "?line=" + strconv.FormatInt(line, 10)
-		}
-		return baseLink
-
-	default:
-		return ""
 	}
 }
