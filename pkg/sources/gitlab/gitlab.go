@@ -159,31 +159,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Get all repos if not specified.
 	if len(repos) == 0 {
-		projects, err := s.getAllProjects(ctx, apiClient)
-		if err != nil {
-			return fmt.Errorf("error getting all projects: %v", err)
-		}
-
 		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
 			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
 		})
-
-		// Turn projects into URLs for Git cloner.
-		for _, prj := range projects {
-			if ignoreRepo(prj.PathWithNamespace) {
-				continue
-			}
-
-			// Ensure the urls are valid before adding them to the repo list.
-			_, err := url.Parse(prj.HTTPURLToRepo)
-			if err != nil {
-				fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
-			}
-			repos = append(repos, prj.HTTPURLToRepo)
+		gitlabRepos, err2, done := s.getReposFromGitlab(ctx, apiClient, ignoreRepo)
+		if done {
+			return err2
 		}
-		if len(repos) == 0 {
-			return errors.Errorf("unable to discover any repos")
-		}
+		repos = gitlabRepos
 	}
 
 	s.repos = repos
@@ -376,6 +359,32 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 		projectList = append(projectList, project)
 	}
 	return projectList, nil
+}
+
+func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Client, ignoreRepo func(repo string) bool) ([]string, error, bool) {
+	projects, err := s.getAllProjects(ctx, apiClient)
+	if err != nil {
+		return nil, fmt.Errorf("error getting all projects: %v", err), true
+	}
+
+	// Turn projects into URLs for Git cloner.
+	var repos []string
+	for _, prj := range projects {
+		if ignoreRepo(prj.PathWithNamespace) {
+			continue
+		}
+
+		// Ensure the urls are valid before adding them to the repo list.
+		_, err := url.Parse(prj.HTTPURLToRepo)
+		if err != nil {
+			fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
+		}
+		repos = append(repos, prj.HTTPURLToRepo)
+	}
+	if len(repos) == 0 {
+		return nil, errors.Errorf("unable to discover any repos"), true
+	}
+	return repos, nil, false
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
