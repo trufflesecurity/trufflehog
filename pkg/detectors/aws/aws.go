@@ -223,43 +223,41 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			} else {
 				return false, nil, err
 			}
-		} else {
-			if res.StatusCode == 403 {
-				// Experimentation has indicated that if you make two GetCallerIdentity requests within five seconds
-				// that share a key ID but are signed with different secrets the second one will be rejected with a 403
-				// that carries a SignatureDoesNotMatch code in its body. This happens even if the second ID-secret pair
-				// is valid. Since this is exactly our access pattern, we need to work around it.
-				//
-				// Fortunately, experimentation has also revealed a workaround: simply resubmit the second request. The
-				// response to the resubmission will be as expected. But there's a caveat: You can't have closed the
-				// body of the response to the original second request, or read to its end, or the resubmission will
-				// also yield a SignatureDoesNotMatch. For this reason, we have to re-request all 403s. We can't
-				// re-request only SignatureDoesNotMatch responses, because we can only tell whether a given 403 is a
-				// SignatureDoesNotMatch after decoding its response body, which requires reading the entire response
-				// body, which disables the workaround.
-				//
-				// We are clearly deep in the guts of AWS implementation details here, so this all might change with no
-				// notice. If you're here because something in this detector broke, you have my condolences.
-				if retryOn403 {
-					return s.verifyMatch(ctx, resIDMatch, resSecretMatch, false)
-				}
-				var body awsErrorResponseBody
-				err = json.NewDecoder(res.Body).Decode(&body)
-				res.Body.Close()
-				if err == nil {
-					// All instances of the code I've seen in the wild are PascalCased but this check is
-					// case-insensitive out of an abundance of caution
-					if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
-						return false, nil, nil
-					} else {
-						return false, nil, fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
-					}
+		} else if res.StatusCode == 403 {
+			// Experimentation has indicated that if you make two GetCallerIdentity requests within five seconds that
+			// share a key ID but are signed with different secrets the second one will be rejected with a 403 that
+			// carries a SignatureDoesNotMatch code in its body. This happens even if the second ID-secret pair is
+			// valid. Since this is exactly our access pattern, we need to work around it.
+			//
+			// Fortunately, experimentation has also revealed a workaround: simply resubmit the second request. The
+			// response to the resubmission will be as expected. But there's a caveat: You can't have closed the body o
+			// the response to the original second request, or read to its end, or the resubmission will also yield a
+			// SignatureDoesNotMatch. For this reason, we have to re-request all 403s. We can't re-request only
+			// SignatureDoesNotMatch responses, because we can only tell whether a given 403 is a SignatureDoesNotMatch
+			// after decoding its response body, which requires reading the entire response body, which disables the
+			// workaround.
+			//
+			// We are clearly deep in the guts of AWS implementation details here, so this all might change with no
+			// notice. If you're here because something in this detector broke, you have my condolences.
+			if retryOn403 {
+				return s.verifyMatch(ctx, resIDMatch, resSecretMatch, false)
+			}
+			var body awsErrorResponseBody
+			err = json.NewDecoder(res.Body).Decode(&body)
+			res.Body.Close()
+			if err == nil {
+				// All instances of the code I've seen in the wild are PascalCased but this check is
+				// case-insensitive out of an abundance of caution
+				if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
+					return false, nil, nil
 				} else {
-					return false, nil, fmt.Errorf("couldn't parse the sts response body (%v)", err)
+					return false, nil, fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
 				}
 			} else {
-				return false, nil, fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
+				return false, nil, fmt.Errorf("couldn't parse the sts response body (%v)", err)
 			}
+		} else {
+			return false, nil, fmt.Errorf("request to %v returned unexpected status %d", res.Request.URL, res.StatusCode)
 		}
 	} else {
 		return false, nil, err
