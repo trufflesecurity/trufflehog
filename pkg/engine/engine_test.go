@@ -177,7 +177,7 @@ func BenchmarkSupportsLineNumbersLoop(b *testing.B) {
 	}
 }
 
-// TestEngine_DuplicatSecrets is a test that lists ALL duplicate secrets with the same decoder.
+// TestEngine_DuplicatSecrets is a test that detects ALL duplicate secrets with the same decoder.
 func TestEngine_DuplicatSecrets(t *testing.T) {
 	ctx := context.Background()
 
