@@ -131,7 +131,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return awsCustomCleanResults(results), nil
 }
 
-func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOnSignatureMismatch bool) detectors.Result {
+func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) detectors.Result {
 	s1 := detectors.Result{
 		DetectorType: detectorspb.DetectorType_AWS,
 		Raw:          []byte(resIDMatch),
@@ -238,7 +238,7 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 				//
 				// We are clearly deep in the guts of AWS implementation details here, so this all might change with no
 				// notice. If you're here because something in this detector broke, you have my condolences.
-				if retryOnSignatureMismatch {
+				if retryOn403 {
 					return s.verifyMatch(ctx, resIDMatch, resSecretMatch, false)
 				}
 				var body awsErrorResponseBody
