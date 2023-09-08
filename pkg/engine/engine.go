@@ -98,7 +98,8 @@ func (t *terminationSignal) signalFinish() {
 
 	if t.exitChan != nil {
 		close(t.exitChan)
-		t.exitChan = nil // Set to nil to prevent double close
+		// Setting exitChan to nil to prevent inadvertent double close in future calls.
+		t.exitChan = nil
 	}
 	t.failFastCondition.Signal() // Signal the condition to unblock Finish.
 }
