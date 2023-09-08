@@ -112,7 +112,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
-			s1 := s.verifyMatch(ctx, resIDMatch, resSecretMatch, 1)
+			s1 := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 			// We would have continued, so don't do anything else here
 			if s1.DetectorType != detectorspb.DetectorType_AWS {
 				continue
@@ -134,7 +134,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return awsCustomCleanResults(results), nil
 }
 
-func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryNumber int) detectors.Result {
+func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOnSignatureMismatch bool) detectors.Result {
 	s1 := detectors.Result{
 		DetectorType: detectorspb.DetectorType_AWS,
 		Raw:          []byte(resIDMatch),
@@ -226,17 +226,23 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			}
 
 			if res.StatusCode == 403 {
-				// There is a really weird case where making a request with an invalid secret will prevent a valid secret
-				// from correctly validating. But only for the first request made with the valid secret.
-				// So if we see a 403, it could be an accidental invalidation.
-				// So resend the request just in case.
-				if retryNumber < 2 {
-					//return s.verifyMatch(ctx, resIDMatch, resSecretMatch, retryNumber + 1)
-					fmt.Printf("======================= retry at retryNumber %d\n", retryNumber)
-					// literally do the same request again
-					//res, _ = client.Do(req)
-					return s.verifyMatch(ctx, resIDMatch, resSecretMatch, 2)
-					//fmt.Printf("=========================  response status %d\n", res.StatusCode)
+				// Experimentation has indicated that if you make two GetCallerIdentity requests within five seconds
+				// that share a key ID but are signed with different secrets the second one will be rejected with a 403
+				// that carries a SignatureDoesNotMatch code in its body. This happens even if the second ID-secret pair
+				// is valid. Since this is exactly our access pattern, we need to work around it.
+				//
+				// Fortunately, experimentation has also revealed a workaround: simply resubmit the second request. The
+				// response to the resubmission will be as expected. But there's a caveat: You can't have closed the
+				// body of the response to the original second request, or read to its end, or the resubmission will
+				// also yield a SignatureDoesNotMatch. For this reason, we have to re-request all 403s. We can't
+				// re-request only SignatureDoesNotMatch responses, because we can only tell whether a given 403 is a
+				// SignatureDoesNotMatch after decoding its response body, which requires reading the entire response
+				// body, which disables the workaround.
+				//
+				// We are clearly deep in the guts of AWS implementation details here, so this all might change with no
+				// notice. If you're here because something in this detector broke, you have my condolences.
+				if retryOnSignatureMismatch {
+					return s.verifyMatch(ctx, resIDMatch, resSecretMatch, false)
 				}
 				var body awsErrorResponseBody
 				err = json.NewDecoder(res.Body).Decode(&body)
@@ -247,9 +253,6 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 					if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
 						// determinate failure - nothing to do
 					} else {
-						// We see a surprising number of false-negative signature mismatch errors here
-						// (The official SDK somehow elicits even more than just making the request
-						// ourselves)
 						s1.VerificationError = fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
 					}
 				} else {
