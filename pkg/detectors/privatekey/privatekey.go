@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"golang.org/x/crypto/ssh"
 )
 
 type Scanner struct {
@@ -53,18 +55,61 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			Redacted:     token[0:64],
 		}
 
-		fingerprint, err := FingerprintPEMKey([]byte(token))
+		var passphrase string
+		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
+		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
+			parsedKey, passphrase, err = crack([]byte(token))
+			if err != nil {
+				secret.VerificationError = err
+				continue
+			}
+		} else if err != nil {
+			// couldn't parse key, probably invalid
+			continue
+		}
+
+		fingerprint, err := FingerprintPEMKey(parsedKey)
 		if err != nil {
 			continue
 		}
 
 		if verify {
+			secret.ExtraData = make(map[string]string)
+
+			if passphrase != "" {
+				secret.ExtraData["passphrase"] = passphrase
+			}
+
 			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
 			if err == nil {
-				secret.StructuredData = data
 				if data != nil {
 					secret.Verified = true
+					secret.ExtraData["certificate_urls"] = strings.Join(data.CertificateURLs, ", ")
 				}
+			} else {
+				secret.VerificationError = err
+			}
+
+			user, err := verifyGitHubUser(parsedKey)
+			if user != nil {
+				secret.Verified = true
+				secret.ExtraData["github_user"] = *user
+			}
+			if err != errPermissionDenied {
+				secret.VerificationError = err
+			}
+
+			user, err = verifyGitLabUser(parsedKey)
+			if user != nil {
+				secret.Verified = true
+				secret.ExtraData["gitlab_user"] = *user
+			}
+			if err != errPermissionDenied {
+				secret.VerificationError = err
+			}
+
+			if len(secret.ExtraData) == 0 {
+				secret.ExtraData = nil
 			}
 		}
 
@@ -74,7 +119,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	return results, nil
 }
 
-func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (data *detectorspb.StructuredData, err error) {
+type result struct {
+	CertificateURLs []string
+	GitHubUsername  string
+}
+
+func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (data *result, err error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
 	if err != nil {
 		return
@@ -100,33 +150,10 @@ func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (d
 			continue
 		}
 		if data == nil {
-			data = &detectorspb.StructuredData{}
+			data = &result{}
 		}
-		if data.TlsPrivateKey == nil {
-			data.TlsPrivateKey = make([]*detectorspb.TlsPrivateKey, 0)
-		}
-		data.TlsPrivateKey = append(data.TlsPrivateKey, &detectorspb.TlsPrivateKey{
-			CertificateFingerprint: r.CertificateFingerprint,
-			ExpirationTimestamp:    r.ExpirationTimestamp.Unix(),
-			VerificationUrl:        fmt.Sprintf("https://crt.sh/?q=%s", r.CertificateFingerprint),
-		})
+		data.CertificateURLs = append(data.CertificateURLs, fmt.Sprintf("https://crt.sh/?q=%s", r.CertificateFingerprint))
 		seen[r.CertificateFingerprint] = struct{}{}
-	}
-
-	for _, r := range results.GitHubSSHResults {
-		if _, ok := seen[r.Username]; ok {
-			continue
-		}
-		if data == nil {
-			data = &detectorspb.StructuredData{}
-		}
-		if data.GithubSshKey == nil {
-			data.GithubSshKey = make([]*detectorspb.GitHubSSHKey, 0)
-		}
-		data.GithubSshKey = append(data.GithubSshKey, &detectorspb.GitHubSSHKey{
-			User: r.Username,
-		})
-		seen[r.Username] = struct{}{}
 	}
 
 	return

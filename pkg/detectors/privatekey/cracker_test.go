@@ -68,10 +68,14 @@ func Test_crack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := crack(tt.in)
+			_, passphrase, err := crack(tt.in)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("crack() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+
+			if passphrase != string(testEncryptedKeyCorrectPassword) {
+				t.Errorf("crack() passphrase = %v, want %v", passphrase, string(testEncryptedKeyCorrectPassword))
 			}
 		})
 	}
