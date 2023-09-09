@@ -26,7 +26,7 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 	}
 	secretTLS := testSecrets.MustGetField("PRIVATEKEY_TLS")
 	secretGitHub := testSecrets.MustGetField("PRIVATEKEY_GITHUB")
-	// secretGitHubEncrypted := testSecrets.MustGetField("PRIVATEKEY_GITHUB_ENCRYPTED")
+	secretGitHubEncrypted := testSecrets.MustGetField("PRIVATEKEY_GITHUB_ENCRYPTED")
 	secretInactive := testSecrets.MustGetField("PRIVATEKEY_UNVERIFIED")
 
 	type args struct {
@@ -104,27 +104,28 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		//// TODO: This test is not passing right now, but it should be.
-		// {
-		// 	name: "found encrypted GitHub SSH private key, verified",
-		// 	s:    Scanner{},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(secretGitHubEncrypted),
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_PrivateKey,
-		// 			Verified:     true,
-		// 			Redacted:     "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFl",
-		// 			ExtraData: map[string]string{
-		// 				"github_user": "sirdetectsalot",
-		// 			},
-		// 		},
-		// 	},
-		// 	wantErr: false,
-		// },
+		{
+			name: "found encrypted GitHub SSH private key, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(secretGitHubEncrypted),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_PrivateKey,
+					Verified:     true,
+					Redacted:     "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFl",
+					ExtraData: map[string]string{
+						"github_user":                   "sirdetectsalot",
+						"encrypted":                     "true",
+						"cracked_encryption_passphrase": "true",
+					},
+				},
+			},
+			wantErr: false,
+		},
 		{
 			name: "not found",
 			s:    Scanner{},

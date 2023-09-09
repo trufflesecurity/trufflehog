@@ -55,13 +55,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			Redacted:     token[0:64],
 		}
 
+		secret.ExtraData = make(map[string]string)
+
 		var passphrase string
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
 		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
+			secret.ExtraData["encrypted"] = "true"
 			parsedKey, passphrase, err = crack([]byte(token))
 			if err != nil {
 				secret.VerificationError = err
 				continue
+			}
+			if passphrase != "" {
+				secret.ExtraData["cracked_encryption_passphrase"] = "true"
 			}
 		} else if err != nil {
 			// couldn't parse key, probably invalid
@@ -74,12 +80,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
-			secret.ExtraData = make(map[string]string)
-
-			if passphrase != "" {
-				secret.ExtraData["passphrase"] = passphrase
-			}
-
 			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
 			if err == nil {
 				if data != nil {
@@ -107,10 +107,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			if err != errPermissionDenied {
 				secret.VerificationError = err
 			}
+		}
 
-			if len(secret.ExtraData) == 0 {
-				secret.ExtraData = nil
-			}
+		if len(secret.ExtraData) == 0 {
+			secret.ExtraData = nil
 		}
 
 		results = append(results, secret)
