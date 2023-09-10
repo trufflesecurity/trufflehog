@@ -6,10 +6,11 @@ package slackwebhook
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -120,6 +121,23 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
+		{
+			name: "found, account disabled",
+			s:    Scanner{client: common.ConstantResponseHttpClient(400, disabledAccountResponse)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -143,6 +161,8 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 		})
 	}
 }
+
+const disabledAccountResponse = `missing_text_or_fallback_or_attachments`
 
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
