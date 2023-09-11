@@ -324,6 +324,7 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 	chunkSkel := &sources.Chunk{
 		SourceName: s.name,
 		SourceType: s.Type(),
+		JobID:      s.JobID(),
 		SourceID:   s.sourceId,
 		Verify:     s.verify,
 		SourceMetadata: &source_metadatapb.MetaData{

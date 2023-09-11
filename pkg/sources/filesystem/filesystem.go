@@ -161,6 +161,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		SourceType: s.Type(),
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Filesystem{
 				Filesystem: &source_metadatapb.Filesystem{
@@ -191,6 +192,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 			SourceType: s.Type(),
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
 			Data:       data.Bytes(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Filesystem{
