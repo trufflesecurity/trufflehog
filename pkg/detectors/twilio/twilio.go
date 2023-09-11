@@ -2,6 +2,7 @@ package twilio
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 
@@ -10,12 +11,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	defaultClient = common.SaneHttpClient()
 	identifierPat = regexp.MustCompile(`(?i)sid.{0,20}AC[0-9a-f]{32}`) // Should we have this? Seems restrictive.
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
@@ -51,6 +55,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
+				client = s.client
+				if client == nil {
+					client = defaultClient
+				}
+
 				req, err := http.NewRequestWithContext(
 					ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
 				if err != nil {
@@ -65,7 +74,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
+					} else if res.StatusCode == 401 || res.StatusCode == 403 {
+						// The secret is determinately not verified (nothing to do)
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
+				} else {
+					s1.VerificationError = err
 				}
 			}
 
