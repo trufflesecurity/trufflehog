@@ -122,6 +122,9 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	if err = json.Unmarshal(bytes, &resp); err != nil {
 		return false, err
 	}
+	if len(resp) == 0 {
+		return false, fmt.Errorf("unexpected response body: %s", string(bytes))
+	}
 
 	return isVerified, err
 }

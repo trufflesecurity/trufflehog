@@ -160,6 +160,24 @@ func TestGenerateLink(t *testing.T) {
 			},
 			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
 		},
+		{
+			name: "Unknown provider on-prem instance",
+			args: args{
+				repo:   "https://onprem.customdomain.com/org/repo.git",
+				commit: "xyz123",
+				file:   "main.go",
+				line:   int64(30),
+			},
+			want: "https://onprem.customdomain.com/org/repo/blob/xyz123/main.go#L30",
+		},
+		{
+			name: "Unknown provider on-prem instance - no file",
+			args: args{
+				repo:   "https://onprem.customdomain.com/org/repo.git",
+				commit: "xyz123",
+			},
+			want: "https://onprem.customdomain.com/org/repo/commit/xyz123",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -565,11 +565,18 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
 
+		// Dedupe results by comparing the detector type, raw result, and source metadata.
+		// We want to avoid duplicate results with different decoder types, but we also
+		// want to include duplicate results with the same decoder type.
+		// Duplicate results with the same decoder type SHOULD have their own entry in the
+		// results list, this would happen if the same secret is found multiple times.
 		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
-		if _, ok := e.dedupeCache.Get(key); ok {
-			continue
+		if val, ok := e.dedupeCache.Get(key); ok {
+			if res, ok := val.(detectorspb.DecoderType); ok && res != r.DecoderType {
+				continue
+			}
 		}
-		e.dedupeCache.Add(key, struct{}{})
+		e.dedupeCache.Add(key, r.DecoderType)
 
 		if r.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)

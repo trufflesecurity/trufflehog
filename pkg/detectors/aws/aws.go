@@ -208,11 +208,10 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 
 	res, err := client.Do(req)
 	if err == nil {
-
+		defer res.Body.Close()
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
 			identityInfo := identityRes{}
 			err := json.NewDecoder(res.Body).Decode(&identityInfo)
-			res.Body.Close()
 			if err == nil {
 				extraData := map[string]string{
 					"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
@@ -244,7 +243,6 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			}
 			var body awsErrorResponseBody
 			err = json.NewDecoder(res.Body).Decode(&body)
-			res.Body.Close()
 			if err == nil {
 				// All instances of the code I've seen in the wild are PascalCased but this check is
 				// case-insensitive out of an abundance of caution
