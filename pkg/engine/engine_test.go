@@ -2,8 +2,13 @@ package engine
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -170,4 +175,33 @@ func BenchmarkSupportsLineNumbersLoop(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = SupportsLineNumbers(sourceType)
 	}
+}
+
+// TestEngine_DuplicatSecrets is a test that detects ALL duplicate secrets with the same decoder.
+func TestEngine_DuplicatSecrets(t *testing.T) {
+	ctx := context.Background()
+
+	absPath, err := filepath.Abs("./testdata")
+	assert.Nil(t, err)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(true, DefaultDetectors()...),
+		WithPrinter(new(discardPrinter)),
+	)
+	assert.Nil(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	// Wait for all the chunks to be processed.
+	assert.Nil(t, e.Finish(ctx))
+	want := uint64(5)
+	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
