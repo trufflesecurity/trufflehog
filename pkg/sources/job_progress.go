@@ -71,11 +71,11 @@ func (r *JobProgressRef) Done() <-chan struct{} {
 // CancelRun requests that the job this is referencing is cancelled and stops
 // running. This method will have no effect if the job does not allow
 // cancellation.
-func (r *JobProgressRef) CancelRun() {
+func (r *JobProgressRef) CancelRun(cause error) {
 	if r.jobProgress == nil || r.jobProgress.jobCancel == nil {
 		return
 	}
-	r.jobProgress.jobCancel()
+	r.jobProgress.jobCancel(cause)
 }
 
 // Fatal is a wrapper around error to differentiate non-fatal errors from fatal
@@ -108,7 +108,7 @@ type JobProgress struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	// Requests to cancel the job.
-	jobCancel context.CancelFunc
+	jobCancel context.CancelCauseFunc
 	// Metrics.
 	metrics     JobProgressMetrics
 	metricsLock sync.Mutex
@@ -150,7 +150,7 @@ func WithHooks(hooks ...JobProgressHook) func(*JobProgress) {
 }
 
 // WithCancel allows cancelling the job by the JobProgressRef.
-func WithCancel(cancel context.CancelFunc) func(*JobProgress) {
+func WithCancel(cancel context.CancelCauseFunc) func(*JobProgress) {
 	return func(jp *JobProgress) { jp.jobCancel = cancel }
 }
 

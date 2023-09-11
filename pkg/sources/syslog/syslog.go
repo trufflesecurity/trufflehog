@@ -272,6 +272,7 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
 			SourceType:     s.syslog.sourceType,
+			JobID:          s.JobID(),
 			SourceMetadata: metadata,
 			Data:           input,
 			Verify:         s.verify,
@@ -313,6 +314,7 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
+			JobID:          s.JobID(),
 			SourceType:     s.syslog.sourceType,
 			SourceMetadata: metadata,
 			Data:           input,

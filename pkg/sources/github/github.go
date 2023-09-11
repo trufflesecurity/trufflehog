@@ -149,14 +149,16 @@ func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) 
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			s.log.V(1).Info("invalid include glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			continue
 		}
 		includeGlobs = append(includeGlobs, g)
 	}
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			s.log.V(1).Info("invalid exclude glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
 	}
@@ -1223,6 +1225,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, 
 		chunk := &sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
 			SourceType: s.Type(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
@@ -1256,6 +1259,7 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -1287,6 +1291,7 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
