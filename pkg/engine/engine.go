@@ -51,6 +51,53 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
+// terminationSignal provides a mechanism to safely signal a termination
+// event across different goroutines. It uses a combination of a condition variable
+// and a mutex to enable safe signaling and waiting, ensuring that the signaling
+// is consistent and that there are no race conditions when checking or updating
+// the status of the termination.
+type terminationSignal struct {
+	// isTerminated indicates the signal state (true if the engine is terminated).
+	isTerminated bool
+	// isFailFast indicates if the engine is in fail-fast mode.
+	isFailFast bool
+	// mutex is used to protect access to isFailFast and to synchronize
+	// the condition variable.
+	mutex sync.Mutex
+	// failFastCondition is a condition variable that's signaled when
+	// a fail-fast event occurs. It's used in Finish to wait for or
+	// react to this signal.
+	failFastCondition *sync.Cond
+}
+
+// newTerminationSignal initializes a new terminationSignal.
+// The failFast argument determines the initial state.
+func newTerminationSignal(failFast bool) *terminationSignal {
+	ts := &terminationSignal{isFailFast: failFast}
+	// Initialize the condition variable with the mutex.
+	ts.failFastCondition = sync.NewCond(&ts.mutex)
+	return ts
+}
+
+// signalFinish signals that the engine has finished its work.
+// It uses the condition variable to notify any waiting goroutines
+// (e.g., the Finish method).
+func (t *terminationSignal) signalFinish() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.isTerminated = true
+
+	t.failFastCondition.Signal() // Signal the condition to unblock Finish.
+}
+
+func (t *terminationSignal) wait() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	for !t.isTerminated {
+		t.failFastCondition.Wait()
+	}
+}
+
 type Engine struct {
 	// CLI flags.
 	concurrency uint8
@@ -74,6 +121,11 @@ type Engine struct {
 	workersWg            sync.WaitGroup
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
+	// termSignal is used to signal the engine to terminate.
+	// It is used to implement the fail-fast feature,
+	// where the engine will terminate scanning as soon as
+	// the first potential secret is detected.
+	termSignal *terminationSignal
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -166,6 +218,19 @@ func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption 
 func WithPrinter(printer Printer) EngineOption {
 	return func(e *Engine) {
 		e.printer = printer
+	}
+}
+
+// WithFailFast returns an EngineOption that configures the engine's termination behavior.
+// If 'failFast' is enabled, the engine will terminate scanning upon detecting the first potential secret.
+// This mode is valuable in contexts like CI/CD pipelines or preliminary scans where
+// immediate feedback is more important than a comprehensive review. In the non-failFast mode,
+// the engine continues its operation without waiting for a result.
+// The boolean parameter 'failFast' dictates the termination behavior.
+func WithFailFast(failFast bool) EngineOption {
+	return func(e *Engine) {
+		// Configure the termination signal with the desired mode (failFast or not).
+		e.termSignal = newTerminationSignal(failFast)
 	}
 }
 
@@ -276,6 +341,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		dedupeCache:          cache,
 		printer:              new(output.PlainPrinter), // default printer
 		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
+		termSignal:           &terminationSignal{},
 	}
 
 	for _, option := range options {
@@ -367,22 +433,15 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		}()
 	}
 
-	// We want 1/4th of the notifier workers as the number of scanner workers.
-	const notifierWorkerRatio = 4
-	maxNotifierWorkers := 1
-	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
-		maxNotifierWorkers = int(numWorkers)
-	}
-	ctx.Logger().V(2).Info("starting notifier workers", "count", maxNotifierWorkers)
-	for worker := 0; worker < maxNotifierWorkers; worker++ {
-		e.WgNotifier.Add(1)
-		go func() {
-			ctx := context.WithValue(ctx, "notifier_worker_id", common.RandomID(5))
-			defer common.Recover(ctx)
-			defer e.WgNotifier.Done()
-			e.notifyResults(ctx)
-		}()
-	}
+	// We want only one notifier worker.
+	ctx.Logger().V(2).Info("starting notifier worker")
+	e.WgNotifier.Add(1)
+	go func() {
+		ctx := context.WithValue(ctx, "notifier_worker_id", common.RandomID(5))
+		defer common.Recover(ctx)
+		defer e.WgNotifier.Done()
+		e.notifyResults(ctx)
+	}()
 
 	return e, nil
 }
@@ -392,6 +451,13 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 // more sources may be scanned by the engine.
 func (e *Engine) Finish(ctx context.Context) error {
 	defer common.RecoverWithExit(ctx)
+
+	// Handle the fail-fast termination signal.
+	if e.termSignal.isFailFast {
+		e.termSignal.wait()
+		return fmt.Errorf("terminated early due to fail-fast flag after printing the first result")
+	}
+
 	// Wait for the sources to finish putting chunks onto the chunks channel.
 	err := e.sourceManager.Wait()
 
@@ -405,6 +471,15 @@ func (e *Engine) Finish(ctx context.Context) error {
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
 	return err
+}
+
+// IsTerminated checks if the engine received a termination signal.
+// This can be used, for example, to determine if the engine
+// terminated early due to the fail-fast feature being activated.
+func (e *Engine) IsTerminated() bool {
+	e.termSignal.mutex.Lock()
+	defer e.termSignal.mutex.Unlock()
+	return e.termSignal.isTerminated
 }
 
 func (e *Engine) ChunksChan() <-chan *sources.Chunk {
@@ -559,27 +634,51 @@ func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 }
 
 func (e *Engine) notifyResults(ctx context.Context) {
+	if e.termSignal.isFailFast {
+		e.processResultsWithFailFast(ctx)
+	} else {
+		e.processRegularResults(ctx)
+	}
+}
+
+func (e *Engine) processResultsWithFailFast(ctx context.Context) {
 	for r := range e.ResultsChan() {
-		if e.onlyVerified && !r.Verified {
-			continue
-		}
-		atomic.AddUint32(&e.numFoundResults, 1)
+		e.processSingleResult(ctx, &r)
 
-		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
-		if _, ok := e.dedupeCache.Get(key); ok {
-			continue
-		}
-		e.dedupeCache.Add(key, struct{}{})
+		// If fail-fast is enabled, signal finish after processing the first result.
+		e.termSignal.signalFinish()
+		return
+	}
+}
 
-		if r.Verified {
-			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
-		} else {
-			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
-		}
+func (e *Engine) processRegularResults(ctx context.Context) {
+	for r := range e.ResultsChan() {
+		e.processSingleResult(ctx, &r)
+	}
+}
 
-		if err := e.printer.Print(ctx, &r); err != nil {
-			ctx.Logger().Error(err, "error printing result")
-		}
+func (e *Engine) processSingleResult(ctx context.Context, r *detectors.ResultWithMetadata) {
+	if e.onlyVerified && !r.Verified {
+		return
+	}
+
+	atomic.AddUint32(&e.numFoundResults, 1)
+
+	key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
+	if _, ok := e.dedupeCache.Get(key); ok {
+		return
+	}
+
+	e.dedupeCache.Add(key, struct{}{})
+
+	if r.Verified {
+		atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
+	} else {
+		atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
+	}
+
+	if err := e.printer.Print(ctx, r); err != nil {
+		ctx.Logger().Error(err, "error printing result")
 	}
 }
 

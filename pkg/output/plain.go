@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/fatih/color"
 	"golang.org/x/text/cases"
@@ -23,7 +22,7 @@ var (
 )
 
 // PlainPrinter is a printer that prints results in plain text format.
-type PlainPrinter struct{ mu sync.Mutex }
+type PlainPrinter struct{}
 
 func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
@@ -40,8 +39,6 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	}
 
 	printer := greenPrinter
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	if out.Verified {
 		yellowPrinter.Print("Found verified result 🐷🔑\n")
