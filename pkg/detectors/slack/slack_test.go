@@ -6,10 +6,11 @@ package slack
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -73,6 +74,23 @@ func TestSlack_FromChunk(t *testing.T) {
 		{
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
+				verify: true,
+			},
+			wantResults: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Slack,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "unexpected auth response",
+			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"ok": false, "error": "unexpected_error"}`)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
