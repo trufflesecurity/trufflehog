@@ -58,6 +58,40 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
+			name: "found, verified, 400 no_text",
+			s:    Scanner{client: common.ConstantResponseHttpClient(400, "no_text")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, verified, 400 missing_text",
+			s:    Scanner{client: common.ConstantResponseHttpClient(400, "missing_text")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
