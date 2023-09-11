@@ -219,17 +219,24 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return errs
 	}
 
-	_ = buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
+	ignoreProject := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
 		msg := fmt.Sprintf("could not compile ignore repo pattern %q", pattern)
 		errs = append(errs, errors.WrapPrefix(err, msg, 0))
 	})
 
-	_, err = s.getAllProjects(ctx, apiClient)
+	projects, err := s.getAllProjects(ctx, apiClient)
 	if err != nil {
 		errs = append(errs, err)
+		return errs
 	}
 
-	return errs
+	for _, p := range projects {
+		if !ignoreProject(p.PathWithNamespace) {
+			return errs
+		}
+	}
+
+	return append(errs, fmt.Errorf("ignore patterns excluded all projects"))
 }
 
 func (s *Source) newClient() (*gitlab.Client, error) {

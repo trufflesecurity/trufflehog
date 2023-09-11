@@ -286,6 +286,18 @@ func TestSource_Validate(t *testing.T) {
 			},
 			wantErrCount: 2,
 		},
+		{
+			name: "ignore globs exclude all repos",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IgnoreRepos: []string{
+					"*",
+				},
+			},
+			wantErrCount: 1,
+		},
 	}
 
 	for _, tt := range tests {
