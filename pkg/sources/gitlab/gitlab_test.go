@@ -243,6 +243,22 @@ func TestSource_Validate(t *testing.T) {
 			wantErrCount: 1,
 		},
 		{
+			name: "repositories and ignore globs both configured",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy", // valid
+				},
+				IgnoreRepos: []string{
+					"tes1188/*-gitlab",
+					"[", // glob doesn't compile, but this won't be checked
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
 			name: "could not compile ignore glob(s)",
 			connection: &sourcespb.GitLab{
 				Credential: &sourcespb.GitLab_Token{

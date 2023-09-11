@@ -206,9 +206,12 @@ func (s *Source) Validate(ctx context.Context) []error {
 				errs = append(errs, err)
 			}
 		}
+
+		if len(s.ignoreRepos) > 0 {
+			errs = append(errs, fmt.Errorf("both repositories and ignore patterns were explicitly configured; ignore patterns will not be used"))
+		}
 	}
 
-	// todo: sort out whether to check ignore globs if repos are explicitly configured
 	if len(errs) > 0 {
 		return errs
 	}
