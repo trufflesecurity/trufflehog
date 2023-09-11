@@ -1,6 +1,7 @@
 package slackwebhook
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -69,11 +70,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				body := string(bodyBytes)
 
 				defer res.Body.Close()
 
-				if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
+				if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (bytes.Equal(bodyBytes, []byte("no_text")) || bytes.Equal(bodyBytes, []byte("missing_text")))) {
 					s1.Verified = true
 				} else if res.StatusCode == 401 || res.StatusCode == 403 {
 					// The secret is determinately not verified (nothing to do)
