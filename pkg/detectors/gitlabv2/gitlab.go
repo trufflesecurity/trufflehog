@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		secret := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitlab,
 			Raw:          []byte(match[1]),
 		}
@@ -76,27 +76,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// 401 is bad key
 					switch res.StatusCode {
 					case http.StatusOK:
-						secret.Verified = true
+						s1.Verified = true
 					case http.StatusForbidden:
 						// Good key but not the right scope
-						secret.Verified = true
+						s1.Verified = true
 					case http.StatusUnauthorized:
 						// Nothing to do; zero values are the ones we want
 					default:
-						secret.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
 				} else {
-					secret.VerificationError = err
+					s1.VerificationError = err
 				}
 			}
 
 		}
 
-		if !secret.Verified && detectors.IsKnownFalsePositive(string(secret.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
-		results = append(results, secret)
+		results = append(results, s1)
 	}
 
 	return
