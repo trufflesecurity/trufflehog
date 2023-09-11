@@ -209,7 +209,7 @@ const (
   }
 ]
 `
-	reponseAccountDeactivated = `{"datail": "Authentication credentials were not provided"}`
+	reponseAccountDeactivated = `{"detail": "Authentication credentials were not provided"}`
 	responseEnmpty            = `[]`
 )
 
