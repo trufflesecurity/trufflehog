@@ -11,6 +11,7 @@ require (
 	cloud.google.com/go/secretmanager v1.11.1
 	cloud.google.com/go/storage v1.31.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
+	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.17.0
 	github.com/aws/aws-sdk-go v1.44.83
@@ -203,7 +204,7 @@ require (
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
+	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/muesli/ansi v0.0.0-20211031195517-c9f0611b6c70 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
