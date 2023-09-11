@@ -1,9 +1,8 @@
-package slackwebhook
+package sourcegraph
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -23,16 +22,16 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`)
+	keyPat = regexp.MustCompile(`\b(sgp_[a-f0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"hooks.slack.com"}
+	return []string{"sgp_"}
 }
 
-// FromData will find and optionally verify SlackWebhook secrets in a given set of bytes.
+// FromData will find and optionally verify Sourcegraph secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -45,37 +44,31 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_SlackWebhook,
+			DetectorType: detectorspb.DetectorType_Sourcegraph,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-
 			client := s.client
 			if client == nil {
 				client = defaultClient
 			}
+			payload := strings.NewReader("{\"query\": \"query { currentUser { username } }\"}")
 
-			payload := strings.NewReader(`{"text": ""}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://sourcegraph.com/.api/graphql", payload)
+			req.Header.Add("Authorization", "token "+resMatch)
+			req.Header.Add("Content-Type", "application/json")
+
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
 
-				defer res.Body.Close()
-
-				if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else if res.StatusCode == 401 || res.StatusCode == 403 {
+				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
 					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
@@ -85,6 +78,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
+		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
+		}
+
 		results = append(results, s1)
 	}
 
@@ -92,5 +90,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_SlackWebhook
+	return detectorspb.DetectorType_Sourcegraph
 }

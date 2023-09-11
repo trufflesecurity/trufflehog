@@ -148,7 +148,7 @@ func TestGenerateLink(t *testing.T) {
 				commit: "abcdef",
 				file:   "main.go",
 			},
-			want: "https://dev.azure.com/org/project/_git/repo?path=main.go&version=GBabcdef",
+			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go",
 		},
 		{
 			name: "Azure link gen with line",
@@ -158,7 +158,7 @@ func TestGenerateLink(t *testing.T) {
 				file:   "main.go",
 				line:   int64(20),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo?path=main.go&version=GBabcdef&line=20",
+			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
 		},
 	}
 	for _, tt := range tests {

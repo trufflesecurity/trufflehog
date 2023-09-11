@@ -43,8 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	instanceMatches := instancePat.FindAllStringSubmatch(dataStr, -1)
 	tokenMatches := accessTokenPat.FindAllStringSubmatch(dataStr, -1)
 
-	fmt.Printf("instanceMatches: %v\n", instanceMatches)
-
 	for _, instance := range instanceMatches {
 		if len(instance) != 1 {
 			continue
