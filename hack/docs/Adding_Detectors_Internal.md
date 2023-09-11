@@ -44,6 +44,18 @@ If you think that something should be included outside of these guidelines, plea
 - Go 1.17+
 - Make
 
+### Adding New Token Formats to an Existing Scanner
+
+In some instances, services will update their token format, requiring a new regex to properly detect secrets in addition to supporting the previous token format. Accomodating this can be done without adding a net-new detector. [We provide a `Versioner` interface](https://github.com/trufflesecurity/trufflehog/blob/e18cfd5e0af1469a9f05b8d5732bcc94c39da49c/pkg/detectors/detectors.go#L30) that can be implemented.
+
+1. Create a copy of the package and append `_v2` to the package and file names. Ex: `<packagename>/` -> `<packagename>_v2`, `<packagename>.go` -> `<packagename>_v2.go`
+
+Note: Be sure to update the tests to reference the new secret values in GSM, or the tests will fail.
+
+2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github_old/github_old.go#L22)
+
+3. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
+
 ### Creating a new Secret Scanner
 
 1. Identify the Secret Detector name from the [/proto/detectors.proto](/proto/detectors.proto) `DetectorType` enum.
@@ -96,7 +108,7 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
    Note: `/tmp/s` is a valid path on Linux. You will need to change that for Windows or OSX, otherwise you will see an error. On Windows you will also need to install [WSL](https://docs.microsoft.com/en-us/windows/wsl/install).
 
    ```bash
-   gcloud secrets versions access --project trufflehog-testing --secret detectors3 latest > /tmp/s
+   gcloud secrets versions access --project trufflehog-testing --secret detectors5 latest > /tmp/s
    ```
 
 2. Add the secret that you need for testing.
@@ -113,8 +125,9 @@ Do not embed test credentials in the test code. Instead, use GCP Secrets Manager
 3. Update the secret version with your modification.
 
    ```bash
-   gcloud secrets versions add --project trufflehog-testing detectors3 --data-file /tmp/s
+   gcloud secrets versions add --project trufflehog-testing detectors5 --data-file /tmp/s
    ```
+   Note: We increment the detectors file name `detectors(n+1)` once the previous one exceeds the max size allowed by GSM (65kb).
 
 4. Access the secret value as shown in the [example code](pkg/detectors/heroku/heroku_test.go).
 

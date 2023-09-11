@@ -29,6 +29,8 @@ var (
 	maxDepth   = 5
 	maxSize    = 250 * 1024 * 1024 // 20MB
 	maxTimeout = time.Duration(30) * time.Second
+
+	defaultBufferSize = 512
 )
 
 // Ensure the Archive satisfies the interfaces at compile time.
@@ -62,7 +64,7 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 
 // FromFile extracts the files from an archive.
 func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []byte {
-	archiveChan := make(chan []byte, 512)
+	archiveChan := make(chan []byte, defaultBufferSize)
 	go func() {
 		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
 		logger := logContext.AddLogger(ctx).Logger()
@@ -183,29 +185,28 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 			logger.Error(err, "Panic occurred when reading archive")
 		}
 	}()
-	fileContent := bytes.Buffer{}
-	logger.V(5).Info("Remaining buffer capacity", "bytes", maxSize-a.size)
-	for i := 0; i <= maxSize/512; i++ {
-		if common.IsDone(ctx) {
-			return nil, ctx.Err()
-		}
-		fileChunk := make([]byte, 512)
-		bRead, err := reader.Read(fileChunk)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return []byte{}, err
-		}
-		a.size += bRead
-		if len(fileChunk) > 0 {
-			fileContent.Write(fileChunk[0:bRead])
-		}
-		if bRead < 512 {
-			return fileContent.Bytes(), nil
-		}
-		if a.size >= maxSize && bRead == 512 {
-			logger.V(2).Info("Max archive size reached.")
-			return fileContent.Bytes(), nil
-		}
+
+	if common.IsDone(ctx) {
+		return nil, ctx.Err()
 	}
+
+	var fileContent bytes.Buffer
+	// Create a limited reader to ensure we don't read more than the max size.
+	lr := io.LimitReader(reader, int64(maxSize))
+
+	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
+	// for the method, due to the internal implementation of io.CopyBuffer, when
+	// *bytes.Buffer implements io.WriterTo or io.ReaderFrom, the provided buf
+	// is simply ignored. Thus, we can pass nil for the buf parameter.
+	_, err = io.CopyBuffer(&fileContent, lr, nil)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+
+	if fileContent.Len() == maxSize {
+		logger.V(2).Info("Max archive size reached.")
+	}
+
 	return fileContent.Bytes(), nil
 }
 

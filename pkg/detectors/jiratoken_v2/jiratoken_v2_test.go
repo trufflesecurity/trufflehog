@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package jiratoken
+package jiratoken_v2
 
 import (
 	"context"
@@ -23,10 +23,10 @@ func TestJiraToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	token := testSecrets.MustGetField("JIRA_TOKEN")
-	inactiveToken := testSecrets.MustGetField("JIRA_INACTIVE")
-	email := testSecrets.MustGetField("JIRA_EMAIL")
-	domain := testSecrets.MustGetField("JIRA_DOMAIN")
+	token := testSecrets.MustGetField("JIRA_V2_TOKEN")
+	inactiveToken := testSecrets.MustGetField("JIRA_V2_INACTIVE")
+	email := testSecrets.MustGetField("JIRA_V2_EMAIL")
+	domain := testSecrets.MustGetField("JIRA_V2_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
