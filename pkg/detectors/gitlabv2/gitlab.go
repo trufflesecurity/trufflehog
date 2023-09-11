@@ -11,7 +11,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{ detectors.EndpointSetter }
+type Scanner struct {
+	client *http.Client
+	detectors.EndpointSetter
+}
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -22,7 +25,8 @@ func (Scanner) Version() int            { return 2 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
-	keyPat = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
+	defaultClient = common.SaneHttpClient()
+	keyPat        = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -52,7 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			// they all grant access to different parts of the API. I couldn't find an endpoint that every
 			// one of these scopes has access to, so we just check an example endpoint for each scope. If any
 			// of them contain data, we know we have a valid key, but if they all fail, we don't
-			client := common.SaneHttpClient()
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
 			for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
 				// test `read_user` scope
 				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
@@ -67,9 +74,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// 200 means good key and has `read_user` scope
 					// 403 means good key but not the right scope
 					// 401 is bad key
-					if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
+					switch res.StatusCode {
+					case http.StatusOK:
 						secret.Verified = true
+					case http.StatusForbidden:
+						// Good key but not the right scope
+						secret.Verified = true
+					case http.StatusUnauthorized:
+						// Nothing to do; zero values are the ones we want
+					default:
+						secret.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
+				} else {
+					secret.VerificationError = err
 				}
 			}
 
