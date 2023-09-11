@@ -133,7 +133,7 @@ func BranchHeads(repo *gogit.Repository) (map[string]*object.Commit, error) {
 		}
 		headCommit, err := repo.CommitObject(*headHash)
 		if err != nil {
-			logger.Error(err, "unable to get commit", "commit", headCommit.String())
+			logger.Error(err, "unable to get commit", "head_hash", headHash.String())
 			return nil
 		}
 		branches[branchName] = headCommit
