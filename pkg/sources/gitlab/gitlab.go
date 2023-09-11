@@ -178,7 +178,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 func (s *Source) Validate(ctx context.Context) []error {
 	// The client is only used to query Gitlab for a repo list - it's not used to actually clone anything. Thus, we
-	// don't use it if there is a list of explicitly-configured repos. However, constructing it validates that the
+	// don't use it if there is a list of explicitly configured repos. However, constructing it validates that the
 	// configured authentication method is sensible, so we'll do it here.
 	apiClient, err := s.newClient()
 	if err != nil {
