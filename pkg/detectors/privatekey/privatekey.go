@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -80,6 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
+			var verificationErrors []string
 			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
 			if err == nil {
 				if data != nil {
@@ -87,25 +89,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 					secret.ExtraData["certificate_urls"] = strings.Join(data.CertificateURLs, ", ")
 				}
 			} else {
-				secret.VerificationError = err
+				verificationErrors = append(verificationErrors, err.Error())
 			}
 
 			user, err := verifyGitHubUser(parsedKey)
+			if !errors.IsError(err, errPermissionDenied) {
+				verificationErrors = append(verificationErrors, err.Error())
+			}
 			if user != nil {
 				secret.Verified = true
 				secret.ExtraData["github_user"] = *user
 			}
-			if err != errPermissionDenied {
-				secret.VerificationError = err
-			}
 
 			user, err = verifyGitLabUser(parsedKey)
+			if !errors.Is(err, errPermissionDenied)) {
+				verificationErrors = append(verificationErrors, err.Error())
+			}
 			if user != nil {
 				secret.Verified = true
 				secret.ExtraData["gitlab_user"] = *user
 			}
-			if err != errPermissionDenied {
-				secret.VerificationError = err
+
+			if !secret.Verified && len(verificationErrors) > 0 {
+				secret.VerificationError = fmt.Errorf("verification failures: %s", strings.Join(verificationErrors, ", "))
 			}
 		}
 
@@ -124,21 +130,21 @@ type result struct {
 	GitHubUsername  string
 }
 
-func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (data *result, err error) {
+func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
 	if err != nil {
-		return
+		return nil, err
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer res.Body.Close()
 
 	results := DriftwoodResult{}
 	err = json.NewDecoder(res.Body).Decode(&results)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	seen := map[string]struct{}{}
@@ -156,7 +162,7 @@ func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (d
 		seen[r.CertificateFingerprint] = struct{}{}
 	}
 
-	return
+	return data, nil
 }
 
 type DriftwoodResult struct {

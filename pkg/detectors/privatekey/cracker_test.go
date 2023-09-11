@@ -56,14 +56,16 @@ Hx7UPVlTK8dyvk1Z+Yw0nrfNClI=
 
 func Test_crack(t *testing.T) {
 	tests := []struct {
-		name    string
-		in      []byte
-		wantErr bool
+		name             string
+		in               []byte
+		wantedPassphrase string
+		wantErr          bool
 	}{
 		{
-			name:    "crackable",
-			wantErr: false,
-			in:      testEncryptedKey,
+			name:             "crackable",
+			wantErr:          false,
+			in:               testEncryptedKey,
+			wantedPassphrase: string(testEncryptedKeyCorrectPassword),
 		},
 	}
 	for _, tt := range tests {
@@ -74,7 +76,7 @@ func Test_crack(t *testing.T) {
 				return
 			}
 
-			if passphrase != string(testEncryptedKeyCorrectPassword) {
+			if passphrase != string(tt.wantedPassphrase) {
 				t.Errorf("crack() passphrase = %v, want %v", passphrase, string(testEncryptedKeyCorrectPassword))
 			}
 		})
