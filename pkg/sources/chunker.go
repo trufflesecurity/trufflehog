@@ -20,7 +20,7 @@ const (
 
 // Chunker takes a chunk and splits it into chunks of ChunkSize.
 func Chunker(originalChunk *Chunk) chan *Chunk {
-	chunkChan := make(chan *Chunk)
+	chunkChan := make(chan *Chunk, 1)
 	go func() {
 		defer close(chunkChan)
 		if len(originalChunk.Data) <= TotalChunkSize {

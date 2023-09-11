@@ -2,6 +2,11 @@ package engine
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
@@ -287,6 +292,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getresponse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getsandbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_oauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_old"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/githubapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab"
@@ -556,7 +562,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterwritekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saucelabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scalewaykey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_oauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scalr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapeowl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scraperapi"
@@ -1532,6 +1537,11 @@ func DefaultDetectors() []detectors.Detector {
 		couchbase.Scanner{},
 		envoyapikey.Scanner{},
 		github_oauth2.Scanner{},
+		snowflake.Scanner{},
+		huggingface.Scanner{},
+		trufflehogenterprise.Scanner{},
+		salesforce.Scanner{},
+		sourcegraph.Scanner{},
 	}
 
 }
