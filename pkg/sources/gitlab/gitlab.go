@@ -212,7 +212,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 		}
 	}
 
-	if len(errs) > 0 {
+	if len(explicitlyConfiguredRepos) > 0 || len(errs) > 0 {
 		return errs
 	}
 
