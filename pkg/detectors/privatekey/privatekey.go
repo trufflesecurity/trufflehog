@@ -93,7 +93,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			}
 
 			user, err := verifyGitHubUser(parsedKey)
-			if !errors.IsError(err, errPermissionDenied) {
+			if !errors.Is(err, errPermissionDenied) {
 				verificationErrors = append(verificationErrors, err.Error())
 			}
 			if user != nil {
@@ -102,7 +102,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			}
 
 			user, err = verifyGitLabUser(parsedKey)
-			if !errors.Is(err, errPermissionDenied)) {
+			if !errors.Is(err, errPermissionDenied) {
 				verificationErrors = append(verificationErrors, err.Error())
 			}
 			if user != nil {
@@ -146,6 +146,8 @@ func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*
 	if err != nil {
 		return nil, err
 	}
+
+	var data *result
 
 	seen := map[string]struct{}{}
 	for _, r := range results.CertificateResults {
