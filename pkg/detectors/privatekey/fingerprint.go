@@ -5,10 +5,12 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"strings"
+	"fmt"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -18,18 +20,8 @@ var (
 	ErrEncryptedKey = errors.New("key is encrypted")
 )
 
-func FingerprintPEMKey(in []byte) (string, error) {
-	parsedKey, err := ssh.ParseRawPrivateKey(in)
-	if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
-		parsedKey, err = crack(in)
-		if err != nil {
-			return "", err
-		}
-	} else if err != nil {
-		return "", err
-	}
-
-	var pubKey interface{}
+func FingerprintPEMKey(parsedKey any) (string, error) {
+	var pubKey any
 	switch privateKey := parsedKey.(type) {
 	case *rsa.PrivateKey:
 		pubKey = &privateKey.PublicKey
@@ -44,6 +36,10 @@ func FingerprintPEMKey(in []byte) (string, error) {
 		return "", ErrNotSupported
 	}
 
+	return fingerprintPublicKey(pubKey)
+}
+
+func fingerprintPublicKey(pubKey any) (string, error) {
 	publickeyBytes, err := x509.MarshalPKIXPublicKey(pubKey)
 	if err != nil {
 		return "", err
@@ -52,4 +48,9 @@ func FingerprintPEMKey(in []byte) (string, error) {
 	publicKeyFingerprint := sha1.Sum(publickeyBytes)
 	publicKeyFingerprintInHex := hex.EncodeToString(publicKeyFingerprint[:])
 	return publicKeyFingerprintInHex, nil
+}
+
+func fingerprintSSHPublicKey(pubKey ssh.PublicKey) string {
+	publicKeyFingerprint := sha256.Sum256(pubKey.Marshal())
+	return fmt.Sprintf("SHA256:%s", base64.RawStdEncoding.EncodeToString(publicKeyFingerprint[:]))
 }
