@@ -37,10 +37,9 @@ type (
 
 // apiClient is an interface for optionally communicating with an external API.
 type apiClient interface {
-	// RegisterSource lets the API know we have a source and it returns a unique source ID for it.
-	RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (SourceID, error)
-	// GetJobID queries the API for an existing job or new job ID.
-	GetJobID(ctx context.Context, id SourceID) (JobID, error)
+	// GetIDs informs the API of the source that's about to run and returns
+	// two identifiers used during source initialization.
+	GetIDs(ctx context.Context, name string, kind sourcespb.SourceType) (SourceID, JobID, error)
 }
 
 // WithAPI adds an API client to the manager for tracking jobs and progress. If
@@ -94,32 +93,13 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 }
 
 func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sourcespb.SourceType) (SourceID, JobID, error) {
-	sourceID, err := s.api.RegisterSource(ctx, sourceName, kind)
-	if err != nil {
-		return 0, 0, err
-	}
-	jobID, err := s.api.GetJobID(ctx, sourceID)
-	if err != nil {
-		return sourceID, 0, err
-	}
-	return sourceID, jobID, nil
+	return s.api.GetIDs(ctx, sourceName, kind)
 }
 
 // Run blocks until a resource is available to run the source, then
-// synchronously runs it. The first fatal error, if any, will be returned.
-func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
-	ref, err := s.ScheduleRun(ctx, sourceName, source)
-	if err != nil {
-		return ref, err
-	}
-	<-ref.Done()
-	return ref, ref.Snapshot().FatalError()
-}
-
-// ScheduleRun blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is stored and accessible via the
 // JobProgressRef as it becomes available.
-func (s *SourceManager) ScheduleRun(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
+func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
 	return s.asyncRun(ctx, sourceName, source)
 }
 
@@ -342,12 +322,8 @@ type headlessAPI struct {
 	jobIDCounter    int64
 }
 
-func (api *headlessAPI) RegisterSource(context.Context, string, sourcespb.SourceType) (SourceID, error) {
-	return SourceID(atomic.AddInt64(&api.sourceIDCounter, 1)), nil
-}
-
-func (api *headlessAPI) GetJobID(context.Context, SourceID) (JobID, error) {
-	return JobID(atomic.AddInt64(&api.jobIDCounter, 1)), nil
+func (api *headlessAPI) GetIDs(context.Context, string, sourcespb.SourceType) (SourceID, JobID, error) {
+	return SourceID(atomic.AddInt64(&api.sourceIDCounter, 1)), JobID(atomic.AddInt64(&api.jobIDCounter, 1)), nil
 }
 
 // mgrUnitReporter implements the UnitReporter interface.

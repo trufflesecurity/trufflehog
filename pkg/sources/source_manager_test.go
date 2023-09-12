@@ -105,8 +105,10 @@ func TestSourceManagerRun(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	for i := 0; i < 3; i++ {
-		_, err = mgr.Run(context.Background(), "dummy", source)
+		ref, err := mgr.Run(context.Background(), "dummy", source)
+		<-ref.Done()
 		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
 		chunk, err := tryRead(mgr.Chunks())
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{byte(i)}, chunk.Data)
@@ -121,7 +123,7 @@ func TestSourceManagerWait(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	// Asynchronously run the source.
-	_, err = mgr.ScheduleRun(context.Background(), "dummy", source)
+	_, err = mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	// Read the 1 chunk we're expecting so Waiting completes.
 	<-mgr.Chunks()
@@ -130,7 +132,7 @@ func TestSourceManagerWait(t *testing.T) {
 	// Run should return an error now.
 	_, err = buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
-	_, err = mgr.ScheduleRun(context.Background(), "dummy", source)
+	_, err = mgr.Run(context.Background(), "dummy", source)
 	assert.Error(t, err)
 }
 
@@ -138,15 +140,11 @@ func TestSourceManagerError(t *testing.T) {
 	mgr := NewManager()
 	source, err := buildDummy(errorChunker{fmt.Errorf("oops")})
 	assert.NoError(t, err)
-	// A synchronous run should fail.
-	_, err = mgr.Run(context.Background(), "dummy", source)
-	assert.Error(t, err)
-	// Scheduling a run should not fail, but the error should surface in
-	// Wait().
-	ref, err := mgr.ScheduleRun(context.Background(), "dummy", source)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
-	assert.Error(t, mgr.Wait())
+	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
+	assert.Error(t, mgr.Wait())
 }
 
 func TestSourceManagerReport(t *testing.T) {
@@ -158,9 +156,9 @@ func TestSourceManagerReport(t *testing.T) {
 		mgr := NewManager(opts...)
 		source, err := buildDummy(&counterChunker{count: 4})
 		assert.NoError(t, err)
-		// Synchronously run the source.
 		ref, err := mgr.Run(context.Background(), "dummy", source)
 		assert.NoError(t, err)
+		<-ref.Done()
 		assert.Equal(t, 0, len(ref.Snapshot().Errors))
 		assert.Equal(t, uint64(4), ref.Snapshot().TotalChunks)
 	}
@@ -222,6 +220,7 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 	assert.NoError(t, err)
 	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
+	<-ref.Done()
 	report := ref.Snapshot()
 	assert.Equal(t, len(input), int(report.TotalUnits))
 	assert.Equal(t, len(input), int(report.FinishedUnits))
@@ -236,7 +235,7 @@ func TestSourceManagerContextCancelled(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ref, err := mgr.ScheduleRun(ctx, "dummy", source)
+	ref, err := mgr.Run(ctx, "dummy", source)
 	assert.NoError(t, err)
 
 	cancel()
@@ -280,7 +279,7 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	}})
 	assert.NoError(t, err)
 
-	ref, err := mgr.ScheduleRun(context.Background(), "dummy", source)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	cancelErr := fmt.Errorf("abort! abort!")
@@ -302,7 +301,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1337, mgr.AvailableCapacity())
-	ref, err := mgr.ScheduleRun(context.Background(), "dummy", source)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	<-start // Wait for start signal.
