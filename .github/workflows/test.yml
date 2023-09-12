@@ -79,7 +79,7 @@ jobs:
       uses: buildpulse/buildpulse-action@main
       with:
         account: 79229934
-        repository: 523156419
+        repository: 77726177
         path: |
           tmp/test-results/*.xml
         key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
