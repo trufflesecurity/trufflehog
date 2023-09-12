@@ -32,6 +32,6 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	if err := fileSystemSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, sourceName, fileSystemSource)
+	_, err = e.sourceManager.Run(ctx, sourceName, fileSystemSource)
 	return err
 }
