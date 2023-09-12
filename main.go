@@ -137,8 +137,9 @@ var (
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 
-	dockerScan       = cli.Command("docker", "Scan Docker Image")
-	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScan        = cli.Command("docker", "Scan Docker Image")
+	dockerScanImages  = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScanAllTags = dockerScan.Flag("all-tags", "Whether to scan all tags of an image in a repository").Bool()
 )
 
 func init() {
@@ -520,7 +521,8 @@ func run(state overseer.State) {
 		}
 	case dockerScan.FullCommand():
 		dockerConn := sourcespb.Docker{
-			Images: *dockerScanImages,
+			Images:  *dockerScanImages,
+			AllTags: dockerScanAllTags,
 			Credential: &sourcespb.Docker_DockerKeychain{
 				DockerKeychain: true,
 			},

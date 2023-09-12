@@ -948,6 +948,10 @@ func (m *Docker) validate(all bool) error {
 
 	}
 
+	if m.AllTags != nil {
+		// no validation rules for AllTags
+	}
+
 	if len(errors) > 0 {
 		return DockerMultiError(errors)
 	}

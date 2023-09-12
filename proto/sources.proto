@@ -113,6 +113,7 @@ message Docker {
     bool docker_keychain = 4;
   }
   repeated string images = 5;
+  optional bool all_tags = 6;
 }
 
 message ECR {

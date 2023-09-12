@@ -74,10 +74,164 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	return nil
 }
 
+// Chunks emits data over a channel that is decoded and scanned for secrets.
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	workers := new(errgroup.Group)
+	workers.SetLimit(s.concurrency)
+
+	scanErrs := sources.NewScanErrors()
+	err := s.parseImages(ctx, s.conn.GetImages(), s.conn.GetAllTags(), workers, scanErrs, chunksChan)
+	if err != nil {
+		return err
+	}
+
+	_ = workers.Wait()
+	if scanErrs.Count() > 0 {
+		ctx.Logger().V(2).Error(nil, "scan errors", "errors", scanErrs.String())
+	}
+
+	return nil
+}
+
+const filePrefix = "file://"
+
+func (s *Source) parseImages(ctx context.Context, images []string, allTags bool, workers *errgroup.Group, scanErrs *sources.ScanErrors, chunksChan chan *sources.Chunk) error {
+	remoteOpts, err := s.remoteOpts()
+	if err != nil {
+		return err
+	}
+
+	// Validate images before we start scanning.
+	var imageRefs []name.Reference
+	for _, image := range images {
+		// TODO: Test whether this validates images and fails when expected.
+		ref, err := name.ParseReference(image)
+		if err != nil {
+			return err
+		}
+
+		if allTags {
+			if strings.HasPrefix(ref.String(), filePrefix) {
+				// This isn't supported & should explicitly fail.
+				return fmt.Errorf("--all-tags can't be used with a local file:// reference")
+			} else if ref.Identifier() != "latest" {
+				// Specifying a tag and using --all-tags is mutually exclusive.
+				// "latest" is the default tag when none is explicitly specified.
+				return fmt.Errorf("tag or digest can't be used with --all-tags (%s)", ref.Name())
+			}
+		}
+		imageRefs = append(imageRefs, ref)
+	}
+
+	for _, imgRef := range imageRefs {
+		workers.Go(func() error {
+			imgCtx := context.WithValues(ctx, "image", imgRef.String())
+			if strings.HasPrefix(imgRef.String(), filePrefix) {
+				path := strings.TrimPrefix(imgRef.Context().Name(), filePrefix)
+				img, err := tarball.ImageFromPath(path, nil)
+				if err != nil {
+					scanErrs.Add(err)
+					return nil
+				}
+
+				imgInfo := &imageInfo{
+					base:  path,
+					image: img,
+				}
+				err = s.processImage(imgCtx, imgInfo, chunksChan)
+				if err != nil {
+					scanErrs.Add(err)
+					return nil
+				}
+			} else {
+				if allTags {
+					// Fetch all tags for the specified image.
+					tags, err := remote.List(imgRef.Context(), remoteOpts...)
+					if err != nil {
+						scanErrs.Add(err)
+						return nil
+					}
+
+					for _, t := range tags {
+						tag := imgRef.Context().Tag(t)
+						imgInfo, err := newImageInfo(tag, remoteOpts)
+						if err != nil {
+							// Skip old v1 images (for now?)
+							// https://github.com/google/go-containerregistry/issues/377
+							if strings.HasPrefix(err.Error(), "unsupported MediaType: ") {
+								imgCtx.Logger().V(0).Error(err, "skipping unsupported v1 image")
+								continue
+							}
+
+							scanErrs.Add(err)
+							return nil
+						}
+
+						imgCtx := context.WithValues(ctx, "image", tag.Name())
+						err = s.processImage(imgCtx, imgInfo, chunksChan)
+						if err != nil {
+							scanErrs.Add(err)
+							return nil
+						}
+					}
+				} else {
+					imgCtx := context.WithValues(ctx, "image", imgRef.Name())
+					imgInfo, err := newImageInfo(imgRef, remoteOpts)
+					if err != nil {
+						scanErrs.Add(err)
+						return nil
+					}
+
+					err = s.processImage(imgCtx, imgInfo, chunksChan)
+					if err != nil {
+						scanErrs.Add(err)
+						return nil
+					}
+				}
+			}
+			return nil
+		})
+	}
+	return nil
+}
+
+func newImageInfo(ref name.Reference, remoteOpts []remote.Option) (*imageInfo, error) {
+	image, err := remote.Image(ref, remoteOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	info := &imageInfo{
+		base:  ref.Context().Name(),
+		tag:   ref.Identifier(),
+		image: image,
+	}
+	return info, nil
+}
+
 type imageInfo struct {
 	image v1.Image
 	base  string
 	tag   string
+}
+
+// processImage processes an individual image and prepares it for further processing.
+func (s *Source) processImage(ctx context.Context, imgInfo *imageInfo, chunksChan chan *sources.Chunk) error {
+	ctx.Logger().V(0).Info("scanning image")
+	layers, err := imgInfo.image.Layers()
+	if err != nil {
+		return err
+	}
+
+	for _, layer := range layers {
+		if err := s.processLayer(ctx, imgInfo, layer, chunksChan); err != nil {
+			return err
+		}
+		dockerLayersScanned.WithLabelValues(s.name).Inc()
+	}
+
+	dockerImagesScanned.WithLabelValues(s.name).Inc()
+	return nil
 }
 
 type layerInfo struct {
@@ -86,103 +240,8 @@ type layerInfo struct {
 	tag    string
 }
 
-// Chunks emits data over a channel that is decoded and scanned for secrets.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	ctx = context.WithValues(ctx, "source_type", s.Type(), "source_name", s.name)
-
-	workers := new(errgroup.Group)
-	workers.SetLimit(s.concurrency)
-
-	scanErrs := sources.NewScanErrors()
-	for _, image := range s.conn.GetImages() {
-		image := image
-		workers.Go(func() error {
-			if common.IsDone(ctx) {
-				return nil
-			}
-
-			imgInfo, err := s.processImage(ctx, image)
-			if err != nil {
-				scanErrs.Add(err)
-				return nil
-			}
-
-			ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
-			ctx.Logger().V(2).Info("scanning image")
-
-			layers, err := imgInfo.image.Layers()
-			if err != nil {
-				scanErrs.Add(err)
-				return nil
-			}
-
-			for _, layer := range layers {
-				if err := s.processLayer(ctx, layer, imgInfo, chunksChan); err != nil {
-					scanErrs.Add(err)
-					return nil
-				}
-				dockerLayersScanned.WithLabelValues(s.name).Inc()
-			}
-
-			dockerImagesScanned.WithLabelValues(s.name).Inc()
-
-			return nil
-		})
-	}
-	_ = workers.Wait()
-	if scanErrs.Count() > 0 {
-		ctx.Logger().V(2).Info("scan errors", "errors", scanErrs.String())
-	}
-
-	return nil
-}
-
-// processImage processes an individual image and prepares it for further processing.
-func (s *Source) processImage(ctx context.Context, image string) (imageInfo, error) {
-	var (
-		imgInfo   imageInfo
-		hasDigest bool
-		imageName name.Reference
-	)
-
-	remoteOpts, err := s.remoteOpts()
-	if err != nil {
-		return imgInfo, err
-	}
-
-	const filePrefix = "file://"
-	if strings.HasPrefix(image, filePrefix) {
-		image = strings.TrimPrefix(image, filePrefix)
-		imgInfo.base = image
-		imgInfo.image, err = tarball.ImageFromPath(image, nil)
-		if err != nil {
-			return imgInfo, err
-		}
-	} else {
-		imgInfo.base, imgInfo.tag, hasDigest = baseAndTagFromImage(image)
-
-		if hasDigest {
-			imageName, err = name.NewDigest(image)
-		} else {
-			imageName, err = name.NewTag(image)
-		}
-		if err != nil {
-			return imgInfo, err
-		}
-
-		imgInfo.image, err = remote.Image(imageName, remoteOpts...)
-		if err != nil {
-			return imgInfo, err
-		}
-	}
-
-	ctx.Logger().WithValues("image", imgInfo.base, "tag", imgInfo.tag).V(2).Info("scanning image")
-
-	return imgInfo, nil
-}
-
 // processLayer processes an individual layer of an image.
-func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo imageInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processLayer(ctx context.Context, imgInfo *imageInfo, layer v1.Layer, chunksChan chan *sources.Chunk) error {
 	layerInfo := layerInfo{
 		base: imgInfo.base,
 		tag:  imgInfo.tag,

@@ -154,10 +154,16 @@ trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 
 ## 10: Scan a Docker image for verified secrets.
 
-Use the `--image` flag multiple times to scan multiple images.
+Use the `--image` flag one or more times to scan specific images.
 
 ```bash
-trufflehog docker --image trufflesecurity/secrets --only-verified
+trufflehog docker --image trufflesecurity/secrets:latest --only-verified
+```
+
+The `--all-tags` flag will scan all published tags for an image.
+
+```bash
+trufflehog docker --image trufflesecurity/secrets --all-tags --only-verified
 ```
 
 # :question: FAQ
