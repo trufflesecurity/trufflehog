@@ -236,3 +236,15 @@ func TestExtractRPMContent(t *testing.T) {
 	expectedLength := 1822720
 	assert.Equal(t, expectedLength, len(string(content)))
 }
+
+func TestOpenInvalidArchive(t *testing.T) {
+	reader := strings.NewReader("invalid archive")
+
+	ctx := logContext.AddLogger(context.Background())
+	a := &Archive{}
+
+	archiveChan := make(chan []byte)
+
+	err := a.openArchive(ctx, 0, reader, archiveChan)
+	assert.Error(t, err)
+}
