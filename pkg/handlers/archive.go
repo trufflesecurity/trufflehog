@@ -102,6 +102,10 @@ func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 		return a.handleNonArchiveContent(ctx, arReader, archiveChan)
 	}
 
+	if err != nil {
+		return err
+	}
+
 	switch archive := format.(type) {
 	case archiver.Decompressor:
 		info := decompressorInfo{depth: depth, reader: arReader, archiveChan: archiveChan, archiver: archive}
