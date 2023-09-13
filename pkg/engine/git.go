@@ -52,7 +52,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	}
 
 	sourceName := "trufflehog - git"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, new(git.Source).Type())
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, git.SourceType)
 
 	gitSource := &git.Source{}
 	if err := gitSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, &conn, runtime.NumCPU()); err != nil {

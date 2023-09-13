@@ -39,6 +39,8 @@ import (
 )
 
 const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_GITHUB
+
 	unauthGithubOrgRateLimt = 30
 	defaultPagination       = 100
 	membersAppPagination    = 500
@@ -104,7 +106,7 @@ var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GITHUB
+	return SourceType
 }
 
 func (s *Source) SourceID() int64 {

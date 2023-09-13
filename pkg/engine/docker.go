@@ -12,7 +12,7 @@ import (
 // ScanDocker scans a given docker connection.
 func (e *Engine) ScanDocker(ctx context.Context, conn *anypb.Any) error {
 	sourceName := "trufflehog - docker"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, new(docker.Source).Type())
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, docker.SourceType)
 
 	dockerSource := &docker.Source{}
 	if err := dockerSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, conn, runtime.NumCPU()); err != nil {

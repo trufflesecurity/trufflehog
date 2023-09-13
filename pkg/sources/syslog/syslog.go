@@ -23,7 +23,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const nilString = ""
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_SYSLOG
+
+	nilString = ""
+)
 
 type Source struct {
 	name     string
@@ -103,7 +107,7 @@ var _ sources.Source = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_SYSLOG
+	return SourceType
 }
 
 func (s *Source) SourceID() int64 {
