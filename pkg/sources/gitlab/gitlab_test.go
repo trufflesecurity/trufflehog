@@ -177,6 +177,150 @@ func TestSource_Scan(t *testing.T) {
 	}
 }
 
+func TestSource_Validate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+	token := secret.MustGetField("GITLAB_TOKEN")
+	tokenWrongScope := secret.MustGetField("GITLAB_TOKEN_WRONG_SCOPE")
+
+	tests := []struct {
+		name         string
+		connection   *sourcespb.GitLab
+		wantErrCount int
+		wantErrs     []string
+	}{
+		{
+			name: "basic auth did not authenticate",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_BasicAuth{
+					BasicAuth: &credentialspb.BasicAuth{
+						Username: "bad-user",
+						Password: "bad-password",
+					},
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "token did not authenticate",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: "bad-token",
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "bad repo urls",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy",  // valid
+					"https://gitlab.com/testermctestface/testy/", // trailing slash
+					"ssh:git@gitlab.com/testermctestface/testy",  // bad protocol
+					"https://gitlab.com",                         // no path
+					"https://gitlab.com/",                        // no org name
+					"https://gitlab.com//testy",                  // no org name
+					"https://gitlab.com/testermctestface/",       // no repo name
+				},
+			},
+			wantErrCount: 6,
+		},
+		{
+			name: "token does not have permission to list projects",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: tokenWrongScope,
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "repositories and ignore globs both configured",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy", // valid
+				},
+				IgnoreRepos: []string{
+					"tes1188/*-gitlab",
+					"[", // glob doesn't compile, but this won't be checked
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "could not compile ignore glob(s)",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IgnoreRepos: []string{
+					"tes1188/*-gitlab",
+					"[",    // glob doesn't compile
+					"[a-]", // glob doesn't compile
+				},
+			},
+			wantErrCount: 2,
+		},
+		{
+			name: "repositories do not exist or are not accessible",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy",
+					"https://gitlab.com/testermctestface/doesn't-exist",
+					"https://gitlab.com/testermctestface/also-doesn't-exist",
+				},
+			},
+			wantErrCount: 2,
+		},
+		{
+			name: "ignore globs exclude all repos",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IgnoreRepos: []string{
+					"*",
+				},
+			},
+			wantErrCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.name, 0, 0, false, conn, 1)
+			if err != nil {
+				t.Fatalf("Source.Init() error: %v", err)
+			}
+
+			errs := s.Validate(ctx)
+
+			assert.Equal(t, tt.wantErrCount, len(errs))
+		})
+	}
+}
+
 func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 	tests := []struct {
 		startingResumeInfoSlice []string
