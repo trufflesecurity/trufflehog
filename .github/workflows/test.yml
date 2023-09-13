@@ -84,7 +84,7 @@ jobs:
           tmp/test-results/*.xml
         key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
         secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
-        tags: scanner
+        tags: community
     - name: Annotate test results
       uses: mikepenz/action-junit-report@v3
       if: success() || failure() # always run even if the previous step fails
