@@ -38,8 +38,8 @@ const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
 
 type Source struct {
 	name     string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	git      *Git
 	sources.Progress
@@ -53,8 +53,8 @@ type Source struct {
 type Git struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
-	sourceID           int64
-	jobID              int64
+	sourceID           sources.SourceID
+	jobID              sources.JobID
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
@@ -65,7 +65,7 @@ type metrics struct {
 	commitsScanned uint64
 }
 
-func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
+func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData,
 ) *Git {
 	return &Git{
@@ -89,11 +89,11 @@ func (s *Source) Type() sourcespb.SourceType {
 	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
@@ -111,7 +111,7 @@ func (s *Source) WithPreserveTempDirs(preserve bool) {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId

@@ -43,8 +43,8 @@ type JobProgressHook interface {
 // If the job supports it, the reference can also be used to cancel running via
 // CancelRun.
 type JobProgressRef struct {
-	JobID       int64
-	SourceID    int64
+	JobID       JobID
+	SourceID    SourceID
 	SourceName  string
 	jobProgress *JobProgress
 }
@@ -101,8 +101,8 @@ func (f ChunkError) Unwrap() error { return f.err }
 // JobProgress aggregates information about a run of a Source.
 type JobProgress struct {
 	// Unique identifiers for this job.
-	JobID      int64
-	SourceID   int64
+	JobID      JobID
+	SourceID   SourceID
 	SourceName string
 	// Tracks whether the job is finished or not.
 	ctx    context.Context
@@ -155,7 +155,7 @@ func WithCancel(cancel context.CancelCauseFunc) func(*JobProgress) {
 }
 
 // NewJobProgress creates a new job report for the given source and job ID.
-func NewJobProgress(jobID, sourceID int64, sourceName string, opts ...func(*JobProgress)) *JobProgress {
+func NewJobProgress(jobID JobID, sourceID SourceID, sourceName string, opts ...func(*JobProgress)) *JobProgress {
 	ctx, cancel := context.WithCancel(context.Background())
 	jp := &JobProgress{
 		JobID:      jobID,

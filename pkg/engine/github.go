@@ -51,7 +51,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
 
 	githubSource := &github.Source{}
-	if err := githubSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, &conn, c.Concurrency); err != nil {
+	if err := githubSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return err
 	}
 	githubSource.WithScanOptions(scanOptions)

@@ -40,8 +40,8 @@ const (
 
 type Source struct {
 	name        string
-	sourceId    int64
-	jobId       int64
+	sourceId    sources.SourceID
+	jobId       sources.JobID
 	verify      bool
 	concurrency int
 	log         logr.Logger
@@ -63,16 +63,16 @@ func (s *Source) Type() sourcespb.SourceType {
 	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
 // Init returns an initialized AWS source
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = context.WithValues(aCtx, "source", s.Type(), "name", name).Logger()
 
 	s.name = name

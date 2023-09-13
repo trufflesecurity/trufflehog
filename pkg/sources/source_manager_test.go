@@ -15,15 +15,15 @@ import (
 
 // DummySource implements Source and is used for testing a SourceManager.
 type DummySource struct {
-	sourceID int64
-	jobID    int64
+	sourceID SourceID
+	jobID    JobID
 	chunker
 }
 
 func (d *DummySource) Type() sourcespb.SourceType { return 1337 }
-func (d *DummySource) SourceID() int64            { return d.sourceID }
-func (d *DummySource) JobID() int64               { return d.jobID }
-func (d *DummySource) Init(_ context.Context, _ string, jobID, sourceID int64, _ bool, _ *anypb.Any, _ int) error {
+func (d *DummySource) SourceID() SourceID         { return d.sourceID }
+func (d *DummySource) JobID() JobID               { return d.jobID }
+func (d *DummySource) Init(_ context.Context, _ string, jobID JobID, sourceID SourceID, _ bool, _ *anypb.Any, _ int) error {
 	d.sourceID = sourceID
 	d.jobID = jobID
 	return nil
