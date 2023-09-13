@@ -24,6 +24,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_DOCKER
+
 type Source struct {
 	name        string
 	sourceId    int64
@@ -42,7 +44,7 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_DOCKER
+	return SourceType
 }
 
 func (s *Source) SourceID() int64 {

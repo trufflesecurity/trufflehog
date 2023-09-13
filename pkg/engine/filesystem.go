@@ -25,7 +25,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	}
 
 	sourceName := "trufflehog - filesystem"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, new(filesystem.Source).Type())
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, filesystem.SourceType)
 
 	fileSystemSource := &filesystem.Source{}
 	fileSystemSource.WithFilter(c.Filter)

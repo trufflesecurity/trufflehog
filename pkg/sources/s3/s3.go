@@ -31,6 +31,8 @@ import (
 )
 
 const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_S3
+
 	defaultAWSRegion     = "us-east-1"
 	defaultMaxObjectSize = 250 * 1024 * 1024 // 250 MiB
 	maxObjectSizeLimit   = 250 * 1024 * 1024 // 250 MiB
@@ -58,7 +60,7 @@ var _ sources.Validator = (*Source)(nil)
 
 // Type returns the type of source
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_S3
+	return SourceType
 }
 
 func (s *Source) SourceID() int64 {

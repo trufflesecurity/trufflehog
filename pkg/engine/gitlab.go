@@ -51,7 +51,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	}
 
 	sourceName := "trufflehog - gitlab"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, new(gitlab.Source).Type())
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gitlab.SourceType)
 
 	gitlabSource := &gitlab.Source{}
 	if err := gitlabSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, &conn, runtime.NumCPU()); err != nil {

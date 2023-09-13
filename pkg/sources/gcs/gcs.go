@@ -28,7 +28,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const defaultCachePersistIncrement = 2500
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_GCS
+
+	defaultCachePersistIncrement = 2500
+)
 
 // Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -37,7 +41,7 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GCS
+	return SourceType
 }
 
 // SourceID number for GCS Source.
