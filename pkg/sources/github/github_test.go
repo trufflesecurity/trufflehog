@@ -190,13 +190,13 @@ func TestAddMembersByApp(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/app/installations").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
 		})
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/members").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"login": "ssm1"},
 			{"login": "ssm2"},
 			{"login": "ssm3"},
@@ -221,7 +221,7 @@ func TestAddReposByApp(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/installation/repositories").
 		Reply(200).
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"repositories": []map[string]string{
 				{"clone_url": "https://github/ssr1.git", "full_name": "ssr1"},
 				{"clone_url": "https://github/ssr2.git", "full_name": "ssr2"},
@@ -247,7 +247,7 @@ func TestAddOrgsByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"login": "sso2"},
 		})
 
