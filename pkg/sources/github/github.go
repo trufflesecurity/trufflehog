@@ -756,7 +756,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			if len(s.scanOptions.Visibility) > 0 {
 				vis := s.visibilityOf(ctx, repoURL)
 				if !slices.Contains(s.scanOptions.Visibility, vis) {
-					s.log.V(0).Info("Skipping repository due to visibility requirements " + repoURL + " (" + vis.String() + ")")
+					s.log.V(2).Info("Skipping repository due to visibility requirements " + repoURL + " (" + vis.String() + ")")
 					return nil
 				}
 			}
