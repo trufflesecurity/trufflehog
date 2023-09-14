@@ -29,26 +29,26 @@ func getValidVisibilityScanOption(optVis string) source_metadatapb.Visibility {
 		return source_metadatapb.Visibility(source_metadatapb.Visibility_value[optVis])
 
 	default:
-		return -1 // TODO: better error handling
+		return source_metadatapb.Visibility_invalid
 	}
 }
 
 func ScanOptionVisibility(optVis string) ScanOption {
 
 	optVis = strings.ToLower(optVis)
-	visEnum := []source_metadatapb.Visibility{}
+	var visEnum []source_metadatapb.Visibility
 
 	if strings.Contains(optVis, ",") {
 		strArr := strings.Split(optVis, ",")
 		for i := 0; i < len(strArr); i++ {
 			tempVis := getValidVisibilityScanOption(strArr[i])
-			if tempVis != -1 { // invalid option specified, TODO: better error handling
+			if tempVis != source_metadatapb.Visibility_invalid {
 				visEnum = append(visEnum, tempVis)
 			}
 		}
 	} else {
 		tempVis := getValidVisibilityScanOption(optVis)
-		if tempVis != -1 { // invalid option specified, TODO: better error handling
+		if tempVis != source_metadatapb.Visibility_invalid {
 			visEnum = []source_metadatapb.Visibility{getValidVisibilityScanOption(optVis)}
 		}
 	}

@@ -27,6 +27,7 @@ const (
 	Visibility_private Visibility = 1
 	Visibility_shared  Visibility = 2
 	Visibility_unknown Visibility = 3
+	Visibility_invalid Visibility = -1
 )
 
 // Enum value maps for Visibility.
@@ -36,12 +37,14 @@ var (
 		1: "private",
 		2: "shared",
 		3: "unknown",
+		-1: "invalid",
 	}
 	Visibility_value = map[string]int32{
 		"public":  0,
 		"private": 1,
 		"shared":  2,
 		"unknown": 3,
+		"invalid": -1,
 	}
 )
 
