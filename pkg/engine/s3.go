@@ -58,17 +58,13 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 		return err
 	}
 
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - s3", new(s3.Source).Type(),
-		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
-			s3Source := s3.Source{}
-			if err := s3Source.Init(ctx, "trufflehog - s3", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-				return nil, err
-			}
-			return &s3Source, nil
-		})
-	if err != nil {
+	sourceName := "trufflehog - s3"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, s3.SourceType)
+
+	s3Source := &s3.Source{}
+	if err := s3Source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	_, err = e.sourceManager.Run(ctx, sourceName, s3Source)
 	return err
 }

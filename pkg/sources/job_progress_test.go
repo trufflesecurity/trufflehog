@@ -38,8 +38,8 @@ func TestJobProgressFatalErrors(t *testing.T) {
 func TestJobProgressRef(t *testing.T) {
 	jp := NewJobProgress(123, 456, "source name")
 	ref := jp.Ref()
-	assert.Equal(t, int64(123), ref.JobID)
-	assert.Equal(t, int64(456), ref.SourceID)
+	assert.Equal(t, JobID(123), ref.JobID)
+	assert.Equal(t, SourceID(456), ref.SourceID)
 
 	// Test Done() blocks until Finish() is called.
 	select {

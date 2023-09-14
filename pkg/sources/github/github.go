@@ -40,6 +40,8 @@ import (
 )
 
 const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_GITHUB
+
 	unauthGithubOrgRateLimt = 30
 	defaultPagination       = 100
 	membersAppPagination    = 500
@@ -52,8 +54,8 @@ type Source struct {
 	githubUser  string
 	githubToken string
 
-	sourceID          int64
-	jobID             int64
+	sourceID          sources.SourceID
+	jobID             sources.JobID
 	verify            bool
 	repos             []string
 	members           []string
@@ -112,14 +114,14 @@ var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GITHUB
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceID
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobID
 }
 
@@ -208,7 +210,7 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
 
 	s.name = name

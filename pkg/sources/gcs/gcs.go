@@ -28,7 +28,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const defaultCachePersistIncrement = 2500
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_GCS
+
+	defaultCachePersistIncrement = 2500
+)
 
 // Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -37,16 +41,16 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GCS
+	return SourceType
 }
 
 // SourceID number for GCS Source.
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
 // JobID number for GCS Source.
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
@@ -58,8 +62,8 @@ type objectManager interface {
 // Source represents a GCS source.
 type Source struct {
 	name        string
-	jobId       int64
-	sourceId    int64
+	jobId       sources.JobID
+	sourceId    sources.SourceID
 	concurrency int
 	verify      bool
 
@@ -107,7 +111,7 @@ func (c *persistableCache) shouldPersist() (bool, string) {
 }
 
 // Init returns an initialized GCS source.
-func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, id sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
 
 	s.name = name

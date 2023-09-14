@@ -15,15 +15,15 @@ import (
 
 // DummySource implements Source and is used for testing a SourceManager.
 type DummySource struct {
-	sourceID int64
-	jobID    int64
+	sourceID SourceID
+	jobID    JobID
 	chunker
 }
 
 func (d *DummySource) Type() sourcespb.SourceType { return 1337 }
-func (d *DummySource) SourceID() int64            { return d.sourceID }
-func (d *DummySource) JobID() int64               { return d.jobID }
-func (d *DummySource) Init(_ context.Context, _ string, jobID, sourceID int64, _ bool, _ *anypb.Any, _ int) error {
+func (d *DummySource) SourceID() SourceID         { return d.sourceID }
+func (d *DummySource) JobID() JobID               { return d.jobID }
+func (d *DummySource) Init(_ context.Context, _ string, jobID JobID, sourceID SourceID, _ bool, _ *anypb.Any, _ int) error {
 	d.sourceID = sourceID
 	d.jobID = jobID
 	return nil
@@ -80,16 +80,13 @@ func (c errorChunker) Chunks(context.Context, chan *Chunk, ...ChunkingTarget) er
 func (c errorChunker) Enumerate(context.Context, UnitReporter) error                { return c }
 func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error   { return c }
 
-// enrollDummy is a helper function to enroll a DummySource with a SourceManager.
-func enrollDummy(mgr *SourceManager, chunkMethod chunker) (handle, error) {
-	return mgr.Enroll(context.Background(), "dummy", 1337,
-		func(ctx context.Context, jobID, sourceID int64) (Source, error) {
-			source := &DummySource{chunker: chunkMethod}
-			if err := source.Init(ctx, "dummy", jobID, sourceID, true, nil, 42); err != nil {
-				return nil, err
-			}
-			return source, nil
-		})
+// buildDummy is a helper function to enroll a DummySource with a SourceManager.
+func buildDummy(chunkMethod chunker) (Source, error) {
+	source := &DummySource{chunker: chunkMethod}
+	if err := source.Init(context.Background(), "dummy", 123, 456, true, nil, 42); err != nil {
+		return nil, err
+	}
+	return source, nil
 }
 
 // tryRead is a helper function that will try to read from a channel and return
@@ -105,11 +102,13 @@ func tryRead(ch <-chan *Chunk) (*Chunk, error) {
 
 func TestSourceManagerRun(t *testing.T) {
 	mgr := NewManager(WithBufferedOutput(8))
-	handle, err := enrollDummy(mgr, &counterChunker{count: 1})
+	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	for i := 0; i < 3; i++ {
-		_, err = mgr.Run(context.Background(), handle)
+		ref, err := mgr.Run(context.Background(), "dummy", source)
+		<-ref.Done()
 		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
 		chunk, err := tryRead(mgr.Chunks())
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{byte(i)}, chunk.Data)
@@ -121,35 +120,31 @@ func TestSourceManagerRun(t *testing.T) {
 
 func TestSourceManagerWait(t *testing.T) {
 	mgr := NewManager()
-	handle, err := enrollDummy(mgr, &counterChunker{count: 1})
+	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	// Asynchronously run the source.
-	_, err = mgr.ScheduleRun(context.Background(), handle)
+	_, err = mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	// Read the 1 chunk we're expecting so Waiting completes.
 	<-mgr.Chunks()
 	// Wait for all resources to complete.
 	assert.NoError(t, mgr.Wait())
-	// Enroll and run should return an error now.
-	_, err = enrollDummy(mgr, &counterChunker{count: 1})
-	assert.Error(t, err)
-	_, err = mgr.ScheduleRun(context.Background(), handle)
+	// Run should return an error now.
+	_, err = buildDummy(&counterChunker{count: 1})
+	assert.NoError(t, err)
+	_, err = mgr.Run(context.Background(), "dummy", source)
 	assert.Error(t, err)
 }
 
 func TestSourceManagerError(t *testing.T) {
 	mgr := NewManager()
-	handle, err := enrollDummy(mgr, errorChunker{fmt.Errorf("oops")})
+	source, err := buildDummy(errorChunker{fmt.Errorf("oops")})
 	assert.NoError(t, err)
-	// A synchronous run should fail.
-	_, err = mgr.Run(context.Background(), handle)
-	assert.Error(t, err)
-	// Scheduling a run should not fail, but the error should surface in
-	// Wait().
-	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
-	assert.Error(t, mgr.Wait())
+	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
+	assert.Error(t, mgr.Wait())
 }
 
 func TestSourceManagerReport(t *testing.T) {
@@ -159,11 +154,11 @@ func TestSourceManagerReport(t *testing.T) {
 		{WithBufferedOutput(8), WithSourceUnits(), WithConcurrentUnits(1)},
 	} {
 		mgr := NewManager(opts...)
-		handle, err := enrollDummy(mgr, &counterChunker{count: 4})
+		source, err := buildDummy(&counterChunker{count: 4})
 		assert.NoError(t, err)
-		// Synchronously run the source.
-		ref, err := mgr.Run(context.Background(), handle)
+		ref, err := mgr.Run(context.Background(), "dummy", source)
 		assert.NoError(t, err)
+		<-ref.Done()
 		assert.Equal(t, 0, len(ref.Snapshot().Errors))
 		assert.Equal(t, uint64(4), ref.Snapshot().TotalChunks)
 	}
@@ -221,10 +216,11 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 		{unit: "three", err: "not again"},
 	}
 	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
-	handle, err := enrollDummy(mgr, &unitChunker{input})
+	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), handle)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
+	<-ref.Done()
 	report := ref.Snapshot()
 	assert.Equal(t, len(input), int(report.TotalUnits))
 	assert.Equal(t, len(input), int(report.FinishedUnits))
@@ -235,11 +231,11 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 
 func TestSourceManagerContextCancelled(t *testing.T) {
 	mgr := NewManager(WithBufferedOutput(8))
-	handle, err := enrollDummy(mgr, &counterChunker{count: 100})
+	source, err := buildDummy(&counterChunker{count: 100})
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ref, err := mgr.ScheduleRun(ctx, handle)
+	ref, err := mgr.Run(ctx, "dummy", source)
 	assert.NoError(t, err)
 
 	cancel()
@@ -249,45 +245,16 @@ func TestSourceManagerContextCancelled(t *testing.T) {
 }
 
 type DummyAPI struct {
-	registerSource func(context.Context, string, sourcespb.SourceType) (int64, error)
-	getJobID       func(context.Context, int64) (int64, error)
+	registerSource func(context.Context, string, sourcespb.SourceType) (SourceID, error)
+	getJobID       func(context.Context, SourceID) (JobID, error)
 }
 
-func (api DummyAPI) RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error) {
+func (api DummyAPI) RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (SourceID, error) {
 	return api.registerSource(ctx, name, kind)
 }
 
-func (api DummyAPI) GetJobID(ctx context.Context, id int64) (int64, error) {
+func (api DummyAPI) GetJobID(ctx context.Context, id SourceID) (JobID, error) {
 	return api.getJobID(ctx, id)
-}
-
-func TestSourceManagerJobAndSourceIDs(t *testing.T) {
-	mgr := NewManager(WithAPI(DummyAPI{
-		registerSource: func(context.Context, string, sourcespb.SourceType) (int64, error) {
-			return 1337, nil
-		},
-		getJobID: func(context.Context, int64) (int64, error) {
-			return 9001, nil
-		},
-	}))
-	var (
-		initializedJobID    int64
-		initializedSourceID int64
-	)
-	handle, err := mgr.Enroll(context.Background(), "dummy", 1337,
-		func(ctx context.Context, jobID, sourceID int64) (Source, error) {
-			initializedJobID = jobID
-			initializedSourceID = sourceID
-			return nil, fmt.Errorf("ignore")
-		})
-	assert.NoError(t, err)
-
-	ref, _ := mgr.Run(context.Background(), handle)
-	assert.Equal(t, int64(1337), initializedSourceID)
-	assert.Equal(t, int64(1337), ref.SourceID)
-	assert.Equal(t, int64(9001), initializedJobID)
-	assert.Equal(t, int64(9001), ref.JobID)
-	assert.Equal(t, "dummy", ref.SourceName)
 }
 
 // Chunk method that has a custom callback for the Chunks method.
@@ -304,7 +271,7 @@ func (c callbackChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) e
 func TestSourceManagerCancelRun(t *testing.T) {
 	mgr := NewManager(WithBufferedOutput(8))
 	var returnedErr error
-	handle, err := enrollDummy(mgr, callbackChunker{func(ctx context.Context, _ chan *Chunk) error {
+	source, err := buildDummy(callbackChunker{func(ctx context.Context, _ chan *Chunk) error {
 		// The context passed to Chunks should get cancelled when ref.CancelRun() is called.
 		<-ctx.Done()
 		returnedErr = fmt.Errorf("oh no: %w", ctx.Err())
@@ -312,7 +279,7 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	}})
 	assert.NoError(t, err)
 
-	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	cancelErr := fmt.Errorf("abort! abort!")
@@ -326,7 +293,7 @@ func TestSourceManagerCancelRun(t *testing.T) {
 func TestSourceManagerAvailableCapacity(t *testing.T) {
 	mgr := NewManager(WithConcurrentSources(1337))
 	start, end := make(chan struct{}), make(chan struct{})
-	handle, err := enrollDummy(mgr, callbackChunker{func(context.Context, chan *Chunk) error {
+	source, err := buildDummy(callbackChunker{func(context.Context, chan *Chunk) error {
 		start <- struct{}{} // Send start signal.
 		<-end               // Wait for end signal.
 		return nil
@@ -334,7 +301,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1337, mgr.AvailableCapacity())
-	ref, err := mgr.ScheduleRun(context.Background(), handle)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	<-start // Wait for start signal.

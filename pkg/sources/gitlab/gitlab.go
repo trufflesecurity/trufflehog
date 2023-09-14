@@ -29,10 +29,12 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
+
 type Source struct {
 	name            string
-	sourceId        int64
-	jobId           int64
+	sourceId        sources.SourceID
+	jobId           sources.JobID
 	verify          bool
 	authMethod      string
 	user            string
@@ -53,23 +55,24 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.Validator = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GITLAB
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
 // Init returns an initialized Gitlab source.
-func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -146,9 +149,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		return errors.New(err)
 	}
 	// Get repo within target.
-	repos, errs := s.getRepos()
+	repos, errs := normalizeRepos(s.repos)
 	for _, repoErr := range errs {
-		ctx.Logger().Info("error getting repo", "error", repoErr)
+		ctx.Logger().Info("error normalizing repo", "error", repoErr)
 	}
 
 	// End early if we had errors getting specified repos but none were validated.
@@ -158,26 +161,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Get all repos if not specified.
 	if len(repos) == 0 {
-		projects, err := s.getAllProjects(ctx, apiClient)
-		if err != nil {
-			return fmt.Errorf("error getting all projects: %v", err)
+		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
+			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
+		})
+		gitlabRepos, err2, done := s.getReposFromGitlab(ctx, apiClient, ignoreRepo)
+		if done {
+			return err2
 		}
-		// Turn projects into URLs for Git cloner.
-		for _, prj := range projects {
-			if s.ignoreRepo(ctx, prj.PathWithNamespace) {
-				continue
-			}
-
-			// Ensure the urls are valid before adding them to the repo list.
-			_, err := url.Parse(prj.HTTPURLToRepo)
-			if err != nil {
-				fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
-			}
-			repos = append(repos, prj.HTTPURLToRepo)
-		}
-		if len(repos) == 0 {
-			return errors.Errorf("unable to discover any repos")
-		}
+		repos = gitlabRepos
 	}
 
 	s.repos = repos
@@ -185,6 +176,69 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	slices.Sort(s.repos)
 
 	return s.scanRepos(ctx, chunksChan)
+}
+
+func (s *Source) Validate(ctx context.Context) []error {
+	// The client is only used to query Gitlab for a repo list - it's not used to actually clone anything. Thus, we
+	// don't use it if there is a list of explicitly configured repos. However, constructing it validates that the
+	// configured authentication method is sensible, so we'll do it here.
+	apiClient, err := s.newClient()
+	if err != nil {
+		return []error{err}
+	}
+
+	_, _, err = apiClient.Users.CurrentUser()
+	if err != nil {
+		msg := fmt.Sprintf("gitlab authentication failed using method %v", s.authMethod)
+		return []error{errors.WrapPrefix(err, msg, 0)}
+	}
+
+	explicitlyConfiguredRepos, errs := normalizeRepos(s.repos)
+
+	if len(explicitlyConfiguredRepos) > 0 {
+		user := s.user
+		if user == "" {
+			user = "placeholder"
+		}
+
+		// We only check reachability for explicitly configured repositories. The purpose of source validation is to
+		// help users validate their configuration files, and Gitlab telling us about repositories that it won't let us
+		// access isn't a local configuration issue.
+		for _, r := range explicitlyConfiguredRepos {
+			if err := git.PingRepoUsingToken(ctx, s.token, r, user); err != nil {
+				msg := fmt.Sprintf("could not reach git repository %q", r)
+				err = errors.WrapPrefix(err, msg, 0)
+				errs = append(errs, err)
+			}
+		}
+
+		if len(s.ignoreRepos) > 0 {
+			errs = append(errs, fmt.Errorf("both repositories and ignore patterns were explicitly configured; ignore patterns will not be used"))
+		}
+	}
+
+	if len(explicitlyConfiguredRepos) > 0 || len(errs) > 0 {
+		return errs
+	}
+
+	ignoreProject := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
+		msg := fmt.Sprintf("could not compile ignore repo pattern %q", pattern)
+		errs = append(errs, errors.WrapPrefix(err, msg, 0))
+	})
+
+	projects, err := s.getAllProjects(ctx, apiClient)
+	if err != nil {
+		errs = append(errs, err)
+		return errs
+	}
+
+	for _, p := range projects {
+		if !ignoreProject(p.PathWithNamespace) {
+			return errs
+		}
+	}
+
+	return append(errs, fmt.Errorf("ignore patterns excluded all projects"))
 }
 
 func (s *Source) newClient() (*gitlab.Client, error) {
@@ -322,23 +376,30 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 	return projectList, nil
 }
 
-func (s *Source) getRepos() ([]string, []error) {
-	if len(s.repos) == 0 {
-		return nil, nil
+func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Client, ignoreRepo func(repo string) bool) ([]string, error, bool) {
+	projects, err := s.getAllProjects(ctx, apiClient)
+	if err != nil {
+		return nil, fmt.Errorf("error getting all projects: %v", err), true
 	}
 
-	var validRepos []string
-	var errs []error
-	for _, prj := range s.repos {
-		repo, err := giturl.NormalizeGitlabRepo(prj)
-		if err != nil {
-			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+	// Turn projects into URLs for Git cloner.
+	var repos []string
+	for _, prj := range projects {
+		if ignoreRepo(prj.PathWithNamespace) {
 			continue
 		}
 
-		validRepos = append(validRepos, repo)
+		// Ensure the urls are valid before adding them to the repo list.
+		_, err := url.Parse(prj.HTTPURLToRepo)
+		if err != nil {
+			fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
+		}
+		repos = append(repos, prj.HTTPURLToRepo)
 	}
-	return validRepos, errs
+	if len(repos) == 0 {
+		return nil, errors.Errorf("unable to discover any repos"), true
+	}
+	return repos, nil, false
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
@@ -411,21 +472,6 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 	return nil
 }
 
-func (s *Source) ignoreRepo(ctx context.Context, r string) bool {
-	for _, ignore := range s.ignoreRepos {
-		g, err := glob.Compile(ignore)
-		if err != nil {
-			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", ignore)
-			continue
-		}
-		if g.Match(r) {
-			ctx.Logger().V(2).Info("Ignoring repo", "repo", r)
-			return true
-		}
-	}
-	return false
-}
-
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
 func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string) {
 	s.resumeInfoMutex.Lock()
@@ -444,4 +490,43 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
+}
+
+func buildIgnorer(patterns []string, onCompileErr func(err error, pattern string)) func(repo string) bool {
+	var globs []glob.Glob
+
+	for _, pattern := range patterns {
+		g, err := glob.Compile(pattern)
+		if err != nil {
+			onCompileErr(err, pattern)
+			continue
+		}
+		globs = append(globs, g)
+	}
+
+	f := func(repo string) bool {
+		for _, g := range globs {
+			if g.Match(repo) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return f
+}
+
+func normalizeRepos(repos []string) ([]string, []error) {
+	var validRepos []string
+	var errs []error
+	for _, prj := range repos {
+		repo, err := giturl.NormalizeGitlabRepo(prj)
+		if err != nil {
+			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+			continue
+		}
+
+		validRepos = append(validRepos, repo)
+	}
+	return validRepos, errs
 }

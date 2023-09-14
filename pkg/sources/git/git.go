@@ -34,10 +34,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
+
 type Source struct {
 	name     string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	git      *Git
 	sources.Progress
@@ -51,8 +53,8 @@ type Source struct {
 type Git struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
-	sourceID           int64
-	jobID              int64
+	sourceID           sources.SourceID
+	jobID              sources.JobID
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
@@ -63,7 +65,7 @@ type metrics struct {
 	commitsScanned uint64
 }
 
-func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
+func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData,
 ) *Git {
 	return &Git{
@@ -84,14 +86,14 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GIT
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
@@ -109,7 +111,7 @@ func (s *Source) WithPreserveTempDirs(preserve bool) {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -368,6 +370,32 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 
 	logger.V(1).Info("successfully cloned repo")
 	return clonePath, repo, nil
+}
+
+// PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
+// that a repo actually exists and is reachable.
+//
+// Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
+func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
+	if err := GitCmdCheck(); err != nil {
+		return err
+	}
+	lsUrl, err := GitURLParse(gitUrl)
+	if err != nil {
+		return err
+	}
+	if lsUrl.User == nil {
+		lsUrl.User = url.UserPassword(user, token)
+	}
+
+	// We don't actually care about any refs on the remote, we just care whether can can list them at all. So we query
+	// only for a ref that we know won't exist to minimize the search time on the remote. (By default, ls-remote exits
+	// with 0 even if it doesn't find any matching refs.)
+	fakeRef := "TRUFFLEHOG_CHECK_GIT_REMOTE_URL_REACHABILITY"
+	gitArgs := []string{"ls-remote", lsUrl.String(), "--quiet", fakeRef}
+	cmd := exec.Command("git", gitArgs...)
+	_, err = cmd.CombinedOutput()
+	return err
 }
 
 // CloneRepoUsingToken clones a repo using a provided token.

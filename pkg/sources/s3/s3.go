@@ -31,6 +31,8 @@ import (
 )
 
 const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_S3
+
 	defaultAWSRegion     = "us-east-1"
 	defaultMaxObjectSize = 250 * 1024 * 1024 // 250 MiB
 	maxObjectSizeLimit   = 250 * 1024 * 1024 // 250 MiB
@@ -38,8 +40,8 @@ const (
 
 type Source struct {
 	name        string
-	sourceId    int64
-	jobId       int64
+	sourceId    sources.SourceID
+	jobId       sources.JobID
 	verify      bool
 	concurrency int
 	log         logr.Logger
@@ -58,19 +60,19 @@ var _ sources.Validator = (*Source)(nil)
 
 // Type returns the type of source
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_S3
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
 // Init returns an initialized AWS source
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = context.WithValues(aCtx, "source", s.Type(), "name", name).Logger()
 
 	s.name = name
@@ -198,7 +200,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 		}
 
 		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
-		logger.Info("Scanning bucket")
+		logger.V(3).Info("Scanning bucket")
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
 		if err != nil {
@@ -278,7 +280,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 
 		// ignore large files
 		if *obj.Size > s.maxObjectSize {
-			s.log.V(3).Info("Skipping %d byte file (over maxObjectSize limit)", "object", *obj.Key)
+			s.log.V(5).Info("Skipping %d byte file (over maxObjectSize limit)", "object", *obj.Key)
 			continue
 		}
 
