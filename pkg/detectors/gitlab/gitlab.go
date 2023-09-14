@@ -14,21 +14,18 @@ import (
 
 type Scanner struct {
 	client *http.Client
-
 	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
-func (Scanner) Version() int            { return 1 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b((?:glpat|)[a-zA-Z0-9\-=_]{20,22})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,20 +39,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
+		// v2 of the gitlab detector has a 'glpat' prefix, but v1 does not
 		if strings.Contains(match[0], "glpat") {
 			keyString := strings.Split(match[0], " ")
 			resMatch = keyString[len(keyString)-1]
 		}
-
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitlab,
-			Raw:          []byte(match[1]),
+			Raw:          []byte(resMatch),
 		}
 
 		if verify {
