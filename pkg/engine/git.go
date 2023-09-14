@@ -55,7 +55,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, git.SourceType)
 
 	gitSource := &git.Source{}
-	if err := gitSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, &conn, runtime.NumCPU()); err != nil {
+	if err := gitSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
 	gitSource.WithScanOptions(scanOptions)

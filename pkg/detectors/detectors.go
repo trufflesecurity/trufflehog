@@ -66,7 +66,7 @@ type ResultWithMetadata struct {
 	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceID is the ID of the source that the API uses to map secrets to specific sources.
-	SourceID int64
+	SourceID sources.SourceID
 	// SourceType is the type of Source.
 	SourceType sourcespb.SourceType
 	// SourceName is the name of the Source.

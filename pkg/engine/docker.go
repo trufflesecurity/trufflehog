@@ -15,7 +15,7 @@ func (e *Engine) ScanDocker(ctx context.Context, conn *anypb.Any) error {
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, docker.SourceType)
 
 	dockerSource := &docker.Source{}
-	if err := dockerSource.Init(ctx, sourceName, int64(jobID), int64(sourceID), true, conn, runtime.NumCPU()); err != nil {
+	if err := dockerSource.Init(ctx, sourceName, jobID, sourceID, true, conn, runtime.NumCPU()); err != nil {
 		return err
 	}
 	_, err := e.sourceManager.Run(ctx, sourceName, dockerSource)

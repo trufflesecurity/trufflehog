@@ -30,11 +30,6 @@ type SourceManager struct {
 	done bool
 }
 
-type (
-	SourceID int64
-	JobID    int64
-)
-
 // apiClient is an interface for optionally communicating with an external API.
 type apiClient interface {
 	// GetIDs informs the API of the source that's about to run and returns
