@@ -87,6 +87,7 @@ var (
 	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue comments in scan.").Bool()
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
+	githubVisibility        = githubScan.Flag("visibility", `Repositories to include based on their visibility state. Example: "public", "private", "shared", "unknown"`).String()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -426,6 +427,7 @@ func run(state overseer.State) {
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
+			Visibility:                 *githubVisibility,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")

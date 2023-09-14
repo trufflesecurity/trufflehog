@@ -20,6 +20,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v42/github"
+	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -64,7 +65,7 @@ type Source struct {
 	git               *git.Git
 
 	scanOptMu   sync.Mutex // protects the scanOptions
-	scanOptions *git.ScanOptions
+	scanOptions *ScanOptions
 
 	httpClient      *http.Client
 	log             logr.Logger
@@ -84,15 +85,22 @@ type Source struct {
 	sources.CommonSourceUnitUnmarshaller
 }
 
-func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
+func (s *Source) WithScanOptions(scanOptions *ScanOptions) {
 	s.scanOptions = scanOptions
+}
+
+func (s *Source) WithGitScanOptions(gitScanOptions *git.ScanOptions) {
+	s.scanOptions = &ScanOptions{
+		gitScanOptions,
+		[]source_metadatapb.Visibility{},
+	}
 }
 
 func (s *Source) setScanOptions(base, head string) {
 	s.scanOptMu.Lock()
 	defer s.scanOptMu.Unlock()
-	s.scanOptions.BaseHash = base
-	s.scanOptions.HeadHash = head
+	s.scanOptions.GitScanOptions.BaseHash = base
+	s.scanOptions.GitScanOptions.HeadHash = head
 }
 
 // Ensure the Source satisfies the interfaces at compile time
@@ -733,7 +741,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	scanErrs := sources.NewScanErrors()
 	// Setup scan options if it wasn't provided.
 	if s.scanOptions == nil {
-		s.scanOptions = &git.ScanOptions{}
+		s.scanOptions = &ScanOptions{}
 	}
 
 	for i, repoURL := range s.repos {
@@ -741,6 +749,16 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 		s.jobPool.Go(func() error {
 			if common.IsDone(ctx) {
 				return nil
+			}
+
+			// skip this repo if scan options limit visibility of repo
+			// AND the visibility of this repo is not in the allowed list
+			if len(s.scanOptions.Visibility) > 0 {
+				vis := s.visibilityOf(ctx, repoURL)
+				if !slices.Contains(s.scanOptions.Visibility, vis) {
+					s.log.V(0).Info("Skipping repository due to visibility requirements " + repoURL + " (" + vis.String() + ")")
+					return nil
+				}
 			}
 
 			// TODO: set progress complete is being called concurrently with i
@@ -785,7 +803,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
 
-			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
+			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions.GitScanOptions, chunksChan); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
 			}

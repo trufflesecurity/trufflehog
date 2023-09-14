@@ -41,11 +41,17 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	}
 
 	logOptions := &gogit.LogOptions{}
-	opts := []git.ScanOption{
+	gitOpts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
 		git.ScanOptionLogOptions(logOptions),
 	}
-	scanOptions := git.NewScanOptions(opts...)
+	gitScanOptions := git.NewScanOptions(gitOpts...)
+	
+	opts := []github.ScanOption{
+		github.ScanOptionGitScanOptions(*gitScanOptions),
+		github.ScanOptionVisibility(c.Visibility),
+	}
+	scanOptions := github.NewScanOptions(opts...)
 
 	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - github", new(github.Source).Type(),
 		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
