@@ -78,7 +78,7 @@ func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []b
 			if errors.Is(err, archiver.ErrNoMatch) {
 				return
 			}
-			logger.V(2).Info("Error unarchiving chunk.")
+			logger.Error(err, "error unarchiving chunk.")
 		}
 	}()
 	return archiveChan

@@ -47,40 +47,42 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 		// an io.MultiReader, which is used by the SpecializedHandler.
 		reReader, err := diskbufferreader.New(file)
 		if err != nil {
-			aCtx.Logger().Error(err, "error creating re-reader reader")
+			aCtx.Logger().Error(err, "error creating reusable reader")
 			return false
 		}
-		defer reReader.Close()
 
-		// Check if the handler implements SpecializedHandler and process accordingly.
-		if specialHandler, ok := h.(SpecializedHandler); ok {
-			file, isSpecial, err := specialHandler.HandleSpecialized(aCtx, reReader)
-			if isSpecial {
-				return handleChunks(aCtx, h.FromFile(ctx, file), chunkSkel, chunksChan)
-			}
-
-			if err != nil {
-				aCtx.Logger().Error(err, "error handling file")
-			}
+		if success := processHandler(aCtx, h, reReader, chunkSkel, chunksChan); success {
+			return true
 		}
-
-		if err := reReader.Reset(); err != nil {
-			aCtx.Logger().Error(err, "error resetting re-reader")
-			return false
-		}
-		if _, isType := h.IsFiletype(aCtx, reReader); !isType {
-			continue
-		}
-
-		if err := reReader.Reset(); err != nil {
-			aCtx.Logger().Error(err, "error resetting re-reader")
-			return false
-		}
-		reReader.Stop()
-		return handleChunks(aCtx, h.FromFile(ctx, reReader), chunkSkel, chunksChan)
 	}
 
 	return false
+}
+
+func processHandler(ctx logContext.Context, h Handler, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+	defer reReader.Close()
+	defer reReader.Stop()
+
+	if specialHandler, ok := h.(SpecializedHandler); ok {
+		file, isSpecial, err := specialHandler.HandleSpecialized(ctx, reReader)
+		if isSpecial {
+			return handleChunks(ctx, h.FromFile(ctx, file), chunkSkel, chunksChan)
+		}
+		if err != nil {
+			ctx.Logger().Error(err, "error handling file")
+		}
+	}
+
+	if _, err := reReader.Seek(0, io.SeekStart); err != nil {
+		ctx.Logger().Error(err, "error seeking to start of file")
+		return false
+	}
+
+	if _, isType := h.IsFiletype(ctx, reReader); !isType {
+		return false
+	}
+
+	return handleChunks(ctx, h.FromFile(ctx, reReader), chunkSkel, chunksChan)
 }
 
 func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
