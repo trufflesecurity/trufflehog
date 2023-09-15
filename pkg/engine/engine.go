@@ -239,7 +239,7 @@ func (m *Metrics) getScanDuration() time.Duration {
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
-	e.metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
+	e.metrics.detectorAvgTime.Range(func(k, v any) bool {
 		key, ok := k.(string)
 		if !ok {
 			logger.Info("expected detectorAvgTime key to be a string")
