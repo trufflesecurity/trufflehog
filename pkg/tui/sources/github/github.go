@@ -66,20 +66,6 @@ func (m githubCmdModel) Cmd() string {
 	return strings.Join(command, " ")
 }
 
-func (m githubCmdModel) Test() map[string]textinputs.Input {
-	inputs := m.GetInputs()
-	if inputs["org"].IsDefault != inputs["repo"].IsDefault {
-		if inputs["org"].IsDefault {
-			delete(inputs, "org")
-		}
-		if inputs["repo"].IsDefault {
-			delete(inputs, "repo")
-		}
-	}
-
-	return inputs
-}
-
 func (m githubCmdModel) Summary() string {
 	inputs := m.GetSpecialInputs()
 	labels := m.GetLabels()
