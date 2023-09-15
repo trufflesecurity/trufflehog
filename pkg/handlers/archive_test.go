@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/stretchr/testify/assert"
@@ -247,4 +248,26 @@ func TestOpenInvalidArchive(t *testing.T) {
 
 	err := a.openArchive(ctx, 0, reader, archiveChan)
 	assert.Error(t, err)
+}
+
+func TestNestedDirArchive(t *testing.T) {
+	file, err := os.Open("testdata/dir-archive.zip")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx, cancel := logContext.WithTimeout(logContext.Background(), 5*time.Second)
+	defer cancel()
+	sourceChan := make(chan *sources.Chunk, 1)
+
+	go func() {
+		defer close(sourceChan)
+		HandleFile(ctx, file, &sources.Chunk{}, sourceChan)
+	}()
+
+	count := 0
+	want := 4
+	for range sourceChan {
+		count++
+	}
+	assert.Equal(t, want, count)
 }

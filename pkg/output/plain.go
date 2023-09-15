@@ -76,7 +76,7 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 		}
 	}
 
-	aggregateData := make(map[string]interface{})
+	aggregateData := make(map[string]any)
 	var aggregateDataKeys []string
 
 	for _, data := range meta {
@@ -93,7 +93,7 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	return nil
 }
 
-func structToMap(obj interface{}) (m map[string]map[string]interface{}, err error) {
+func structToMap(obj any) (m map[string]map[string]any, err error) {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return

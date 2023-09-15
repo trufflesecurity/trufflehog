@@ -96,7 +96,7 @@ func constructRequest(secret, keyID string) (*http.Request, error) {
 		return nil, err
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"request": accountDetail,
 		"nonce":   time.Now().UnixNano(),
 	}
