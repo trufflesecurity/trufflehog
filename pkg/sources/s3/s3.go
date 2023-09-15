@@ -377,6 +377,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				},
 				Verify: s.verify,
 			}
+
 			if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
 				atomic.AddUint64(objectCount, 1)
 				s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
