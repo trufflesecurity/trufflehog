@@ -15,6 +15,7 @@ func GetFields() gitCmdModel {
 	uri := textinputs.InputConfig{
 		Label:       "Git URI",
 		Key:         "uri",
+		Help:        "file:// for local git repos",
 		Required:    true,
 		Placeholder: "git@github.com:trufflesecurity/trufflehog.git",
 	}
