@@ -60,6 +60,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 }
 
 func processHandler(ctx logContext.Context, h Handler, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+	defer reReader.Close()
 	defer reReader.Stop()
 
 	if specialHandler, ok := h.(SpecializedHandler); ok {
