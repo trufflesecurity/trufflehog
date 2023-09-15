@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -44,7 +44,7 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a myfreshworks secret %s within myfreshworksdomain %s", secret, domain)),
+				data:   []byte(fmt.Sprintf("You can find a myfreshworks secret %s domain %s here", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -60,7 +60,7 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a myfreshworks secret %s within myfreshworksdomain %s but not valid", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a invalid myfreshworks secret %s domain %s here", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{

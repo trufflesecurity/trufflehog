@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshworks"}) + `\b([a-z0-9A-Z-]{22})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshworks"}) + `\b([a-z0-9A-Z-_]{22})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"freshworks"}) + `\b([a-zA-Z0-9-_]{2,20})\b`)
 )
 
@@ -34,7 +34,6 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Myfreshworks secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idmatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -75,7 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, s1)
-
 		}
 
 	}
