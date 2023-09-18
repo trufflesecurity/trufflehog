@@ -32,7 +32,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"docker"}
+	return []string{"dckr_pat_","docker"}
 }
 
 // FromData will find and optionally verify Dockerhub secrets in a given set of bytes.
