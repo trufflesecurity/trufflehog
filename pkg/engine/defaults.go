@@ -383,6 +383,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/livestorm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loadmill"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/locationiq"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loggly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loginradius"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lokalisetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
@@ -1544,6 +1545,7 @@ func DefaultDetectors() []detectors.Detector {
 		salesforce.Scanner{},
 		sourcegraph.Scanner{},
 		tailscale.Scanner{},
+		loggly.Scanner{},
 	}
 
 }
