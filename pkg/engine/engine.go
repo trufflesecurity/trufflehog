@@ -548,8 +548,9 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 		}
 		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
-		newLink := giturl.UpdateLinkLineNumber(ctx, link, *mdLine)
-		copyChunk.SourceMetadata.GetGithub().Link = newLink
+		if link != "" {
+			copyChunk.SourceMetadata.GetGithub().Link = giturl.UpdateLinkLineNumber(ctx, link, *mdLine)
+		}
 		data.chunk = copyChunk
 	}
 	if ignoreLinePresent {
