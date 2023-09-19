@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -204,4 +205,61 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(5)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+func TestFragmentFirstLineAndLink(t *testing.T) {
+	tests := []struct {
+		name         string
+		chunk        *sources.Chunk
+		expectedLine int64
+		expectedLink string
+	}{
+		{
+			name: "Test Git Metadata",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Git{
+						Git: &source_metadatapb.Git{
+							Line: 10,
+						},
+					},
+				},
+			},
+			expectedLine: 10,
+			expectedLink: "", // Git doesn't support links
+		},
+		{
+			name: "Test Github Metadata",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Line: 5,
+							Link: "https://example.github.com",
+						},
+					},
+				},
+			},
+			expectedLine: 5,
+			expectedLink: "https://example.github.com",
+		},
+		{
+			name:         "Unsupported Type",
+			chunk:        &sources.Chunk{},
+			expectedLine: 0,
+			expectedLink: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			line, linePtr, link := FragmentFirstLineAndLink(tt.chunk)
+			assert.Equal(t, tt.expectedLink, link, "Mismatch in link")
+			assert.Equal(t, tt.expectedLine, line, "Mismatch in line")
+
+			if linePtr != nil {
+				assert.Equal(t, tt.expectedLine, *linePtr, "Mismatch in linePtr value")
+			}
+		})
+	}
 }
