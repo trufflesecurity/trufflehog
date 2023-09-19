@@ -151,7 +151,6 @@ var linePattern = regexp.MustCompile(`L\d+`)
 
 // UpdateLinkLineNumber updates the line number in a repository link.
 // Used post-link generation to refine reported issue locations within large scanned blocks.
-// Also checks for an "ignore tag" on the result line, allowing certain detections to be disregarded.
 func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
 	parsedURL, err := url.Parse(link)
 	if err != nil {
