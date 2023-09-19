@@ -19,6 +19,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -532,12 +533,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	for _, res := range results {
-		e.processResult(data, res)
+		e.processResult(ctx, data, res)
 	}
 	data.wgDoneFn()
 }
 
-func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
+func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
 		copyChunk := data.chunk
@@ -545,8 +546,10 @@ func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 			copyChunk.SourceMetadata = copyMetaData
 		}
-		fragStart, mdLine, _ := FragmentFirstLineAndLink(&copyChunk)
+		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+		newLink := giturl.UpdateLinkLineNumber(ctx, link, *mdLine)
+		copyChunk.SourceMetadata.GetGithub().Link = newLink
 		data.chunk = copyChunk
 	}
 	if ignoreLinePresent {
