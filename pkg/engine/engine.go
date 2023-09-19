@@ -545,7 +545,7 @@ func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 			copyChunk.SourceMetadata = copyMetaData
 		}
-		fragStart, mdLine := FragmentFirstLine(&copyChunk)
+		fragStart, mdLine, _ := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
 		data.chunk = copyChunk
 	}
@@ -625,27 +625,42 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	return lineNumber, false
 }
 
-// FragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
-// chunk metadata.
-func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
-	var fragmentStart *int64
+// FragmentFirstLineAndLink extracts the first line number and the link from the chunk metadata.
+// It returns:
+//   - The first line number of the fragment.
+//   - A pointer to the line number, facilitating direct updates.
+//   - The link associated with the fragment. This link may be updated in the chunk metadata
+//     if there's a change in the line number.
+func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
+	if chunk.SourceMetadata == nil {
+		return 0, nil, ""
+	}
+
+	var (
+		fragmentStart *int64
+		link          string
+	)
 	switch metadata := chunk.SourceMetadata.GetData().(type) {
 	case *source_metadatapb.MetaData_Git:
 		fragmentStart = &metadata.Git.Line
 	case *source_metadatapb.MetaData_Github:
 		fragmentStart = &metadata.Github.Line
+		link = metadata.Github.Link
 	case *source_metadatapb.MetaData_Gitlab:
 		fragmentStart = &metadata.Gitlab.Line
+		link = metadata.Gitlab.Link
 	case *source_metadatapb.MetaData_Bitbucket:
 		fragmentStart = &metadata.Bitbucket.Line
+		link = metadata.Bitbucket.Link
 	case *source_metadatapb.MetaData_Gerrit:
 		fragmentStart = &metadata.Gerrit.Line
 	case *source_metadatapb.MetaData_Filesystem:
 		fragmentStart = &metadata.Filesystem.Line
+		link = metadata.Filesystem.Link
 	default:
-		return 0, nil
+		return 0, nil, ""
 	}
-	return *fragmentStart, fragmentStart
+	return *fragmentStart, fragmentStart, link
 }
 
 // SetResultLineNumber sets the line number in the provided result.

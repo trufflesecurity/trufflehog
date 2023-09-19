@@ -2,10 +2,13 @@ package giturl
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type provider string
@@ -142,4 +145,43 @@ func GenerateLink(repo, commit, file string, line int64) string {
 		}
 		return baseLink
 	}
+}
+
+var linePattern = regexp.MustCompile(`L\d+`)
+
+// UpdateLinkLineNumber updates the line number in a repository link.
+// Used post-link generation to refine reported issue locations within large scanned blocks.
+// Also checks for an "ignore tag" on the result line, allowing certain detections to be disregarded.
+func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		ctx.Logger().Error(err, "unable to parse link to update line number", "link", link)
+		return link
+	}
+
+	switch determineProvider(link) {
+	case providerBitbucket:
+		// For Bitbucket, it doesn't support line links (based on the GenerateLink function).
+		// So we don't need to change anything.
+		return link
+
+	case providerAzure:
+		// For Azure, line numbers are appended as ?line=<number>.
+		query := parsedURL.Query()
+		query.Set("line", strconv.FormatInt(newLine, 10))
+		parsedURL.RawQuery = query.Encode()
+
+	case providerGithub, providerGitlab:
+		fallthrough
+	default:
+		// Assumed format: .../blob/<commit>/file.go#L<number>
+		fragment := "L" + strconv.FormatInt(newLine, 10)
+		if linePattern.MatchString(parsedURL.Fragment) {
+			parsedURL.Fragment = linePattern.ReplaceAllString(parsedURL.Fragment, fragment)
+		} else {
+			parsedURL.Fragment += fragment
+		}
+	}
+
+	return parsedURL.String()
 }
