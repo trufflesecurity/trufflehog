@@ -171,6 +171,8 @@ func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) strin
 		parsedURL.RawQuery = query.Encode()
 
 	case providerGithub, providerGitlab:
+		// If the provider name isn't one of the cloud defaults, it is probably an on-prem github or gitlab.
+		// So do the same thing.
 		fallthrough
 	default:
 		// Assumed format: .../blob/<commit>/file.go#L<number>

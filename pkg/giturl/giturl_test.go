@@ -204,6 +204,14 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "Update bitbucket, no line number supported",
+			args: args{
+				link:    "https://bitbucket.org/org/repo/blob/xyz123/main.go",
+				newLine: int64(10),
+			},
+			want: "https://bitbucket.org/org/repo/blob/xyz123/main.go",
+		},
+		{
 			name: "Update github link with line",
 			args: args{
 				link:    "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore#L4",
