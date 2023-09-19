@@ -938,6 +938,7 @@ enum DetectorType {
   Snowflake = 927;
   Sourcegraph = 928;
   Tailscale = 929;
+  GrafanaServiceAccount = 930;
 }
 
 message Result {
