@@ -2,6 +2,7 @@ package microsoftteamswebhook
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -13,13 +14,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClientTimeOut(5 * time.Second)
+	defaultClient = common.SaneHttpClientTimeOut(5 * time.Second)
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(https:\/\/[a-zA-Z-0-9]+\.webhook\.office\.com\/webhookb2\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\@[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12}\/IncomingWebhook\/[a-zA-Z-0-9]{32}\/[a-zA-Z-0-9]{8}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{4}-[a-zA-Z-0-9]{12})`)
@@ -48,19 +51,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+
 			payload := strings.NewReader(`{'text':''}`)
 			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				body, err := io.ReadAll(res.Body)
-				res.Body.Close()
-				if err == nil {
-					if res.StatusCode >= 200 && strings.Contains(string(body), "Text is required") {
-						s1.Verified = true
+				s1.VerificationError = err
+			} else {
+				req.Header.Add("Content-Type", "application/json")
+				res, err := client.Do(req)
+				if err != nil {
+					s1.VerificationError = err
+				} else {
+					body, err := io.ReadAll(res.Body)
+					res.Body.Close()
+					if err != nil {
+						s1.VerificationError = err
+					} else if res.StatusCode == http.StatusBadRequest {
+						if strings.Contains(string(body), "Text is required") {
+							s1.Verified = true
+						} else {
+							s1.VerificationError = fmt.Errorf("unexpected response body: %s", string(body))
+						}
+					} else if res.StatusCode < 200 || res.StatusCode >= 500 {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status: %d", res.StatusCode)
 					}
 				}
 			}
