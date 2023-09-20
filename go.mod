@@ -54,6 +54,7 @@ require (
 	github.com/launchdarkly/go-server-sdk/v6 v6.1.0
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20221222153816-e95291e2243e
+	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.18
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
