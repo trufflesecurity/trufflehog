@@ -341,7 +341,7 @@ func TestSetLink(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := SetLink(ctx, tt.input, tt.link, tt.line)
+			err := UpdateLink(ctx, tt.input, tt.link, tt.line)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Unexpected error: %v", err)
 			}

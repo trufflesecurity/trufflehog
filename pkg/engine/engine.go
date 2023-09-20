@@ -548,7 +548,7 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 		}
 		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
-		if err := SetLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
+		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
 			ctx.Logger().Error(err, "error setting link")
 			return
 		}
@@ -675,8 +675,8 @@ func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragSta
 	return skip
 }
 
-// SetLink updates the link of the provided source metadata.
-func SetLink(ctx context.Context, metadata *source_metadatapb.MetaData, link string, line int64) error {
+// UpdateLink updates the link of the provided source metadata.
+func UpdateLink(ctx context.Context, metadata *source_metadatapb.MetaData, link string, line int64) error {
 	if metadata == nil {
 		return fmt.Errorf("metadata is nil when setting the link")
 	}
