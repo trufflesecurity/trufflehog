@@ -548,8 +548,9 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 		}
 		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
-		if link != "" {
-			copyChunk.SourceMetadata.GetGithub().Link = giturl.UpdateLinkLineNumber(ctx, link, *mdLine)
+		if err := SetLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
+			ctx.Logger().Error(err, "error setting link")
+			return
 		}
 		data.chunk = copyChunk
 	}
@@ -672,4 +673,32 @@ func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragSta
 	offset, skip := FragmentLineOffset(chunk, result)
 	*mdLine = fragStart + offset
 	return skip
+}
+
+// SetLink updates the link of the provided source metadata.
+func SetLink(ctx context.Context, metadata *source_metadatapb.MetaData, link string, line int64) error {
+	if metadata == nil {
+		return fmt.Errorf("metadata is nil when setting the link")
+	}
+
+	if link == "" {
+		ctx.Logger().V(4).Info("link is empty, skipping update")
+		return nil
+	}
+
+	newLink := giturl.UpdateLinkLineNumber(ctx, link, line)
+
+	switch meta := metadata.GetData().(type) {
+	case *source_metadatapb.MetaData_Github:
+		meta.Github.Link = newLink
+	case *source_metadatapb.MetaData_Gitlab:
+		meta.Gitlab.Link = newLink
+	case *source_metadatapb.MetaData_Bitbucket:
+		meta.Bitbucket.Link = newLink
+	case *source_metadatapb.MetaData_Filesystem:
+		meta.Filesystem.Link = newLink
+	default:
+		return fmt.Errorf("unsupported metadata type")
+	}
+	return nil
 }
