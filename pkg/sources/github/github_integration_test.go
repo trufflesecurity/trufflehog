@@ -838,3 +838,71 @@ func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testin
 // 		})
 // 	}
 // }
+
+func TestSource_Chunks_TargetedScan(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3000)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	type init struct {
+		name          string
+		verify        bool
+		connection    *sourcespb.GitHub
+		queryCriteria *source_metadatapb.MetaData
+	}
+	tests := []struct {
+		name       string
+		init       init
+		wantChunks int
+	}{
+		{
+			name: "targeted scan",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "https://github.com/trufflesecurity/test_keys/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "keys",
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			assert.Nil(t, err)
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			assert.Nil(t, err)
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh, &sources.ChunkingTarget{QueryCriteria: tt.init.queryCriteria})
+				assert.Nil(t, err)
+			}()
+
+			i := 0
+			for range chunksCh {
+				i++
+			}
+			assert.Equal(t, tt.wantChunks, i)
+		})
+	}
+}

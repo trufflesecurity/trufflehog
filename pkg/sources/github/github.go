@@ -415,10 +415,16 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	apiEndpoint := s.conn.Endpoint
 	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = "https://api.github.com"
+	}
+
+	// If targets are provided, we're only scanning the data in those targets.
+	// Otherwise, we're scanning all data.
+	if len(targets) > 0 {
+		return s.scanTargets(ctx, targets, chunksChan)
 	}
 
 	// Reset consumption and rate limit metrics on each run.
@@ -1319,6 +1325,60 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 		}
 	}
 	return nil
+}
+
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	for _, tgt := range targets {
+		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
+			ctx.Logger().Error(err, "error scanning target")
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
+	if !ok {
+		return fmt.Errorf("unable to cast metadata type for targetted scan")
+	}
+	meta := metaType.Github
+
+	u, err := url.Parse(meta.GetLink())
+	if err != nil {
+		return fmt.Errorf("unable to parse GitHub URL: %w", err)
+	}
+
+	// The owner is the second segment of the path.
+	// Ex: https://github.com/trufflesecurity/.....
+	segments := strings.Split(u.Path, "/")
+	if len(segments) <= 1 {
+		return fmt.Errorf("invalid GitHub URL")
+	}
+
+	qry := commitQuery{
+		repo:     meta.GetRepository(),
+		owner:    segments[1],
+		sha:      meta.GetCommit(),
+		filename: meta.GetFile(),
+	}
+	res, err := s.getDiffForFileInCommit(ctx, qry)
+	if err != nil {
+		return err
+	}
+	chunk := &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
+		Data:       []byte(res),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{Github: meta},
+		},
+		Verify: s.verify,
+	}
+
+	return common.CancellableWrite(ctx, chunksChan, chunk)
 }
 
 func removeURLAndSplit(url string) []string {

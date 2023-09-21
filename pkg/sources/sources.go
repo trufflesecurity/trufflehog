@@ -42,7 +42,7 @@ type Chunk struct {
 // without processing the entire dataset.
 type ChunkingTarget struct {
 	// QueryCriteria represents specific parameters or conditions to target the chunking process.
-	QueryCriteria source_metadatapb.MetaData
+	QueryCriteria *source_metadatapb.MetaData
 }
 
 // Source defines the interface required to implement a source chunker.
