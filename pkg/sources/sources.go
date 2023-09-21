@@ -277,6 +277,9 @@ type Validator interface {
 // scope should be the len(scopedItems)
 // message is the public facing user information about the current progress
 // encodedResumeInfo is an optional string representing any information necessary to resume the job if interrupted
+//
+//	NOTE: SetProgressOngoing should be used when source does not yet know how many items it is scanning (scope)
+//	and does not want to display a percentage complete
 func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo string) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
@@ -293,6 +296,23 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 	}
 
 	p.PercentComplete = int64((float64(i) / float64(scope)) * 100)
+}
+
+// SetProgressOngoing sets information about the current running job based on
+// the highest level objects in the source.
+// message is the public facing user information about the current progress
+// encodedResumeInfo is an optional string representing any information necessary to resume the job if interrupted
+//
+//	NOTE: This method should be used over SetProgressComplete when the source does
+//	not yet know how many items it is scanning and does not want to display a percentage complete.
+func (p *Progress) SetProgressOngoing(message string, encodedResumeInfo string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+
+	p.Message = message
+	p.EncodedResumeInfo = encodedResumeInfo
+	// Explicitly set SectionsRemaining to 0 so the frontend does not display a percent.
+	p.SectionsRemaining = 0
 }
 
 // GetProgress gets job completion percentage for metrics reporting.
