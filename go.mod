@@ -74,7 +74,7 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.13.0
 	golang.org/x/exp v0.0.0-20230206171751-46f607a40771
-	golang.org/x/oauth2 v0.10.0
+	golang.org/x/oauth2 v0.12.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/text v0.13.0
 	google.golang.org/api v0.132.0
@@ -246,7 +246,7 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/net v0.14.0 // indirect
+	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/term v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
