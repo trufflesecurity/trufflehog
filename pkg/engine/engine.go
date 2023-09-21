@@ -605,7 +605,8 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 		sourcespb.SourceType_SOURCE_TYPE_GERRIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG,
 		sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT,
-		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM:
+		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM,
+		sourcespb.SourceType_SOURCE_TYPE_AZURE_REPOS:
 		return true
 	default:
 		return false
@@ -662,6 +663,9 @@ func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
 	case *source_metadatapb.MetaData_Filesystem:
 		fragmentStart = &metadata.Filesystem.Line
 		link = metadata.Filesystem.Link
+	case *source_metadatapb.MetaData_AzureRepos:
+		fragmentStart = &metadata.AzureRepos.Line
+		link = metadata.AzureRepos.Link
 	default:
 		return 0, nil, ""
 	}
@@ -697,6 +701,8 @@ func UpdateLink(ctx context.Context, metadata *source_metadatapb.MetaData, link 
 		meta.Bitbucket.Link = newLink
 	case *source_metadatapb.MetaData_Filesystem:
 		meta.Filesystem.Link = newLink
+	case *source_metadatapb.MetaData_AzureRepos:
+		meta.AzureRepos.Link = newLink
 	default:
 		return fmt.Errorf("unsupported metadata type")
 	}
