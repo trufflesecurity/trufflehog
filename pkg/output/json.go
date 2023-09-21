@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 // JSONPrinter is a printer that prints results in JSON format.
@@ -20,7 +21,7 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		// SourceMetadata contains source-specific contextual information.
 		SourceMetadata *source_metadatapb.MetaData
 		// SourceID is the ID of the source that the API uses to map secrets to specific sources.
-		SourceID int64
+		SourceID sources.SourceID
 		// SourceType is the type of Source.
 		SourceType sourcespb.SourceType
 		// SourceName is the name of the Source.

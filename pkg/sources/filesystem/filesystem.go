@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/fs"
@@ -23,17 +22,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const (
-	// These buffer sizes are mainly driven by our largest credential size, which is GCP @ ~2.25KB.
-	// Having a peek size larger than that ensures that we have complete credential coverage in our chunks.
-	BufferSize = 10 * 1024 // 10KB
-	PeekSize   = 3 * 1024  // 3KB
-)
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM
 
 type Source struct {
 	name     string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	paths    []string
 	log      logr.Logger
@@ -51,19 +45,19 @@ var _ sources.SourceUnitChunker = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
 // Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, _ int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, _ int) error {
 	s.log = aCtx.Logger()
 
 	s.name = name
@@ -85,7 +79,7 @@ func (s *Source) WithFilter(filter *common.Filter) {
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	for i, path := range s.paths {
 		logger := ctx.Logger().WithValues("path", path)
 		if common.IsDone(ctx) {
@@ -169,6 +163,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		SourceType: s.Type(),
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Filesystem{
 				Filesystem: &source_metadatapb.Filesystem{
@@ -187,34 +182,34 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	reReader.Stop()
 
-	for {
-		chunkBytes := make([]byte, BufferSize)
-		reader := bufio.NewReaderSize(reReader, BufferSize)
-		n, err := reader.Read(chunkBytes)
-		if err != nil && !errors.Is(err, io.EOF) {
-			break
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, reReader)
+	for data := range chunkResChan {
+		if err := data.Error(); err != nil {
+			s.log.Error(err, "error reading chunk.")
+			continue
 		}
-		peekData, _ := reader.Peek(PeekSize)
-		if n > 0 {
-			chunksChan <- &sources.Chunk{
-				SourceType: s.Type(),
-				SourceName: s.name,
-				SourceID:   s.SourceID(),
-				Data:       append(chunkBytes[:n], peekData...),
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Filesystem{
-						Filesystem: &source_metadatapb.Filesystem{
-							File: sanitizer.UTF8(path),
-						},
+
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			Data:       data.Bytes(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Filesystem{
+					Filesystem: &source_metadatapb.Filesystem{
+						File: sanitizer.UTF8(path),
 					},
 				},
-				Verify: s.verify,
-			}
+			},
+			Verify: s.verify,
 		}
-		if errors.Is(err, io.EOF) {
-			break
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 

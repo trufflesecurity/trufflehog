@@ -13,6 +13,7 @@ import (
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
+	"github.com/mattn/go-isatty"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
@@ -72,17 +74,20 @@ var (
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
-	githubScan             = cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint     = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos        = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs         = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken        = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
-	githubIncludeForks     = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers   = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-	githubIncludeRepos     = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubExcludeRepos     = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
-	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	githubScan              = cli.Command("github", "Find credentials in GitHub repositories.")
+	githubScanEndpoint      = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos         = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs          = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken         = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubIncludeForks      = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers    = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
+	githubIncludeRepos      = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
+	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue comments in scan.").Bool()
+	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request comments in scan.").Bool()
+	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 	// githubScanMaxDepth     = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	githubScanSinceDate = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
 
@@ -105,6 +110,7 @@ var (
 
 	s3Scan              = cli.Command("s3", "Find credentials in S3 buckets.")
 	s3ScanKey           = s3Scan.Flag("key", "S3 key used to authenticate. Can be provided with environment variable AWS_ACCESS_KEY_ID.").Envar("AWS_ACCESS_KEY_ID").String()
+	s3ScanRoleArns      = s3Scan.Flag("role-arn", "Specify the ARN of an IAM role to assume for scanning. You can repeat this flag.").Strings()
 	s3ScanSecret        = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
 	s3ScanSessionToken  = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
 	s3ScanCloudEnv      = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
@@ -147,6 +153,18 @@ func init() {
 	}
 
 	cli.Version("trufflehog " + version.BuildVersion)
+
+	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
+		args := tui.Run()
+		if len(args) == 0 {
+			os.Exit(0)
+		}
+
+		// Overwrite the Args slice so overseer works properly.
+		os.Args = os.Args[:1]
+		os.Args = append(os.Args, args...)
+	}
+
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
 	switch {
@@ -339,6 +357,10 @@ func run(state overseer.State) {
 		printer = new(output.PlainPrinter)
 	}
 
+	if !*jsonLegacy && !*jsonOut {
+		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
+	}
+
 	e, err := engine.Start(ctx,
 		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
@@ -399,16 +421,19 @@ func run(state overseer.State) {
 		}
 
 		cfg := sources.GithubConfig{
-			Endpoint:       *githubScanEndpoint,
-			Token:          *githubScanToken,
-			IncludeForks:   *githubIncludeForks,
-			IncludeMembers: *githubIncludeMembers,
-			Concurrency:    *concurrency,
-			ExcludeRepos:   *githubExcludeRepos,
-			IncludeRepos:   *githubIncludeRepos,
-			Repos:          *githubScanRepos,
-			Orgs:           *githubScanOrgs,
-			Filter:         filter,
+			Endpoint:                   *githubScanEndpoint,
+			Token:                      *githubScanToken,
+			IncludeForks:               *githubIncludeForks,
+			IncludeMembers:             *githubIncludeMembers,
+			Concurrency:                *concurrency,
+			ExcludeRepos:               *githubExcludeRepos,
+			IncludeRepos:               *githubIncludeRepos,
+			Repos:                      *githubScanRepos,
+			Orgs:                       *githubScanOrgs,
+			IncludeIssueComments:       *githubScanIssueComments,
+			IncludePullRequestComments: *githubScanPRComments,
+			IncludeGistComments:        *githubScanGistComments,
+			Filter:                     filter,
 			// MaxDepth:       *githubScanMaxDepth,
 			SinceDate: *githubScanSinceDate,
 		}
@@ -454,6 +479,7 @@ func run(state overseer.State) {
 			Secret:        *s3ScanSecret,
 			SessionToken:  *s3ScanSessionToken,
 			Buckets:       *s3ScanBuckets,
+			Roles:         *s3ScanRoleArns,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
 		}
@@ -507,10 +533,6 @@ func run(state overseer.State) {
 		if err := e.ScanDocker(ctx, anyConn); err != nil {
 			logFatal(err, "Failed to scan Docker.")
 		}
-	}
-
-	if !*jsonLegacy && !*jsonOut {
-		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
 	// Wait for all workers to finish.

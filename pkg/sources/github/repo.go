@@ -226,7 +226,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			s.repoSizes.addRepo(repoURL, r.GetSize())
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
-			logger.V(3).Info("repo attributes", "name", repoName, "size", r.GetSize(), "repo_url", repoURL)
+			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
 		if res.NextPage == 0 {

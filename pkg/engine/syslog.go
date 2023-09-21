@@ -41,18 +41,14 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) error {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - syslog", new(syslog.Source).Type(),
-		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
-			syslogSource := syslog.Source{}
-			if err := syslogSource.Init(ctx, "trufflehog - syslog", jobID, sourceID, true, &conn, c.Concurrency); err != nil {
-				return nil, err
-			}
-			syslogSource.InjectConnection(connection)
-			return &syslogSource, nil
-		})
-	if err != nil {
+	sourceName := "trufflehog - syslog"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, syslog.SourceType)
+	syslogSource := &syslog.Source{}
+	if err := syslogSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	syslogSource.InjectConnection(connection)
+
+	_, err = e.sourceManager.Run(ctx, sourceName, syslogSource)
 	return err
 }

@@ -51,21 +51,18 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 		return err
 	}
 
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - git", new(git.Source).Type(),
-		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
-			gitSource := git.Source{}
-			if err := gitSource.Init(ctx, "trufflehog - git", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-				return nil, err
-			}
-			gitSource.WithScanOptions(scanOptions)
-			// Don't try to clean up the provided directory. That's handled by the
-			// caller of ScanGit.
-			gitSource.WithPreserveTempDirs(true)
-			return &gitSource, nil
-		})
-	if err != nil {
+	sourceName := "trufflehog - git"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, git.SourceType)
+
+	gitSource := &git.Source{}
+	if err := gitSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	gitSource.WithScanOptions(scanOptions)
+	// Don't try to clean up the provided directory. That's handled by the
+	// caller of ScanGit.
+	gitSource.WithPreserveTempDirs(true)
+
+	_, err := e.sourceManager.Run(ctx, sourceName, gitSource)
 	return err
 }

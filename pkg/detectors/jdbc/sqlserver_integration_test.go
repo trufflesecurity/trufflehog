@@ -88,7 +88,7 @@ func startSqlServer() error {
 		return nil
 	case <-time.After(30 * time.Second):
 		stopSqlServer()
-		return errors.New("timeout waiting for mysql database to be ready")
+		return errors.New("timeout waiting for sql server database to be ready")
 	}
 }
 
