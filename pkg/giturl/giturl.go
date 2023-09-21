@@ -2,9 +2,13 @@ package giturl
 
 import (
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type provider string
@@ -13,7 +17,28 @@ const (
 	providerGithub    provider = "Github"
 	providerGitlab    provider = "Gitlab"
 	providerBitbucket provider = "Bitbucket"
+	providerAzure     provider = "Azure"
+
+	urlGithub    = "github.com/"
+	urlGitlab    = "gitlab.com/"
+	urlBitbucket = "bitbucket.org/"
+	urlAzure     = "dev.azure.com/"
 )
+
+func determineProvider(repo string) provider {
+	switch {
+	case strings.Contains(repo, urlGithub):
+		return providerGithub
+	case strings.Contains(repo, urlGitlab):
+		return providerGitlab
+	case strings.Contains(repo, urlBitbucket):
+		return providerBitbucket
+	case strings.Contains(repo, urlAzure):
+		return providerAzure
+	default:
+		return ""
+	}
+}
 
 func NormalizeBitbucketRepo(repoURL string) (string, error) {
 	if !strings.HasPrefix(repoURL, "https") {
@@ -87,4 +112,77 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 	// If we're here it's probably a provider repo without ".git" at the end, so add it and return
 	parsed.Path += ".git"
 	return parsed.String(), nil
+}
+
+// GenerateLink crafts a link to the specific file from a commit.
+// Supports GitHub, GitLab, Bitbucket, and Azure Repos.
+// If the provider supports hyperlinks to specific lines, the line number will be included.
+func GenerateLink(repo, commit, file string, line int64) string {
+	switch determineProvider(repo) {
+	case providerBitbucket:
+		return repo[:len(repo)-4] + "/commits/" + commit
+
+	case providerAzure:
+		baseLink := repo + "/commit/" + commit + "/" + file
+		if line > 0 {
+			baseLink += "?line=" + strconv.FormatInt(line, 10)
+		}
+		return baseLink
+
+	case providerGithub, providerGitlab:
+		// If the provider name isn't one of the cloud defaults, it is probably an on-prem github or gitlab.
+		// So do the same thing.
+		fallthrough
+	default:
+		var baseLink string
+		if file == "" {
+			baseLink = repo[:len(repo)-4] + "/commit/" + commit
+		} else {
+			baseLink = repo[:len(repo)-4] + "/blob/" + commit + "/" + file
+			if line > 0 {
+				baseLink += "#L" + strconv.FormatInt(line, 10)
+			}
+		}
+		return baseLink
+	}
+}
+
+var linePattern = regexp.MustCompile(`L\d+`)
+
+// UpdateLinkLineNumber updates the line number in a repository link.
+// Used post-link generation to refine reported issue locations within large scanned blocks.
+func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		ctx.Logger().Error(err, "unable to parse link to update line number", "link", link)
+		return link
+	}
+
+	switch determineProvider(link) {
+	case providerBitbucket:
+		// For Bitbucket, it doesn't support line links (based on the GenerateLink function).
+		// So we don't need to change anything.
+		return link
+
+	case providerAzure:
+		// For Azure, line numbers are appended as ?line=<number>.
+		query := parsedURL.Query()
+		query.Set("line", strconv.FormatInt(newLine, 10))
+		parsedURL.RawQuery = query.Encode()
+
+	case providerGithub, providerGitlab:
+		// If the provider name isn't one of the cloud defaults, it is probably an on-prem github or gitlab.
+		// So do the same thing.
+		fallthrough
+	default:
+		// Assumed format: .../blob/<commit>/file.go#L<number>
+		fragment := "L" + strconv.FormatInt(newLine, 10)
+		if linePattern.MatchString(parsedURL.Fragment) {
+			parsedURL.Fragment = linePattern.ReplaceAllString(parsedURL.Fragment, fragment)
+		} else {
+			parsedURL.Fragment += fragment
+		}
+	}
+
+	return parsedURL.String()
 }

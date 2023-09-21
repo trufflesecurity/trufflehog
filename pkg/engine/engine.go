@@ -19,6 +19,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -239,7 +240,7 @@ func (m *Metrics) getScanDuration() time.Duration {
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
 	avgTime := map[string][]time.Duration{}
-	e.metrics.detectorAvgTime.Range(func(k, v interface{}) bool {
+	e.metrics.detectorAvgTime.Range(func(k, v any) bool {
 		key, ok := k.(string)
 		if !ok {
 			logger.Info("expected detectorAvgTime key to be a string")
@@ -415,6 +416,13 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 	return e.results
 }
 
+// ScanChunk injects a chunk into the output stream of chunks to be scanned.
+// This method should rarely be used. TODO: Remove when dependencies no longer
+// rely on this functionality.
+func (e *Engine) ScanChunk(chunk *sources.Chunk) {
+	e.sourceManager.ScanChunk(chunk)
+}
+
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
 	detector detectors.Detector
@@ -525,12 +533,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	for _, res := range results {
-		e.processResult(data, res)
+		e.processResult(ctx, data, res)
 	}
 	data.wgDoneFn()
 }
 
-func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
+func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
 		copyChunk := data.chunk
@@ -538,8 +546,12 @@ func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 			copyChunk.SourceMetadata = copyMetaData
 		}
-		fragStart, mdLine := FragmentFirstLine(&copyChunk)
+		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
+			ctx.Logger().Error(err, "error setting link")
+			return
+		}
 		data.chunk = copyChunk
 	}
 	if ignoreLinePresent {
@@ -558,11 +570,18 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
 
+		// Dedupe results by comparing the detector type, raw result, and source metadata.
+		// We want to avoid duplicate results with different decoder types, but we also
+		// want to include duplicate results with the same decoder type.
+		// Duplicate results with the same decoder type SHOULD have their own entry in the
+		// results list, this would happen if the same secret is found multiple times.
 		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
-		if _, ok := e.dedupeCache.Get(key); ok {
-			continue
+		if val, ok := e.dedupeCache.Get(key); ok {
+			if res, ok := val.(detectorspb.DecoderType); ok && res != r.DecoderType {
+				continue
+			}
 		}
-		e.dedupeCache.Add(key, struct{}{})
+		e.dedupeCache.Add(key, r.DecoderType)
 
 		if r.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
@@ -595,40 +614,58 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	lines := bytes.Split(chunk.Data, []byte("\n"))
-	for i, line := range lines {
-		if bytes.Contains(line, result.Raw) {
-			// if the line contains the ignore tag, we should ignore the result
-			if bytes.Contains(line, []byte(ignoreTag)) {
-				return int64(i), true
-			}
-			return int64(i), false
-		}
+	before, after, found := bytes.Cut(chunk.Data, result.Raw)
+	if !found {
+		return 0, false
 	}
-	return 0, false
+	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	// If the line contains the ignore tag, we should ignore the result.
+	endLine := bytes.Index(after, []byte("\n"))
+	if endLine == -1 {
+		endLine = len(after)
+	}
+	if bytes.Contains(after[:endLine], []byte(ignoreTag)) {
+		return lineNumber, true
+	}
+	return lineNumber, false
 }
 
-// FragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
-// chunk metadata.
-func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
-	var fragmentStart *int64
+// FragmentFirstLineAndLink extracts the first line number and the link from the chunk metadata.
+// It returns:
+//   - The first line number of the fragment.
+//   - A pointer to the line number, facilitating direct updates.
+//   - The link associated with the fragment. This link may be updated in the chunk metadata
+//     if there's a change in the line number.
+func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
+	if chunk.SourceMetadata == nil {
+		return 0, nil, ""
+	}
+
+	var (
+		fragmentStart *int64
+		link          string
+	)
 	switch metadata := chunk.SourceMetadata.GetData().(type) {
 	case *source_metadatapb.MetaData_Git:
 		fragmentStart = &metadata.Git.Line
 	case *source_metadatapb.MetaData_Github:
 		fragmentStart = &metadata.Github.Line
+		link = metadata.Github.Link
 	case *source_metadatapb.MetaData_Gitlab:
 		fragmentStart = &metadata.Gitlab.Line
+		link = metadata.Gitlab.Link
 	case *source_metadatapb.MetaData_Bitbucket:
 		fragmentStart = &metadata.Bitbucket.Line
+		link = metadata.Bitbucket.Link
 	case *source_metadatapb.MetaData_Gerrit:
 		fragmentStart = &metadata.Gerrit.Line
 	case *source_metadatapb.MetaData_Filesystem:
 		fragmentStart = &metadata.Filesystem.Line
+		link = metadata.Filesystem.Link
 	default:
-		return 0, nil
+		return 0, nil, ""
 	}
-	return *fragmentStart, fragmentStart
+	return *fragmentStart, fragmentStart, link
 }
 
 // SetResultLineNumber sets the line number in the provided result.
@@ -636,4 +673,32 @@ func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragSta
 	offset, skip := FragmentLineOffset(chunk, result)
 	*mdLine = fragStart + offset
 	return skip
+}
+
+// UpdateLink updates the link of the provided source metadata.
+func UpdateLink(ctx context.Context, metadata *source_metadatapb.MetaData, link string, line int64) error {
+	if metadata == nil {
+		return fmt.Errorf("metadata is nil when setting the link")
+	}
+
+	if link == "" {
+		ctx.Logger().V(4).Info("link is empty, skipping update")
+		return nil
+	}
+
+	newLink := giturl.UpdateLinkLineNumber(ctx, link, line)
+
+	switch meta := metadata.GetData().(type) {
+	case *source_metadatapb.MetaData_Github:
+		meta.Github.Link = newLink
+	case *source_metadatapb.MetaData_Gitlab:
+		meta.Gitlab.Link = newLink
+	case *source_metadatapb.MetaData_Bitbucket:
+		meta.Bitbucket.Link = newLink
+	case *source_metadatapb.MetaData_Filesystem:
+		meta.Filesystem.Link = newLink
+	default:
+		return fmt.Errorf("unsupported metadata type")
+	}
+	return nil
 }

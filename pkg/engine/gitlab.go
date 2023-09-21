@@ -50,18 +50,14 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 		return err
 	}
 
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - gitlab", new(gitlab.Source).Type(),
-		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
-			gitlabSource := gitlab.Source{}
-			if err := gitlabSource.Init(ctx, "trufflehog - gitlab", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-				return nil, err
-			}
-			gitlabSource.WithScanOptions(scanOptions)
-			return &gitlabSource, nil
-		})
-	if err != nil {
+	sourceName := "trufflehog - gitlab"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gitlab.SourceType)
+
+	gitlabSource := &gitlab.Source{}
+	if err := gitlabSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	gitlabSource.WithScanOptions(scanOptions)
+	_, err = e.sourceManager.Run(ctx, sourceName, gitlabSource)
 	return err
 }

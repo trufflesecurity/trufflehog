@@ -44,18 +44,14 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 		return fmt.Errorf("failed to marshal GCS connection: %w", err)
 	}
 
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - gcs", new(gcs.Source).Type(),
-		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
-			gcsSource := gcs.Source{}
-			if err := gcsSource.Init(ctx, "trufflehog - gcs", jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
-				return nil, err
-			}
-			return &gcsSource, nil
-		})
-	if err != nil {
+	sourceName := "trufflehog - gcs"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gcs.SourceType)
+
+	gcsSource := &gcs.Source{}
+	if err := gcsSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	_, err = e.sourceManager.Run(ctx, sourceName, gcsSource)
 	return err
 }
 

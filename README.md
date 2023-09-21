@@ -32,7 +32,7 @@ Have questions? Feedback? Jump in slack or discord and hang out with us
 
 Join our [Slack Community](https://join.slack.com/t/trufflehog-community/shared_invite/zt-pw2qbi43-Aa86hkiimstfdKH9UCpPzQ)
 
-Join the [Secret Scanning Discord](https://discord.gg/sydS6AHTUP)
+Join the [Secret Scanning Discord](https://discord.gg/8Hzbrnkr7E)
 
 # :tv: Demo
 
@@ -116,25 +116,31 @@ Expected output:
 trufflehog s3 --bucket=<bucket name> --only-verified
 ```
 
-## 5: Scan a Github Repo using SSH authentication in docker
+## 5: Scan S3 buckets using IAM Roles
+
+```bash
+trufflehog s3 --role-arn=<iam role arn>
+```
+
+## 6: Scan a Github Repo using SSH authentication in docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
-## 6: Scan individual files or directories
+## 7: Scan individual files or directories
 
 ```bash
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 7: Scan GCS buckets for verified secrets.
+## 8: Scan GCS buckets for verified secrets.
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
-# 8: Scan a Docker image for verified secrets.
+## 9: Scan a Docker image for verified secrets.
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -216,6 +222,30 @@ For example, to scan a  `git` repository, start with
 
 ```
 $ trufflehog git https://github.com/trufflesecurity/trufflehog.git
+```
+
+## S3 
+
+The S3 source supports assuming IAM roles for scanning in addition to IAM users. This makes it easier for users to scan multiple AWS accounts without needing to rely on hardcoded credentials for each account.
+
+The IAM identity that TruffleHog uses initially will need to have `AssumeRole` privileges as a principal in the [trust policy](https://aws.amazon.com/blogs/security/how-to-use-trust-policies-with-iam-roles/) of each IAM role to assume.
+
+To scan a specific bucket using locally set credentials or instance metadata if on an EC2 instance:
+
+```bash
+trufflehog s3 --bucket=<bucket-name>
+```
+
+To scan a specific bucket using an assumed role:
+
+```bash
+trufflehog s3 --bucket=<bucket-name> --role-arn=<iam-role-arn>
+```
+
+Multiple roles can be passed as separate arguments. The following command will attempt to scan every bucket each role has permissions to list in the S3 API:
+
+```bash
+trufflehog s3 --role-arn=<iam-role-arn-1> --role-arn=<iam-role-arn-2>
 ```
 
 Exit Codes:

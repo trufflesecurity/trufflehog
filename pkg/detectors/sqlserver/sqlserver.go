@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"regexp"
 
+	mssql "github.com/denisenkom/go-mssqldb"
 	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
@@ -49,9 +50,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			verified, err := ping(paramsUnsafe)
-			if err != nil {
+
+			detected.Verified = verified
+
+			if mssqlErr, isMssqlErr := err.(mssql.Error); isMssqlErr && mssqlErr.Number == 18456 {
+				// Login failed
+				// Number taken from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
+				// Nothing to do; determinate failure to verify
 			} else {
-				detected.Verified = verified
+				detected.VerificationError = err
 			}
 		}
 

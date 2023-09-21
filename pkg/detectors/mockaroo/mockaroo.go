@@ -83,8 +83,8 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 type typeRes struct {
 	Types []struct {
-		Name       string        `json:"name"`
-		Type       interface{}   `json:"type"`
-		Parameters []interface{} `json:"parameters"`
+		Name       string `json:"name"`
+		Type       any    `json:"type"`
+		Parameters []any  `json:"parameters"`
 	} `json:"types"`
 }

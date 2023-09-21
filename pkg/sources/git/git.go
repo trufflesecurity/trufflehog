@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -26,6 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -35,10 +34,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
+
 type Source struct {
 	name     string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	git      *Git
 	sources.Progress
@@ -52,8 +53,8 @@ type Source struct {
 type Git struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
-	sourceID           int64
-	jobID              int64
+	sourceID           sources.SourceID
+	jobID              sources.JobID
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
@@ -64,7 +65,7 @@ type metrics struct {
 	commitsScanned uint64
 }
 
-func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
+func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData,
 ) *Git {
 	return &Git{
@@ -85,14 +86,14 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GIT
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
@@ -110,7 +111,7 @@ func (s *Source) WithPreserveTempDirs(preserve bool) {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -154,7 +155,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	if err := s.scanRepos(ctx, chunksChan); err != nil {
 		return err
 	}
@@ -163,7 +164,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 	}
 
 	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
-	ctx.Logger().V(1).Info("Git source finished scanning", "repo_count", totalRepos, "commits_scanned", atomic.LoadUint64(&s.git.metrics.commitsScanned))
+	ctx.Logger().V(1).Info("Git source finished scanning", "repo_count", totalRepos)
 	s.SetProgressComplete(
 		totalRepos, totalRepos,
 		fmt.Sprintf("Completed scanning source %s", s.name), "",
@@ -371,6 +372,32 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 	return clonePath, repo, nil
 }
 
+// PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
+// that a repo actually exists and is reachable.
+//
+// Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
+func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
+	if err := GitCmdCheck(); err != nil {
+		return err
+	}
+	lsUrl, err := GitURLParse(gitUrl)
+	if err != nil {
+		return err
+	}
+	if lsUrl.User == nil {
+		lsUrl.User = url.UserPassword(user, token)
+	}
+
+	// We don't actually care about any refs on the remote, we just care whether can can list them at all. So we query
+	// only for a ref that we know won't exist to minimize the search time on the remote. (By default, ls-remote exits
+	// with 0 even if it doesn't find any matching refs.)
+	fakeRef := "TRUFFLEHOG_CHECK_GIT_REMOTE_URL_REACHABILITY"
+	gitArgs := []string{"ls-remote", lsUrl.String(), "--quiet", fakeRef}
+	cmd := exec.Command("git", gitArgs...)
+	_, err = cmd.CombinedOutput()
+	return err
+}
+
 // CloneRepoUsingToken clones a repo using a provided token.
 func CloneRepoUsingToken(ctx context.Context, token, gitUrl, user string, args ...string) (string, *git.Repository, error) {
 	userInfo := url.UserPassword(user, token)
@@ -447,6 +474,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
@@ -465,6 +493,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
+				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           diff.Content.Bytes(),
@@ -491,6 +520,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 				chunksChan <- &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
@@ -505,6 +535,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 				chunksChan <- &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           line,
@@ -524,6 +555,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.sourceName,
 			SourceID:       s.sourceID,
+			JobID:          s.jobID,
 			SourceType:     s.sourceType,
 			SourceMetadata: metadata,
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
@@ -589,6 +621,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
@@ -603,6 +636,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
+				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           diff.Content.Bytes(),
@@ -640,7 +674,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	}
 
 	scanTime := time.Now().Unix() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime)
+	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime, "commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned))
 	return nil
 }
 
@@ -691,28 +725,6 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error)
 	}
 
 	return nil
-}
-
-// GenerateLink crafts a link to the specific file from a commit. This works in most major git providers (Github/Gitlab)
-func GenerateLink(repo, commit, file string, line int64) string {
-	// bitbucket links are commits not commit...
-	if strings.Contains(repo, "bitbucket.org/") {
-		return repo[:len(repo)-4] + "/commits/" + commit
-	}
-	var link string
-	if file == "" {
-		link = repo[:len(repo)-4] + "/commit/" + commit
-	} else {
-		link = repo[:len(repo)-4] + "/blob/" + commit + "/" + file
-
-		// Both GitHub and Gitlab support hyperlinking to a specific line with #L<number>, e.g.:
-		// https://github.com/trufflesecurity/trufflehog/blob/e856a6890d0da5a218f4f9283500b80043884641/go.mod#L169
-		// https://gitlab.com/pdftk-java/pdftk/-/blob/88559a08f34175b6fae76c40a88f0377f64a12d7/java/com/gitlab/pdftk_java/report.java#L893
-		if line > 0 && (strings.Contains(repo, "github") || strings.Contains(repo, "gitlab")) {
-			link += "#L" + strconv.FormatInt(line, 10)
-		}
-	}
-	return link
 }
 
 func stripPassword(u string) (string, error) {
@@ -930,14 +942,18 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	}
 	reader.Stop()
 
-	chunkData, err := io.ReadAll(reader)
-	if err != nil {
-		return err
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, reader)
+	for data := range chunkResChan {
+		chunk := *chunkSkel
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
+		}
+		if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+			return err
+		}
 	}
-
-	chunk := *chunkSkel
-	chunk.Data = chunkData
-	chunksChan <- &chunk
 
 	return nil
 }
