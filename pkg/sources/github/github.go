@@ -1350,15 +1350,15 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("unable to parse GitHub URL: %w", err)
 	}
 
-	// The owner is the second segment of the path.
-	// Ex: https://github.com/trufflesecurity/.....
+	// The owner is the second segment and the repo is the third segment of the path.
+	// Ex: https://github.com/owner/repo/.....
 	segments := strings.Split(u.Path, "/")
-	if len(segments) <= 1 {
+	if len(segments) < 3 {
 		return fmt.Errorf("invalid GitHub URL")
 	}
 
 	qry := commitQuery{
-		repo:     meta.GetRepository(),
+		repo:     segments[2],
 		owner:    segments[1],
 		sha:      meta.GetCommit(),
 		filename: meta.GetFile(),

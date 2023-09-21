@@ -862,7 +862,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 		wantChunks int
 	}{
 		{
-			name: "targeted scan, one file in commit",
+			name: "targeted scan, one file in small commit",
 			init: init{
 				name:       "test source",
 				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
@@ -873,6 +873,24 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 							Link:       "https://github.com/trufflesecurity/test_keys/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
 							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
 							File:       "keys",
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
+			name: "targeted scan, one file in med commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/trufflehog.git",
+							Link:       "https://github.com/trufflesecurity/trufflehog/blob/33eed42e17fda8b1a66feaeafcd57efccff26c11/pkg/sources/s3/s3_test.go#L78",
+							Commit:     "33eed42e17fda8b1a66feaeafcd57efccff26c11",
+							File:       "pkg/sources/s3/s3_test.go",
 						},
 					},
 				},
