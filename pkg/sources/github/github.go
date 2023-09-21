@@ -423,6 +423,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	// If targets are provided, we're only scanning the data in those targets.
 	// Otherwise, we're scanning all data.
+	// This allows us to only scan the commit where a vulnerability was found.
 	if len(targets) > 0 {
 		return s.scanTargets(ctx, targets, chunksChan)
 	}
