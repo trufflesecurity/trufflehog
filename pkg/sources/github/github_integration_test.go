@@ -862,7 +862,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 		wantChunks int
 	}{
 		{
-			name: "targeted scan",
+			name: "targeted scan, one file in commit",
 			init: init{
 				name:       "test source",
 				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
@@ -879,6 +879,42 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			},
 			wantChunks: 1,
 		},
+		{
+			name: "no file in commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "https://github.com/trufflesecurity/test_keys/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "not-the-file",
+						},
+					},
+				},
+			},
+			wantChunks: 0,
+		},
+		{
+			name: "invalid query criteria, malformed link",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "malformed-link",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "not-the-file",
+						},
+					},
+				},
+			},
+			wantChunks: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -894,7 +930,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
 				defer close(chunksCh)
-				err = s.Chunks(ctx, chunksCh, &sources.ChunkingTarget{QueryCriteria: tt.init.queryCriteria})
+				err = s.Chunks(ctx, chunksCh, sources.ChunkingTarget{QueryCriteria: tt.init.queryCriteria})
 				assert.Nil(t, err)
 			}()
 
