@@ -79,7 +79,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...*sources.ChunkingTarget) error {
 	projects, err := s.projects(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting projects: %w", err)

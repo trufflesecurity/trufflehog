@@ -142,7 +142,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...*sources.ChunkingTarget) error {
 	// Start client.
 	apiClient, err := s.newClient()
 	if err != nil {

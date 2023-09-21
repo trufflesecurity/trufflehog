@@ -234,7 +234,7 @@ func (s *Source) scanBuckets(ctx context.Context, client *s3.S3, role string, bu
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...*sources.ChunkingTarget) error {
 	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) {
 		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
 	}

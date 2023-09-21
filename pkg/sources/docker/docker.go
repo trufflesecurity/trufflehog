@@ -87,7 +87,7 @@ type layerInfo struct {
 }
 
 // Chunks emits data over a channel that is decoded and scanned for secrets.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...*sources.ChunkingTarget) error {
 	ctx = context.WithValues(ctx, "source_type", s.Type(), "source_name", s.name)
 
 	workers := new(errgroup.Group)

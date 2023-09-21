@@ -155,7 +155,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...*sources.ChunkingTarget) error {
 	if err := s.scanRepos(ctx, chunksChan); err != nil {
 		return err
 	}
