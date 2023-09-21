@@ -32,7 +32,7 @@ func (d *DummySource) GetProgress() *Progress { return nil }
 
 // Interface to easily test different chunking methods.
 type chunker interface {
-	Chunks(context.Context, chan *Chunk, ...ChunkingTarget) error
+	Chunks(context.Context, chan *Chunk, ...*ChunkingTarget) error
 	ChunkUnit(ctx context.Context, unit SourceUnit, reporter ChunkReporter) error
 	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
@@ -43,7 +43,7 @@ type counterChunker struct {
 	count        int
 }
 
-func (c *counterChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...ChunkingTarget) error {
+func (c *counterChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...*ChunkingTarget) error {
 	for i := 0; i < c.count; i++ {
 		select {
 		case ch <- &Chunk{Data: []byte{c.chunkCounter}}:
@@ -76,9 +76,9 @@ func (c *counterChunker) ChunkUnit(ctx context.Context, unit SourceUnit, reporte
 // Chunk method that always returns an error.
 type errorChunker struct{ error }
 
-func (c errorChunker) Chunks(context.Context, chan *Chunk, ...ChunkingTarget) error { return c }
-func (c errorChunker) Enumerate(context.Context, UnitReporter) error                { return c }
-func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error   { return c }
+func (c errorChunker) Chunks(context.Context, chan *Chunk, ...*ChunkingTarget) error { return c }
+func (c errorChunker) Enumerate(context.Context, UnitReporter) error                 { return c }
+func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error    { return c }
 
 // buildDummy is a helper function to enroll a DummySource with a SourceManager.
 func buildDummy(chunkMethod chunker) (Source, error) {
@@ -172,7 +172,7 @@ type unitChunk struct {
 
 type unitChunker struct{ steps []unitChunk }
 
-func (c *unitChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...ChunkingTarget) error {
+func (c *unitChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...*ChunkingTarget) error {
 	for _, step := range c.steps {
 		if step.err != "" {
 			continue
@@ -262,7 +262,7 @@ type callbackChunker struct {
 	cb func(context.Context, chan *Chunk) error
 }
 
-func (c callbackChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...ChunkingTarget) error {
+func (c callbackChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...*ChunkingTarget) error {
 	return c.cb(ctx, ch)
 }
 func (c callbackChunker) Enumerate(context.Context, UnitReporter) error              { return nil }
