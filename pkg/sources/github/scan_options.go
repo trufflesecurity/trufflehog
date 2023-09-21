@@ -21,9 +21,7 @@ func ScanOptionGitScanOptions(opts git.ScanOptions) ScanOption {
 }
 
 func getValidVisibilityScanOption(optVis string) source_metadatapb.Visibility {
-
 	optVis = strings.TrimSpace(optVis)
-
 	switch optVis {
 	case "public", "private", "shared":
 		return source_metadatapb.Visibility(source_metadatapb.Visibility_value[optVis])
@@ -34,10 +32,8 @@ func getValidVisibilityScanOption(optVis string) source_metadatapb.Visibility {
 }
 
 func ScanOptionVisibility(optVis string) ScanOption {
-
 	optVis = strings.ToLower(optVis)
 	var visEnum []source_metadatapb.Visibility
-
 	if strings.Contains(optVis, ",") {
 		strArr := strings.Split(optVis, ",")
 		for i := 0; i < len(strArr); i++ {
@@ -52,7 +48,6 @@ func ScanOptionVisibility(optVis string) ScanOption {
 			visEnum = []source_metadatapb.Visibility{getValidVisibilityScanOption(optVis)}
 		}
 	}
-
 	return func(scanOptions *ScanOptions) {
 		scanOptions.Visibility = visEnum
 	}
