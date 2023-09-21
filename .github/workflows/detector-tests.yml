@@ -1,16 +1,11 @@
-name: Test
+name: detector test aggregation
 
 on:
-  push:
-    tags:
-      - v*
-    branches:
-      - main
-  pull_request:
+  schedule:
+    - cron: "0 8 * * *"
 
 jobs:
-  test:
-    if: ${{ ! github.event.pull_request.head.repo.fork }}
+  test-detectors:
     runs-on: ubuntu-latest
     permissions:
       actions: "read"
@@ -36,36 +31,20 @@ jobs:
           mkdir -p tmp/test-results
       - name: Test
         run: |
-          CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=sources $(go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
-        if: ${{ success() || failure() }} # always run this step, even if there were previous errors
+          CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=detectors -timeout=15m $(go list ./... | pkg/detectors)
       - name: Upload test results to BuildPulse for flaky test detection
-        if: "!cancelled()" # Run this step even when the tests fail. Skip if the workflow is cancelled.
+        if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
         uses: buildpulse/buildpulse-action@main
         with:
           account: 79229934
-          repository: 77726177
+          repository: 694446374
           path: |
             tmp/test-results/*.xml
-          key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
-          secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
-          tags: integration
+          key: ${{ secrets.BUILDPULSE_DETECTORS_ACCESS_KEY_ID }}
+          secret: ${{ secrets.BUILDPULSE_DETECTORS_SECRET_ACCESS_KEY }}
+          tags: detectors
       - name: Annotate test results
         uses: mikepenz/action-junit-report@v3
         if: success() || failure() # always run even if the previous step fails
         with:
           report_paths: "tmp/test-results/*.xml"
-  test-community:
-    if: ${{ github.event.pull_request.head.repo.fork }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: "read"
-      contents: "read"
-    steps:
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: "1.21"
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Test
-        run: make test-community
