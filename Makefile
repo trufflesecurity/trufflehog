@@ -1,4 +1,4 @@
-PROTOS_IMAGE ?= trufflesecurity/protos:1.18-0
+PROTOS_IMAGE ?= trufflesecurity/protos:1.21-0
 
 .PHONY: check
 .PHONY: lint
