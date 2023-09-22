@@ -17,12 +17,11 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int { return 1 }
+func (Scanner) Version() int { return 2 }
 
 var (
 	client = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b([0-9]{6}-[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
