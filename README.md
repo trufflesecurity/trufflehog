@@ -45,7 +45,11 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --or
 # :floppy_disk: Installation
 
 Several options available for you:
+
 ```bash
+# Using install script
+curl -L https://raw.githubusercontent.com/trufflehog/trufflehog/main/install.sh <version> | sh
+
 # MacOS users
 brew install trufflesecurity/trufflehog/trufflehog
 
@@ -74,6 +78,7 @@ trufflehog git https://github.com/trufflesecurity/test_keys --only-verified
 ```
 
 Expected output:
+
 ```
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
 
@@ -105,6 +110,7 @@ trufflehog git https://github.com/trufflesecurity/test_keys --only-verified --js
 ```
 
 Expected output:
+
 ```
 {"SourceMetadata":{"Data":{"Git":{"commit":"fbc14303ffbf8fb1c2c1914e8dda7d0121633aca","file":"keys","email":"counter \u003ccounter@counters-MacBook-Air.local\u003e","repository":"https://github.com/trufflesecurity/test_keys","timestamp":"2022-06-16 10:17:40 -0700 PDT","line":4}}},"SourceID":0,"SourceType":16,"SourceName":"trufflehog - git","DetectorType":2,"DetectorName":"AWS","DecoderName":"PLAIN","Verified":true,"Raw":"AKIAYVP4CIPPERUVIFXG","Redacted":"AKIAYVP4CIPPERUVIFXG","ExtraData":{"account":"595918472158","arn":"arn:aws:iam::595918472158:user/canarytokens.com@@mirux23ppyky6hx3l6vclmhnj","user_id":"AIDAYVP4CIPPJ5M54LRCY"},"StructuredData":null}
 ...
@@ -134,13 +140,13 @@ docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest 
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 8: Scan GCS buckets for verified secrets.
+## 8: Scan GCS buckets for verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
-## 9: Scan a Docker image for verified secrets.
+## 9: Scan a Docker image for verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -157,37 +163,36 @@ trufflehog docker --image trufflesecurity/secrets --only-verified
 + It says a private key was verified, what does that mean?
   + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
 + Is there an easy way to ignore specific secrets?
-  + If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets. 
-
+  + If the scanned source [supports line numbers](https://github.com/trufflesecurity/trufflehog/blob/d6375ba92172fd830abb4247cca15e3176448c5d/pkg/engine/engine.go#L358-L365), then you can add a `trufflehog:ignore` comment on the line containing the secret to ignore that secrets.
 
 # :newspaper: What's new in v3?
 
 TruffleHog v3 is a complete rewrite in Go with many new powerful features.
 
-- We've **added over 700 credential detectors that support active verification against their respective APIs**.
-- We've also added native **support for scanning GitHub, GitLab, filesystems, S3, GCS and Circle CI**.
-- **Instantly verify private keys** against millions of github users and **billions** of TLS certificates using our [Driftwood](https://trufflesecurity.com/blog/driftwood) technology.
-- Scan binaries and other file formats
-- Available as a GitHub Action and a pre-commit hook
-
++ We've **added over 700 credential detectors that support active verification against their respective APIs**.
++ We've also added native **support for scanning GitHub, GitLab, filesystems, S3, GCS and Circle CI**.
++ **Instantly verify private keys** against millions of github users and **billions** of TLS certificates using our [Driftwood](https://trufflesecurity.com/blog/driftwood) technology.
++ Scan binaries and other file formats
++ Available as a GitHub Action and a pre-commit hook
 
 ## What is credential verification?
+
 For every potential credential that is detected, we've painstakingly implemented programmatic verification against the API that we think it belongs to. Verification eliminates false positives. For example, the [AWS credential detector](pkg/detectors/aws/aws.go) performs a `GetCallerIdentity` API call against the AWS API to verify if an AWS credential is active.
 
 # :memo: Usage
 
 TruffleHog has a sub-command for each source of data that you may want to scan:
 
-- git
-- github
-- gitlab
-- docker
-- S3
-- filesystem (files and directories)
-- syslog
-- circleci
-- GCS (Google Cloud Storage)
-- stdin (coming soon)
++ git
++ github
++ gitlab
++ docker
++ S3
++ filesystem (files and directories)
++ syslog
++ circleci
++ GCS (Google Cloud Storage)
++ stdin (coming soon)
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -221,10 +226,10 @@ Args:
 For example, to scan a  `git` repository, start with
 
 ```
-$ trufflehog git https://github.com/trufflesecurity/trufflehog.git
+trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
 
-## S3 
+## S3
 
 The S3 source supports assuming IAM roles for scanning in addition to IAM users. This makes it easier for users to scan multiple AWS accounts without needing to rely on hardcoded credentials for each account.
 
@@ -249,9 +254,10 @@ trufflehog s3 --role-arn=<iam-role-arn-1> --role-arn=<iam-role-arn-2>
 ```
 
 Exit Codes:
-- 0: No errors and no results were found.
-- 1: An error was encountered. Sources may not have completed scans.
-- 183: No errors were encountered, but results were found. Will only be returned if `--fail` flag is used.
+
++ 0: No errors and no results were found.
++ 1: An error was encountered. Sources may not have completed scans.
++ 183: No errors were encountered, but results were found. Will only be returned if `--fail` flag is used.
 
 # :octocat: TruffleHog Github Action
 
@@ -273,6 +279,7 @@ The TruffleHog OSS Github Action can be used to scan a range of commits for leak
 any results are found.
 
 For example, to scan the contents of pull requests you could use the following workflow:
+
 ```yaml
 name: TruffleHog Secrets Scan
 on: [pull_request]
@@ -409,11 +416,9 @@ with HTTPServer(('', 8000), Verifier) as server:
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
 
-
 <a href="https://github.com/trufflesecurity/trufflehog/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=trufflesecurity/trufflehog" />
 </a>
-
 
 # :computer: Contributing
 
@@ -421,23 +426,21 @@ Contributions are very welcome! Please see our [contribution guidelines first](C
 
 We no longer accept contributions to TruffleHog v2, but that code is available in the `v2` branch.
 
-
 ## Adding new secret detectors
 
 We have published some [documentation and tooling to get started on adding new secret detectors](hack/docs/Adding_Detectors_external.md). Let's improve detection together!
-
 
 # Use as a library
 
 Currently, trufflehog is in heavy development and no guarantees can be made on
 the stability of the public APIs at this time.
+
 # License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
 
-
 # :money_with_wings: Enterprise product
 
-Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
+Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more <https://trufflesecurity.com/contact/>
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
