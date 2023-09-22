@@ -115,7 +115,7 @@ Expected output:
 Command:
 
 ```bash
-trufflehog github --repo https://github.com/trufflesecurity/trufflehog  --only-verified --issue-comments --pr-comments
+trufflehog github --repo https://github.com/trufflesecurity/test_keys  --only-verified --issue-comments --pr-comments
 ```
 
 Expected output:
@@ -126,14 +126,10 @@ Found verified result 🐷🔑
 Detector Type: AWS
 Decoder Type: PLAIN
 Raw result: AKIAQYLPMN5HLU6OP3FX
-Account: 052310077262
-User_id: AIDAQYLPMN5HFO4YI7IOF
-Arn: arn:aws:iam::052310077262:user/canarytokens.com@@4y924v19oqbe551caetqhx6pn
 Line: 1
 Link: https://github.com/trufflesecurity/test_keys/issues/3#issuecomment-1731842331
 Repository: test_keys
 Timestamp: 2023-09-22 18:06:26 +0000 UTC
-Username: joeleonjr
 ...
 ```
 
