@@ -6,7 +6,7 @@ An often requested feature for TruffleHog is a generic detector. By default, we 
 
 #### Try it out:
 ```
-wget UPDATE ONCE MERGED
+wget https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/examples/generic.yml
 trufflehog filesystem --config=$PWD/generic.yml $PWD
 
 # to filter so that _only_ generic credentials are logged:
