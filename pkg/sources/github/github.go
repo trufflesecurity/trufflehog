@@ -1159,7 +1159,6 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		fmt.Println(s.excludeComments)
 		if s.excludeComments {
 			s.log.Info("excluding github pull request comments", "repository", repoInfo.repoPath)
 		} else {
