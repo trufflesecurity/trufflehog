@@ -85,7 +85,7 @@ var (
 	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue comments in scan.").Bool()
-	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull requests comments in scan.").Bool()
+	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 	githubScanIssues        = githubScan.Flag("issues", "Include issues and issue comments in scan.").Bool()
 	githubScanPRs           = githubScan.Flag("prs", "Include pull requests and pull request comments in scan.").Bool()
