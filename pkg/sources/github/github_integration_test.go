@@ -114,9 +114,9 @@ func TestSource_ScanComments(t *testing.T) {
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
-					Repositories:               []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
-					IncludeIssueComments:       true,
-					IncludePullRequestComments: false,
+					Repositories:        []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					IncludeIssues:       true,
+					IncludePullRequests: false,
 					Credential: &sourcespb.GitHub_Token{
 						Token: githubToken,
 					},
@@ -144,9 +144,9 @@ func TestSource_ScanComments(t *testing.T) {
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
-					Repositories:               []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
-					IncludePullRequestComments: true,
-					IncludeIssueComments:       false,
+					Repositories:        []string{"https://github.com/truffle-test-integration-org/another-test-repo.git"},
+					IncludePullRequests: true,
+					IncludeIssues:       false,
 					Credential: &sourcespb.GitHub_Token{
 						Token: githubToken,
 					},

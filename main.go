@@ -73,20 +73,21 @@ var (
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
-	githubScan              = cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint      = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos         = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs          = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken         = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
-	githubIncludeForks      = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers    = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-	githubIncludeRepos      = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
-	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue comments in scan.").Bool()
-	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request comments in scan.").Bool()
-	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
+	githubScan             = cli.Command("github", "Find credentials in GitHub repositories.")
+	githubScanEndpoint     = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos        = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs         = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken        = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubIncludeForks     = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers   = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
+	githubIncludeRepos     = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubExcludeRepos     = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
+	githubScanIncludePaths = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	githubScanExcludePaths = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	githubScanIssues       = githubScan.Flag("issues", "Include issues and issue comments in scan.").Bool()
+	githubScanPRs          = githubScan.Flag("prs", "Include pull requests and pull request comments in scan.").Bool()
+	githubExcludeComments  = githubScan.Flag("exclude-comments", "Exclude Issue and PR comments from scan.").Bool()
+	githubScanGistComments = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -417,19 +418,20 @@ func run(state overseer.State) {
 		}
 
 		cfg := sources.GithubConfig{
-			Endpoint:                   *githubScanEndpoint,
-			Token:                      *githubScanToken,
-			IncludeForks:               *githubIncludeForks,
-			IncludeMembers:             *githubIncludeMembers,
-			Concurrency:                *concurrency,
-			ExcludeRepos:               *githubExcludeRepos,
-			IncludeRepos:               *githubIncludeRepos,
-			Repos:                      *githubScanRepos,
-			Orgs:                       *githubScanOrgs,
-			IncludeIssueComments:       *githubScanIssueComments,
-			IncludePullRequestComments: *githubScanPRComments,
-			IncludeGistComments:        *githubScanGistComments,
-			Filter:                     filter,
+			Endpoint:            *githubScanEndpoint,
+			Token:               *githubScanToken,
+			IncludeForks:        *githubIncludeForks,
+			IncludeMembers:      *githubIncludeMembers,
+			Concurrency:         *concurrency,
+			ExcludeRepos:        *githubExcludeRepos,
+			IncludeRepos:        *githubIncludeRepos,
+			Repos:               *githubScanRepos,
+			Orgs:                *githubScanOrgs,
+			IncludeIssues:       *githubScanIssues,
+			IncludePullRequests: *githubScanPRs,
+			IncludeGistComments: *githubScanGistComments,
+			ExcludeComments:     *githubExcludeComments,
+			Filter:              filter,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")

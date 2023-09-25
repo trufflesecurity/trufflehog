@@ -15,15 +15,16 @@ import (
 // ScanGitHub scans Github with the provided options.
 func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	connection := sourcespb.GitHub{
-		Endpoint:                   c.Endpoint,
-		Organizations:              c.Orgs,
-		Repositories:               c.Repos,
-		ScanUsers:                  c.IncludeMembers,
-		IgnoreRepos:                c.ExcludeRepos,
-		IncludeRepos:               c.IncludeRepos,
-		IncludeIssueComments:       c.IncludeIssueComments,
-		IncludePullRequestComments: c.IncludePullRequestComments,
-		IncludeGistComments:        c.IncludeGistComments,
+		Endpoint:            c.Endpoint,
+		Organizations:       c.Orgs,
+		Repositories:        c.Repos,
+		ScanUsers:           c.IncludeMembers,
+		IgnoreRepos:         c.ExcludeRepos,
+		IncludeRepos:        c.IncludeRepos,
+		IncludeIssues:       c.IncludeIssues,
+		IncludePullRequests: c.IncludePullRequests,
+		IncludeGistComments: c.IncludeGistComments,
+		ExcludeComments:     c.ExcludeComments,
 	}
 	if len(c.Token) > 0 {
 		connection.Credential = &sourcespb.GitHub_Token{

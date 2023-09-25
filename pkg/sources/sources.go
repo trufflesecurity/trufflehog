@@ -193,12 +193,14 @@ type GithubConfig struct {
 	IncludeRepos []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
-	// IncludeIssueComments indicates whether to include GitHub issue comments in the scan.
-	IncludeIssueComments,
-	// IncludePullRequestComments indicates whether to include GitHub pull request comments in the scan.
-	IncludePullRequestComments,
+	// IncludeIssues indicates whether to include GitHub issues and issue comments in the scan.
+	IncludeIssues,
+	// IncludePullRequests indicates whether to include GitHub pull requests and pull request comments in the scan.
+	IncludePullRequests,
 	// IncludeGistComments indicates whether to include GitHub gist comments in the scan.
-	IncludeGistComments bool
+	IncludeGistComments,
+	// ExcludeComments indicates whether to exclude comments from pull requests and issues.
+	ExcludeComments bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.

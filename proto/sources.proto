@@ -183,9 +183,10 @@ message GitHub {
   string base = 10;
   repeated string ignoreRepos = 11;
   repeated string includeRepos = 12;
-  bool includePullRequestComments = 14;
-  bool includeIssueComments = 15;
+  bool includePullRequests = 14;
+  bool includeIssues = 15;
   bool includeGistComments = 16;
+  bool excludeComments = 17;
 }
 
 message GoogleDrive {
