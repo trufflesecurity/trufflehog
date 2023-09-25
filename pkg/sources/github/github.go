@@ -79,10 +79,11 @@ type Source struct {
 	mu        sync.Mutex // protects the visibility maps
 	publicMap map[string]source_metadatapb.Visibility
 
-	includePRs          bool
-	includeIssues       bool
-	includeGistComments bool
-	excludeComments     bool
+	includePRComments    bool
+	includeIssueComments bool
+	includeGistComments  bool
+	includePRs           bool
+	includeIssues        bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -237,10 +238,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		s.filteredRepoCache.Set(r, r)
 	}
 
+	s.includeIssueComments = s.conn.IncludeIssueComments
+	s.includePRComments = s.conn.IncludePullRequestComments
+	s.includeGistComments = s.conn.IncludeGistComments
 	s.includeIssues = s.conn.IncludeIssues
 	s.includePRs = s.conn.IncludePullRequests
-	s.includeGistComments = s.conn.IncludeGistComments
-	s.excludeComments = s.conn.ExcludeComments
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -1141,27 +1143,34 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 
 	repoInfo := repoInfo{owner: owner, repo: repo, repoPath: repoPath}
 
+	if s.includeIssueComments {
+		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
+	}
+
+	if s.includePRComments {
+		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
+	}
+
 	if s.includeIssues {
 		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if s.excludeComments {
-			s.log.Info("excluding github issue comments", "repository", repoInfo.repoPath)
-		} else {
+		if !s.includeIssueComments {
 			if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
 				return err
 			}
 		}
-
 	}
 
 	if s.includePRs {
 		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if s.excludeComments {
-			s.log.Info("excluding github pull request comments", "repository", repoInfo.repoPath)
-		} else {
+		if !s.includePRComments {
 			if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
 				return err
 			}

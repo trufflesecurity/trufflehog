@@ -1880,13 +1880,15 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for Base
 
-	// no validation rules for IncludePullRequests
+	// no validation rules for IncludePullRequestComments
 
-	// no validation rules for IncludeIssues
+	// no validation rules for IncludeIssueComments
 
 	// no validation rules for IncludeGistComments
 
-	// no validation rules for ExcludeComments
+	// no validation rules for IncludePullRequests
+
+	// no validation rules for IncludeIssues
 
 	switch m.Credential.(type) {
 
