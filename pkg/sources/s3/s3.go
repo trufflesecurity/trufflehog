@@ -130,20 +130,21 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
 	cfg.Region = aws.String(region)
 
-	if roleArn == "" {
-		switch cred := s.conn.GetCredential().(type) {
-		case *sourcespb.S3_SessionToken:
-			cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
-		case *sourcespb.S3_AccessKey:
-			cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
-		case *sourcespb.S3_Unauthenticated:
-			cfg.Credentials = credentials.AnonymousCredentials
-		case *sourcespb.S3_CloudEnvironment:
-			// Nothing needs to be done!
-		default:
-			return nil, errors.Errorf("invalid configuration given for %s source", s.name)
-		}
-	} else {
+	//if roleArn == "" {
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.S3_SessionToken:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
+	case *sourcespb.S3_AccessKey:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
+	case *sourcespb.S3_Unauthenticated:
+		cfg.Credentials = credentials.AnonymousCredentials
+	case *sourcespb.S3_CloudEnvironment:
+		// Nothing needs to be done!
+		//default:
+		//	return nil, errors.Errorf("invalid configuration given for %s source", s.name)
+	}
+	//} else {
+	if roleArn != "" {
 		sess, err := session.NewSession(cfg)
 		if err != nil {
 			return nil, err

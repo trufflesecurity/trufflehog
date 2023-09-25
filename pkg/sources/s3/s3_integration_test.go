@@ -181,8 +181,8 @@ func runTestCase(t *testing.T, tt validationTestCase, s3key, s3secret string, cr
 		name += " [creds in config]"
 	} else {
 		setupCreds = func(t *testing.T, _ *sourcespb.S3) {
-			t.Setenv("AWS_ACCESS_KEY_ID", s3key)
-			t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
+			//t.Setenv("AWS_ACCESS_KEY_ID", s3key)
+			//t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
 		}
 		name += " [creds in env]"
 	}
