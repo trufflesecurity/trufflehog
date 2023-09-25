@@ -50,37 +50,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
 			Raw:          []byte(resMatch),
 		}
+
 		if verify {
 			client := s.client
 			if client == nil {
 				client = defaultClient
 			}
 
-			payload := strings.NewReader(`{'text':''}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
-			if err != nil {
-				s1.VerificationError = err
-			} else {
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err != nil {
-					s1.VerificationError = err
-				} else {
-					body, err := io.ReadAll(res.Body)
-					res.Body.Close()
-					if err != nil {
-						s1.VerificationError = err
-					} else if res.StatusCode == http.StatusBadRequest {
-						if strings.Contains(string(body), "Text is required") {
-							s1.Verified = true
-						} else {
-							s1.VerificationError = fmt.Errorf("unexpected response body: %s", string(body))
-						}
-					} else if res.StatusCode < 200 || res.StatusCode >= 500 {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status: %d", res.StatusCode)
-					}
-				}
-			}
+			isVerified, verificationErr := verifyWebhook(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.VerificationError = verificationErr
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {
@@ -91,6 +70,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyWebhook(ctx context.Context, client *http.Client, webhookURL string) (bool, error) {
+	payload := strings.NewReader(`{'text':''}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	switch {
+	case res.StatusCode == http.StatusBadRequest:
+		if strings.Contains(string(body), "Text is required") {
+			return true, nil
+		}
+		return false, fmt.Errorf("unexpected response body: %s", string(body))
+	case res.StatusCode < 200 || res.StatusCode >= 500:
+		return false, fmt.Errorf("unexpected HTTP response status: %d", res.StatusCode)
+	default:
+		return false, nil
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
