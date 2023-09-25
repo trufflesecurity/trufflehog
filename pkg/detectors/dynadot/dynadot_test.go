@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -29,11 +30,12 @@ func TestDynadot_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
@@ -65,7 +67,8 @@ func TestDynadot_FromChunk(t *testing.T) {
 					Verified:     false,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
@@ -93,7 +96,8 @@ func TestDynadot_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Dynadot.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -25,7 +25,7 @@ var (
 	defaultClient = common.SaneHttpClientTimeOut(5 * time.Second)
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"dynadot"}) + `\b([a-z0-9A-Z]{30})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"dynadot"}) + `\b([a-z0-9A-Z]{45})\b`)
 )
 
 func (s Scanner) Keywords() []string {
@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.dynadot.com/api3.xml?key=%s&command=create_contact&name=Webb&email=myemail@email.com&phonenum=8662623399&phonecc=1&address1=POBox345&city=SanMateo&zip=94401&country=US", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.dynadot.com/api3.json?key=%s&command=search&domain0=mydomain.com&show_price=1&currency=USD", resMatch), nil)
 			if err != nil {
 				s1.VerificationError = err
 			} else {
