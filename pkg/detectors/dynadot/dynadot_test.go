@@ -20,8 +20,8 @@ func TestDynadot_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DYNADOT")
-	inactiveSecret := testSecrets.MustGetField("DYNADOT_INACTIVE")
+	secret := testSecrets.MustGetField("DYNADOT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("DYNADOT_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
