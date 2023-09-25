@@ -46,7 +46,7 @@ execute() {
   hash_sha256_verify "${tmpdir}/${TARBALL}" "${tmpdir}/${CHECKSUM}"
   srcdir="${tmpdir}"
   (cd "${tmpdir}" && untar "${TARBALL}")
-  test ! -d "${BINDIR}" && install -d "${BINDIR}"
+  install -d "${BINDIR}"
 
   binexe=${BINARY}
   if [ "$OS" = "windows" ]; then
