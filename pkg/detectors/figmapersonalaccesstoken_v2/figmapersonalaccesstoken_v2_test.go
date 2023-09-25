@@ -19,12 +19,12 @@ import (
 func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_V2_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
