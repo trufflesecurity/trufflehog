@@ -2,6 +2,7 @@ package browserstack
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -11,17 +12,21 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
+const browserStackAPIURL = "https://www.browserstack.com/automate/plan.json"
+
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"https://", "http://", "hub-cloud.browserstack.com", "accessKey", "\"access_Key\":", "ACCESS_KEY", "key", "browserstackKey", "BS_AUTHKEY", "BROWSERSTACK_ACCESS_KEY"}) + `\b([0-9a-zA-Z]{20})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"https://", "http://", "hub-cloud.browserstack.com", "userName", "\"username\":", "USER_NAME", "user", "browserstackUser", "BS_USERNAME", "BROWSERSTACK_USERNAME"}) + `\b([a-zA-Z\d]{3,18}[._-]+[a-zA-Z\d]{6})\b`)
+	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "accessKey", "\"access_Key\":", "ACCESS_KEY", "key", "browserstackKey", "BS_AUTHKEY", "BROWSERSTACK_ACCESS_KEY"}) + `\b([0-9a-zA-Z]{20})\b`)
+	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "userName", "\"username\":", "USER_NAME", "user", "browserstackUser", "BS_USERNAME", "BROWSERSTACK_USERNAME"}) + `\b([a-zA-Z\d]{3,18}[._-]?[a-zA-Z\d]{6,11})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -56,30 +61,48 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.browserstack.com/automate/plan.json", nil)
-				if err != nil {
-					continue
+				client := s.client
+				if client == nil {
+					client = defaultClient
 				}
-				req.Header.Add("Content-Type", "application/json")
-				req.SetBasicAuth(resUserMatch, resMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
-					}
-				}
+
+				isVerified, verificationErr := verifyBrowserStackCredentials(ctx, client, resUserMatch, resMatch)
+				s1.Verified = isVerified
+				s1.VerificationError = verificationErr
 			}
 
+			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+				continue
+			}
 			results = append(results, s1)
 		}
 	}
+
 	return results, nil
+}
+
+func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, username, accessKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, browserStackAPIURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.SetBasicAuth(username, accessKey)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return true, nil
+	} else if res.StatusCode != 401 {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

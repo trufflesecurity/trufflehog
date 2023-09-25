@@ -2,6 +2,7 @@ package figmapersonalaccesstoken
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -11,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -20,8 +23,8 @@ var _ detectors.Versioner = (*Scanner)(nil)
 func (Scanner) Version() int { return 2 }
 
 var (
-	client = common.SaneHttpClient()
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b`)
+	defaultClient = common.SaneHttpClient()
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,6 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.figma.com/v1/me", nil)
 			if err != nil {
 				continue
@@ -58,14 +66,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
+				} else if res.StatusCode != 403 {
+					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 				}
+			} else {
+				s1.VerificationError = err
 			}
 		}
 
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
+		}
 		results = append(results, s1)
 	}
 

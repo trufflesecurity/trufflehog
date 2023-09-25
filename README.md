@@ -61,6 +61,9 @@ Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
 # Compile from source
 git clone https://github.com/trufflesecurity/trufflehog.git
 cd trufflehog; go install
+
+# Using installation script
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 ```
 
 # :rocket: Quick Start
