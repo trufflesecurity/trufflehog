@@ -50,6 +50,13 @@ func TestSource_ChunksCount(t *testing.T) {
 	assert.Greater(t, got, wantChunkCount)
 }
 
+type validationTestCase struct {
+	name         string
+	roles        []string
+	buckets      []string
+	wantErrCount int
+}
+
 func TestSource_Validate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
@@ -62,12 +69,7 @@ func TestSource_Validate(t *testing.T) {
 	s3key := secret.MustGetField("AWS_S3_KEY")
 	s3secret := secret.MustGetField("AWS_S3_SECRET")
 
-	tests := []struct {
-		name         string
-		roles        []string
-		buckets      []string
-		wantErrCount int
-	}{
+	tests := []validationTestCase{
 		{
 			name: "buckets without roles, can access all buckets",
 			buckets: []string{
@@ -136,40 +138,155 @@ func TestSource_Validate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-			var cancelOnce sync.Once
-			defer cancelOnce.Do(cancel)
+		//setupCreds := func(t *testing.T) {
+		//	t.Setenv("AWS_ACCESS_KEY_ID", s3key)
+		//	t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
+		//}
+		//cfg := &sourcespb.S3{
+		//	Credential: &sourcespb.S3_AccessKey{
+		//		AccessKey: &credentialspb.KeySecret{
+		//			Key:    s3key,
+		//			Secret: s3secret,
+		//		},
+		//	},
+		//}
+		//name, f := buildValidateTestFunc(s3key, s3secret, tt)
+		//t.Run(name, f)
+		runTestCase(t, tt, s3key, s3secret, credentialLocation_CONFIG)
+		runTestCase(t, tt, s3key, s3secret, credentialLocation_ENV)
+	}
+}
 
-			// These are used by the tests that assume roles
+type credentialLocation int
+
+const (
+	credentialLocation_CONFIG = iota
+	credentialLocation_ENV
+)
+
+func runTestCase(t *testing.T, tt validationTestCase, s3key, s3secret string, credLoc credentialLocation) {
+	//cfg := &sourcespb.S3{}
+	name := tt.name
+	var setupCreds func(t *testing.T, cfg *sourcespb.S3)
+
+	if credLoc == credentialLocation_CONFIG {
+		setupCreds = func(_ *testing.T, cfg *sourcespb.S3) {
+			cfg.Credential = &sourcespb.S3_AccessKey{
+				AccessKey: &credentialspb.KeySecret{
+					Key:    s3key,
+					Secret: s3secret,
+				},
+			}
+		}
+		name += " [creds in config]"
+	} else {
+		setupCreds = func(t *testing.T, _ *sourcespb.S3) {
 			t.Setenv("AWS_ACCESS_KEY_ID", s3key)
 			t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
+		}
+		name += " [creds in env]"
+	}
 
-			s := &Source{}
+	t.Run(name, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+		var cancelOnce sync.Once
+		defer cancelOnce.Do(cancel)
 
-			conn, err := anypb.New(&sourcespb.S3{
-				// These are used by the tests that don't assume roles
-				Credential: &sourcespb.S3_AccessKey{
-					AccessKey: &credentialspb.KeySecret{
-						Key:    s3key,
-						Secret: s3secret,
-					},
-				},
-				Buckets: tt.buckets,
-				Roles:   tt.roles,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
+		// These are used by the tests that assume roles
+		//t.Setenv("AWS_ACCESS_KEY_ID", s3key)
+		//t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
 
-			err = s.Init(ctx, tt.name, 0, 0, false, conn, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
+		s := &Source{}
 
-			errs := s.Validate(ctx)
+		//cfg.Buckets = tt.buckets
+		//cfg.Roles = tt.roles
 
-			assert.Equal(t, tt.wantErrCount, len(errs))
-		})
+		cfg := &sourcespb.S3{
+			Buckets: tt.buckets,
+			Roles:   tt.roles,
+		}
+		setupCreds(t, cfg)
+
+		//conn, err := anypb.New(&sourcespb.S3{
+		//	// These are used by the tests that don't assume roles
+		//	Credential: &sourcespb.S3_AccessKey{
+		//		AccessKey: &credentialspb.KeySecret{
+		//			Key:    s3key,
+		//			Secret: s3secret,
+		//		},
+		//	},
+		//	Buckets: tt.buckets,
+		//	Roles:   tt.roles,
+		//})
+		conn, err := anypb.New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = s.Init(ctx, tt.name, 0, 0, false, conn, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		errs := s.Validate(ctx)
+
+		assert.Equal(t, tt.wantErrCount, len(errs))
+	})
+}
+
+func buildValidateTestFunc(s3key, s3secret string, tt validationTestCase) (string, func(t *testing.T)) {
+	setupCreds := func(t *testing.T, cfg *sourcespb.S3) {
+		t.Setenv("AWS_ACCESS_KEY_ID", s3key)
+		t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
+
+		cfg.Credential = &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		}
+	}
+
+	return tt.name, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+		var cancelOnce sync.Once
+		defer cancelOnce.Do(cancel)
+
+		// These are used by the tests that assume roles
+		//t.Setenv("AWS_ACCESS_KEY_ID", s3key)
+		//t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
+
+		s := &Source{}
+
+		cfg := &sourcespb.S3{
+			Buckets: tt.buckets,
+			Roles:   tt.roles,
+		}
+		setupCreds(t, cfg)
+
+		//conn, err := anypb.New(&sourcespb.S3{
+		//	// These are used by the tests that don't assume roles
+		//	Credential: &sourcespb.S3_AccessKey{
+		//		AccessKey: &credentialspb.KeySecret{
+		//			Key:    s3key,
+		//			Secret: s3secret,
+		//		},
+		//	},
+		//	Buckets: tt.buckets,
+		//	Roles:   tt.roles,
+		//})
+		conn, err := anypb.New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = s.Init(ctx, tt.name, 0, 0, false, conn, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		errs := s.Validate(ctx)
+
+		assert.Equal(t, tt.wantErrCount, len(errs))
 	}
 }
