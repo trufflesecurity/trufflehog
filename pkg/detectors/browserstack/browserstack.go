@@ -19,6 +19,8 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
+const browserStackAPIURL = "https://www.browserstack.com/automate/plan.json"
+
 var (
 	defaultClient = common.SaneHttpClient()
 
@@ -64,24 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.browserstack.com/automate/plan.json", nil)
-				if err != nil {
-					s1.VerificationError = err
-				} else {
-					req.Header.Add("Content-Type", "application/json")
-					req.SetBasicAuth(resUserMatch, resMatch)
-					res, err := client.Do(req)
-					if err != nil {
-						s1.VerificationError = err
-					} else {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						} else if res.StatusCode != 401 {
-							s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-						}
-					}
-				}
+				isVerified, verificationErr := verifyBrowserStackCredentials(ctx, client, resUserMatch, resMatch)
+				s1.Verified = isVerified
+				s1.VerificationError = verificationErr
 			}
 
 			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
@@ -93,6 +80,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, username, accessKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, browserStackAPIURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.SetBasicAuth(username, accessKey)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return true, nil
+	} else if res.StatusCode != 401 {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
