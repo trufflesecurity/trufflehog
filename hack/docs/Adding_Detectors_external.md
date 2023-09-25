@@ -54,19 +54,22 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
 
 ### Creating a new Secret Scanner
 
-1. Identify the Secret Detector name from the [/proto/detectors.proto](/proto/detectors.proto) `DetectorType` enum. If necessary, run `make protos` when adding new ones.
+1. Add a new Secret Detector enum to the [`DetectorType` list here](/proto/detectors.proto).
 
-2. Generate the Secret Detector
+2. Run `make protos` to update the `.pb` files.
+
+3. Generate the Secret Detector
 
    ```bash
    go run hack/generate/generate.go detector <DetectorType enum name>
+   example: go run hack/generate/generate.go detector SampleAPI
    ```
-3. Add Secret Scanner
+4. Add the Secret Detector to TruffleHog's Default Detectors
 
-   Add the secret scanner to the `pkg/engine/defaults.go` file like `github.com/trufflesecurity/trufflehog/v3/pkg/detectors/<detector_name>` and 
-   `<detector_name>.Scanner{},`
+   Add the secret scanner to the [`pkg/engine/defaults.go`](https://github.com/trufflesecurity/trufflehog/blob/main/pkg/engine/defaults.go) file like [`github.com/trufflesecurity/trufflehog/v3/pkg/detectors/<detector_name>`](https://github.com/trufflesecurity/trufflehog/blob/b71ea27a696bdf1c3141f637fda4ee4936c2f2d6/pkg/engine/defaults.go#L9) and 
+   [`<detector_name>.Scanner{}`](https://github.com/trufflesecurity/trufflehog/blob/b71ea27a696bdf1c3141f637fda4ee4936c2f2d6/pkg/engine/defaults.go#L1546)
 
-4. Complete the secret detector.
+5. Complete the secret detector.
 
    The previous step templated a boilerplate + some example code as a package in the `pkg/detectors` folder for you to work on.
    The secret detector can be completed with these general steps:
