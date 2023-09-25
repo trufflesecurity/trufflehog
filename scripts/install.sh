@@ -46,7 +46,7 @@ execute() {
   hash_sha256_verify "${tmpdir}/${TARBALL}" "${tmpdir}/${CHECKSUM}"
   srcdir="${tmpdir}"
   (cd "${tmpdir}" && untar "${TARBALL}")
-  install -d "${BINDIR}"
+  mkdir -p "${BINDIR}"
 
   binexe=${BINARY}
   if [ "$OS" = "windows" ]; then
@@ -79,7 +79,7 @@ tag_to_version() {
   else
     log_info "checking GitHub for tag '${TAG}'"
   fi
-  REALTAG=$(github_release "$OWNER/$REPO" "${TAG}") && true
+  REALTAG=$(github_release "$OWNER/$REPO" "${TAG}") || true
   if test -z "$REALTAG"; then
     log_crit "unable to find '${TAG}' - use 'latest' or see https://github.com/${PREFIX}/releases for details"
     exit 1
