@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -o errexit
 
 usage() {
   this=$1
