@@ -15,9 +15,9 @@ The purpose of Secret Detectors is to discover secrets with exceptionally high s
     + [Sourcing Guidelines](#sourcing-guidelines)
     + [Development Guidelines](#development-guidelines)
     + [Development Dependencies](#development-dependencies)
-    + [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
+    + [Creating a new Secret Scanner](#creating-a-new-secret-detector)
+    + [Creating a new Secret Scanner](#testing-the-detector)
   * [Addendum](#addendum)
-    + [Using a test secret file](#using-a-test-secret-file)
     + [Adding Protos in Windows](#adding-protos-in-windows)
 
 ## Getting Started
@@ -156,7 +156,3 @@ For example, consider a hypothetical authentication endpoint that returns `200 O
    make protos
    ```
 
-### Testing a detector
-```bash
-   go test ./pkg/detectors/<detector> -tags=detectors
-   ```
