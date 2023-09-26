@@ -15,8 +15,8 @@ The purpose of Secret Detectors is to discover secrets with exceptionally high s
     + [Sourcing Guidelines](#sourcing-guidelines)
     + [Development Guidelines](#development-guidelines)
     + [Development Dependencies](#development-dependencies)
-    + [Creating a new Secret Scanner](#creating-a-new-secret-detector)
-    + [Creating a new Secret Scanner](#testing-the-detector)
+    + [Creating a new Secret Detector](#creating-a-new-secret-detector)
+    + [Testing the Detector](#testing-the-detector)
   * [Addendum](#addendum)
     + [Adding Protos in Windows](#adding-protos-in-windows)
 
