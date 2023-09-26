@@ -1,4 +1,4 @@
-package gitlab
+package gitlabV2
 
 import (
 	"context"
@@ -20,7 +20,9 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
+func (Scanner) Version() int            { return 2 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (

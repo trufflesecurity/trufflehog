@@ -297,6 +297,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_old"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/githubapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlabV2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glitterlyapi"
@@ -769,6 +770,7 @@ func DefaultDetectors() []detectors.Detector {
 		&azure.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlab.Scanner{},
+		&gitlabV2.Scanner{},
 		&sendgrid.Scanner{},
 		&mailchimp.Scanner{},
 		&okta.Scanner{},

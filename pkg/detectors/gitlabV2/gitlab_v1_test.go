@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package gitlab
+package gitlabV2
 
 import (
 	"context"
@@ -11,21 +11,21 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestGitlabV2_FromChunk(t *testing.T) {
+// This test ensures gitlab v2 detector does not work on gitlab v1 secrets
+func TestGitlabV2_FromChunk_WithV1Secrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLABV2")
-	secretInactive := testSecrets.MustGetField("GITLABV2_INACTIVE")
-
+	secret := testSecrets.MustGetField("GITLAB")
+	secretInactive := testSecrets.MustGetField("GITLAB_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -40,85 +40,36 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "verified v1 secret, not found",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
-					Verified:     true,
-				},
-			},
+			want:    nil,
 			wantErr: false,
 		},
 		{
-			name: "found unverified",
+			name: "verified v1 secret, not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("gitlab %s", secret)),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "unverified v1 secret, not found",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secretInactive)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, would be verified but for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found and valid but unexpected api response",
-			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, good key but wrong scope",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Gitlab,
-					Verified:     true,
-				},
-			},
+			want:    nil,
 			wantErr: false,
 		},
 		{
@@ -156,7 +107,7 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 	}
 }
 
-func BenchmarkV2FromData(benchmark *testing.B) {
+func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
