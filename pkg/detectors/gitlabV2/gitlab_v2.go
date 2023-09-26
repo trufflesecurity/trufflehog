@@ -1,4 +1,4 @@
-package gitlabV2
+package gitlabv2
 
 import (
 	"context"

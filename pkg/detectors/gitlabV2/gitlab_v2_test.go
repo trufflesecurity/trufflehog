@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package gitlabV2
+package gitlabv2
 
 import (
 	"context"
