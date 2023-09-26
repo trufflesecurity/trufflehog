@@ -113,37 +113,44 @@ Expected output:
 ...
 ```
 
-## 4: Scan an S3 bucket for verified keys
+## 4: Scan a GitHub Repo + its Issues and Pull Requests.
+
+
+```bash
+trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issues --prs
+```
+
+## 5: Scan an S3 bucket for verified keys
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --only-verified
 ```
 
-## 5: Scan S3 buckets using IAM Roles
+## 6: Scan S3 buckets using IAM Roles
 
 ```bash
 trufflehog s3 --role-arn=<iam role arn>
 ```
 
-## 6: Scan a Github Repo using SSH authentication in docker
+## 7: Scan a Github Repo using SSH authentication in docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
-## 7: Scan individual files or directories
+## 8: Scan individual files or directories
 
 ```bash
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 8: Scan GCS buckets for verified secrets.
+## 9: Scan GCS buckets for verified secrets.
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
-## 9: Scan a Docker image for verified secrets.
+## 10: Scan a Docker image for verified secrets.
 
 Use the `--image` flag multiple times to scan multiple images.
 

@@ -1886,6 +1886,10 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for IncludeGistComments
 
+	// no validation rules for IncludePullRequests
+
+	// no validation rules for IncludeIssues
+
 	switch m.Credential.(type) {
 
 	case *GitHub_GithubApp:

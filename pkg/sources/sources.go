@@ -198,7 +198,11 @@ type GithubConfig struct {
 	// IncludePullRequestComments indicates whether to include GitHub pull request comments in the scan.
 	IncludePullRequestComments,
 	// IncludeGistComments indicates whether to include GitHub gist comments in the scan.
-	IncludeGistComments bool
+	IncludeGistComments,
+	// IncludeIssues indicates whether to include GitHub issues and issue comments in the scan.
+	IncludeIssues,
+	// IncludePullRequests indicates whether to include GitHub pull requests and pull request comments in the scan.
+	IncludePullRequests bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.

@@ -82,6 +82,8 @@ type Source struct {
 	includePRComments    bool
 	includeIssueComments bool
 	includeGistComments  bool
+	includePRs           bool
+	includeIssues        bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -239,6 +241,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
+	s.includeIssues = s.conn.IncludeIssues
+	s.includePRs = s.conn.IncludePullRequests
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -1119,6 +1123,8 @@ var (
 	// allComments is a placeholder for specifying the comment ID to start listing from.
 	// A value of 0 means that all comments will be listed.
 	allComments = 0
+	// state of "all" for the ListByRepo captures both open and closed issues.
+	state = "all"
 )
 
 type repoInfo struct {
@@ -1137,18 +1143,68 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 
 	repoInfo := repoInfo{owner: owner, repo: repo, repoPath: repoPath}
 
-	if s.includeIssueComments {
+	if s.includeIssues || s.includeIssueComments {
 		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-
 	}
 
-	if s.includePRComments {
-		return s.processPRComments(ctx, repoInfo, chunksChan)
+	if s.includeIssues {
+		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
 	}
+
+	if s.includePRs || s.includePRComments {
+		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
+	}
+
+	if s.includePRs {
+		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
+	}
+
 	return nil
 
+}
+
+func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github issues", "repository", info.repoPath)
+
+	bodyTextsOpts := &github.IssueListByRepoOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		State:     state,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
+	}
+
+	for {
+		issues, resp, err := s.apiClient.Issues.ListByRepo(ctx, info.owner, info.repo, bodyTextsOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkIssues(ctx, info.repo, info.repoPath, issues, chunksChan); err != nil {
+			return err
+		}
+
+		bodyTextsOpts.ListOptions.Page++
+
+		if len(issues) < defaultPagination {
+			break
+		}
+	}
+	return nil
 }
 
 func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
@@ -1186,6 +1242,42 @@ func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunks
 	return nil
 }
 
+func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github pull requests", "repository", info.repoPath)
+
+	prOpts := &github.PullRequestListOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		State:     state,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
+	}
+
+	for {
+		prs, resp, err := s.apiClient.PullRequests.List(ctx, info.owner, info.repo, prOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkPullRequests(ctx, info.repo, prs, chunksChan); err != nil {
+			return err
+		}
+
+		prOpts.ListOptions.Page++
+
+		if len(prs) < defaultPagination {
+			break
+		}
+	}
+	return nil
+}
+
 func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
 	s.log.Info("scanning github pull request comments", "repository", info.repoPath)
 
@@ -1216,6 +1308,45 @@ func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksCha
 
 		if len(prComments) < defaultPagination {
 			break
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkIssues(ctx context.Context, repo, repoPath string, issues []*github.Issue, chunksChan chan *sources.Chunk) error {
+	for _, issue := range issues {
+
+		// Skip pull requests since covered by processPRs.
+		if issue.IsPullRequest() {
+			continue
+		}
+
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(issue.GetHTMLURL()),
+						Username:   sanitizer.UTF8(issue.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(issue.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(issue.GetCreatedAt().String()),
+						Visibility: s.visibilityOf(ctx, repoPath),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(issue.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
 		}
 	}
 	return nil
@@ -1274,6 +1405,38 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 				},
 			},
 			Data:   []byte(sanitizer.UTF8(comment.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkPullRequests(ctx context.Context, repo string, prs []*github.PullRequest, chunksChan chan *sources.Chunk) error {
+	for _, pr := range prs {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			JobID:      s.JobID(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(pr.GetHTMLURL()),
+						Username:   sanitizer.UTF8(pr.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(pr.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(pr.GetCreatedAt().String()),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(pr.GetBody())),
 			Verify: s.verify,
 		}
 
