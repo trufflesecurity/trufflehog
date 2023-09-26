@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package figmapersonalaccesstoken
+package figmapersonalaccesstokenV2
 
 import (
 	"context"

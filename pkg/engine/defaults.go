@@ -247,6 +247,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fetchrss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstokenV2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
@@ -824,6 +825,7 @@ func DefaultDetectors() []detectors.Detector {
 		&snykkey.Scanner{},
 		&postmark.Scanner{},
 		&figmapersonalaccesstoken.Scanner{},
+		&figmapersonalaccesstokenV2.Scanner{},
 		&github_old.Scanner{},
 		&webex.Scanner{},
 		&segmentapikey.Scanner{},
