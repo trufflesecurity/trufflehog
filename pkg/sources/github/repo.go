@@ -258,6 +258,11 @@ func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) 
 		return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
 	}
 
+	if len(commit.Files) == 0 {
+		return "", fmt.Errorf("commit %s does not contain any files", query.sha)
+	}
+
+	res := new(strings.Builder)
 	// Only return the diff if the file is in the commit.
 	for _, file := range commit.Files {
 		if *file.Filename != query.filename {
@@ -268,10 +273,17 @@ func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) 
 			return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
 		}
 
-		return *file.Patch, nil
+		if _, err := res.WriteString(*file.Patch); err != nil {
+			return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
+		}
+		res.WriteString("\n")
 	}
 
-	return "", fmt.Errorf("commit %s does not contain file %s", query.sha, query.filename)
+	if res.Len() == 0 {
+		return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
+	}
+
+	return res.String(), nil
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {
