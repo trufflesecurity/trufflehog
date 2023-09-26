@@ -52,44 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			// there are 4 read 'scopes' for a gitlab token: api, read_user, read_repo, and read_registry
-			// they all grant access to different parts of the API. I couldn't find an endpoint that every
-			// one of these scopes has access to, so we just check an example endpoint for each scope. If any
-			// of them contain data, we know we have a valid key, but if they all fail, we don't
-
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
-				// test `read_user` scope
-				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-				res, err := client.Do(req)
-				if err == nil {
-					res.Body.Close() // The request body is unused.
-
-					// 200 means good key and has `read_user` scope
-					// 403 means good key but not the right scope
-					// 401 is bad key
-					switch res.StatusCode {
-					case http.StatusOK:
-						s1.Verified = true
-					case http.StatusForbidden:
-						// Good key but not the right scope
-						s1.Verified = true
-					case http.StatusUnauthorized:
-						// Nothing to do; zero values are the ones we want
-					default:
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					}
-				} else {
-					s1.VerificationError = err
-				}
-			}
+			isVerified, verificationErr := s.verifyGitlab(ctx, resMatch)
+			s1.Verified = isVerified
+			s1.VerificationError = verificationErr
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
@@ -100,6 +65,49 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error) {
+	// there are 4 read 'scopes' for a gitlab token: api, read_user, read_repo, and read_registry
+	// they all grant access to different parts of the API. I couldn't find an endpoint that every
+	// one of these scopes has access to, so we just check an example endpoint for each scope. If any
+	// of them contain data, we know we have a valid key, but if they all fail, we don't
+
+	client := s.client
+	if client == nil {
+		client = defaultClient
+	}
+	for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+		// test `read_user` scope
+		req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+		res, err := client.Do(req)
+		if err != nil {
+			return false, err
+		}
+		defer res.Body.Close() // The request body is unused.
+
+		// 200 means good key and has `read_user` scope
+		// 403 means good key but not the right scope
+		// 401 is bad key
+		switch res.StatusCode {
+		case http.StatusOK:
+			return true, nil
+		case http.StatusForbidden:
+			// Good key but not the right scope
+			return true, nil
+		case http.StatusUnauthorized:
+			// Nothing to do; zero values are the ones we want
+			return false, nil
+		default:
+			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		}
+
+	}
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
