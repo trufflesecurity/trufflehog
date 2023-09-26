@@ -239,6 +239,53 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 	return nil
 }
 
+// commitQuery represents the details required to fetch a commit.
+type commitQuery struct {
+	repo     string
+	owner    string
+	sha      string
+	filename string
+}
+
+// getDiffForFileInCommit retrieves the diff for a specified file in a commit.
+// If the file or its diff is not found, it returns an error.
+func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
+	commit, resp, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+	if handled := s.handleRateLimit(err, resp); handled {
+		return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
+	}
+	if err != nil {
+		return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+	}
+
+	if len(commit.Files) == 0 {
+		return "", fmt.Errorf("commit %s does not contain any files", query.sha)
+	}
+
+	res := new(strings.Builder)
+	// Only return the diff if the file is in the commit.
+	for _, file := range commit.Files {
+		if *file.Filename != query.filename {
+			continue
+		}
+
+		if file.Patch == nil {
+			return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
+		}
+
+		if _, err := res.WriteString(*file.Patch); err != nil {
+			return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
+		}
+		res.WriteString("\n")
+	}
+
+	if res.Len() == 0 {
+		return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
+	}
+
+	return res.String(), nil
+}
+
 func (s *Source) normalizeRepo(repo string) (string, error) {
 	// If there's a '/', assume it's a URL and try to normalize it.
 	if strings.ContainsRune(repo, '/') {
