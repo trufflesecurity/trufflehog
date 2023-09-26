@@ -13,10 +13,10 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-// This test ensures gitlab v1 detector does not work on gitlab v2 secrets
-func TestGitlab_FromChunk(t *testing.T) {
+func TestGitlabV2_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
@@ -40,25 +40,85 @@ func TestGitlab_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "verified secret, not found",
+			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secret)),
 				verify: true,
 			},
-			want:    nil,
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     true,
+				},
+			},
 			wantErr: false,
 		},
 		{
-			name: "unverified secret, not found",
+			name: "found unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a gitlab secret %s within", secretInactive)),
 				verify: true,
 			},
-			want:    nil,
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, would be verified but for timeout",
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found and valid but unexpected api response",
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, good key but wrong scope",
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a gitlab super secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Gitlab,
+					Verified:     true,
+				},
+			},
 			wantErr: false,
 		},
 		{
