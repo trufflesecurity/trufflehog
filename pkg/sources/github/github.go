@@ -1143,14 +1143,8 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 
 	repoInfo := repoInfo{owner: owner, repo: repo, repoPath: repoPath}
 
-	if s.includeIssueComments {
+	if s.includeIssues || s.includeIssueComments {
 		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
-			return err
-		}
-	}
-
-	if s.includePRComments {
-		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
 	}
@@ -1159,10 +1153,11 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if !s.includeIssueComments {
-			if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
-				return err
-			}
+	}
+
+	if s.includePRs || s.includePRComments {
+		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
+			return err
 		}
 	}
 
@@ -1170,12 +1165,8 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if !s.includePRComments {
-			if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
-				return err
-			}
-		}
 	}
+
 	return nil
 
 }
