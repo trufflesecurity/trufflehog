@@ -93,10 +93,10 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 ...
 ```
 
-## 2: Scan a GitHub Org for only verified secrets
+## 2: Scan a GitHub Org for only verified secrets (including the comments sections)
 
 ```bash
-trufflehog github --org=trufflesecurity --only-verified
+trufflehog github --org=trufflesecurity --only-verified --issue-coments --pr-comments
 ```
 
 ## 3: Scan a GitHub Repo for only verified keys and get JSON output
