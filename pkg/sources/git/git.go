@@ -792,10 +792,10 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 	}
 	// TODO: refactor with PrepareRepo to remove duplicated logic
 
-	// The git CLI doesn't have an option to shallow executeClone starting at a commit
-	// hash, but it does have an option to shallow executeClone since a timestamp. If
+	// The git CLI doesn't have an option to shallow clone starting at a commit
+	// hash, but it does have an option to shallow clone since a timestamp. If
 	// the uriString is github.com, then we query the API for the timestamp of the
-	// hash and use that to executeClone.
+	// hash and use that to clone.
 
 	uri, err := GitURLParse(uriString)
 	if err != nil {
@@ -845,13 +845,13 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 		}
 		path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username(), "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to executeClone authenticated Git repo (%s): %s", uri.Redacted(), err)
+			return path, true, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
 		}
 	default:
 		ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
 		path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath, "--shallow-since", timestamp)
 		if err != nil {
-			return path, true, fmt.Errorf("failed to executeClone unauthenticated Git repo (%s): %s", remotePath, err)
+			return path, true, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 		}
 	}
 
@@ -883,13 +883,13 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 			}
 			path, _, err = CloneRepoUsingToken(ctx, password, remotePath, uri.User.Username())
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to executeClone authenticated Git repo (%s): %s", uri.Redacted(), err)
+				return path, remote, fmt.Errorf("failed to clone authenticated Git repo (%s): %s", uri.Redacted(), err)
 			}
 		default:
 			ctx.Logger().V(1).Info("cloning repo without authentication", "uri", uri)
 			path, _, err = CloneRepoUsingUnauthenticated(ctx, remotePath)
 			if err != nil {
-				return path, remote, fmt.Errorf("failed to executeClone unauthenticated Git repo (%s): %s", remotePath, err)
+				return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 			}
 		}
 	case "ssh":
@@ -897,7 +897,7 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 		remote = true
 		path, _, err = CloneRepoUsingSSH(ctx, remotePath)
 		if err != nil {
-			return path, remote, fmt.Errorf("failed to executeClone unauthenticated Git repo (%s): %s", remotePath, err)
+			return path, remote, fmt.Errorf("failed to clone unauthenticated Git repo (%s): %s", remotePath, err)
 		}
 	default:
 		return "", remote, fmt.Errorf("unsupported Git URI: %s", uriString)
