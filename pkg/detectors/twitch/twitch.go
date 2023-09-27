@@ -92,23 +92,24 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 	data.Set("client_secret", resMatch)
 	data.Set("grant_type", "client_credentials")
 	encodedData := data.Encode()
+
 	req, err := http.NewRequestWithContext(ctx, "POST", verifyURL, strings.NewReader(encodedData))
 	if err != nil {
 		return false, err
 	}
+
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
 	res, err := client.Do(req)
-
-	if err == nil {
-		defer res.Body.Close()
-		if res.StatusCode == http.StatusOK {
-			return true, nil
-		} else if !(res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusForbidden) {
-			return false, fmt.Errorf("unexpected http response status %d", res.StatusCode)
-		}
-	} else {
+	if err != nil {
 		return false, err
+	}
+
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusOK {
+		return true, nil
+	} else if !(res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusForbidden) {
+		return false, fmt.Errorf("unexpected http response status %d", res.StatusCode)
 	}
 
 	return false, nil
