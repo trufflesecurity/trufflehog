@@ -82,8 +82,6 @@ type Source struct {
 	includePRComments    bool
 	includeIssueComments bool
 	includeGistComments  bool
-	includePRs           bool
-	includeIssues        bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -241,8 +239,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
-	s.includeIssues = s.conn.IncludeIssues
-	s.includePRs = s.conn.IncludePullRequests
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -1150,25 +1146,19 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 
 	repoInfo := repoInfo{owner: owner, repo: repo, repoPath: repoPath}
 
-	if s.includeIssues || s.includeIssueComments {
+	if s.includeIssueComments {
 		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-	}
-
-	if s.includeIssues {
 		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
 	}
 
-	if s.includePRs || s.includePRComments {
+	if s.includePRComments {
 		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-	}
-
-	if s.includePRs {
 		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
@@ -1179,7 +1169,7 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 }
 
 func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github issues", "repository", info.repoPath)
+	s.log.Info("scanning github issue descriptions", "repository", info.repoPath)
 
 	bodyTextsOpts := &github.IssueListByRepoOptions{
 		Sort:      sortType,
@@ -1250,7 +1240,7 @@ func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunks
 }
 
 func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github pull requests", "repository", info.repoPath)
+	s.log.Info("scanning github pull request descriptions", "repository", info.repoPath)
 
 	prOpts := &github.PullRequestListOptions{
 		Sort:      sortType,

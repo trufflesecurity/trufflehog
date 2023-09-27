@@ -117,7 +117,7 @@ Expected output:
 
 
 ```bash
-trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issues --prs
+trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
 ```
 
 ## 5: Scan an S3 bucket for verified keys
