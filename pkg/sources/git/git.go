@@ -312,63 +312,80 @@ func GitURLParse(gitURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
+// CloneRepo clones a given Git repository and returns its local path along with a git.Repository object for further operations.
+// The function utilizes a nested function (closure) to centralize error handling.
+// The outer function sets up a deferred call to CleanOnError, which captures the address of a single 'err' variable.
+// The inner function (closure) is responsible for the core logic and returns an error that sets the outer 'err' variable.
+// This ensures that CleanOnError always has the most up-to-date error information for conditional cleanup.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args ...string) (string, *git.Repository, error) {
-	if err := GitCmdCheck(); err != nil {
+	var err error
+	if err = GitCmdCheck(); err != nil {
 		return "", nil, err
 	}
 	clonePath, err := os.MkdirTemp(os.TempDir(), "trufflehog")
 	if err != nil {
 		return "", nil, err
 	}
+
 	defer CleanOnError(&err, clonePath)
-	cloneURL, err := GitURLParse(gitUrl)
+
+	var repo *git.Repository
+
+	err = func() error {
+		cloneURL, err := GitURLParse(gitUrl)
+		if err != nil {
+			return err
+		}
+		if cloneURL.User == nil {
+			cloneURL.User = userInfo
+		}
+
+		gitArgs := []string{"clone", cloneURL.String(), clonePath}
+		gitArgs = append(gitArgs, args...)
+		cloneCmd := exec.Command("git", gitArgs...)
+
+		safeURL, err := stripPassword(gitUrl)
+		if err != nil {
+			ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
+		}
+		logger := ctx.Logger().WithValues(
+			"subcommand", "git clone",
+			"repo", safeURL,
+			"path", clonePath,
+			"args", args,
+		)
+
+		// Execute command and wait for the stdout / stderr.
+		output, err := cloneCmd.CombinedOutput()
+		if err != nil {
+			err = errors.WrapPrefix(err, "error running 'git clone'", 0)
+		}
+		logger.V(3).Info("git subcommand finished", "output", string(output))
+
+		if cloneCmd.ProcessState == nil {
+			return fmt.Errorf("clone command exited with no output")
+		}
+		if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
+			logger.V(1).Info("git clone failed", "output", string(output), "error", err)
+			return fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
+		}
+
+		options := &git.PlainOpenOptions{
+			DetectDotGit:          true,
+			EnableDotGitCommonDir: true,
+		}
+		repo, err = git.PlainOpenWithOptions(clonePath, options)
+		if err != nil {
+			return fmt.Errorf("could not open cloned repo: %w", err)
+		}
+		logger.V(1).Info("successfully cloned repo")
+
+		return nil
+	}()
 	if err != nil {
 		return "", nil, err
 	}
-	if cloneURL.User == nil {
-		cloneURL.User = userInfo
-	}
 
-	gitArgs := []string{"clone", cloneURL.String(), clonePath}
-	gitArgs = append(gitArgs, args...)
-	cloneCmd := exec.Command("git", gitArgs...)
-
-	safeUrl, err := stripPassword(gitUrl)
-	if err != nil {
-		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
-	}
-	logger := ctx.Logger().WithValues(
-		"subcommand", "git clone",
-		"repo", safeUrl,
-		"path", clonePath,
-		"args", args,
-	)
-
-	// Execute command and wait for the stdout / stderr.
-	output, err := cloneCmd.CombinedOutput()
-	if err != nil {
-		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
-	}
-	logger.V(3).Info("git subcommand finished", "output", string(output))
-
-	if cloneCmd.ProcessState == nil {
-		return "", nil, errors.New("clone command exited with no output")
-	}
-	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
-		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
-	}
-
-	options := &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
-	}
-	repo, err := git.PlainOpenWithOptions(clonePath, options)
-	if err != nil {
-		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
-	}
-
-	logger.V(1).Info("successfully cloned repo")
 	return clonePath, repo, nil
 }
 
