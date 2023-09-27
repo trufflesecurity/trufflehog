@@ -337,6 +337,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, clonePath})
 	if err != nil {
 		// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
+		// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
 		CleanOnError(&err, clonePath)
 		return "", nil, err
 	}
