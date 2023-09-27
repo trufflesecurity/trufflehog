@@ -26,6 +26,7 @@ func TestLoggly_FromChunk(t *testing.T) {
 	}
 	secret := testSecrets.MustGetField("LOGGLY")
 	inactiveSecret := testSecrets.MustGetField("LOGGLY_INACTIVE")
+	domain := testSecrets.MustGetField("LOGGLY_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -45,7 +46,7 @@ func TestLoggly_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within loggly Domain %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -62,7 +63,7 @@ func TestLoggly_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within loggly Domain %s but not valid", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
