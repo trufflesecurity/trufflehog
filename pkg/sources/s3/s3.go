@@ -130,20 +130,19 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
 	cfg.Region = aws.String(region)
 
-	if roleArn == "" {
-		switch cred := s.conn.GetCredential().(type) {
-		case *sourcespb.S3_SessionToken:
-			cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
-		case *sourcespb.S3_AccessKey:
-			cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
-		case *sourcespb.S3_Unauthenticated:
-			cfg.Credentials = credentials.AnonymousCredentials
-		case *sourcespb.S3_CloudEnvironment:
-			// Nothing needs to be done!
-		default:
-			return nil, errors.Errorf("invalid configuration given for %s source", s.name)
-		}
-	} else {
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.S3_SessionToken:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
+	case *sourcespb.S3_AccessKey:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
+	case *sourcespb.S3_Unauthenticated:
+		cfg.Credentials = credentials.AnonymousCredentials
+	default:
+		// In all other cases, the AWS SDK will follow its normal waterfall logic to pick up credentials (i.e. they can
+		// come from the environment or the credentials file or whatever else AWS gets up to).
+	}
+
+	if roleArn != "" {
 		sess, err := session.NewSession(cfg)
 		if err != nil {
 			return nil, err
