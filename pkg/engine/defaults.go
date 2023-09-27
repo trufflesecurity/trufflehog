@@ -728,6 +728,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/walkscore"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weatherbit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weatherstack"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/web3storage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraper"
@@ -1544,6 +1545,7 @@ func DefaultDetectors() []detectors.Detector {
 		salesforce.Scanner{},
 		sourcegraph.Scanner{},
 		tailscale.Scanner{},
+		web3storage.Scanner{},
 	}
 
 }
