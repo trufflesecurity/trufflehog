@@ -1,4 +1,4 @@
-package figmapersonalaccesstokenV2
+package figmapersonalaccesstoken
 
 import (
 	"context"
