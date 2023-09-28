@@ -58,43 +58,53 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
+				client := s.getClient()
 
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://ps.pndsn.com/signal/"+resMatch+"/"+ressubMatch+"/0/ch1/0/%22typing_on%22?uuid=user-123", nil)
-				if err != nil {
-					continue
-				}
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else if res.StatusCode == 400 || res.StatusCode == 403 {
-						// 403 is suggested by the API docs (https://www.pubnub.com/docs/sdks/rest-api/send-signal-to-channel)
-						// 400 is what actually seems to be coming back for invalid credentials
-						// There's nothing to do here, because zero values of Result are what we want
-					} else {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					}
-				} else {
-					s1.VerificationError = err
-				}
+				isVerified, verificationErr := verifyPubNub(ctx, client, resMatch, ressubMatch)
+				s1.Verified = isVerified
+				s1.VerificationError = verificationErr
 			}
+
 			// This function will check false positives for common test words, but also it will make sure the key
 			// appears 'random' enough to be a real key.
 			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 				continue
 			}
-
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
+func verifyPubNub(ctx context.Context, client *http.Client, resMatch, ressubMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://ps.pndsn.com/signal/"+resMatch+"/"+ressubMatch+"/0/ch1/0/%22typing_on%22?uuid=user-123", nil)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer res.Body.Close()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return true, nil
+	} else if !(res.StatusCode == 400 || res.StatusCode == 403) {
+		// 403 is suggested by the API docs (https://www.pubnub.com/docs/sdks/rest-api/send-signal-to-channel)
+		// 400 is what actually seems to be coming back for invalid credentials
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
