@@ -771,8 +771,8 @@ func DefaultDetectors() []detectors.Detector {
 		aws.New(),
 		&azure.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
-		&gitlabv2.Scanner{},
 		&gitlab.Scanner{},
+		&gitlabv2.Scanner{},
 		&sendgrid.Scanner{},
 		&mailchimp.Scanner{},
 		&okta.Scanner{},

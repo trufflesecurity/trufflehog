@@ -1,4 +1,4 @@
-package gitlab
+package gitlabv2
 
 import (
 	"context"
@@ -22,12 +22,12 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int            { return 1 }
+func (Scanner) Version() int            { return 2 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -45,12 +45,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if len(match) != 2 {
 			continue
 		}
-		// ignore v2 detectors which have a prefix of `glpat-`
-		if strings.Contains(match[0], "glpat-") {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
 
+		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitlab,
 			Raw:          []byte(resMatch),
