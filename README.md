@@ -64,6 +64,8 @@ cd trufflehog; go install
 
 # Using installation script
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+# Using installation script to install a specific version
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
 
 # :rocket: Quick Start
