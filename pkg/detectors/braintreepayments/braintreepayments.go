@@ -99,7 +99,7 @@ func (s Scanner) getClient() *http.Client {
 
 func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, privKey string) (bool, error) {
 	payload := strings.NewReader(`{"query": "query { ping }"}`)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
 	if err != nil {
 		return false, err
 	}
