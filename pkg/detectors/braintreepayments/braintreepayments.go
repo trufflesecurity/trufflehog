@@ -21,11 +21,13 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
 
-var (
-	defaultClient = common.SaneHttpClient()
+const (
 	verifyURL     = "https://payments.braintree-api.com/graphql"
 	verifyTestURL = "https://payments.sandbox.braintree-api.com/graphql"
+)
 
+var (
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"braintree"}) + `\b([0-9a-f]{32})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"braintree"}) + `\b([0-9a-z]{16})\b`)
@@ -54,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if len(idMatch) != 2 {
 				continue
 			}
-
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
