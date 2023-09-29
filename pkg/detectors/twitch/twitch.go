@@ -21,9 +21,10 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
 
+const verifyURL = "https://id.twitch.tv/oauth2/token"
+
 var (
 	defaultClient = common.SaneHttpClient()
-	verifyURL     = "https://id.twitch.tv/oauth2/token"
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitch"}) + `\b([0-9a-z]{30})\b`)
@@ -53,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if len(idMatch) != 2 {
 				continue
 			}
-
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
@@ -63,7 +63,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				client := s.getClient()
-
 				isVerified, verificationErr := verifyTwitch(ctx, client, resMatch, resIdMatch)
 				s1.Verified = isVerified
 				s1.VerificationError = verificationErr
@@ -93,7 +92,7 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 	data.Set("grant_type", "client_credentials")
 	encodedData := data.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", verifyURL, strings.NewReader(encodedData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, verifyURL, strings.NewReader(encodedData))
 	if err != nil {
 		return false, err
 	}
@@ -104,15 +103,16 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 	if err != nil {
 		return false, err
 	}
-
 	defer res.Body.Close()
-	if res.StatusCode == http.StatusOK {
+
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if !(res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusForbidden) {
+	case http.StatusBadRequest, http.StatusForbidden:
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected http response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
