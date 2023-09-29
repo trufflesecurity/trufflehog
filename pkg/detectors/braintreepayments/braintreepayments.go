@@ -65,7 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				client := s.getClient()
 				url := s.getBraintreeURL()
-				fmt.Println(url)
 				isVerified, verificationErr := verifyBraintree(ctx, client, url, resIdMatch, resMatch)
 				s1.Verified = isVerified
 				s1.VerificationError = verificationErr
