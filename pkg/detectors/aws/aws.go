@@ -217,7 +217,8 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 					"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
 					"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
 					"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
-				}
+                    "Rotation Guide": "https://howtorotate.com/docs/tutorials/aws/",
+                }
 				return true, extraData, nil
 			} else {
 				return false, nil, err

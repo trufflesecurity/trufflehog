@@ -73,6 +73,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(resToken),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resEmail, resToken, resDomain)),
 				}
+                // Set the RotationGuideURL in the ExtraData
+                s1.ExtraData = map[string]string{
+                    "Rotation Guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+                }
 
 				if verify {
 					client := s.getClient()

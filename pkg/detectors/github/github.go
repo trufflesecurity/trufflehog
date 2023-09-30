@@ -95,6 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								"site_admin":   fmt.Sprintf("%t", userResponse.SiteAdmin),
 								"name":         userResponse.Name,
 								"company":      userResponse.Company,
+                                "Rotation Guide": "https://howtorotate.com/docs/tutorials/github/",
 							}
 						}
 					}

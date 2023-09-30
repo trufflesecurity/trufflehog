@@ -53,8 +53,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				RawV2:        []byte(sid + key),
 				Redacted:     sid,
 			}
-
-			if verify {
+			
+            // Set the RotationGuideURL in the ExtraData
+            s1.ExtraData = map[string]string{
+                "Rotation Guide": "https://howtorotate.com/docs/tutorials/twilio/",
+            }
+            
+            if verify {
 				client = s.client
 				if client == nil {
 					client = defaultClient

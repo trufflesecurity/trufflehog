@@ -55,6 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Gitlab,
 			Raw:          []byte(resMatch),
 		}
+        // Set the RotationGuideURL in the ExtraData
+        s1.ExtraData = map[string]string{
+            "Rotation Guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+        }
 
 		if verify {
 			isVerified, verificationErr := s.verifyGitlab(ctx, resMatch)
