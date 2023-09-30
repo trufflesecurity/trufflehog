@@ -135,7 +135,7 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 			chunkRes := ChunkResult{}
 			chunkBytes := make([]byte, config.totalSize)
 			chunkBytes = chunkBytes[:config.chunkSize]
-			n, err := chunkReader.Read(chunkBytes)
+			n, err := io.ReadFull(chunkReader, chunkBytes)
 			if n > 0 {
 				peekData, _ := chunkReader.Peek(config.totalSize - n)
 				chunkBytes = append(chunkBytes[:n], peekData...)
@@ -143,8 +143,8 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 			}
 
 			// If there is an error other than EOF, or if we have read some bytes, send the chunk.
-			if err != nil && !errors.Is(err, io.EOF) || n > 0 {
-				if err != nil && !errors.Is(err, io.EOF) {
+			if (err != nil && !errors.Is(err, io.ErrUnexpectedEOF)) || n > 0 {
+				if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 					ctx.Logger().Error(err, "error reading chunk")
 					chunkRes.err = err
 				}
