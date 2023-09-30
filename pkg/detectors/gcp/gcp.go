@@ -70,7 +70,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		creds.AuthProviderX509CertURL = trimCarrots(creds.AuthProviderX509CertURL)
 		creds.AuthURI = trimCarrots(creds.AuthURI)
-		creds.project_id = trimCarrots(creds.project_id)
 		creds.ClientX509CertURL = trimCarrots(creds.ClientX509CertURL)
 		creds.TokenURI = trimCarrots(creds.TokenURI)
 
@@ -91,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
         // Set the RotationGuideURL in the ExtraData
         s.ExtraData = map[string]string{
             "Rotation Guide": "https://howtorotate.com/docs/tutorials/gcp/",
-            "Project": creds.project_id,
+            "Project": creds.ProjectID,
         }
 
 		if verify {
