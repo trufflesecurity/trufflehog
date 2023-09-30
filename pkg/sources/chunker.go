@@ -143,18 +143,31 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 			}
 
 			// If there is an error other than EOF, or if we have read some bytes, send the chunk.
-			if (err != nil && !errors.Is(err, io.ErrUnexpectedEOF)) || n > 0 {
-				if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
-					ctx.Logger().Error(err, "error reading chunk")
-					chunkRes.err = err
-				}
+			// io.ReadFull will only return io.EOF when n == 0.
+			if isErrAndNotEOF(err) {
+				ctx.Logger().Error(err, "error reading chunk")
+				chunkRes.err = err
+				chunkResultChan <- chunkRes
+			} else if n > 0 {
 				chunkResultChan <- chunkRes
 			}
 
+			// Return on any type of error.
 			if err != nil {
 				return
 			}
 		}
 	}()
 	return chunkResultChan
+}
+
+// reportableErr checks whether the error is one we are interested in flagging.
+func isErrAndNotEOF(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return false
+	}
+	return true
 }

@@ -198,7 +198,7 @@ func BenchmarkChunkReader(b *testing.B) {
 	}
 }
 
-func TestFlakyReader(t *testing.T) {
+func TestFlakyChunkReader(t *testing.T) {
 	a := "aaaa"
 	b := "bbbb"
 
