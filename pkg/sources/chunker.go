@@ -34,7 +34,7 @@ func Chunker(originalChunk *Chunk) chan *Chunk {
 			chunkBytes := make([]byte, TotalChunkSize)
 			chunk := *originalChunk
 			chunkBytes = chunkBytes[:ChunkSize]
-			n, err := reader.Read(chunkBytes)
+			n, err := io.ReadFull(reader, chunkBytes)
 			if n > 0 {
 				peekData, _ := reader.Peek(TotalChunkSize - n)
 				chunkBytes = append(chunkBytes[:n], peekData...)
