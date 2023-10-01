@@ -939,6 +939,7 @@ enum DetectorType {
   Sourcegraph = 928;
   Tailscale = 929;
   Web3Storage = 930;
+  PlanetScaleDb = 931;
 }
 
 message Result {
