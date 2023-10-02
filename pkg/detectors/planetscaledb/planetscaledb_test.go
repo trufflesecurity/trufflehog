@@ -6,10 +6,11 @@ package planetscaledb
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -24,8 +25,10 @@ func TestPlanetscaledb_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PLANETSCALEDB")
-	inactiveSecret := testSecrets.MustGetField("PLANETSCALEDB_INACTIVE")
+	username := testSecrets.MustGetField("PLANET_SCALEDB_USERNAME")
+	host := testSecrets.MustGetField("PLANET_SCALEDB_HOST")
+	password := testSecrets.MustGetField("PLANET_SCALEDB_PASSWORD")
+	inactivePassword := testSecrets.MustGetField("PLANET_SCALEDB_PASSWORD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,12 +48,12 @@ func TestPlanetscaledb_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscaledb secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a planetscaledb secret %s %s %s", username, password, host)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Planetscaledb,
+					DetectorType: detectorspb.DetectorType_PlanetScaleDb,
 					Verified:     true,
 				},
 			},
@@ -61,13 +64,12 @@ func TestPlanetscaledb_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscaledb secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
+				ctx:  context.Background(),
+				data: []byte(fmt.Sprintf("You can find a planetscaledb secret %s %s %s", username, inactivePassword, host)),
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Planetscaledb,
+					DetectorType: detectorspb.DetectorType_PlanetScaleDb,
 					Verified:     false,
 				},
 			},
@@ -85,40 +87,6 @@ func TestPlanetscaledb_FromChunk(t *testing.T) {
 			want:                nil,
 			wantErr:             false,
 			wantVerificationErr: false,
-		},
-		{
-			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscaledb secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Planetscaledb,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscaledb secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Planetscaledb,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {

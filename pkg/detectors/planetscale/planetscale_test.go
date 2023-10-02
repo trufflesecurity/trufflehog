@@ -6,10 +6,11 @@ package planetscale
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -24,8 +25,10 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PLANETSCALE")
-	inactiveSecret := testSecrets.MustGetField("PLANETSCALE_INACTIVE")
+	secret := testSecrets.MustGetField("PLANET_SCALE_TOKEN")
+	secretID := testSecrets.MustGetField("PLANET_SCALE_ID")
+	inactiveSecret := testSecrets.MustGetField("PLANET_SCALE_TOKEN_INACTIVE")
+	inactiveSecretID := testSecrets.MustGetField("PLANET_SCALE_ID_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,12 +48,12 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within with id %s", secret, secretID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Planetscale,
+					DetectorType: detectorspb.DetectorType_PlanetScale,
 					Verified:     true,
 				},
 			},
@@ -62,12 +65,12 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within with id %s but not valid", inactiveSecret, inactiveSecretID)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Planetscale,
+					DetectorType: detectorspb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},
@@ -91,12 +94,12 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within with id %s", secret, secretID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Planetscale,
+					DetectorType: detectorspb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},
@@ -108,12 +111,12 @@ func TestPlanetscale_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a planetscale secret %s within with id %s", secret, secretID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Planetscale,
+					DetectorType: detectorspb.DetectorType_PlanetScale,
 					Verified:     false,
 				},
 			},

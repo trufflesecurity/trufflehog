@@ -65,9 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
+					} else if res.StatusCode == 401 {
 						// The secret is determinately not verified
 						s1.Verified = false
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected status code %d", res.StatusCode)
 					}
 				} else {
 					s1.VerificationError = err
@@ -84,4 +86,3 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PlanetScale
 }
-

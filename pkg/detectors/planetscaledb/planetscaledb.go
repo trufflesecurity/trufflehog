@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						s1.VerificationError = err
 					} else {
-						err = db.Ping()
+						err = db.PingContext(ctx)
 						if err == nil {
 							s1.Verified = true
 						} else {
@@ -79,4 +79,3 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PlanetScaleDb
 }
-
