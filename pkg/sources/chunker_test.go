@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/stretchr/testify/assert"
@@ -195,4 +196,24 @@ func BenchmarkChunkReader(b *testing.B) {
 		_, err := reader.Seek(0, 0)
 		assert.Nil(b, err)
 	}
+}
+
+func TestFlakyChunkReader(t *testing.T) {
+	a := "aaaa"
+	b := "bbbb"
+
+	reader := iotest.OneByteReader(strings.NewReader(a + b))
+
+	chunkReader := NewChunkReader()
+	chunkResChan := chunkReader(context.TODO(), reader)
+
+	var chunks []ChunkResult
+	for chunk := range chunkResChan {
+		chunks = append(chunks, chunk)
+	}
+
+	assert.Equal(t, 1, len(chunks))
+	chunk := chunks[0]
+	assert.NoError(t, chunk.Error())
+	assert.Equal(t, a+b, string(chunk.Bytes()))
 }
