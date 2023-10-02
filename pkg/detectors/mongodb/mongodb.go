@@ -2,8 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 	"regexp"
 	"strings"
 	"time"
@@ -11,6 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -49,10 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_MongoDB,
 			Raw:          []byte(resMatch),
 		}
-        // Set the RotationGuideURL in the ExtraData
-        s1.ExtraData = map[string]string{
-            "Rotation Guide": "https://howtorotate.com/docs/tutorials/mongo/",
-        }
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+		}
 
 		if verify {
 			timeout := s.timeout

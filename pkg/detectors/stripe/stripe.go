@@ -40,10 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Stripe,
 			Raw:          []byte(match),
 		}
-        // Set the RotationGuideURL in the ExtraData
-        s.ExtraData = map[string]string{
-            "Rotation Guide": "https://howtorotate.com/docs/tutorials/stripe/",
-        }
+		s.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/stripe/",
+		}
 
 		if verify {
 

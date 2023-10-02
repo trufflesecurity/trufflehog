@@ -54,10 +54,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(idMatch[1]),
 				RawV2:        []byte(idMatch[1] + secretMatch[1]),
 			}
-            // Set the RotationGuideURL in the ExtraData
-            s1.ExtraData = map[string]string{
-                "Rotation Guide": "https://howtorotate.com/docs/tutorials/github/",
-            }
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+			}
 
 			config := &clientcredentials.Config{
 				ClientID:     idMatch[1],

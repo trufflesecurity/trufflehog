@@ -57,10 +57,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_GitHubApp,
 				Raw:          []byte(resMatch),
 			}
-            // Set the RotationGuideURL in the ExtraData
-            s1.ExtraData = map[string]string{
-                "Rotation Guide": "https://howtorotate.com/docs/tutorials/github/",
-            }
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+			}
 
 			if verify {
 				signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(resMatch))

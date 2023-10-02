@@ -48,10 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_SendGrid,
 			Raw:          []byte(res),
 		}
-        // Set the RotationGuideURL in the ExtraData
-        s1.ExtraData = map[string]string{
-            "Rotation Guide": "https://howtorotate.com/docs/tutorials/sendgrid/",
-        }
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/sendgrid/",
+		}
 
 		if verify {
 			// there are a few endpoints we can check, but templates seems the least sensitive.
