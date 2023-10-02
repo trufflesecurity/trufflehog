@@ -6,10 +6,11 @@ package azurestorage
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -50,7 +51,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azurestorage,
+					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     true,
 				},
 			},
@@ -67,7 +68,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azurestorage,
+					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
 				},
 			},
@@ -96,7 +97,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azurestorage,
+					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
 				},
 			},
@@ -113,7 +114,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azurestorage,
+					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
 				},
 			},
@@ -125,7 +126,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Azurestorage.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Azuretorage.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
