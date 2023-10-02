@@ -57,6 +57,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					RawV2:        []byte(clientID[2] + clientSecret[2] + tenantID[2]),
 					Redacted:     clientID[2],
 				}
+				// Set the RotationGuideURL in the ExtraData
+				s.ExtraData = map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/azure/",
+				}
 
 				if verify {
 					cred := auth.NewClientCredentialsConfig(clientID[2], clientSecret[2], tenantID[2])

@@ -50,6 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
 			Raw:          []byte(resMatch),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/microsoftteams/",
+		}
 
 		if verify {
 			client := s.client

@@ -206,6 +206,10 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 		client = defaultVerificationClient
 	}
 
+	extraData := map[string]string{
+		"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+	}
+
 	res, err := client.Do(req)
 	if err == nil {
 		defer res.Body.Close()
@@ -213,11 +217,9 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 			identityInfo := identityRes{}
 			err := json.NewDecoder(res.Body).Decode(&identityInfo)
 			if err == nil {
-				extraData := map[string]string{
-					"account": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account,
-					"user_id": identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID,
-					"arn":     identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn,
-				}
+				extraData["account"] = identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Account
+				extraData["user_id"] = identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.UserID
+				extraData["arn"] = identityInfo.GetCallerIdentityResponse.GetCallerIdentityResult.Arn
 				return true, extraData, nil
 			} else {
 				return false, nil, err

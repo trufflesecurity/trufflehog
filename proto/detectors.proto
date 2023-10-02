@@ -939,7 +939,8 @@ enum DetectorType {
   Sourcegraph = 928;
   Tailscale = 929;
   Web3Storage = 930;
-  PlanetScaleDb = 931;
+  AzureStorage = 931;
+  PlanetScaleDb = 932;
 }
 
 message Result {

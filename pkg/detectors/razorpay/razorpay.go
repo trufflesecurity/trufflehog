@@ -21,14 +21,14 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	keyPat    = regexp.MustCompile(`(?i)\brzp_live_\w{10,20}\b`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"razor|secret|rzp|key"}) + `([A-Za-z0-9]{20,50})`)
+	keyPat    = regexp.MustCompile(`(?i)\brzp_live_[A-Za-z0-9]{14}\b`)
+	secretPat = regexp.MustCompile(`\b[A-Za-z0-9]{24}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"rzp_"}
+	return []string{"rzp_live_"}
 }
 
 // FromData will find and optionally verify RazorPay secrets in a given set of bytes.

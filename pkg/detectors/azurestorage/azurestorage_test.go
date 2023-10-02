@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package pagerdutyapikey
+package azurestorage
 
 import (
 	"context"
@@ -11,20 +11,22 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestPagerDutyApiKey_FromChunk(t *testing.T) {
+func TestAzurestorage_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PAGERDUTYAPIKEY_TOKEN")
-	invalidSecret := testSecrets.MustGetField("PAGERDUTYAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField("AZURE_STORAGE")
+	inactiveSecret := testSecrets.MustGetField("AZURE_STORAGE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -44,28 +46,58 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     true,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AzureStorage,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want:                nil,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
 				},
 			},
@@ -77,51 +109,24 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
+					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
 				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
-		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pagerdutyapikey secret %s within but not valid", invalidSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("PagerDutyApiKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Azuretorage.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -129,12 +134,12 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Errorf("PagerDutyApiKey.FromData() verificationError = %v, wantVerificationErr %v", got[i].VerificationError, tt.wantVerificationErr)
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("PagerDutyApiKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Azurestorage.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

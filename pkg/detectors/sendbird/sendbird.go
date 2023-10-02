@@ -61,6 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Sendbird,
 				Raw:          []byte(resMatch),
 			}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/sendbird/",
+			}
 
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api-%s.sendbird.com/v3/users", resAppIdMatch), nil)

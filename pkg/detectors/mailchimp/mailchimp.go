@@ -42,6 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Mailchimp,
 			Raw:          []byte(match),
 		}
+		s.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/mailchimp/",
+		}
 
 		if verify {
 			datacenter := strings.Split(match, "-")[1]
