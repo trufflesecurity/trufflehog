@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = http.DefaultClient
-	keyPat        = regexp.MustCompile(`DefaultEndpointsProtocol=https;AccountName=(?P<account_name>[^;]+);AccountKey=(?P<account_key>[^;]+);EndpointSuffix=core.windows.net`)
+	keyPat        = regexp.MustCompile(`DefaultEndpointsProtocol=https;AccountName=(?P<account_name>[^;]+);AccountKey=(?P<account_key>[^;]+);EndpointSuffix=core\.windows\.net`)
 )
 
 func (s Scanner) Keywords() []string {
@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			now := time.Now().UTC().Format(http.TimeFormat)
-            stringToSign := "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:" + now + "\nx-ms-version:2019-12-12\n/" + accountName + "/\ncomp:list"
+			stringToSign := "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:" + now + "\nx-ms-version:2019-12-12\n/" + accountName + "/\ncomp:list"
 			accountKeyBytes, _ := base64.StdEncoding.DecodeString(accountKey)
 			h := hmac.New(sha256.New, accountKeyBytes)
 			h.Write([]byte(stringToSign))
@@ -92,5 +92,3 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureStorage
 }
-
-
