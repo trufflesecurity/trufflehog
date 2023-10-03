@@ -287,6 +287,8 @@ message Artifactory {
     string access_token = 3;
   }
   repeated string repositories = 4;
+  repeated string include_paths = 5;
+  repeated string ignore_paths = 6;
 }
 
 message Syslog {
