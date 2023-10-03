@@ -95,3 +95,16 @@ func TestGlobFilterExcludePrecdence(t *testing.T) {
 		globTest{"foobar", true},
 	)
 }
+
+func TestGlobNil(t *testing.T) {
+	testGlobs(t, nil,
+		globTest{"foo", true},
+		globTest{"bar", true},
+		globTest{"bara", true},
+		globTest{"barb", true},
+		globTest{"barbosa", true},
+		globTest{"foobar", true},
+		globTest{"food", true},
+		globTest{"anything else", true},
+	)
+}

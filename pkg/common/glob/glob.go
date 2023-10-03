@@ -58,6 +58,9 @@ func NewGlobFilter(opts ...globFilterOpt) (*Filter, error) {
 // Pass returns whether the object is not in the include list or in the exclude
 // list.
 func (f *Filter) Pass(object string) bool {
+	if f == nil {
+		return false
+	}
 	exclude, include := len(f.exclude), len(f.include)
 	if exclude == 0 && include == 0 {
 		return false
