@@ -47,11 +47,22 @@ type InputConfig struct {
 	Placeholder string
 }
 
-func (m Model) GetInputs() map[string]string {
-	inputs := make(map[string]string)
+type Input struct {
+	Value     string
+	IsDefault bool
+}
+
+func (m Model) GetInputs() map[string]Input {
+	inputs := make(map[string]Input)
 
 	for i, input := range m.inputs {
-		inputs[m.configs[i].Key] = input.Value()
+		isDefault := false
+		value := input.Value()
+		if value == "" && m.configs[i].Required {
+			isDefault = true
+			value = input.Placeholder
+		}
+		inputs[m.configs[i].Key] = Input{Value: value, IsDefault: isDefault}
 	}
 
 	return inputs

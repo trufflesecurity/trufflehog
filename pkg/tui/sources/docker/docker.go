@@ -29,7 +29,8 @@ func (m dockerCmdModel) Cmd() string {
 	command = append(command, "trufflehog", "docker")
 
 	inputs := m.GetInputs()
-	vals := inputs["images"]
+	vals := inputs["images"].Value
+
 	if vals != "" {
 		images := strings.Fields(vals)
 		for _, image := range images {

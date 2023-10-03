@@ -64,10 +64,8 @@ func (m syslogCmdModel) Cmd() string {
 	syslogKeys := [5]string{"address", "protocol", "cert", "key", "format"}
 
 	for _, key := range syslogKeys {
-		if inputs[key] != "" {
-			flag := "--" + key + "=" + inputs[key]
-			command = append(command, flag)
-		}
+		flag := "--" + key + "=" + inputs[key].Value
+		command = append(command, flag)
 	}
 
 	return strings.Join(command, " ")
