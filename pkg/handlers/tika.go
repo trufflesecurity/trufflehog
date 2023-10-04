@@ -3,11 +3,15 @@ package handlers
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"runtime"
+	"time"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-logr/logr"
 	"github.com/h2non/filetype"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -15,11 +19,13 @@ import (
 
 // Tika is a handler that uses Apache Tika to extract text from many file types.
 type tika struct {
-	enabled    bool
-	logger     logr.Logger
-	endpoint   string
-	ocrTimeout string
-	client     *http.Client
+	enabled     bool
+	logger      logr.Logger
+	endpoint    string
+	ocrTimeout  string
+	client      *http.Client
+	concurrency *semaphore.Weighted
+	disableOCR  bool
 }
 
 func WithLogger(log logr.Logger) func(*tika) {
@@ -40,19 +46,42 @@ func WithOCRTimeout(timeoutSeconds int) func(*tika) {
 	}
 }
 
+func WithDisableOCR(disable bool) func(*tika) {
+	return func(t *tika) {
+		t.disableOCR = disable
+	}
+}
+
 func WithHTTPClient(client *http.Client) func(*tika) {
 	return func(t *tika) {
 		t.client = client
 	}
 }
 
+func WithConcurrency(concurrency int64) func(*tika) {
+	return func(t *tika) {
+		t.concurrency = semaphore.NewWeighted(concurrency)
+	}
+}
+
 // New creates a new Tika handler.
 func NewTika(opts ...func(*tika)) *tika {
+	transport := http.Transport{
+		Dial: func(netword, addr string) (net.Conn, error) {
+			return net.DialTimeout(netword, addr, 1*time.Second)
+		},
+	}
+
+	client := http.Client{
+		Transport: &transport,
+	}
+
 	t := &tika{
-		logger:     context.Background().Logger().WithValues("component", "tika_handler"),
-		endpoint:   "http://localhost:9998/tika",
-		ocrTimeout: "20",
-		client:     &http.Client{},
+		logger:      context.Background().Logger().WithValues("component", "tika_handler"),
+		endpoint:    "http://localhost:9998/tika",
+		ocrTimeout:  "20",
+		client:      &client,
+		concurrency: semaphore.NewWeighted(int64(runtime.NumCPU())),
 	}
 
 	for _, opt := range opts {
@@ -61,16 +90,16 @@ func NewTika(opts ...func(*tika)) *tika {
 
 	req, err := http.NewRequest("GET", t.endpoint, nil)
 	if err != nil {
-		t.logger.Error(err, "Invalid URL for tika server, skipping handler")
+		t.logger.Error(err, "Invalid URL for Tika server, disabling file handler")
 		return nil
 	}
 	res, err := common.SaneHttpClient().Do(req)
 	if err != nil {
-		t.logger.Error(err, "Failed to test connection to tika server, skipping handler")
+		t.logger.Error(err, "Failed to test connection to Tika server, disabling file handler")
 		return nil
 	}
 	if res.StatusCode != 200 {
-		t.logger.Error(err, "Failed to test connection to tika server (invalid response), skipping handler")
+		t.logger.Error(err, "Failed to test connection to Tika server (invalid response), disabling file handler")
 	}
 
 	return t
@@ -113,29 +142,38 @@ func (t *tika) IsFiletype(file *diskbufferreader.DiskBufferReader) bool {
 
 // FromFile returns a channel of []byte chunks from the file.
 func (t *tika) FromFile(file *diskbufferreader.DiskBufferReader) chan ([]byte) {
-	t.logger.V(1).Info("Extracting text from file using Apache Tika")
-	req, err := http.NewRequest("PUT", t.endpoint, file)
-	if err != nil {
-		t.logger.Error(err, "Failed to create request for tika server")
-		return nil
-	}
-	req.Header.Set("X-Tika-OCRTimeoutSeconds", t.ocrTimeout)
-	req.Header.Set("Accept", "text/plain")
-	resp, err := t.client.Do(req)
-	if err != nil {
-		t.logger.Error(err, "Failed to send request to tika server")
-		return nil
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.logger.Error(err, "Failed to read response from tika server")
-		return nil
-	}
+	t.concurrency.Acquire(context.Background(), 1)
 
 	outputChan := make(chan []byte)
+
 	go func() {
+		defer t.concurrency.Release(1)
+
+		t.logger.V(1).Info("Extracting text from file using Apache Tika")
+		req, err := http.NewRequest("PUT", t.endpoint, file)
+		if err != nil {
+			t.logger.Error(err, "Failed to create request for tika server")
+			return
+		}
+		req.Header.Set("X-Tika-OCRTimeoutSeconds", t.ocrTimeout)
+		if t.disableOCR {
+			req.Header.Set("X-Tika-OCRmaxFileSizeToOcr", "0")
+		}
+		req.Header.Set("Accept", "text/plain")
+
+		resp, err := t.client.Do(req)
+		if err != nil {
+			t.logger.Error(err, "Failed to send request to tika server")
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.logger.Error(err, "Failed to read response from tika server")
+			return
+		}
+
 		outputChan <- body
 		close(outputChan)
 	}()

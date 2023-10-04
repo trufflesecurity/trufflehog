@@ -6,10 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -88,75 +90,86 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 			done = true
 		}()
 
+		sem := semaphore.NewWeighted(int64(runtime.NumCPU()))
+
 		err := fs.WalkDir(os.DirFS(cleanPath), ".", func(relativePath string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}
 
-			path := filepath.Join(cleanPath, relativePath)
+			sem.Acquire(ctx, 1)
 
-			fileStat, err := os.Stat(path)
-			if err != nil {
-				log.WithError(err).Warnf("unable to stat file: %s", path)
-				return nil
-			}
-			if !fileStat.Mode().IsRegular() {
-				return nil
-			}
+			go func() {
 
-			inputFile, err := os.Open(path)
-			if err != nil {
-				log.Warn(err)
-				return nil
-			}
-			defer inputFile.Close()
-			log.WithField("file_path", path).Trace("scanning file")
+				defer sem.Release(1)
 
-			reReader, err := diskbufferreader.New(inputFile)
-			if err != nil {
-				log.WithError(err).Error("Could not create re-readable reader.")
-			}
-			defer reReader.Close()
+				path := filepath.Join(cleanPath, relativePath)
 
-			chunkSkel := &sources.Chunk{
-				SourceType: s.Type(),
-				SourceName: s.name,
-				SourceID:   s.SourceID(),
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Filesystem{
-						Filesystem: &source_metadatapb.Filesystem{
-							File: sanitizer.UTF8(path),
+				fileStat, err := os.Stat(path)
+				if err != nil {
+					log.WithError(err).Warnf("unable to stat file: %s", path)
+					return
+				}
+				if !fileStat.Mode().IsRegular() {
+					return
+				}
+
+				inputFile, err := os.Open(path)
+				if err != nil {
+					log.Warn(err)
+					return
+				}
+				defer inputFile.Close()
+				log.WithField("file_path", path).Trace("scanning file")
+
+				reReader, err := diskbufferreader.New(inputFile)
+				if err != nil {
+					log.WithError(err).Error("Could not create re-readable reader.")
+				}
+				defer reReader.Close()
+
+				chunkSkel := &sources.Chunk{
+					SourceType: s.Type(),
+					SourceName: s.name,
+					SourceID:   s.SourceID(),
+					SourceMetadata: &source_metadatapb.MetaData{
+						Data: &source_metadatapb.MetaData_Filesystem{
+							Filesystem: &source_metadatapb.Filesystem{
+								File: sanitizer.UTF8(path),
+							},
 						},
 					},
-				},
-				Verify: s.verify,
-			}
-			if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
-				return nil
-			}
+					Verify: s.verify,
+				}
+				if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
+					return
+				}
 
-			if err := reReader.Reset(); err != nil {
-				return err
-			}
-			reReader.Stop()
-			data, err := io.ReadAll(reReader)
-			if err != nil {
-				return err
-			}
-			chunksChan <- &sources.Chunk{
-				SourceType: s.Type(),
-				SourceName: s.name,
-				SourceID:   s.SourceID(),
-				Data:       data,
-				SourceMetadata: &source_metadatapb.MetaData{
-					Data: &source_metadatapb.MetaData_Filesystem{
-						Filesystem: &source_metadatapb.Filesystem{
-							File: sanitizer.UTF8(path),
+				if err := reReader.Reset(); err != nil {
+					return
+				}
+				reReader.Stop()
+				data, err := io.ReadAll(reReader)
+				if err != nil {
+					return
+				}
+				chunksChan <- &sources.Chunk{
+					SourceType: s.Type(),
+					SourceName: s.name,
+					SourceID:   s.SourceID(),
+					Data:       data,
+					SourceMetadata: &source_metadatapb.MetaData{
+						Data: &source_metadatapb.MetaData_Filesystem{
+							Filesystem: &source_metadatapb.Filesystem{
+								File: sanitizer.UTF8(path),
+							},
 						},
 					},
-				},
-				Verify: s.verify,
-			}
+					Verify: s.verify,
+				}
+				return
+			}()
+
 			return nil
 		})
 
