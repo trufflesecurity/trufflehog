@@ -70,23 +70,21 @@ func TestGlobFilterEmpty(t *testing.T) {
 }
 
 func TestGlobFilterExcludeInclude(t *testing.T) {
-	// This is effectively the same as only an include filter.
-	filter, err := NewGlobFilter(WithExcludeGlobs("foo*"), WithIncludeGlobs("bar*"))
+	filter, err := NewGlobFilter(WithExcludeGlobs("/foo/bar/**"), WithIncludeGlobs("/foo/**"))
 	assert.NoError(t, err)
 
 	testGlobs(t, filter,
-		globTest{"foo", false},
-		globTest{"bar", true},
-		globTest{"bara", true},
-		globTest{"barb", true},
-		globTest{"barbosa", true},
-		globTest{"foobar", false},
-		globTest{"food", false},
-		globTest{"ambiguous anything else", false},
+		globTest{"/foo/a", true},
+		globTest{"/foo/b", true},
+		globTest{"/foo/c/d/e", true},
+		globTest{"/foo/bar/a", false},
+		globTest{"/foo/bar/b", false},
+		globTest{"/foo/bar/c/d/e", false},
+		globTest{"/any/other/path", false},
 	)
 }
 
-func TestGlobFilterExcludePrecdence(t *testing.T) {
+func TestGlobFilterExcludePrecedence(t *testing.T) {
 	filter, err := NewGlobFilter(WithExcludeGlobs("foo"), WithIncludeGlobs("foo*"))
 	assert.NoError(t, err)
 
