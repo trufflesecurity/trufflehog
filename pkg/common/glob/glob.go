@@ -22,7 +22,7 @@ func WithExcludeGlobs(excludes ...string) globFilterOpt {
 		for _, exclude := range excludes {
 			g, err := glob.Compile(exclude)
 			if err != nil {
-				return err
+				return fmt.Errorf("invalid exclude glob %q: %w", exclude, err)
 			}
 			f.exclude = append(f.exclude, g)
 		}
@@ -36,7 +36,7 @@ func WithIncludeGlobs(includes ...string) globFilterOpt {
 		for _, include := range includes {
 			g, err := glob.Compile(include)
 			if err != nil {
-				return err
+				return fmt.Errorf("invalid include glob %q: %w", include, err)
 			}
 			f.include = append(f.include, g)
 		}

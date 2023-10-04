@@ -108,3 +108,10 @@ func TestGlobNil(t *testing.T) {
 		globTest{"anything else", true},
 	)
 }
+
+func TestGlobErrorContainsGlob(t *testing.T) {
+	invalidGlob := "[this is invalid because it doesn't close the capture group"
+	_, err := NewGlobFilter(WithExcludeGlobs(invalidGlob))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), invalidGlob)
+}
