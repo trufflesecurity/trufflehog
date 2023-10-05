@@ -85,7 +85,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.VerificationError = fmt.Errorf("unexpected HTTP response body: %w", err)
 						continue
 					}
-					fmt.Println(resp.Error.Message)
 					if resp.Error.Message == "max_tokens_to_sample: field required" {
 						// The secret is verified
 						// Anthropic returns 400 on a request containing a valid API key,
