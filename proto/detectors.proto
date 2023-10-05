@@ -943,6 +943,7 @@ enum DetectorType {
   PlanetScaleDb = 932;
   Anthropic = 933;
   Ramp = 934;
+  Klaviyo = 935;
 }
 
 message Result {
