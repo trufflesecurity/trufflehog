@@ -942,6 +942,7 @@ enum DetectorType {
   AzureStorage = 931;
   PlanetScaleDb = 932;
   Anthropic = 933;
+  Ramp = 934;
 }
 
 message Result {
