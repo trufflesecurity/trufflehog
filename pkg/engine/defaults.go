@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
@@ -1548,6 +1549,7 @@ func DefaultDetectors() []detectors.Detector {
 		sourcegraph.Scanner{},
 		tailscale.Scanner{},
 		web3storage.Scanner{},
+		&anthropic.Scanner{},
 	}
 
 }
