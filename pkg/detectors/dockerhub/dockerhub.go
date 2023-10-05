@@ -18,7 +18,9 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
+func (s Scanner) Version() int { return 1 }
 var (
 	client = common.SaneHttpClient()
 
@@ -27,7 +29,7 @@ var (
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
+	accessTokenPat = regexp.MustCompile(`\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
