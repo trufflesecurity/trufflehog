@@ -305,6 +305,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
@@ -1548,6 +1549,7 @@ func DefaultDetectors() []detectors.Detector {
 		sourcegraph.Scanner{},
 		tailscale.Scanner{},
 		web3storage.Scanner{},
+		grafana.Scanner{},
 	}
 
 }
