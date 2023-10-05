@@ -12,6 +12,9 @@ import (
 type Filter struct {
 	exclude []glob.Glob
 	include []glob.Glob
+	// If an object is not found in either of the filters, return this
+	// value in Pass.
+	notFoundPassBehavior bool
 }
 
 type globFilterOpt func(*Filter) error
@@ -44,9 +47,29 @@ func WithIncludeGlobs(includes ...string) globFilterOpt {
 	}
 }
 
+// WithDefaultDeny configures the filter to deny objects that are not found
+// in either exclude or include filter (in the ambiguous case where both are
+// configured).
+func WithDefaultDeny() globFilterOpt {
+	return func(f *Filter) error {
+		f.notFoundPassBehavior = true
+		return nil
+	}
+}
+
+// WithDefaultAllow configures the filter to allow objects that are not found
+// in either exclude or include filter (in the ambiguous case where both are
+// configured).
+func WithDefaultAllow() globFilterOpt {
+	return func(f *Filter) error {
+		f.notFoundPassBehavior = false
+		return nil
+	}
+}
+
 // NewGlobFilter creates a new Filter with the provided options.
 func NewGlobFilter(opts ...globFilterOpt) (*Filter, error) {
-	filter := &Filter{}
+	filter := &Filter{notFoundPassBehavior: true}
 	for _, opt := range opts {
 		if err := opt(filter); err != nil {
 			return nil, err
@@ -72,11 +95,8 @@ func (f *Filter) Pass(object string) bool {
 		if pass, err := f.passExcludeInclude(object); err == nil {
 			return pass
 		}
-		// Ambiguous case. Should we skip? Should we not skip?
-		// Let's skip since the user indicated they want *some* form of
-		// filtering.
-		// TODO: Maybe this could be configurable.
-		return true
+		// Ambiguous case.
+		return f.notFoundPassBehavior
 	}
 }
 

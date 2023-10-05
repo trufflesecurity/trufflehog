@@ -113,3 +113,33 @@ func TestGlobErrorContainsGlob(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), invalidGlob)
 }
+
+func TestGlobDefaultDeny(t *testing.T) {
+	filter, err := NewGlobFilter(
+		WithExcludeGlobs("/foo/bar/**"),
+		WithIncludeGlobs("/foo/**"),
+		WithDefaultDeny(),
+	)
+	assert.NoError(t, err)
+
+	testGlobs(t, filter,
+		globTest{"/foo/a", true},
+		globTest{"/foo/bar/a", false},
+		globTest{"/any/other/path", false},
+	)
+}
+
+func TestGlobDefaultAllow(t *testing.T) {
+	filter, err := NewGlobFilter(
+		WithExcludeGlobs("/foo/bar/**"),
+		WithIncludeGlobs("/foo/**"),
+		WithDefaultAllow(),
+	)
+	assert.NoError(t, err)
+
+	testGlobs(t, filter,
+		globTest{"/foo/a", true},
+		globTest{"/foo/bar/a", false},
+		globTest{"/any/other/path", true},
+	)
+}
