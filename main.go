@@ -87,7 +87,6 @@ var (
 	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue descriptions and comments in scan.").Bool()
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
-	githubScanIgnoreGist    = githubScan.Flag("ignore-gist", "Ignore gist comments in scan.").Bool()
 	githubScanIncludeGist   = githubScan.Flag("include-gist", "Include gist comments in scan.").Bool()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
