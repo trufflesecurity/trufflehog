@@ -79,18 +79,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else if res.StatusCode == 403 {
-					// The secret is determinately verified.
 					var apiResp response
+					// Klaviyo responds with 403 when the API-key does not have permissions to hit /api/profiles.
+					// Ensure that the 403 is from Klaviyo: https://developers.klaviyo.com/en/docs/rate_limits_and_error_handling
 					if err = json.NewDecoder(res.Body).Decode(&apiResp); err == nil {
+						// valid JSON response
 						if len(apiResp.Errors) > 0 {
-							// Klaviyo responds with 403 when the API-key does not have permissions to hit /api/profiles.
 							// Thus, the key is verified, but it is up to the user to determine what scopes the key has.
-							if apiResp.Errors[0].Code == "permission_denied" {
-								s1.Verified = true
-							}
+							s1.Verified = true
 						}
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected API JSON response")
 					}
-
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
