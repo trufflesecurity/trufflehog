@@ -87,6 +87,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if len(apiResp.Errors) > 0 {
 							// Thus, the key is verified, but it is up to the user to determine what scopes the key has.
 							s1.Verified = true
+						} else {
+							s1.VerificationError = fmt.Errorf("errors expected")
 						}
 					} else {
 						s1.VerificationError = fmt.Errorf("unexpected API JSON response")
