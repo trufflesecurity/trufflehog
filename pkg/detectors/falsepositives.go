@@ -2,6 +2,7 @@ package detectors
 
 import (
 	_ "embed"
+	"math"
 	"strings"
 	"unicode"
 )
@@ -89,4 +90,42 @@ func bytesToCleanWordList(data []byte) []string {
 		}
 	}
 	return words
+}
+
+// DefaultMinEntropy setting inspired by the original TruffleHog's default value for strings
+const DefaultMinEntropy = 3.0
+
+func StringShannonEntropy(input string) float64 {
+	chars := make(map[rune]float64)
+
+	for _, char := range input {
+		chars[char]++
+	}
+
+	entropy := 0.0
+	for _, value := range chars {
+		value /= float64(len(input))
+		entropy += value * math.Log2(value)
+	}
+
+	return -entropy
+}
+
+// FilterResultsWithEntropy filters out determinately unverified results that have a shannon entropy below the given value.
+func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
+	filteredResults := []Result{}
+	for _, result := range results {
+		if result.Verified == false && result.VerificationError == nil {
+			if result.RawV2 != nil {
+				if StringShannonEntropy(string(result.RawV2)) >= entropy {
+					filteredResults = append(filteredResults, result)
+				}
+			} else {
+				if StringShannonEntropy(string(result.Raw)) >= entropy {
+					filteredResults = append(filteredResults, result)
+				}
+			}
+		}
+	}
+	return filteredResults
 }

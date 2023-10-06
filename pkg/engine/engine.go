@@ -60,7 +60,9 @@ type Engine struct {
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
-	filterUnverified     bool
+	filterUnverified bool
+	// entropyFilter is used to filter out unverified results using Shannon entropy.
+	filterEntropy        *float64
 	onlyVerified         bool
 	printAvgDetectorTime bool
 
@@ -125,6 +127,15 @@ func WithDecoders(decoders ...decoders.Decoder) EngineOption {
 func WithFilterUnverified(filter bool) EngineOption {
 	return func(e *Engine) {
 		e.filterUnverified = filter
+	}
+}
+
+// WithFilterEntropy filters out unverified results using Shannon entropy.
+func WithFilterEntropy(entropy float64) EngineOption {
+	return func(e *Engine) {
+		if entropy > 0 {
+			e.filterEntropy = &entropy
+		}
 	}
 }
 
@@ -513,6 +524,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
 	}
+
 	if e.printAvgDetectorTime && len(results) > 0 {
 		elapsed := time.Since(start)
 		detectorName := results[0].DetectorType.String()
@@ -530,6 +542,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	if e.filterUnverified {
 		results = detectors.CleanResults(results)
+	}
+
+	if e.filterEntropy != nil {
+		results = detectors.FilterResultsWithEntropy(results, *e.filterEntropy)
 	}
 
 	for _, res := range results {
