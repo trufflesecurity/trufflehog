@@ -12,15 +12,15 @@ func TestPrefixRegex(t *testing.T) {
 	}{
 		{
 			keywords: []string{"securitytrails"},
-			expected: `(?i)(?:securitytrails).|(?:[\n\r]){0,40}`,
+			expected: `(?i)(?:securitytrails)(?:.|[\n\r]){0,40}`,
 		},
 		{
 			keywords: []string{"zipbooks"},
-			expected: `(?i)(?:zipbooks).|(?:[\n\r]){0,40}`,
+			expected: `(?i)(?:zipbooks)(?:.|[\n\r]){0,40}`,
 		},
 		{
 			keywords: []string{"wrike"},
-			expected: `(?i)(?:wrike).|(?:[\n\r]){0,40}`,
+			expected: `(?i)(?:wrike)(?:.|[\n\r]){0,40}`,
 		},
 	}
 	for _, tt := range tests {
