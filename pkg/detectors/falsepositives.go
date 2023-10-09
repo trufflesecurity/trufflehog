@@ -92,20 +92,18 @@ func bytesToCleanWordList(data []byte) []string {
 	return words
 }
 
-// DefaultMinEntropy setting inspired by the original TruffleHog's default value for strings
-const DefaultMinEntropy = 3.0
-
 func StringShannonEntropy(input string) float64 {
 	chars := make(map[rune]float64)
+	inverseTotal := 1 / float64(len(input)) // precompute the inverse
 
 	for _, char := range input {
 		chars[char]++
 	}
 
 	entropy := 0.0
-	for _, value := range chars {
-		value /= float64(len(input))
-		entropy += value * math.Log2(value)
+	for _, count := range chars {
+		probability := count * inverseTotal
+		entropy += probability * math.Log2(probability)
 	}
 
 	return -entropy
