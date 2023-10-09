@@ -138,6 +138,9 @@ var (
 
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+
+	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
+	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
 )
 
 func init() {
@@ -495,6 +498,10 @@ func run(state overseer.State) {
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logFatal(err, "Failed to scan CircleCI.")
+		}
+	case travisCiScan.FullCommand():
+		if err := e.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+			logFatal(err, "Failed to scan TravisCI.")
 		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{

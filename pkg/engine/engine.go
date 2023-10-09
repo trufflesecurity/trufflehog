@@ -295,6 +295,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	e.sourceManager = sources.NewManager(
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithSourceUnits(),
 	)
 
 	if len(e.decoders) == 0 {
