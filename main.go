@@ -16,6 +16,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/mitchellh/go-ps"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -209,6 +210,26 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
+}
+
+func getScannerPIDs() ([]int, error)  {
+	ctx := context.Background()
+	logger := ctx.Logger()
+	logFatal := logFatalFunc(logger)
+	pids:= []int{}
+
+	procs, err := ps.Processes()
+	if err != nil {
+		logFatal(err, "Cannot get scanner PIDs")
+	}
+
+	for _, proc := range procs {
+		if strings.Contains(proc.Executable(), "trufflehog") {
+			pids = append(pids, proc.Pid())
+		}
+	}
+
+	return pids, nil
 }
 
 func run(state overseer.State) {
