@@ -232,6 +232,30 @@ func getScannerPIDs() ([]int, error)  {
 	return pids, nil
 }
 
+func cleanTempDir(pid int) {
+	ctx := context.Background()
+	logger := ctx.Logger()
+	logFatal := logFatalFunc(logger)
+
+	tempDir := os.TempDir()
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		logFatal(err, "Failed to read the OS temporary directory")
+	}
+
+	pidStr := strconv.Itoa(pid)
+
+	for _, file := range files {
+		if file.IsDir() && strings.Contains(file.Name(), pidStr) && !strings.Contains(file.Name(), pidStr+"-") {
+			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
+			if err := os.RemoveAll(dirPath); err != nil {
+				logFatal(err, "Failed to remove directory")
+			}
+			fmt.Printf("Deleted directory: %s\n", dirPath)
+		}
+	}
+}
+
 func run(state overseer.State) {
 	ctx := context.Background()
 	logger := ctx.Logger()
@@ -548,6 +572,12 @@ func run(state overseer.State) {
 		if err := e.ScanDocker(ctx, anyConn); err != nil {
 			logFatal(err, "Failed to scan Docker.")
 		}
+	}
+
+	pids, _ := getScannerPIDs()
+
+	for _, pid := range pids {
+		cleanTempDir(pid)
 	}
 
 	// Wait for all workers to finish.
