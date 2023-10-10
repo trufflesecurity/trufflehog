@@ -16,7 +16,6 @@ import (
 	"github.com/mattn/go-isatty"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
-	"github.com/mitchellh/go-ps"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -210,50 +209,6 @@ func main() {
 	err := overseer.RunErr(updateCfg)
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
-	}
-}
-
-func getScannerPIDs() ([]int, error)  {
-	ctx := context.Background()
-	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
-	pids:= []int{}
-
-	procs, err := ps.Processes()
-	if err != nil {
-		logFatal(err, "Cannot get scanner PIDs")
-	}
-
-	for _, proc := range procs {
-		if strings.Contains(proc.Executable(), "trufflehog") {
-			pids = append(pids, proc.Pid())
-		}
-	}
-
-	return pids, nil
-}
-
-func cleanTempDir(pid int) {
-	ctx := context.Background()
-	logger := ctx.Logger()
-	logFatal := logFatalFunc(logger)
-
-	tempDir := os.TempDir()
-	files, err := os.ReadDir(tempDir)
-	if err != nil {
-		logFatal(err, "Failed to read the OS temporary directory")
-	}
-
-	pidStr := strconv.Itoa(pid)
-
-	for _, file := range files {
-		if file.IsDir() && strings.Contains(file.Name(), pidStr) && !strings.Contains(file.Name(), pidStr+"-") {
-			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
-			if err := os.RemoveAll(dirPath); err != nil {
-				logFatal(err, "Failed to remove directory")
-			}
-			fmt.Printf("Deleted directory: %s\n", dirPath)
-		}
 	}
 }
 
@@ -574,12 +529,6 @@ func run(state overseer.State) {
 		if err := e.ScanDocker(ctx, anyConn); err != nil {
 			logFatal(err, "Failed to scan Docker.")
 		}
-	}
-
-	pids, _ := getScannerPIDs()
-
-	for _, pid := range pids {
-		cleanTempDir(pid)
 	}
 
 	// Wait for all workers to finish.
