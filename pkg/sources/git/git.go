@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -19,10 +20,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
+	"github.com/mitchellh/go-ps"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -319,6 +322,44 @@ type cloneParams struct {
 	clonePath string
 }
 
+func getScannerPIDs() ([]int, error)  {
+	pids:= []int{}
+
+	procs, err := ps.Processes()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, proc := range procs {
+		if strings.Contains(proc.Executable(), "truffle") {
+			pids = append(pids, proc.Pid())
+		}
+	}
+
+	return pids, nil
+}
+
+func cleanTempDir(pid int) error {
+	tempDir := os.TempDir()
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		return err
+	}
+
+	pidStr := strconv.Itoa(pid)
+
+	for _, file := range files {
+		if file.IsDir() && strings.Contains(file.Name(), pidStr) && !strings.Contains(file.Name(), pidStr+"-") {
+			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
+			if err := os.RemoveAll(dirPath); err != nil {
+				return err
+			}
+			fmt.Printf("Deleted directory: %s\n", dirPath)
+		}
+	}
+	return nil
+}
+
 // CloneRepo orchestrates the cloning of a given Git repository, returning its local path
 // and a git.Repository object for further operations. The function sets up error handling
 // infrastructure, ensuring that any encountered errors trigger a cleanup of resources.
@@ -329,7 +370,16 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 	if err = GitCmdCheck(); err != nil {
 		return "", nil, err
 	}
-	clonePath, err := os.MkdirTemp(os.TempDir(), "trufflehog")
+
+	pids, _ := getScannerPIDs()
+
+	for _, pid := range pids {
+		cleanTempDir(pid)
+	}
+
+	tmpdir := fmt.Sprintf("trufflehog-%d-%d", strconv.Itoa(pids[0]), rand.String(6))
+
+	clonePath, err := os.MkdirTemp(os.TempDir(), tmpdir)
 	if err != nil {
 		return "", nil, err
 	}
