@@ -322,6 +322,8 @@ type cloneParams struct {
 	clonePath string
 }
 
+var ExecutableName = "trufflehog"
+
 func getScannerPIDs() ([]int, error)  {
 	pids:= []int{}
 
@@ -331,7 +333,7 @@ func getScannerPIDs() ([]int, error)  {
 	}
 
 	for _, proc := range procs {
-		if strings.Contains(proc.Executable(), "truffle") {
+		if strings.Contains(proc.Executable(), ExecutableName) {
 			pids = append(pids, proc.Pid())
 		}
 	}
