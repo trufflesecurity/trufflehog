@@ -63,7 +63,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else if res.StatusCode == 401 {
+				} else if res.StatusCode == 403 || res.StatusCode == 401 {
+					// 403 when the gateway is not configured to accept the token,
+					// 401 when the token is invalid.
 					// The secret is determinately not verified (nothing to do)
 				} else {
 					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
