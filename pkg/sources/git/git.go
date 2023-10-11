@@ -376,10 +376,15 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 	pids, _ := getScannerPIDs()
 
 	for _, pid := range pids {
-		cleanTempDir(pid)
+		err := cleanTempDir(pid)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
-	tmpdir := fmt.Sprintf("trufflehog-%d-%d", strconv.Itoa(pids[0]), rand.String(6))
+	spid := strconv.Itoa(pids[0])
+
+	tmpdir := fmt.Sprintf("trufflehog-%s-%s", spid, rand.String(6))
 
 	clonePath, err := os.MkdirTemp(os.TempDir(), tmpdir)
 	if err != nil {
