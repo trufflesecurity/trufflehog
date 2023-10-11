@@ -120,7 +120,7 @@ func TestJobProgressElapsedTime(t *testing.T) {
 	metrics := JobProgressMetrics{}
 	assert.Equal(t, time.Duration(0), metrics.ElapsedTime())
 
-	metrics.StartTime = time.Now()
+	metrics.StartTime = time.Date(2022, time.March, 30, 0, 0, 0, 0, time.UTC)
 	assert.Greater(t, metrics.ElapsedTime(), time.Duration(0))
 
 	metrics.EndTime = metrics.StartTime.Add(1 * time.Hour)
