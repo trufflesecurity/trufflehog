@@ -554,6 +554,25 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
+	func main() {
+    var wg sync.WaitGroup
+    filesToScan := []string{"file1.txt", "file2.txt", "file3.txt"}
+
+    for _, file := range filesToScan {
+        wg.Add(1)
+        go func(file string) {
+            defer wg.Done()
+            fileContent, err := ioutil.ReadFile(file)
+            if err != nil {
+                fmt.Println("Error reading file:", err)
+                return
+            }
+            detectSecrets(fileContent)
+        }(file)
+    }
+
+    wg.Wait()
+}
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
