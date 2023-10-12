@@ -129,7 +129,7 @@ func WithFilterUnverified(filter bool) Option {
 }
 
 // WithFilterEntropy filters out unverified results using Shannon entropy.
-func WithFilterEntropy(entropy float64) EngineOption {
+func WithFilterEntropy(entropy float64) Option {
 	return func(e *Engine) {
 		if entropy > 0 {
 			e.filterEntropy = &entropy
