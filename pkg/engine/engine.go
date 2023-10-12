@@ -49,20 +49,6 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
-// detectorKey is used to identify a detector in the keywordsToDetectors map.
-// Multiple detectors can have the same detector type but different versions.
-// This allows us to identify a detector by its type and version.
-type detectorKey struct {
-	detectorType detectorspb.DetectorType
-	version      int
-}
-
-// detectorInfo is used to store a detector and whether it should be verified.
-type detectorInfo struct {
-	detectors.Detector
-	shouldVerify bool
-}
-
 type Engine struct {
 	// CLI flags.
 	concurrency uint8
@@ -75,7 +61,7 @@ type Engine struct {
 	onlyVerified         bool
 	printAvgDetectorTime bool
 
-	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups
+	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahoCorasickCore
 
 	// Engine synchronization primitives.
