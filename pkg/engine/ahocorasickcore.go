@@ -15,7 +15,7 @@ import (
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
 type ahoCorasickCore struct {
 	// prefilter is a ahocorasick struct used for doing efficient string
-	// matching given a set of words (keywords from the rules in the config)
+	// matching given a set of words. (keywords from the rules in the config)
 	prefilter ahocorasick.Trie
 	// Maps for efficient lookups during detection.
 	detectorTypeToDetectorInfo map[detectorKey]detectorInfo
@@ -23,8 +23,10 @@ type ahoCorasickCore struct {
 	keywordsToDetectors        map[string][]detectorKey
 }
 
-// newAhoCorasickCore allocates and initializes a new ahoCorasickCore.
-// It sets up an empty keyword-to-detectors map, preparing it for subsequent population.
+// newAhoCorasickCore allocates and initializes a new instance of ahoCorasickCore.
+// It creates an empty keyword-to-detectors map for future string matching operations.
+// The map detectorTypeToDetectorInfo is pre-allocated based on the size of detectors
+// provided, for efficient storage and lookup of detector information.
 func newAhoCorasickCore(detectors map[bool][]detectors.Detector) *ahoCorasickCore {
 	return &ahoCorasickCore{
 		keywordsToDetectors:        make(map[string][]detectorKey),
@@ -37,6 +39,7 @@ func newAhoCorasickCore(detectors map[bool][]detectors.Detector) *ahoCorasickCor
 // This involves pre-filtering setup and lookup optimization, critical for the engine's performance.
 func (ac *ahoCorasickCore) setup(ctx context.Context) {
 	ac.buildLookups(ctx)
+	ctx.Logger().V(4).Info("ahoCorasickCore setup complete")
 }
 
 // buildLookups prepares maps for fast detector lookups. Instead of scanning through an array of
@@ -53,7 +56,7 @@ func (ac *ahoCorasickCore) buildLookups(ctx context.Context) {
 	// Implementing a trie aids in substring searches among the keywords.
 	// This is crucial when you have large sets of strings to search through.
 	ac.buildTrie(keywords)
-	ctx.Logger().V(4).Info("engine lookups built")
+	ctx.Logger().V(4).Info("ahoCorasickCore lookups built")
 }
 
 // classifyDetector assigns a unique key for each detector. This key based on type and version,
@@ -94,7 +97,7 @@ func (ac *ahoCorasickCore) matchString(input string) []*ahocorasick.Match {
 
 // populateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
 // This method is designed to reuse the same map for performance optimization,
-// reducing the need for repeated allocations.
+// reducing the need for repeated allocations within each detector worker in the engine.
 func (ac *ahoCorasickCore) populateDetectorsByMatch(match *ahocorasick.Match, detectors map[detectorspb.DetectorType]detectorInfo) bool {
 	matchedKeys, ok := ac.keywordsToDetectors[match.MatchString()]
 	if !ok {
