@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	ahocorasick "github.com/BobuSumisu/aho-corasick"
 	lru "github.com/hashicorp/golang-lru"
 	"google.golang.org/protobuf/proto"
 
@@ -76,9 +75,8 @@ type Engine struct {
 	onlyVerified         bool
 	printAvgDetectorTime bool
 
-	// prefilter is a ahocorasick struct used for doing efficient string
-	// matching given a set of words (keywords from the rules in the config)
-	prefilter ahocorasick.Trie
+	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups
+	ahoCorasickCore *ahoCorasickCore
 
 	// Engine synchronization primitives.
 	sourceManager        *sources.SourceManager
@@ -87,10 +85,6 @@ type Engine struct {
 	workersWg            sync.WaitGroup
 	wgDetectorWorkers    sync.WaitGroup
 	WgNotifier           sync.WaitGroup
-
-	// Maps for efficient lookups during detection.
-	detectorTypeToDetectorInfo map[detectorKey]detectorInfo
-	keywordsToDetectors        map[string][]detectorKey
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -286,7 +280,7 @@ func Start(ctx context.Context, options ...Option) (*Engine, error) {
 		return nil, err
 	}
 	e.setDefaults(ctx)
-	e.buildLookups(ctx)
+	e.ahoCorasickCore.setup(ctx)
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
 
@@ -319,6 +313,8 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 		option(e)
 	}
 	ctx.Logger().V(4).Info("engine initialized")
+	ctx.Logger().V(4).Info("setting up aho-corasick core")
+	e.ahoCorasickCore = newAhoCorasickCore(e.detectors)
 
 	return nil
 }
@@ -351,60 +347,6 @@ func (e *Engine) setDefaults(ctx context.Context) {
 		e.detectors[false] = []detectors.Detector{}
 	}
 	ctx.Logger().V(4).Info("default engine options set")
-}
-
-// buildLookups prepares maps for fast detector lookups. Instead of scanning
-// through an array of detectors for every chunk, this lookup optimization
-// provides rapid access to relevant detectors using keywords.
-func (e *Engine) buildLookups(ctx context.Context) {
-	e.detectorTypeToDetectorInfo = make(map[detectorKey]detectorInfo, len(e.detectors[true])+len(e.detectors[false]))
-	e.keywordsToDetectors = make(map[string][]detectorKey)
-
-	var keywords []string
-	for verify, detectorsSet := range e.detectors {
-		for _, d := range detectorsSet {
-			key := e.classifyDetector(d, verify)
-			keywords = e.extractAndMapKeywords(d, key, keywords)
-		}
-	}
-
-	// Implementing a trie aids in substring searches among the keywords.
-	// This is crucial when you have large sets of strings to search through.
-	e.buildTrie(keywords)
-	ctx.Logger().V(4).Info("engine lookups built")
-}
-
-// classifyDetector assigns a unique key for each detector. This key
-// based on type and version, ensures faster lookups and reduces
-// redundancy in our main detector store.
-func (e *Engine) classifyDetector(d detectors.Detector, shouldVerify bool) detectorKey {
-	detectorType := d.Type()
-	var version int
-	if v, ok := d.(detectors.Versioner); ok {
-		version = v.Version()
-	}
-	key := detectorKey{detectorType: detectorType, version: version}
-	e.detectorTypeToDetectorInfo[key] = detectorInfo{Detector: d, shouldVerify: shouldVerify}
-	return key
-}
-
-// extractAndMapKeywords captures keywords associated with each detector
-// and maps them. This allows us to quickly determine which detectors
-// are relevant based on the presence of certain keywords.
-func (e *Engine) extractAndMapKeywords(d detectors.Detector, key detectorKey, keywords []string) []string {
-	for _, kw := range d.Keywords() {
-		kwLower := strings.ToLower(kw)
-		keywords = append(keywords, kwLower)
-		e.keywordsToDetectors[kwLower] = append(e.keywordsToDetectors[kwLower], key)
-	}
-	return keywords
-}
-
-// buildTrie uses the Ahocorasick algorithm to create a trie structure
-// for efficient keyword matching. This ensures that we can rapidly match
-// against a vast set of keywords without individually comparing each one.
-func (e *Engine) buildTrie(keywords []string) {
-	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 }
 
 // Sanity check detectors for duplicate configuration. Only log in case
@@ -519,7 +461,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 2
-	uniqueDetectors := make(map[detectorspb.DetectorType]detectorInfo, avgDetectorsPerChunk)
+	chunkSpecificDetectors := make(map[detectorspb.DetectorType]detectorInfo, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
@@ -530,17 +472,13 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				for _, match := range e.prefilter.MatchString(strings.ToLower(string(decoded.Chunk.Data))) {
-					matchedKeys, ok := e.keywordsToDetectors[match.MatchString()]
-					if !ok {
+				for _, match := range e.ahoCorasickCore.matchString(strings.ToLower(string(decoded.Chunk.Data))) {
+					if !e.ahoCorasickCore.populateDetectorsByMatch(match, chunkSpecificDetectors) {
 						continue
-					}
-					for _, key := range matchedKeys {
-						uniqueDetectors[key.detectorType] = e.detectorTypeToDetectorInfo[key]
 					}
 				}
 
-				for k, detector := range uniqueDetectors {
+				for k, detector := range chunkSpecificDetectors {
 					decoded.Chunk.Verify = detector.shouldVerify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
@@ -549,7 +487,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						decoder:  decoded.DecoderType,
 						wgDoneFn: wgDetect.Done,
 					}
-					delete(uniqueDetectors, k)
+					delete(chunkSpecificDetectors, k)
 				}
 			}
 		}
