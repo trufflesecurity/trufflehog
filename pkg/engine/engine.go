@@ -266,6 +266,7 @@ func Start(ctx context.Context, options ...Option) (*Engine, error) {
 		return nil, err
 	}
 	e.setDefaults(ctx)
+	ctx.Logger().V(4).Info("setting up aho-corasick core")
 	e.ahoCorasickCore.setup(ctx)
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
@@ -299,7 +300,6 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 		option(e)
 	}
 	ctx.Logger().V(4).Info("engine initialized")
-	ctx.Logger().V(4).Info("setting up aho-corasick core")
 	e.ahoCorasickCore = newAhoCorasickCore(e.detectors)
 
 	return nil
@@ -366,8 +366,7 @@ func (e *Engine) startWorkers(ctx context.Context) {
 		}()
 	}
 
-	// Detector workers apply keyword matching, regexes and API calls to
-	// detect secrets in chunks.
+	// Detector workers apply keyword matching, regexes and API calls to detect secrets in chunks.
 	const detectorWorkerMultiplier = 50
 	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
