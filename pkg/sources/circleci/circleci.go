@@ -19,13 +19,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const baseURL = "https://circleci.com/api/v1.1/"
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
+
+	baseURL = "https://circleci.com/api/v1.1/"
+)
 
 type Source struct {
 	name     string
 	token    string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	jobPool  *errgroup.Group
 	sources.Progress
@@ -40,19 +44,19 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
 // Init returns an initialized CircleCI source.
-func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -75,7 +79,7 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	projects, err := s.projects(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting projects: %w", err)
@@ -238,6 +242,7 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 			SourceType: s.Type(),
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
 			Data:       removeCircleSha1Line(data.Bytes()),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Circleci{

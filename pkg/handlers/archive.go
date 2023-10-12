@@ -17,18 +17,23 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type ctxKey int
 
 const (
 	depthKey ctxKey = iota
+
+	errMaxArchiveDepthReached = "max archive depth reached"
 )
 
 var (
 	maxDepth   = 5
 	maxSize    = 250 * 1024 * 1024 // 20MB
 	maxTimeout = time.Duration(30) * time.Second
+
+	defaultBufferSize = 512
 )
 
 // Ensure the Archive satisfies the interfaces at compile time.
@@ -62,7 +67,7 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 
 // FromFile extracts the files from an archive.
 func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []byte {
-	archiveChan := make(chan []byte, 512)
+	archiveChan := make(chan []byte, defaultBufferSize)
 	go func() {
 		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
 		logger := logContext.AddLogger(ctx).Logger()
@@ -73,57 +78,76 @@ func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []b
 			if errors.Is(err, archiver.ErrNoMatch) {
 				return
 			}
-			logger.V(2).Info("Error unarchiving chunk.")
+			logger.Error(err, "error unarchiving chunk.")
 		}
 	}()
 	return archiveChan
 }
 
+type decompressorInfo struct {
+	depth       int
+	reader      io.Reader
+	archiveChan chan []byte
+	archiver    archiver.Decompressor
+}
+
 // openArchive takes a reader and extracts the contents up to the maximum depth.
 func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
 	if depth >= maxDepth {
-		return fmt.Errorf("max archive depth reached")
+		return fmt.Errorf(errMaxArchiveDepthReached)
 	}
-	format, reader, err := archiver.Identify("", reader)
+
+	format, arReader, err := archiver.Identify("", reader)
+	if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
+		return a.handleNonArchiveContent(ctx, arReader, archiveChan)
+	}
+
 	if err != nil {
-		if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
-			chunkSize := 10 * 1024
-			for {
-				chunk := make([]byte, chunkSize)
-				n, _ := reader.Read(chunk)
-				archiveChan <- chunk
-				if n < chunkSize {
-					break
-				}
-			}
-			return nil
-		}
 		return err
 	}
+
 	switch archive := format.(type) {
 	case archiver.Decompressor:
-		compReader, err := archive.OpenReader(reader)
-		if err != nil {
-			return err
-		}
-		fileBytes, err := a.ReadToMax(ctx, compReader)
-		if err != nil {
-			return err
-		}
-		newReader := bytes.NewReader(fileBytes)
-		return a.openArchive(ctx, depth+1, newReader, archiveChan)
+		info := decompressorInfo{depth: depth, reader: arReader, archiveChan: archiveChan, archiver: archive}
+		return a.handleDecompressor(ctx, info)
 	case archiver.Extractor:
-		err := archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, a.extractorHandler(archiveChan))
-		if err != nil {
+		return archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, a.extractorHandler(archiveChan))
+	default:
+		return fmt.Errorf("unknown archive type: %s", format.Name())
+	}
+}
+
+func (a *Archive) handleNonArchiveContent(ctx context.Context, reader io.Reader, archiveChan chan []byte) error {
+	aCtx := logContext.AddLogger(ctx)
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(aCtx, reader)
+	for data := range chunkResChan {
+		if err := data.Error(); err != nil {
+			aCtx.Logger().Error(err, "error reading chunk")
+			continue
+		}
+		if err := common.CancellableWrite(ctx, archiveChan, data.Bytes()); err != nil {
 			return err
 		}
-		return nil
 	}
-	return fmt.Errorf("Unknown archive type: %s", format.Name())
+	return nil
+}
+
+func (a *Archive) handleDecompressor(ctx context.Context, info decompressorInfo) error {
+	compReader, err := info.archiver.OpenReader(info.reader)
+	if err != nil {
+		return err
+	}
+	fileBytes, err := a.ReadToMax(ctx, compReader)
+	if err != nil {
+		return err
+	}
+	newReader := bytes.NewReader(fileBytes)
+	return a.openArchive(ctx, info.depth+1, newReader, info.archiveChan)
 }
 
 // IsFiletype returns true if the provided reader is an archive.
-func (a *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, bool) {
+func (a *Archive) IsFiletype(_ context.Context, reader io.Reader) (io.Reader, bool) {
 	format, readerB, err := archiver.Identify("", reader)
 	if err != nil {
 		return readerB, false
@@ -133,8 +157,9 @@ func (a *Archive) IsFiletype(ctx context.Context, reader io.Reader) (io.Reader, 
 		return readerB, true
 	case archiver.Decompressor:
 		return readerB, true
+	default:
+		return readerB, false
 	}
-	return readerB, false
 }
 
 // extractorHandler is applied to each file in an archiver.Extractor file.
@@ -178,34 +203,33 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 			if e, ok := r.(error); ok {
 				err = e
 			} else {
-				err = fmt.Errorf("Panic occurred: %v", r)
+				err = fmt.Errorf("panic occurred: %v", r)
 			}
 			logger.Error(err, "Panic occurred when reading archive")
 		}
 	}()
-	fileContent := bytes.Buffer{}
-	logger.V(5).Info("Remaining buffer capacity", "bytes", maxSize-a.size)
-	for i := 0; i <= maxSize/512; i++ {
-		if common.IsDone(ctx) {
-			return nil, ctx.Err()
-		}
-		fileChunk := make([]byte, 512)
-		bRead, err := reader.Read(fileChunk)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return []byte{}, err
-		}
-		a.size += bRead
-		if len(fileChunk) > 0 {
-			fileContent.Write(fileChunk[0:bRead])
-		}
-		if bRead < 512 {
-			return fileContent.Bytes(), nil
-		}
-		if a.size >= maxSize && bRead == 512 {
-			logger.V(2).Info("Max archive size reached.")
-			return fileContent.Bytes(), nil
-		}
+
+	if common.IsDone(ctx) {
+		return nil, ctx.Err()
 	}
+
+	var fileContent bytes.Buffer
+	// Create a limited reader to ensure we don't read more than the max size.
+	lr := io.LimitReader(reader, int64(maxSize))
+
+	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
+	// for the method, due to the internal implementation of io.CopyBuffer, when
+	// *bytes.Buffer implements io.WriterTo or io.ReaderFrom, the provided buf
+	// is simply ignored. Thus, we can pass nil for the buf parameter.
+	_, err = io.CopyBuffer(&fileContent, lr, nil)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+
+	if fileContent.Len() == maxSize {
+		logger.V(2).Info("Max archive size reached.")
+	}
+
 	return fileContent.Bytes(), nil
 }
 
@@ -282,7 +306,7 @@ func (a *Archive) HandleSpecialized(ctx logContext.Context, reader io.Reader) (i
 // The caller is responsible for closing the returned reader.
 func (a *Archive) extractDebContent(ctx logContext.Context, file io.Reader) (io.ReadCloser, error) {
 	if a.currentDepth >= maxDepth {
-		return nil, fmt.Errorf("max archive depth reached")
+		return nil, fmt.Errorf(errMaxArchiveDepthReached)
 	}
 
 	tmpEnv, err := a.createTempEnv(ctx, file)

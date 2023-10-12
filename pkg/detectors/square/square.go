@@ -49,6 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Square,
 			Raw:          []byte(res),
 		}
+		s.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/square/",
+		}
 
 		if verify {
 			// there are a few endpoints we can check, but templates seems the least sensitive.

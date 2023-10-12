@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
+	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"golang.org/x/crypto/ssh"
 )
 
 type Scanner struct {
@@ -53,19 +56,67 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			Redacted:     token[0:64],
 		}
 
-		fingerprint, err := FingerprintPEMKey([]byte(token))
+		secret.ExtraData = make(map[string]string)
+
+		var passphrase string
+		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
+		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
+			secret.ExtraData["encrypted"] = "true"
+			parsedKey, passphrase, err = crack([]byte(token))
+			if err != nil {
+				secret.VerificationError = err
+				continue
+			}
+			if passphrase != "" {
+				secret.ExtraData["cracked_encryption_passphrase"] = "true"
+			}
+		} else if err != nil {
+			// couldn't parse key, probably invalid
+			continue
+		}
+
+		fingerprint, err := FingerprintPEMKey(parsedKey)
 		if err != nil {
 			continue
 		}
 
 		if verify {
+			verificationErrors := []string{}
 			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
 			if err == nil {
-				secret.StructuredData = data
 				if data != nil {
 					secret.Verified = true
+					secret.ExtraData["certificate_urls"] = strings.Join(data.CertificateURLs, ", ")
 				}
+			} else {
+				verificationErrors = append(verificationErrors, err.Error())
 			}
+
+			user, err := verifyGitHubUser(parsedKey)
+			if err != nil && !errors.Is(err, errPermissionDenied) {
+				verificationErrors = append(verificationErrors, err.Error())
+			}
+			if user != nil {
+				secret.Verified = true
+				secret.ExtraData["github_user"] = *user
+			}
+
+			user, err = verifyGitLabUser(parsedKey)
+			if err != nil && !errors.Is(err, errPermissionDenied) {
+				verificationErrors = append(verificationErrors, err.Error())
+			}
+			if user != nil {
+				secret.Verified = true
+				secret.ExtraData["gitlab_user"] = *user
+			}
+
+			if !secret.Verified && len(verificationErrors) > 0 {
+				secret.VerificationError = fmt.Errorf("verification failures: %s", strings.Join(verificationErrors, ", "))
+			}
+		}
+
+		if len(secret.ExtraData) == 0 {
+			secret.ExtraData = nil
 		}
 
 		results = append(results, secret)
@@ -74,22 +125,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	return results, nil
 }
 
-func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (data *detectorspb.StructuredData, err error) {
+type result struct {
+	CertificateURLs []string
+	GitHubUsername  string
+}
+
+func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
 	if err != nil {
-		return
+		return nil, err
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer res.Body.Close()
 
 	results := DriftwoodResult{}
 	err = json.NewDecoder(res.Body).Decode(&results)
 	if err != nil {
-		return
+		return nil, err
 	}
+
+	var data *result
 
 	seen := map[string]struct{}{}
 	for _, r := range results.CertificateResults {
@@ -100,36 +158,13 @@ func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (d
 			continue
 		}
 		if data == nil {
-			data = &detectorspb.StructuredData{}
+			data = &result{}
 		}
-		if data.TlsPrivateKey == nil {
-			data.TlsPrivateKey = make([]*detectorspb.TlsPrivateKey, 0)
-		}
-		data.TlsPrivateKey = append(data.TlsPrivateKey, &detectorspb.TlsPrivateKey{
-			CertificateFingerprint: r.CertificateFingerprint,
-			ExpirationTimestamp:    r.ExpirationTimestamp.Unix(),
-			VerificationUrl:        fmt.Sprintf("https://crt.sh/?q=%s", r.CertificateFingerprint),
-		})
+		data.CertificateURLs = append(data.CertificateURLs, fmt.Sprintf("https://crt.sh/?q=%s", r.CertificateFingerprint))
 		seen[r.CertificateFingerprint] = struct{}{}
 	}
 
-	for _, r := range results.GitHubSSHResults {
-		if _, ok := seen[r.Username]; ok {
-			continue
-		}
-		if data == nil {
-			data = &detectorspb.StructuredData{}
-		}
-		if data.GithubSshKey == nil {
-			data.GithubSshKey = make([]*detectorspb.GitHubSSHKey, 0)
-		}
-		data.GithubSshKey = append(data.GithubSshKey, &detectorspb.GitHubSSHKey{
-			User: r.Username,
-		})
-		seen[r.Username] = struct{}{}
-	}
-
-	return
+	return data, nil
 }
 
 type DriftwoodResult struct {

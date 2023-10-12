@@ -2202,6 +2202,8 @@ func (m *JIRA) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for InsecureSkipVerifyTls
+
 	switch m.Credential.(type) {
 
 	case *JIRA_BasicAuth:
@@ -3441,6 +3443,8 @@ func (m *Jenkins) validate(all bool) error {
 		}
 		errors = append(errors, err)
 	}
+
+	// no validation rules for InsecureSkipVerifyTls
 
 	switch m.Credential.(type) {
 

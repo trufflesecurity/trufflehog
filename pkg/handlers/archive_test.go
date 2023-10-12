@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/stretchr/testify/assert"
@@ -126,6 +128,58 @@ func TestHandleFile(t *testing.T) {
 	assert.Equal(t, 1, len(ch))
 }
 
+func TestReadToMax(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected []byte
+	}{
+		{
+			name:     "read full content within maxSize",
+			input:    []byte("abcdefg"),
+			expected: []byte("abcdefg"),
+		},
+		{
+			name:     "read content larger than maxSize",
+			input:    make([]byte, maxSize+10), // this creates a byte slice 10 bytes larger than maxSize
+			expected: make([]byte, maxSize),
+		},
+		{
+			name:     "empty input",
+			input:    []byte(""),
+			expected: []byte(""),
+		},
+	}
+
+	a := &Archive{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := bytes.NewReader(tt.input)
+			output, err := a.ReadToMax(context.Background(), reader)
+			assert.Nil(t, err)
+
+			assert.Equal(t, tt.expected, output)
+		})
+	}
+}
+
+func BenchmarkReadToMax(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), 1024*1000) // 1MB of data.
+	reader := bytes.NewReader(data)
+	a := &Archive{}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		_, _ = a.ReadToMax(context.Background(), reader)
+		b.StopTimer()
+
+		_, _ = reader.Seek(0, 0) // Reset the reader position.
+		a.size = 0               // Reset archive size.
+	}
+}
+
 func TestExtractDebContent(t *testing.T) {
 	// Open the sample .deb file from the testdata folder.
 	file, err := os.Open("testdata/test.deb")
@@ -182,4 +236,38 @@ func TestExtractRPMContent(t *testing.T) {
 	assert.Nil(t, err)
 	expectedLength := 1822720
 	assert.Equal(t, expectedLength, len(string(content)))
+}
+
+func TestOpenInvalidArchive(t *testing.T) {
+	reader := strings.NewReader("invalid archive")
+
+	ctx := logContext.AddLogger(context.Background())
+	a := &Archive{}
+
+	archiveChan := make(chan []byte)
+
+	err := a.openArchive(ctx, 0, reader, archiveChan)
+	assert.Error(t, err)
+}
+
+func TestNestedDirArchive(t *testing.T) {
+	file, err := os.Open("testdata/dir-archive.zip")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	ctx, cancel := logContext.WithTimeout(logContext.Background(), 5*time.Second)
+	defer cancel()
+	sourceChan := make(chan *sources.Chunk, 1)
+
+	go func() {
+		defer close(sourceChan)
+		HandleFile(ctx, file, &sources.Chunk{}, sourceChan)
+	}()
+
+	count := 0
+	want := 4
+	for range sourceChan {
+		count++
+	}
+	assert.Equal(t, want, count)
 }

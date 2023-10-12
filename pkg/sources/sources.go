@@ -11,14 +11,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
+type (
+	SourceID int64
+	JobID    int64
+)
+
 // Chunk contains data to be decoded and scanned along with context on where it came from.
 type Chunk struct {
 	// SourceName is the name of the Source that produced the chunk.
 	SourceName string
 	// SourceID is the ID of the source that the Chunk originated from.
-	SourceID int64
+	SourceID SourceID
 	// JobID is the ID of the job that the Chunk originated from.
-	JobID int64
+	JobID JobID
 	// SourceType is the type of Source that produced the chunk.
 	SourceType sourcespb.SourceType
 	// SourceMetadata holds the context of where the Chunk was found.
@@ -30,18 +35,32 @@ type Chunk struct {
 	Verify bool
 }
 
+// ChunkingTarget specifies criteria for a targeted chunking process.
+// Instead of collecting data indiscriminately, this struct allows the caller
+// to specify particular subsets of data they're interested in. This becomes
+// especially useful when one needs to verify or recheck specific data points
+// without processing the entire dataset.
+type ChunkingTarget struct {
+	// QueryCriteria represents specific parameters or conditions to target the chunking process.
+	QueryCriteria *source_metadatapb.MetaData
+}
+
 // Source defines the interface required to implement a source chunker.
 type Source interface {
 	// Type returns the source type, used for matching against configuration and jobs.
 	Type() sourcespb.SourceType
 	// SourceID returns the initialized source ID used for tracking relationships in the DB.
-	SourceID() int64
+	SourceID() SourceID
 	// JobID returns the initialized job ID used for tracking relationships in the DB.
-	JobID() int64
+	JobID() JobID
 	// Init initializes the source.
-	Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error
-	// Chunks emits data over a channel that is decoded and scanned for secrets.
-	Chunks(ctx context.Context, chunksChan chan *Chunk) error
+	Init(aCtx context.Context, name string, jobId JobID, sourceId SourceID, verify bool, connection *anypb.Any, concurrency int) error
+	// Chunks emits data over a channel which is then decoded and scanned for secrets.
+	// By default, data is obtained indiscriminately. However, by providing one or more
+	// ChunkingTarget parameters, the caller can direct the function to retrieve
+	// specific chunks of data. This targeted approach allows for efficient and
+	// intentional data processing, beneficial when verifying or rechecking specific data points.
+	Chunks(ctx context.Context, chunksChan chan *Chunk, targets ...ChunkingTarget) error
 	// GetProgress is the completion progress (percentage) for Scanned Source.
 	GetProgress() *Progress
 }
@@ -258,6 +277,9 @@ type Validator interface {
 // scope should be the len(scopedItems)
 // message is the public facing user information about the current progress
 // encodedResumeInfo is an optional string representing any information necessary to resume the job if interrupted
+//
+//	NOTE: SetProgressOngoing should be used when source does not yet know how many items it is scanning (scope)
+//	and does not want to display a percentage complete
 func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo string) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
@@ -274,6 +296,23 @@ func (p *Progress) SetProgressComplete(i, scope int, message, encodedResumeInfo 
 	}
 
 	p.PercentComplete = int64((float64(i) / float64(scope)) * 100)
+}
+
+// SetProgressOngoing sets information about the current running job based on
+// the highest level objects in the source.
+// message is the public facing user information about the current progress
+// encodedResumeInfo is an optional string representing any information necessary to resume the job if interrupted
+//
+//	NOTE: This method should be used over SetProgressComplete when the source does
+//	not yet know how many items it is scanning and does not want to display a percentage complete.
+func (p *Progress) SetProgressOngoing(message string, encodedResumeInfo string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+
+	p.Message = message
+	p.EncodedResumeInfo = encodedResumeInfo
+	// Explicitly set SectionsRemaining to 0 so the frontend does not display a percent.
+	p.SectionsRemaining = 0
 }
 
 // GetProgress gets job completion percentage for metrics reporting.

@@ -14,9 +14,9 @@ type gcsCmdModel struct {
 func GetFields() gcsCmdModel {
 	projectId := textinputs.InputConfig{
 		Label:       "Project ID",
-		Key:         "project_id",
+		Key:         "project-id",
 		Required:    true,
-		Placeholder: "my-project",
+		Placeholder: "trufflehog-testing",
 	}
 
 	return gcsCmdModel{textinputs.New([]textinputs.InputConfig{projectId})}
@@ -27,9 +27,8 @@ func (m gcsCmdModel) Cmd() string {
 	command = append(command, "trufflehog", "gcs")
 
 	inputs := m.GetInputs()
-	if inputs["project_id"] != "" {
-		command = append(command, "--project_id="+inputs["project_id"])
-	}
+
+	command = append(command, "--project-id="+inputs["project-id"].Value)
 
 	command = append(command, "--cloud-environment")
 	return strings.Join(command, " ")
@@ -39,6 +38,6 @@ func (m gcsCmdModel) Summary() string {
 	inputs := m.GetInputs()
 	labels := m.GetLabels()
 
-	keys := []string{"project_id"}
+	keys := []string{"project-id"}
 	return common.SummarizeSource(keys, inputs, labels)
 }

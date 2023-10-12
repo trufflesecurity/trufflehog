@@ -43,8 +43,8 @@ type JobProgressHook interface {
 // If the job supports it, the reference can also be used to cancel running via
 // CancelRun.
 type JobProgressRef struct {
-	JobID       int64
-	SourceID    int64
+	JobID       JobID
+	SourceID    SourceID
 	SourceName  string
 	jobProgress *JobProgress
 }
@@ -71,11 +71,11 @@ func (r *JobProgressRef) Done() <-chan struct{} {
 // CancelRun requests that the job this is referencing is cancelled and stops
 // running. This method will have no effect if the job does not allow
 // cancellation.
-func (r *JobProgressRef) CancelRun() {
+func (r *JobProgressRef) CancelRun(cause error) {
 	if r.jobProgress == nil || r.jobProgress.jobCancel == nil {
 		return
 	}
-	r.jobProgress.jobCancel()
+	r.jobProgress.jobCancel(cause)
 }
 
 // Fatal is a wrapper around error to differentiate non-fatal errors from fatal
@@ -101,14 +101,14 @@ func (f ChunkError) Unwrap() error { return f.err }
 // JobProgress aggregates information about a run of a Source.
 type JobProgress struct {
 	// Unique identifiers for this job.
-	JobID      int64
-	SourceID   int64
+	JobID      JobID
+	SourceID   SourceID
 	SourceName string
 	// Tracks whether the job is finished or not.
 	ctx    context.Context
 	cancel context.CancelFunc
 	// Requests to cancel the job.
-	jobCancel context.CancelFunc
+	jobCancel context.CancelCauseFunc
 	// Metrics.
 	metrics     JobProgressMetrics
 	metricsLock sync.Mutex
@@ -150,12 +150,12 @@ func WithHooks(hooks ...JobProgressHook) func(*JobProgress) {
 }
 
 // WithCancel allows cancelling the job by the JobProgressRef.
-func WithCancel(cancel context.CancelFunc) func(*JobProgress) {
+func WithCancel(cancel context.CancelCauseFunc) func(*JobProgress) {
 	return func(jp *JobProgress) { jp.jobCancel = cancel }
 }
 
 // NewJobProgress creates a new job report for the given source and job ID.
-func NewJobProgress(jobID, sourceID int64, sourceName string, opts ...func(*JobProgress)) *JobProgress {
+func NewJobProgress(jobID JobID, sourceID SourceID, sourceName string, opts ...func(*JobProgress)) *JobProgress {
 	ctx, cancel := context.WithCancel(context.Background())
 	jp := &JobProgress{
 		JobID:      jobID,

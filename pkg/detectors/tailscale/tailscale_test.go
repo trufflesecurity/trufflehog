@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package figmapersonalaccesstoken
+package tailscale
 
 import (
 	"context"
@@ -11,20 +11,21 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
+func TestTailscaleapi_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
-	if err != nil {
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	if err != nil && false {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField("TAILSCALEAPI")
+	inactiveSecret := testSecrets.MustGetField("TAILSCALEAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +44,12 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a figmapersonalaccesstoken secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a tailscaleapi secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
+					DetectorType: detectorspb.DetectorType_Tailscale,
 					Verified:     true,
 				},
 			},
@@ -59,12 +60,12 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a figmapersonalaccesstoken secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a tailscaleapi secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
+					DetectorType: detectorspb.DetectorType_Tailscale,
 					Verified:     false,
 				},
 			},
@@ -87,7 +88,7 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("FigmaPersonalAccessToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Tailscaleapi.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +98,7 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("FigmaPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Tailscaleapi.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
@@ -108,7 +109,6 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

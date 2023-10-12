@@ -47,18 +47,14 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
-	handle, err := e.sourceManager.Enroll(ctx, "trufflehog - github", new(github.Source).Type(),
-		func(ctx context.Context, jobID, sourceID int64) (sources.Source, error) {
-			githubSource := github.Source{}
-			if err := githubSource.Init(ctx, "trufflehog - github", jobID, sourceID, true, &conn, c.Concurrency); err != nil {
-				return nil, err
-			}
-			githubSource.WithScanOptions(scanOptions)
-			return &githubSource, nil
-		})
-	if err != nil {
+	sourceName := "trufflehog - github"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
+
+	githubSource := &github.Source{}
+	if err := githubSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.ScheduleRun(ctx, handle)
+	githubSource.WithScanOptions(scanOptions)
+	_, err = e.sourceManager.Run(ctx, sourceName, githubSource)
 	return err
 }

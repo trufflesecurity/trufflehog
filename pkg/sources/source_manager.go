@@ -2,10 +2,12 @@ package sources
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/marusama/semaphore/v2"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -13,45 +15,29 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
-// handle uniquely identifies a Source given to the manager to manage. If the
-// SourceManager is connected to the API, it will be equivalent to the unique
-// source ID, otherwise it behaves as a counter.
-type handle int64
-
-// SourceInitFunc is a function that takes a source and job ID and returns an
-// initialized Source.
-type SourceInitFunc func(ctx context.Context, jobID, sourceID int64) (Source, error)
-
-// sourceInfo is an aggregate struct to store source information provided on
-// initialization.
-type sourceInfo struct {
-	initFunc SourceInitFunc
-	name     string
-}
-
 type SourceManager struct {
 	api   apiClient
 	hooks []JobProgressHook
-	// Map of handle to source initializer.
-	handles     map[handle]sourceInfo
-	handlesLock sync.Mutex
 	// Pool limiting the amount of concurrent sources running.
-	pool            errgroup.Group
+	sem semaphore.Semaphore
+	wg  sync.WaitGroup
+	// Max number of units to scan concurrently per source.
 	concurrentUnits int
 	// Run the sources using source unit enumeration / chunking if available.
 	useSourceUnits bool
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
 	// Set when Wait() returns.
-	done bool
+	firstErr chan error
+	waitErr  error
+	done     bool
 }
 
 // apiClient is an interface for optionally communicating with an external API.
 type apiClient interface {
-	// RegisterSource lets the API know we have a source and it returns a unique source ID for it.
-	RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error)
-	// GetJobID queries the API for an existing job or new job ID.
-	GetJobID(ctx context.Context, id int64) (int64, error)
+	// GetIDs informs the API of the source that's about to run and returns
+	// two identifiers used during source initialization.
+	GetIDs(ctx context.Context, name string, kind sourcespb.SourceType) (SourceID, JobID, error)
 }
 
 // WithAPI adds an API client to the manager for tracking jobs and progress. If
@@ -68,7 +54,9 @@ func WithReportHook(hook JobProgressHook) func(*SourceManager) {
 
 // WithConcurrentSources limits the concurrent number of sources a manager can run.
 func WithConcurrentSources(concurrency int) func(*SourceManager) {
-	return func(mgr *SourceManager) { mgr.pool.SetLimit(concurrency) }
+	return func(mgr *SourceManager) {
+		mgr.sem.SetLimit(concurrency)
+	}
 }
 
 // WithBufferedOutput sets the size of the buffer used for the Chunks() channel.
@@ -93,8 +81,9 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	mgr := SourceManager{
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
-		handles:      make(map[handle]sourceInfo),
+		sem:          semaphore.New(runtime.NumCPU()),
 		outputChunks: make(chan *Chunk),
+		firstErr:     make(chan error, 1),
 	}
 	for _, opt := range opts {
 		opt(&mgr)
@@ -102,79 +91,53 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	return &mgr
 }
 
-// Enroll informs the SourceManager to track and manage a Source.
-func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.SourceType, f SourceInitFunc) (handle, error) {
-	if s.done {
-		return 0, fmt.Errorf("manager is done")
-	}
-	id, err := s.api.RegisterSource(ctx, name, kind)
-	if err != nil {
-		return 0, err
-	}
-	handleID := handle(id)
-	s.handlesLock.Lock()
-	defer s.handlesLock.Unlock()
-	if _, ok := s.handles[handleID]; ok {
-		// TODO: smartly handle this?
-		return 0, fmt.Errorf("handle ID '%d' already in use", handleID)
-	}
-	s.handles[handleID] = sourceInfo{
-		initFunc: f,
-		name:     name,
-	}
-	return handleID, nil
+func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sourcespb.SourceType) (SourceID, JobID, error) {
+	return s.api.GetIDs(ctx, sourceName, kind)
 }
 
 // Run blocks until a resource is available to run the source, then
-// synchronously runs it. The first fatal error, if any, will be returned.
-func (s *SourceManager) Run(ctx context.Context, handle handle) (JobProgressRef, error) {
-	progress, err := s.asyncRun(ctx, handle)
-	if err != nil {
-		return progress, err
-	}
-	<-progress.Done()
-	return progress, progress.Snapshot().FatalError()
-}
-
-// ScheduleRun blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is stored and accessible via the
 // JobProgressRef as it becomes available.
-func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) (JobProgressRef, error) {
-	return s.asyncRun(ctx, handle)
+func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
+	return s.asyncRun(ctx, sourceName, source)
 }
 
-// asyncRun is a helper method to asynchronously run the Source. It calls out
-// to the API to get a job ID for this run, creates a JobProgress object, then
-// waits for an available goroutine to asynchronously run it.
-func (s *SourceManager) asyncRun(ctx context.Context, handle handle) (JobProgressRef, error) {
+// asyncRun is a helper method to asynchronously run the Source.
+func (s *SourceManager) asyncRun(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
+	sourceID, jobID := source.SourceID(), source.JobID()
 	// Do preflight checks before waiting on the pool.
-	if err := s.preflightChecks(ctx, handle); err != nil {
-		return JobProgressRef{}, err
-	}
-	// Get the name. Should never fail due to preflight checks.
-	sourceInfo, ok := s.getSourceInfo(handle)
-	if !ok {
-		return JobProgressRef{SourceID: int64(handle)}, fmt.Errorf("unrecognized handle")
-	}
-	sourceName := sourceInfo.name
-	// Get a Job ID.
-	ctx = context.WithValue(ctx, "source_id", int64(handle))
-	jobID, err := s.api.GetJobID(ctx, int64(handle))
-	if err != nil {
-		return JobProgressRef{SourceID: int64(handle), SourceName: sourceName}, err
+	if err := s.preflightChecks(ctx); err != nil {
+		return JobProgressRef{
+			SourceName: sourceName,
+			SourceID:   sourceID,
+			JobID:      jobID,
+		}, err
 	}
 	// Create a JobProgress object for tracking progress.
-	ctx, cancel := context.WithCancel(ctx)
-	progress := NewJobProgress(jobID, int64(handle), sourceName, WithHooks(s.hooks...), WithCancel(cancel))
-	s.pool.Go(func() error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
+	if err := s.sem.Acquire(ctx, 1); err != nil {
+		// Context cancelled.
+		progress.ReportError(Fatal{err})
+		return progress.Ref(), Fatal{err}
+	}
+	s.wg.Add(1)
+	go func() {
+		defer s.sem.Release(1)
+		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
 			"job_id", jobID,
 			"source_manager_worker_id", common.RandomID(5),
 		)
 		defer common.Recover(ctx)
-		defer cancel()
-		return s.run(ctx, handle, jobID, progress)
-	})
+		defer cancel(nil)
+		if err := s.run(ctx, source, progress); err != nil {
+			select {
+			case s.firstErr <- err:
+			default:
+			}
+		}
+	}()
 	return progress.Ref(), nil
 }
 
@@ -191,13 +154,19 @@ func (s *SourceManager) Chunks() <-chan *Chunk {
 func (s *SourceManager) Wait() error {
 	// Check if the manager has been Waited.
 	if s.done {
-		return s.pool.Wait()
+		return s.waitErr
 	}
-	defer close(s.outputChunks)
-	defer func() { s.done = true }()
+	s.done = true
 
 	// Return the first error returned by run.
-	return s.pool.Wait()
+	s.wg.Wait()
+	select {
+	case s.waitErr = <-s.firstErr:
+	default:
+	}
+	close(s.outputChunks)
+	close(s.firstErr)
+	return s.waitErr
 }
 
 // ScanChunk injects a chunk into the output stream of chunks to be scanned.
@@ -207,16 +176,38 @@ func (s *SourceManager) ScanChunk(chunk *Chunk) {
 	s.outputChunks <- chunk
 }
 
+// AvailableCapacity returns the number of concurrent jobs the manager can
+// accommodate at this time.
+func (s *SourceManager) AvailableCapacity() int {
+	return s.sem.GetLimit() - s.sem.GetCount()
+}
+
+// MaxConcurrentSources returns the maximum configured limit of concurrent
+// sources the manager will run.
+func (s *SourceManager) MaxConcurrentSources() int {
+	return s.sem.GetLimit()
+}
+
+// ConcurrentSources returns the current number of concurrently running
+// sources.
+func (s *SourceManager) ConcurrentSources() int {
+	return s.sem.GetCount()
+}
+
+// SetMaxConcurrentSources sets the maximum number of concurrently running
+// sources. If the count is lower than the already existing number of
+// concurrently running sources, no sources will be scheduled to run until the
+// existing sources complete.
+func (s *SourceManager) SetMaxConcurrentSources(maxRunCount int) {
+	s.sem.SetLimit(maxRunCount)
+}
+
 // preflightChecks is a helper method to check the Manager or the context isn't
-// done and that the handle is valid.
-func (s *SourceManager) preflightChecks(ctx context.Context, handle handle) error {
+// done.
+func (s *SourceManager) preflightChecks(ctx context.Context) error {
 	// Check if the manager has been Waited.
 	if s.done {
 		return fmt.Errorf("manager is done")
-	}
-	// Check the handle is valid.
-	if _, ok := s.getSourceInfo(handle); !ok {
-		return fmt.Errorf("unrecognized handle")
 	}
 	return ctx.Err()
 }
@@ -224,39 +215,32 @@ func (s *SourceManager) preflightChecks(ctx context.Context, handle handle) erro
 // run is a helper method to sychronously run the source. It does not check for
 // acquired resources. An error is returned if there was a fatal error during
 // the run. This information is also recorded in the JobProgress.
-func (s *SourceManager) run(ctx context.Context, handle handle, jobID int64, report *JobProgress) error {
+func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress) error {
 	defer report.Finish()
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
 
-	// Initialize the source.
-	sourceInfo, ok := s.getSourceInfo(handle)
-	if !ok {
-		// Shouldn't happen due to preflight checks.
-		err := fmt.Errorf("unrecognized handle")
-		report.ReportError(Fatal{err})
-		return Fatal{err}
-	}
-	source, err := sourceInfo.initFunc(ctx, jobID, int64(handle))
-	if err != nil {
-		report.ReportError(Fatal{err})
-		return Fatal{err}
-	}
+	defer func() {
+		if err := context.Cause(ctx); err != nil {
+			report.ReportError(Fatal{err})
+		}
+	}()
+
 	report.TrackProgress(source.GetProgress())
 	ctx = context.WithValues(ctx,
 		"source_type", source.Type().String(),
-		"source_name", sourceInfo.name,
+		"source_name", report.SourceName,
 	)
 	// Check for the preferred method of tracking source units.
 	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits {
-		return s.runWithUnits(ctx, handle, enumChunker, report)
+		return s.runWithUnits(ctx, enumChunker, report)
 	}
-	return s.runWithoutUnits(ctx, handle, source, report)
+	return s.runWithoutUnits(ctx, source, report)
 }
 
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
-func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, source Source, report *JobProgress) error {
+func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress) error {
 	// Introspect on the chunks we get from the Chunks method.
 	ch := make(chan *Chunk, 1)
 	var wg sync.WaitGroup
@@ -286,7 +270,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 // runWithUnits is a helper method to run a Source that is also a
 // SourceUnitEnumChunker. This allows better introspection of what is getting
 // scanned and any errors encountered.
-func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source SourceUnitEnumChunker, report *JobProgress) error {
+func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumChunker, report *JobProgress) error {
 	unitReporter := &mgrUnitReporter{
 		unitCh: make(chan SourceUnit, 1),
 		report: report,
@@ -361,28 +345,15 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 	}
 }
 
-// getSourceInfo is a helper method for safe concurrent access to the
-// map[handle]SourceInitFunc map.
-func (s *SourceManager) getSourceInfo(handle handle) (sourceInfo, bool) {
-	s.handlesLock.Lock()
-	defer s.handlesLock.Unlock()
-	f, ok := s.handles[handle]
-	return f, ok
-}
-
 // headlessAPI implements the apiClient interface locally.
 type headlessAPI struct {
-	// Counters for assigning handle and job IDs.
+	// Counters for assigning source and job IDs.
 	sourceIDCounter int64
 	jobIDCounter    int64
 }
 
-func (api *headlessAPI) RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error) {
-	return atomic.AddInt64(&api.sourceIDCounter, 1), nil
-}
-
-func (api *headlessAPI) GetJobID(ctx context.Context, id int64) (int64, error) {
-	return atomic.AddInt64(&api.jobIDCounter, 1), nil
+func (api *headlessAPI) GetIDs(context.Context, string, sourcespb.SourceType) (SourceID, JobID, error) {
+	return SourceID(atomic.AddInt64(&api.sourceIDCounter, 1)), JobID(atomic.AddInt64(&api.jobIDCounter, 1)), nil
 }
 
 // mgrUnitReporter implements the UnitReporter interface.

@@ -38,8 +38,8 @@ func TestJobProgressFatalErrors(t *testing.T) {
 func TestJobProgressRef(t *testing.T) {
 	jp := NewJobProgress(123, 456, "source name")
 	ref := jp.Ref()
-	assert.Equal(t, int64(123), ref.JobID)
-	assert.Equal(t, int64(456), ref.SourceID)
+	assert.Equal(t, JobID(123), ref.JobID)
+	assert.Equal(t, SourceID(456), ref.SourceID)
 
 	// Test Done() blocks until Finish() is called.
 	select {
@@ -120,7 +120,7 @@ func TestJobProgressElapsedTime(t *testing.T) {
 	metrics := JobProgressMetrics{}
 	assert.Equal(t, time.Duration(0), metrics.ElapsedTime())
 
-	metrics.StartTime = time.Now()
+	metrics.StartTime = time.Date(2022, time.March, 30, 0, 0, 0, 0, time.UTC)
 	assert.Greater(t, metrics.ElapsedTime(), time.Duration(0))
 
 	metrics.EndTime = metrics.StartTime.Add(1 * time.Hour)

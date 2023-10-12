@@ -45,6 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_AirbrakeUserKey,
 			Raw:          []byte(resMatch),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/airbrake/",
+		}
 
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.airbrake.io/api/v4/projects?key="+resMatch, nil)

@@ -39,6 +39,8 @@ import (
 )
 
 const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_GITHUB
+
 	unauthGithubOrgRateLimt = 30
 	defaultPagination       = 100
 	membersAppPagination    = 500
@@ -51,8 +53,8 @@ type Source struct {
 	githubUser  string
 	githubToken string
 
-	sourceID          int64
-	jobID             int64
+	sourceID          sources.SourceID
+	jobID             sources.JobID
 	verify            bool
 	repos             []string
 	members           []string
@@ -104,14 +106,14 @@ var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GITHUB
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceID
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobID
 }
 
@@ -149,14 +151,16 @@ func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) 
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			s.log.V(1).Info("invalid include glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			continue
 		}
 		includeGlobs = append(includeGlobs, g)
 	}
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			s.log.V(1).Info("invalid exclude glob", "glob", g, "err", err)
+			s.log.V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
 	}
@@ -198,7 +202,7 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
 
 	s.name = name
@@ -218,7 +222,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID, sourceID int64, 
 	}
 	s.conn = &conn
 
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.IncludeRepos, s.conn.IgnoreRepos)
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.GetRepositories(), s.conn.GetIgnoreRepos())
 	s.memberCache = make(map[string]struct{})
 
 	s.repoSizes = newRepoSize()
@@ -411,10 +415,17 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	apiEndpoint := s.conn.Endpoint
 	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = "https://api.github.com"
+	}
+
+	// If targets are provided, we're only scanning the data in those targets.
+	// Otherwise, we're scanning all data.
+	// This allows us to only scan the commit where a vulnerability was found.
+	if len(targets) > 0 {
+		return s.scanTargets(ctx, targets, chunksChan)
 	}
 
 	// Reset consumption and rate limit metrics on each run.
@@ -1115,6 +1126,8 @@ var (
 	// allComments is a placeholder for specifying the comment ID to start listing from.
 	// A value of 0 means that all comments will be listed.
 	allComments = 0
+	// state of "all" for the ListByRepo captures both open and closed issues.
+	state = "all"
 )
 
 type repoInfo struct {
@@ -1137,14 +1150,58 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-
+		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
 	}
 
 	if s.includePRComments {
-		return s.processPRComments(ctx, repoInfo, chunksChan)
+		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
+		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
+			return err
+		}
 	}
+
 	return nil
 
+}
+
+func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github issue descriptions", "repository", info.repoPath)
+
+	bodyTextsOpts := &github.IssueListByRepoOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		State:     state,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
+	}
+
+	for {
+		issues, resp, err := s.apiClient.Issues.ListByRepo(ctx, info.owner, info.repo, bodyTextsOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkIssues(ctx, info.repo, info.repoPath, issues, chunksChan); err != nil {
+			return err
+		}
+
+		bodyTextsOpts.ListOptions.Page++
+
+		if len(issues) < defaultPagination {
+			break
+		}
+	}
+	return nil
 }
 
 func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
@@ -1176,6 +1233,42 @@ func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunks
 		issueOpts.ListOptions.Page++
 
 		if len(issueComments) < defaultPagination {
+			break
+		}
+	}
+	return nil
+}
+
+func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
+	s.log.Info("scanning github pull request descriptions", "repository", info.repoPath)
+
+	prOpts := &github.PullRequestListOptions{
+		Sort:      sortType,
+		Direction: directionType,
+		State:     state,
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+			Page:    initialPage,
+		},
+	}
+
+	for {
+		prs, resp, err := s.apiClient.PullRequests.List(ctx, info.owner, info.repo, prOpts)
+		if s.handleRateLimit(err, resp) {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = s.chunkPullRequests(ctx, info.repo, prs, chunksChan); err != nil {
+			return err
+		}
+
+		prOpts.ListOptions.Page++
+
+		if len(prs) < defaultPagination {
 			break
 		}
 	}
@@ -1217,12 +1310,52 @@ func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksCha
 	return nil
 }
 
+func (s *Source) chunkIssues(ctx context.Context, repo, repoPath string, issues []*github.Issue, chunksChan chan *sources.Chunk) error {
+	for _, issue := range issues {
+
+		// Skip pull requests since covered by processPRs.
+		if issue.IsPullRequest() {
+			continue
+		}
+
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			SourceType: s.Type(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(issue.GetHTMLURL()),
+						Username:   sanitizer.UTF8(issue.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(issue.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(issue.GetCreatedAt().String()),
+						Visibility: s.visibilityOf(ctx, repoPath),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(issue.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
 func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
 			SourceType: s.Type(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
@@ -1256,6 +1389,7 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -1280,6 +1414,38 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 	return nil
 }
 
+func (s *Source) chunkPullRequests(ctx context.Context, repo string, prs []*github.PullRequest, chunksChan chan *sources.Chunk) error {
+	for _, pr := range prs {
+		// Create chunk and send it to the channel.
+		chunk := &sources.Chunk{
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			SourceType: s.Type(),
+			JobID:      s.JobID(),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{
+						Link:       sanitizer.UTF8(pr.GetHTMLURL()),
+						Username:   sanitizer.UTF8(pr.GetUser().GetLogin()),
+						Email:      sanitizer.UTF8(pr.GetUser().GetEmail()),
+						Repository: sanitizer.UTF8(repo),
+						Timestamp:  sanitizer.UTF8(pr.GetCreatedAt().String()),
+					},
+				},
+			},
+			Data:   []byte(sanitizer.UTF8(pr.GetBody())),
+			Verify: s.verify,
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case chunksChan <- chunk:
+		}
+	}
+	return nil
+}
+
 func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
@@ -1287,6 +1453,7 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
+			JobID:      s.JobID(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -1312,6 +1479,60 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 		}
 	}
 	return nil
+}
+
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	for _, tgt := range targets {
+		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
+			ctx.Logger().Error(err, "error scanning target")
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
+	if !ok {
+		return fmt.Errorf("unable to cast metadata type for targetted scan")
+	}
+	meta := metaType.Github
+
+	u, err := url.Parse(meta.GetLink())
+	if err != nil {
+		return fmt.Errorf("unable to parse GitHub URL: %w", err)
+	}
+
+	// The owner is the second segment and the repo is the third segment of the path.
+	// Ex: https://github.com/owner/repo/.....
+	segments := strings.Split(u.Path, "/")
+	if len(segments) < 3 {
+		return fmt.Errorf("invalid GitHub URL")
+	}
+
+	qry := commitQuery{
+		repo:     segments[2],
+		owner:    segments[1],
+		sha:      meta.GetCommit(),
+		filename: meta.GetFile(),
+	}
+	res, err := s.getDiffForFileInCommit(ctx, qry)
+	if err != nil {
+		return err
+	}
+	chunk := &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
+		Data:       []byte(res),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{Github: meta},
+		},
+		Verify: s.verify,
+	}
+
+	return common.CancellableWrite(ctx, chunksChan, chunk)
 }
 
 func removeURLAndSplit(url string) []string {

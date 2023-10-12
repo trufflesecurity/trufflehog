@@ -27,10 +27,7 @@ func (m circleCiCmdModel) Cmd() string {
 	command = append(command, "trufflehog", "circleci")
 
 	inputs := m.GetInputs()
-
-	if inputs["token"] != "" {
-		command = append(command, "--token="+inputs["token"])
-	}
+	command = append(command, "--token="+inputs["token"].Value)
 
 	return strings.Join(command, " ")
 }

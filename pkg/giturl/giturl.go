@@ -2,10 +2,13 @@ package giturl
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type provider string
@@ -119,7 +122,18 @@ func GenerateLink(repo, commit, file string, line int64) string {
 	case providerBitbucket:
 		return repo[:len(repo)-4] + "/commits/" + commit
 
+	case providerAzure:
+		baseLink := repo + "/commit/" + commit + "/" + file
+		if line > 0 {
+			baseLink += "?line=" + strconv.FormatInt(line, 10)
+		}
+		return baseLink
+
 	case providerGithub, providerGitlab:
+		// If the provider name isn't one of the cloud defaults, it is probably an on-prem github or gitlab.
+		// So do the same thing.
+		fallthrough
+	default:
 		var baseLink string
 		if file == "" {
 			baseLink = repo[:len(repo)-4] + "/commit/" + commit
@@ -130,15 +144,45 @@ func GenerateLink(repo, commit, file string, line int64) string {
 			}
 		}
 		return baseLink
+	}
+}
+
+var linePattern = regexp.MustCompile(`L\d+`)
+
+// UpdateLinkLineNumber updates the line number in a repository link.
+// Used post-link generation to refine reported issue locations within large scanned blocks.
+func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		ctx.Logger().Error(err, "unable to parse link to update line number", "link", link)
+		return link
+	}
+
+	switch determineProvider(link) {
+	case providerBitbucket:
+		// For Bitbucket, it doesn't support line links (based on the GenerateLink function).
+		// So we don't need to change anything.
+		return link
 
 	case providerAzure:
-		baseLink := repo + "?path=" + file + "&version=GB" + commit
-		if line > 0 {
-			baseLink += "&line=" + strconv.FormatInt(line, 10)
-		}
-		return baseLink
+		// For Azure, line numbers are appended as ?line=<number>.
+		query := parsedURL.Query()
+		query.Set("line", strconv.FormatInt(newLine, 10))
+		parsedURL.RawQuery = query.Encode()
 
+	case providerGithub, providerGitlab:
+		// If the provider name isn't one of the cloud defaults, it is probably an on-prem github or gitlab.
+		// So do the same thing.
+		fallthrough
 	default:
-		return ""
+		// Assumed format: .../blob/<commit>/file.go#L<number>
+		fragment := "L" + strconv.FormatInt(newLine, 10)
+		if linePattern.MatchString(parsedURL.Fragment) {
+			parsedURL.Fragment = linePattern.ReplaceAllString(parsedURL.Fragment, fragment)
+		} else {
+			parsedURL.Fragment += fragment
+		}
 	}
+
+	return parsedURL.String()
 }

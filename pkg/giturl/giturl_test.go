@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func Test_NormalizeOrgRepoURL(t *testing.T) {
@@ -148,7 +150,7 @@ func TestGenerateLink(t *testing.T) {
 				commit: "abcdef",
 				file:   "main.go",
 			},
-			want: "https://dev.azure.com/org/project/_git/repo?path=main.go&version=GBabcdef",
+			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go",
 		},
 		{
 			name: "Azure link gen with line",
@@ -158,13 +160,112 @@ func TestGenerateLink(t *testing.T) {
 				file:   "main.go",
 				line:   int64(20),
 			},
-			want: "https://dev.azure.com/org/project/_git/repo?path=main.go&version=GBabcdef&line=20",
+			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
+		},
+		{
+			name: "Unknown provider on-prem instance",
+			args: args{
+				repo:   "https://onprem.customdomain.com/org/repo.git",
+				commit: "xyz123",
+				file:   "main.go",
+				line:   int64(30),
+			},
+			want: "https://onprem.customdomain.com/org/repo/blob/xyz123/main.go#L30",
+		},
+		{
+			name: "Unknown provider on-prem instance - no file",
+			args: args{
+				repo:   "https://onprem.customdomain.com/org/repo.git",
+				commit: "xyz123",
+			},
+			want: "https://onprem.customdomain.com/org/repo/commit/xyz123",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := GenerateLink(tt.args.repo, tt.args.commit, tt.args.file, tt.args.line); got != tt.want {
 				t.Errorf("generateLink() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdateLinkLineNumber(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		link    string
+		newLine int64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "Update bitbucket, no line number supported",
+			args: args{
+				link:    "https://bitbucket.org/org/repo/blob/xyz123/main.go",
+				newLine: int64(10),
+			},
+			want: "https://bitbucket.org/org/repo/blob/xyz123/main.go",
+		},
+		{
+			name: "Update github link with line",
+			args: args{
+				link:    "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore#L4",
+				newLine: int64(10),
+			},
+			want: "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore#L10",
+		},
+		{
+			name: "Update Azure link with line",
+			args: args{
+				link:    "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=20",
+				newLine: int64(40),
+			},
+			want: "https://dev.azure.com/org/project/_git/repo/commit/abcdef/main.go?line=40",
+		},
+		{
+			name: "Add line to github link without line",
+			args: args{
+				link:    "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore",
+				newLine: int64(7),
+			},
+			want: "https://github.com/trufflesec-julian/confluence-go-api/blob/047b4a2ba42fc5b6c0bd535c5307434a666db5ec/.gitignore#L7",
+		},
+		{
+			name: "Update Unknown provider on-prem instance with line",
+			args: args{
+				link:    "https://onprem.customdomain.com/org/repo/blob/xyz123/main.go#L30",
+				newLine: int64(50),
+			},
+			want: "https://onprem.customdomain.com/org/repo/blob/xyz123/main.go#L50",
+		},
+		{
+			name: "Update Unknown provider on-prem instance without line",
+			args: args{
+				link:    "https://onprem.customdomain.com/org/repo/commit/xyz123",
+				newLine: int64(50),
+			},
+			want: "https://onprem.customdomain.com/org/repo/commit/xyz123#L50",
+		},
+		{
+			name: "Invalid link",
+			args: args{
+				link:    "definitely not a link",
+				newLine: int64(50),
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := UpdateLinkLineNumber(context.Background(), tt.args.link, tt.args.newLine)
+			if got != tt.want && !tt.wantErr {
+				t.Errorf("UpdateLinkLineNumber() = %v, want %v", got, tt.want)
 			}
 		})
 	}

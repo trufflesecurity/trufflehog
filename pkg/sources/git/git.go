@@ -34,10 +34,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
+
 type Source struct {
 	name     string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	git      *Git
 	sources.Progress
@@ -51,8 +53,8 @@ type Source struct {
 type Git struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
-	sourceID           int64
-	jobID              int64
+	sourceID           sources.SourceID
+	jobID              sources.JobID
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
@@ -63,7 +65,7 @@ type metrics struct {
 	commitsScanned uint64
 }
 
-func NewGit(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
+func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData,
 ) *Git {
 	return &Git{
@@ -84,14 +86,14 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GIT
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
@@ -109,7 +111,7 @@ func (s *Source) WithPreserveTempDirs(preserve bool) {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -153,7 +155,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, 
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	if err := s.scanRepos(ctx, chunksChan); err != nil {
 		return err
 	}
@@ -310,36 +312,63 @@ func GitURLParse(gitURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
-func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args ...string) (string, *git.Repository, error) {
-	if err := GitCmdCheck(); err != nil {
+type cloneParams struct {
+	userInfo  *url.Userinfo
+	gitURL    string
+	args      []string
+	clonePath string
+}
+
+// CloneRepo orchestrates the cloning of a given Git repository, returning its local path
+// and a git.Repository object for further operations. The function sets up error handling
+// infrastructure, ensuring that any encountered errors trigger a cleanup of resources.
+// The core cloning logic is delegated to a nested function, which returns errors to the
+// outer function for centralized error handling and cleanup.
+func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args ...string) (string, *git.Repository, error) {
+	var err error
+	if err = GitCmdCheck(); err != nil {
 		return "", nil, err
 	}
 	clonePath, err := os.MkdirTemp(os.TempDir(), "trufflehog")
 	if err != nil {
 		return "", nil, err
 	}
-	defer CleanOnError(&err, clonePath)
-	cloneURL, err := GitURLParse(gitUrl)
+
+	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, clonePath})
 	if err != nil {
+		// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
+		// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
+		CleanOnError(&err, clonePath)
 		return "", nil, err
 	}
+
+	return clonePath, repo, nil
+}
+
+// executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
+// clonePath. It then opens the cloned repository, returning a git.Repository object.
+func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
+	cloneURL, err := GitURLParse(params.gitURL)
+	if err != nil {
+		return nil, err
+	}
 	if cloneURL.User == nil {
-		cloneURL.User = userInfo
+		cloneURL.User = params.userInfo
 	}
 
-	gitArgs := []string{"clone", cloneURL.String(), clonePath}
-	gitArgs = append(gitArgs, args...)
+	gitArgs := []string{"clone", cloneURL.String(), params.clonePath}
+	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
-	safeUrl, err := stripPassword(gitUrl)
+	safeURL, err := stripPassword(params.gitURL)
 	if err != nil {
 		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
 	}
 	logger := ctx.Logger().WithValues(
 		"subcommand", "git clone",
-		"repo", safeUrl,
-		"path", clonePath,
-		"args", args,
+		"repo", safeURL,
+		"path", params.clonePath,
+		"args", params.args,
 	)
 
 	// Execute command and wait for the stdout / stderr.
@@ -350,24 +379,47 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 	logger.V(3).Info("git subcommand finished", "output", string(output))
 
 	if cloneCmd.ProcessState == nil {
-		return "", nil, errors.New("clone command exited with no output")
+		return nil, fmt.Errorf("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
 		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
-		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
+		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
-	options := &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
-	}
-	repo, err := git.PlainOpenWithOptions(clonePath, options)
+	options := &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
+	repo, err := git.PlainOpenWithOptions(params.clonePath, options)
 	if err != nil {
-		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
+		return nil, fmt.Errorf("could not open cloned repo: %w", err)
+	}
+	logger.V(1).Info("successfully cloned repo")
+
+	return repo, nil
+}
+
+// PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
+// that a repo actually exists and is reachable.
+//
+// Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
+func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
+	if err := GitCmdCheck(); err != nil {
+		return err
+	}
+	lsUrl, err := GitURLParse(gitUrl)
+	if err != nil {
+		return err
+	}
+	if lsUrl.User == nil {
+		lsUrl.User = url.UserPassword(user, token)
 	}
 
-	logger.V(1).Info("successfully cloned repo")
-	return clonePath, repo, nil
+	// We don't actually care about any refs on the remote, we just care whether can can list them at all. So we query
+	// only for a ref that we know won't exist to minimize the search time on the remote. (By default, ls-remote exits
+	// with 0 even if it doesn't find any matching refs.)
+	fakeRef := "TRUFFLEHOG_CHECK_GIT_REMOTE_URL_REACHABILITY"
+	gitArgs := []string{"ls-remote", lsUrl.String(), "--quiet", fakeRef}
+	cmd := exec.Command("git", gitArgs...)
+	_, err = cmd.CombinedOutput()
+	return err
 }
 
 // CloneRepoUsingToken clones a repo using a provided token.
@@ -446,6 +498,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
@@ -464,6 +517,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
+				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           diff.Content.Bytes(),
@@ -490,6 +544,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 				chunksChan <- &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
@@ -504,6 +559,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 				chunksChan <- &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Data:           line,
@@ -523,6 +579,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.sourceName,
 			SourceID:       s.sourceID,
+			JobID:          s.jobID,
 			SourceType:     s.sourceType,
 			SourceMetadata: metadata,
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
@@ -588,6 +645,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
+					JobID:          s.jobID,
 					SourceType:     s.sourceType,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
@@ -602,6 +660,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			chunksChan <- &sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
+				JobID:          s.jobID,
 				SourceType:     s.sourceType,
 				SourceMetadata: metadata,
 				Data:           diff.Content.Bytes(),

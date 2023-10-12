@@ -41,7 +41,7 @@ func (m *MockJobProgressHook) End(arg0 JobProgressRef, arg1 time.Time) {
 }
 
 // End indicates an expected call of End.
-func (mr *MockJobProgressHookMockRecorder) End(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) End(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "End", reflect.TypeOf((*MockJobProgressHook)(nil).End), arg0, arg1)
 }
@@ -53,7 +53,7 @@ func (m *MockJobProgressHook) EndEnumerating(arg0 JobProgressRef, arg1 time.Time
 }
 
 // EndEnumerating indicates an expected call of EndEnumerating.
-func (mr *MockJobProgressHookMockRecorder) EndEnumerating(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) EndEnumerating(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EndEnumerating", reflect.TypeOf((*MockJobProgressHook)(nil).EndEnumerating), arg0, arg1)
 }
@@ -65,7 +65,7 @@ func (m *MockJobProgressHook) EndUnitChunking(arg0 JobProgressRef, arg1 SourceUn
 }
 
 // EndUnitChunking indicates an expected call of EndUnitChunking.
-func (mr *MockJobProgressHookMockRecorder) EndUnitChunking(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) EndUnitChunking(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EndUnitChunking", reflect.TypeOf((*MockJobProgressHook)(nil).EndUnitChunking), arg0, arg1, arg2)
 }
@@ -77,7 +77,7 @@ func (m *MockJobProgressHook) Finish(arg0 JobProgressRef) {
 }
 
 // Finish indicates an expected call of Finish.
-func (mr *MockJobProgressHookMockRecorder) Finish(arg0 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) Finish(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finish", reflect.TypeOf((*MockJobProgressHook)(nil).Finish), arg0)
 }
@@ -89,7 +89,7 @@ func (m *MockJobProgressHook) ReportChunk(arg0 JobProgressRef, arg1 SourceUnit, 
 }
 
 // ReportChunk indicates an expected call of ReportChunk.
-func (mr *MockJobProgressHookMockRecorder) ReportChunk(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) ReportChunk(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportChunk", reflect.TypeOf((*MockJobProgressHook)(nil).ReportChunk), arg0, arg1, arg2)
 }
@@ -101,7 +101,7 @@ func (m *MockJobProgressHook) ReportError(arg0 JobProgressRef, arg1 error) {
 }
 
 // ReportError indicates an expected call of ReportError.
-func (mr *MockJobProgressHookMockRecorder) ReportError(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) ReportError(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportError", reflect.TypeOf((*MockJobProgressHook)(nil).ReportError), arg0, arg1)
 }
@@ -113,7 +113,7 @@ func (m *MockJobProgressHook) ReportUnit(arg0 JobProgressRef, arg1 SourceUnit) {
 }
 
 // ReportUnit indicates an expected call of ReportUnit.
-func (mr *MockJobProgressHookMockRecorder) ReportUnit(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) ReportUnit(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportUnit", reflect.TypeOf((*MockJobProgressHook)(nil).ReportUnit), arg0, arg1)
 }
@@ -125,7 +125,7 @@ func (m *MockJobProgressHook) Start(arg0 JobProgressRef, arg1 time.Time) {
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockJobProgressHookMockRecorder) Start(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) Start(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockJobProgressHook)(nil).Start), arg0, arg1)
 }
@@ -137,7 +137,7 @@ func (m *MockJobProgressHook) StartEnumerating(arg0 JobProgressRef, arg1 time.Ti
 }
 
 // StartEnumerating indicates an expected call of StartEnumerating.
-func (mr *MockJobProgressHookMockRecorder) StartEnumerating(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) StartEnumerating(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartEnumerating", reflect.TypeOf((*MockJobProgressHook)(nil).StartEnumerating), arg0, arg1)
 }
@@ -149,7 +149,7 @@ func (m *MockJobProgressHook) StartUnitChunking(arg0 JobProgressRef, arg1 Source
 }
 
 // StartUnitChunking indicates an expected call of StartUnitChunking.
-func (mr *MockJobProgressHookMockRecorder) StartUnitChunking(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockJobProgressHookMockRecorder) StartUnitChunking(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartUnitChunking", reflect.TypeOf((*MockJobProgressHook)(nil).StartUnitChunking), arg0, arg1, arg2)
 }

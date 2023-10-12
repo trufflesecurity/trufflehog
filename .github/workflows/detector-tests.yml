@@ -1,0 +1,46 @@
+name: detector test aggregation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * *"
+
+jobs:
+  test-detectors:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: "read"
+      contents: "read"
+      id-token: "write"
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - id: "auth"
+        uses: "google-github-actions/auth@v1"
+        with:
+          workload_identity_provider: "projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "github-ci-external@trufflehog-testing.iam.gserviceaccount.com"
+      - name: Test
+        run: make test-integration
+      - name: Set up gotestsum
+        run: |
+          go install gotest.tools/gotestsum@latest
+          mkdir -p tmp/test-results
+      - name: Test
+        run: |
+          CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=detectors -timeout=15m $(go list ./... | grep pkg/detectors)
+      - name: Upload test results to BuildPulse for flaky test detection
+        if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
+        uses: buildpulse/buildpulse-action@main
+        with:
+          account: 79229934
+          repository: 694446374
+          path: |
+            tmp/test-results/*.xml
+          key: ${{ secrets.BUILDPULSE_DETECTORS_ACCESS_KEY_ID }}
+          secret: ${{ secrets.BUILDPULSE_DETECTORS_SECRET_ACCESS_KEY }}
+          tags: detectors

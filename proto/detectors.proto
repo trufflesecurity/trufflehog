@@ -936,6 +936,14 @@ enum DetectorType {
   Salesforce = 925;
   HuggingFace = 926;
   Snowflake = 927;
+  Sourcegraph = 928;
+  Tailscale = 929;
+  Web3Storage = 930;
+  AzureStorage = 931;
+  PlanetScaleDb = 932;
+  Anthropic = 933;
+  Ramp = 934;
+  Klaviyo = 935;
 }
 
 message Result {

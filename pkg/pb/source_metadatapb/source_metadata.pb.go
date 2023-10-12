@@ -2128,6 +2128,7 @@ type PublicEventMonitoring struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Metadata:
+	//
 	//	*PublicEventMonitoring_Github
 	Metadata isPublicEventMonitoring_Metadata `protobuf_oneof:"metadata"`
 }
@@ -2511,6 +2512,7 @@ type MetaData struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Data:
+	//
 	//	*MetaData_Azure
 	//	*MetaData_Bitbucket
 	//	*MetaData_Circleci
