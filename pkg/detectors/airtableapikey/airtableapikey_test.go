@@ -102,7 +102,7 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Ramp.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Airtable.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
