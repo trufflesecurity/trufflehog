@@ -944,6 +944,7 @@ enum DetectorType {
   Anthropic = 933;
   Ramp = 934;
   Klaviyo = 935;
+<<<<<<< HEAD
   SourcegraphCody = 936;
   Voiceflow = 937;
   Privacy = 938;
@@ -990,6 +991,7 @@ enum DetectorType {
   AzureSQL = 979;
   FlyIO = 980;
   BuiltWith = 981;
+  JupiterOne = 982;
 }
 
 message Result {

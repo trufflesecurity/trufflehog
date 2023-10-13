@@ -1,6 +1,17 @@
 package engine
 
 import (
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jupiterone"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -1571,6 +1582,7 @@ func DefaultDetectors() []detectors.Detector {
 		web3storage.Scanner{},
 		&ramp.Scanner{},
 		&anthropic.Scanner{},
+<<<<<<< HEAD
 		&sourcegraphcody.Scanner{},
 		voiceflow.Scanner{},
 		ip2location.Scanner{},
@@ -1613,6 +1625,7 @@ func DefaultDetectors() []detectors.Detector {
 		&azuresearchquerykey.Scanner{},
 		jiratoken_v2.Scanner{},
 		&googleoauth2.Scanner{},
+		&jupiterone.Scanner{},
 	}
 
 }
