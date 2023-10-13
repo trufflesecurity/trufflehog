@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				client = s.client
+				client := s.client
 				if client == nil {
 					client = defaultClient
 				}
