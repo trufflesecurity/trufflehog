@@ -944,6 +944,7 @@ enum DetectorType {
   Anthropic = 933;
   Ramp = 934;
   Klaviyo = 935;
+  SourcegraphCody = 936;
 }
 
 message Result {
