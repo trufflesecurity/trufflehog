@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jupiterone"}) + `\b([0-9a-zA-Z]{23}_[0-9a-zA-Z]{8})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jupiterone"}) + `\b([0-9a-zA-Z]{76})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Jupiterone,
+			DetectorType: detectorspb.DetectorType_JupiterOne,
 			Raw:          []byte(resMatch),
 		}
 
@@ -53,14 +53,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://eth-mainnet.g.jupiterone.com/v2/"+resMatch+"/getNFTs/?owner=vitalik.eth", nil)
+
+			payload := strings.NewReader(`{
+				"query": "query J1QL($query: String! = \"find jupiterone_account\", $variables: JSON, $cursor: String, $scopeFilters: [JSON!], $flags: QueryV1Flags) { queryV1(query: $query, variables: $variables, cursor: $cursor, scopeFilters: $scopeFilters, flags: $flags) { type data cursor }}"
+			  }`,
+			)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://graphql.us.jupiterone.io/", payload)
 			if err != nil {
 				continue
 			}
+
+			req.Header.Add("Authorization", "Bearer "+resMatch)
+			req.Header.Add("JupiterOne-Account", "12345678-1234-1234-1234-123412341234") // dummy account number
+			req.Header.Add("Content-Type", "application/json")
+
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				if res.StatusCode == 200 {
 					s1.Verified = true
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
@@ -84,5 +94,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Jupiterone
+	return detectorspb.DetectorType_JupiterOne
 }

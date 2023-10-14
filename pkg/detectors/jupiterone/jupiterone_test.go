@@ -50,7 +50,7 @@ func TestJupiterone_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Jupiterone,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestJupiterone_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Jupiterone,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     false,
 				},
 			},
@@ -96,7 +96,7 @@ func TestJupiterone_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Jupiterone,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     false,
 				},
 			},
@@ -113,7 +113,7 @@ func TestJupiterone_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Jupiterone,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     false,
 				},
 			},
