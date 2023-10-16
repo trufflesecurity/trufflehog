@@ -11,12 +11,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func TestSource_Scan(t *testing.T) {
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	// defer cancel()
 	ctx := context.Background()
 
 	secret, err := common.GetTestSecret(ctx)
@@ -76,7 +74,7 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatalf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			reporter := sources.TestReporter{}
+			reporter := sourcestest.TestReporter{}
 			s.returnAfterFirstChunk = true
 
 			err = s.Enumerate(ctx, &reporter)
