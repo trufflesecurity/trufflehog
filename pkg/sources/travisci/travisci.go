@@ -145,53 +145,51 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 
 		for _, build := range builds {
-			for jobPage := 0; ; jobPage++ {
-				jobs, _, err := s.client.Jobs.ListByBuild(ctx, *build.Id)
+			jobs, _, err := s.client.Jobs.ListByBuild(ctx, *build.Id)
+			if err != nil {
+				return reporter.ChunkErr(ctx, err)
+			}
+
+			if len(jobs) == 0 {
+				break
+			}
+
+			for _, job := range jobs {
+				log, _, err := s.client.Logs.FindByJobId(ctx, *job.Id)
 				if err != nil {
 					return reporter.ChunkErr(ctx, err)
 				}
 
-				if len(jobs) == 0 {
-					break
-				}
+				logger.V(3).Info("scanning job", "id", *job.Id, "number", *job.Number)
 
-				for _, job := range jobs {
-					log, _, err := s.client.Logs.FindByJobId(ctx, *job.Id)
-					if err != nil {
-						return reporter.ChunkErr(ctx, err)
-					}
-
-					logger.V(3).Info("scanning job", "id", *job.Id, "number", *job.Number)
-
-					chunk := sources.Chunk{
-						SourceType: s.Type(),
-						SourceName: s.name,
-						SourceID:   s.SourceID(),
-						JobID:      s.JobID(),
-						Data:       []byte(*log.Content),
-						SourceMetadata: &source_metadatapb.MetaData{
-							Data: &source_metadatapb.MetaData_TravisCI{
-								TravisCI: &source_metadatapb.TravisCI{
-									Username:    *job.Owner.Login,
-									Repository:  *repo.Name,
-									BuildNumber: *build.Number,
-									JobNumber:   *job.Number,
-									Link:        fmt.Sprintf("https://app.travis-ci.com/github/%s/%s/jobs/%d", *job.Owner.Login, *repo.Name, *job.Id),
-									Public:      !*repo.Private,
-								},
+				chunk := sources.Chunk{
+					SourceType: s.Type(),
+					SourceName: s.name,
+					SourceID:   s.SourceID(),
+					JobID:      s.JobID(),
+					Data:       []byte(*log.Content),
+					SourceMetadata: &source_metadatapb.MetaData{
+						Data: &source_metadatapb.MetaData_TravisCI{
+							TravisCI: &source_metadatapb.TravisCI{
+								Username:    *job.Owner.Login,
+								Repository:  *repo.Name,
+								BuildNumber: *build.Number,
+								JobNumber:   *job.Number,
+								Link:        fmt.Sprintf("https://app.travis-ci.com/github/%s/%s/jobs/%d", *job.Owner.Login, *repo.Name, *job.Id),
+								Public:      !*repo.Private,
 							},
 						},
-						Verify: s.verify,
-					}
+					},
+					Verify: s.verify,
+				}
 
-					err = reporter.ChunkOk(ctx, chunk)
-					if err != nil {
-						return reporter.ChunkErr(ctx, err)
-					}
+				err = reporter.ChunkOk(ctx, chunk)
+				if err != nil {
+					return reporter.ChunkErr(ctx, err)
+				}
 
-					if s.returnAfterFirstChunk {
-						return nil
-					}
+				if s.returnAfterFirstChunk {
+					return nil
 				}
 			}
 		}
