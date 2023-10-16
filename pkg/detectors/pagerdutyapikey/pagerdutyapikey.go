@@ -24,13 +24,13 @@ const verifyURL = "https://api.pagerduty.com/users"
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pagerduty", "pd"}) + `\b([a-zA-Z0-9_+-]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pagerduty", "pager_duty", "pd_", "pd-"}) + `\b([a-zA-Z0-9_+-]{20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"pagerduty", "pd"}
+	return []string{"pagerduty", "pager_duty", "pd_", "pd-"}
 }
 
 // FromData will find and optionally verify PagerDutyApiKey secrets in a given set of bytes.
