@@ -131,14 +131,26 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	logger := ctx.Logger().WithValues("repo", *repo.Name)
 	logger.V(2).Info("scanning repository")
 
+	// Counts continuous errors from ListByRepoSlug. Used to quit early in
+	// case the API always returns an error.
+	var buildPageErrs int
 	for buildPage := 0; ; buildPage++ {
 		builds, _, err := s.client.Builds.ListByRepoSlug(ctx, *repo.Slug, &travis.BuildsByRepoOption{
 			Limit:  pageSize,
 			Offset: buildPage * pageSize,
 		})
 		if err != nil {
-			return reporter.ChunkErr(ctx, err)
+			if err := reporter.ChunkErr(ctx, err); err != nil {
+				return err
+			}
+			buildPageErrs++
+			if buildPageErrs >= 5 {
+				return fmt.Errorf("encountered too many errors listing builds, aborting")
+			}
+			continue
 		}
+		// Reset the page error counter.
+		buildPageErrs = 0
 
 		if len(builds) == 0 {
 			break
@@ -147,7 +159,10 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		for _, build := range builds {
 			jobs, _, err := s.client.Jobs.ListByBuild(ctx, *build.Id)
 			if err != nil {
-				return reporter.ChunkErr(ctx, err)
+				if err := reporter.ChunkErr(ctx, err); err != nil {
+					return err
+				}
+				continue
 			}
 
 			if len(jobs) == 0 {
@@ -157,7 +172,10 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			for _, job := range jobs {
 				log, _, err := s.client.Logs.FindByJobId(ctx, *job.Id)
 				if err != nil {
-					return reporter.ChunkErr(ctx, err)
+					if err := reporter.ChunkErr(ctx, err); err != nil {
+						return err
+					}
+					continue
 				}
 
 				logger.V(3).Info("scanning job", "id", *job.Id, "number", *job.Number)
@@ -183,9 +201,8 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 					Verify: s.verify,
 				}
 
-				err = reporter.ChunkOk(ctx, chunk)
-				if err != nil {
-					return reporter.ChunkErr(ctx, err)
+				if err := reporter.ChunkOk(ctx, chunk); err != nil {
+					return err
 				}
 
 				if s.returnAfterFirstChunk {
