@@ -13,8 +13,8 @@ type Filter struct {
 	exclude []glob.Glob
 	include []glob.Glob
 	// If an object is not found in either of the filters, return this
-	// value in Pass.
-	notFoundPassBehavior bool
+	// value in ShouldInclude.
+	notFoundShouldIncludeBehavior bool
 }
 
 type globFilterOpt func(*Filter) error
@@ -52,7 +52,7 @@ func WithIncludeGlobs(includes ...string) globFilterOpt {
 // configured).
 func WithDefaultDeny() globFilterOpt {
 	return func(f *Filter) error {
-		f.notFoundPassBehavior = true
+		f.notFoundShouldIncludeBehavior = false
 		return nil
 	}
 }
@@ -62,14 +62,14 @@ func WithDefaultDeny() globFilterOpt {
 // configured).
 func WithDefaultAllow() globFilterOpt {
 	return func(f *Filter) error {
-		f.notFoundPassBehavior = false
+		f.notFoundShouldIncludeBehavior = true
 		return nil
 	}
 }
 
 // NewGlobFilter creates a new Filter with the provided options.
 func NewGlobFilter(opts ...globFilterOpt) (*Filter, error) {
-	filter := &Filter{notFoundPassBehavior: true}
+	filter := &Filter{}
 	for _, opt := range opts {
 		if err := opt(filter); err != nil {
 			return nil, err
@@ -78,43 +78,32 @@ func NewGlobFilter(opts ...globFilterOpt) (*Filter, error) {
 	return filter, nil
 }
 
-// Pass returns whether the object is not in the include list or in the exclude
-// list.
-func (f *Filter) Pass(object string) bool {
+// ShouldInclude returns whether the object is in the include list or not in
+// the exclude list (exclude taking precedence).
+func (f *Filter) ShouldInclude(object string) bool {
 	if f == nil {
-		return false
+		return true
 	}
 	exclude, include := len(f.exclude), len(f.include)
 	if exclude == 0 && include == 0 {
-		return false
+		return true
 	} else if exclude > 0 && include == 0 {
-		return f.passExclude(object)
+		return f.shouldIncludeFromExclude(object)
 	} else if exclude == 0 && include > 0 {
-		return f.passInclude(object)
+		return f.shouldIncludeFromInclude(object)
 	} else {
-		if pass, err := f.passExcludeInclude(object); err == nil {
-			return pass
+		if ok, err := f.shouldIncludeFromBoth(object); err == nil {
+			return ok
 		}
 		// Ambiguous case.
-		return f.notFoundPassBehavior
+		return f.notFoundShouldIncludeBehavior
 	}
 }
 
-// passExclude checks for explicitly excluded paths. This should only be called
-// when the include list is empty.
-func (f *Filter) passExclude(object string) bool {
+// shouldIncludeFromExclude checks for explicitly excluded paths. This should
+// only be called when the include list is empty.
+func (f *Filter) shouldIncludeFromExclude(object string) bool {
 	for _, glob := range f.exclude {
-		if glob.Match(object) {
-			return true
-		}
-	}
-	return false
-}
-
-// passInclude checks for explicitly included paths. This should only be called
-// when the exclude list is empty.
-func (f *Filter) passInclude(object string) bool {
-	for _, glob := range f.include {
 		if glob.Match(object) {
 			return false
 		}
@@ -122,20 +111,31 @@ func (f *Filter) passInclude(object string) bool {
 	return true
 }
 
-// passExcludeInclude checks for either excluded or included paths. Exclusion
-// takes precedence. If neither list contains the object, true is returned.
-func (f *Filter) passExcludeInclude(object string) (bool, error) {
-	// Exclude takes precedence. If we find the object in the exclude list,
-	// we should pass.
-	for _, glob := range f.exclude {
-		if glob.Match(object) {
-			return true, nil
-		}
-	}
-	// If we find the object in the include list, we should not pass.
+// shouldIncludeFromInclude checks for explicitly included paths. This should
+// only be called when the exclude list is empty.
+func (f *Filter) shouldIncludeFromInclude(object string) bool {
 	for _, glob := range f.include {
 		if glob.Match(object) {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldIncludeFromBoth checks for either excluded or included paths. Exclusion
+// takes precedence. If neither list contains the object, true is returned.
+func (f *Filter) shouldIncludeFromBoth(object string) (bool, error) {
+	// Exclude takes precedence. If we find the object in the exclude list,
+	// we should not match.
+	for _, glob := range f.exclude {
+		if glob.Match(object) {
 			return false, nil
+		}
+	}
+	// If we find the object in the include list, we should match.
+	for _, glob := range f.include {
+		if glob.Match(object) {
+			return true, nil
 		}
 	}
 	// If we find it in neither, return an error to let the caller decide.

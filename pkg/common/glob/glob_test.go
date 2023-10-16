@@ -16,7 +16,7 @@ func testGlobs(t *testing.T, filter *Filter, tests ...globTest) {
 		t.Run(tt.input, func(t *testing.T) {
 			// Invert because mentally it's easier to say whether an
 			// input should be included.
-			assert.Equal(t, !tt.shouldInclude, filter.Pass(tt.input))
+			assert.Equal(t, tt.shouldInclude, filter.ShouldInclude(tt.input))
 		})
 	}
 }
