@@ -143,6 +143,9 @@ func TestEnumerate(t *testing.T) {
 	for _, unit := range reporter.Units {
 		assert.Contains(t, units, unit.SourceUnitID())
 	}
+	for _, unit := range units {
+		assert.Contains(t, reporter.Units, sources.CommonSourceUnit{ID: unit})
+	}
 }
 
 func TestChunkUnit(t *testing.T) {
