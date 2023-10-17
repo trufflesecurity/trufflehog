@@ -324,11 +324,12 @@ type cloneParams struct {
 
 var ExecutableName = "trufflehog"
 
-func getScannerPIDs() ([]int, error)  {
+func getScannerPIDs(ctx context.Context) ([]int, error)  {
 	pids:= []int{}
 
 	procs, err := ps.Processes()
 	if err != nil {
+		ctx.Logger().Error(err, "Error getting job PIDs")
 		return nil, err
 	}
 
@@ -341,7 +342,8 @@ func getScannerPIDs() ([]int, error)  {
 	return pids, nil
 }
 
-func cleanTempDir(pid int) error {
+func cleanTempDir(ctx context.Context, pid int) error {
+	logger := ctx.Logger()
 	tempDir := os.TempDir()
 	files, err := os.ReadDir(tempDir)
 	if err != nil {
@@ -351,12 +353,12 @@ func cleanTempDir(pid int) error {
 	pidStr := strconv.Itoa(pid)
 
 	for _, file := range files {
-		if file.IsDir() && strings.Contains(file.Name(), pidStr) && !strings.Contains(file.Name(), pidStr+"-") {
+		if file.IsDir() && strings.Contains(file.Name(), pidStr) {
 			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
 			if err := os.RemoveAll(dirPath); err != nil {
-				return err
+				ctx.Logger().Error(err, "Error deleting temp directory", "directory path", dirPath)
 			}
-			fmt.Printf("Deleted directory: %s\n", dirPath)
+			logger.V(1).Info("Deleted directory", dirPath)
 		}
 	}
 	return nil
@@ -373,10 +375,10 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 		return "", nil, err
 	}
 
-	pids, _ := getScannerPIDs()
+	pids, _ := getScannerPIDs(ctx)
 
 	for _, pid := range pids {
-		err := cleanTempDir(pid)
+		err := cleanTempDir(ctx, pid)
 		if err != nil {
 			return "", nil, err
 		}
