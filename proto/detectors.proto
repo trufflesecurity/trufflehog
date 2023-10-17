@@ -947,6 +947,7 @@ enum DetectorType {
   SourcegraphCody = 936;
   Voiceflow = 937;
   Privacy = 938;
+  CoinbaseWaaS = 939;
 }
 
 message Result {

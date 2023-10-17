@@ -2,6 +2,7 @@ package engine
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase_waas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
@@ -1556,6 +1557,7 @@ func DefaultDetectors() []detectors.Detector {
 		&anthropic.Scanner{},
 		&sourcegraphcody.Scanner{},
 		voiceflow.Scanner{},
+		coinbase_waas.Scanner{},
 	}
 
 }
