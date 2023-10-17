@@ -233,7 +233,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			aCtx.Logger().Error(err, "invalid repository", "repo", repo)
 			continue
 		}
-		s.filteredRepoCache.Set(r, r)
+		s.filteredRepoCache.Set(repo, r)
 	}
 
 	s.includeIssueComments = s.conn.IncludeIssueComments
