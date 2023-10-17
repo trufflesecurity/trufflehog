@@ -32,7 +32,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 2,
+			expectedLine: 3,
 			ignore:       true,
 		},
 		{
@@ -43,7 +43,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 2,
+			expectedLine: 3,
 			ignore:       false,
 		},
 		{
@@ -54,7 +54,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 4,
+			expectedLine: 5,
 			ignore:       false,
 		},
 		{
@@ -65,7 +65,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret\nhere"),
 			},
-			expectedLine: 4,
+			expectedLine: 5,
 			ignore:       false,
 		},
 		{
@@ -76,7 +76,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret\nhere"),
 			},
-			expectedLine: 3,
+			expectedLine: 4,
 			ignore:       true,
 		},
 		{
@@ -87,7 +87,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 3,
+			expectedLine: 4,
 			ignore:       true,
 		},
 	}
