@@ -1,6 +1,18 @@
 package engine
 
 import (
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/voiceflow"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paytm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -1569,6 +1581,7 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
+		paytm.Scanner{}
 	}
 
 }
