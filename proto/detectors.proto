@@ -948,6 +948,7 @@ enum DetectorType {
   Voiceflow = 937;
   Privacy = 938;
   IPInfo = 939;
+  Ip2location = 940;
 }
 
 message Result {
