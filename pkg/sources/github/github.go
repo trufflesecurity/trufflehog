@@ -825,38 +825,51 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 // Unauthenticated access to most github endpoints has a rate limit of 60 requests per hour.
 // This will likely only be exhausted if many users/orgs are scanned without auth
 func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
-	limit, ok := errIn.(*github.RateLimitError)
-	if !ok {
+	var (
+		knownWait  = true
+		remaining  = 0
+		retryAfter time.Duration
+	)
+
+	// GitHub has both primary (RateLimit) and secondary (AbuseRateLimit) errors.
+	var rateLimit *github.RateLimitError
+	var abuseLimit *github.AbuseRateLimitError
+	if errors.As(errIn, &rateLimit) {
+		// Do nothing
+	} else if errors.As(errIn, &abuseLimit) {
+		retryAfter = abuseLimit.GetRetryAfter()
+	} else {
 		return false
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-
-	if res != nil {
-		knownWait := true
-		remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
+	// Parse retry information from response headers, unless a Retry-After value was already provided.
+	// https://docs.github.com/en/rest/overview/resources-in-the-rest-api#exceeding-the-rate-limit
+	if retryAfter <= 0 && res != nil {
+		var err error
+		remaining, err = strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
 		if err != nil {
 			knownWait = false
 		}
+
 		resetTime, err := strconv.Atoi(res.Header.Get("x-ratelimit-reset"))
 		if err != nil || resetTime == 0 {
 			knownWait = false
-		}
-
-		if knownWait && remaining == 0 {
-			waitTime := int64(resetTime) - time.Now().Unix()
-			if waitTime > 0 {
-				duration := time.Duration(waitTime+1) * time.Second
-				s.log.V(2).Info("rate limited", "resumeTime", time.Now().Add(duration).String())
-				time.Sleep(duration)
-				githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(duration.Seconds())
-				return true
-			}
+		} else if resetTime > 0 {
+			retryAfter = time.Duration(int64(resetTime)-time.Now().Unix()) * time.Second
 		}
 	}
 
-	s.log.V(2).Info("handling rate limit (5 minutes retry)", "retry-after", limit.Message)
-	time.Sleep(time.Minute * 5)
+	resumeTime := time.Now().Add(retryAfter).String()
+	if knownWait && remaining == 0 && retryAfter > 0 {
+		s.log.V(2).Info("rate limited", "retry_after", retryAfter.String(), "resume_time", resumeTime)
+	} else {
+		// TODO: Use exponential backoff instead of static retry time.
+		retryAfter = time.Minute * 5
+		s.log.V(2).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", resumeTime)
+	}
+	time.Sleep(retryAfter)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
 	return true
 }
 
