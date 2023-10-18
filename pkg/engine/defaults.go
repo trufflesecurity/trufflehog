@@ -5,6 +5,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ip2location"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metabase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
@@ -1550,6 +1551,7 @@ func DefaultDetectors() []detectors.Detector {
 		ip2location.Scanner{},
 		vagrantcloudpersonaltoken.Scanner{},
 		openvpn.Scanner{},
+		&metabase.Scanner{},
 	}
 
 }
