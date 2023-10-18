@@ -82,6 +82,8 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			return errors.WrapPrefix(err, "error getting testing travis client", 0)
 		}
 		ctx.Logger().V(2).Info("authenticated to Travis CI with user", "username", user.Login)
+	default:
+		return errors.New("credential type not implemented for Travis CI")
 	}
 
 	return nil
@@ -96,11 +98,10 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		if err != nil {
 			if repoPage == 0 {
 				return fmt.Errorf("error listing repositories: %w", err)
-			} else {
-				err = reporter.UnitErr(ctx, err)
-				if err != nil {
-					return fmt.Errorf("error reporting error: %w", err)
-				}
+			}
+			err = reporter.UnitErr(ctx, err)
+			if err != nil {
+				return fmt.Errorf("error reporting error: %w", err)
 			}
 		}
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/travisci"
 )
 
@@ -23,15 +22,15 @@ func (e *Engine) ScanTravisCI(ctx context.Context, token string) error {
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		ctx.Logger().Error(err, "failed to marshal Circle CI connection")
+		ctx.Logger().Error(err, "failed to marshal Travis CI connection")
 		return err
 	}
 
 	sourceName := "trufflehog - Travis CI"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, circleci.SourceType)
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, travisci.SourceType)
 
 	travisSource := &travisci.Source{}
-	if err := travisSource.Init(ctx, "trufflehog - Travis CI", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	if err := travisSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
 	_, err = e.sourceManager.Run(ctx, sourceName, travisSource)
