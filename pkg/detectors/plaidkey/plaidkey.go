@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := strings.NewReader(`{"client_id":"` + idresMatch + `","secret":"` + resMatch + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://development.plaid.com/link/token/create", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://production.plaid.com/link/token/create", payload)
 				if err != nil {
 					continue
 				}
