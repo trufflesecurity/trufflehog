@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CurrencyCloud,
 				Raw:          []byte(resMatch),
 			}
-
+			
 			if verify {
 				// Get authentication token
 				payload := strings.NewReader(`{"login_id":"` + resEmailMatch + `","api_key":"` + resMatch + `"`)
