@@ -416,8 +416,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	}
 
 	gitArgs := []string{
-		"clone",
-		cloneURL.String(),
+		"clone", cloneURL.String(),
 		params.clonePath,
 		"-c",
 		"remote.origin.fetch=+refs/*:refs/remotes/origin/*",
