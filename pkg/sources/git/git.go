@@ -374,7 +374,13 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		cloneURL.User = params.userInfo
 	}
 
-	gitArgs := []string{"clone", cloneURL.String(), params.clonePath}
+	gitArgs := []string{
+		"clone", cloneURL.String(), params.clonePath,
+		// Fetch additional refs from GitHub and GitLab.
+		// https://github.com/trufflesecurity/trufflehog/issues/1588
+		"-c", "remote.origin.fetch=+refs/pull/*:refs/heads/pull/*",
+		"-c", "remote.origin.fetch=+refs/merge-requests/*:refs/heads/merge-requests/*",
+	}
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
