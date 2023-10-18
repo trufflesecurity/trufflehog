@@ -12,9 +12,6 @@ import (
 type Filter struct {
 	exclude []glob.Glob
 	include []glob.Glob
-	// If an object is not found in either of the filters, return this
-	// value in ShouldInclude.
-	notFoundShouldIncludeBehavior bool
 }
 
 type globFilterOpt func(*Filter) error
@@ -43,26 +40,6 @@ func WithIncludeGlobs(includes ...string) globFilterOpt {
 			}
 			f.include = append(f.include, g)
 		}
-		return nil
-	}
-}
-
-// WithDefaultDeny configures the filter to deny objects that are not found
-// in either exclude or include filter (in the ambiguous case where both are
-// configured).
-func WithDefaultDeny() globFilterOpt {
-	return func(f *Filter) error {
-		f.notFoundShouldIncludeBehavior = false
-		return nil
-	}
-}
-
-// WithDefaultAllow configures the filter to allow objects that are not found
-// in either exclude or include filter (in the ambiguous case where both are
-// configured).
-func WithDefaultAllow() globFilterOpt {
-	return func(f *Filter) error {
-		f.notFoundShouldIncludeBehavior = true
 		return nil
 	}
 }
@@ -96,7 +73,7 @@ func (f *Filter) ShouldInclude(object string) bool {
 			return ok
 		}
 		// Ambiguous case.
-		return f.notFoundShouldIncludeBehavior
+		return false
 	}
 }
 
