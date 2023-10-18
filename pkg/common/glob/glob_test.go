@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"pgregory.net/rapid"
 )
 
 type globTest struct {
@@ -94,22 +95,6 @@ func TestGlobFilterExcludePrecedence(t *testing.T) {
 	)
 }
 
-func TestGlobDefault(t *testing.T) {
-	// Test default *Filter and Filter have the same behavior.
-	for _, filter := range []*Filter{nil, {}} {
-		testGlobs(t, filter,
-			globTest{"foo", true},
-			globTest{"bar", true},
-			globTest{"bara", true},
-			globTest{"barb", true},
-			globTest{"barbosa", true},
-			globTest{"foobar", true},
-			globTest{"food", true},
-			globTest{"anything else", true},
-		)
-	}
-}
-
 func TestGlobErrorContainsGlob(t *testing.T) {
 	invalidGlob := "[this is invalid because it doesn't close the capture group"
 	_, err := NewGlobFilter(WithExcludeGlobs(invalidGlob))
@@ -117,32 +102,37 @@ func TestGlobErrorContainsGlob(t *testing.T) {
 	assert.Contains(t, err.Error(), invalidGlob)
 }
 
-func TestGlobDefaultDeny(t *testing.T) {
-	filter, err := NewGlobFilter(
-		WithExcludeGlobs("/foo/bar/**"),
-		WithIncludeGlobs("/foo/**"),
-		WithDefaultDeny(),
-	)
-	assert.NoError(t, err)
-
-	testGlobs(t, filter,
-		globTest{"/foo/a", true},
-		globTest{"/foo/bar/a", false},
-		globTest{"/any/other/path", false},
-	)
+// The filters in this test should be mutually exclusive because one includes
+// and the other excludes the same glob.
+func TestGlobInverse(t *testing.T) {
+	for _, glob := range []string{
+		"a",
+		"a*",
+		"a**",
+		"*a",
+		"**a",
+		"*",
+	} {
+		include, err := NewGlobFilter(WithIncludeGlobs(glob))
+		assert.NoError(t, err)
+		exclude, err := NewGlobFilter(WithExcludeGlobs(glob))
+		assert.NoError(t, err)
+		rapid.Check(t, func(t *rapid.T) {
+			input := rapid.String().Draw(t, "input")
+			a, b := include.ShouldInclude(input), exclude.ShouldInclude(input)
+			if a == b {
+				t.Fatalf("Filter(Include(%q)) == Filter(Exclude(%q)) == %v for input %q", glob, glob, a, input)
+			}
+		})
+	}
 }
 
-func TestGlobDefaultAllow(t *testing.T) {
-	filter, err := NewGlobFilter(
-		WithExcludeGlobs("/foo/bar/**"),
-		WithIncludeGlobs("/foo/**"),
-		WithDefaultAllow(),
-	)
-	assert.NoError(t, err)
-
-	testGlobs(t, filter,
-		globTest{"/foo/a", true},
-		globTest{"/foo/bar/a", false},
-		globTest{"/any/other/path", true},
-	)
+func TestGlobDefaultFilters(t *testing.T) {
+	for _, filter := range []*Filter{nil, {}} {
+		rapid.Check(t, func(t *rapid.T) {
+			if !filter.ShouldInclude(rapid.String().Draw(t, "input")) {
+				t.Fatalf("filter %#v did not include input", filter)
+			}
+		})
+	}
 }
