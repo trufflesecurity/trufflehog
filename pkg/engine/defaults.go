@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraphcody"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/voiceflow"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
@@ -1554,6 +1555,7 @@ func DefaultDetectors() []detectors.Detector {
 		&ramp.Scanner{},
 		&anthropic.Scanner{},
 		&sourcegraphcody.Scanner{},
+		voiceflow.Scanner{},
 	}
 
 }
