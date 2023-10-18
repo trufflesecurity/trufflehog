@@ -949,6 +949,7 @@ enum DetectorType {
   Privacy = 938;
   IPInfo = 939;
   Ip2location = 940;
+  Instamojo = 941;
 }
 
 message Result {
