@@ -94,17 +94,20 @@ func TestGlobFilterExcludePrecedence(t *testing.T) {
 	)
 }
 
-func TestGlobNil(t *testing.T) {
-	testGlobs(t, nil,
-		globTest{"foo", true},
-		globTest{"bar", true},
-		globTest{"bara", true},
-		globTest{"barb", true},
-		globTest{"barbosa", true},
-		globTest{"foobar", true},
-		globTest{"food", true},
-		globTest{"anything else", true},
-	)
+func TestGlobDefault(t *testing.T) {
+	// Test default *Filter and Filter have the same behavior.
+	for _, filter := range []*Filter{nil, {}} {
+		testGlobs(t, filter,
+			globTest{"foo", true},
+			globTest{"bar", true},
+			globTest{"bara", true},
+			globTest{"barb", true},
+			globTest{"barbosa", true},
+			globTest{"foobar", true},
+			globTest{"food", true},
+			globTest{"anything else", true},
+		)
+	}
 }
 
 func TestGlobErrorContainsGlob(t *testing.T) {
