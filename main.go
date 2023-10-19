@@ -139,6 +139,8 @@ var (
 
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+
+	usingTUI = false
 )
 
 func init() {
@@ -164,6 +166,7 @@ func init() {
 		// Overwrite the Args slice so overseer works properly.
 		os.Args = os.Args[:1]
 		os.Args = append(os.Args, args...)
+		usingTUI = true
 	}
 
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
@@ -203,7 +206,7 @@ func main() {
 	}
 
 	if !*noUpdate {
-		updateCfg.Fetcher = updater.Fetcher(version.BuildVersion)
+		updateCfg.Fetcher = updater.Fetcher(usingTUI)
 	}
 	if version.BuildVersion == "dev" {
 		updateCfg.Fetcher = nil
