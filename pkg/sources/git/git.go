@@ -325,12 +325,12 @@ type cloneParams struct {
 var ExecutableName = "trufflehog"
 
 func getScannerPIDs(ctx context.Context) ([]int, error)  {
-	pids:= []int{}
+	var pids []int
 
 	procs, err := ps.Processes()
 	if err != nil {
-		ctx.Logger().Error(err, "Error getting job PIDs")
-		return nil, err
+		return nil, fmt.Errorf("error getting jobs PIDs: %w", err)
+
 	}
 
 	for _, proc := range procs {
@@ -343,7 +343,6 @@ func getScannerPIDs(ctx context.Context) ([]int, error)  {
 }
 
 func cleanTempDir(ctx context.Context, pid int) error {
-	logger := ctx.Logger()
 	tempDir := os.TempDir()
 	files, err := os.ReadDir(tempDir)
 	if err != nil {
@@ -358,7 +357,7 @@ func cleanTempDir(ctx context.Context, pid int) error {
 			if err := os.RemoveAll(dirPath); err != nil {
 				ctx.Logger().Error(err, "Error deleting temp directory", "directory path", dirPath)
 			}
-			logger.V(1).Info("Deleted directory", dirPath)
+			ctx.Logger().V(1).Info("Deleted directory", dirPath)
 		}
 	}
 	return nil
@@ -378,6 +377,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 	pids, _ := getScannerPIDs(ctx)
 
 	for _, pid := range pids {
+		// this function will only remove directories that do *not* match running PIDs
 		err := cleanTempDir(ctx, pid)
 		if err != nil {
 			return "", nil, err
