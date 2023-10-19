@@ -1151,16 +1151,16 @@ type repoInfo struct {
 }
 
 func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
-	if !(s.includeIssueComments || s.includePRComments) {
-		return nil
-	}
-
 	// Normal repository URL (https://github.com/<owner>/<repo>).
 	if len(trimmedURL) < 3 {
 		return fmt.Errorf("url missing owner and/or repo: '%s'", repoURL.String())
 	}
 	owner := trimmedURL[1]
 	repo := trimmedURL[2]
+
+	if !(s.includeIssueComments || s.includePRComments) {
+		return nil
+	}
 
 	repoInfo := repoInfo{
 		owner:      owner,
