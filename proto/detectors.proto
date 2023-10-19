@@ -945,6 +945,7 @@ enum DetectorType {
   Ramp = 934;
   Klaviyo = 935;
   SourcegraphCody = 936;
+  Voiceflow = 937;
 }
 
 message Result {
