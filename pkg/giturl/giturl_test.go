@@ -252,6 +252,14 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 			want: "https://onprem.customdomain.com/org/repo/commit/xyz123#L50",
 		},
 		{
+			name: "Don't include line when it's 0",
+			args: args{
+				link:    "https://github.com/coinbase/cbpay-js/issues/181",
+				newLine: int64(0),
+			},
+			want: "https://github.com/coinbase/cbpay-js/issues/181",
+		},
+		{
 			name: "Invalid link",
 			args: args{
 				link:    "definitely not a link",
