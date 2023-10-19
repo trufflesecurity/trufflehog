@@ -152,6 +152,9 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
+	//Support -h for help
+	cli.HelpFlag.Short('h')
+
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
 		args := tui.Run()
 		if len(args) == 0 {

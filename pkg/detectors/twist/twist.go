@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b([0-9a-f:]{40,47})\b`)
+	accessToken = regexp.MustCompile(detectors.PrefixRegex([]string{"twist"}) + `\b(?:oauth2:)?([0-9a-f]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,7 +34,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := accessToken.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
 		if len(match) != 2 {

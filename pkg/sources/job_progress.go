@@ -89,14 +89,14 @@ func (f Fatal) Unwrap() error { return f.error }
 // ChunkError is a custom error type for errors encountered during chunking of
 // a specific unit.
 type ChunkError struct {
-	unit SourceUnit
-	err  error
+	Unit SourceUnit
+	Err  error
 }
 
 func (f ChunkError) Error() string {
-	return fmt.Sprintf("error chunking unit %q: %s", f.unit.SourceUnitID(), f.err.Error())
+	return fmt.Sprintf("error chunking unit %q: %s", f.Unit.SourceUnitID(), f.Err.Error())
 }
-func (f ChunkError) Unwrap() error { return f.err }
+func (f ChunkError) Unwrap() error { return f.Err }
 
 // JobProgress aggregates information about a run of a Source.
 type JobProgress struct {
@@ -350,4 +350,18 @@ func (m JobProgressMetrics) ElapsedTime() time.Duration {
 		return time.Since(m.StartTime)
 	}
 	return m.EndTime.Sub(m.StartTime)
+}
+
+// ErrorsFor returns all the errors for the given SourceUnit. If there are no
+// errors, including the case that the unit has not been encountered, nil will
+// be returned.
+func (m JobProgressMetrics) ErrorsFor(unit SourceUnit) []error {
+	var errs []error
+	for _, err := range m.Errors {
+		var chunkErr ChunkError
+		if errors.As(err, &chunkErr) && chunkErr.Unit == unit {
+			errs = append(errs, err)
+		}
+	}
+	return errs
 }
