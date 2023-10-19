@@ -322,9 +322,15 @@ type cloneParams struct {
 	clonePath string
 }
 
-var ExecutableName = "trufflehog"
+type PID interface {
+	getPIDs(ctx context.Context, executable string) ([]int, error)
+}
 
-func getScannerPIDs(ctx context.Context) ([]int, error)  {
+type TempDir interface {
+	cleanTempDir(ctx context.Context, pid int) error
+}
+
+func getScannerPIDs(ctx context.Context, executable string) ([]int, error)  {
 	var pids []int
 
 	procs, err := ps.Processes()
@@ -334,7 +340,7 @@ func getScannerPIDs(ctx context.Context) ([]int, error)  {
 	}
 
 	for _, proc := range procs {
-		if strings.Contains(proc.Executable(), ExecutableName) {
+		if strings.Contains(proc.Executable(), executable) {
 			pids = append(pids, proc.Pid())
 		}
 	}
@@ -374,7 +380,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 		return "", nil, err
 	}
 
-	pids, _ := getScannerPIDs(ctx)
+	pids, _ := getScannerPIDs(ctx, "trufflehog")
 
 	for _, pid := range pids {
 		// this function will only remove directories that do *not* match running PIDs
