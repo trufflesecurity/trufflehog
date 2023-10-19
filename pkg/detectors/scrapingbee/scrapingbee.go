@@ -19,14 +19,15 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
+	keywords = []string{"scrapingbee", "scraping-bee", "scraping_bee"}
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scrapingbee"}) + `\b([A-Z0-9]{80})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex(keywords) + `\b([A-Z0-9]{80})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"scrapingbee"}
+	return keywords
 }
 
 // FromData will find and optionally verify ScrapingBee secrets in a given set of bytes.
@@ -53,15 +54,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				if res.StatusCode == http.StatusOK {
 					s1.Verified = true
+				} else if res.StatusCode == http.StatusUnauthorized {
+					continue
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}
+				_ = res.Body.Close()
+			} else {
+				s1.VerificationError = err
 			}
 		}
 
