@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -25,7 +25,6 @@ import (
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -322,21 +321,17 @@ type cloneParams struct {
 	clonePath string
 }
 
+//Defines the interface for returning a single PID value given an executable name
 type PID interface {
-	getPIDs(ctx context.Context, executable string) ([]int, error)
+	getPIDs(ctx context.Context, executable string) (int, error)
 }
 
-type TempDir interface {
-	cleanTempDir(ctx context.Context, pid int) error
-}
-
-func getScannerPIDs(ctx context.Context, executable string) ([]int, error)  {
+func GetScannerPIDs(ctx context.Context, executable string) (int, error)  {
 	var pids []int
 
 	procs, err := ps.Processes()
 	if err != nil {
-		return nil, fmt.Errorf("error getting jobs PIDs: %w", err)
-
+		return 0, fmt.Errorf("error getting jobs PIDs: %w", err)
 	}
 
 	for _, proc := range procs {
@@ -345,28 +340,18 @@ func getScannerPIDs(ctx context.Context, executable string) ([]int, error)  {
 		}
 	}
 
-	return pids, nil
-}
-
-func cleanTempDir(ctx context.Context, pid int) error {
-	tempDir := os.TempDir()
-	files, err := os.ReadDir(tempDir)
-	if err != nil {
-		return err
+	if len(pids) < 2 {
+		return 0, fmt.Errorf("not enough PIDs found for executable %s", executable)
 	}
 
-	pidStr := strconv.Itoa(pid)
+	// Sort the PIDs in ascending order
+	sort.Ints(pids)
 
-	for _, file := range files {
-		if file.IsDir() && strings.Contains(file.Name(), pidStr) {
-			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
-			if err := os.RemoveAll(dirPath); err != nil {
-				ctx.Logger().Error(err, "Error deleting temp directory", "directory path", dirPath)
-			}
-			ctx.Logger().V(1).Info("Deleted directory", dirPath)
-		}
+	// Return the lowest value of the first two PIDs
+	if pids[0] < pids[1] {
+		return pids[0], nil
 	}
-	return nil
+	return pids[1], nil
 }
 
 // CloneRepo orchestrates the cloning of a given Git repository, returning its local path
@@ -380,19 +365,13 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 		return "", nil, err
 	}
 
-	pids, _ := getScannerPIDs(ctx, "trufflehog")
-
-	for _, pid := range pids {
-		// this function will only remove directories that do *not* match running PIDs
-		err := cleanTempDir(ctx, pid)
-		if err != nil {
-			return "", nil, err
-		}
+	pid, err := GetScannerPIDs(ctx, "trufflehog")
+	if err != nil {
+		return "", nil, err
 	}
 
-	spid := strconv.Itoa(pids[0])
+	tmpdir := fmt.Sprintf("trufflehog-%d-", pid)
 
-	tmpdir := fmt.Sprintf("trufflehog-%s-%s", spid, rand.String(6))
 
 	clonePath, err := os.MkdirTemp(os.TempDir(), tmpdir)
 	if err != nil {

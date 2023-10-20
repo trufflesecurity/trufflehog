@@ -176,6 +176,34 @@ func init() {
 	}
 }
 
+//Defines the interface for removing orphaned artifacts from aborted scans
+type CleanTemp interface {
+	//Removes orphaned directories from sources like Git
+	CleanTempDir(ctx context.Context, dirName string, pid int) error
+	//Removes orphaned files/artifacts from sources like Artifactory
+	CleanTempFiles(ctx context.Context, fileName string, pid int) error
+}
+
+func CleanTempDir(ctx context.Context, dirName string, pid int) error {
+	tempDir := os.TempDir()
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		return err
+	}
+
+	pidStr := strconv.Itoa(pid)
+
+	for _, file := range files {
+		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
+			if err := os.RemoveAll(dirPath); err != nil {
+				ctx.Logger().Error(err, "Error deleting temp directory", "directory path", dirPath)
+			}
+			ctx.Logger().V(1).Info("Deleted directory", dirPath)
+		}
+	}
+	return nil
+}
+
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -213,6 +241,18 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
+
+        ctx := context.Background()
+
+	var execName = "trufflehog"
+
+	pid, _ := git.GetScannerPIDs(ctx, execName)
+
+	err = CleanTempDir(ctx, execName, pid)
+	if err != nil {
+		fmt.Errorf("Error cleaning up orphaned directories - %s", err)
+	}
+	
 }
 
 func run(state overseer.State) {
