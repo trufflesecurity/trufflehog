@@ -326,6 +326,8 @@ type PID interface {
 	getPIDs(ctx context.Context, executable string) (int, error)
 }
 
+var ExecutableName = "trufflehog"
+
 func GetScannerPIDs(ctx context.Context, executable string) (int, error)  {
 	var pids []int
 
@@ -341,17 +343,19 @@ func GetScannerPIDs(ctx context.Context, executable string) (int, error)  {
 	}
 
 	if len(pids) < 2 {
-		return 0, fmt.Errorf("not enough PIDs found for executable %s", executable)
-	}
-
-	// Sort the PIDs in ascending order
-	sort.Ints(pids)
-
-	// Return the lowest value of the first two PIDs
-	if pids[0] < pids[1] {
 		return pids[0], nil
+	} else {
+
+	        // Sort the PIDs in ascending order
+	        sort.Ints(pids)
+
+	        // Return the lowest value of the first two PIDs
+	        if pids[0] < pids[1] {
+	        	return pids[0], nil
+	        }
+	        return pids[1], nil
 	}
-	return pids[1], nil
+
 }
 
 // CloneRepo orchestrates the cloning of a given Git repository, returning its local path
@@ -365,12 +369,12 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 		return "", nil, err
 	}
 
-	pid, err := GetScannerPIDs(ctx, "trufflehog")
+	pid, err := GetScannerPIDs(ctx, ExecutableName)
 	if err != nil {
 		return "", nil, err
 	}
 
-	tmpdir := fmt.Sprintf("trufflehog-%d-", pid)
+	tmpdir := fmt.Sprintf("%s-%d-", ExecutableName, pid)
 
 
 	clonePath, err := os.MkdirTemp(os.TempDir(), tmpdir)

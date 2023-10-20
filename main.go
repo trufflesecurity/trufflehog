@@ -188,7 +188,7 @@ func CleanTempDir(ctx context.Context, dirName string, pid int) error {
 	tempDir := os.TempDir()
 	files, err := os.ReadDir(tempDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error reading temp dir: %w", err)
 	}
 
 	pidStr := strconv.Itoa(pid)
@@ -196,7 +196,7 @@ func CleanTempDir(ctx context.Context, dirName string, pid int) error {
 	for _, file := range files {
 		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
 			if err := os.RemoveAll(dirPath); err != nil {
-				ctx.Logger().Error(err, "Error deleting temp directory", "directory path", dirPath)
+				return fmt.Errorf("Error deleting temp directory: %s", dirPath)
 			}
 			ctx.Logger().V(1).Info("Deleted directory", dirPath)
 		}
@@ -250,9 +250,8 @@ func main() {
 
 	err = CleanTempDir(ctx, execName, pid)
 	if err != nil {
-		fmt.Errorf("Error cleaning up orphaned directories - %s", err)
+		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
 	}
-	
 }
 
 func run(state overseer.State) {
