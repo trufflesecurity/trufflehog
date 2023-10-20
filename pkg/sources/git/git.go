@@ -326,7 +326,7 @@ type PID interface {
 	getPIDs(ctx context.Context, executable string) (int, error)
 }
 
-var ExecutableName = "trufflehog"
+var ExecutableName = os.Args[0]
 
 func GetScannerPIDs(ctx context.Context, executable string) (int, error) {
 	var pids []int

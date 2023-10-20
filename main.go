@@ -200,7 +200,7 @@ func CleanTempDir(ctx context.Context, dirName string, pid int) error {
 			if err := os.RemoveAll(dirPath); err != nil {
 				return fmt.Errorf("Error deleting temp directory: %s", dirPath)
 			}
-			ctx.Logger().V(1).Info("Deleted directory", dirPath)
+			ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
 		}
 	}
 	return nil
