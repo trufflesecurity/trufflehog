@@ -946,7 +946,8 @@ enum DetectorType {
   Klaviyo = 935;
   SourcegraphCody = 936;
   Voiceflow = 937;
-  IPInfo = 938;
+  Privacy = 938;
+  IPInfo = 939;
 }
 
 message Result {
