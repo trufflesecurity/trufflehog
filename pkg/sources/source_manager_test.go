@@ -310,3 +310,61 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 	<-ref.Done()      // Wait for the job to finish.
 	assert.Equal(t, 1337, mgr.AvailableCapacity())
 }
+
+func TestSourceManagerUnitHook(t *testing.T) {
+	ch := make(chan UnitMetrics, 8)
+	hook := UnitHook{FinishedMetrics: ch}
+
+	input := []unitChunk{
+		{unit: "one", output: "bar"},
+		{unit: "two", err: "oh no"},
+		{unit: "three", err: "not again"},
+	}
+	mgr := NewManager(
+		WithBufferedOutput(8),
+		WithSourceUnits(), WithConcurrentUnits(1),
+		WithReportHook(&hook),
+	)
+	source, err := buildDummy(&unitChunker{input})
+	assert.NoError(t, err)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
+	assert.NoError(t, err)
+	<-ref.Done()
+
+	select {
+	case metrics := <-ch:
+		assert.Equal(t, "one", metrics.Unit.SourceUnitID())
+		assert.Equal(t, uint64(1), metrics.TotalChunks)
+		assert.Equal(t, uint64(3), metrics.TotalBytes)
+		assert.NotZero(t, metrics.StartTime)
+		assert.NotZero(t, metrics.EndTime)
+		assert.NotZero(t, metrics.ElapsedTime())
+		assert.Equal(t, 0, len(metrics.Errors))
+	default:
+		t.Fatalf("expected 3 metrics, got 0")
+	}
+	select {
+	case metrics := <-ch:
+		assert.Equal(t, "two", metrics.Unit.SourceUnitID())
+		assert.Equal(t, uint64(0), metrics.TotalChunks)
+		assert.Equal(t, uint64(0), metrics.TotalBytes)
+		assert.NotZero(t, metrics.StartTime)
+		assert.NotZero(t, metrics.EndTime)
+		assert.NotZero(t, metrics.ElapsedTime())
+		assert.Equal(t, 1, len(metrics.Errors))
+	default:
+		t.Fatalf("expected 3 metrics, got 1")
+	}
+	select {
+	case metrics := <-ch:
+		assert.Equal(t, "three", metrics.Unit.SourceUnitID())
+		assert.Equal(t, uint64(0), metrics.TotalChunks)
+		assert.Equal(t, uint64(0), metrics.TotalBytes)
+		assert.NotZero(t, metrics.StartTime)
+		assert.NotZero(t, metrics.EndTime)
+		assert.NotZero(t, metrics.ElapsedTime())
+		assert.Equal(t, 1, len(metrics.Errors))
+	default:
+		t.Fatalf("expected 3 metrics, got 2")
+	}
+}
