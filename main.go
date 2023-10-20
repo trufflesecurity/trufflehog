@@ -5,6 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -176,7 +177,7 @@ func init() {
 	}
 }
 
-//Defines the interface for removing orphaned artifacts from aborted scans
+// Defines the interface for removing orphaned artifacts from aborted scans
 type CleanTemp interface {
 	//Removes orphaned directories from sources like Git
 	CleanTempDir(ctx context.Context, dirName string, pid int) error
@@ -194,7 +195,8 @@ func CleanTempDir(ctx context.Context, dirName string, pid int) error {
 	pidStr := strconv.Itoa(pid)
 
 	for _, file := range files {
-		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {			dirPath := fmt.Sprintf("%s/%s", tempDir, file.Name())
+		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {
+			dirPath := filepath.Join(tempDir, file.Name())
 			if err := os.RemoveAll(dirPath); err != nil {
 				return fmt.Errorf("Error deleting temp directory: %s", dirPath)
 			}
@@ -242,7 +244,7 @@ func main() {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
 
-        ctx := context.Background()
+	ctx := context.Background()
 
 	var execName = "trufflehog"
 
