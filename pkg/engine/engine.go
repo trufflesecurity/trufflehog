@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -469,7 +468,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				for _, match := range e.ahoCorasickCore.matchString(strings.ToLower(string(decoded.Chunk.Data))) {
+				for _, match := range e.ahoCorasickCore.matchString(string(decoded.Chunk.Data)) {
 					if !e.ahoCorasickCore.populateDetectorsByMatch(match, chunkSpecificDetectors) {
 						continue
 					}

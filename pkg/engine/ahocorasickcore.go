@@ -52,38 +52,32 @@ func newAhoCorasickCore(detectors map[bool][]detectors.Detector) *ahoCorasickCor
 // setup initializes the internal state of ahoCorasickCore to prepare it for keyword matching.
 // This involves pre-filtering setup and lookup optimization, critical for the engine's performance.
 func (ac *ahoCorasickCore) setup(ctx context.Context) {
-	ac.buildLookups(ctx)
-	ctx.Logger().V(4).Info("ahoCorasickCore setup complete")
-}
-
-// buildLookups prepares maps for fast detector lookups. Instead of scanning through an array of
-// detectors for every chunk, this lookup optimization  provides rapid access to relevant detectors using keywords.
-func (ac *ahoCorasickCore) buildLookups(ctx context.Context) {
+	// Prepare maps for fast detector lookups, instead of scanning through an array of detectors for every chunk.
 	var keywords []string
 	for verify, detectorsSet := range ac.detectors {
 		for _, d := range detectorsSet {
-			key := ac.classifyDetector(d, verify)
+			key := createDetectorKey(d)
+			ac.detectorTypeToDetectorInfo[key] = detectorInfo{Detector: d, shouldVerify: verify}
 			keywords = ac.extractAndMapKeywords(d, key, keywords)
 		}
 	}
 
-	// Implementing a trie aids in substring searches among the keywords.
-	// This is crucial when you have large sets of strings to search through.
-	ac.buildTrie(keywords)
+	// Use the Ahocorasick algorithm to create a trie structure for efficient keyword matching.
+	// This ensures that we can rapidly match against a vast set of keywords without individually comparing each one.
+	ac.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 	ctx.Logger().V(4).Info("ahoCorasickCore lookups built")
+	ctx.Logger().V(4).Info("ahoCorasickCore setup complete")
 }
 
-// classifyDetector assigns a unique key for each detector. This key based on type and version,
-// ensures faster lookups and reduces redundancy in our main detector store.
-func (ac *ahoCorasickCore) classifyDetector(d detectors.Detector, shouldVerify bool) detectorKey {
+// createDetectorKey creates a unique key for each detector. This key based on type and version,
+// it ensures faster lookups and reduces redundancy in our main detector store.
+func createDetectorKey(d detectors.Detector) detectorKey {
 	detectorType := d.Type()
 	var version int
 	if v, ok := d.(detectors.Versioner); ok {
 		version = v.Version()
 	}
-	key := detectorKey{detectorType: detectorType, version: version}
-	ac.detectorTypeToDetectorInfo[key] = detectorInfo{Detector: d, shouldVerify: shouldVerify}
-	return key
+	return detectorKey{detectorType: detectorType, version: version}
 }
 
 // extractAndMapKeywords captures keywords associated with each detector and maps them.
@@ -95,12 +89,6 @@ func (ac *ahoCorasickCore) extractAndMapKeywords(d detectors.Detector, key detec
 		ac.keywordsToDetectors[kwLower] = append(ac.keywordsToDetectors[kwLower], key)
 	}
 	return keywords
-}
-
-// buildTrie uses the Ahocorasick algorithm to create a trie structure for efficient keyword matching.
-// This ensures that we can rapidly match against a vast set of keywords without individually comparing each one.
-func (ac *ahoCorasickCore) buildTrie(keywords []string) {
-	ac.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
 }
 
 // matchString performs a string match using the Aho-Corasick algorithm, returning an array of matches.
