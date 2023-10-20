@@ -19,6 +19,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -59,7 +60,9 @@ type Engine struct {
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
-	filterUnverified     bool
+	filterUnverified bool
+	// entropyFilter is used to filter out unverified results using Shannon entropy.
+	filterEntropy        *float64
 	onlyVerified         bool
 	printAvgDetectorTime bool
 
@@ -124,6 +127,15 @@ func WithDecoders(decoders ...decoders.Decoder) EngineOption {
 func WithFilterUnverified(filter bool) EngineOption {
 	return func(e *Engine) {
 		e.filterUnverified = filter
+	}
+}
+
+// WithFilterEntropy filters out unverified results using Shannon entropy.
+func WithFilterEntropy(entropy float64) EngineOption {
+	return func(e *Engine) {
+		if entropy > 0 {
+			e.filterEntropy = &entropy
+		}
 	}
 }
 
@@ -512,6 +524,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
 	}
+
 	if e.printAvgDetectorTime && len(results) > 0 {
 		elapsed := time.Since(start)
 		detectorName := results[0].DetectorType.String()
@@ -531,13 +544,17 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results = detectors.CleanResults(results)
 	}
 
+	if e.filterEntropy != nil {
+		results = detectors.FilterResultsWithEntropy(results, *e.filterEntropy)
+	}
+
 	for _, res := range results {
-		e.processResult(data, res)
+		e.processResult(ctx, data, res)
 	}
 	data.wgDoneFn()
 }
 
-func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
+func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
 		copyChunk := data.chunk
@@ -545,8 +562,12 @@ func (e *Engine) processResult(data detectableChunk, res detectors.Result) {
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 			copyChunk.SourceMetadata = copyMetaData
 		}
-		fragStart, mdLine := FragmentFirstLine(&copyChunk)
+		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
 		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
+			ctx.Logger().Error(err, "error setting link")
+			return
+		}
 		data.chunk = copyChunk
 	}
 	if ignoreLinePresent {
@@ -600,7 +621,8 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 		sourcespb.SourceType_SOURCE_TYPE_GERRIT,
 		sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG,
 		sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT,
-		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM:
+		sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM,
+		sourcespb.SourceType_SOURCE_TYPE_AZURE_REPOS:
 		return true
 	default:
 		return false
@@ -613,7 +635,7 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	if !found {
 		return 0, false
 	}
-	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	lineNumber := int64(bytes.Count(before, []byte("\n")) + 1)
 	// If the line contains the ignore tag, we should ignore the result.
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
@@ -625,27 +647,45 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	return lineNumber, false
 }
 
-// FragmentFirstLine returns the first line number of a fragment along with a pointer to the value to update in the
-// chunk metadata.
-func FragmentFirstLine(chunk *sources.Chunk) (int64, *int64) {
-	var fragmentStart *int64
+// FragmentFirstLineAndLink extracts the first line number and the link from the chunk metadata.
+// It returns:
+//   - The first line number of the fragment.
+//   - A pointer to the line number, facilitating direct updates.
+//   - The link associated with the fragment. This link may be updated in the chunk metadata
+//     if there's a change in the line number.
+func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
+	if chunk.SourceMetadata == nil {
+		return 0, nil, ""
+	}
+
+	var (
+		fragmentStart *int64
+		link          string
+	)
 	switch metadata := chunk.SourceMetadata.GetData().(type) {
 	case *source_metadatapb.MetaData_Git:
 		fragmentStart = &metadata.Git.Line
 	case *source_metadatapb.MetaData_Github:
 		fragmentStart = &metadata.Github.Line
+		link = metadata.Github.Link
 	case *source_metadatapb.MetaData_Gitlab:
 		fragmentStart = &metadata.Gitlab.Line
+		link = metadata.Gitlab.Link
 	case *source_metadatapb.MetaData_Bitbucket:
 		fragmentStart = &metadata.Bitbucket.Line
+		link = metadata.Bitbucket.Link
 	case *source_metadatapb.MetaData_Gerrit:
 		fragmentStart = &metadata.Gerrit.Line
 	case *source_metadatapb.MetaData_Filesystem:
 		fragmentStart = &metadata.Filesystem.Line
+		link = metadata.Filesystem.Link
+	case *source_metadatapb.MetaData_AzureRepos:
+		fragmentStart = &metadata.AzureRepos.Line
+		link = metadata.AzureRepos.Link
 	default:
-		return 0, nil
+		return 0, nil, ""
 	}
-	return *fragmentStart, fragmentStart
+	return *fragmentStart, fragmentStart, link
 }
 
 // SetResultLineNumber sets the line number in the provided result.
@@ -653,4 +693,34 @@ func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragSta
 	offset, skip := FragmentLineOffset(chunk, result)
 	*mdLine = fragStart + offset
 	return skip
+}
+
+// UpdateLink updates the link of the provided source metadata.
+func UpdateLink(ctx context.Context, metadata *source_metadatapb.MetaData, link string, line int64) error {
+	if metadata == nil {
+		return fmt.Errorf("metadata is nil when setting the link")
+	}
+
+	if link == "" {
+		ctx.Logger().V(4).Info("link is empty, skipping update")
+		return nil
+	}
+
+	newLink := giturl.UpdateLinkLineNumber(ctx, link, line)
+
+	switch meta := metadata.GetData().(type) {
+	case *source_metadatapb.MetaData_Github:
+		meta.Github.Link = newLink
+	case *source_metadatapb.MetaData_Gitlab:
+		meta.Gitlab.Link = newLink
+	case *source_metadatapb.MetaData_Bitbucket:
+		meta.Bitbucket.Link = newLink
+	case *source_metadatapb.MetaData_Filesystem:
+		meta.Filesystem.Link = newLink
+	case *source_metadatapb.MetaData_AzureRepos:
+		meta.AzureRepos.Link = newLink
+	default:
+		return fmt.Errorf("unsupported metadata type")
+	}
+	return nil
 }

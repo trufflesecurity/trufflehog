@@ -938,7 +938,16 @@ enum DetectorType {
   Snowflake = 927;
   Sourcegraph = 928;
   Tailscale = 929;
-  Loggly = 930;
+  Web3Storage = 930;
+  AzureStorage = 931;
+  PlanetScaleDb = 932;
+  Anthropic = 933;
+  Ramp = 934;
+  Klaviyo = 935;
+  SourcegraphCody = 936;
+  Voiceflow = 937;
+  Privacy = 938;
+  Loggly = 939;
 }
 
 message Result {

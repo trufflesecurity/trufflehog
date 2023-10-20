@@ -48,6 +48,7 @@ var (
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
 	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy       = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
@@ -84,8 +85,8 @@ var (
 	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue comments in scan.").Bool()
-	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request comments in scan.").Bool()
+	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue descriptions and comments in scan.").Bool()
+	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
@@ -150,6 +151,9 @@ func init() {
 	}
 
 	cli.Version("trufflehog " + version.BuildVersion)
+
+	//Support -h for help
+	cli.HelpFlag.Short('h')
 
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
 		args := tui.Run()
@@ -370,6 +374,7 @@ func run(state overseer.State) {
 		engine.WithOnlyVerified(*onlyVerified),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
+		engine.WithFilterEntropy(*filterEntropy),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")

@@ -23,7 +23,6 @@ var (
 	identifierPat = regexp.MustCompile(`(?i)sid.{0,20}AC[0-9a-f]{32}`) // Should we have this? Seems restrictive.
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
-	client        = common.SaneHttpClient()
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -54,8 +53,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     sid,
 			}
 
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
+			}
+
 			if verify {
-				client = s.client
+				client := s.client
 				if client == nil {
 					client = defaultClient
 				}

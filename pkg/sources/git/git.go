@@ -312,36 +312,63 @@ func GitURLParse(gitURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
-func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args ...string) (string, *git.Repository, error) {
-	if err := GitCmdCheck(); err != nil {
+type cloneParams struct {
+	userInfo  *url.Userinfo
+	gitURL    string
+	args      []string
+	clonePath string
+}
+
+// CloneRepo orchestrates the cloning of a given Git repository, returning its local path
+// and a git.Repository object for further operations. The function sets up error handling
+// infrastructure, ensuring that any encountered errors trigger a cleanup of resources.
+// The core cloning logic is delegated to a nested function, which returns errors to the
+// outer function for centralized error handling and cleanup.
+func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args ...string) (string, *git.Repository, error) {
+	var err error
+	if err = GitCmdCheck(); err != nil {
 		return "", nil, err
 	}
 	clonePath, err := os.MkdirTemp(os.TempDir(), "trufflehog")
 	if err != nil {
 		return "", nil, err
 	}
-	defer CleanOnError(&err, clonePath)
-	cloneURL, err := GitURLParse(gitUrl)
+
+	repo, err := executeClone(ctx, cloneParams{userInfo, gitURL, args, clonePath})
 	if err != nil {
+		// DO NOT FORGET TO CLEAN UP THE CLONE PATH HERE!!
+		// If we don't, we'll end up with a bunch of orphaned directories in the temp dir.
+		CleanOnError(&err, clonePath)
 		return "", nil, err
 	}
+
+	return clonePath, repo, nil
+}
+
+// executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
+// clonePath. It then opens the cloned repository, returning a git.Repository object.
+func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
+	cloneURL, err := GitURLParse(params.gitURL)
+	if err != nil {
+		return nil, err
+	}
 	if cloneURL.User == nil {
-		cloneURL.User = userInfo
+		cloneURL.User = params.userInfo
 	}
 
-	gitArgs := []string{"clone", cloneURL.String(), clonePath}
-	gitArgs = append(gitArgs, args...)
+	gitArgs := []string{"clone", cloneURL.String(), params.clonePath}
+	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
-	safeUrl, err := stripPassword(gitUrl)
+	safeURL, err := stripPassword(params.gitURL)
 	if err != nil {
 		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
 	}
 	logger := ctx.Logger().WithValues(
 		"subcommand", "git clone",
-		"repo", safeUrl,
-		"path", clonePath,
-		"args", args,
+		"repo", safeURL,
+		"path", params.clonePath,
+		"args", params.args,
 	)
 
 	// Execute command and wait for the stdout / stderr.
@@ -352,24 +379,21 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitUrl string, args 
 	logger.V(3).Info("git subcommand finished", "output", string(output))
 
 	if cloneCmd.ProcessState == nil {
-		return "", nil, errors.New("clone command exited with no output")
+		return nil, fmt.Errorf("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
 		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
-		return "", nil, fmt.Errorf("could not clone repo: %s, %w", safeUrl, err)
+		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
-	options := &git.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
-	}
-	repo, err := git.PlainOpenWithOptions(clonePath, options)
+	options := &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
+	repo, err := git.PlainOpenWithOptions(params.clonePath, options)
 	if err != nil {
-		return "", nil, fmt.Errorf("could not open cloned repo: %w", err)
+		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-
 	logger.V(1).Info("successfully cloned repo")
-	return clonePath, repo, nil
+
+	return repo, nil
 }
 
 // PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate

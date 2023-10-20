@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -31,7 +32,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 2,
+			expectedLine: 3,
 			ignore:       true,
 		},
 		{
@@ -42,7 +43,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 2,
+			expectedLine: 3,
 			ignore:       false,
 		},
 		{
@@ -53,7 +54,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 4,
+			expectedLine: 5,
 			ignore:       false,
 		},
 		{
@@ -64,7 +65,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret\nhere"),
 			},
-			expectedLine: 4,
+			expectedLine: 5,
 			ignore:       false,
 		},
 		{
@@ -75,7 +76,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret\nhere"),
 			},
-			expectedLine: 3,
+			expectedLine: 4,
 			ignore:       true,
 		},
 		{
@@ -86,7 +87,7 @@ func TestFragmentLineOffset(t *testing.T) {
 			result: &detectors.Result{
 				Raw: []byte("secret here"),
 			},
-			expectedLine: 3,
+			expectedLine: 4,
 			ignore:       true,
 		},
 	}
@@ -151,21 +152,27 @@ func TestDefaultDecoders(t *testing.T) {
 }
 
 func TestSupportsLineNumbers(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    sourcespb.SourceType
-		expected bool
+	tests := []struct {
+		name          string
+		sourceType    sourcespb.SourceType
+		expectedValue bool
 	}{
-		{"Git source type", sourcespb.SourceType_SOURCE_TYPE_GIT, true},
-		{"Github source type", sourcespb.SourceType_SOURCE_TYPE_GITHUB, true},
-		{"Gitlab source type", sourcespb.SourceType_SOURCE_TYPE_GITLAB, true},
+		{"Git source", sourcespb.SourceType_SOURCE_TYPE_GIT, true},
+		{"Github source", sourcespb.SourceType_SOURCE_TYPE_GITHUB, true},
+		{"Gitlab source", sourcespb.SourceType_SOURCE_TYPE_GITLAB, true},
+		{"Bitbucket source", sourcespb.SourceType_SOURCE_TYPE_BITBUCKET, true},
+		{"Gerrit source", sourcespb.SourceType_SOURCE_TYPE_GERRIT, true},
+		{"Github unauthenticated org source", sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG, true},
+		{"Public Git source", sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT, true},
+		{"Filesystem source", sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM, true},
+		{"Azure Repos source", sourcespb.SourceType_SOURCE_TYPE_AZURE_REPOS, true},
+		{"Unsupported type", sourcespb.SourceType_SOURCE_TYPE_BUILDKITE, false},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if result := SupportsLineNumbers(tc.input); result != tc.expected {
-				t.Errorf("Expected %v for input %v, got %v", tc.expected, tc.input, result)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SupportsLineNumbers(tt.sourceType)
+			assert.Equal(t, tt.expectedValue, result)
 		})
 	}
 }
@@ -204,4 +211,189 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(5)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+func TestFragmentFirstLineAndLink(t *testing.T) {
+	tests := []struct {
+		name         string
+		chunk        *sources.Chunk
+		expectedLine int64
+		expectedLink string
+	}{
+		{
+			name: "Test Git Metadata",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Git{
+						Git: &source_metadatapb.Git{
+							Line: 10,
+						},
+					},
+				},
+			},
+			expectedLine: 10,
+			expectedLink: "", // Git doesn't support links
+		},
+		{
+			name: "Test Github Metadata",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Line: 5,
+							Link: "https://example.github.com",
+						},
+					},
+				},
+			},
+			expectedLine: 5,
+			expectedLink: "https://example.github.com",
+		},
+		{
+			name: "Test Azure Repos Metadata",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_AzureRepos{
+						AzureRepos: &source_metadatapb.AzureRepos{
+							Line: 5,
+							Link: "https://example.azure.com",
+						},
+					},
+				},
+			},
+			expectedLine: 5,
+			expectedLink: "https://example.azure.com",
+		},
+		{
+			name:         "Unsupported Type",
+			chunk:        &sources.Chunk{},
+			expectedLine: 0,
+			expectedLink: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			line, linePtr, link := FragmentFirstLineAndLink(tt.chunk)
+			assert.Equal(t, tt.expectedLink, link, "Mismatch in link")
+			assert.Equal(t, tt.expectedLine, line, "Mismatch in line")
+
+			if linePtr != nil {
+				assert.Equal(t, tt.expectedLine, *linePtr, "Mismatch in linePtr value")
+			}
+		})
+	}
+}
+
+func TestSetLink(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *source_metadatapb.MetaData
+		link     string
+		line     int64
+		wantLink string
+		wantErr  bool
+	}{
+		{
+			name: "Github link set",
+			input: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Github{
+					Github: &source_metadatapb.Github{},
+				},
+			},
+			link:     "https://github.com/example",
+			line:     42,
+			wantLink: "https://github.com/example#L42",
+		},
+		{
+			name: "Gitlab link set",
+			input: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Gitlab{
+					Gitlab: &source_metadatapb.Gitlab{},
+				},
+			},
+			link:     "https://gitlab.com/example",
+			line:     10,
+			wantLink: "https://gitlab.com/example#L10",
+		},
+		{
+			name: "Bitbucket link set",
+			input: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Bitbucket{
+					Bitbucket: &source_metadatapb.Bitbucket{},
+				},
+			},
+			link:     "https://bitbucket.com/example",
+			line:     8,
+			wantLink: "https://bitbucket.com/example#L8",
+		},
+		{
+			name: "Filesystem link set",
+			input: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Filesystem{
+					Filesystem: &source_metadatapb.Filesystem{},
+				},
+			},
+			link:     "file:///path/to/example",
+			line:     3,
+			wantLink: "file:///path/to/example#L3",
+		},
+		{
+			name: "Azure Repos link set",
+			input: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_AzureRepos{
+					AzureRepos: &source_metadatapb.AzureRepos{},
+				},
+			},
+			link:     "https://dev.azure.com/example",
+			line:     3,
+			wantLink: "https://dev.azure.com/example?line=3",
+		},
+		{
+			name: "Unsupported metadata type",
+			input: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Git{
+					Git: &source_metadatapb.Git{},
+				},
+			},
+			link:    "https://git.example.com/link",
+			line:    5,
+			wantErr: true,
+		},
+		{
+			name:    "Metadata nil",
+			input:   nil,
+			link:    "https://some.link",
+			line:    1,
+			wantErr: true,
+		},
+	}
+
+	ctx := context.Background()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := UpdateLink(ctx, tt.input, tt.link, tt.line)
+			if err != nil && !tt.wantErr {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			switch data := tt.input.GetData().(type) {
+			case *source_metadatapb.MetaData_Github:
+				assert.Equal(t, tt.wantLink, data.Github.Link, "Github link mismatch")
+			case *source_metadatapb.MetaData_Gitlab:
+				assert.Equal(t, tt.wantLink, data.Gitlab.Link, "Gitlab link mismatch")
+			case *source_metadatapb.MetaData_Bitbucket:
+				assert.Equal(t, tt.wantLink, data.Bitbucket.Link, "Bitbucket link mismatch")
+			case *source_metadatapb.MetaData_Filesystem:
+				assert.Equal(t, tt.wantLink, data.Filesystem.Link, "Filesystem link mismatch")
+			case *source_metadatapb.MetaData_AzureRepos:
+				assert.Equal(t, tt.wantLink, data.AzureRepos.Link, "Azure Repos link mismatch")
+			}
+		})
+	}
 }

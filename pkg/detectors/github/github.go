@@ -68,6 +68,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+			},
 		}
 
 		if verify {
@@ -88,14 +91,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						res.Body.Close()
 						if err == nil {
 							s1.Verified = true
-							s1.ExtraData = map[string]string{
-								"username":     userResponse.Login,
-								"url":          userResponse.UserURL,
-								"account_type": userResponse.Type,
-								"site_admin":   fmt.Sprintf("%t", userResponse.SiteAdmin),
-								"name":         userResponse.Name,
-								"company":      userResponse.Company,
-							}
+							s1.ExtraData["username"] = userResponse.Login
+							s1.ExtraData["url"] = userResponse.UserURL
+							s1.ExtraData["account_type"] = userResponse.Type
+							s1.ExtraData["site_admin"] = fmt.Sprintf("%t", userResponse.SiteAdmin)
+							s1.ExtraData["name"] = userResponse.Name
+							s1.ExtraData["company"] = userResponse.Company
 						}
 					}
 				}

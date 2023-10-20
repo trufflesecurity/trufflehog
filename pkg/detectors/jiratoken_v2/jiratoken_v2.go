@@ -76,42 +76,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					client := s.client
-					if client == nil {
-						client = defaultClient
-					}
-
-					data := fmt.Sprintf("%s:%s", resEmail, resToken)
-					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomain+"/rest/api/3/dashboard", nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Accept", "application/json")
-					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-
-						// If the request is successful and the login reason is not failed authentication, then the token is valid.
-						// This is because Jira returns a 200 status code even if the token is invalid.
-						// Jira returns a default dashboard page.
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							if res.Header.Get(loginReasonHeaderKey) != failedAuth {
-								s1.Verified = true
-							}
-						} else {
-							s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-						}
-					} else {
-						s1.VerificationError = err
-					}
+					client := s.getClient()
+					isVerified, verificationErr := verifyJiratoken(ctx, client, resEmail, resDomain, resToken)
+					s1.Verified = isVerified
+					s1.VerificationError = verificationErr
 				}
 
-				if !s1.Verified {
-					if detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-						continue
-					}
+				if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
+					continue
 				}
 
 				results = append(results, s1)
@@ -122,6 +94,42 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
+func verifyJiratoken(ctx context.Context, client *http.Client, email, domain, token string) (bool, error) {
+	data := fmt.Sprintf("%s:%s", email, token)
+	sEnc := b64.StdEncoding.EncodeToString([]byte(data))
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domain+"/rest/api/3/dashboard", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	// If the request is successful and the login reason is not failed authentication, then the token is valid.
+	// This is because Jira returns a 200 status code even if the token is invalid.
+	// Jira returns a default dashboard page.
+	if !(res.StatusCode >= 200 && res.StatusCode < 300) {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	if res.Header.Get(loginReasonHeaderKey) != failedAuth {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

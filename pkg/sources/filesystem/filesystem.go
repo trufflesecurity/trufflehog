@@ -39,8 +39,7 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
-var _ sources.SourceUnitEnumerator = (*Source)(nil)
-var _ sources.SourceUnitChunker = (*Source)(nil)
+var _ sources.SourceUnitEnumChunker = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.

@@ -14,21 +14,20 @@ import (
 
 type Scanner struct {
 	client *http.Client
-
 	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 func (Scanner) Version() int            { return 1 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b((?:glpat|)[a-zA-Z0-9\-=_]{20,22})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,71 +41,81 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
-		if strings.Contains(match[0], "glpat") {
-			keyString := strings.Split(match[0], " ")
-			resMatch = keyString[len(keyString)-1]
+		// ignore v2 detectors which have a prefix of `glpat-`
+		if strings.Contains(match[0], "glpat-") {
+			continue
 		}
+		resMatch := strings.TrimSpace(match[1])
 
-		secret := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitlab,
-			Raw:          []byte(match[1]),
+			Raw:          []byte(resMatch),
+		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
 		}
 
 		if verify {
-			// there are 4 read 'scopes' for a gitlab token: api, read_user, read_repo, and read_registry
-			// they all grant access to different parts of the API. I couldn't find an endpoint that every
-			// one of these scopes has access to, so we just check an example endpoint for each scope. If any
-			// of them contain data, we know we have a valid key, but if they all fail, we don't
-
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
-				// test `read_user` scope
-				req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-				res, err := client.Do(req)
-				if err == nil {
-					res.Body.Close() // The request body is unused.
-
-					// 200 means good key and has `read_user` scope
-					// 403 means good key but not the right scope
-					// 401 is bad key
-					switch res.StatusCode {
-					case http.StatusOK:
-						secret.Verified = true
-					case http.StatusForbidden:
-						// Good key but not the right scope
-						secret.Verified = true
-					case http.StatusUnauthorized:
-						// Nothing to do; zero values are the ones we want
-					default:
-						secret.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					}
-				} else {
-					secret.VerificationError = err
-				}
-			}
+			isVerified, verificationErr := s.verifyGitlab(ctx, resMatch)
+			s1.Verified = isVerified
+			s1.VerificationError = verificationErr
 		}
 
-		if !secret.Verified && detectors.IsKnownFalsePositive(string(secret.Raw), detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
-		results = append(results, secret)
+		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error) {
+	// there are 4 read 'scopes' for a gitlab token: api, read_user, read_repo, and read_registry
+	// they all grant access to different parts of the API. I couldn't find an endpoint that every
+	// one of these scopes has access to, so we just check an example endpoint for each scope. If any
+	// of them contain data, we know we have a valid key, but if they all fail, we don't
+
+	client := s.client
+	if client == nil {
+		client = defaultClient
+	}
+	for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+		// test `read_user` scope
+		req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+		res, err := client.Do(req)
+		if err != nil {
+			return false, err
+		}
+		defer res.Body.Close() // The request body is unused.
+
+		// 200 means good key and has `read_user` scope
+		// 403 means good key but not the right scope
+		// 401 is bad key
+		switch res.StatusCode {
+		case http.StatusOK:
+			return true, nil
+		case http.StatusForbidden:
+			// Good key but not the right scope
+			return true, nil
+		case http.StatusUnauthorized:
+			// Nothing to do; zero values are the ones we want
+			return false, nil
+		default:
+			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		}
+
+	}
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

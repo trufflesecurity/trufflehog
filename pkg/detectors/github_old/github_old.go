@@ -69,6 +69,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+		}
 
 		if verify {
 			client := common.SaneHttpClient()

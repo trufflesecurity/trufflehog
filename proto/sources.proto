@@ -204,6 +204,7 @@ message JIRA {
   }
   repeated string projects = 5;
   repeated string ignore_projects = 7;
+  bool insecure_skip_verify_tls = 8;
 }
 
 message NPMUnauthenticatedPackage {
@@ -263,6 +264,7 @@ message Jenkins {
     credentials.BasicAuth basic_auth = 2;
     credentials.Header header = 3;
   }
+  bool insecure_skip_verify_tls = 4;
 }
 
 message Teams {
@@ -285,6 +287,8 @@ message Artifactory {
     string access_token = 3;
   }
   repeated string repositories = 4;
+  repeated string include_paths = 5;
+  repeated string ignore_paths = 6;
 }
 
 message Syslog {
