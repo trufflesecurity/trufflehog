@@ -6,10 +6,10 @@ package dockerhub
 import (
 	"context"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
-
-	"github.com/kylelemons/godebug/pretty"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -20,14 +20,13 @@ import (
 func TestDockerhub_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
-	email := testSecrets.MustGetField("DOCKERHUB_EMAIL")
-	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
-	inactivePat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
+        username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
+        pat := testSecrets.MustGetField("DOCKERHUB_PAT")
+        inactivePat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
 
 	type args struct {
 		ctx    context.Context
@@ -35,18 +34,19 @@ func TestDockerhub_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, pat)),
+				data:   []byte(fmt.Sprintf("You can find a dockerhub secret %s with username %s", pat, username)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -55,30 +55,15 @@ func TestDockerhub_FromChunk(t *testing.T) {
 					Verified:     true,
 				},
 			},
-			wantErr: false,
-		},
-		{
-			name: "found, verified (email)",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", email, pat)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Dockerhub,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, inactivePat)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a dockerhub secret %s with username %s but not valid", inactivePat, username)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -87,7 +72,8 @@ func TestDockerhub_FromChunk(t *testing.T) {
 					Verified:     false,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
@@ -97,14 +83,48 @@ func TestDockerhub_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:    nil,
-			wantErr: false,
+			want:                nil,
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, would be verified if not for timeout",
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a dockerhub secret %s with username %s", pat, username)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dockerhub,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, verified but unexpected api surface",
+			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a dockerhub secret %s with username %s", pat, username)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dockerhub,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Dockerhub.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -113,9 +133,12 @@ func TestDockerhub_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Dockerhub.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	client *http.Client
+}
 
 
 // Ensure the Scanner satisfies the interfaces at compile time.
@@ -29,7 +31,7 @@ var (
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(`\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -46,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr = emailPat.ReplaceAllString(dataStr, "")
 	usernameMatches := usernamePat.FindAllStringSubmatch(dataStr, -1)
 
-	accessTokenMatches := accessTokenPat.FindAllString(dataStr, -1)
+	accessTokenMatches := accessTokenPat.FindAllStringSubmatch(dataStr, -1)
 
 	userMatches := emailMatches
 	for _, usernameMatch := range usernameMatches {
@@ -57,14 +59,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, resUserMatch := range userMatches {
 		for _, resAccessTokenMatch := range accessTokenMatches {
+			if len(resAccessTokenMatch) != 2 {
+                        	continue
+                	}
+                	pat := strings.TrimSpace(resAccessTokenMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Dockerhub,
-				Raw:          []byte(fmt.Sprintf("%s: %s", resUserMatch, resAccessTokenMatch)),
+				Raw:          []byte(fmt.Sprintf("%s: %s", resUserMatch, pat)),
 			}
 
 			if verify {
-				payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, resUserMatch, resAccessTokenMatch))
+				payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, resUserMatch, pat))
 
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://hub.docker.com/v2/users/login", payload)
 				if err != nil {
