@@ -321,14 +321,14 @@ type cloneParams struct {
 	clonePath string
 }
 
-//Defines the interface for returning a single PID value given an executable name
+// Defines the interface for returning a single PID value given an executable name
 type PID interface {
 	getPIDs(ctx context.Context, executable string) (int, error)
 }
 
 var ExecutableName = "trufflehog"
 
-func GetScannerPIDs(ctx context.Context, executable string) (int, error)  {
+func GetScannerPIDs(ctx context.Context, executable string) (int, error) {
 	var pids []int
 
 	procs, err := ps.Processes()
@@ -342,18 +342,11 @@ func GetScannerPIDs(ctx context.Context, executable string) (int, error)  {
 		}
 	}
 
-	if len(pids) < 2 {
-		return pids[0], nil
+	sort.Ints(pids)
+	if len(pids) == 0 {
+		return 0, fmt.Errorf("PID for %q not found", executable)
 	} else {
-
-	        // Sort the PIDs in ascending order
-	        sort.Ints(pids)
-
-	        // Return the lowest value of the first two PIDs
-	        if pids[0] < pids[1] {
-	        	return pids[0], nil
-	        }
-	        return pids[1], nil
+		return pids[0], nil
 	}
 
 }
@@ -375,7 +368,6 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 	}
 
 	tmpdir := fmt.Sprintf("%s-%d-", ExecutableName, pid)
-
 
 	clonePath, err := os.MkdirTemp(os.TempDir(), tmpdir)
 	if err != nil {
