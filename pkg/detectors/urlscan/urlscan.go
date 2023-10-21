@@ -2,6 +2,7 @@ package urlscan
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
@@ -27,6 +28,10 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"urlscan"}
+}
+
+type response struct {
+	Source string `json:"source"`
 }
 
 // FromData will find and optionally verify Urlscan secrets in a given set of bytes.
@@ -56,7 +61,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
+					var r response
+					err := json.NewDecoder(res.Body).Decode(&r)
+					if err != nil {
+						s1.VerificationError = err
+						continue
+					}
+					if r.Source == "team" {
+						s1.Verified = true
+					}
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
