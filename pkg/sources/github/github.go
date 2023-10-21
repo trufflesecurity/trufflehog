@@ -222,7 +222,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.GetRepositories(), s.conn.GetIgnoreRepos())
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(),
+		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
+		s.conn.GetIgnoreRepos(),
+	)
 	s.memberCache = make(map[string]struct{})
 
 	s.repoSizes = newRepoSize()
@@ -508,12 +511,12 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint strin
 
 	for _, org := range s.orgsCache.Keys() {
 		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+			s.log.Error(err, "error fetching repos for org")
 		}
 
 		// We probably don't need to do this, since getting repos by org makes more sense?
 		if err := s.getReposByUser(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+			s.log.Error(err, "error fetching repos for user")
 		}
 
 		if s.conn.ScanUsers {
