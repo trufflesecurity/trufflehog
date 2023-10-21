@@ -3,8 +3,10 @@ package sources
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"testing"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -200,6 +202,8 @@ func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkR
 			if err := rep.ChunkErr(ctx, fmt.Errorf(step.err)); err != nil {
 				return err
 			}
+		}
+		if step.output == "" {
 			continue
 		}
 		if err := rep.ChunkOk(ctx, Chunk{Data: []byte(step.output)}); err != nil {
@@ -312,8 +316,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 }
 
 func TestSourceManagerUnitHook(t *testing.T) {
-	ch := make(chan UnitMetrics, 8)
-	hook := UnitHook{FinishedMetrics: ch}
+	hook := NewUnitHook(context.TODO())
 
 	input := []unitChunk{
 		{unit: "one", output: "bar"},
@@ -323,7 +326,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	mgr := NewManager(
 		WithBufferedOutput(8),
 		WithSourceUnits(), WithConcurrentUnits(1),
-		WithReportHook(&hook),
+		WithReportHook(hook),
 	)
 	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
@@ -331,40 +334,94 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NoError(t, err)
 	<-ref.Done()
 
-	select {
-	case metrics := <-ch:
-		assert.Equal(t, "one", metrics.Unit.SourceUnitID())
-		assert.Equal(t, uint64(1), metrics.TotalChunks)
-		assert.Equal(t, uint64(3), metrics.TotalBytes)
-		assert.NotZero(t, metrics.StartTime)
-		assert.NotZero(t, metrics.EndTime)
-		assert.NotZero(t, metrics.ElapsedTime())
-		assert.Equal(t, 0, len(metrics.Errors))
-	default:
-		t.Fatalf("expected 3 metrics, got 0")
+	metrics := hook.UnitMetrics()
+	assert.Equal(t, 3, len(metrics))
+	sort.Slice(metrics, func(i, j int) bool {
+		return metrics[i].EndTime.Before(metrics[j].EndTime)
+	})
+	m0, m1, m2 := metrics[0], metrics[1], metrics[2]
+
+	assert.Equal(t, "one", m0.Unit.SourceUnitID())
+	assert.Equal(t, uint64(1), m0.TotalChunks)
+	assert.Equal(t, uint64(3), m0.TotalBytes)
+	assert.NotZero(t, m0.StartTime)
+	assert.NotZero(t, m0.EndTime)
+	assert.NotZero(t, m0.ElapsedTime())
+	assert.Equal(t, 0, len(m0.Errors))
+
+	assert.Equal(t, "two", m1.Unit.SourceUnitID())
+	assert.Equal(t, uint64(0), m1.TotalChunks)
+	assert.Equal(t, uint64(0), m1.TotalBytes)
+	assert.NotZero(t, m1.StartTime)
+	assert.NotZero(t, m1.EndTime)
+	assert.NotZero(t, m1.ElapsedTime())
+	assert.Equal(t, 1, len(m1.Errors))
+
+	assert.Equal(t, "three", m2.Unit.SourceUnitID())
+	assert.Equal(t, uint64(0), m2.TotalChunks)
+	assert.Equal(t, uint64(0), m2.TotalBytes)
+	assert.NotZero(t, m2.StartTime)
+	assert.NotZero(t, m2.EndTime)
+	assert.NotZero(t, m2.ElapsedTime())
+	assert.Equal(t, 1, len(m2.Errors))
+}
+
+// TestSourceManagerUnitHookNoBlock tests that the UnitHook drops metrics if
+// they aren't handled fast enough.
+func TestSourceManagerUnitHookNoBlock(t *testing.T) {
+	var evictedKeys []string
+	cache, _ := lru.NewWithEvict(1, func(key string, _ *UnitMetrics) {
+		evictedKeys = append(evictedKeys, key)
+	})
+	hook := NewUnitHook(context.TODO(), WithUnitHookCache(cache))
+
+	input := []unitChunk{
+		{unit: "one", output: "bar"},
+		{unit: "two", err: "oh no"},
+		{unit: "three", err: "not again"},
 	}
-	select {
-	case metrics := <-ch:
-		assert.Equal(t, "two", metrics.Unit.SourceUnitID())
-		assert.Equal(t, uint64(0), metrics.TotalChunks)
-		assert.Equal(t, uint64(0), metrics.TotalBytes)
-		assert.NotZero(t, metrics.StartTime)
-		assert.NotZero(t, metrics.EndTime)
-		assert.NotZero(t, metrics.ElapsedTime())
-		assert.Equal(t, 1, len(metrics.Errors))
-	default:
-		t.Fatalf("expected 3 metrics, got 1")
-	}
-	select {
-	case metrics := <-ch:
-		assert.Equal(t, "three", metrics.Unit.SourceUnitID())
-		assert.Equal(t, uint64(0), metrics.TotalChunks)
-		assert.Equal(t, uint64(0), metrics.TotalBytes)
-		assert.NotZero(t, metrics.StartTime)
-		assert.NotZero(t, metrics.EndTime)
-		assert.NotZero(t, metrics.ElapsedTime())
-		assert.Equal(t, 1, len(metrics.Errors))
-	default:
-		t.Fatalf("expected 3 metrics, got 2")
-	}
+	mgr := NewManager(
+		WithBufferedOutput(8),
+		WithSourceUnits(), WithConcurrentUnits(1),
+		WithReportHook(hook),
+	)
+	source, err := buildDummy(&unitChunker{input})
+	assert.NoError(t, err)
+	ref, err := mgr.Run(context.Background(), "dummy", source)
+	assert.NoError(t, err)
+	<-ref.Done()
+
+	assert.Equal(t, 2, len(evictedKeys))
+	metrics := hook.UnitMetrics()
+	assert.Equal(t, 1, len(metrics))
+	assert.Equal(t, "three", metrics[0].Unit.SourceUnitID())
+}
+
+// TestSourceManagerUnitHookNoUnits tests whether the UnitHook works for
+// sources that don't support units.
+func TestSourceManagerUnitHookNoUnits(t *testing.T) {
+	hook := NewUnitHook(context.TODO())
+
+	mgr := NewManager(
+		WithBufferedOutput(8),
+		WithReportHook(hook),
+	)
+	source, err := buildDummy(&counterChunker{count: 5})
+	assert.NoError(t, err)
+
+	ref, err := mgr.Run(context.Background(), "dummy", source)
+	assert.NoError(t, err)
+	<-ref.Done()
+
+	metrics := hook.UnitMetrics()
+	assert.Equal(t, 1, len(metrics))
+
+	m := metrics[0]
+	assert.Equal(t, nil, m.Unit)
+	assert.Equal(t, uint64(5), m.TotalChunks)
+	assert.Equal(t, uint64(5), m.TotalBytes)
+	assert.NotZero(t, m.StartTime)
+	assert.NotZero(t, m.EndTime)
+	assert.NotZero(t, m.ElapsedTime())
+	assert.Equal(t, 0, len(m.Errors))
 }

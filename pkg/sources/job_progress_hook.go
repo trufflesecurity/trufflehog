@@ -6,19 +6,41 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 // UnitHook implements JobProgressHook for tracking the progress of each
 // individual unit.
 type UnitHook struct {
-	// Channel to send the metrics on when the unit has finished chunking.
-	// NOTE: Hooks are synchronous! If writing to this channel blocks, the
-	//       source manager cannot progress!
-	FinishedMetrics chan<- UnitMetrics
-	// Coarse grain locking.
+	metrics *lru.Cache[string, *UnitMetrics]
 	mu      sync.Mutex
-	metrics map[string]*UnitMetrics
 	NoopHook
+}
+
+type UnitHookOpt func(*UnitHook)
+
+func WithUnitHookCache(cache *lru.Cache[string, *UnitMetrics]) UnitHookOpt {
+	return func(hook *UnitHook) { hook.metrics = cache }
+}
+
+func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) *UnitHook {
+	// lru.NewWithEvict can only fail if the size is < 0.
+	cache, _ := lru.NewWithEvict(1024, func(key string, value *UnitMetrics) {
+		if value.handled {
+			return
+		}
+		ctx.Logger().Error(fmt.Errorf("eviction"), "dropping unit metric",
+			"id", key,
+			"metric", value,
+		)
+	})
+	hook := UnitHook{metrics: cache}
+	for _, opt := range opts {
+		opt(&hook)
+	}
+	return &hook
 }
 
 // id is a helper method to generate an ID for the given job and unit.
@@ -30,60 +52,72 @@ func (u *UnitHook) id(ref JobProgressRef, unit SourceUnit) string {
 	return fmt.Sprintf("%d/%d/%s", ref.SourceID, ref.JobID, unitID)
 }
 
-// unitMetrics is a helper method to get the initialized *UnitMetrics object
-// from the map. This method must be called with the lock already acquired.
-func (u *UnitHook) unitMetrics(ref JobProgressRef, unit SourceUnit) *UnitMetrics {
-	id := u.id(ref, unit)
-	if u.metrics == nil {
-		u.metrics = make(map[string]*UnitMetrics)
-	}
-	// Check if it already exists in the map.
-	if unitMetrics := u.metrics[id]; unitMetrics != nil {
-		return unitMetrics
-	}
-	// Create and save the metrics in the map.
-	u.metrics[id] = &UnitMetrics{
-		Unit:   unit,
-		Parent: ref,
-	}
-	return u.metrics[id]
-}
-
 func (u *UnitHook) StartUnitChunking(ref JobProgressRef, unit SourceUnit, start time.Time) {
+	id := u.id(ref, unit)
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
-	u.unitMetrics(ref, unit).StartTime = start
+	u.metrics.Add(id, &UnitMetrics{
+		Unit:      unit,
+		Parent:    ref,
+		StartTime: start,
+	})
 }
 
 func (u *UnitHook) EndUnitChunking(ref JobProgressRef, unit SourceUnit, end time.Time) {
+	id := u.id(ref, unit)
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
-	metrics := u.unitMetrics(ref, unit)
+	metrics, ok := u.metrics.Get(id)
+	if !ok {
+		return
+	}
 	metrics.EndTime = end
-	u.FinishedMetrics <- *metrics
-	delete(u.metrics, u.id(ref, unit))
 }
 
 func (u *UnitHook) ReportChunk(ref JobProgressRef, unit SourceUnit, chunk *Chunk) {
+	id := u.id(ref, unit)
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
-	metrics := u.unitMetrics(ref, unit)
+	metrics, ok := u.metrics.Get(id)
+	if !ok && unit != nil {
+		// The unit has been evicted.
+		return
+	} else if !ok && unit == nil {
+		// This is a chunk from a non-unit source.
+		metrics = &UnitMetrics{
+			Unit:      nil,
+			Parent:    ref,
+			StartTime: ref.Snapshot().StartTime,
+		}
+		u.metrics.Add(id, metrics)
+	}
 	metrics.TotalChunks++
 	metrics.TotalBytes += uint64(len(chunk.Data))
 }
 
 func (u *UnitHook) ReportError(ref JobProgressRef, err error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	// Always add the error to the nil unit if it exists.
+	if metrics, ok := u.metrics.Get(u.id(ref, nil)); ok {
+		metrics.Errors = append(metrics.Errors, err)
+	}
+
+	// Check if it's a ChunkError for a specific unit.
 	var chunkErr ChunkError
 	if !errors.As(err, &chunkErr) {
 		return
 	}
-	u.mu.Lock()
-	defer u.mu.Unlock()
+	id := u.id(ref, chunkErr.Unit)
 
-	metrics := u.unitMetrics(ref, chunkErr.Unit)
+	metrics, ok := u.metrics.Get(id)
+	if !ok {
+		return
+	}
 	metrics.Errors = append(metrics.Errors, err)
 }
 
@@ -93,8 +127,12 @@ func (u *UnitHook) Finish(ref JobProgressRef) {
 	// Clear out any metrics on this job. This covers the case for the
 	// source running without unit support.
 	prefix := u.id(ref, nil)
-	for id, metric := range u.metrics {
+	for _, id := range u.metrics.Keys() {
 		if !strings.HasPrefix(id, prefix) {
+			continue
+		}
+		metric, ok := u.metrics.Get(id)
+		if !ok {
 			continue
 		}
 		// If the unit is nil, the source does not support units.
@@ -105,9 +143,28 @@ func (u *UnitHook) Finish(ref JobProgressRef) {
 			metric.EndTime = snap.EndTime
 			metric.Errors = snap.Errors
 		}
-		u.FinishedMetrics <- *metric
-		delete(u.metrics, id)
 	}
+}
+
+// UnitMetrics gets all the currently active or newly finished metrics for this
+// job. If a unit returned from this method has finished, it will be removed
+// from the cache and no longer returned in successive calls to UnitMetrics().
+func (u *UnitHook) UnitMetrics() []UnitMetrics {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	output := make([]UnitMetrics, 0, u.metrics.Len())
+	for _, id := range u.metrics.Keys() {
+		metric, ok := u.metrics.Get(id)
+		if !ok {
+			continue
+		}
+		output = append(output, *metric)
+		if metric.IsFinished() {
+			metric.handled = true
+			u.metrics.Remove(id)
+		}
+	}
+	return output
 }
 
 type UnitMetrics struct {
@@ -122,6 +179,13 @@ type UnitMetrics struct {
 	TotalBytes uint64
 	// All errors encountered by this unit.
 	Errors []error
+	// Flag to mark that these metrics were intentionally evicted from
+	// the cache.
+	handled bool
+}
+
+func (u UnitMetrics) IsFinished() bool {
+	return !u.EndTime.IsZero()
 }
 
 // ElapsedTime is a convenience method that provides the elapsed time the job
