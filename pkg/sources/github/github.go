@@ -222,7 +222,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.GetRepositories(), s.conn.GetIgnoreRepos())
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(),
+		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
+		s.conn.GetIgnoreRepos(),
+	)
 	s.memberCache = make(map[string]struct{})
 
 	s.repoSizes = newRepoSize()
@@ -508,12 +511,12 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint strin
 
 	for _, org := range s.orgsCache.Keys() {
 		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+			s.log.Error(err, "error fetching repos for org")
 		}
 
 		// We probably don't need to do this, since getting repos by org makes more sense?
 		if err := s.getReposByUser(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+			s.log.Error(err, "error fetching repos for user")
 		}
 
 		if s.conn.ScanUsers {
@@ -1089,7 +1092,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 }
 
 func (s *Source) processGistComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github gist comments", "repository", repoPath)
+	ctx.Logger().V(2).Info("scanning github gist comments", "repository", repoPath)
 	// GitHub Gist URL.
 	gistID, err := extractGistID(trimmedURL)
 	if err != nil {
@@ -1170,19 +1173,21 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 	}
 
 	if s.includeIssueComments {
-		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
+		ctx.Logger().V(2).Info("scanning github issues", "repository", repoInfo.repoPath)
+		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
 	}
 
 	if s.includePRComments {
-		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
+		ctx.Logger().V(2).Info("scanning github pull requests", "repository", repoInfo.repoPath)
+		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
 	}
@@ -1192,8 +1197,6 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 }
 
 func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github issue descriptions", "repository", info.repoPath)
-
 	bodyTextsOpts := &github.IssueListByRepoOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1228,8 +1231,6 @@ func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan ch
 }
 
 func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github issue comments", "repository", info.repoPath)
-
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
@@ -1263,8 +1264,6 @@ func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunks
 }
 
 func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github pull request descriptions", "repository", info.repoPath)
-
 	prOpts := &github.PullRequestListOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1299,8 +1298,6 @@ func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan 
 }
 
 func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github pull request comments", "repository", info.repoPath)
-
 	prOpts := &github.PullRequestListCommentsOptions{
 		Sort:      sortType,
 		Direction: directionType,
