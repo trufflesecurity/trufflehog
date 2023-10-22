@@ -20,11 +20,9 @@ type Scanner struct{
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
 
-func (s Scanner) Version() int { return 1 }
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Can use email or username for login.
 	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
@@ -70,6 +68,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
+				client := s.client
+                        	if client == nil {
+                                	client = defaultClient
+                        	}
+
 				payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, resUserMatch, pat))
 
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://hub.docker.com/v2/users/login", payload)
@@ -88,8 +91,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Valid credentials can still return a 401 status code if 2FA is enabled
 					if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 401 && strings.Contains(string(body), "login_2fa_token")) {
 						s1.Verified = true
+					} else if res.StatusCode == 401 {
+                                        // The secret is determinately not verified (nothing to do)
+                                	} else {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					}
-				}
+				} else {
+        	                        s1.VerificationError = err
+	                        }
+
 			}
 
 			results = append(results, s1)
