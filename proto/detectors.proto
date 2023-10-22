@@ -952,6 +952,7 @@ enum DetectorType {
   Instamojo = 941;
   PortainerToken = 942;
   Loggly = 943;
+  OpenVpn = 944;
 }
 
 message Result {
