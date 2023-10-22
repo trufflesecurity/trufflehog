@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://shot.screenshotapi.net/screenshot?token="+resMatch+"&url=https://google.com&width=1920&height=1080&output=image", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://shot.screenshotapi.net/screenshot?token="+resMatch+"&url=https://google.com&width=1920&height=1080", nil)
 			if err != nil {
 				continue
 			}
