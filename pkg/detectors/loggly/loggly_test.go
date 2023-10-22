@@ -92,7 +92,7 @@ func TestLoggly_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -109,7 +109,7 @@ func TestLoggly_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a loggly secret %s within %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -137,7 +137,7 @@ func TestLoggly_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Loggly.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
