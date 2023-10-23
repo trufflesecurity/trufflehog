@@ -18,8 +18,8 @@ type detectorKey struct {
 	version      int
 }
 
-// detectorInfo is used to store a detector and whether it should be verified.
-type detectorInfo struct {
+// DetectorInfo is used to store a detector and whether it should be verified.
+type DetectorInfo struct {
 	detectors.Detector
 	shouldVerify bool
 }
@@ -32,7 +32,7 @@ type AhoCorasickCore struct {
 	// matching given a set of words. (keywords from the rules in the config)
 	prefilter ahocorasick.Trie
 	// Maps for efficient lookups during detection.
-	detectorTypeToDetectorInfo map[detectorKey]detectorInfo
+	detectorTypeToDetectorInfo map[detectorKey]DetectorInfo
 	detectors                  map[bool][]detectors.Detector
 	keywordsToDetectors        map[string][]detectorKey
 }
@@ -45,7 +45,7 @@ func NewAhoCorasickCore(detectors map[bool][]detectors.Detector) *AhoCorasickCor
 	return &AhoCorasickCore{
 		keywordsToDetectors:        make(map[string][]detectorKey),
 		detectors:                  detectors,
-		detectorTypeToDetectorInfo: make(map[detectorKey]detectorInfo, len(detectors[true])+len(detectors[false])),
+		detectorTypeToDetectorInfo: make(map[detectorKey]DetectorInfo, len(detectors[true])+len(detectors[false])),
 	}
 }
 
@@ -57,7 +57,7 @@ func (ac *AhoCorasickCore) Setup(ctx context.Context) {
 	for verify, detectorsSet := range ac.detectors {
 		for _, d := range detectorsSet {
 			key := createDetectorKey(d)
-			ac.detectorTypeToDetectorInfo[key] = detectorInfo{Detector: d, shouldVerify: verify}
+			ac.detectorTypeToDetectorInfo[key] = DetectorInfo{Detector: d, shouldVerify: verify}
 			keywords = ac.extractAndMapKeywords(d, key, keywords)
 		}
 	}
@@ -99,7 +99,7 @@ func (ac *AhoCorasickCore) MatchString(input string) []*ahocorasick.Match {
 // PopulateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
 // This method is designed to reuse the same map for performance optimization,
 // reducing the need for repeated allocations within each detector worker in the engine.
-func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, detectors map[detectorspb.DetectorType]detectorInfo) bool {
+func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, detectors map[detectorspb.DetectorType]DetectorInfo) bool {
 	matchedKeys, ok := ac.keywordsToDetectors[match.MatchString()]
 	if !ok {
 		return false
