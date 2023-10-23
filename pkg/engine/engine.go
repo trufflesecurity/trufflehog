@@ -3,14 +3,11 @@ package engine
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	ahocorasick "github.com/BobuSumisu/aho-corasick"
 	lru "github.com/hashicorp/golang-lru"
 	"google.golang.org/protobuf/proto"
 
@@ -66,9 +63,8 @@ type Engine struct {
 	onlyVerified         bool
 	printAvgDetectorTime bool
 
-	// prefilter is a ahocorasick struct used for doing efficient string
-	// matching given a set of words (keywords from the rules in the config)
-	prefilter ahocorasick.Trie
+	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
+	ahoCorasickCore *AhoCorasickCore
 
 	// Engine synchronization primitives.
 	sourceManager        *sources.SourceManager
@@ -93,9 +89,10 @@ type Engine struct {
 	dedupeCache *lru.Cache
 }
 
-type EngineOption func(*Engine)
+// Option is used to configure the engine during initialization using functional options.
+type Option func(*Engine)
 
-func WithConcurrency(concurrency uint8) EngineOption {
+func WithConcurrency(concurrency uint8) Option {
 	return func(e *Engine) {
 		e.concurrency = concurrency
 	}
@@ -103,7 +100,7 @@ func WithConcurrency(concurrency uint8) EngineOption {
 
 const ignoreTag = "trufflehog:ignore"
 
-func WithDetectors(verify bool, d ...detectors.Detector) EngineOption {
+func WithDetectors(verify bool, d ...detectors.Detector) Option {
 	return func(e *Engine) {
 		if e.detectors == nil {
 			e.detectors = make(map[bool][]detectors.Detector)
@@ -116,7 +113,7 @@ func WithDetectors(verify bool, d ...detectors.Detector) EngineOption {
 	}
 }
 
-func WithDecoders(decoders ...decoders.Decoder) EngineOption {
+func WithDecoders(decoders ...decoders.Decoder) Option {
 	return func(e *Engine) {
 		e.decoders = decoders
 	}
@@ -124,14 +121,14 @@ func WithDecoders(decoders ...decoders.Decoder) EngineOption {
 
 // WithFilterUnverified sets the filterUnverified flag on the engine. If set to
 // true, the engine will only return the first unverified result for a chunk for a detector.
-func WithFilterUnverified(filter bool) EngineOption {
+func WithFilterUnverified(filter bool) Option {
 	return func(e *Engine) {
 		e.filterUnverified = filter
 	}
 }
 
 // WithFilterEntropy filters out unverified results using Shannon entropy.
-func WithFilterEntropy(entropy float64) EngineOption {
+func WithFilterEntropy(entropy float64) Option {
 	return func(e *Engine) {
 		if entropy > 0 {
 			e.filterEntropy = &entropy
@@ -141,7 +138,7 @@ func WithFilterEntropy(entropy float64) EngineOption {
 
 // WithOnlyVerified sets the onlyVerified flag on the engine. If set to true,
 // the engine will only print verified results.
-func WithOnlyVerified(onlyVerified bool) EngineOption {
+func WithOnlyVerified(onlyVerified bool) Option {
 	return func(e *Engine) {
 		e.onlyVerified = onlyVerified
 	}
@@ -153,7 +150,7 @@ func WithOnlyVerified(onlyVerified bool) EngineOption {
 // the engine is configured to print the results.
 // Calculating the average time taken by each detector is an expensive operation
 // and should be avoided unless specified by the user.
-func WithPrintAvgDetectorTime(printAvgDetectorTime bool) EngineOption {
+func WithPrintAvgDetectorTime(printAvgDetectorTime bool) Option {
 	return func(e *Engine) {
 		e.printAvgDetectorTime = printAvgDetectorTime
 	}
@@ -163,7 +160,7 @@ func WithPrintAvgDetectorTime(printAvgDetectorTime bool) EngineOption {
 // the filterFunc returns true, the detector will be included for scanning.
 // This option applies to the existing list of detectors configured, so the
 // order this option appears matters. All filtering happens before scanning.
-func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption {
+func WithFilterDetectors(filterFunc func(detectors.Detector) bool) Option {
 	return func(e *Engine) {
 		// If no detectors are configured, do nothing.
 		if e.detectors == nil {
@@ -175,7 +172,7 @@ func WithFilterDetectors(filterFunc func(detectors.Detector) bool) EngineOption 
 }
 
 // WithPrinter sets the Printer on the engine.
-func WithPrinter(printer Printer) EngineOption {
+func WithPrinter(printer Printer) Option {
 	return func(e *Engine) {
 		e.printer = printer
 	}
@@ -269,32 +266,60 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	return avgTime
 }
 
-// Start the engine with options.
-func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
-	const (
-		defaultChannelBuffer = 1
-		// TODO (ahrav): Determine the optimal cache size.
-		cacheSize = 512 // number of entries in the LRU cache
-	)
+// Start initializes and activates the engine's processing pipeline.
+// It sets up various default configurations, prepares lookup structures for
+// detectors, conducts basic sanity checks, and kickstarts all necessary workers.
+// Once started, the engine begins processing input data to identify secrets.
+func Start(ctx context.Context, options ...Option) (*Engine, error) {
+	e := &Engine{}
+
+	if err := e.initialize(ctx, options...); err != nil {
+		return nil, err
+	}
+	e.setDefaults(ctx)
+	ctx.Logger().V(4).Info("setting up aho-corasick core")
+	e.ahoCorasickCore.Setup(ctx)
+	e.sanityChecks(ctx)
+	e.startWorkers(ctx)
+
+	return e, nil
+}
+
+const defaultChannelBuffer = 1
+
+// initialize prepares the engine's internal structures. The LRU cache optimizes
+// deduplication efforts, allowing the engine to quickly check if a chunk has
+// been processed before, thereby saving computational overhead.
+func (e *Engine) initialize(ctx context.Context, options ...Option) error {
+	// TODO (ahrav): Determine the optimal cache size.
+	const cacheSize = 512 // number of entries in the LRU cache
 
 	cache, err := lru.New(cacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize LRU cache: %w", err)
+		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
 
-	e := &Engine{
-		detectableChunksChan: make(chan detectableChunk, defaultChannelBuffer),
-		results:              make(chan detectors.ResultWithMetadata, defaultChannelBuffer),
-		dedupeCache:          cache,
-		printer:              new(output.PlainPrinter), // default printer
-		metrics:              runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}},
-	}
+	// Channels are used for communication between different parts of the engine,
+	// ensuring that data flows smoothly without race conditions.
+	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer)
+	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
+	e.dedupeCache = cache
+	e.printer = new(output.PlainPrinter)
+	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
 
 	for _, option := range options {
 		option(e)
 	}
+	ctx.Logger().V(4).Info("engine initialized")
+	e.ahoCorasickCore = NewAhoCorasickCore(e.detectors)
 
-	// Set defaults.
+	return nil
+}
+
+// setDefaults ensures that if specific engine properties aren't provided,
+// they're set to reasonable default values. It makes the engine robust to
+// incomplete configuration.
+func (e *Engine) setDefaults(ctx context.Context) {
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
@@ -302,12 +327,13 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 	}
 	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
-	// Create SourceManager.
 	e.sourceManager = sources.NewManager(
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithBufferedOutput(defaultChannelBuffer),
 	)
 
+	// Default decoders handle common encoding formats.
 	if len(e.decoders) == 0 {
 		e.decoders = decoders.DefaultDecoders()
 	}
@@ -317,46 +343,30 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		e.detectors[true] = DefaultDetectors()
 		e.detectors[false] = []detectors.Detector{}
 	}
+	ctx.Logger().V(4).Info("default engine options set")
+}
 
-	// build ahocorasick prefilter for efficient string matching
-	// on keywords
-	keywords := []string{}
-	for _, d := range e.detectors[false] {
-		for _, kw := range d.Keywords() {
-			keywords = append(keywords, strings.ToLower(kw))
+// Sanity check detectors for duplicate configuration. Only log in case
+// a detector has been configured in a way that isn't represented by
+// the DetectorID (type and version).
+func (e *Engine) sanityChecks(ctx context.Context) {
+	dets := append(e.detectors[true], e.detectors[false]...)
+	seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
+	for _, det := range dets {
+		id := config.GetDetectorID(det)
+		if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
+			ctx.Logger().Info("possible duplicate detector configured", "detector", id)
 		}
+		seenDetectors[id] = struct{}{}
 	}
-	for _, d := range e.detectors[true] {
-		for _, kw := range d.Keywords() {
-			keywords = append(keywords, strings.ToLower(kw))
-		}
-	}
-	e.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
+}
 
-	ctx.Logger().V(3).Info("loaded decoders", "count", len(e.decoders))
-	ctx.Logger().V(3).Info("loaded detectors",
-		"total", len(e.detectors[true])+len(e.detectors[false]),
-		"verification_enabled", len(e.detectors[true]),
-		"verification_disabled", len(e.detectors[false]),
-	)
-
-	// Sanity check detectors for duplicate configuration. Only log in case
-	// a detector has been configured in a way that isn't represented by
-	// the DetectorID (type and version).
-	{
-		dets := append(e.detectors[true], e.detectors[false]...)
-		seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
-		for _, det := range dets {
-			id := config.GetDetectorID(det)
-			if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
-				ctx.Logger().Info("possible duplicate detector configured", "detector", id)
-			}
-			seenDetectors[id] = struct{}{}
-		}
-	}
-
+// startWorkers initiates all necessary workers. Workers handle processing of
+// chunks concurrently. Separating the initialization of different types of
+// workers helps in scalability and makes it easier to diagnose issues.
+func (e *Engine) startWorkers(ctx context.Context) {
+	// Scanner workers process input data and extract chunks for detectors.
 	ctx.Logger().V(2).Info("starting scanner workers", "count", e.concurrency)
-	// Run the Secret scanner workers and Notifier pipelines.
 	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.workersWg.Add(1)
 		go func() {
@@ -367,6 +377,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		}()
 	}
 
+	// Detector workers apply keyword matching, regexes and API calls to detect secrets in chunks.
 	const detectorWorkerMultiplier = 50
 	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
@@ -379,6 +390,7 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 		}()
 	}
 
+	// Notifier workers communicate detected issues to the user or any downstream systems.
 	// We want 1/4th of the notifier workers as the number of scanner workers.
 	const notifierWorkerRatio = 4
 	maxNotifierWorkers := 1
@@ -395,8 +407,6 @@ func Start(ctx context.Context, options ...EngineOption) (*Engine, error) {
 			e.notifyResults(ctx)
 		}()
 	}
-
-	return e, nil
 }
 
 // Finish waits for running sources to complete and workers to finish scanning
@@ -445,64 +455,42 @@ type detectableChunk struct {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
+	// Reuse the same map to avoid allocations.
+	const avgDetectorsPerChunk = 2
+	chunkSpecificDetectors := make(map[detectorspb.DetectorType]detectorInfo, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
-			matchedKeywords := make(map[string]struct{})
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
-				var decoderType detectorspb.DecoderType
-				switch decoder.(type) {
-				case *decoders.UTF8:
-					decoderType = detectorspb.DecoderType_PLAIN
-				case *decoders.Base64:
-					decoderType = detectorspb.DecoderType_BASE64
-				case *decoders.UTF16:
-					decoderType = detectorspb.DecoderType_UTF16
-				default:
-					ctx.Logger().Info("unknown decoder type", "type", reflect.TypeOf(decoder).String())
-					decoderType = detectorspb.DecoderType_UNKNOWN
-				}
-
 				decoded := decoder.FromChunk(chunk)
-
 				if decoded == nil {
+					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
 					continue
 				}
 
-				// build a map of all keywords that were matched in the chunk
-				for _, m := range e.prefilter.MatchString(strings.ToLower(string(decoded.Data))) {
-					matchedKeywords[strings.ToLower(m.MatchString())] = struct{}{}
+				for _, match := range e.ahoCorasickCore.MatchString(string(decoded.Chunk.Data)) {
+					if !e.ahoCorasickCore.PopulateDetectorsByMatch(match, chunkSpecificDetectors) {
+						continue
+					}
 				}
 
-				for verify, detectorsSet := range e.detectors {
-					for _, detector := range detectorsSet {
-						chunkContainsKeyword := false
-						for _, kw := range detector.Keywords() {
-							if _, ok := matchedKeywords[strings.ToLower(kw)]; ok {
-								chunkContainsKeyword = true
-								break
-							}
-						}
-
-						if !chunkContainsKeyword {
-							continue
-						}
-
-						decoded.Verify = verify
-						wgDetect.Add(1)
-						e.detectableChunksChan <- detectableChunk{
-							chunk:    *decoded,
-							detector: detector,
-							decoder:  decoderType,
-							wgDoneFn: wgDetect.Done,
-						}
+				for k, detector := range chunkSpecificDetectors {
+					decoded.Chunk.Verify = detector.shouldVerify
+					wgDetect.Add(1)
+					e.detectableChunksChan <- detectableChunk{
+						chunk:    *decoded.Chunk,
+						detector: detector,
+						decoder:  decoded.DecoderType,
+						wgDoneFn: wgDetect.Done,
 					}
+					delete(chunkSpecificDetectors, k)
 				}
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
 	wgDetect.Wait()
+	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
 func (e *Engine) detectChunks(ctx context.Context) {
