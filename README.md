@@ -164,7 +164,7 @@ trufflehog docker --image trufflesecurity/secrets --only-verified
 
 + All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
   + That means no secrets were detected
-+ Why is the scan is taking a long time when I scan a GitHub org
++ Why is the scan taking a long time when I scan a GitHub org
   + Unauthenticated GitHub scans have rate limits. To improve your rate limits, include the `--token` flag with a personal access token
 + It says a private key was verified, what does that mean?
   + Check out our Driftwood blog post to learn how to do this, in short we've confirmed the key can be used live for SSH or SSL [Blog post](https://trufflesecurity.com/blog/driftwood-know-if-private-keys-are-sensitive/)
@@ -219,7 +219,7 @@ Flags:
       --concurrency=10           Number of concurrent workers.
       --no-verification          Don't verify the results.
       --only-verified            Only output verified results.
-      --filter-unverified        Only output first unverified result per chunk per detector if there are more than one results.
+      --filter-unverified        Only output first unverified result per chunk per detector if there is more than one result.
       --config=CONFIG            Path to configuration file.
       --print-avg-detector-time  Print the average time spent on each detector.
       --no-update                Don't check for updates.
