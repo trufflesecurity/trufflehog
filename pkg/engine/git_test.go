@@ -2,6 +2,7 @@ package engine
 
 import (
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,9 +121,10 @@ func BenchmarkGitEngine(b *testing.B) {
 	defer cancel()
 
 	e, err := Start(ctx,
-		WithConcurrency(1),
+		WithConcurrency(uint8(runtime.NumCPU())),
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(false, DefaultDetectors()...),
+		WithPrinter(new(discardPrinter)),
 	)
 	assert.Nil(b, err)
 
@@ -133,6 +135,7 @@ func BenchmarkGitEngine(b *testing.B) {
 		}
 	}()
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// TODO: this is measuring the time it takes to initialize the source
 		// and not to do the full scan
