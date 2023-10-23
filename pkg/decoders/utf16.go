@@ -5,22 +5,24 @@ import (
 	"encoding/binary"
 	"unicode/utf8"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type UTF16 struct{}
 
-func (d *UTF16) FromChunk(chunk *sources.Chunk) *sources.Chunk {
+func (d *UTF16) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	if chunk == nil || len(chunk.Data) == 0 {
 		return nil
 	}
 
+	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: detectorspb.DecoderType_UTF16}
 	if utf16Data, err := utf16ToUTF8(chunk.Data); err == nil {
 		if len(utf16Data) == 0 {
 			return nil
 		}
 		chunk.Data = utf16Data
-		return chunk
+		return decodableChunk
 	}
 
 	return nil
