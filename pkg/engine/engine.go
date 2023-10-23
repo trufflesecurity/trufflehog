@@ -64,7 +64,7 @@ type Engine struct {
 	printAvgDetectorTime bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
-	ahoCorasickCore *ahoCorasickCore
+	ahoCorasickCore *AhoCorasickCore
 
 	// Engine synchronization primitives.
 	sourceManager        *sources.SourceManager
@@ -278,7 +278,7 @@ func Start(ctx context.Context, options ...Option) (*Engine, error) {
 	}
 	e.setDefaults(ctx)
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore.setup(ctx)
+	e.ahoCorasickCore.Setup(ctx)
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
 
@@ -311,7 +311,7 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 		option(e)
 	}
 	ctx.Logger().V(4).Info("engine initialized")
-	e.ahoCorasickCore = newAhoCorasickCore(e.detectors)
+	e.ahoCorasickCore = NewAhoCorasickCore(e.detectors)
 
 	return nil
 }
@@ -468,8 +468,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				for _, match := range e.ahoCorasickCore.matchString(string(decoded.Chunk.Data)) {
-					if !e.ahoCorasickCore.populateDetectorsByMatch(match, chunkSpecificDetectors) {
+				for _, match := range e.ahoCorasickCore.MatchString(string(decoded.Chunk.Data)) {
+					if !e.ahoCorasickCore.PopulateDetectorsByMatch(match, chunkSpecificDetectors) {
 						continue
 					}
 				}
