@@ -65,7 +65,6 @@ func (ac *AhoCorasickCore) Setup(ctx context.Context) {
 	// Use the Ahocorasick algorithm to create a trie structure for efficient keyword matching.
 	// This ensures that we can rapidly match against a vast set of keywords without individually comparing each one.
 	ac.prefilter = *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()
-	ctx.Logger().V(4).Info("AhoCorasickCore lookups built")
 	ctx.Logger().V(4).Info("AhoCorasickCore Setup complete")
 }
 
