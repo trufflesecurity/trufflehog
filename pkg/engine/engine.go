@@ -623,7 +623,7 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	if !found {
 		return 0, false
 	}
-	lineNumber := int64(bytes.Count(before, []byte("\n")) + 1)
+	lineNumber := int64(bytes.Count(before, []byte("\n")))
 	// If the line contains the ignore tag, we should ignore the result.
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
