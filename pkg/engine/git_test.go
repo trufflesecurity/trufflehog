@@ -33,9 +33,6 @@ func TestGitEngine(t *testing.T) {
 	ctx := context.Background()
 	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
 	// Modifies the executable name in the testing context
-	liveExecutableName := git.ExecutableName
-	git.ExecutableName = "engine.test"
-	defer func() { git.ExecutableName = liveExecutableName }()
 	path, _, err := git.PrepareRepo(ctx, repoUrl)
 	if err != nil {
 		t.Error(err)

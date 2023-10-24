@@ -5,7 +5,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -177,35 +177,6 @@ func init() {
 	}
 }
 
-// Defines the interface for removing orphaned artifacts from aborted scans
-type CleanTemp interface {
-	//Removes orphaned directories from sources like Git
-	CleanTempDir(ctx context.Context, dirName string, pid int) error
-	//Removes orphaned files/artifacts from sources like Artifactory
-	CleanTempFiles(ctx context.Context, fileName string, pid int) error
-}
-
-func CleanTempDir(ctx context.Context, dirName string, pid int) error {
-	tempDir := os.TempDir()
-	files, err := os.ReadDir(tempDir)
-	if err != nil {
-		return fmt.Errorf("Error reading temp dir: %w", err)
-	}
-
-	pidStr := strconv.Itoa(pid)
-
-	for _, file := range files {
-		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {
-			dirPath := filepath.Join(tempDir, file.Name())
-			if err := os.RemoveAll(dirPath); err != nil {
-				return fmt.Errorf("Error deleting temp directory: %s", dirPath)
-			}
-			ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
-		}
-	}
-	return nil
-}
-
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -248,9 +219,9 @@ func main() {
 
 	var execName = "trufflehog"
 
-	pid, _ := git.GetScannerPIDs(ctx, execName)
+	pid := os.Getpid()
 
-	err = CleanTempDir(ctx, execName, pid)
+	err = cleantemp.CleanTempDir(ctx, execName, pid)
 	if err != nil {
 		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
 	}

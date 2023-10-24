@@ -9,23 +9,22 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
-	"github.com/mitchellh/go-ps"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
@@ -321,36 +320,6 @@ type cloneParams struct {
 	clonePath string
 }
 
-// Defines the interface for returning a single PID value given an executable name
-type PID interface {
-	getPIDs(ctx context.Context, executable string) (int, error)
-}
-
-var ExecutableName = os.Args[0]
-
-func GetScannerPIDs(ctx context.Context, executable string) (int, error) {
-	var pids []int
-
-	procs, err := ps.Processes()
-	if err != nil {
-		return 0, fmt.Errorf("error getting jobs PIDs: %w", err)
-	}
-
-	for _, proc := range procs {
-		if strings.Contains(proc.Executable(), executable) {
-			pids = append(pids, proc.Pid())
-		}
-	}
-
-	sort.Ints(pids)
-	if len(pids) == 0 {
-		return 0, fmt.Errorf("PID for %q not found", executable)
-	} else {
-		return pids[0], nil
-	}
-
-}
-
 // CloneRepo orchestrates the cloning of a given Git repository, returning its local path
 // and a git.Repository object for further operations. The function sets up error handling
 // infrastructure, ensuring that any encountered errors trigger a cleanup of resources.
@@ -362,14 +331,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args 
 		return "", nil, err
 	}
 
-	pid, err := GetScannerPIDs(ctx, ExecutableName)
-	if err != nil {
-		return "", nil, err
-	}
-
-	tmpdir := fmt.Sprintf("%s-%d-", ExecutableName, pid)
-
-	clonePath, err := os.MkdirTemp(os.TempDir(), tmpdir)
+	clonePath, err := cleantemp.MkdirTemp()
 	if err != nil {
 		return "", nil, err
 	}
