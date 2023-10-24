@@ -2,7 +2,7 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.21
 
-replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
+replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2.7
 
 require (
 	cloud.google.com/go/secretmanager v1.11.2
