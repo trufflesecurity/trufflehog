@@ -23,6 +23,10 @@ var wordList []byte
 //go:embed "programmingbooks.txt"
 var programmingBookWords []byte
 
+//go:embed "uuids.txt"
+var uuidList []byte
+var UuidFalsePositives []string
+
 var filter *ahocorasick.Trie
 
 func init() {
@@ -36,6 +40,10 @@ func init() {
 
 	programmingBookWords := bytesToCleanWordList(programmingBookWords)
 	builder.AddStrings(programmingBookWords)
+
+	uuidList := bytesToCleanWordList(uuidList)
+	UuidFalsePositives = uuidList
+	builder.AddStrings(uuidList)
 
 	filter = builder.Build()
 }
@@ -60,6 +68,20 @@ func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordChec
 		}
 	}
 
+	return false
+}
+
+func IsKnownFalsePositiveUuid(match string) bool {
+	if !utf8.ValidString(match) {
+		return true
+	}
+	lower := strings.ToLower(match)
+
+	for _, fp := range UuidFalsePositives {
+		if strings.Contains(lower, string(fp)) {
+			return true
+		}
+	}
 	return false
 }
 
