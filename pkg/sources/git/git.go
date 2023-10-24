@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
