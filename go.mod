@@ -4,9 +4,6 @@ go 1.21
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
-// go wants to pull in the latest but after v10.2.5 has a breaking API change
-replace github.com/couchbase/gocbcore/v10 => github.com/couchbase/gocbcore/v10 v10.2.4
-
 require (
 	cloud.google.com/go/secretmanager v1.11.1
 	cloud.google.com/go/storage v1.33.0
@@ -23,7 +20,7 @@ require (
 	github.com/charmbracelet/bubbletea v0.24.2
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/charmbracelet/lipgloss v0.7.1
-	github.com/couchbase/gocb/v2 v2.6.3
+	github.com/couchbase/gocb/v2 v2.6.5
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/envoyproxy/protoc-gen-validate v1.0.2
@@ -141,7 +138,7 @@ require (
 	github.com/connesc/cipherio v0.2.1 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
-	github.com/couchbase/gocbcore/v10 v10.2.4 // indirect
+	github.com/couchbase/gocbcore/v10 v10.2.9 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
