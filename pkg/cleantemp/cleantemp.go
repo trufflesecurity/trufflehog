@@ -60,16 +60,22 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 	for _, file := range files {
 		// Make sure we don't delete the working dir of the current PID
 		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {
+			// Mark these directories initially as ones that should be deleted
+			shouldDelete := true
+			// If they match any live PIDs, mark as should not delete
 			for _, pidval := range pids {
-				// Make sure not to delete directories that may be tied to other instances of trufflehog
-				if !strings.Contains(file.Name(), pidval) {
-					dirPath := filepath.Join(tempDir, file.Name())
-					if err := os.RemoveAll(dirPath); err != nil {
-						return fmt.Errorf("Error deleting temp directory: %s", dirPath)
-					}
-					ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
-
+				if strings.Contains(file.Name(), pidval) {
+					shouldDelete = false
+					// break out so we can still delete directories even if no other Trufflehog processes are running
+					break
 				}
+			}
+			if shouldDelete {
+				dirPath := filepath.Join(tempDir, file.Name())
+				if err := os.RemoveAll(dirPath); err != nil {
+					return fmt.Errorf("Error deleting temp directory: %s", dirPath)
+				}
+				ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
 			}
 		}
 	}
