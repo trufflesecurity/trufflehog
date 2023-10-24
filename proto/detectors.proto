@@ -948,7 +948,9 @@ enum DetectorType {
   Voiceflow = 937;
   Privacy = 938;
   IPInfo = 939;
-  PortainerToken = 940;
+  Ip2location = 940;
+  Instamojo = 941;
+  PortainerToken = 942;
 }
 
 message Result {
