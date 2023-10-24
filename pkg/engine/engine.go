@@ -457,7 +457,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 2
-	chunkSpecificDetectors := make(map[detectorspb.DetectorType]detectorInfo, avgDetectorsPerChunk)
+	chunkSpecificDetectors := make(map[detectorspb.DetectorType]DetectorInfo, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
