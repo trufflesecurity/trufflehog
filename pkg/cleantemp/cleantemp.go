@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mitchellh/go-ps"
+
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -33,21 +35,42 @@ type CleanTemp interface {
 
 // Deletes orphaned temp directories that do not contain running PID values
 func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
+	// Finds other trufflehog PIDs that may be running
+	var pids []string
+	procs, err := ps.Processes()
+	if err != nil {
+		return fmt.Errorf("error getting jobs PIDs: %w", err)
+	}
+
+	for _, proc := range procs {
+		if strings.Contains(proc.Executable(), dirName) {
+			pids = append(pids, strconv.Itoa(proc.Pid()))
+		}
+	}
+
 	tempDir := os.TempDir()
 	files, err := os.ReadDir(tempDir)
 	if err != nil {
 		return fmt.Errorf("Error reading temp dir: %w", err)
 	}
 
+	// Current PID
 	pidStr := strconv.Itoa(pid)
 
 	for _, file := range files {
+		// Make sure we don't delete the working dir of the current PID
 		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {
-			dirPath := filepath.Join(tempDir, file.Name())
-			if err := os.RemoveAll(dirPath); err != nil {
-				return fmt.Errorf("Error deleting temp directory: %s", dirPath)
+			for _, pidval := range pids {
+				// Make sure not to delete directories that may be tied to other instances of trufflehog
+				if !strings.Contains(file.Name(), pidval) {
+					dirPath := filepath.Join(tempDir, file.Name())
+					if err := os.RemoveAll(dirPath); err != nil {
+						return fmt.Errorf("Error deleting temp directory: %s", dirPath)
+					}
+					ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
+
+				}
 			}
-			ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
 		}
 	}
 	return nil

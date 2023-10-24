@@ -183,7 +183,7 @@ func init() {
 func runCleanup(ctx context.Context, execName string) {
 	// Every 15 minutes, attempt to remove dirs
 	pid := os.Getpid()
-	ticker := time.NewTicker(15 * time.Minute)
+	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
