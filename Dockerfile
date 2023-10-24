@@ -8,7 +8,7 @@ RUN  --mount=type=cache,target=/go/pkg/mod \
      --mount=type=cache,target=/root/.cache/go-build \
      GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o trufflehog .
 
-FROM alpine:3.16
+FROM alpine:3.18
 RUN apk add --no-cache bash git openssh-client ca-certificates \
     && rm -rf /var/cache/apk/* && update-ca-certificates
 COPY --from=builder /build/trufflehog /usr/bin/trufflehog
