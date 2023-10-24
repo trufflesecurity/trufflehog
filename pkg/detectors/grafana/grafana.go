@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`(glc_[A-Za-z0-9+\/]+\={0,2})`)
+	keyPat = regexp.MustCompile(`(glc_[A-Za-z0-9+\/]{50,150}\={0,2})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
