@@ -2,12 +2,12 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.21
 
-replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
+replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2.7
 
 require (
 	cloud.google.com/go/secretmanager v1.11.2
 	cloud.google.com/go/storage v1.33.0
-	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.17.0
@@ -36,7 +36,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt v3.2.2+incompatible
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-github/v42 v42.0.0
 	github.com/google/go-github/v56 v56.0.0
@@ -49,7 +49,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
-	github.com/launchdarkly/go-server-sdk/v6 v6.1.0
+	github.com/launchdarkly/go-server-sdk/v6 v6.1.1
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20230911164824-e3824f1adde9
 	github.com/marusama/semaphore/v2 v2.5.0
@@ -193,7 +193,7 @@ require (
 	github.com/launchdarkly/eventsource v1.6.2 // indirect
 	github.com/launchdarkly/go-jsonstream/v3 v3.0.0 // indirect
 	github.com/launchdarkly/go-sdk-common/v3 v3.0.1 // indirect
-	github.com/launchdarkly/go-sdk-events/v2 v2.0.1 // indirect
+	github.com/launchdarkly/go-sdk-events/v2 v2.0.2 // indirect
 	github.com/launchdarkly/go-semver v1.0.2 // indirect
 	github.com/launchdarkly/go-server-sdk-evaluation/v2 v2.0.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect

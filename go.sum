@@ -52,6 +52,8 @@ github.com/Azure/go-autorest/autorest/adal v0.9.18 h1:kLnPsRjzZZUF3K5REu/Kc+qMQr
 github.com/Azure/go-autorest/autorest/adal v0.9.18/go.mod h1:XVVeme+LZwABT8K5Lc3hA4nAe8LDBVle26gTrguhhPQ=
 github.com/Azure/go-autorest/autorest/azure/auth v0.5.11 h1:P6bYXFoao05z5uhOQzbC3Qd8JqF3jUoocoTeIxkp2cA=
 github.com/Azure/go-autorest/autorest/azure/auth v0.5.11/go.mod h1:84w/uV8E37feW2NCJ08uT9VBfjfUHpgLVnG2InYD6cg=
+github.com/Azure/go-autorest/autorest/azure/auth v0.5.12 h1:wkAZRgT/pn8HhFyzfe9UnqOjJYqlembgCTi72Bm/xKk=
+github.com/Azure/go-autorest/autorest/azure/auth v0.5.12/go.mod h1:84w/uV8E37feW2NCJ08uT9VBfjfUHpgLVnG2InYD6cg=
 github.com/Azure/go-autorest/autorest/azure/cli v0.4.5 h1:0W/yGmFdTIT77fvdlGZ0LMISoLHFJ7Tx4U0yeB+uFs4=
 github.com/Azure/go-autorest/autorest/azure/cli v0.4.5/go.mod h1:ADQAXrkgm7acgWVUNamOgh8YNrv4p27l3Wc55oVfpzg=
 github.com/Azure/go-autorest/autorest/date v0.3.0 h1:7gUk1U5M/CQbp9WoqinNzJar+8KY+LPI6wiWrP/myHw=
@@ -361,6 +363,8 @@ github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.8/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
+github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-containerregistry v0.15.2 h1:MMkSh+tjSdnmJZO7ljvEqV1DjfekB6VUEAZgy3a+TQE=
 github.com/google/go-containerregistry v0.15.2/go.mod h1:wWK+LnOv4jXMM23IT/F1wdYftGWGr47Is8CG+pmHK1Q=
 github.com/google/go-github/v42 v42.0.0 h1:YNT0FwjPrEysRkLIiKuEfSvBPCGKphW5aS5PxwaoLec=
@@ -474,12 +478,16 @@ github.com/launchdarkly/go-sdk-common/v3 v3.0.1 h1:rVdLusAIViduNvyjNKy06RA+SPwk0
 github.com/launchdarkly/go-sdk-common/v3 v3.0.1/go.mod h1:H/zISoCNhviHTTqqBjIKQy2YgSHT8ioL1FtgBKpiEGg=
 github.com/launchdarkly/go-sdk-events/v2 v2.0.1 h1:vnUN2Y7og/5wtOCcCZW7wYpmZcS++GAyclasc7gaTIY=
 github.com/launchdarkly/go-sdk-events/v2 v2.0.1/go.mod h1:Msqbl6brgFO83RUxmLaJAUx2sYG+WKULcy+Vf3+tKww=
+github.com/launchdarkly/go-sdk-events/v2 v2.0.2 h1:Ngp050AGYUyN3YRxX7zfu110NETHEPEOVys1ey2Hyvw=
+github.com/launchdarkly/go-sdk-events/v2 v2.0.2/go.mod h1:Msqbl6brgFO83RUxmLaJAUx2sYG+WKULcy+Vf3+tKww=
 github.com/launchdarkly/go-semver v1.0.2 h1:sYVRnuKyvxlmQCnCUyDkAhtmzSFRoX6rG2Xa21Mhg+w=
 github.com/launchdarkly/go-semver v1.0.2/go.mod h1:xFmMwXba5Mb+3h72Z+VeSs9ahCvKo2QFUTHRNHVqR28=
 github.com/launchdarkly/go-server-sdk-evaluation/v2 v2.0.2 h1:PAM0GvE0nIUBeOkjdiymIEKI+8FFLJ+fEsWTupW1yGU=
 github.com/launchdarkly/go-server-sdk-evaluation/v2 v2.0.2/go.mod h1:Mztipcz+7ZMatXVun3k/IfPa8IOgUnAqiZawtFh2MRg=
 github.com/launchdarkly/go-server-sdk/v6 v6.1.0 h1:pp/VBIon5JNbtSw7ih7I5MXN9mXHfo6T5xikKVy52dI=
 github.com/launchdarkly/go-server-sdk/v6 v6.1.0/go.mod h1:3TfS6vNsNksPT4LGeGuGKtT3zTjTbbOsCUK3nrj1neA=
+github.com/launchdarkly/go-server-sdk/v6 v6.1.1 h1:L57BC9Fy4IJG0zRZoYBkoxko6QTAC2OF8QzTVUqn2p8=
+github.com/launchdarkly/go-server-sdk/v6 v6.1.1/go.mod h1:67QqqyeRNyXx7S/fZiSZesRvaePCyxhzsnY+4fhK55U=
 github.com/launchdarkly/go-test-helpers/v2 v2.2.0 h1:L3kGILP/6ewikhzhdNkHy1b5y4zs50LueWenVF0sBbs=
 github.com/launchdarkly/go-test-helpers/v2 v2.2.0/go.mod h1:L7+th5govYp5oKU9iN7To5PgznBuIjBPn+ejqKR0avw=
 github.com/launchdarkly/go-test-helpers/v3 v3.0.2 h1:rh0085g1rVJM5qIukdaQ8z1XTWZztbJ49vRZuveqiuU=
@@ -648,6 +656,8 @@ github.com/trufflesecurity/disk-buffer-reader v0.1.9 h1:1dji/Cx5aPL5DlsqI1B86xFM
 github.com/trufflesecurity/disk-buffer-reader v0.1.9/go.mod h1:uYwTCdxzV0o+qaeBMxflOsq4eu2WjrE46qGR2e80O9Y=
 github.com/trufflesecurity/overseer v1.1.7-custom5 h1:xu+Fg6fkSRifUPzUCl7N8HmobJ6WGOkIApGnM7mJS6w=
 github.com/trufflesecurity/overseer v1.1.7-custom5/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
+github.com/trufflesecurity/overseer v1.2.7 h1:DEiu2wrL/0f+XqshIT9C4/0nj7SHZvLmFeE4jELh4Oo=
+github.com/trufflesecurity/overseer v1.2.7/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
 github.com/ulikunitz/xz v0.5.6/go.mod h1:2bypXElzHzzJZwzH67Y6wb67pO62Rzfn7BSiF4ABRW8=
 github.com/ulikunitz/xz v0.5.10 h1:t92gobL9l3HE202wg3rlk19F6X+JOxl9BBrCCMYEYd8=
 github.com/ulikunitz/xz v0.5.10/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
