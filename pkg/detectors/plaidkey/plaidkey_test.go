@@ -26,6 +26,8 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("PLAIDKEY_SECRET")
 	inactiveSecret := testSecrets.MustGetField("PLAIDKEY_SECRET_INACTIVE")
 	id := testSecrets.MustGetField("PLAIDKEY_CLIENTID")
+	// env := testSecrets.MustGetField("PLAIDKEY_ENVIRONMENT") // development or production
+	env := "development"
 
 	type args struct {
 		ctx    context.Context
@@ -51,6 +53,9 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_PlaidKey,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"environment": fmt.Sprintf("https://%s.plaid.com", env),
+					},
 				},
 			},
 			wantErr: false,

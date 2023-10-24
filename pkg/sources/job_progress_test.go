@@ -120,9 +120,32 @@ func TestJobProgressElapsedTime(t *testing.T) {
 	metrics := JobProgressMetrics{}
 	assert.Equal(t, time.Duration(0), metrics.ElapsedTime())
 
-	metrics.StartTime = time.Now()
+	metrics.StartTime = time.Date(2022, time.March, 30, 0, 0, 0, 0, time.UTC)
 	assert.Greater(t, metrics.ElapsedTime(), time.Duration(0))
 
 	metrics.EndTime = metrics.StartTime.Add(1 * time.Hour)
 	assert.Equal(t, metrics.ElapsedTime(), 1*time.Hour)
+}
+
+func TestJobProgressErrorsFor(t *testing.T) {
+	metrics := JobProgressMetrics{
+		Errors: []error{
+			Fatal{ChunkError{
+				Unit: CommonSourceUnit{ID: "foo"},
+				Err:  fmt.Errorf("foo error"),
+			}},
+			ChunkError{
+				Unit: CommonSourceUnit{ID: "foo"},
+				Err:  fmt.Errorf("foo again error"),
+			},
+			ChunkError{
+				Unit: CommonSourceUnit{ID: "bar"},
+				Err:  fmt.Errorf("bar error"),
+			},
+			fmt.Errorf("hi there"),
+		},
+	}
+	assert.Equal(t, 2, len(metrics.ErrorsFor(CommonSourceUnit{ID: "foo"})))
+	assert.Equal(t, 1, len(metrics.ErrorsFor(CommonSourceUnit{ID: "bar"})))
+	assert.Equal(t, 0, len(metrics.ErrorsFor(CommonSourceUnit{ID: "baz"})))
 }
