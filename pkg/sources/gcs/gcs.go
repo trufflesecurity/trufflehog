@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"cloud.google.com/go/storage"
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 	"golang.org/x/oauth2"
