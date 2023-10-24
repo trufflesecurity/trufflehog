@@ -457,7 +457,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 2
-	chunkSpecificDetectors := make(map[detectorspb.DetectorType]detectorInfo, avgDetectorsPerChunk)
+	chunkSpecificDetectors := make(map[detectorspb.DetectorType]DetectorInfo, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
@@ -475,7 +475,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				for k, detector := range chunkSpecificDetectors {
-					decoded.Chunk.Verify = detector.shouldVerify
+					decoded.Chunk.Verify = detector.ShouldVerify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
 						chunk:    *decoded.Chunk,
@@ -623,7 +623,7 @@ func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, 
 	if !found {
 		return 0, false
 	}
-	lineNumber := int64(bytes.Count(before, []byte("\n")) + 1)
+	lineNumber := int64(bytes.Count(before, []byte("\n")))
 	// If the line contains the ignore tag, we should ignore the result.
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
