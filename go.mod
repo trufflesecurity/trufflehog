@@ -39,6 +39,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-github/v42 v42.0.0
+	github.com/google/go-github/v56 v56.0.0
 	github.com/googleapis/gax-go/v2 v2.12.0
 	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-retryablehttp v0.7.4
