@@ -475,7 +475,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				for k, detector := range chunkSpecificDetectors {
-					decoded.Chunk.Verify = detector.shouldVerify
+					decoded.Chunk.Verify = detector.ShouldVerify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
 						chunk:    *decoded.Chunk,

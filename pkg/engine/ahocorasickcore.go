@@ -21,7 +21,7 @@ type detectorKey struct {
 // DetectorInfo is used to store a detector and whether it should be verified.
 type DetectorInfo struct {
 	detectors.Detector
-	shouldVerify bool
+	ShouldVerify bool
 }
 
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
@@ -57,7 +57,7 @@ func (ac *AhoCorasickCore) Setup(ctx context.Context) {
 	for verify, detectorsSet := range ac.detectors {
 		for _, d := range detectorsSet {
 			key := createDetectorKey(d)
-			ac.detectorTypeToDetectorInfo[key] = DetectorInfo{Detector: d, shouldVerify: verify}
+			ac.detectorTypeToDetectorInfo[key] = DetectorInfo{Detector: d, ShouldVerify: verify}
 			keywords = ac.extractAndMapKeywords(d, key, keywords)
 		}
 	}
