@@ -5,14 +5,14 @@ go 1.21
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.1.7-custom5
 
 require (
-	cloud.google.com/go/secretmanager v1.11.1
+	cloud.google.com/go/secretmanager v1.11.2
 	cloud.google.com/go/storage v1.33.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.17.0
 	github.com/aws/aws-sdk-go v1.45.19
-	github.com/aymanbagabas/go-osc52 v1.2.1
+	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.7.0
@@ -27,7 +27,7 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.24.1
-	github.com/go-errors/errors v1.4.2
+	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.8.1
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-logr/logr v1.2.4
@@ -72,7 +72,7 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
-	golang.org/x/oauth2 v0.12.0
+	golang.org/x/oauth2 v0.13.0
 	golang.org/x/sync v0.4.0
 	golang.org/x/text v0.13.0
 	google.golang.org/api v0.132.0
