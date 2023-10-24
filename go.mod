@@ -7,7 +7,7 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2
 require (
 	cloud.google.com/go/secretmanager v1.11.2
 	cloud.google.com/go/storage v1.33.0
-	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.17.0
