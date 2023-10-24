@@ -183,6 +183,12 @@ func init() {
 func runCleanup(ctx context.Context, execName string) {
 	// Every 15 minutes, attempt to remove dirs
 	pid := os.Getpid()
+	// Inital orphaned dir cleanup when the scanner is invoked
+	err := cleantemp.CleanTempDir(ctx, execName, pid)
+	if err != nil {
+		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+	}
+
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
@@ -236,13 +242,6 @@ func main() {
 	ctx := context.Background()
 
 	var execName = "trufflehog"
-
-	// Inital orphaned dir cleanup when the scanner is invoked
-	pid := os.Getpid()
-	err = cleantemp.CleanTempDir(ctx, execName, pid)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
-	}
 
 	go runCleanup(ctx, execName)
 
