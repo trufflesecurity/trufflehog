@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
@@ -219,11 +220,18 @@ func main() {
 
 	var execName = "trufflehog"
 
-	pid := os.Getpid()
+	ticker := time.NewTicker(900 * time.Second)
+	defer ticker.Stop()
 
-	err = cleantemp.CleanTempDir(ctx, execName, pid)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+	for {
+		select {
+		case <-ticker.C:
+			pid := os.Getpid()
+			err = cleantemp.CleanTempDir(ctx, execName, pid)
+			if err != nil {
+				ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+			}
+		}
 	}
 }
 
