@@ -31,7 +31,7 @@ require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.24.1
 	github.com/go-errors/errors v1.4.2
-	github.com/go-git/go-git/v5 v5.8.0
+	github.com/go-git/go-git/v5 v5.8.1
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-logr/logr v1.2.4
 	github.com/go-logr/zapr v1.2.4
@@ -51,7 +51,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
-	github.com/launchdarkly/go-server-sdk/v6 v6.0.0-alpha.pub.12
+	github.com/launchdarkly/go-server-sdk/v6 v6.1.0
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20221222153816-e95291e2243e
 	github.com/marusama/semaphore/v2 v2.5.0
@@ -65,7 +65,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/rabbitmq/amqp091-go v1.8.1
 	github.com/sergi/go-diff v1.3.1
-	github.com/snowflakedb/gosnowflake v1.6.20
+	github.com/snowflakedb/gosnowflake v1.6.23
 	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/trufflesecurity/disk-buffer-reader v0.1.9
@@ -91,6 +91,7 @@ require (
 	cloud.google.com/go/compute v1.20.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.0 // indirect
+	dario.cat/mergo v1.0.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.4.0 // indirect
@@ -104,6 +105,7 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230717121422-5aa5874ade95 // indirect
 	github.com/acomagu/bufpipe v1.0.4 // indirect
@@ -111,7 +113,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
-	github.com/apache/arrow/go/v10 v10.0.1 // indirect
+	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/thrift v0.16.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.7 // indirect
@@ -179,7 +181,6 @@ require (
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -240,7 +241,7 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/yuin/goldmark v1.5.2 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
-	github.com/yusufpapurcu/wmi v1.2.3 // indirect
+	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
