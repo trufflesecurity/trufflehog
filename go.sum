@@ -155,8 +155,6 @@ github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLj
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/bill-rich/disk-buffer-reader v0.1.7 h1:oPgDjsbeqErOrFJeWID/51LhIOGjU3cqN1Tj3V6RiwE=
-github.com/bill-rich/disk-buffer-reader v0.1.7/go.mod h1:VVzzsK1Ac2AnpOfp/5r9JlIFaFkZ9uSf7zisZayCt0Y=
 github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c h1:tSME5FDS02qQll3JYodI6RZR/g4EKOHApGv1wMZT+Z0=
 github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c/go.mod h1:+sCc6hztur+oZCLOsNk6wCCy+GLrnSNHSRmTnnL+8iQ=
 github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb h1:9v7Bzlg+1EBYi2IYcUmOwHReBEfqBbYIj3ZCi9cIe1Q=
@@ -639,6 +637,8 @@ github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502 h1:34icjjmqJ2HP
 github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
 github.com/therootcompany/xz v1.0.1 h1:CmOtsn1CbtmyYiusbfmhmkpAAETj0wBIH6kCYaX+xzw=
 github.com/therootcompany/xz v1.0.1/go.mod h1:3K3UH1yCKgBneZYhuQUvJ9HPD19UEXEI0BWbMn8qNMY=
+github.com/trufflesecurity/disk-buffer-reader v0.1.9 h1:1dji/Cx5aPL5DlsqI1B86xFMo6OfbBEhkQhXxgbX9WA=
+github.com/trufflesecurity/disk-buffer-reader v0.1.9/go.mod h1:uYwTCdxzV0o+qaeBMxflOsq4eu2WjrE46qGR2e80O9Y=
 github.com/trufflesecurity/overseer v1.1.7-custom5 h1:xu+Fg6fkSRifUPzUCl7N8HmobJ6WGOkIApGnM7mJS6w=
 github.com/trufflesecurity/overseer v1.1.7-custom5/go.mod h1:nT9w37AiO1Nop2VhVhNfzAFaPjthvxgpDV3XKsxYkcI=
 github.com/ulikunitz/xz v0.5.6/go.mod h1:2bypXElzHzzJZwzH67Y6wb67pO62Rzfn7BSiF4ABRW8=

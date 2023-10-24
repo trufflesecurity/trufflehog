@@ -16,7 +16,6 @@ require (
 	github.com/TheZeroSlave/zapsentry v1.17.0
 	github.com/aws/aws-sdk-go v1.45.19
 	github.com/aymanbagabas/go-osc52 v1.2.1
-	github.com/bill-rich/disk-buffer-reader v0.1.7
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.7.0
@@ -69,6 +68,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.23
 	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
+	github.com/trufflesecurity/disk-buffer-reader v0.1.9
 	github.com/xanzy/go-gitlab v0.92.3
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/mock v0.2.0
