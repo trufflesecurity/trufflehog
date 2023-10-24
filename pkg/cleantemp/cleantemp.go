@@ -26,7 +26,7 @@ func MkdirTemp() (string, error) {
 // Defines the interface for removing orphaned artifacts from aborted scans
 type CleanTemp interface {
 	//Removes orphaned directories from sources like Git
-	CleanTempDir(ctx context.Context, dirName string, pid int) error
+	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
 	//Removes orphaned files/artifacts from sources like Artifactory
 	CleanTempFiles(ctx context.Context, fileName string, pid int) error
 }

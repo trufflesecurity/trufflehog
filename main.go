@@ -178,6 +178,23 @@ func init() {
 	}
 }
 
+// Encloses tempdir cleanup in a function so it can be pushed
+// to a goroutine
+func runCleanup(ctx context.Context, execName string) {
+	// Every 15 minutes, attempt to remove dirs
+	pid := os.Getpid()
+	ticker := time.NewTicker(900 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		err := cleantemp.CleanTempDir(ctx, execName, pid)
+		if err != nil {
+			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+		}
+	}
+
+}
+
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -220,19 +237,15 @@ func main() {
 
 	var execName = "trufflehog"
 
-	ticker := time.NewTicker(900 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			pid := os.Getpid()
-			err = cleantemp.CleanTempDir(ctx, execName, pid)
-			if err != nil {
-				ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
-			}
-		}
+	// Inital orphaned dir cleanup when the scanner is invoked
+	pid := os.Getpid()
+	err = cleantemp.CleanTempDir(ctx, execName, pid)
+	if err != nil {
+		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
 	}
+
+	go runCleanup(ctx, execName)
+
 }
 
 func run(state overseer.State) {
