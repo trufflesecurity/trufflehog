@@ -32,7 +32,6 @@ func (p *discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) e
 func TestGitEngine(t *testing.T) {
 	ctx := context.Background()
 	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
-	// Modifies the executable name in the testing context
 	path, _, err := git.PrepareRepo(ctx, repoUrl)
 	if err != nil {
 		t.Error(err)
