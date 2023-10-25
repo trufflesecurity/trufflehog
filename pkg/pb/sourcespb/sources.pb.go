@@ -222,6 +222,7 @@ type LocalSource struct {
 	// which is a fixed-length span of time represented as a count of seconds and fractions of seconds
 	// at nanosecond resolution. Most of the time, we want to be able to specify a scan interval in
 	// human-readable format (e.g. 45s, 30m, 12h, etc.) which is not possible with a duration.
+	// https://protobuf.dev/reference/protobuf/google.protobuf/#duration
 	//
 	// Deprecated: Do not use.
 	ScanInterval *durationpb.Duration `protobuf:"bytes,3,opt,name=scan_interval,json=scanInterval,proto3" json:"scan_interval,omitempty"`
