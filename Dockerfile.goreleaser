@@ -1,6 +1,6 @@
 FROM alpine:3.18
 
-RUN apk add --no-cache bash git openssh-client ca-certificates \
+RUN apk add --no-cache bash git openssh-client ca-certificates rpm2cpio \
     && rm -rf /var/cache/apk/* && update-ca-certificates
 WORKDIR /usr/bin/
 COPY trufflehog .
