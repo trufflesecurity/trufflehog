@@ -10,21 +10,23 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestDatabrickstoken_FromChunk(t *testing.T) {
+func TestDatabricksToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
+
 	secret := testSecrets.MustGetField("DATABRICKSTOKEN")
 	inactiveSecret := testSecrets.MustGetField("DATABRICKSTOKEN_INACTIVE")
+	domain := testSecrets.MustGetField("DATABRICKSTOKEN_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -43,13 +45,14 @@ func TestDatabrickstoken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a databrickstoken secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a databrickstoken secret %s within databricks domain %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_DatabricksToken,
 					Verified:     true,
+					ExtraData:    map[string]string{"url": domain},
 				},
 			},
 			wantErr: false,
@@ -59,7 +62,7 @@ func TestDatabrickstoken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a databrickstoken secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a databrickstoken secret %s within databricks domain %s", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -87,7 +90,7 @@ func TestDatabrickstoken_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Databrickstoken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DatabricksToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +100,7 @@ func TestDatabrickstoken_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Databrickstoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("DatabricksToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
@@ -108,7 +111,6 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

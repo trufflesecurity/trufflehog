@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(`\b(dapi[0-9Aa-f]{32})\b`)
+	keyPat    = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
 	domainPat = regexp.MustCompile(`\b([\w-\.]+\.(cloud\.databricks\.com|gcp\.databricks\.com|azuredatabricks\.net))\b`)
 )
 
@@ -34,20 +33,18 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify DatabricksToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 
-	matches := keyPat.FindAll(data, -1)
-	domainMatches := domainPat.FindAll(data, -1)
+	dataStr := string(data)
+
+	matches := keyPat.FindAllString(dataStr, -1)
+	domainMatches := domainPat.FindAllString(dataStr, -1)
 
 	for _, match := range matches {
 
-		resMatch := strings.TrimSpace(string(match))
-
-		for _, domainMatch := range domainMatches {
-
-			domain := strings.TrimSpace(string(domainMatch))
+		for _, domain := range domainMatches {
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_DatabricksToken,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(match),
 				Verified:     false,
 			}
 
@@ -60,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match))
 
 				res, err := client.Do(req)
 				if err == nil {
@@ -71,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.ExtraData = map[string]string{"url": domain} // store the domain with the result
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive(match, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
