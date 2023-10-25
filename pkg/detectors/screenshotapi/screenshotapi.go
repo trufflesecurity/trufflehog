@@ -2,6 +2,7 @@ package screenshotapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
@@ -30,6 +31,10 @@ func (s Scanner) Keywords() []string {
 	return []string{"screenshotapi"}
 }
 
+type response struct {
+	Screenshot string `json:"screenshot"`
+}
+
 // FromData will find and optionally verify ScreenshotAPI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -50,14 +55,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://shot.screenshotapi.net/screenshot?token="+resMatch+"&url=https://google.com&width=1920&height=1080&output=image", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://shot.screenshotapi.net/screenshot?token="+resMatch+"&url=https://google.com&width=1920&height=1080", nil)
 			if err != nil {
 				continue
 			}
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				var r response
+				if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+					s1.VerificationError = err
+					continue
+				}
+				if res.StatusCode >= 200 && res.StatusCode < 300 && r.Screenshot != "" {
 					s1.Verified = true
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
