@@ -950,7 +950,11 @@ enum DetectorType {
   IPInfo = 939;
   Ip2location = 940;
   Instamojo = 941;
-  VagrantCloudPersonalToken = 942;
+  Portainer = 942;
+  PortainerToken = 943;
+  Loggly = 944;
+  OpenVpn = 945;
+  VagrantCloudPersonalToken = 946;
 }
 
 message Result {
