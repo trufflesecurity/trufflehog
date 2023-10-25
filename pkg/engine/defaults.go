@@ -76,7 +76,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baseapiio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besnappy"
@@ -1251,7 +1250,6 @@ func DefaultDetectors() []detectors.Detector {
 		scrapeowl.Scanner{},
 		rebrandly.Scanner{},
 		dandelion.Scanner{},
-		baseapiio.Scanner{},
 		purestake.Scanner{},
 		carboninterface.Scanner{},
 		signaturit.Scanner{},
