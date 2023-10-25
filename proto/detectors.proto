@@ -947,7 +947,11 @@ enum DetectorType {
   SourcegraphCody = 936;
   Voiceflow = 937;
   Privacy = 938;
-  Loggly = 939;
+  IPInfo = 939;
+  Ip2location = 940;
+  Instamojo = 941;
+  PortainerToken = 942;
+  Loggly = 943;
 }
 
 message Result {

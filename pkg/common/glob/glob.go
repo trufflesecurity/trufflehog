@@ -1,4 +1,4 @@
-package common
+package glob
 
 import (
 	"fmt"
