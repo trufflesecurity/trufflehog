@@ -780,7 +780,7 @@ enum DetectorType {
   ConversionTools = 769;
   CraftMyPDF = 770;
   ExportSDK = 771;
-  GlitterlyAPI = 772;
+  GlitterlyAPI = 772 [deprecated = true];
   Hybiscus = 773;
   Miro = 774;
   Statuspage = 775;

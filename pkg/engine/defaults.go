@@ -306,7 +306,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlabv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glitterlyapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
@@ -1405,7 +1404,6 @@ func DefaultDetectors() []detectors.Detector {
 		convier.Scanner{},
 		loadmill.Scanner{},
 		magicbell.Scanner{},
-		glitterlyapi.Scanner{},
 		apitemplate.Scanner{},
 		knapsackpro.Scanner{},
 		twitter.Scanner{},
