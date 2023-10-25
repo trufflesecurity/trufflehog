@@ -716,6 +716,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/urlscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vatlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vbout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vercel"
@@ -1559,6 +1560,7 @@ func DefaultDetectors() []detectors.Detector {
 		&sourcegraphcody.Scanner{},
 		voiceflow.Scanner{},
 		ip2location.Scanner{},
+		vagrantcloudpersonaltoken.Scanner{},
 		openvpn.Scanner{},
 	}
 
