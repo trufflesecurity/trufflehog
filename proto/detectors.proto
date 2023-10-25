@@ -953,6 +953,7 @@ enum DetectorType {
   PortainerToken = 942;
   Loggly = 943;
   OpenVpn = 944;
+  ZeroTier = 945;
 }
 
 message Result {

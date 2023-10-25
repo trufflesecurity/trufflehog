@@ -14,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/voiceflow"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zerotier"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
@@ -1562,6 +1563,7 @@ func DefaultDetectors() []detectors.Detector {
 		voiceflow.Scanner{},
 		ip2location.Scanner{},
 		openvpn.Scanner{},
+		zerotier.Scanner{},
 	}
 
 }
