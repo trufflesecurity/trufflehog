@@ -193,7 +193,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databrickstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datafire"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
@@ -1217,7 +1216,6 @@ func DefaultDetectors() []detectors.Detector {
 		scraperbox.Scanner{},
 		passbase.Scanner{},
 		ticketmaster.Scanner{},
-		datafire.Scanner{},
 		iexcloud.Scanner{},
 		partnerstack.Scanner{},
 		qubole.Scanner{},
