@@ -951,6 +951,7 @@ enum DetectorType {
   Ip2location = 940;
   Instamojo = 941;
   PortainerToken = 942;
+  Loggly = 943;
 }
 
 message Result {
