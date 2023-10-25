@@ -361,7 +361,7 @@ enum DetectorType {
   Imagga = 349;
   SMSApi = 350;
   Distribusion = 351;
-  Blablabus = 352;
+  Blablabus = 352 [deprecated = true];
   WordsApi = 353;
   Currencylayer = 354;
   Html2Pdf = 355;

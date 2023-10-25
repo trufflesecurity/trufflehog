@@ -86,7 +86,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitlyaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitmex"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blablabus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blazemeter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blitapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
@@ -1064,7 +1063,6 @@ func DefaultDetectors() []detectors.Detector {
 		deepgram.Scanner{},
 		brandfetch.Scanner{},
 		typeform.Scanner{},
-		blablabus.Scanner{},
 		fxmarket.Scanner{},
 		ipapi.Scanner{},
 		clearbit.Scanner{},
