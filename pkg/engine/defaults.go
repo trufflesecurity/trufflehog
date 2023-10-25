@@ -5,6 +5,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ip2location"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
@@ -75,7 +76,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baseapiio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besnappy"
@@ -389,6 +389,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/livestorm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loadmill"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/locationiq"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loggly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loginradius"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lokalisetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
@@ -715,6 +716,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/urlscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/userstack"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vagrantcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vatlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vbout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/vercel"
@@ -1249,7 +1251,6 @@ func DefaultDetectors() []detectors.Detector {
 		scrapeowl.Scanner{},
 		rebrandly.Scanner{},
 		dandelion.Scanner{},
-		baseapiio.Scanner{},
 		purestake.Scanner{},
 		carboninterface.Scanner{},
 		signaturit.Scanner{},
@@ -1552,12 +1553,15 @@ func DefaultDetectors() []detectors.Detector {
 		salesforce.Scanner{},
 		sourcegraph.Scanner{},
 		tailscale.Scanner{},
+		loggly.Scanner{},
 		web3storage.Scanner{},
 		&ramp.Scanner{},
 		&anthropic.Scanner{},
 		&sourcegraphcody.Scanner{},
 		voiceflow.Scanner{},
 		ip2location.Scanner{},
+		vagrantcloudpersonaltoken.Scanner{},
+		openvpn.Scanner{},
 	}
 
 }
