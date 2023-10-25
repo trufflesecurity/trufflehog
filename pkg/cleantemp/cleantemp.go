@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -57,9 +58,12 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 	// Current PID
 	pidStr := strconv.Itoa(pid)
 
+	pattern := `^trufflehog-\d+-\d+$`
+	re := regexp.MustCompile(pattern)
+
 	for _, file := range files {
 		// Make sure we don't delete the working dir of the current PID
-		if file.IsDir() && strings.Contains(file.Name(), dirName) && !strings.Contains(file.Name(), pidStr) {
+		if file.IsDir() && re.MatchString(file.Name()) && !strings.Contains(file.Name(), pidStr) {
 			// Mark these directories initially as ones that should be deleted
 			shouldDelete := true
 			// If they match any live PIDs, mark as should not delete
