@@ -21,9 +21,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.BuildRegex(common.AlphaNumPattern, "", 32))
-	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat"}) + common.EmailPattern)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zulipchat", "domain"}) + common.SubDomainPattern)
+	keyPat    = regexp.MustCompile(common.BuildRegex(common.AlphaNumPattern, "", 32))
+	idPat     = regexp.MustCompile(`\b(([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-]+)(\.[a-zA-Z]{2,5}){1,2})\b`)
+	domainPat = regexp.MustCompile(`\b([a-z0-9-]+\.zulipchat\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		for _, idMatch := range idMatches {
 			// getting the last word of the string
-			resIdMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
+			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			for _, domainMatch := range domainMatches {
 				if len(domainMatch) != 2 {
@@ -60,10 +60,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Raw:          []byte(resMatch),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s",resMatch, resIdMatch, resDomainMatch)),
 				}
 
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.zulipchat.com/api/v1/users", resDomainMatch), nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v1/users", resDomainMatch), nil)
 					if err != nil {
 						continue
 					}
