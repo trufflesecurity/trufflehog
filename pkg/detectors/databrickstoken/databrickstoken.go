@@ -47,9 +47,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, domainmatch := range domainMatches {
-			if len(domainmatch) != 2 {
-				continue
-			}
 			resDomainMatch := strings.TrimSpace(domainmatch[1])
 
 			s1 := detectors.Result{
