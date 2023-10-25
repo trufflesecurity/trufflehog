@@ -57,7 +57,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", resDomainMatch + "/api/2.0/clusters/list", nil)
+				url := fmt.Sprintf("https://%s/api/2.0/token/list", domain)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+				
 				if err != nil {
 					continue
 				}
