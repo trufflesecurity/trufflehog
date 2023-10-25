@@ -23,7 +23,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	domain = regexp.MustCompile(`\b([a-z0-9-]+\.cloud\.databricks\.com)\b`)
+	domain = regexp.MustCompile(`([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))`)
 	keyPat = regexp.MustCompile(`\b(dapi[a-z0-9]{32})\b`)
 )
 
