@@ -628,7 +628,7 @@ enum DetectorType {
   Nylas = 617;
   Squareup = 618;
   Dandelion = 619;
-  DataFire = 620;
+  DataFire = 620 [deprecated = true];
   DeepAI = 621;
   MeaningCloud = 622;
   NeutrinoApi = 623;
