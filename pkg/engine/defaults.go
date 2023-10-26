@@ -86,7 +86,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitlyaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitmex"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blablabus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blazemeter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blitapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
@@ -305,7 +304,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlabv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glitterlyapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
@@ -534,7 +532,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qualaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qubole"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/quickmetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rawg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/razorpay"
@@ -1064,7 +1061,6 @@ func DefaultDetectors() []detectors.Detector {
 		deepgram.Scanner{},
 		brandfetch.Scanner{},
 		typeform.Scanner{},
-		blablabus.Scanner{},
 		fxmarket.Scanner{},
 		ipapi.Scanner{},
 		clearbit.Scanner{},
@@ -1190,7 +1186,6 @@ func DefaultDetectors() []detectors.Detector {
 		restpackscreenshotapi.Scanner{},
 		shortcut.Scanner{},
 		// nasdaqdatalink.Scanner{},
-		quickmetrics.Scanner{},
 		neutrinoapi.Scanner{},
 		bitmex.Scanner{},
 		deepai.Scanner{},
@@ -1403,7 +1398,6 @@ func DefaultDetectors() []detectors.Detector {
 		convier.Scanner{},
 		loadmill.Scanner{},
 		magicbell.Scanner{},
-		glitterlyapi.Scanner{},
 		apitemplate.Scanner{},
 		knapsackpro.Scanner{},
 		twitter.Scanner{},
