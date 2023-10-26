@@ -192,7 +192,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/databrickstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datafire"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
@@ -314,7 +313,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/guardianapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gumroad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gyazo"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heatmapapi"
@@ -532,7 +530,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qualaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qubole"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/quickmetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rawg"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/razorpay"
@@ -1187,7 +1184,6 @@ func DefaultDetectors() []detectors.Detector {
 		restpackscreenshotapi.Scanner{},
 		shortcut.Scanner{},
 		// nasdaqdatalink.Scanner{},
-		quickmetrics.Scanner{},
 		neutrinoapi.Scanner{},
 		bitmex.Scanner{},
 		deepai.Scanner{},
@@ -1213,7 +1209,6 @@ func DefaultDetectors() []detectors.Detector {
 		scraperbox.Scanner{},
 		passbase.Scanner{},
 		ticketmaster.Scanner{},
-		datafire.Scanner{},
 		iexcloud.Scanner{},
 		partnerstack.Scanner{},
 		qubole.Scanner{},
@@ -1364,7 +1359,6 @@ func DefaultDetectors() []detectors.Detector {
 		ditto.Scanner{},
 		buddyns.Scanner{},
 		checio.Scanner{},
-		happi.Scanner{},
 		kucoin.Scanner{},
 		eightxeight.Scanner{},
 		avazapersonalaccesstoken.Scanner{},
