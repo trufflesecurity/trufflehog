@@ -265,7 +265,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightstats"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/float"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowdash"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowdock"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowflu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flutterwave"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fmfw"
@@ -1429,7 +1428,6 @@ func DefaultDetectors() []detectors.Detector {
 		flowdash.Scanner{},
 		lunchmoney.Scanner{},
 		atera.Scanner{},
-		flowdock.Scanner{},
 		parsehub.Scanner{},
 		voodoosms.Scanner{},
 		yelp.Scanner{},
