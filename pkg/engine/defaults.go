@@ -314,7 +314,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/guardianapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gumroad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gyazo"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heatmapapi"
@@ -1361,7 +1360,6 @@ func DefaultDetectors() []detectors.Detector {
 		ditto.Scanner{},
 		buddyns.Scanner{},
 		checio.Scanner{},
-		happi.Scanner{},
 		kucoin.Scanner{},
 		eightxeight.Scanner{},
 		avazapersonalaccesstoken.Scanner{},

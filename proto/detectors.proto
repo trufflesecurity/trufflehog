@@ -642,7 +642,7 @@ enum DetectorType {
   TheOddsApi = 631;
   Apacta = 632;
   GetSandbox = 633;
-  Happi = 634;
+  Happi = 634 [deprecated = true];
   Oanda = 635;
   FastForex = 636;
   APIMatic = 637;
