@@ -815,7 +815,7 @@ enum DetectorType {
   PackageCloud = 804;
   Cloudsmith = 805;
   Flowdash = 806;
-  Flowdock = 807;
+  Flowdock = 807 [deprecated = true];
   Fibery = 808;
   Typetalk = 809;
   VoodooSMS = 810;
