@@ -588,7 +588,7 @@ enum DetectorType {
   Qubole = 577;
   CarbonInterface = 578;
   Intrinio = 579;
-  QuickMetrics = 580;
+  QuickMetrics = 580 [deprecated = true];
   ScrapeStack = 581;
   TechnicalAnalysisApi = 582;
   Urlscan = 583;
