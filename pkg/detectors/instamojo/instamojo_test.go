@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package flowdock
+package instamojo
 
 import (
 	"context"
@@ -16,15 +16,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestFlowdock_FromChunk(t *testing.T) {
+func TestInstamojo_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FLOWDOCK")
-	inactiveSecret := testSecrets.MustGetField("FLOWDOCK_INACTIVE")
+	id := testSecrets.MustGetField("INSTAMOJO_CLIENT_ID")
+	secret := testSecrets.MustGetField("INSTAMOJO_SECRET")
+	inactiveSecret := testSecrets.MustGetField("INSTAMOJO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -32,43 +33,46 @@ func TestFlowdock_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a flowdock secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a instamojo secret %s within id %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Flowdock,
+					DetectorType: detectorspb.DetectorType_Instamojo,
 					Verified:     true,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a flowdock secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a instamojo secret %s within but not valid, within id %s", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Flowdock,
-					Verified:     false,
+					DetectorType: detectorspb.DetectorType_Instamojo,
+					VerificationError: fmt.Errorf("unexpected HTTP response status 401"),
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
@@ -78,16 +82,16 @@ func TestFlowdock_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:    nil,
-			wantErr: false,
+			want: nil,
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Flowdock.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Instamojo.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +101,7 @@ func TestFlowdock_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Flowdock.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Instamojo.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
