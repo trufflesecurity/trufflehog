@@ -10,7 +10,7 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
-	github.com/TheZeroSlave/zapsentry v1.17.0
+	github.com/TheZeroSlave/zapsentry v1.19.0
 	github.com/aws/aws-sdk-go v1.45.19
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
