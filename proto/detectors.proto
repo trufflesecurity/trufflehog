@@ -956,6 +956,7 @@ enum DetectorType {
   OpenVpn = 945;
   VagrantCloudPersonalToken = 946;
   BetterStack = 947;
+  ZeroTier = 948;
 }
 
 message Result {
