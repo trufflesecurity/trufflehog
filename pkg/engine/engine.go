@@ -279,8 +279,6 @@ func Start(ctx context.Context, options ...Option) (*Engine, error) {
 		return nil, err
 	}
 	e.setDefaults(ctx)
-	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore.Setup(ctx)
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
 
@@ -313,7 +311,10 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 		option(e)
 	}
 	ctx.Logger().V(4).Info("engine initialized")
+
+	ctx.Logger().V(4).Info("setting up aho-corasick core")
 	e.ahoCorasickCore = NewAhoCorasickCore(e.detectors)
+	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
 }
