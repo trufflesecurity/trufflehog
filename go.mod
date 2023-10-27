@@ -56,6 +56,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/paulbellamy/ratecounter v0.2.0
