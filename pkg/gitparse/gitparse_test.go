@@ -760,6 +760,10 @@ func TestStagedDiffParsing(t *testing.T) {
 					IsBinary:  false,
 				},
 				{
+					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
+					IsBinary: true,
+				},
+				{
 					PathB:     "tzu",
 					LineStart: 11,
 					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
@@ -813,7 +817,7 @@ func TestStagedDiffParsing(t *testing.T) {
 		}
 
 		if !commit.Equal(&expected[i]) {
-			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
+			t.Errorf("Commit does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], commit)
 		}
 		i++
 	}
@@ -1715,14 +1719,24 @@ protos:
 			Author:  "John Smith <john.smith@example.com>",
 			Date:    newTime("Mon Jul 10 12:21:33 2023 -0400"),
 			Message: newStringBuilderValue("Change binary file\n"),
-			Diffs:   []Diff{},
+			Diffs: []Diff{
+				{
+					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
+					IsBinary: true,
+				},
+			},
 		},
 		{
 			Hash:    "638595917417c5c8a956937b28c5127719023363",
 			Author:  "John Smith <john.smith@example.com>",
 			Date:    newTime("Mon Jul 10 12:20:35 2023 -0400"),
 			Message: newStringBuilderValue("Add binary file\n"),
-			Diffs:   []Diff{},
+			Diffs: []Diff{
+				{
+					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
+					IsBinary: true,
+				},
+			},
 		},
 		{
 			Hash:    "ce0f5d1fe0272f180ccb660196f439c0c2f4ec8e",
