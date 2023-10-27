@@ -9,14 +9,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-// detectorKey is used to identify a detector in the keywordsToDetectors map.
-// Multiple detectors can have the same detector type but different versions.
-// This allows us to identify a detector by its type and version.
-type detectorKey struct {
-	detectorType detectorspb.DetectorType
-	version      int
-}
-
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
