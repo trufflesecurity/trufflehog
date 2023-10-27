@@ -48,16 +48,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if len(urlMatch) != 2 {
 				continue
 			}
-			resUrlMatch := strings.TrimSpace(urlMatch[1])
-			
+			resURLMatch := strings.TrimSpace(urlMatch[1])
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Metabase,
 				Raw:          []byte(resMatch),
-				RawV2: []byte(resMatch + resUrlMatch),
+				RawV2:        []byte(resMatch + resURLMatch),
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", resUrlMatch + "/api/user/current", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", resURLMatch+"/api/user/current", nil)
 				if err != nil {
 					continue
 				}
