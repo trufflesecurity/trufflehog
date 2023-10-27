@@ -18,12 +18,6 @@ type detectorKey struct {
 	version      int
 }
 
-// DetectorInfo is used to store a detector and whether it should be verified.
-type DetectorInfo struct {
-	detectors.Detector
-	ShouldVerify bool
-}
-
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
@@ -32,8 +26,8 @@ type AhoCorasickCore struct {
 	// matching given a set of words. (keywords from the rules in the config)
 	prefilter ahocorasick.Trie
 	// Maps for efficient lookups during detection.
-	detectorTypeToDetectorInfo map[detectorKey]DetectorInfo
-	detectors                  map[bool][]detectors.Detector
+	detectorTypeToDetectorInfo map[detectorKey]detectors.Detector
+	detectors                  []detectors.Detector
 	keywordsToDetectors        map[string][]detectorKey
 }
 
@@ -41,11 +35,11 @@ type AhoCorasickCore struct {
 // It creates an empty keyword-to-detectors map for future string matching operations.
 // The map detectorTypeToDetectorInfo is pre-allocated based on the size of detectors
 // provided, for efficient storage and lookup of detector information.
-func NewAhoCorasickCore(detectors map[bool][]detectors.Detector) *AhoCorasickCore {
+func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	return &AhoCorasickCore{
 		keywordsToDetectors:        make(map[string][]detectorKey),
-		detectors:                  detectors,
-		detectorTypeToDetectorInfo: make(map[detectorKey]DetectorInfo, len(detectors[true])+len(detectors[false])),
+		detectors:                  allDetectors,
+		detectorTypeToDetectorInfo: make(map[detectorKey]detectors.Detector, len(allDetectors)),
 	}
 }
 
@@ -54,12 +48,10 @@ func NewAhoCorasickCore(detectors map[bool][]detectors.Detector) *AhoCorasickCor
 func (ac *AhoCorasickCore) Setup(ctx context.Context) {
 	// Prepare maps for fast detector lookups, instead of scanning through an array of detectors for every chunk.
 	var keywords []string
-	for verify, detectorsSet := range ac.detectors {
-		for _, d := range detectorsSet {
-			key := createDetectorKey(d)
-			ac.detectorTypeToDetectorInfo[key] = DetectorInfo{Detector: d, ShouldVerify: verify}
-			keywords = ac.extractAndMapKeywords(d, key, keywords)
-		}
+	for _, d := range ac.detectors {
+		key := createDetectorKey(d)
+		ac.detectorTypeToDetectorInfo[key] = d
+		keywords = ac.extractAndMapKeywords(d, key, keywords)
 	}
 
 	// Use the Ahocorasick algorithm to create a trie structure for efficient keyword matching.
@@ -99,7 +91,7 @@ func (ac *AhoCorasickCore) MatchString(input string) []*ahocorasick.Match {
 // PopulateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
 // This method is designed to reuse the same map for performance optimization,
 // reducing the need for repeated allocations within each detector worker in the engine.
-func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, detectors map[detectorspb.DetectorType]DetectorInfo) bool {
+func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, detectors map[detectorspb.DetectorType]detectors.Detector) bool {
 	matchedKeys, ok := ac.keywordsToDetectors[match.MatchString()]
 	if !ok {
 		return false
