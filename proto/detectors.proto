@@ -955,6 +955,7 @@ enum DetectorType {
   Loggly = 944;
   OpenVpn = 945;
   VagrantCloudPersonalToken = 946;
+  BetterStack = 947;
 }
 
 message Result {

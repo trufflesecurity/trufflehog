@@ -2,6 +2,7 @@ package engine
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ip2location"
@@ -1550,6 +1551,7 @@ func DefaultDetectors() []detectors.Detector {
 		ip2location.Scanner{},
 		vagrantcloudpersonaltoken.Scanner{},
 		openvpn.Scanner{},
+		betterstack.Scanner{},
 	}
 
 }
