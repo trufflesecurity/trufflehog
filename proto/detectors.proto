@@ -958,6 +958,7 @@ enum DetectorType {
   BetterStack = 947;
   ZeroTier = 948;
   AppOptics = 949;
+  Metabase = 950;
 }
 
 message Result {

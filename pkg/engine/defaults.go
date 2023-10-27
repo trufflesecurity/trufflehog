@@ -407,6 +407,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mesibo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/messagebird"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metabase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metrilo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/microsoftteamswebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mindmeister"
@@ -1552,6 +1553,7 @@ func DefaultDetectors() []detectors.Detector {
 		ip2location.Scanner{},
 		vagrantcloudpersonaltoken.Scanner{},
 		openvpn.Scanner{},
+		&metabase.Scanner{},
 		appoptics.Scanner{},
 		zerotier.Scanner{},
 		betterstack.Scanner{},
