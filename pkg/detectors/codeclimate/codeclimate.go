@@ -2,6 +2,7 @@ package codeclimate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -28,6 +29,12 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"codeclimate"}
+}
+
+type response struct {
+	Data struct {
+		Id string `json:"id"`
+	} `json:"data"`
 }
 
 // FromData will find and optionally verify Codeclimate secrets in a given set of bytes.
@@ -58,7 +65,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
+					var r response
+					if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+						s1.VerificationError = err
+						continue
+					}
+					if r.Data.Id != "" {
+						s1.Verified = true
+					}
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
