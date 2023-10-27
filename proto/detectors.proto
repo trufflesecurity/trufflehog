@@ -959,6 +959,7 @@ enum DetectorType {
   ZeroTier = 948;
   AppOptics = 949;
   Metabase = 950;
+  CoinbaseWaaS = 951;
 }
 
 message Result {

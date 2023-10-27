@@ -124,9 +124,9 @@ VERSION_ID = '646bc'`,
 		t.Run(test.name, func(t *testing.T) {
 			s := Scanner{}
 
-			results, err := s.FromData(context.Background(), true, []byte(test.data))
+			results, err := s.FromData(context.Background(), false, []byte(test.data))
 			if err != nil {
-				t.Errorf("CoinbaseWaaS.FromData() error = %v", err)
+				t.Errorf("Voiceflow.FromData() error = %v", err)
 				return
 			}
 
@@ -140,9 +140,6 @@ VERSION_ID = '646bc'`,
 					expected = test.match
 				}
 				result := results[0]
-				if result.VerificationError != nil {
-					fmt.Printf("VerificationError: %v\n", result.VerificationError)
-				}
 				resultData := string(result.Raw)
 				if resultData != expected {
 					t.Errorf("%s: did not receive expected match.\n\texpected: '%s'\n\t  actual: '%s'", test.name, expected, resultData)

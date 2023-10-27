@@ -145,6 +145,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codequiry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase_waas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinmarketcap"
@@ -1557,6 +1558,7 @@ func DefaultDetectors() []detectors.Detector {
 		appoptics.Scanner{},
 		zerotier.Scanner{},
 		betterstack.Scanner{},
+		coinbase_waas.Scanner{},
 	}
 
 }
