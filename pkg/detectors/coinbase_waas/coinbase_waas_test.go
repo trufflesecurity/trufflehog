@@ -5,11 +5,13 @@ package coinbase_waas
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -154,8 +156,19 @@ func TestCoinbaseWaaS_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COINBASEWAAS")
-	inactiveSecret := testSecrets.MustGetField("COINBASEWAAS_INACTIVE")
+	secretb64 := testSecrets.MustGetField("COINBASE_WAAS")
+	secretB, err := base64.StdEncoding.DecodeString(secretb64)
+	if err != nil {
+		t.Fatalf("could not decode secret: %s", err)
+	}
+	secret := string(secretB)
+
+	inactiveSecretb64 := testSecrets.MustGetField("COINBASE_WAAS_INACTIVE")
+	inactiveSecretB, err := base64.StdEncoding.DecodeString(inactiveSecretb64)
+	if err != nil {
+		t.Fatalf("could not decode secret: %s", err)
+	}
+	inactiveSecret := string(inactiveSecretB)
 
 	type args struct {
 		ctx    context.Context
