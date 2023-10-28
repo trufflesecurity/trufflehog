@@ -179,6 +179,8 @@ github.com/bodgit/windows v1.0.0 h1:rLQ/XjsleZvx4fR1tB/UxQrK+SJ2OFHzfPjLWWOhDIA=
 github.com/bodgit/windows v1.0.0/go.mod h1:a6JLwrB4KrTR5hBpp8FI9/9W9jJfeQ2h4XDXU74ZCdM=
 github.com/bradleyfalzon/ghinstallation/v2 v2.7.0 h1:ranXaC3Zz/F6G/f0Joj3LrFp2OzOKfJZev5Q7OaMc88=
 github.com/bradleyfalzon/ghinstallation/v2 v2.7.0/go.mod h1:ymxfmloxXBFXvvF1KpeUhOQM6Dfz9NYtfvTiJyk82UE=
+github.com/bradleyfalzon/ghinstallation/v2 v2.8.0 h1:yUmoVv70H3J4UOqxqsee39+KlXxNEDfTbAp8c/qULKk=
+github.com/bradleyfalzon/ghinstallation/v2 v2.8.0/go.mod h1:fmPmvCiBWhJla3zDv9ZTQSZc8AbwyRnGW1yg5ep1Pcs=
 github.com/bwesterb/go-ristretto v1.2.0/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
 github.com/bwesterb/go-ristretto v1.2.3/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
@@ -384,6 +386,8 @@ github.com/google/go-github/v42 v42.0.0 h1:YNT0FwjPrEysRkLIiKuEfSvBPCGKphW5aS5Px
 github.com/google/go-github/v42 v42.0.0/go.mod h1:jgg/jvyI0YlDOM1/ps6XYh04HNQ3vKf0CVko62/EhRg=
 github.com/google/go-github/v55 v55.0.0 h1:4pp/1tNMB9X/LuAhs5i0KQAE40NmiR/y6prLNb9x9cg=
 github.com/google/go-github/v55 v55.0.0/go.mod h1:JLahOTA1DnXzhxEymmFF5PP2tSS9JVNj68mSZNDwskA=
+github.com/google/go-github/v56 v56.0.0 h1:TysL7dMa/r7wsQi44BjqlwaHvwlFlqkK8CtBWCX3gb4=
+github.com/google/go-github/v56 v56.0.0/go.mod h1:D8cdcX98YWJvi7TLo7zM4/h8ZTx6u6fwGEkCdisopo0=
 github.com/google/go-querystring v1.1.0 h1:AnCroh3fv4ZBgVIf1Iwtovgjaw/GiKJo8M8yD/fhyJ8=
 github.com/google/go-querystring v1.1.0/go.mod h1:Kcdr2DB4koayq7X8pmAG4sNG59So17icRSOU623lUBU=
 github.com/google/martian v2.1.0+incompatible h1:/CP5g8u/VJHijgedC/Legn3BAbAaWPgecwXBIDzw5no=
