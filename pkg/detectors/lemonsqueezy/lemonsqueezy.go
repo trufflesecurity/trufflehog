@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// JWT token
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"lemonsqueezy"}) + `\b(eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9\.[0-9A-Za-z]{314}\.[0-9A-Z-a-z\-_]{512})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"lemonsqueezy"}) + `\b(eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9\.[0-9A-Za-z]{314}\.[0-9A-Za-z-_]{512})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
