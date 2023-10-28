@@ -542,6 +542,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replyio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
@@ -1569,6 +1570,7 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
+		requestfinance.Scanner{},
 	}
 
 }
