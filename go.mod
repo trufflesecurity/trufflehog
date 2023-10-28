@@ -69,7 +69,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/trufflesecurity/disk-buffer-reader v0.1.9
-	github.com/xanzy/go-gitlab v0.92.3
+	github.com/xanzy/go-gitlab v0.93.2
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.24.0
