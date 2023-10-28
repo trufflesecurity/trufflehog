@@ -538,6 +538,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
@@ -1559,6 +1560,7 @@ func DefaultDetectors() []detectors.Detector {
 		zerotier.Scanner{},
 		betterstack.Scanner{},
 		coinbase_waas.Scanner{},
+		replyio.Scanner{},
 	}
 
 }
