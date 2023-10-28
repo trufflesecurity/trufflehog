@@ -367,6 +367,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ldap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/leadfeeder"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lemlist"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lemonsqueezy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lendflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lessannoyingcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lexigram"
@@ -1559,6 +1560,7 @@ func DefaultDetectors() []detectors.Detector {
 		zerotier.Scanner{},
 		betterstack.Scanner{},
 		coinbase_waas.Scanner{},
+		lemonsqueezy.Scanner{},
 	}
 
 }
