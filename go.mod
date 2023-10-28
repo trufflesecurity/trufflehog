@@ -27,7 +27,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.2
 	github.com/fatih/color v1.15.0
 	github.com/felixge/fgprof v0.9.3
-	github.com/getsentry/sentry-go v0.24.1
+	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.8.1
 	github.com/go-ldap/ldap/v3 v3.4.6
