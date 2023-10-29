@@ -50,7 +50,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
-	github.com/launchdarkly/go-server-sdk/v6 v6.0.0-alpha.pub.12
+	github.com/launchdarkly/go-server-sdk/v6 v6.1.1
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20230911164824-e3824f1adde9
 	github.com/marusama/semaphore/v2 v2.5.0
