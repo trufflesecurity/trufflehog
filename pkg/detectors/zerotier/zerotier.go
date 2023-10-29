@@ -1,4 +1,4 @@
-package datafire
+package zerotier
 
 import (
 	"context"
@@ -12,25 +12,26 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datafire"}) + `\b([a-z0-9\S]{175,190})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zerotier"}) + `\b([0-9a-zA-Z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"datafire"}
+	return []string{"zerotier"}
 }
 
-// FromData will find and optionally verify DataFire secrets in a given set of bytes.
+// FromData will find and optionally verify Zerotier secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -43,28 +44,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_DataFire,
+			DetectorType: detectorspb.DetectorType_ZeroTier,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.datafire.io/projects/", nil)
+			// API docs: https://docs.zerotier.com/central/v1/
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.zerotier.com/api/v1/network", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+			req.Header.Add("Authorization", fmt.Sprintf("token %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
+				} else if res.StatusCode == 401 {
+					// The secret is determinately not verified (nothing to do)
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
+					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 				}
+			} else {
+				s1.VerificationError = err
 			}
+		}
+
+		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s1)
@@ -74,5 +86,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_DataFire
+	return detectorspb.DetectorType_ZeroTier
 }
