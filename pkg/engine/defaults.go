@@ -88,6 +88,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buddyns"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/budibase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
@@ -1561,6 +1562,7 @@ func DefaultDetectors() []detectors.Detector {
 		betterstack.Scanner{},
 		coinbase_waas.Scanner{},
 		lemonsqueezy.Scanner{},
+		budibase.Scanner{},
 	}
 
 }
