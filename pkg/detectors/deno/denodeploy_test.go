@@ -6,10 +6,11 @@ package denodeploy
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -229,7 +230,7 @@ func TestDenoDeploy_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Denodeploy.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

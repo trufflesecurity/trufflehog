@@ -961,7 +961,8 @@ enum DetectorType {
   Metabase = 950;
   CoinbaseWaaS = 951;
   LemonSqueezy = 952;
-  DenoDeploy = 953;
+  Budibase = 953;
+  DenoDeploy = 954;
 }
 
 message Result {

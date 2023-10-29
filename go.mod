@@ -29,7 +29,7 @@ require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-errors/errors v1.5.1
-	github.com/go-git/go-git/v5 v5.8.1
+	github.com/go-git/go-git/v5 v5.8.0
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/zapr v1.2.4
@@ -69,10 +69,10 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/trufflesecurity/disk-buffer-reader v0.1.9
-	github.com/xanzy/go-gitlab v0.92.3
+	github.com/xanzy/go-gitlab v0.93.2
 	go.mongodb.org/mongo-driver v1.12.1
-	go.uber.org/mock v0.2.0
-	go.uber.org/zap v1.24.0
+	go.uber.org/mock v0.3.0
+	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
@@ -134,9 +134,9 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bodgit/plumbing v1.2.0 // indirect
-	github.com/bodgit/sevenzip v1.3.0 // indirect
-	github.com/bodgit/windows v1.0.0 // indirect
+	github.com/bodgit/plumbing v1.3.0 // indirect
+	github.com/bodgit/sevenzip v1.4.3 // indirect
+	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/connesc/cipherio v0.2.1 // indirect
@@ -183,13 +183,14 @@ require (
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/s3 v1.1.4 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
-	github.com/klauspost/compress v1.16.5 // indirect
+	github.com/klauspost/compress v1.16.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/launchdarkly/ccache v1.1.0 // indirect
@@ -220,7 +221,7 @@ require (
 	github.com/onsi/gomega v1.23.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
-	github.com/pierrec/lz4/v4 v4.1.17 // indirect
+	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pkg/diff v0.0.0-20200914180035-5b29258ca4f7 // indirect
@@ -234,7 +235,7 @@ require (
 	github.com/sirupsen/logrus v1.9.1 // indirect
 	github.com/skeema/knownhosts v1.2.0 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
-	github.com/ulikunitz/xz v0.5.10 // indirect
+	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -248,7 +249,7 @@ require (
 	go.einride.tech/aip v0.60.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
