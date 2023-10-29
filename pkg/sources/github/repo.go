@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v42/github"
+	"github.com/google/go-github/v57/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -98,12 +98,11 @@ func (s *Source) userAndToken(ctx context.Context, installationClient *github.Cl
 	case *sourcespb.GitHub_Token:
 		var (
 			ghUser *github.User
-			resp   *github.Response
 			err    error
 		)
 		for {
-			ghUser, resp, err = s.apiClient.Users.Get(ctx, "")
-			if handled := s.handleRateLimit(err, resp); handled {
+			ghUser, _, err = s.apiClient.Users.Get(ctx, "")
+			if s.handleRateLimit(err) {
 				continue
 			}
 			if err != nil {
@@ -204,10 +203,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
+		if s.handleRateLimit(err) {
 			continue
 		}
 		if err != nil {
@@ -287,8 +283,8 @@ type commitQuery struct {
 // getDiffForFileInCommit retrieves the diff for a specified file in a commit.
 // If the file or its diff is not found, it returns an error.
 func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	commit, resp, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-	if handled := s.handleRateLimit(err, resp); handled {
+	commit, _, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+	if s.handleRateLimit(err) {
 		return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
 	}
 	if err != nil {
