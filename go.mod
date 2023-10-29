@@ -65,7 +65,7 @@ require (
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/sergi/go-diff v1.3.1
-	github.com/snowflakedb/gosnowflake v1.6.20
+	github.com/snowflakedb/gosnowflake v1.6.25
 	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/trufflesecurity/disk-buffer-reader v0.1.9
@@ -114,6 +114,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
+	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/thrift v0.16.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.7 // indirect
@@ -182,6 +183,7 @@ require (
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
