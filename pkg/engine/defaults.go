@@ -188,6 +188,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/delighted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/demio"
+	denodeploy "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deno"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deputy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectlanguage"
@@ -1562,6 +1563,7 @@ func DefaultDetectors() []detectors.Detector {
 		betterstack.Scanner{},
 		coinbase_waas.Scanner{},
 		lemonsqueezy.Scanner{},
+		denodeploy.Scanner{},
 		budibase.Scanner{},
 	}
 
