@@ -141,6 +141,9 @@ var (
 
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+
+	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
+	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
 )
 
 func init() {
@@ -397,8 +400,9 @@ func run(state overseer.State) {
 	e, err := engine.Start(ctx,
 		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
-		engine.WithDetectors(!*noVerification, conf.Detectors...),
+		engine.WithDetectors(engine.DefaultDetectors()...),
+		engine.WithDetectors(conf.Detectors...),
+		engine.WithVerify(!*noVerification),
 		engine.WithFilterDetectors(includeFilter),
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
@@ -532,6 +536,10 @@ func run(state overseer.State) {
 	case circleCiScan.FullCommand():
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logFatal(err, "Failed to scan CircleCI.")
+		}
+	case travisCiScan.FullCommand():
+		if err := e.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+			logFatal(err, "Failed to scan TravisCI.")
 		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{
