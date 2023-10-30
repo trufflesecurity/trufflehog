@@ -47,7 +47,7 @@ func TestURI_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Redis,
 					Verified:     false,
-					Redacted:     "redis://user:********@redis.com",
+					Redacted:     "redis://user:*******@redis.com",
 				},
 			},
 			wantErr: false,
