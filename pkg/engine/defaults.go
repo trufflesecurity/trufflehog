@@ -88,6 +88,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buddyns"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/budibase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
@@ -187,6 +188,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/delighted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/demio"
+	denodeploy "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deno"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deputy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectlanguage"
@@ -367,6 +369,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ldap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/leadfeeder"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lemlist"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lemonsqueezy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lendflow"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lessannoyingcrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lexigram"
@@ -1561,6 +1564,9 @@ func DefaultDetectors() []detectors.Detector {
 		betterstack.Scanner{},
 		coinbase_waas.Scanner{},
 		stripo.Scanner{},
+		lemonsqueezy.Scanner{},
+		denodeploy.Scanner{},
+		budibase.Scanner{},
 	}
 
 }
