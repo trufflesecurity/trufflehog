@@ -197,7 +197,8 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	e, err := Start(ctx,
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(true, DefaultDetectors()...),
+		WithDetectors(DefaultDetectors()...),
+		WithVerify(true),
 		WithPrinter(new(discardPrinter)),
 	)
 	assert.Nil(t, err)
