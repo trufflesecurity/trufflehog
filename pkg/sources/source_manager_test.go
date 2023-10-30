@@ -337,7 +337,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	metrics := hook.UnitMetrics()
 	assert.Equal(t, 3, len(metrics))
 	sort.Slice(metrics, func(i, j int) bool {
-		return metrics[i].EndTime.Before(metrics[j].EndTime)
+		return metrics[i].StartTime.Before(metrics[j].StartTime)
 	})
 	m0, m1, m2 := metrics[0], metrics[1], metrics[2]
 
