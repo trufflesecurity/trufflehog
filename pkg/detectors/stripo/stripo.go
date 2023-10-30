@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// JWT token
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"stripo"}) + `\b(eyJhbGciOiJIUzI1NiJ9\.[0-9A-Za-z]{130}\.[0-9A-Za-z-_]{43})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"stripo"}) + `\b(eyJhbGciOiJIUzI1NiJ9\.[0-9A-Za-z]{130}\.[0-9A-Za-z_-]{43})\b`)
 )
 
 func (s Scanner) Keywords() []string {
