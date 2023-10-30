@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -114,6 +115,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if ctx == nil {
 						ctx = context.Background()
 					}
+
+					// Disable pool + retries to prevent flooding the server with failed login attemps.
+					db.SetConnMaxLifetime(time.Second)
+					db.SetMaxOpenConns(1)
 
 					err = db.PingContext(ctx)
 					if err != nil {
