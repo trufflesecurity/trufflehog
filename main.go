@@ -63,18 +63,19 @@ var (
 	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
 	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.").String()
 
-	gitScan             = cli.Command("git", "Find credentials in git repositories.")
-	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
-	gitScanIncludePaths = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
-	gitScanExcludePaths = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	gitScanExcludeGlobs = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
-	gitScanSinceCommit  = gitScan.Flag("since-commit", "Commit to start scan from.").String()
-	gitScanBranch       = gitScan.Flag("branch", "Branch to scan.").String()
-	gitScanMaxDepth     = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
-	gitScanBare         = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
-	_                   = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
-	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
-	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
+	gitScan              = cli.Command("git", "Find credentials in git repositories.")
+	gitScanURI           = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
+	gitScanIncludePaths  = gitScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
+	gitScanExcludePaths  = gitScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitScanExcludeGlobs  = gitScan.Flag("exclude-globs", "Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.").String()
+	gitScanSinceCommit   = gitScan.Flag("since-commit", "Commit to start scan from.").String()
+	gitScanSinceDuration = gitScan.Flag("since", "Date or duration to start scan from. Can not be used togehter with `since-commit`.").String()
+	gitScanBranch        = gitScan.Flag("branch", "Branch to scan.").String()
+	gitScanMaxDepth      = gitScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	gitScanBare          = gitScan.Flag("bare", "Scan bare repository (e.g. useful while using in pre-receive hooks)").Bool()
+	_                    = gitScan.Flag("allow", "No-op flag for backwards compat.").Bool()
+	_                    = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
+	_                    = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
 	githubScan              = cli.Command("github", "Find credentials in GitHub repositories.")
 	githubScanEndpoint      = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
@@ -268,6 +269,14 @@ func run(state overseer.State) {
 		*concurrency = 1
 	}
 
+	if *gitScanSinceDuration != "" {
+		*concurrency = 1
+	}
+
+	if *gitScanSinceCommit != "" && *gitScanSinceDuration != "" {
+		logFatal(fmt.Errorf("cannot use both --since-commit and --since"), "invalid git scan configuration")
+	}
+	
 	if *profile {
 		go func() {
 			router := http.NewServeMux()
@@ -424,7 +433,7 @@ func run(state overseer.State) {
 		if err != nil {
 			logFatal(err, "could not create filter")
 		}
-		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
+		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit, *gitScanSinceDuration)
 		if err != nil || repoPath == "" {
 			logFatal(err, "error preparing git repo for scanning")
 		}

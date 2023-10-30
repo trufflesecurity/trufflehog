@@ -790,8 +790,8 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 }
 
 // PrepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
-func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (string, bool, error) {
-	if commitHash == "" {
+func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string, since string) (string, bool, error) {
+	if commitHash == "" && since == "" {
 		return PrepareRepo(ctx, uriString)
 	}
 	// TODO: refactor with PrepareRepo to remove duplicated logic
@@ -825,17 +825,21 @@ func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (
 		client = github.NewClient(tc)
 	}
 
-	commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
-	if err != nil {
-		return PrepareRepo(ctx, uriString)
-	}
 	var timestamp string
-	{
-		author := commit.GetAuthor()
-		if author == nil {
+	if since == "" {
+		commit, _, err := client.Git.GetCommit(context.Background(), owner, repoName, commitHash)
+		if err != nil {
 			return PrepareRepo(ctx, uriString)
 		}
-		timestamp = author.GetDate().Format(time.RFC3339)
+		{
+			author := commit.GetAuthor()
+			if author == nil {
+				return PrepareRepo(ctx, uriString)
+			}
+			timestamp = author.GetDate().Format(time.RFC3339)
+		}
+	} else {
+		timestamp = since
 	}
 
 	remotePath := uri.String()
