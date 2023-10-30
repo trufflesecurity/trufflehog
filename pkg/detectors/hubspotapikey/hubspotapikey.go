@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				if (res.StatusCode >= 200 && res.StatusCode < 300) || res.StatusCode == 403 {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
