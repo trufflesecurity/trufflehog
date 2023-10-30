@@ -29,7 +29,7 @@ require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-errors/errors v1.5.1
-	github.com/go-git/go-git/v5 v5.8.0
+	github.com/go-git/go-git/v5 v5.10.0
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/zapr v1.2.4
@@ -108,7 +108,7 @@ require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/ProtonMail/go-crypto v0.0.0-20230717121422-5aa5874ade95 // indirect
+	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
 	github.com/acomagu/bufpipe v1.0.4 // indirect
 	github.com/alecthomas/chroma v0.10.0 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
@@ -143,6 +143,7 @@ require (
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/couchbase/gocbcore/v10 v10.2.9 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
@@ -158,7 +159,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
-	github.com/go-git/go-billy/v5 v5.4.1 // indirect
+	github.com/go-git/go-billy/v5 v5.5.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/goccy/go-json v0.10.0 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
@@ -218,7 +219,7 @@ require (
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
-	github.com/onsi/gomega v1.23.0 // indirect
+	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
@@ -230,7 +231,7 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
-	github.com/rogpeppe/go-internal v1.10.0 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/sahilm/fuzzy v0.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.1 // indirect
 	github.com/skeema/knownhosts v1.2.0 // indirect
