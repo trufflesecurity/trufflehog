@@ -27,7 +27,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	accessTokenPat = regexp.MustCompile(`\b00[a-zA-Z0-9]{13}![a-zA-Z0-9_.]{96}\b`)
-	instancePat    = regexp.MustCompile(`\bhttps://[0-9a-zA-Z-\.]{1,100}\.my\.salesforce\.com\b`)
+	instancePat    = regexp.MustCompile(`\b[0-9a-zA-Z-\.]{1,100}\.salesforce\.com\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Salesforce,
 				Raw:          []byte(tokenMatch),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", instanceMatch, tokenMatch)),
 			}
 
 			if verify {
@@ -68,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				req, err := http.NewRequestWithContext(ctx, "GET", instanceMatch+"/services/data/v"+currentVersion+"/query?q=SELECT+name+from+Account", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+instanceMatch+"/services/data/v"+currentVersion+"/query?q=SELECT+name+from+Account", nil)
 				if err != nil {
 					continue
 				}
