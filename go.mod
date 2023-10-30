@@ -80,7 +80,7 @@ require (
 	golang.org/x/text v0.13.0
 	google.golang.org/api v0.148.0
 	google.golang.org/protobuf v1.31.0
-	gopkg.in/alecthomas/kingpin.v2 v2.2.6
+	gopkg.in/alecthomas/kingpin.v2 v2.3.2
 	gopkg.in/h2non/gock.v1 v1.1.2
 	pgregory.net/rapid v1.1.0
 	sigs.k8s.io/yaml v1.4.0
