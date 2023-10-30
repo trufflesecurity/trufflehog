@@ -1531,6 +1531,7 @@ type GitHub struct {
 	Base                       string              `protobuf:"bytes,10,opt,name=base,proto3" json:"base,omitempty"`
 	IgnoreRepos                []string            `protobuf:"bytes,11,rep,name=ignoreRepos,proto3" json:"ignoreRepos,omitempty"`
 	IncludeRepos               []string            `protobuf:"bytes,12,rep,name=includeRepos,proto3" json:"includeRepos,omitempty"`
+	Visibility                 string              `protobuf:"bytes,10,opt,name=base,proto3" json:"visibility,omitempty"`
 	IncludePullRequestComments bool                `protobuf:"varint,14,opt,name=includePullRequestComments,proto3" json:"includePullRequestComments,omitempty"`
 	IncludeIssueComments       bool                `protobuf:"varint,15,opt,name=includeIssueComments,proto3" json:"includeIssueComments,omitempty"`
 	IncludeGistComments        bool                `protobuf:"varint,16,opt,name=includeGistComments,proto3" json:"includeGistComments,omitempty"`

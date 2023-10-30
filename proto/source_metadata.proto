@@ -169,6 +169,8 @@ enum Visibility {
   private = 1;
   shared = 2;
   unknown = 3;
+
+  _invalid = -1;
 }
 
 message Slack {

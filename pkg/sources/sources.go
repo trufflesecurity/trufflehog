@@ -191,6 +191,8 @@ type GithubConfig struct {
 	ExcludeRepos,
 	// IncludeRepos is a list of repositories to include in the scan.
 	IncludeRepos []string
+	// Visibility is a list of repository visibility states to include in the scan
+	Visibility string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// IncludeIssueComments indicates whether to include GitHub issue comments in the scan.

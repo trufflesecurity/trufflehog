@@ -41,11 +41,17 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	}
 
 	logOptions := &gogit.LogOptions{}
-	opts := []git.ScanOption{
+	gitOpts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
 		git.ScanOptionLogOptions(logOptions),
 	}
-	scanOptions := git.NewScanOptions(opts...)
+	gitScanOptions := git.NewScanOptions(gitOpts...)
+	
+	opts := []github.ScanOption{
+		github.ScanOptionGitScanOptions(*gitScanOptions),
+		github.ScanOptionVisibility(c.Visibility),
+	}
+	scanOptions := github.NewScanOptions(opts...)
 
 	sourceName := "trufflehog - github"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
