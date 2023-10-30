@@ -333,6 +333,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	e.sourceManager = sources.NewManager(
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithSourceUnits(),
 		sources.WithBufferedOutput(defaultChannelBuffer),
 	)
 
