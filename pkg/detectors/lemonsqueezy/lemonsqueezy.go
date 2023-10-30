@@ -1,4 +1,4 @@
-package replyio
+package lemonsqueezy
 
 import (
 	"context"
@@ -21,14 +21,17 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"replyio"}) + `\b([0-9A-Za-z]{24})\b`)
+	// JWT token
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"lemonsqueezy"}) + `\b(eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9\.[0-9A-Za-z]{314}\.[0-9A-Za-z-_]{512})\b`)
 )
 
+// Keywords are used for efficiently pre-filtering chunks.
+// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"replyio"}
+	return []string{"lemonsqueezy"}
 }
 
+// FromData will find and optionally verify Lemonsqueezy secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -41,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ReplyIO,
+			DetectorType: detectorspb.DetectorType_LemonSqueezy,
 			Raw:          []byte(resMatch),
 		}
 
@@ -50,11 +53,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.reply.io/v1/people", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.lemonsqueezy.com/v1/products/", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("X-Api-Key", resMatch)
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -82,5 +85,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ReplyIO
+	return detectorspb.DetectorType_LemonSqueezy
 }

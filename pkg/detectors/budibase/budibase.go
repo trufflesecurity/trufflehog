@@ -1,4 +1,4 @@
-package replyio
+package budibase
 
 import (
 	"context"
@@ -21,14 +21,17 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"replyio"}) + `\b([0-9A-Za-z]{24})\b`)
+	
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"budibase"}) + `\b([a-f0-9]{32}-[a-f0-9]{78,80})\b`)
 )
 
+// Keywords are used for efficiently pre-filtering chunks.
+// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"replyio"}
+	return []string{"budibase"}
 }
 
+// FromData will find and optionally verify Budibase secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -41,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ReplyIO,
+			DetectorType: detectorspb.DetectorType_Budibase,
 			Raw:          []byte(resMatch),
 		}
 
@@ -50,11 +53,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.reply.io/v1/people", nil)
+
+			
+			// URL: https://docs.budibase.com/reference/appsearch
+			// API searches for the app with given name, since we only need to check api key, sending any appname will work.
+			payload := strings.NewReader(`{"name":"qwerty"}`)
+
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://budibase.app/api/public/v1/applications/search", payload)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("X-Api-Key", resMatch)
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("x-budibase-api-key", resMatch)
+
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -82,5 +93,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ReplyIO
+	return detectorspb.DetectorType_Budibase
 }

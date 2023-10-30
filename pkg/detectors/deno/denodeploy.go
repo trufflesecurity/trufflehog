@@ -1,15 +1,15 @@
-package replyio
+package denodeploy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"net/http"
-	"regexp"
-	"strings"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"io"
+	"net/http"
+	"regexp"
 )
 
 type Scanner struct {
@@ -21,28 +21,31 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"replyio"}) + `\b([0-9A-Za-z]{24})\b`)
+	tokenPat      = regexp.MustCompile(`\b(dd[pw]_[a-zA-Z0-9]{36})\b`)
 )
 
+// Keywords are used for efficiently pre-filtering chunks.
+// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"replyio"}
+	return []string{"ddp_", "ddw_"}
 }
 
+type userResponse struct {
+	Login string `json:"login"`
+}
+
+// FromData will find and optionally verify DenoDeploy secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	tokenMatches := tokenPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	for _, tokenMatch := range tokenMatches {
+		token := tokenMatch[1]
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ReplyIO,
-			Raw:          []byte(resMatch),
+			DetectorType: s.Type(),
+			Raw:          []byte(token),
 		}
 
 		if verify {
@@ -50,16 +53,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.reply.io/v1/people", nil)
+
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.deno.com/user", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("X-Api-Key", resMatch)
+
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				if res.StatusCode == 200 {
 					s1.Verified = true
+
+					body, err := io.ReadAll(res.Body)
+					if err != nil {
+						s1.VerificationError = err
+					} else {
+						var user userResponse
+						if err := json.Unmarshal(body, &user); err != nil {
+							fmt.Printf("Unmarshal error: %v\n", err)
+							s1.VerificationError = err
+						} else {
+							s1.ExtraData = map[string]string{
+								"login": user.Login,
+							}
+						}
+					}
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
@@ -71,7 +91,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
 			continue
 		}
 
@@ -82,5 +102,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ReplyIO
+	return detectorspb.DetectorType_DenoDeploy
 }
