@@ -361,7 +361,7 @@ enum DetectorType {
   Imagga = 349;
   SMSApi = 350;
   Distribusion = 351;
-  Blablabus = 352;
+  Blablabus = 352 [deprecated = true];
   WordsApi = 353;
   Currencylayer = 354;
   Html2Pdf = 355;
@@ -588,7 +588,7 @@ enum DetectorType {
   Qubole = 577;
   CarbonInterface = 578;
   Intrinio = 579;
-  QuickMetrics = 580;
+  QuickMetrics = 580 [deprecated = true];
   ScrapeStack = 581;
   TechnicalAnalysisApi = 582;
   Urlscan = 583;
@@ -628,7 +628,7 @@ enum DetectorType {
   Nylas = 617;
   Squareup = 618;
   Dandelion = 619;
-  DataFire = 620;
+  DataFire = 620 [deprecated = true];
   DeepAI = 621;
   MeaningCloud = 622;
   NeutrinoApi = 623;
@@ -642,7 +642,7 @@ enum DetectorType {
   TheOddsApi = 631;
   Apacta = 632;
   GetSandbox = 633;
-  Happi = 634;
+  Happi = 634 [deprecated = true];
   Oanda = 635;
   FastForex = 636;
   APIMatic = 637;
@@ -780,7 +780,7 @@ enum DetectorType {
   ConversionTools = 769;
   CraftMyPDF = 770;
   ExportSDK = 771;
-  GlitterlyAPI = 772;
+  GlitterlyAPI = 772 [deprecated = true];
   Hybiscus = 773;
   Miro = 774;
   Statuspage = 775;
@@ -815,7 +815,7 @@ enum DetectorType {
   PackageCloud = 804;
   Cloudsmith = 805;
   Flowdash = 806;
-  Flowdock = 807;
+  Flowdock = 807 [deprecated = true];
   Fibery = 808;
   Typetalk = 809;
   VoodooSMS = 810;
@@ -945,6 +945,26 @@ enum DetectorType {
   Ramp = 934;
   Klaviyo = 935;
   SourcegraphCody = 936;
+  Voiceflow = 937;
+  Privacy = 938;
+  IPInfo = 939;
+  Ip2location = 940;
+  Instamojo = 941;
+  Portainer = 942;
+  PortainerToken = 943;
+  Loggly = 944;
+  OpenVpn = 945;
+  VagrantCloudPersonalToken = 946;
+  BetterStack = 947;
+  ZeroTier = 948;
+  AppOptics = 949;
+  Metabase = 950;
+  CoinbaseWaaS = 951;
+  LemonSqueezy = 952;
+  Budibase = 953;
+  DenoDeploy = 954;
+  Stripo = 955;
+  ReplyIO = 956;
 }
 
 message Result {

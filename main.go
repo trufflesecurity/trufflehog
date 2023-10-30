@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -155,6 +157,9 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
+	//Support -h for help
+	cli.HelpFlag.Short('h')
+
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
 		args := tui.Run()
 		if len(args) == 0 {
@@ -174,6 +179,29 @@ func init() {
 	case *debug:
 		log.SetLevel(2)
 	}
+}
+
+// Encloses tempdir cleanup in a function so it can be pushed
+// to a goroutine
+func runCleanup(ctx context.Context, execName string) {
+	// Every 15 minutes, attempt to remove dirs
+	pid := os.Getpid()
+	// Inital orphaned dir cleanup when the scanner is invoked
+	err := cleantemp.CleanTempDir(ctx, execName, pid)
+	if err != nil {
+		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+	}
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		err := cleantemp.CleanTempDir(ctx, execName, pid)
+		if err != nil {
+			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+		}
+	}
+
 }
 
 func main() {
@@ -213,6 +241,13 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
+
+	ctx := context.Background()
+
+	var execName = "trufflehog"
+
+	go runCleanup(ctx, execName)
+
 }
 
 func run(state overseer.State) {
@@ -365,8 +400,9 @@ func run(state overseer.State) {
 	e, err := engine.Start(ctx,
 		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
-		engine.WithDetectors(!*noVerification, conf.Detectors...),
+		engine.WithDetectors(engine.DefaultDetectors()...),
+		engine.WithDetectors(conf.Detectors...),
+		engine.WithVerify(!*noVerification),
 		engine.WithFilterDetectors(includeFilter),
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),

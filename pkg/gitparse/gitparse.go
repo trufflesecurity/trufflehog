@@ -275,7 +275,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = CommitLine
 
 			// If there is a currentDiff, add it to currentCommit.
-			if currentDiff.Content.Len() > 0 {
+			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				currentCommit.Size += currentDiff.Content.Len()
 			}
@@ -324,7 +324,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if currentCommit == nil {
 				currentCommit = &Commit{}
 			}
-			if currentDiff.Content.Len() > 0 {
+			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
 				totalSize := 0
@@ -356,8 +356,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isBinaryLine(isStaged, latestState, line):
 			latestState = BinaryFileLine
 
-			currentDiff.IsBinary = true
 			currentDiff.PathB = pathFromBinaryLine(line)
+
+			// Don't do anything if the file is deleted. (pathA has file path, pathB is /dev/null)
+			if currentDiff.PathB != "" {
+				currentDiff.IsBinary = true
+			}
 		case isFromFileLine(isStaged, latestState, line):
 			latestState = FromFileLine
 			// NoOp
@@ -369,7 +373,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isHunkLineNumberLine(isStaged, latestState, line):
 			latestState = HunkLineNumberLine
 
-			if currentDiff.Content.Len() > 0 {
+			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 			}
 			currentDiff = Diff{
@@ -604,7 +608,7 @@ func pathFromBinaryLine(line []byte) string {
 		return ""
 	}
 	bRaw := sbytes[1]
-	return string(bRaw[:len(bRaw)-7]) // drop the "b/" and " differ"
+	return strings.TrimSpace(string(bRaw[:len(bRaw)-7])) // drop the "b/" and " differ"
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
@@ -710,7 +714,7 @@ func isCommitSeparatorLine(isStaged bool, latestState ParseState, line []byte) b
 
 func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
 	// Ignore empty or binary diffs (this condition may be redundant).
-	if currentDiff != nil && currentDiff.Content.Len() > 0 {
+	if currentDiff != nil && (currentDiff.Content.Len() > 0 || currentDiff.IsBinary) {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 	}
 	if currentCommit != nil {
