@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -48,6 +50,7 @@ var (
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
 	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy       = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
@@ -151,6 +154,9 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
+	//Support -h for help
+	cli.HelpFlag.Short('h')
+
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
 		args := tui.Run()
 		if len(args) == 0 {
@@ -170,6 +176,29 @@ func init() {
 	case *debug:
 		log.SetLevel(2)
 	}
+}
+
+// Encloses tempdir cleanup in a function so it can be pushed
+// to a goroutine
+func runCleanup(ctx context.Context, execName string) {
+	// Every 15 minutes, attempt to remove dirs
+	pid := os.Getpid()
+	// Inital orphaned dir cleanup when the scanner is invoked
+	err := cleantemp.CleanTempDir(ctx, execName, pid)
+	if err != nil {
+		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+	}
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		err := cleantemp.CleanTempDir(ctx, execName, pid)
+		if err != nil {
+			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+		}
+	}
+
 }
 
 func main() {
@@ -209,6 +238,13 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
+
+	ctx := context.Background()
+
+	var execName = "trufflehog"
+
+	go runCleanup(ctx, execName)
+
 }
 
 func run(state overseer.State) {
@@ -370,6 +406,7 @@ func run(state overseer.State) {
 		engine.WithOnlyVerified(*onlyVerified),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
+		engine.WithFilterEntropy(*filterEntropy),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")
