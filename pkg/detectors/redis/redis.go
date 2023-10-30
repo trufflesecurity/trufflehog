@@ -2,9 +2,9 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"regexp"
-	"fmt"
 	"strings"
 
 	"github.com/go-redis/redis"
@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\bredi(s{1,2})://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat        = regexp.MustCompile(`\bredi[s]{1,2}://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 	azureRedisPat = regexp.MustCompile(`\b([\w\d.-]{1,100}\.redis\.cache\.windows\.net:6380),password=([^,]{44}),ssl=True,abortConnect=False\b`)
 )
 
@@ -39,7 +39,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range azureMatches {
 		host := match[1]
 		password := match[2]
-        urlMatch := fmt.Sprintf("rediss://:%s@%s", password, host)
+		urlMatch := fmt.Sprintf("rediss://:%s@%s", password, host)
 
 		// Skip findings where the password only has "*" characters, this is a redacted password
 		if strings.Trim(password, "*") == "" {
@@ -79,8 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		results = append(results, s)
 	}
-
-
 
 	for _, match := range matches {
 		urlMatch := match[0]

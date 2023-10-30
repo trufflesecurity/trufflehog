@@ -47,7 +47,7 @@ func TestURI_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Redis,
 					Verified:     false,
-					Redacted:     "redis://user:*******@redis.com",
+					Redacted:     "redis://user:********@redis.com",
 				},
 			},
 			wantErr: false,
@@ -61,9 +61,6 @@ func TestURI_FromChunk(t *testing.T) {
 				t.Errorf("URI.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// if os.Getenv("FORCE_PASS_DIFF") == "true" {
-			// 	return
-			// }
 			for i := range got {
 				got[i].Raw = nil
 			}
