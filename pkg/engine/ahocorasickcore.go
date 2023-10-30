@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
-
+	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -13,8 +13,9 @@ import (
 // Multiple detectors can have the same detector type but different versions.
 // This allows us to identify a detector by its type and version.
 type detectorKey struct {
-	detectorType detectorspb.DetectorType
-	version      int
+	detectorType       detectorspb.DetectorType
+	version            int
+	customDetectorName string
 }
 
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
@@ -85,5 +86,9 @@ func createDetectorKey(d detectors.Detector) detectorKey {
 	if v, ok := d.(detectors.Versioner); ok {
 		version = v.Version()
 	}
-	return detectorKey{detectorType: detectorType, version: version}
+	var customDetectorName string
+	if r, ok := d.(*custom_detectors.CustomRegexWebhook); ok {
+		customDetectorName = r.GetName()
+	}
+	return detectorKey{detectorType: detectorType, version: version, customDetectorName: customDetectorName}
 }
