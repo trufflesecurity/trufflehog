@@ -78,8 +78,8 @@ func TestAhoCorasickCore_MultipleCustomDetectorsMatchable(t *testing.T) {
 	matches := ac.MatchString("a")
 	assert.Equal(t, 1, len(matches))
 
-	matchingDetectors := make(map[detectorspb.DetectorType]detectors.Detector)
-	ac.PopulateDetectorsByMatch(matches[0], matchingDetectors)
+	matchingDetectors := make([]detectors.Detector, 0, 2)
+	ac.PopulateDetectorsByMatch(matches[0], &matchingDetectors)
 	assert.Equal(t, 2, len(matchingDetectors))
 	assert.Contains(t, matchingDetectors, customDetector1)
 	assert.Contains(t, matchingDetectors, customDetector2)
@@ -95,8 +95,8 @@ func TestAhoCorasickCore_MultipleDetectorVersionsMatchable(t *testing.T) {
 	matches := ac.MatchString("a")
 	assert.Equal(t, 1, len(matches))
 
-	matchingDetectors := make(map[detectorspb.DetectorType]detectors.Detector)
-	ac.PopulateDetectorsByMatch(matches[0], matchingDetectors)
+	matchingDetectors := make([]detectors.Detector, 0, 2)
+	ac.PopulateDetectorsByMatch(matches[0], &matchingDetectors)
 	assert.Equal(t, 2, len(matchingDetectors))
 	assert.Contains(t, matchingDetectors, v1)
 	assert.Contains(t, matchingDetectors, v2)

@@ -69,13 +69,13 @@ func (ac *AhoCorasickCore) MatchString(input string) []*ahocorasick.Match {
 // PopulateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
 // This method is designed to reuse the same map for performance optimization,
 // reducing the need for repeated allocations within each detector worker in the engine.
-func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, detectors map[detectorspb.DetectorType]detectors.Detector) bool {
+func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, detectors *[]detectors.Detector) bool {
 	matchedDetectorKeys, ok := ac.keywordsToDetectors[match.MatchString()]
 	if !ok {
 		return false
 	}
 	for _, key := range matchedDetectorKeys {
-		detectors[key.detectorType] = ac.detectorsByKey[key]
+		*detectors = append(*detectors, ac.detectorsByKey[key])
 	}
 	return true
 }
