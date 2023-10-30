@@ -11,7 +11,9 @@ import (
 
 // detectorKey is used to identify a detector in the keywordsToDetectors map.
 // Multiple detectors can have the same detector type but different versions.
-// This allows us to identify a detector by its type and version.
+// This allows us to identify a detector by its type and version. An
+// additional (optional) field is provided to disambiguate multiple custom
+// detectors.
 type detectorKey struct {
 	detectorType       detectorspb.DetectorType
 	version            int
