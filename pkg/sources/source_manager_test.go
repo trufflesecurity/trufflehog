@@ -319,9 +319,9 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	hook := NewUnitHook(context.TODO())
 
 	input := []unitChunk{
-		{unit: "one", output: "bar"},
-		{unit: "two", err: "oh no"},
-		{unit: "three", err: "not again"},
+		{unit: "1 one", output: "bar"},
+		{unit: "2 two", err: "oh no"},
+		{unit: "3 three", err: "not again"},
 	}
 	mgr := NewManager(
 		WithBufferedOutput(8),
@@ -337,11 +337,11 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	metrics := hook.UnitMetrics()
 	assert.Equal(t, 3, len(metrics))
 	sort.Slice(metrics, func(i, j int) bool {
-		return metrics[i].EndTime.Before(metrics[j].EndTime)
+		return metrics[i].Unit.SourceUnitID() < metrics[j].Unit.SourceUnitID()
 	})
 	m0, m1, m2 := metrics[0], metrics[1], metrics[2]
 
-	assert.Equal(t, "one", m0.Unit.SourceUnitID())
+	assert.Equal(t, "1 one", m0.Unit.SourceUnitID())
 	assert.Equal(t, uint64(1), m0.TotalChunks)
 	assert.Equal(t, uint64(3), m0.TotalBytes)
 	assert.NotZero(t, m0.StartTime)
@@ -349,7 +349,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m0.ElapsedTime())
 	assert.Equal(t, 0, len(m0.Errors))
 
-	assert.Equal(t, "two", m1.Unit.SourceUnitID())
+	assert.Equal(t, "2 two", m1.Unit.SourceUnitID())
 	assert.Equal(t, uint64(0), m1.TotalChunks)
 	assert.Equal(t, uint64(0), m1.TotalBytes)
 	assert.NotZero(t, m1.StartTime)
@@ -357,7 +357,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m1.ElapsedTime())
 	assert.Equal(t, 1, len(m1.Errors))
 
-	assert.Equal(t, "three", m2.Unit.SourceUnitID())
+	assert.Equal(t, "3 three", m2.Unit.SourceUnitID())
 	assert.Equal(t, uint64(0), m2.TotalChunks)
 	assert.Equal(t, uint64(0), m2.TotalBytes)
 	assert.NotZero(t, m2.StartTime)

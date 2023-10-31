@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/proto"

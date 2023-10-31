@@ -7,7 +7,7 @@ import (
 	"testing"
 	"testing/iotest"
 
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"

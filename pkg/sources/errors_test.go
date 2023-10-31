@@ -1,8 +1,8 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 )
@@ -40,7 +40,7 @@ func TestNewScanErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := NewScanErrors()
 
-			if !reflect.DeepEqual(got, tc.want) {
+			if !errors.Is(got.Errors(), tc.want.Errors()) {
 				t.Errorf("got %+v, want %+v", got, tc.want)
 			}
 		})
