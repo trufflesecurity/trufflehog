@@ -317,7 +317,12 @@ func TestDetermineMimeType(t *testing.T) {
 			name:       "Truncated JPEG file",
 			input:      io.LimitReader(bytes.NewReader(jpegBytes), 2),
 			expected:   mimeType("unknown"),
-			shouldFail: true, // Explicit failure expectation
+			shouldFail: true,
+		},
+		{
+			name:       "Empty reader",
+			input:      bytes.NewReader([]byte{}),
+			shouldFail: true,
 		},
 	}
 
