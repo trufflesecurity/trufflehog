@@ -44,6 +44,7 @@ enum SourceType {
   SOURCE_TYPE_SHAREPOINT = 29;
   SOURCE_TYPE_GCS_UNAUTHED = 30;
   SOURCE_TYPE_AZURE_REPOS = 31;
+  SOURCE_TYPE_TRAVISCI = 32;
 }
 
 message LocalSource {
@@ -84,6 +85,13 @@ message Bitbucket {
 }
 
 message CircleCI {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+  }
+}
+
+message TravisCI {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
     string token = 2;
