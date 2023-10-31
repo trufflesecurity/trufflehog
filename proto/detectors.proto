@@ -443,7 +443,7 @@ enum DetectorType {
   BitcoinAverage = 432;
   CommerceJS = 433;
   DetectLanguage = 434;
-  FakeJSON = 435;
+  FakeJSON = 435 [deprecated = true];
   Graphhopper = 436;
   Lexigram = 437;
   LinkPreview = 438;

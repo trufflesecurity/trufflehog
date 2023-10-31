@@ -236,7 +236,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/extractorapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/facebookoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/faceplusplus"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fakejson"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fastforex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fastlypersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/feedier"
@@ -1112,7 +1111,6 @@ func DefaultDetectors() []detectors.Detector {
 		bitcoinaverage.Scanner{},
 		zipcodeapi.Scanner{},
 		gyazo.Scanner{},
-		fakejson.Scanner{},
 		// sparkpost.Scanner{},
 		locationiq.Scanner{},
 		saucelabs.Scanner{},
