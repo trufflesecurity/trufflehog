@@ -251,11 +251,12 @@ var mimeTools = map[mimeType][]string{
 var extractToolCache map[string]bool
 
 func init() {
-	extractToolCache = make(map[string]bool, len(mimeTools))
 	// Preload the extractToolCache with the availability status of each required tool.
+	extractToolCache = make(map[string]bool)
 	for _, tools := range mimeTools {
 		for _, tool := range tools {
-			extractToolCache[tool] = isToolInstalled(tool)
+			_, err := exec.LookPath(tool)
+			extractToolCache[tool] = err == nil
 		}
 	}
 }
@@ -267,24 +268,11 @@ func ensureToolsForMimeType(mimeType mimeType) error {
 	}
 
 	for _, tool := range tools {
-		if !isToolInstalled(tool) {
+		if installed, ok := extractToolCache[tool]; !ok || !installed {
 			return fmt.Errorf("required tool %s is not installed", tool)
 		}
 	}
 	return nil
-}
-
-func isToolInstalled(tool string) bool {
-	if installed, ok := extractToolCache[tool]; ok {
-		return installed
-	}
-
-	// If the tool isn't in the cache, check its availability and cache it.
-	_, err := exec.LookPath(tool)
-	installed := err == nil
-	// Cache the result to avoid future filesystem checks for this tool.
-	extractToolCache[tool] = installed
-	return installed
 }
 
 // HandleSpecialized takes a file path and an io.Reader representing the input file,
