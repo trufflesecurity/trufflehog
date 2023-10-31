@@ -6,10 +6,11 @@ package azurebatch
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -103,7 +104,7 @@ func TestAzurebatch_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-            ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw","Redacted", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "Redacted", "VerificationError")
 
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AzureBatch.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
