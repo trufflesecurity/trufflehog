@@ -20,20 +20,20 @@ import (
 // for poorly defined regexps.
 const maxTotalMatches = 100
 
-// customRegexWebhook is a CustomRegex with webhook validation that is
+// CustomRegexWebhook is a CustomRegex with webhook validation that is
 // guaranteed to be valid (assuming the data is not changed after
 // initialization).
-type customRegexWebhook struct {
+type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*customRegexWebhook)(nil)
+var _ detectors.Detector = (*CustomRegexWebhook)(nil)
 
-// NewWebhookCustomRegex initializes and validates a customRegexWebhook. An
+// NewWebhookCustomRegex initializes and validates a CustomRegexWebhook. An
 // unexported type is intentionally returned here to ensure the values have
 // been validated.
-func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*customRegexWebhook, error) {
+func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebhook, error) {
 	// TODO: Return all validation errors.
 	if err := ValidateKeywords(pb.Keywords); err != nil {
 		return nil, err
@@ -52,12 +52,12 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*customRegexWebh
 	}
 
 	// TODO: Copy only necessary data out of pb.
-	return &customRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{pb}, nil
 }
 
 var httpClient = common.SaneHttpClient()
 
-func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 	regexMatches := make(map[string][][]string, len(c.GetRegex()))
 
@@ -109,7 +109,7 @@ func (c *customRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	return results, nil
 }
 
-func (c *customRegexWebhook) createResults(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
+func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
 	if common.IsDone(ctx) {
 		// TODO: Log we're possibly leaving out results.
 		return ctx.Err()
@@ -180,7 +180,7 @@ func (c *customRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 }
 
-func (c *customRegexWebhook) Keywords() []string {
+func (c *CustomRegexWebhook) Keywords() []string {
 	return c.GetKeywords()
 }
 
@@ -245,6 +245,6 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 	return matches
 }
 
-func (c *customRegexWebhook) Type() detectorspb.DetectorType {
+func (c *CustomRegexWebhook) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CustomRegex
 }
