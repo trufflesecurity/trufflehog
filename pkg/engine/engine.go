@@ -469,8 +469,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				matches := e.ahoCorasickCore.MatchString(string(decoded.Chunk.Data))
-				e.ahoCorasickCore.PopulateDetectorsByMatches(matches, &chunkSpecificDetectors)
+				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), &chunkSpecificDetectors)
 
 				for _, detector := range chunkSpecificDetectors {
 					decoded.Chunk.Verify = e.verify

@@ -108,10 +108,8 @@ func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	matches := ac.MatchString("a a")
-
 	matchingDetectors := make([]detectors.Detector, 0, 1)
-	ac.PopulateDetectorsByMatches(matches, &matchingDetectors)
+	ac.PopulateMatchingDetectors("a a", &matchingDetectors)
 	assert.Equal(t, 1, len(matchingDetectors))
 	assert.Contains(t, matchingDetectors, d)
 }

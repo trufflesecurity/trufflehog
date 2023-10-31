@@ -80,13 +80,13 @@ func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, de
 	return true
 }
 
-// PopulateDetectorsByMatches populates the given detector slice based on the Aho-Corasick match results.
-// This method populates an existing slice rather than allocating a new one because it will be called
-// once per chunk and that many allocations has a noticeable performance cost.
-func (ac *AhoCorasickCore) PopulateDetectorsByMatches(matches []*ahocorasick.Match, detectors *[]detectors.Detector) bool {
+// PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
+// provided input. This method populates an existing slice rather than allocating a new one because
+// it will be called once per chunk and that many allocations has a noticeable performance cost.
+func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors *[]detectors.Detector) bool {
 	seen := make(map[string]struct{})
 	gotAny := false
-	for _, m := range matches {
+	for _, m := range ac.prefilter.MatchString(strings.ToLower(chunkData)) {
 		// Everything should be lowercased by now, so we won't do it again
 		s := m.MatchString()
 
