@@ -965,7 +965,8 @@ enum DetectorType {
   DenoDeploy = 954;
   Stripo = 955;
   ReplyIO = 956;
-  LogzIO = 957;
+  AzureBatch = 957;
+  LogzIO = 958;
 }
 
 message Result {
