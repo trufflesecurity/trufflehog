@@ -308,16 +308,16 @@ func TestDetermineMimeType(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name:       "Truncated JPEG file",
-			input:      io.LimitReader(bytes.NewReader(jpegBytes), 2),
-			expected:   mimeType("unknown"),
-			shouldFail: true, // Explicit failure expectation
-		},
-		{
 			name:       "RPM file",
 			input:      bytes.NewReader(rpmBytes),
 			expected:   mimeType("application/x-rpm"),
 			shouldFail: false,
+		},
+		{
+			name:       "Truncated JPEG file",
+			input:      io.LimitReader(bytes.NewReader(jpegBytes), 2),
+			expected:   mimeType("unknown"),
+			shouldFail: true, // Explicit failure expectation
 		},
 	}
 
