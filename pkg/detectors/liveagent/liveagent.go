@@ -22,13 +22,13 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	domainPat = regexp.MustCompile(`\b(https?://[A-Za-z0-9-]+\.ladesk\.com)\b`)
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"liveagent"}) + `\b([a-zA-Z0-9]{32})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"liveagent", "apikey"}) + `\b([a-zA-Z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"liveagent"}
+	return []string{"liveagent", "ladesk"}
 }
 
 type response struct {
