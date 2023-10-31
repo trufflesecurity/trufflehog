@@ -222,7 +222,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), s.conn.IncludeRepos, s.conn.IgnoreRepos)
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(),
+		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
+		s.conn.GetIgnoreRepos(),
+	)
 	s.memberCache = make(map[string]struct{})
 
 	s.repoSizes = newRepoSize()
@@ -233,7 +236,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			aCtx.Logger().Error(err, "invalid repository", "repo", repo)
 			continue
 		}
-		s.filteredRepoCache.Set(r, r)
+		s.filteredRepoCache.Set(repo, r)
 	}
 
 	s.includeIssueComments = s.conn.IncludeIssueComments
@@ -508,12 +511,12 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint strin
 
 	for _, org := range s.orgsCache.Keys() {
 		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+			s.log.Error(err, "error fetching repos for org")
 		}
 
 		// We probably don't need to do this, since getting repos by org makes more sense?
 		if err := s.getReposByUser(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+			s.log.Error(err, "error fetching repos for user")
 		}
 
 		if s.conn.ScanUsers {
@@ -825,38 +828,51 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 // Unauthenticated access to most github endpoints has a rate limit of 60 requests per hour.
 // This will likely only be exhausted if many users/orgs are scanned without auth
 func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
-	limit, ok := errIn.(*github.RateLimitError)
-	if !ok {
+	var (
+		knownWait  = true
+		remaining  = 0
+		retryAfter time.Duration
+	)
+
+	// GitHub has both primary (RateLimit) and secondary (AbuseRateLimit) errors.
+	var rateLimit *github.RateLimitError
+	var abuseLimit *github.AbuseRateLimitError
+	if errors.As(errIn, &rateLimit) {
+		// Do nothing
+	} else if errors.As(errIn, &abuseLimit) {
+		retryAfter = abuseLimit.GetRetryAfter()
+	} else {
 		return false
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-
-	if res != nil {
-		knownWait := true
-		remaining, err := strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
+	// Parse retry information from response headers, unless a Retry-After value was already provided.
+	// https://docs.github.com/en/rest/overview/resources-in-the-rest-api#exceeding-the-rate-limit
+	if retryAfter <= 0 && res != nil {
+		var err error
+		remaining, err = strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
 		if err != nil {
 			knownWait = false
 		}
+
 		resetTime, err := strconv.Atoi(res.Header.Get("x-ratelimit-reset"))
 		if err != nil || resetTime == 0 {
 			knownWait = false
-		}
-
-		if knownWait && remaining == 0 {
-			waitTime := int64(resetTime) - time.Now().Unix()
-			if waitTime > 0 {
-				duration := time.Duration(waitTime+1) * time.Second
-				s.log.V(2).Info("rate limited", "resumeTime", time.Now().Add(duration).String())
-				time.Sleep(duration)
-				githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(duration.Seconds())
-				return true
-			}
+		} else if resetTime > 0 {
+			retryAfter = time.Duration(int64(resetTime)-time.Now().Unix()) * time.Second
 		}
 	}
 
-	s.log.V(2).Info("handling rate limit (5 minutes retry)", "retry-after", limit.Message)
-	time.Sleep(time.Minute * 5)
+	resumeTime := time.Now().Add(retryAfter).String()
+	if knownWait && remaining == 0 && retryAfter > 0 {
+		s.log.V(2).Info("rate limited", "retry_after", retryAfter.String(), "resume_time", resumeTime)
+	} else {
+		// TODO: Use exponential backoff instead of static retry time.
+		retryAfter = time.Minute * 5
+		s.log.V(2).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", resumeTime)
+	}
+	time.Sleep(retryAfter)
+	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
 	return true
 }
 
@@ -1076,7 +1092,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, chunksChan c
 }
 
 func (s *Source) processGistComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github gist comments", "repository", repoPath)
+	ctx.Logger().V(2).Info("scanning github gist comments", "repository", repoPath)
 	// GitHub Gist URL.
 	gistID, err := extractGistID(trimmedURL)
 	if err != nil {
@@ -1131,9 +1147,10 @@ var (
 )
 
 type repoInfo struct {
-	owner    string
-	repo     string
-	repoPath string
+	owner      string
+	repo       string
+	repoPath   string
+	visibility source_metadatapb.Visibility
 }
 
 func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimmedURL []string, repoURL *url.URL, chunksChan chan *sources.Chunk) error {
@@ -1144,22 +1161,33 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 	owner := trimmedURL[1]
 	repo := trimmedURL[2]
 
-	repoInfo := repoInfo{owner: owner, repo: repo, repoPath: repoPath}
+	if !(s.includeIssueComments || s.includePRComments) {
+		return nil
+	}
+
+	repoInfo := repoInfo{
+		owner:      owner,
+		repo:       repo,
+		repoPath:   repoPath,
+		visibility: s.visibilityOf(ctx, repoPath),
+	}
 
 	if s.includeIssueComments {
-		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
+		ctx.Logger().V(2).Info("scanning github issues", "repository", repoInfo.repoPath)
+		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
 	}
 
 	if s.includePRComments {
-		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
+		ctx.Logger().V(2).Info("scanning github pull requests", "repository", repoInfo.repoPath)
+		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
-		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
 			return err
 		}
 	}
@@ -1169,8 +1197,6 @@ func (s *Source) processRepoComments(ctx context.Context, repoPath string, trimm
 }
 
 func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github issue descriptions", "repository", info.repoPath)
-
 	bodyTextsOpts := &github.IssueListByRepoOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1191,7 +1217,7 @@ func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan ch
 			return err
 		}
 
-		if err = s.chunkIssues(ctx, info.repo, info.repoPath, issues, chunksChan); err != nil {
+		if err = s.chunkIssues(ctx, info, issues, chunksChan); err != nil {
 			return err
 		}
 
@@ -1205,8 +1231,6 @@ func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan ch
 }
 
 func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github issue comments", "repository", info.repoPath)
-
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
@@ -1226,7 +1250,7 @@ func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunks
 			return err
 		}
 
-		if err = s.chunkIssueComments(ctx, info.repo, info.repoPath, issueComments, chunksChan); err != nil {
+		if err = s.chunkIssueComments(ctx, info, issueComments, chunksChan); err != nil {
 			return err
 		}
 
@@ -1240,8 +1264,6 @@ func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunks
 }
 
 func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github pull request descriptions", "repository", info.repoPath)
-
 	prOpts := &github.PullRequestListOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1262,7 +1284,7 @@ func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan 
 			return err
 		}
 
-		if err = s.chunkPullRequests(ctx, info.repo, prs, chunksChan); err != nil {
+		if err = s.chunkPullRequests(ctx, info, prs, chunksChan); err != nil {
 			return err
 		}
 
@@ -1276,8 +1298,6 @@ func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan 
 }
 
 func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksChan chan *sources.Chunk) error {
-	s.log.Info("scanning github pull request comments", "repository", info.repoPath)
-
 	prOpts := &github.PullRequestListCommentsOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1297,7 +1317,7 @@ func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksCha
 			return err
 		}
 
-		if err = s.chunkPullRequestComments(ctx, info.repo, prComments, chunksChan); err != nil {
+		if err = s.chunkPullRequestComments(ctx, info, prComments, chunksChan); err != nil {
 			return err
 		}
 
@@ -1310,7 +1330,7 @@ func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksCha
 	return nil
 }
 
-func (s *Source) chunkIssues(ctx context.Context, repo, repoPath string, issues []*github.Issue, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, chunksChan chan *sources.Chunk) error {
 	for _, issue := range issues {
 
 		// Skip pull requests since covered by processPRs.
@@ -1330,9 +1350,9 @@ func (s *Source) chunkIssues(ctx context.Context, repo, repoPath string, issues 
 						Link:       sanitizer.UTF8(issue.GetHTMLURL()),
 						Username:   sanitizer.UTF8(issue.GetUser().GetLogin()),
 						Email:      sanitizer.UTF8(issue.GetUser().GetEmail()),
-						Repository: sanitizer.UTF8(repo),
+						Repository: sanitizer.UTF8(repoInfo.repo),
 						Timestamp:  sanitizer.UTF8(issue.GetCreatedAt().String()),
-						Visibility: s.visibilityOf(ctx, repoPath),
+						Visibility: repoInfo.visibility,
 					},
 				},
 			},
@@ -1349,7 +1369,7 @@ func (s *Source) chunkIssues(ctx context.Context, repo, repoPath string, issues 
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1363,9 +1383,9 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, 
 						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
 						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
 						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
-						Repository: sanitizer.UTF8(repo),
+						Repository: sanitizer.UTF8(repoInfo.repo),
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
-						Visibility: s.visibilityOf(ctx, repoPath),
+						Visibility: repoInfo.visibility,
 					},
 				},
 			},
@@ -1382,7 +1402,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repo, repoPath string, 
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1396,8 +1416,9 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 						Link:       sanitizer.UTF8(comment.GetHTMLURL()),
 						Username:   sanitizer.UTF8(comment.GetUser().GetLogin()),
 						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
-						Repository: sanitizer.UTF8(repo),
+						Repository: sanitizer.UTF8(repoInfo.repo),
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
+						Visibility: repoInfo.visibility,
 					},
 				},
 			},
@@ -1414,7 +1435,7 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repo string, comm
 	return nil
 }
 
-func (s *Source) chunkPullRequests(ctx context.Context, repo string, prs []*github.PullRequest, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []*github.PullRequest, chunksChan chan *sources.Chunk) error {
 	for _, pr := range prs {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1428,8 +1449,9 @@ func (s *Source) chunkPullRequests(ctx context.Context, repo string, prs []*gith
 						Link:       sanitizer.UTF8(pr.GetHTMLURL()),
 						Username:   sanitizer.UTF8(pr.GetUser().GetLogin()),
 						Email:      sanitizer.UTF8(pr.GetUser().GetEmail()),
-						Repository: sanitizer.UTF8(repo),
+						Repository: sanitizer.UTF8(repoInfo.repo),
 						Timestamp:  sanitizer.UTF8(pr.GetCreatedAt().String()),
+						Visibility: repoInfo.visibility,
 					},
 				},
 			},
@@ -1462,8 +1484,7 @@ func (s *Source) chunkGistComments(ctx context.Context, gistUrl string, comments
 						Email:      sanitizer.UTF8(comment.GetUser().GetEmail()),
 						Repository: sanitizer.UTF8(gistUrl),
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt().String()),
-						// Fetching this information requires making an additional API call.
-						// We may want to include this in the future.
+						// TODO: Fetching this requires making an additional API call. We may want to include this in the future.
 						// Visibility: s.visibilityOf(ctx, repoPath),
 					},
 				},

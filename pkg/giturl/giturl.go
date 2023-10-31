@@ -158,6 +158,11 @@ func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) strin
 		return link
 	}
 
+	if newLine <= 0 {
+		// Don't change the link if the line number is 0.
+		return link
+	}
+
 	switch determineProvider(link) {
 	case providerBitbucket:
 		// For Bitbucket, it doesn't support line links (based on the GenerateLink function).
