@@ -310,7 +310,7 @@ func TestDetermineMimeType(t *testing.T) {
 		{
 			name:       "RPM file",
 			input:      bytes.NewReader(rpmBytes),
-			expected:   mimeType("application/x-rpm"),
+			expected:   rpmMimeType,
 			shouldFail: false,
 		},
 		{
