@@ -268,7 +268,7 @@ func ensureToolsForMimeType(mimeType mimeType) error {
 	}
 
 	for _, tool := range tools {
-		if installed, ok := extractToolCache[tool]; !ok || !installed {
+		if installed := extractToolCache[tool]; !installed {
 			return fmt.Errorf("required tool %s is not installed", tool)
 		}
 	}
