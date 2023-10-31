@@ -482,7 +482,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/parsers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/parseur"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/partnerstack"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/passbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pastebin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paydirtapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/paymoapp"
@@ -1218,7 +1217,6 @@ func DefaultDetectors() []detectors.Detector {
 		optimizely.Scanner{},
 		censys.Scanner{},
 		scraperbox.Scanner{},
-		passbase.Scanner{},
 		ticketmaster.Scanner{},
 		iexcloud.Scanner{},
 		partnerstack.Scanner{},
