@@ -229,6 +229,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etsyapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eventbrite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/everhour"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangerateapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangeratesapi"
@@ -1569,6 +1570,7 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
+		eventbrite.Scanner{},
 	}
 
 }
