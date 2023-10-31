@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"fmt"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -18,8 +19,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Oauth2 client ID and secret
-	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{20})\b`)
-	oauth2ClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{40})\b`)
+	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github", "id"}) + `\b([a-f0-9]{20})\b`)
+	oauth2ClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github", "secret"}) + `\b([a-f0-9]{40})\b`)
 )
 
 const (
@@ -52,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GitHubOauth2,
 				Raw:          []byte(idMatch[1]),
-				RawV2:        []byte(idMatch[1] + secretMatch[1]),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", idMatch[1] + secretMatch[1])),
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
