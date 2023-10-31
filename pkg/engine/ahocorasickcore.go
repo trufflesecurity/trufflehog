@@ -84,10 +84,20 @@ func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, de
 // This method populates an existing slice rather than allocating a new one because it will be called
 // once per chunk and that many allocations has a noticeable performance cost.
 func (ac *AhoCorasickCore) PopulateDetectorsByMatches(matches []*ahocorasick.Match, detectors *[]detectors.Detector) bool {
+	seen := make(map[string]struct{})
 	gotAny := false
 	for _, m := range matches {
+		// Everything should be lowercased by now, so we won't do it again
+		s := m.MatchString()
+
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+
 		gotAny = ac.PopulateDetectorsByMatch(m, detectors) || gotAny
 	}
+
 	return gotAny
 }
 
