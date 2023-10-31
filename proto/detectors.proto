@@ -960,6 +960,11 @@ enum DetectorType {
   AppOptics = 949;
   Metabase = 950;
   CoinbaseWaaS = 951;
+  LemonSqueezy = 952;
+  Budibase = 953;
+  DenoDeploy = 954;
+  Stripo = 955;
+  ReplyIO = 956;
 }
 
 message Result {
