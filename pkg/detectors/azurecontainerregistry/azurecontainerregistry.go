@@ -2,10 +2,10 @@ package azurecontainerregistry
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
-	"encoding/base64"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,8 +22,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-    url = regexp.MustCompile(`([a-zA-Z0-9-]{1,100})\.azurecr\.io`)
-    password = regexp.MustCompile(`\b[A-Za-z0-9+/=]{52\b}`)
+	url      = regexp.MustCompile(`([a-zA-Z0-9-]{1,100})\.azurecr\.io`)
+	password = regexp.MustCompile(`\b[A-Za-z0-9+/=]{52\b}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -67,14 +67,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				req.Header.Set("Authorization", fmt.Sprintf("Basic %s", auth))
-				resp, err := client.Do(req)
-				if err != nil {
-					continue
-				}
-				defer resp.Body.Close()
-
-				if resp.StatusCode == http.StatusOK {
-					s1.Verified = true
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
+					} else if res.StatusCode == 401 {
+						// The secret is determinately not verified (nothing to do)
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					}
+				} else {
+					s1.VerificationError = err
 				}
 			}
 
