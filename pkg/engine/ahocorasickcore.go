@@ -80,6 +80,17 @@ func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, de
 	return true
 }
 
+// PopulateDetectorsByMatches populates the given detector slice based on the Aho-Corasick match results.
+// This method populates an existing slice rather than allocating a new one because it will be called
+// once per chunk and that many allocations has a noticeable performance cost.
+func (ac *AhoCorasickCore) PopulateDetectorsByMatches(matches []*ahocorasick.Match, detectors *[]detectors.Detector) bool {
+	gotAny := false
+	for _, m := range matches {
+		gotAny = ac.PopulateDetectorsByMatch(m, detectors) || gotAny
+	}
+	return gotAny
+}
+
 // createDetectorKey creates a unique key for each detector. This key based on type and version,
 // it ensures faster lookups and reduces redundancy in our main detector store.
 func createDetectorKey(d detectors.Detector) detectorKey {
