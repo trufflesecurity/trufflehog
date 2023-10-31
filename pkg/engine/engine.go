@@ -485,7 +485,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						wgDoneFn: wgDetect.Done,
 					}
 				}
-				clear(chunkSpecificDetectors)
+				chunkSpecificDetectors = chunkSpecificDetectors[:0]
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
