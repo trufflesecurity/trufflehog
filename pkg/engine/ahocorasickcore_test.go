@@ -101,3 +101,17 @@ func TestAhoCorasickCore_MultipleDetectorVersionsMatchable(t *testing.T) {
 	assert.Contains(t, matchingDetectors, v1)
 	assert.Contains(t, matchingDetectors, v2)
 }
+
+func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
+	d := testDetectorV1{}
+	allDetectors := []detectors.Detector{d}
+
+	ac := NewAhoCorasickCore(allDetectors)
+
+	matches := ac.MatchString("a a")
+
+	matchingDetectors := make([]detectors.Detector, 0, 1)
+	ac.PopulateDetectorsByMatches(matches, &matchingDetectors)
+	assert.Equal(t, 1, len(matchingDetectors))
+	assert.Contains(t, matchingDetectors, d)
+}
