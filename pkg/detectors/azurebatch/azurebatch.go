@@ -90,7 +90,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if resp.StatusCode == http.StatusOK {
 					s1.Verified = true
-				} else {
 				}
 
 			}
