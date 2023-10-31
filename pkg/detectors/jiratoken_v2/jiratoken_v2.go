@@ -28,9 +28,9 @@ var (
 
 	// https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/
 	// Tokens created after Jan 18 2023 use a variable length
-	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{5,24}\.[a-zA-Z-0-9]{3,16}\.[a-zA-Z-0-9]{3,16})\b`)
-	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`)
+	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira","token"}) + `\b([A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})`)
+	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9-]+\.atlassian\.net)\b`)
+	emailPat  = regexp.MustCompile(`\b([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-z]+)\b`)
 )
 
 const (
@@ -53,7 +53,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	emails := emailPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, email := range emails {
-		email = strings.Split(email[0], " ")
 		if len(email) != 2 {
 			continue
 		}
