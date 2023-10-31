@@ -418,7 +418,7 @@ func determineMimeType(reader io.Reader) (mimeType, io.Reader, error) {
 	// If fewer bytes are read, MIME type detection may still succeed.
 	buffer := make([]byte, 512)
 	n, err := reader.Read(buffer)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return "", nil, fmt.Errorf("unable to read file for MIME type detection: %w", err)
 	}
 
