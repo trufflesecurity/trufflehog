@@ -414,9 +414,11 @@ func (a *Archive) handleNestedFileMIME(ctx logContext.Context, tempEnv tempEnv, 
 // determineMimeType reads from the provided reader to detect the MIME type.
 // It returns the detected MIME type and a new reader that includes the read portion.
 func determineMimeType(reader io.Reader) (mimeType, io.Reader, error) {
+	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// If fewer bytes are read, MIME type detection may still succeed.
 	buffer := make([]byte, 512)
 	n, err := reader.Read(buffer)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return "", nil, fmt.Errorf("unable to read file for MIME type detection: %w", err)
 	}
 
