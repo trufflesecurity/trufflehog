@@ -62,11 +62,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
-<<<<<<< HEAD
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
-=======
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
->>>>>>> 74a56de8313c2e2b0f3694b9ce9e8a030fe0c59d
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
