@@ -60,16 +60,10 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	}
 }
 
-// MatchString performs a string match using the Aho-Corasick algorithm, returning an array of matches.
-// Designed for internal use within the AhoCorasickCore component.
-func (ac *AhoCorasickCore) MatchString(input string) []*ahocorasick.Match {
-	return ac.prefilter.MatchString(strings.ToLower(input))
-}
-
-// PopulateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
+// populateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
 // This method is designed to reuse the same map for performance optimization,
 // reducing the need for repeated allocations within each detector worker in the engine.
-func (ac *AhoCorasickCore) PopulateDetectorsByMatch(match *ahocorasick.Match, detectors *[]detectors.Detector) bool {
+func (ac *AhoCorasickCore) populateDetectorsByMatch(match *ahocorasick.Match, detectors *[]detectors.Detector) bool {
 	matchedDetectorKeys, ok := ac.keywordsToDetectors[match.MatchString()]
 	if !ok {
 		return false
@@ -95,7 +89,7 @@ func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors
 		}
 		seen[s] = struct{}{}
 
-		gotAny = ac.PopulateDetectorsByMatch(m, detectors) || gotAny
+		gotAny = ac.populateDetectorsByMatch(m, detectors) || gotAny
 	}
 
 	return gotAny
