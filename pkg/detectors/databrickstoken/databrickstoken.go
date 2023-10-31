@@ -23,8 +23,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	domain = regexp.MustCompile(`([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))`)
-	keyPat = regexp.MustCompile(`\b(dapi[a-z0-9]{32})\b`)
+	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))\b`)
+	keyPat    = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -41,9 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domain.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, domainmatch := range domainMatches {
