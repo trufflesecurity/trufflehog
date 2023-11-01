@@ -21,7 +21,7 @@ func (d testDetectorV1) FromData(ctx context.Context, verify bool, data []byte) 
 }
 
 func (d testDetectorV1) Keywords() []string {
-	return []string{"a"}
+	return []string{"a", "b"}
 }
 
 func (d testDetectorV1) Type() detectorspb.DetectorType {
@@ -103,7 +103,7 @@ func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
 	ac := NewAhoCorasickCore(allDetectors)
 
 	matchingDetectors := make([]detectors.Detector, 0, 1)
-	ac.PopulateMatchingDetectors("a a", &matchingDetectors)
+	ac.PopulateMatchingDetectors("a a b b", &matchingDetectors)
 	assert.Equal(t, 1, len(matchingDetectors))
 	assert.Contains(t, matchingDetectors, d)
 }
