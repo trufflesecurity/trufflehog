@@ -236,7 +236,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				err = s.git.ScanRepo(ctx, repo, repoPath, &tt.scanOptions, chunksCh)
+				err = s.git.ScanRepo(ctx, repo, repoPath, &tt.scanOptions, sources.ChanReporter{Ch: chunksCh})
 				if err != nil {
 					panic(err)
 				}
