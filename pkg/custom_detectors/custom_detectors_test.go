@@ -105,7 +105,7 @@ func TestCustomDetectorsParsing(t *testing.T) {
 }
 
 func TestFromData_InvalidRegEx(t *testing.T) {
-	c := &customRegexWebhook{
+	c := &CustomRegexWebhook{
 		&custom_detectorspb.CustomRegex{
 			Name:     "Internal bi tool",
 			Keywords: []string{"secret_v1_", "pat_v2_"},
