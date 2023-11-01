@@ -517,7 +517,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prodpad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prospectcrm"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prospectio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/protocolsio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/proxycrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubpublishkey"
@@ -942,7 +941,6 @@ func DefaultDetectors() []detectors.Detector {
 		&delighted.Scanner{},
 		&abbysale.Scanner{},
 		&feedier.Scanner{},
-		&prospectio.Scanner{},
 		&nytimes.Scanner{},
 		&powrbot.Scanner{},
 		&magnetic.Scanner{},
