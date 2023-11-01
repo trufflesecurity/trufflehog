@@ -471,7 +471,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
 
-				for _, detector := range chunkSpecificDetectors {
+				for k, detector := range chunkSpecificDetectors {
 					decoded.Chunk.Verify = e.verify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
@@ -480,8 +480,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						decoder:  decoded.DecoderType,
 						wgDoneFn: wgDetect.Done,
 					}
+					delete(chunkSpecificDetectors, k)
 				}
-				clear(chunkSpecificDetectors)
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
