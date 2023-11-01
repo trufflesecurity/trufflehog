@@ -107,12 +107,12 @@ func TestArchiveHandler(t *testing.T) {
 }
 
 func TestHandleFile(t *testing.T) {
-	ch := make(chan *sources.Chunk, 2)
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 2)}
 
 	// Context cancels the operation.
 	canceledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
-	assert.False(t, HandleFile(canceledCtx, strings.NewReader("file"), &sources.Chunk{}, ch))
+	assert.False(t, HandleFile(canceledCtx, strings.NewReader("file"), &sources.Chunk{}, reporter))
 
 	// Only one chunk is sent on the channel.
 	// TODO: Embed a zip without making an HTTP request.
@@ -124,9 +124,9 @@ func TestHandleFile(t *testing.T) {
 	reader, err := diskbufferreader.New(resp.Body)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 0, len(ch))
-	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, ch))
-	assert.Equal(t, 1, len(ch))
+	assert.Equal(t, 0, len(reporter.Ch))
+	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, reporter))
+	assert.Equal(t, 1, len(reporter.Ch))
 }
 
 func TestReadToMax(t *testing.T) {
@@ -209,7 +209,7 @@ func TestExtractTarContent(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		ok := HandleFile(ctx, file, &sources.Chunk{}, chunkCh)
+		ok := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.True(t, ok)
 	}()
 
@@ -262,7 +262,7 @@ func TestNestedDirArchive(t *testing.T) {
 
 	go func() {
 		defer close(sourceChan)
-		HandleFile(ctx, file, &sources.Chunk{}, sourceChan)
+		HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
 	}()
 
 	count := 0

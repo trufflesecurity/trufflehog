@@ -25,7 +25,6 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -157,10 +156,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	if err := s.scanRepos(ctx, chunksChan); err != nil {
+	reporter := sources.ChanReporter{Ch: chunksChan}
+	if err := s.scanRepos(ctx, reporter); err != nil {
 		return err
 	}
-	if err := s.scanDirs(ctx, chunksChan); err != nil {
+	if err := s.scanDirs(ctx, reporter); err != nil {
 		return err
 	}
 
@@ -174,7 +174,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 // scanRepos scans the configured repositories in s.conn.Repositories.
-func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanRepos(ctx context.Context, reporter sources.ChunkReporter) error {
 	if len(s.conn.Repositories) == 0 {
 		return nil
 	}
@@ -196,7 +196,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -215,7 +215,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -234,7 +234,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				if err != nil {
 					return err
 				}
-				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan)
+				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 			}(repoURI)
 			if err != nil {
 				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
@@ -248,7 +248,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 }
 
 // scanDirs scans the configured directories in s.conn.Directories.
-func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanDirs(ctx context.Context, reporter sources.ChunkReporter) error {
 	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
 	for i, gitDir := range s.conn.Directories {
 		s.SetProgressComplete(len(s.conn.Repositories)+i, totalRepos, fmt.Sprintf("Repo: %s", gitDir), "")
@@ -272,7 +272,7 @@ func (s *Source) scanDirs(ctx context.Context, chunksChan chan *sources.Chunk) e
 				defer os.RemoveAll(repoPath)
 			}
 
-			return s.git.ScanRepo(ctx, repo, repoPath, s.scanOptions, chunksChan)
+			return s.git.ScanRepo(ctx, repo, repoPath, s.scanOptions, reporter)
 		}(gitDir)
 		if err != nil {
 			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
@@ -445,7 +445,7 @@ func (s *Git) CommitsScanned() uint64 {
 	return atomic.LoadUint64(&s.metrics.commitsScanned)
 }
 
-func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	if err := GitCmdCheck(); err != nil {
 		return err
 	}
@@ -505,18 +505,18 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 				continue
 			}
 
 			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(ctx, diff, fileName, email, hash, when, urlMetadata, chunksChan)
+				s.gitChunk(ctx, diff, fileName, email, hash, when, urlMetadata, reporter)
 				continue
 			}
 			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
-			chunksChan <- &sources.Chunk{
+			chunk := sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
 				JobID:          s.jobID,
@@ -525,12 +525,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				Data:           diff.Content.Bytes(),
 				Verify:         s.verify,
 			}
+			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, chunksChan chan *sources.Chunk) {
+func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, reporter sources.ChunkReporter) {
 	originalChunk := bufio.NewScanner(&diff.Content)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
@@ -543,7 +546,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 			if newChunkBuffer.Len() > 0 {
 				// Send the existing fragment.
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+lastOffset))
-				chunksChan <- &sources.Chunk{
+				chunk := sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
 					JobID:          s.jobID,
@@ -552,13 +555,18 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 					Verify:         s.verify,
 				}
+				if err := reporter.ChunkOk(ctx, chunk); err != nil {
+					// TODO: Return error.
+					return
+				}
+
 				newChunkBuffer.Reset()
 				lastOffset = offset
 			}
 			if len(line) > sources.ChunkSize {
 				// Send the oversize line.
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+offset))
-				chunksChan <- &sources.Chunk{
+				chunk := sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
 					JobID:          s.jobID,
@@ -566,6 +574,10 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 					SourceMetadata: metadata,
 					Data:           line,
 					Verify:         s.verify,
+				}
+				if err := reporter.ChunkOk(ctx, chunk); err != nil {
+					// TODO: Return error.
+					return
 				}
 				continue
 			}
@@ -578,7 +590,7 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 	// Send anything still in the new chunk buffer
 	if newChunkBuffer.Len() > 0 {
 		metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+lastOffset))
-		chunksChan <- &sources.Chunk{
+		chunk := sources.Chunk{
 			SourceName:     s.sourceName,
 			SourceID:       s.sourceID,
 			JobID:          s.jobID,
@@ -587,11 +599,15 @@ func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email,
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 			Verify:         s.verify,
 		}
+		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			// TODO: Return error.
+			return
+		}
 	}
 }
 
 // ScanStaged chunks staged changes.
-func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the URL metadata for reporting (may be empty).
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
@@ -652,14 +668,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, chunksChan, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
 				}
 				continue
 			}
 
 			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
-			chunksChan <- &sources.Chunk{
+			chunk := sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
 				JobID:          s.jobID,
@@ -668,12 +684,15 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				Data:           diff.Content.Bytes(),
 				Verify:         s.verify,
 			}
+			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, chunksChan chan *sources.Chunk) error {
+func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	if scanOptions == nil {
 		scanOptions = NewScanOptions()
 	}
@@ -682,11 +701,11 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	}
 	start := time.Now().Unix()
 
-	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
+	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, reporter); err != nil {
 		return err
 	}
 	if !scanOptions.Bare {
-		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, chunksChan); err != nil {
+		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter); err != nil {
 			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
 		}
 	}
@@ -934,7 +953,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *sources.Chunk, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
 	ctx.Logger().V(5).Info("handling binary file", "path", path)
 	commit, err := repo.CommitObject(commitHash)
 	if err != nil {
@@ -958,7 +977,7 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
+	if handlers.HandleFile(ctx, reader, chunkSkel, reporter) {
 		return nil
 	}
 
@@ -976,7 +995,7 @@ func handleBinary(ctx context.Context, repo *git.Repository, chunksChan chan *so
 		if err := data.Error(); err != nil {
 			return err
 		}
-		if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
+		if err := reporter.ChunkOk(ctx, chunk); err != nil {
 			return err
 		}
 	}
