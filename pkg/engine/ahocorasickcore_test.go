@@ -75,11 +75,13 @@ func TestAhoCorasickCore_MultipleCustomDetectorsMatchable(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
+	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
+	ac.PopulateMatchingDetectors("a", detectorsMap)
 	matchingDetectors := make([]detectors.Detector, 0, 2)
-	ac.PopulateMatchingDetectors("a", &matchingDetectors)
-	assert.Equal(t, 2, len(matchingDetectors))
-	assert.Contains(t, matchingDetectors, customDetector1)
-	assert.Contains(t, matchingDetectors, customDetector2)
+	for _, d := range detectorsMap {
+		matchingDetectors = append(matchingDetectors, d)
+	}
+	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }
 
 func TestAhoCorasickCore_MultipleDetectorVersionsMatchable(t *testing.T) {
@@ -89,11 +91,13 @@ func TestAhoCorasickCore_MultipleDetectorVersionsMatchable(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
+	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
+	ac.PopulateMatchingDetectors("a", detectorsMap)
 	matchingDetectors := make([]detectors.Detector, 0, 2)
-	ac.PopulateMatchingDetectors("a", &matchingDetectors)
-	assert.Equal(t, 2, len(matchingDetectors))
-	assert.Contains(t, matchingDetectors, v1)
-	assert.Contains(t, matchingDetectors, v2)
+	for _, d := range detectorsMap {
+		matchingDetectors = append(matchingDetectors, d)
+	}
+	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }
 
 func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
@@ -102,8 +106,11 @@ func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	matchingDetectors := make([]detectors.Detector, 0, 1)
-	ac.PopulateMatchingDetectors("a a b b", &matchingDetectors)
-	assert.Equal(t, 1, len(matchingDetectors))
-	assert.Contains(t, matchingDetectors, d)
+	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
+	ac.PopulateMatchingDetectors("a a b b", detectorsMap)
+	matchingDetectors := make([]detectors.Detector, 0, 2)
+	for _, d := range detectorsMap {
+		matchingDetectors = append(matchingDetectors, d)
+	}
+	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }
