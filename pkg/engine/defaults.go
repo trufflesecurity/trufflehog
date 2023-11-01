@@ -62,6 +62,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
@@ -88,6 +89,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buddyns"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/budibase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
@@ -187,6 +189,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/delighted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/demio"
+	denodeploy "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deno"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deputy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/detectlanguage"
@@ -539,6 +542,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
@@ -643,6 +647,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/strava"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/streak"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripe"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stytch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sugester"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sumologickey"
@@ -776,6 +781,7 @@ func DefaultDetectors() []detectors.Detector {
 		&alibaba.Scanner{},
 		aws.New(),
 		&azure.Scanner{},
+		&azurebatch.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlab.Scanner{},
 		&gitlabv2.Scanner{},
@@ -1560,7 +1566,11 @@ func DefaultDetectors() []detectors.Detector {
 		zerotier.Scanner{},
 		betterstack.Scanner{},
 		coinbase_waas.Scanner{},
+		replyio.Scanner{},
+		stripo.Scanner{},
 		lemonsqueezy.Scanner{},
+		denodeploy.Scanner{},
+		budibase.Scanner{},
 	}
 
 }

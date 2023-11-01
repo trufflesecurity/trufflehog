@@ -1,4 +1,7 @@
-package braintreepayments
+//go:build detectors
+// +build detectors
+
+package budibase
 
 import (
 	"context"
@@ -8,22 +11,22 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestBraintreePayments_FromChunk(t *testing.T) {
+func TestBudibase_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BRAINTREEPAYMENTS")
-	id := testSecrets.MustGetField("BRAINTREEPAYMENTS_USER")
-	inactiveSecret := testSecrets.MustGetField("BRAINTREEPAYMENTS_INACTIVE")
+	secret := testSecrets.MustGetField("BUDIBASE")
+	inactiveSecret := testSecrets.MustGetField("BUDIBASE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -40,73 +43,38 @@ func TestBraintreePayments_FromChunk(t *testing.T) {
 	}{
 		{
 			name: "found, verified",
-			s:    Scanner{useTestURL: true},
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a braintree secret %s within braintree %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
+					DetectorType: detectorspb.DetectorType_Budibase,
 					Verified:     true,
 				},
 			},
-			wantErr: false,
-		},
-		{
-			name: "found, verified but unexpected api surface",
-			s: Scanner{
-				client: common.ConstantResponseHttpClient(404, ""),
-			},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a braintree secret %s within braintree %s", secret, id)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
-					Verified:     false,
-				},
-			},
 			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, would be verified if not for timeout",
-			s: Scanner{
-				client: common.SaneHttpClientTimeOut(1 * time.Microsecond),
-			},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a braintree secret %s within braintree %s", secret, id)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, unverified",
-			s:    Scanner{useTestURL: true},
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a braintree secret %s within braintree %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_BraintreePayments,
+					DetectorType: detectorspb.DetectorType_Budibase,
 					Verified:     false,
+					VerificationError: fmt.Errorf("unexpected HTTP response status 403"),
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
@@ -116,15 +84,17 @@ func TestBraintreePayments_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:    nil,
-			wantErr: false,
+			want:                nil,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
+		
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("BraintreePayments.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Budibase.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -135,10 +105,9 @@ func TestBraintreePayments_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("BraintreePayments.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Budibase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
