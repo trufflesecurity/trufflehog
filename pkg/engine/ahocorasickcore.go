@@ -13,7 +13,9 @@ import (
 // Multiple detectors can have the same detector type but different versions.
 // This allows us to identify a detector by its type and version. An
 // additional (optional) field is provided to disambiguate multiple custom
-// detectors.
+// detectors. This type is exported even though none of its fields are so
+// that the AhoCorasickCore can populate passed-in maps keyed on this type
+// without exposing any of its internals to consumers.
 type DetectorKey struct {
 	detectorType       detectorspb.DetectorType
 	version            int
@@ -61,8 +63,8 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 }
 
 // populateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
-// This method is designed to reuse the same map for performance optimization,
-// reducing the need for repeated allocations within each detector worker in the engine.
+// This method populates an existing map rather than allocating a new one to avoid allocating a new
+// map for every match.
 func (ac *AhoCorasickCore) populateDetectorsByMatch(match *ahocorasick.Match, detectors map[DetectorKey]detectors.Detector) bool {
 	matchedDetectorKeys, ok := ac.keywordsToDetectors[match.MatchString()]
 	if !ok {
@@ -75,7 +77,7 @@ func (ac *AhoCorasickCore) populateDetectorsByMatch(match *ahocorasick.Match, de
 }
 
 // PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
-// provided input. This method populates an existing slice rather than allocating a new one because
+// provided input. This method populates an existing map rather than allocating a new one because
 // it will be called once per chunk and that many allocations has a noticeable performance cost.
 func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors map[DetectorKey]detectors.Detector) bool {
 	seen := make(map[string]struct{})
@@ -95,8 +97,8 @@ func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors
 	return gotAny
 }
 
-// createDetectorKey creates a unique key for each detector. This key based on type and version,
-// it ensures faster lookups and reduces redundancy in our main detector store.
+// createDetectorKey creates a unique key for each detector from its type, version, and, for
+// custom regex detectors, its name.
 func createDetectorKey(d detectors.Detector) DetectorKey {
 	detectorType := d.Type()
 	var version int
