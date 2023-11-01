@@ -80,8 +80,11 @@ func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sourc
 }
 
 // Ensure the Source satisfies the interfaces at compile time.
-var _ sources.Source = (*Source)(nil)
-var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ interface {
+	sources.Source
+	sources.SourceUnitEnumChunker
+	sources.SourceUnitUnmarshaller
+} = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -179,70 +182,51 @@ func (s *Source) scanRepos(ctx context.Context, reporter sources.ChunkReporter) 
 		return nil
 	}
 	totalRepos := len(s.conn.Repositories) + len(s.conn.Directories)
-	// TODO: refactor to remove duplicate code
+	for i, repoURI := range s.conn.Repositories {
+		s.SetProgressComplete(i, totalRepos, fmt.Sprintf("Repo: %s", repoURI), "")
+		if len(repoURI) == 0 {
+			continue
+		}
+		if err := s.scanRepo(ctx, repoURI, reporter); err != nil {
+			ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
+			continue
+		}
+	}
+	return nil
+}
+
+// scanRepo scans a single provided repository.
+func (s *Source) scanRepo(ctx context.Context, repoURI string, reporter sources.ChunkReporter) error {
+	var cloneFunc func() (string, *git.Repository, error)
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.Git_BasicAuth:
-		user := cred.BasicAuth.Username
-		token := cred.BasicAuth.Password
-
-		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, totalRepos, fmt.Sprintf("Repo: %s", repoURI), "")
-			if len(repoURI) == 0 {
-				continue
-			}
-			err := func(repoURI string) error {
-				path, repo, err := CloneRepoUsingToken(ctx, token, repoURI, user)
-				defer os.RemoveAll(path)
-				if err != nil {
-					return err
-				}
-				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
-			}(repoURI)
-			if err != nil {
-				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
-				continue
-			}
+		cloneFunc = func() (string, *git.Repository, error) {
+			user := cred.BasicAuth.Username
+			token := cred.BasicAuth.Password
+			return CloneRepoUsingToken(ctx, token, repoURI, user)
 		}
 	case *sourcespb.Git_Unauthenticated:
-		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, totalRepos, fmt.Sprintf("Repo: %s", repoURI), "")
-			if len(repoURI) == 0 {
-				continue
-			}
-			err := func(repoURI string) error {
-				path, repo, err := CloneRepoUsingUnauthenticated(ctx, repoURI)
-				defer os.RemoveAll(path)
-				if err != nil {
-					return err
-				}
-				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
-			}(repoURI)
-			if err != nil {
-				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
-				continue
-			}
+		cloneFunc = func() (string, *git.Repository, error) {
+			return CloneRepoUsingUnauthenticated(ctx, repoURI)
 		}
 	case *sourcespb.Git_SshAuth:
-		for i, repoURI := range s.conn.Repositories {
-			s.SetProgressComplete(i, totalRepos, fmt.Sprintf("Repo: %s", repoURI), "")
-			if len(repoURI) == 0 {
-				continue
-			}
-			err := func(repoURI string) error {
-				path, repo, err := CloneRepoUsingSSH(ctx, repoURI)
-				defer os.RemoveAll(path)
-				if err != nil {
-					return err
-				}
-				return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
-			}(repoURI)
-			if err != nil {
-				ctx.Logger().Info("error scanning repository", "repo", repoURI, "error", err)
-				continue
-			}
+		cloneFunc = func() (string, *git.Repository, error) {
+			return CloneRepoUsingSSH(ctx, repoURI)
 		}
 	default:
 		return errors.New("invalid connection type for git source")
+	}
+
+	err := func() error {
+		path, repo, err := cloneFunc()
+		defer os.RemoveAll(path)
+		if err != nil {
+			return err
+		}
+		return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
+	}()
+	if err != nil {
+		return reporter.ChunkErr(ctx, err)
 	}
 	return nil
 }
@@ -256,29 +240,35 @@ func (s *Source) scanDirs(ctx context.Context, reporter sources.ChunkReporter) e
 		if len(gitDir) == 0 {
 			continue
 		}
-		if !s.scanOptions.Bare && strings.HasSuffix(gitDir, "git") {
-			// TODO: Figure out why we skip directories ending in "git".
-			continue
-		}
-		// try paths instead of url
-		repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
-		if err != nil {
+		if err := s.scanDir(ctx, gitDir, reporter); err != nil {
 			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
 			continue
 		}
+	}
+	return nil
+}
 
-		err = func(repoPath string) error {
-			if !s.preserveTempDirs && strings.HasPrefix(repoPath, filepath.Join(os.TempDir(), "trufflehog")) {
-				defer os.RemoveAll(repoPath)
-			}
+// scanDir scans a single provided directory.
+func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.ChunkReporter) error {
+	if !s.scanOptions.Bare && strings.HasSuffix(gitDir, "git") {
+		// TODO: Figure out why we skip directories ending in "git".
+		return nil
+	}
+	// try paths instead of url
+	repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
+	if err != nil {
+		return reporter.ChunkErr(ctx, err)
+	}
 
-			return s.git.ScanRepo(ctx, repo, repoPath, s.scanOptions, reporter)
-		}(gitDir)
-		if err != nil {
-			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
-			continue
+	err = func() error {
+		if !s.preserveTempDirs && strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) {
+			defer os.RemoveAll(gitDir)
 		}
 
+		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)
+	}()
+	if err != nil {
+		return reporter.ChunkErr(ctx, err)
 	}
 	return nil
 }
@@ -1001,6 +991,44 @@ func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.Ch
 	}
 
 	return nil
+}
+
+func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+	for _, repo := range s.conn.GetDirectories() {
+		if repo == "" {
+			continue
+		}
+		unit := SourceUnit{ID: repo, Kind: UnitDir}
+		if err := reporter.UnitOk(ctx, unit); err != nil {
+			return err
+		}
+	}
+	for _, repo := range s.conn.GetRepositories() {
+		if repo == "" {
+			continue
+		}
+		unit := SourceUnit{ID: repo, Kind: UnitRepo}
+		if err := reporter.UnitOk(ctx, unit); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	gitUnit, ok := unit.(SourceUnit)
+	if !ok {
+		return fmt.Errorf("unsupported unit type: %T", unit)
+	}
+
+	switch gitUnit.Kind {
+	case UnitRepo:
+		return s.scanRepo(ctx, gitUnit.ID, reporter)
+	case UnitDir:
+		return s.scanDir(ctx, gitUnit.ID, reporter)
+	default:
+		return fmt.Errorf("unexpected git unit kind: %q", gitUnit.Kind)
+	}
 }
 
 func (s *Source) UnmarshalSourceUnit(data []byte) (sources.SourceUnit, error) {
