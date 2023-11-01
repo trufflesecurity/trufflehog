@@ -253,7 +253,7 @@ enum DetectorType {
   Nytimes = 241;
   Polygon = 242;
   Powrbot = 243;
-  ProspectIO = 244;
+  ProspectIO = 244 [deprecated = true];
   Skrappio = 245;
   Monday = 246;
   Smartsheets = 247;
