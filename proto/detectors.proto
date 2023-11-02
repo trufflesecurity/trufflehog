@@ -966,6 +966,7 @@ enum DetectorType {
   Stripo = 955;
   ReplyIO = 956;
   AzureBatch = 957;
+  AzureContainerRegistry = 958;
 }
 
 message Result {
