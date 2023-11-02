@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 
@@ -79,7 +80,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() {
+						// Ensure we drain the response body so this connection can be reused.
+						_, _ = io.Copy(io.Discard, res.Body)
+						_ = res.Body.Close()
+					}()
 					var authResponse authRes
 					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
 						s1.VerificationError = fmt.Errorf("failed to decode auth response: %w", err)

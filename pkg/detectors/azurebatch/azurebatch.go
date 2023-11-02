@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -86,7 +87,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				defer resp.Body.Close()
+				defer func() {
+					// Ensure we drain the response body so this connection can be reused.
+					_, _ = io.Copy(io.Discard, resp.Body)
+					_ = resp.Body.Close()
+				}()
 
 				if resp.StatusCode == http.StatusOK {
 					s1.Verified = true

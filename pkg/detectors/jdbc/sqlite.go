@@ -14,7 +14,7 @@ type sqliteJDBC struct {
 	testing  bool
 }
 
-var cannotVerifySqliteError error = errors.New("sqlite credentials cannot be verified")
+var cannotVerifySqliteError = errors.New("sqlite credentials cannot be verified")
 
 func (s *sqliteJDBC) ping(ctx context.Context) pingResult {
 	if !s.testing {

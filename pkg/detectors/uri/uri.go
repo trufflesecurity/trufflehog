@@ -2,6 +2,7 @@ package uri
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -123,8 +124,11 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	credentialedRes.Body.Close()
-
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, credentialedRes.Body)
+		_ = credentialedRes.Body.Close()
+	}()
 	// If the credentialed URL returns a non 2XX code, we can assume it's a false positive.
 	if credentialedRes.StatusCode < 200 || credentialedRes.StatusCode > 299 {
 		return false, nil
@@ -141,7 +145,11 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	nonCredentialedRes.Body.Close()
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, nonCredentialedRes.Body)
+		_ = nonCredentialedRes.Body.Close()
+	}()
 
 	// If the non-credentialed URL returns a non 400-428 code and basic auth header, we can assume it's verified now.
 	if nonCredentialedRes.StatusCode >= 400 && nonCredentialedRes.StatusCode < 429 {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -165,7 +166,11 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			continue
 		}
 		// TODO: Read response body.
-		res.Body.Close()
+		defer func() {
+			// Ensure we drain the response body so this connection can be reused.
+			_, _ = io.Copy(io.Discard, res.Body)
+			_ = res.Body.Close()
+		}()
 		if res.StatusCode == http.StatusOK {
 			result.Verified = true
 			break

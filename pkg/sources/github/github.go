@@ -894,11 +894,8 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 	gistOpts := &github.GistListOptions{}
 	logger := s.log.WithValues("user", user)
 	for {
-		gists, res, err := s.apiClient.Gists.List(ctx, user, gistOpts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
+		gists, resp, err := s.apiClient.Gists.List(ctx, user, gistOpts)
+		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil {
@@ -907,11 +904,11 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 		for _, gist := range gists {
 			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
 		}
-		if res == nil || res.NextPage == 0 {
+		if resp == nil || resp.NextPage == 0 {
 			break
 		}
-		logger.V(2).Info("Listed gists", "page", gistOpts.Page, "last_page", res.LastPage)
-		gistOpts.Page = res.NextPage
+		logger.V(2).Info("Listed gists", "page", gistOpts.Page, "last_page", resp.LastPage)
+		gistOpts.Page = resp.NextPage
 	}
 	return nil
 }
@@ -952,9 +949,6 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 	}
 	for {
 		orgs, resp, err := s.apiClient.Organizations.ListAll(ctx, orgOpts)
-		if err == nil {
-			resp.Body.Close()
-		}
 		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
@@ -991,9 +985,6 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	logger := s.log.WithValues("user", user)
 	for {
 		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
-		if err == nil {
-			resp.Body.Close()
-		}
 		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
@@ -1028,20 +1019,17 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 
 	logger := s.log.WithValues("org", org)
 	for {
-		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
-		if err == nil {
-			defer res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
+		members, resp, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
+		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil || len(members) == 0 {
 			return errors.New("Could not list organization members: account may not have access to list organization members")
 		}
-		if res == nil {
+		if resp == nil {
 			break
 		}
-		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", res.LastPage)
+		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", resp.LastPage)
 		for _, m := range members {
 			usr := m.Login
 			if usr == nil || *usr == "" {
@@ -1051,10 +1039,10 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 				s.memberCache[*usr] = struct{}{}
 			}
 		}
-		if res.NextPage == 0 {
+		if resp.NextPage == 0 {
 			break
 		}
-		opts.Page = res.NextPage
+		opts.Page = resp.NextPage
 	}
 
 	return nil

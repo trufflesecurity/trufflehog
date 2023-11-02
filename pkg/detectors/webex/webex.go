@@ -63,8 +63,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client := common.SaneHttpClient()
 				res, err := client.Do(req)
 				if err == nil {
+					defer func() {
+						// Ensure we drain the response body so this connection can be reused.
+						_, _ = io.Copy(io.Discard, res.Body)
+						_ = res.Body.Close()
+					}()
 					body, err := io.ReadAll(res.Body)
-					res.Body.Close()
 					if err == nil {
 						var message struct {
 							Message string `json:"message"`

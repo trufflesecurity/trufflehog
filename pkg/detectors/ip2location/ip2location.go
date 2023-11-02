@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct {}
+type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -47,8 +47,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.ip2location.io/?key=" + resMatch, nil)
-			
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.ip2location.io/?key="+resMatch, nil)
+
 			if err != nil {
 				continue
 			}
@@ -79,6 +79,3 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ip2location
 }
-
-
-

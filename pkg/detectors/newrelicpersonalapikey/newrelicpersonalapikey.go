@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.Header.Add("X-Api-Key", resMatch)
 			reqEU.Header.Add("X-Api-Key", resMatch)
-			
+
 			res, err := client.Do(req)
 			resEU, errEU := client.Do(reqEU)
 

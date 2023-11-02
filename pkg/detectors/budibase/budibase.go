@@ -3,6 +3,7 @@ package budibase
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	
+
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"budibase"}) + `\b([a-f0-9]{32}-[a-f0-9]{78,80})\b`)
 )
 
@@ -54,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			
 			// URL: https://docs.budibase.com/reference/appsearch
 			// API searches for the app with given name, since we only need to check api key, sending any appname will work.
 			payload := strings.NewReader(`{"name":"qwerty"}`)
@@ -68,7 +68,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
+				defer func() {
+					// Ensure we drain the response body so this connection can be reused.
+					_, _ = io.Copy(io.Discard, res.Body)
+					_ = res.Body.Close()
+				}()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else if res.StatusCode == 401 {

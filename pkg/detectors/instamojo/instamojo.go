@@ -24,7 +24,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	//KeyPat is client_id
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{40})\b`)
 	//Secretpat is Client_secret
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{128})\b`)
 )

@@ -72,8 +72,11 @@ func (g *OSS) Fetch() (io.Reader, error) {
 	if err != nil || resp == nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode == http.StatusNoContent {
 		return nil, errors.New("already up to date")
 	}
