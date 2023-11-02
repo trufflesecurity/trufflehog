@@ -453,7 +453,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 			}
 
 			logger.V(2).Info(fmt.Sprintf("Starting to scan repo %d/%d", i+1, len(s.repos)))
-			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
+			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
