@@ -69,6 +69,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
@@ -774,6 +775,7 @@ func DefaultDetectors() []detectors.Detector {
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
 		aws.New(),
+		awssessionkey.New(),
 		&azure.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlab.Scanner{},
