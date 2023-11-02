@@ -233,36 +233,45 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 	return fileContent.Bytes(), nil
 }
 
+type mimeType string
+
 const (
-	arMimeType  = "application/x-unix-archive"
-	rpmMimeType = "application/x-rpm"
+	arMimeType  mimeType = "application/x-unix-archive"
+	rpmMimeType mimeType = "application/x-rpm"
 )
 
-// Define a map of mime types to corresponding command-line tools
-var mimeTools = map[string][]string{
+// mimeTools maps MIME types to the necessary command-line tools to handle them.
+// This centralizes the tool requirements for different file types.
+var mimeTools = map[mimeType][]string{
 	arMimeType:  {"ar"},
 	rpmMimeType: {"rpm2cpio", "cpio"},
 }
 
-// Check if the command-line tool is installed.
-func isToolInstalled(tool string) bool {
-	_, err := exec.LookPath(tool)
-	return err == nil
+// extractToolCache stores the availability of extraction tools, eliminating the need for repeated filesystem lookups.
+var extractToolCache map[string]bool
+
+func init() {
+	// Preload the extractToolCache with the availability status of each required tool.
+	extractToolCache = make(map[string]bool)
+	for _, tools := range mimeTools {
+		for _, tool := range tools {
+			_, err := exec.LookPath(tool)
+			extractToolCache[tool] = err == nil
+		}
+	}
 }
 
-// Ensure all tools are available for given mime type.
-func ensureToolsForMimeType(mimeType string) error {
+func ensureToolsForMimeType(mimeType mimeType) error {
 	tools, exists := mimeTools[mimeType]
 	if !exists {
-		return fmt.Errorf("unsupported mime type")
+		return fmt.Errorf("unsupported mime type: %s", mimeType)
 	}
 
 	for _, tool := range tools {
-		if !isToolInstalled(tool) {
-			return fmt.Errorf("Required tool " + tool + " is not installed")
+		if installed := extractToolCache[tool]; !installed {
+			return fmt.Errorf("required tool %s is not installed", tool)
 		}
 	}
-
 	return nil
 }
 
@@ -389,9 +398,7 @@ func (a *Archive) handleNestedFileMIME(ctx logContext.Context, tempEnv tempEnv, 
 	}
 
 	switch mimeType {
-	case arMimeType:
-		_, _, err = a.HandleSpecialized(ctx, reader)
-	case rpmMimeType:
+	case arMimeType, rpmMimeType:
 		_, _, err = a.HandleSpecialized(ctx, reader)
 	default:
 		return "", nil
@@ -406,10 +413,12 @@ func (a *Archive) handleNestedFileMIME(ctx logContext.Context, tempEnv tempEnv, 
 
 // determineMimeType reads from the provided reader to detect the MIME type.
 // It returns the detected MIME type and a new reader that includes the read portion.
-func determineMimeType(reader io.Reader) (string, io.Reader, error) {
+func determineMimeType(reader io.Reader) (mimeType, io.Reader, error) {
+	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// If fewer bytes are read, MIME type detection may still succeed.
 	buffer := make([]byte, 512)
 	n, err := reader.Read(buffer)
-	if err != nil {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return "", nil, fmt.Errorf("unable to read file for MIME type detection: %w", err)
 	}
 
@@ -422,7 +431,7 @@ func determineMimeType(reader io.Reader) (string, io.Reader, error) {
 		return "", nil, fmt.Errorf("unable to determine file type: %w", err)
 	}
 
-	return kind.MIME.Value, reader, nil
+	return mimeType(kind.MIME.Value), reader, nil
 }
 
 // handleExtractedFiles processes each file in the extracted directory using a provided handler function.
