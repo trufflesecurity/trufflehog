@@ -14,9 +14,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sts"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -376,7 +376,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
+			if handlers.HandleFile(ctx, reader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
 				atomic.AddUint64(objectCount, 1)
 				s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
 				return nil
