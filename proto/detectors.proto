@@ -634,7 +634,7 @@ enum DetectorType {
   NeutrinoApi = 623;
   Storecove = 624;
   Shipday = 625;
-  Sentiment = 626;
+  Sentiment = 626 [deprecated = true];
   StreamChatMessaging = 627;
   TeamworkCRM = 628;
   TeamworkDesk = 629;
@@ -965,6 +965,8 @@ enum DetectorType {
   DenoDeploy = 954;
   Stripo = 955;
   ReplyIO = 956;
+  AzureBatch = 957;
+  AzureContainerRegistry = 958;
 }
 
 message Result {
