@@ -63,6 +63,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
@@ -780,6 +781,7 @@ func DefaultDetectors() []detectors.Detector {
 		&alibaba.Scanner{},
 		aws.New(),
 		&azure.Scanner{},
+		&azurecontainerregistry.Scanner{},
 		&azurebatch.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlab.Scanner{},
@@ -1257,7 +1259,6 @@ func DefaultDetectors() []detectors.Detector {
 		blitapp.Scanner{},
 		restpackhtmltopdfapi.Scanner{},
 		webscraping.Scanner{},
-		// sentiment.Scanner{},
 		geoapify.Scanner{},
 		dfuse.Scanner{},
 		gitter.Scanner{},
