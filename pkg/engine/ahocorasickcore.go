@@ -65,23 +65,21 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 // populateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
 // This method populates an existing map rather than allocating a new one to avoid allocating a new
 // map for every match.
-func (ac *AhoCorasickCore) populateDetectorsByMatch(match *ahocorasick.Match, detectors map[DetectorKey]detectors.Detector) bool {
+func (ac *AhoCorasickCore) populateDetectorsByMatch(match *ahocorasick.Match, detectors map[DetectorKey]detectors.Detector) {
 	matchedDetectorKeys, ok := ac.keywordsToDetectors[match.MatchString()]
 	if !ok {
-		return false
+		return
 	}
 	for _, key := range matchedDetectorKeys {
 		detectors[key] = ac.detectorsByKey[key]
 	}
-	return true
 }
 
 // PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
 // provided input. This method populates an existing map rather than allocating a new one because
 // it will be called once per chunk and that many allocations has a noticeable performance cost.
-func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors map[DetectorKey]detectors.Detector) bool {
+func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors map[DetectorKey]detectors.Detector) {
 	seen := make(map[string]struct{})
-	gotAny := false
 	for _, m := range ac.prefilter.MatchString(strings.ToLower(chunkData)) {
 		// Everything should be lowercased by now, so we won't do it again
 		s := m.MatchString()
@@ -91,10 +89,8 @@ func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors
 		}
 		seen[s] = struct{}{}
 
-		gotAny = ac.populateDetectorsByMatch(m, detectors) || gotAny
+		ac.populateDetectorsByMatch(m, detectors)
 	}
-
-	return gotAny
 }
 
 // createDetectorKey creates a unique key for each detector from its type, version, and, for
