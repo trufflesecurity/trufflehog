@@ -62,22 +62,14 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	}
 }
 
-// populateDetectorsByMatch populates the given detectorMap based on the Aho-Corasick match results.
-// This method populates an existing map rather than allocating a new one to avoid allocating a new
-// map for every match.
-func (ac *AhoCorasickCore) populateDetectorsByMatch(match *ahocorasick.Match, detectors map[DetectorKey]detectors.Detector) {
-	matchedDetectorKeys := ac.keywordsToDetectors[match.MatchString()]
-	for _, key := range matchedDetectorKeys {
-		detectors[key] = ac.detectorsByKey[key]
-	}
-}
-
 // PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
 // provided input. This method populates an existing map rather than allocating a new one because
 // it will be called once per chunk and that many allocations has a noticeable performance cost.
 func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors map[DetectorKey]detectors.Detector) {
 	for _, m := range ac.prefilter.MatchString(strings.ToLower(chunkData)) {
-		ac.populateDetectorsByMatch(m, detectors)
+		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
+			detectors[k] = ac.detectorsByKey[k]
+		}
 	}
 }
 
