@@ -967,6 +967,7 @@ enum DetectorType {
   ReplyIO = 956;
   AzureBatch = 957;
   AzureContainerRegistry = 958;
+  AWSSessionKey = 959;
 }
 
 message Result {
