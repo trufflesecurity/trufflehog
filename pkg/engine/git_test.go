@@ -69,7 +69,8 @@ func TestGitEngine(t *testing.T) {
 			e, err := Start(ctx,
 				WithConcurrency(1),
 				WithDecoders(decoders.DefaultDecoders()...),
-				WithDetectors(true, DefaultDetectors()...),
+				WithDetectors(DefaultDetectors()...),
+				WithVerify(true),
 				WithPrinter(new(discardPrinter)),
 			)
 			assert.Nil(t, err)
@@ -123,7 +124,8 @@ func BenchmarkGitEngine(b *testing.B) {
 	e, err := Start(ctx,
 		WithConcurrency(uint8(runtime.NumCPU())),
 		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(false, DefaultDetectors()...),
+		WithDetectors(DefaultDetectors()...),
+		WithVerify(false),
 		WithPrinter(new(discardPrinter)),
 	)
 	assert.Nil(b, err)

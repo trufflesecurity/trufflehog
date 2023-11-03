@@ -61,9 +61,6 @@ func TestURI_FromChunk(t *testing.T) {
 				t.Errorf("URI.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// if os.Getenv("FORCE_PASS_DIFF") == "true" {
-			// 	return
-			// }
 			for i := range got {
 				got[i].Raw = nil
 			}

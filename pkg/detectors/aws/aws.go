@@ -22,6 +22,22 @@ type scanner struct {
 	skipIDs            map[string]struct{}
 }
 
+// resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
+var resourceTypes = map[string]string{
+	"ABIA": "AWS STS service bearer token",
+	"ACCA": "Context-specific credential",
+	"AGPA": "User group",
+	"AIDA": "IAM user",
+	"AIPA": "Amazon EC2 instance profile",
+	"AKIA": "Access key",
+	"ANPA": "Managed policy",
+	"ANVA": "Version in a managed policy",
+	"APKA": "Public key",
+	"AROA": "Role",
+	"ASCA": "Certificate",
+	"ASIA": "Temporary (AWS STS) access key IDs",
+}
+
 func New(opts ...func(*scanner)) *scanner {
 	scanner := &scanner{
 		skipIDs: map[string]struct{}{},
@@ -93,7 +109,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, idMatch := range idMatches {
-		if len(idMatch) != 2 {
+		if len(idMatch) != 3 {
 			continue
 		}
 		resIDMatch := strings.TrimSpace(idMatch[1])
@@ -115,12 +131,19 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resIDMatch),
 				Redacted:     resIDMatch,
 				RawV2:        []byte(resIDMatch + resSecretMatch),
+				ExtraData: map[string]string{
+					"resource_type": resourceTypes[idMatch[2]],
+				},
 			}
 
 			if verify {
 				verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = verified
-				s1.ExtraData = extraData
+				//Append the extraData to the existing ExtraData map.
+				// This will overwrite with the new verified values.
+				for k, v := range extraData {
+					s1.ExtraData[k] = v
+				}
 				s1.VerificationError = verificationErr
 			}
 
