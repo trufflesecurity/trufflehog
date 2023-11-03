@@ -969,6 +969,7 @@ enum DetectorType {
   AzureContainerRegistry = 958;
   AWSSessionKey = 959;
   Coda = 960;
+  LogzIO = 961;
 }
 
 message Result {

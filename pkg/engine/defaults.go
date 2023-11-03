@@ -386,6 +386,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/locationiq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loggly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loginradius"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/logzio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lokalisetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lunchmoney"
@@ -1570,6 +1571,7 @@ func DefaultDetectors() []detectors.Detector {
 		budibase.Scanner{},
 		coda.Scanner{},
 		grafana.Scanner{},
+		logzio.Scanner{},
 	}
 
 }
