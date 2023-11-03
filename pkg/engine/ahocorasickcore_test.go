@@ -21,7 +21,7 @@ func (d testDetectorV1) FromData(ctx context.Context, verify bool, data []byte) 
 }
 
 func (d testDetectorV1) Keywords() []string {
-	return []string{"a"}
+	return []string{"a", "b"}
 }
 
 func (d testDetectorV1) Type() detectorspb.DetectorType {
@@ -40,7 +40,7 @@ func (d testDetectorV2) FromData(ctx context.Context, verify bool, data []byte) 
 }
 
 func (d testDetectorV2) Keywords() []string {
-	return []string{"b"}
+	return []string{"a"}
 }
 
 func (d testDetectorV2) Type() detectorspb.DetectorType {
@@ -66,72 +66,51 @@ func TestAhoCorasickCore_MultipleCustomDetectorsMatchable(t *testing.T) {
 
 	customDetector2, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
 		Name:     "custom detector 2",
-		Keywords: []string{"b"},
+		Keywords: []string{"a"},
 		Regex:    map[string]string{"": ""},
 	})
 	assert.Nil(t, err)
 
-	testCases := []struct {
-		matchString string
-		detector    detectors.Detector
-	}{
-		{
-			matchString: "a",
-			detector:    customDetector1,
-		},
-		{
-			matchString: "b",
-			detector:    customDetector2,
-		},
-	}
-
-	var allDetectors []detectors.Detector
-	for _, tt := range testCases {
-		allDetectors = append(allDetectors, tt.detector)
-	}
+	allDetectors := []detectors.Detector{customDetector1, customDetector2}
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	for _, tt := range testCases {
-		matches := ac.MatchString(tt.matchString)
-		assert.Equal(t, 1, len(matches))
-
-		matchingDetectors := make(map[detectorspb.DetectorType]detectors.Detector)
-		ac.PopulateDetectorsByMatch(matches[0], matchingDetectors)
-		assert.Equal(t, 1, len(matchingDetectors))
-		assert.Equal(t, tt.detector, matchingDetectors[detectorspb.DetectorType_CustomRegex])
+	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
+	ac.PopulateMatchingDetectors("a", detectorsMap)
+	matchingDetectors := make([]detectors.Detector, 0, 2)
+	for _, d := range detectorsMap {
+		matchingDetectors = append(matchingDetectors, d)
 	}
+	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }
 
 func TestAhoCorasickCore_MultipleDetectorVersionsMatchable(t *testing.T) {
-	testCases := []struct {
-		matchString string
-		detector    detectors.Detector
-	}{
-		{
-			matchString: "a",
-			detector:    testDetectorV1{},
-		},
-		{
-			matchString: "b",
-			detector:    testDetectorV2{},
-		},
-	}
-
-	var allDetectors []detectors.Detector
-	for _, tt := range testCases {
-		allDetectors = append(allDetectors, tt.detector)
-	}
+	v1 := testDetectorV1{}
+	v2 := testDetectorV2{}
+	allDetectors := []detectors.Detector{v1, v2}
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	for _, tt := range testCases {
-		matches := ac.MatchString(tt.matchString)
-		assert.Equal(t, 1, len(matches))
-
-		matchingDetectors := make(map[detectorspb.DetectorType]detectors.Detector)
-		ac.PopulateDetectorsByMatch(matches[0], matchingDetectors)
-		assert.Equal(t, 1, len(matchingDetectors))
-		assert.Equal(t, tt.detector, matchingDetectors[TestDetectorType])
+	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
+	ac.PopulateMatchingDetectors("a", detectorsMap)
+	matchingDetectors := make([]detectors.Detector, 0, 2)
+	for _, d := range detectorsMap {
+		matchingDetectors = append(matchingDetectors, d)
 	}
+	assert.ElementsMatch(t, allDetectors, matchingDetectors)
+}
+
+func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
+	d := testDetectorV1{}
+	allDetectors := []detectors.Detector{d}
+
+	ac := NewAhoCorasickCore(allDetectors)
+
+	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
+	ac.PopulateMatchingDetectors("a a b b", detectorsMap)
+	matchingDetectors := make([]detectors.Detector, 0, 2)
+	for _, d := range detectorsMap {
+		matchingDetectors = append(matchingDetectors, d)
+	}
+	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }
