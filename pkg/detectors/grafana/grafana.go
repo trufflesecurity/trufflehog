@@ -1,38 +1,37 @@
-package scrapersite
+package grafana
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClientTimeOut(10 * time.Second)
-
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scrapersite"}) + `\b([a-zA-Z0-9]{45})\b`)
+	keyPat = regexp.MustCompile(`\b(glc_[A-Za-z0-9+\/]{50,150}\={0,2})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"scrapersite"}
+	return []string{"glc_"}
 }
 
-// FromData will find and optionally verify ScraperSite secrets in a given set of bytes.
+// FromData will find and optionally verify Grafana secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -45,37 +44,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ScraperSite,
+			DetectorType: detectorspb.DetectorType_Grafana,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://scrapersite.com/api-v1?api_key=%s&url=https://google.com", resMatch), nil)
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://grafana.com/api/v1/tokens?region=us", nil)
 			if err != nil {
 				continue
 			}
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				bodyString := string(bodyBytes)
-				validResponse := strings.Contains(bodyString, `"status":true`)
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if validResponse {
-						s1.Verified = true
-					} else {
-						s1.Verified = false
-					}
+				if res.StatusCode >= 200 && res.StatusCode < 300 || res.StatusCode == 403 {
+					s1.Verified = true
+				} else if res.StatusCode == 401 {
+					// The secret is determinately not verified (nothing to do)
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
+					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 				}
+			} else {
+				s1.VerificationError = err
 			}
+		}
+
+		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s1)
@@ -85,5 +85,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ScraperSite
+	return detectorspb.DetectorType_Grafana
 }
