@@ -58,7 +58,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
+	awssessionkey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
@@ -143,6 +143,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloverly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clustdoc"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coda"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codacy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codeclimate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codemagic"
@@ -1567,7 +1568,8 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
-    grafana.Scanner{},
+		coda.Scanner{},
+		grafana.Scanner{},
 	}
 
 }

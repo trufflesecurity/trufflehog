@@ -968,6 +968,7 @@ enum DetectorType {
   AzureBatch = 957;
   AzureContainerRegistry = 958;
   AWSSessionKey = 959;
+  Coda = 960;
 }
 
 message Result {
