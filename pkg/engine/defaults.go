@@ -301,6 +301,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
@@ -518,7 +519,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prodpad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prospectcrm"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prospectio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/protocolsio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/proxycrawl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pubnubpublishkey"
@@ -944,7 +944,6 @@ func DefaultDetectors() []detectors.Detector {
 		&delighted.Scanner{},
 		&abbysale.Scanner{},
 		&feedier.Scanner{},
-		&prospectio.Scanner{},
 		&nytimes.Scanner{},
 		&powrbot.Scanner{},
 		&magnetic.Scanner{},
@@ -1571,6 +1570,7 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
+		grafana.Scanner{},
 		eventbrite.Scanner{},
 	}
 
