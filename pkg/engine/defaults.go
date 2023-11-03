@@ -58,6 +58,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
@@ -569,7 +570,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapeowl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scraperapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scraperbox"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapersite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapestack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapfly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/scrapingant"
@@ -779,6 +779,7 @@ func DefaultDetectors() []detectors.Detector {
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
 		aws.New(),
+		awssessionkey.New(),
 		&azure.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azurebatch.Scanner{},
@@ -1315,7 +1316,6 @@ func DefaultDetectors() []detectors.Detector {
 		zenkitapi.Scanner{},
 		sherpadesk.Scanner{},
 		shotstack.Scanner{},
-		scrapersite.Scanner{},
 		luno.Scanner{},
 		apacta.Scanner{},
 		fmfw.Scanner{},

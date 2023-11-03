@@ -667,7 +667,7 @@ enum DetectorType {
   Meistertask = 656;
   Mindmeister = 657;
   PeopleDataLabs = 658;
-  ScraperSite = 659;
+  ScraperSite = 659  [deprecated = true];
   Scrapfly = 660;
   SimplyNoted = 661;
   TravelPayouts = 662;
@@ -967,6 +967,7 @@ enum DetectorType {
   ReplyIO = 956;
   AzureBatch = 957;
   AzureContainerRegistry = 958;
+  AWSSessionKey = 959;
 }
 
 message Result {
