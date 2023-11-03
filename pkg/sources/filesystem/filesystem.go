@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -39,8 +39,7 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
-var _ sources.SourceUnitEnumerator = (*Source)(nil)
-var _ sources.SourceUnitChunker = (*Source)(nil)
+var _ sources.SourceUnitEnumChunker = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -173,7 +172,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		},
 		Verify: s.verify,
 	}
-	if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
+	if handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
 		return nil
 	}
 
