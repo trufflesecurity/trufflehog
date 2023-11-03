@@ -582,7 +582,7 @@ enum DetectorType {
   Hive = 571;
   Hiveage = 572;
   Kickbox = 573;
-  Passbase = 574;
+  Passbase = 574 [deprecated = true];
   PostageApp = 575;
   PureStake = 576;
   Qubole = 577;
