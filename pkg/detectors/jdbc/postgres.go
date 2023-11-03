@@ -70,7 +70,6 @@ func parsePostgres(subname string) (jdbc, error) {
 		user, pass, _ = strings.Cut(userPass, ":")
 	} else {
 		hostAndDB = userPass
-		userPass = ""
 	}
 	host, database, found := strings.Cut(hostAndDB, "/")
 	if !found {
