@@ -53,8 +53,8 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
-	idPat     = regexp.MustCompile(`\b((?:ASIA)[0-9A-Z]{16})\b`)
-	secretPat = regexp.MustCompile(`\b[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}\b`)
+	idPat      = regexp.MustCompile(`\b((?:ASIA)[0-9A-Z]{16})\b`)
+	secretPat  = regexp.MustCompile(`\b[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}\b`)
 	sessionPat = regexp.MustCompile(`\b[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+=\/]{41,1000})[^A-Za-z0-9+=\/]{0,1}\b`)
 	// Hashes, like those for git, do technically match the secret pattern.
 	// But they are extremely unlikely to be generated as an actual AWS secret.
@@ -84,13 +84,12 @@ func GetHMAC(key []byte, data []byte) []byte {
 }
 
 func checkSessionToken(sessionToken string, secret string) bool {
-	if !strings.Contains(sessionToken, "YXdz") || strings.Contains(sessionToken, secret){
+	if !strings.Contains(sessionToken, "YXdz") || strings.Contains(sessionToken, secret) {
 		// Handle error if the sessionToken is not a valid base64 string
 		return false
 	}
 	return true
 }
-
 
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -113,51 +112,51 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		for _, secretMatch := range secretMatches {
-            if len(secretMatch) != 2 {
-                continue
-            }
-            resSecretMatch := strings.TrimSpace(secretMatch[1])
+			if len(secretMatch) != 2 {
+				continue
+			}
+			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
-		    for _, sessionMatch := range sessionMatches {
-                if len(sessionMatch) != 2 {
-                    continue
-                }
-                resSessionMatch := strings.TrimSpace(sessionMatch[1])
-                if !checkSessionToken(resSessionMatch, resSecretMatch){
-                    continue
-                }
-                s1 := detectors.Result{
-                    DetectorType: detectorspb.DetectorType_AWSSessionKey,
-                    Raw:          []byte(resIDMatch),
-                    Redacted:     resIDMatch,
-                    RawV2:        []byte(resIDMatch + resSecretMatch + resSessionMatch),
-                }
+			for _, sessionMatch := range sessionMatches {
+				if len(sessionMatch) != 2 {
+					continue
+				}
+				resSessionMatch := strings.TrimSpace(sessionMatch[1])
+				if !checkSessionToken(resSessionMatch, resSecretMatch) {
+					continue
+				}
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_AWSSessionKey,
+					Raw:          []byte(resIDMatch),
+					Redacted:     resIDMatch,
+					RawV2:        []byte(resIDMatch + resSecretMatch + resSessionMatch),
+				}
 
-                if verify {
-                    verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, true)
-                    s1.Verified = verified
-                    s1.ExtraData = extraData
-                    s1.VerificationError = verificationErr
-                }
+				if verify {
+					verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, true)
+					s1.Verified = verified
+					s1.ExtraData = extraData
+					s1.VerificationError = verificationErr
+				}
 
-                if !s1.Verified {
-                    // Unverified results that contain common test words are probably not secrets
-                    if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-                        continue
-                    }
-                    // Unverified results that look like hashes are probably not secrets
-                    if falsePositiveSecretCheck.MatchString(resSecretMatch) {
-                        continue
-                    }
-                }
+				if !s1.Verified {
+					// Unverified results that contain common test words are probably not secrets
+					if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
+						continue
+					}
+					// Unverified results that look like hashes are probably not secrets
+					if falsePositiveSecretCheck.MatchString(resSecretMatch) {
+						continue
+					}
+				}
 
-                results = append(results, s1)
-                // If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
-                if s1.Verified {
-                    break
-                }
-            }
-        }
+				results = append(results, s1)
+				// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
+				if s1.Verified {
+					break
+				}
+			}
+		}
 	}
 	return awsCustomCleanResults(results), nil
 }
@@ -165,52 +164,50 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, resSessionMatch string, retryOn403 bool) (bool, map[string]string, error) {
 
 	// REQUEST VALUES.
-    method := "GET"
-    service := "sts"
-    host := "sts.amazonaws.com"
-    region := "us-east-1"
-    endpoint := "https://sts.amazonaws.com"
-    now := time.Now().UTC()
-    datestamp := now.Format("20060102")
-    amzDate := now.Format("20060102T150405Z")
+	method := "GET"
+	service := "sts"
+	host := "sts.amazonaws.com"
+	region := "us-east-1"
+	endpoint := "https://sts.amazonaws.com"
+	now := time.Now().UTC()
+	datestamp := now.Format("20060102")
+	amzDate := now.Format("20060102T150405Z")
 
-    req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
-    if err != nil {
-        return false, nil, err
-    }
-    req.Header.Set("Accept", "application/json")
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
+	if err != nil {
+		return false, nil, err
+	}
+	req.Header.Set("Accept", "application/json")
 
-    canonicalURI := "/"
-    canonicalHeaders := "host:" + host + "\n" + "x-amz-date:" + amzDate + "\n" + "x-amz-security-token:" + resSessionMatch + "\n"
-    signedHeaders := "host;x-amz-date;x-amz-security-token"
-    algorithm := "AWS4-HMAC-SHA256"
-    credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
+	canonicalURI := "/"
+	canonicalHeaders := "host:" + host + "\n" + "x-amz-date:" + amzDate + "\n" + "x-amz-security-token:" + resSessionMatch + "\n"
+	signedHeaders := "host;x-amz-date;x-amz-security-token"
+	algorithm := "AWS4-HMAC-SHA256"
+	credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, region, service)
 
-    params := req.URL.Query()
-    params.Add("Action", "GetCallerIdentity")
-    params.Add("Version", "2011-06-15")
-    canonicalQuerystring := params.Encode()
-    payloadHash := GetHash("") // empty payload
-    canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
+	params := req.URL.Query()
+	params.Add("Action", "GetCallerIdentity")
+	params.Add("Version", "2011-06-15")
+	canonicalQuerystring := params.Encode()
+	payloadHash := GetHash("") // empty payload
+	canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQuerystring + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash
 
-    stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
+	stringToSign := algorithm + "\n" + amzDate + "\n" + credentialScope + "\n" + GetHash(canonicalRequest)
 
-    hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resSecretMatch)), []byte(datestamp))
-    hash = GetHMAC(hash, []byte(region))
-    hash = GetHMAC(hash, []byte(service))
-    hash = GetHMAC(hash, []byte("aws4_request"))
+	hash := GetHMAC([]byte(fmt.Sprintf("AWS4%s", resSecretMatch)), []byte(datestamp))
+	hash = GetHMAC(hash, []byte(region))
+	hash = GetHMAC(hash, []byte(service))
+	hash = GetHMAC(hash, []byte("aws4_request"))
 
-    signature2 := GetHMAC(hash, []byte(stringToSign)) // Get Signature HMAC SHA256
-    signature := hex.EncodeToString(signature2)
+	signature2 := GetHMAC(hash, []byte(stringToSign)) // Get Signature HMAC SHA256
+	signature := hex.EncodeToString(signature2)
 
-    authorizationHeader := fmt.Sprintf("%s Credential=%s/%s, SignedHeaders=%s, Signature=%s",
-        algorithm, resIDMatch, credentialScope, signedHeaders, signature)
-    
-    req.Header.Add("Authorization", authorizationHeader)
-    req.Header.Add("x-amz-date", amzDate)
-    req.Header.Add("x-amz-security-token", resSessionMatch)
+	authorizationHeader := fmt.Sprintf("%s Credential=%s/%s, SignedHeaders=%s, Signature=%s",
+		algorithm, resIDMatch, credentialScope, signedHeaders, signature)
 
-    // Rest of your code...
+	req.Header.Add("Authorization", authorizationHeader)
+	req.Header.Add("x-amz-date", amzDate)
+	req.Header.Add("x-amz-security-token", resSessionMatch)
 
 	req.URL.RawQuery = params.Encode()
 
@@ -329,4 +326,3 @@ type identityRes struct {
 func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AWSSessionKey
 }
-
