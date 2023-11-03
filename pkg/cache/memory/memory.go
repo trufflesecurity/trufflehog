@@ -94,7 +94,7 @@ func (c *Cache) Values() []string {
 	return res
 }
 
-// Contents returns all key-value pairs in the cache encodes as a string.
+// Contents returns a comma-separated string containing all keys in the cache.
 func (c *Cache) Contents() string {
 	items := c.c.Items()
 	res := make([]string, 0, len(items))
