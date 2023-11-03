@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -172,7 +172,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		},
 		Verify: s.verify,
 	}
-	if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
+	if handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
 		return nil
 	}
 

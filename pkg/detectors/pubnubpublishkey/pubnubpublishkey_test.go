@@ -6,10 +6,11 @@ package pubnubpublishkey
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -134,7 +135,7 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 					t.Fatalf(" wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("PubNubPublishKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

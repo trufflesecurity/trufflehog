@@ -10,9 +10,9 @@ import (
 	"sync"
 
 	"cloud.google.com/go/storage"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
@@ -375,7 +375,7 @@ func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Ch
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(ctx, reader, chunk, s.chunksCh) {
+	if handlers.HandleFile(ctx, reader, chunk, sources.ChanReporter{Ch: s.chunksCh}) {
 		ctx.Logger().V(3).Info("File was handled", "name", s.name, "bucket", o.bucket, "object", o.name)
 		return nil, nil
 	}

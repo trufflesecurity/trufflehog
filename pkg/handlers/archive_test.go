@@ -11,8 +11,9 @@ import (
 	"testing"
 	"time"
 
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
+	"github.com/h2non/filetype"
 	"github.com/stretchr/testify/assert"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -106,12 +107,12 @@ func TestArchiveHandler(t *testing.T) {
 }
 
 func TestHandleFile(t *testing.T) {
-	ch := make(chan *sources.Chunk, 2)
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 2)}
 
 	// Context cancels the operation.
 	canceledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
-	assert.False(t, HandleFile(canceledCtx, strings.NewReader("file"), &sources.Chunk{}, ch))
+	assert.False(t, HandleFile(canceledCtx, strings.NewReader("file"), &sources.Chunk{}, reporter))
 
 	// Only one chunk is sent on the channel.
 	// TODO: Embed a zip without making an HTTP request.
@@ -123,9 +124,9 @@ func TestHandleFile(t *testing.T) {
 	reader, err := diskbufferreader.New(resp.Body)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 0, len(ch))
-	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, ch))
-	assert.Equal(t, 1, len(ch))
+	assert.Equal(t, 0, len(reporter.Ch))
+	assert.True(t, HandleFile(context.Background(), reader, &sources.Chunk{}, reporter))
+	assert.Equal(t, 1, len(reporter.Ch))
 }
 
 func TestReadToMax(t *testing.T) {
@@ -208,7 +209,7 @@ func TestExtractTarContent(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		ok := HandleFile(ctx, file, &sources.Chunk{}, chunkCh)
+		ok := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.True(t, ok)
 	}()
 
@@ -261,7 +262,7 @@ func TestNestedDirArchive(t *testing.T) {
 
 	go func() {
 		defer close(sourceChan)
-		HandleFile(ctx, file, &sources.Chunk{}, sourceChan)
+		HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
 	}()
 
 	count := 0
@@ -270,4 +271,78 @@ func TestNestedDirArchive(t *testing.T) {
 		count++
 	}
 	assert.Equal(t, want, count)
+}
+
+func TestDetermineMimeType(t *testing.T) {
+	filetype.AddMatcher(filetype.NewType("txt", "text/plain"), func(buf []byte) bool {
+		return strings.HasPrefix(string(buf), "text:")
+	})
+
+	pngBytes := []byte("\x89PNG\r\n\x1a\n")
+	jpegBytes := []byte{0xFF, 0xD8, 0xFF}
+	textBytes := []byte("text: This is a plain text")
+	rpmBytes := []byte("\xed\xab\xee\xdb")
+
+	tests := []struct {
+		name       string
+		input      io.Reader
+		expected   mimeType
+		shouldFail bool
+	}{
+		{
+			name:       "PNG file",
+			input:      bytes.NewReader(pngBytes),
+			expected:   mimeType("image/png"),
+			shouldFail: false,
+		},
+		{
+			name:       "JPEG file",
+			input:      bytes.NewReader(jpegBytes),
+			expected:   mimeType("image/jpeg"),
+			shouldFail: false,
+		},
+		{
+			name:       "Text file",
+			input:      bytes.NewReader(textBytes),
+			expected:   mimeType("text/plain"),
+			shouldFail: false,
+		},
+		{
+			name:       "RPM file",
+			input:      bytes.NewReader(rpmBytes),
+			expected:   rpmMimeType,
+			shouldFail: false,
+		},
+		{
+			name:       "Truncated JPEG file",
+			input:      io.LimitReader(bytes.NewReader(jpegBytes), 2),
+			expected:   mimeType("unknown"),
+			shouldFail: true,
+		},
+		{
+			name:       "Empty reader",
+			input:      bytes.NewReader([]byte{}),
+			shouldFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalData, _ := io.ReadAll(io.TeeReader(tt.input, &bytes.Buffer{}))
+			tt.input = bytes.NewReader(originalData) // Reset the reader
+
+			mime, reader, err := determineMimeType(tt.input)
+			if err != nil && !tt.shouldFail {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !tt.shouldFail {
+				assert.Equal(t, tt.expected, mime)
+			}
+
+			// Ensure the reader still contains all the original data.
+			data, _ := io.ReadAll(reader)
+			assert.Equal(t, originalData, data)
+		})
+	}
 }
