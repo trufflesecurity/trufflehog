@@ -1,16 +1,15 @@
 //go:build detectors
 // +build detectors
 
-package pubnubpublishkey
+package logzio
 
 import (
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"testing"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -18,16 +17,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestPubNubPublishKey_FromChunk(t *testing.T) {
+func TestLogzIO_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	pub := testSecrets.MustGetField("PUBNUBPUBLISHKEY_TOKEN")
-	inactivePub := testSecrets.MustGetField("PUBNUBPUBLISHKEY_INACTIVE")
-	sub := testSecrets.MustGetField("PUBNUBSUBSCRIPTIONKEY_TOKEN")
+	secret := testSecrets.MustGetField("LOGZIO")
+	inactiveSecret := testSecrets.MustGetField("LOGZIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -47,66 +45,34 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pubnub secret %s within pubnub %s", pub, sub)),
+				data:   []byte(fmt.Sprintf("You can find a logzio secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					DetectorType: detectorspb.DetectorType_LogzIO,
 					Verified:     true,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pubnub secret %s within pubnub %s but not valid", inactivePub, sub)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a logzio secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, would be verified but for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pubnub secret %s within pubnub %s", pub, sub)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
+					DetectorType: detectorspb.DetectorType_LogzIO,
 					Verified:     false,
 				},
 			},
 			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, valid but unexpected api response",
-			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a pubnub secret %s within pubnub %s", pub, sub)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PubNubPublishKey,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
@@ -116,15 +82,50 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:    nil,
-			wantErr: false,
+			want:                nil,
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, would be verified if not for timeout",
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a logzio secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LogzIO,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, verified but unexpected api surface",
+			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a logzio secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LogzIO,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("PubNubPublishKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("LogzIO.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -132,12 +133,12 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf(" wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "VerificationError")
-			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
-				t.Errorf("PubNubPublishKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("LogzIO.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
