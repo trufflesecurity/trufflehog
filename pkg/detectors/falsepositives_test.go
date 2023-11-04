@@ -90,3 +90,10 @@ func TestStringShannonEntropy(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkDefaultIsKnownFalsePositive(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		// Use a string that won't be found in any dictionary for the worst case check.
+		IsKnownFalsePositive("aoeuaoeuaoeuaoeuaoeuaoeu", DefaultFalsePositives, true)
+	}
+}
