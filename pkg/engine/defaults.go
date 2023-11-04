@@ -58,7 +58,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
+	awssessionkey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
@@ -143,6 +143,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloverly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clustdoc"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coda"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codacy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codeclimate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codemagic"
@@ -232,6 +233,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etsyapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eventbrite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/everhour"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangerateapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangeratesapi"
@@ -385,6 +387,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/locationiq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loggly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loginradius"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/logzio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lokalisetoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lunchmoney"
@@ -1567,7 +1570,11 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
-    grafana.Scanner{},
+		grafana.Scanner{},
+		coda.Scanner{},
+		grafana.Scanner{},
+		logzio.Scanner{},
+		eventbrite.Scanner{},
 	}
 
 }
