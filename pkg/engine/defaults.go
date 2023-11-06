@@ -1570,7 +1570,6 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
-		grafana.Scanner{},
 		coda.Scanner{},
 		grafana.Scanner{},
 		logzio.Scanner{},
