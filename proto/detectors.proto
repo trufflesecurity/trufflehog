@@ -971,6 +971,7 @@ enum DetectorType {
   Coda = 960;
   LogzIO = 961;
   Eventbrite = 962;
+  GrafanaServiceAccount = 963;
 }
 
 message Result {

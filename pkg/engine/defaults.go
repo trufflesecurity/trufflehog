@@ -304,6 +304,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
@@ -1558,6 +1559,7 @@ func DefaultDetectors() []detectors.Detector {
 		&sourcegraphcody.Scanner{},
 		voiceflow.Scanner{},
 		ip2location.Scanner{},
+		grafanaserviceaccount.Scanner{},
 		vagrantcloudpersonaltoken.Scanner{},
 		openvpn.Scanner{},
 		&metabase.Scanner{},
