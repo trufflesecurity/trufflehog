@@ -972,7 +972,8 @@ enum DetectorType {
   LogzIO = 961;
   Eventbrite = 962;
   GrafanaServiceAccount = 963;
-  Overloop = 964;
+  RequestFinance = 964;
+  Overloop = 965;
 }
 
 message Result {
