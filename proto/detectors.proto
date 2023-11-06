@@ -972,6 +972,7 @@ enum DetectorType {
   LogzIO = 961;
   Eventbrite = 962;
   GrafanaServiceAccount = 963;
+  RequestFinance = 964;
 }
 
 message Result {
