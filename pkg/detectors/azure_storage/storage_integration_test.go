@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package azurestorage
+package azure_storage
 
 import (
 	"context"

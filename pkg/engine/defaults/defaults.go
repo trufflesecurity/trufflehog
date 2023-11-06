@@ -73,11 +73,11 @@ import (
 	azure_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
 	azure_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
@@ -899,7 +899,7 @@ func buildDetectorList() []detectors.Detector {
 		&azure_openai.Scanner{},
 		&azuresearchadminkey.Scanner{},
 		&azuresearchquerykey.Scanner{},
-		&azurestorage.Scanner{},
+		&azure_storage.Scanner{},
 		&bannerbear.Scanner{},
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
