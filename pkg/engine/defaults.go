@@ -65,6 +65,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
@@ -1575,6 +1576,7 @@ func DefaultDetectors() []detectors.Detector {
 		grafana.Scanner{},
 		logzio.Scanner{},
 		eventbrite.Scanner{},
+		&azurestorage.Scanner{},
 	}
 
 }
