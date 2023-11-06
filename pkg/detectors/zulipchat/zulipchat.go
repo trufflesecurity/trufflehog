@@ -25,7 +25,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(common.BuildRegex(common.AlphaNumPattern, "", 32))
 	idPat     = regexp.MustCompile(`\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b`)
-	domainPat = regexp.MustCompile(`\b([a-z0-9-]+\.zulipchat\.com)\b`)
+	domainPat = regexp.MustCompile(`\b([a-z0-9-]+\.zulip(?:(?:chat)?\.com|\.org))\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
