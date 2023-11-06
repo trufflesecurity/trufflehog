@@ -973,6 +973,7 @@ enum DetectorType {
   Eventbrite = 962;
   GrafanaServiceAccount = 963;
   RequestFinance = 964;
+  Overloop = 965;
 }
 
 message Result {

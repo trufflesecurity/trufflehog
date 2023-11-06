@@ -477,6 +477,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opsgenie"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/optimizely"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/overloop"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/owlbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/packagecloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pagerdutyapikey"
@@ -1578,6 +1579,7 @@ func DefaultDetectors() []detectors.Detector {
 		grafana.Scanner{},
 		logzio.Scanner{},
 		eventbrite.Scanner{},
+		&overloop.Scanner{},
 	}
 
 }
