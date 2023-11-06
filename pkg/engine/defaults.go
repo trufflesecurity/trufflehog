@@ -303,11 +303,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
-<<<<<<< HEAD
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
-=======
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
->>>>>>> b2d541e0eace6f1393077ea04bcd79cd6898c0d9
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
