@@ -34,10 +34,10 @@ type Handler interface {
 // HandleFile processes a given file by selecting an appropriate handler from DefaultHandlers.
 // It first checks if the handler implements SpecializedHandler for any special processing,
 // then falls back to regular file type handling. If successful, it reads the file in chunks,
-// packages them in the provided chunk skeleton, and sends them to chunksChan.
+// packages them in the provided chunk skeleton, and reports them to the chunk reporter.
 // The function returns true if processing was successful and false otherwise.
 // Context is used for cancellation, and the caller is responsible for canceling it if needed.
-func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
 	aCtx := logContext.AddLogger(ctx)
 	for _, h := range DefaultHandlers() {
 		h.New()
@@ -51,7 +51,7 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 			return false
 		}
 
-		if success := processHandler(aCtx, h, reReader, chunkSkel, chunksChan); success {
+		if success := processHandler(aCtx, h, reReader, chunkSkel, reporter); success {
 			return true
 		}
 	}
@@ -59,14 +59,14 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, c
 	return false
 }
 
-func processHandler(ctx logContext.Context, h Handler, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+func processHandler(ctx logContext.Context, h Handler, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
 	defer reReader.Close()
 	defer reReader.Stop()
 
 	if specialHandler, ok := h.(SpecializedHandler); ok {
 		file, isSpecial, err := specialHandler.HandleSpecialized(ctx, reReader)
 		if isSpecial {
-			return handleChunks(ctx, h.FromFile(ctx, file), chunkSkel, chunksChan)
+			return handleChunks(ctx, h.FromFile(ctx, file), chunkSkel, reporter)
 		}
 		if err != nil {
 			ctx.Logger().Error(err, "error handling file")
@@ -82,10 +82,10 @@ func processHandler(ctx logContext.Context, h Handler, reReader *diskbufferreade
 		return false
 	}
 
-	return handleChunks(ctx, h.FromFile(ctx, reReader), chunkSkel, chunksChan)
+	return handleChunks(ctx, h.FromFile(ctx, reReader), chunkSkel, reporter)
 }
 
-func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, chunksChan chan *sources.Chunk) bool {
+func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
 	for {
 		select {
 		case data, open := <-handlerChan:
@@ -94,9 +94,7 @@ func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sourc
 			}
 			chunk := *chunkSkel
 			chunk.Data = data
-			select {
-			case chunksChan <- &chunk:
-			case <-ctx.Done():
+			if err := reporter.ChunkOk(logContext.AddLogger(ctx), chunk); err != nil {
 				return false
 			}
 		case <-ctx.Done():
