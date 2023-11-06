@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/paulbellamy/ratecounter"
 	"golang.org/x/sync/semaphore"
-	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -204,7 +204,7 @@ func main() {
 					})
 
 				logger.Info("scanning repo", "repo", r)
-				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
+				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), sources.ChanReporter{Ch: chunksChan})
 				if err != nil {
 					logFatal(err, "error scanning repo")
 				}
