@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	token  = regexp.MustCompile(`([A-Za-z0-9_-]{40})`)
-	email  = regexp.MustCompile(`\b(\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b)\b`)
+	email  = regexp.MustCompile(`\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b`)
 	domain = regexp.MustCompile(`\b([a-zA-Z-0-9]{3,16}\.zendesk\.com)\b`)
 )
 
