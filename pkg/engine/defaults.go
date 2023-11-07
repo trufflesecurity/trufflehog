@@ -277,6 +277,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ftp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fulcrum"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory_v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fusebill"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
@@ -1086,6 +1087,7 @@ func DefaultDetectors() []detectors.Detector {
 		ipgeolocation.Scanner{},
 		tmetric.Scanner{},
 		fullstory.Scanner{},
+		fullstory_v2.Scanner{},
 		noticeable.Scanner{},
 		currencyscoop.Scanner{},
 		scrapingbee.Scanner{},
