@@ -253,7 +253,7 @@ enum DetectorType {
   Nytimes = 241;
   Polygon = 242;
   Powrbot = 243;
-  ProspectIO = 244;
+  ProspectIO = 244 [deprecated = true];
   Skrappio = 245;
   Monday = 246;
   Smartsheets = 247;
@@ -582,7 +582,7 @@ enum DetectorType {
   Hive = 571;
   Hiveage = 572;
   Kickbox = 573;
-  Passbase = 574;
+  Passbase = 574 [deprecated = true];
   PostageApp = 575;
   PureStake = 576;
   Qubole = 577;
@@ -667,7 +667,7 @@ enum DetectorType {
   Meistertask = 656;
   Mindmeister = 657;
   PeopleDataLabs = 658;
-  ScraperSite = 659;
+  ScraperSite = 659  [deprecated = true];
   Scrapfly = 660;
   SimplyNoted = 661;
   TravelPayouts = 662;
@@ -967,6 +967,13 @@ enum DetectorType {
   ReplyIO = 956;
   AzureBatch = 957;
   AzureContainerRegistry = 958;
+  AWSSessionKey = 959;
+  Coda = 960;
+  LogzIO = 961;
+  Eventbrite = 962;
+  GrafanaServiceAccount = 963;
+  RequestFinance = 964;
+  Overloop = 965;
 }
 
 message Result {
