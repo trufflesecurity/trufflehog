@@ -975,6 +975,7 @@ enum DetectorType {
   RequestFinance = 964;
   Overloop = 965;
   Ngrok = 966;
+  Replicate = 967;
 }
 
 message Result {

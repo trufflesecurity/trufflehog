@@ -549,6 +549,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/refiner"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replicate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
@@ -1584,6 +1585,7 @@ func DefaultDetectors() []detectors.Detector {
 		eventbrite.Scanner{},
 		&overloop.Scanner{},
 		ngrok.Scanner{},
+		replicate.Scanner{},
 	}
 
 }
