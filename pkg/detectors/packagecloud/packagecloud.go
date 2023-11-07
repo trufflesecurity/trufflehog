@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b([0-9a-f]{48})\b`)
+	keyPat = regexp.MustCompile(`(?i)(?:packagecloud(?:.|[\n\r]){0,40}?([0-9a-f]{48})\b|\b([0-9a-f]{48})(?:.|[\n\r]){0,40}?packagecloud\.com)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -36,9 +36,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
