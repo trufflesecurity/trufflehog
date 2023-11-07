@@ -974,6 +974,7 @@ enum DetectorType {
   GrafanaServiceAccount = 963;
   RequestFinance = 964;
   Overloop = 965;
+  Ngrok = 966;
 }
 
 message Result {

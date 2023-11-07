@@ -447,6 +447,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nexmoapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nftport"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ngc"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ngrok"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
@@ -1582,6 +1583,7 @@ func DefaultDetectors() []detectors.Detector {
 		logzio.Scanner{},
 		eventbrite.Scanner{},
 		&overloop.Scanner{},
+		ngrok.Scanner{},
 	}
 
 }
