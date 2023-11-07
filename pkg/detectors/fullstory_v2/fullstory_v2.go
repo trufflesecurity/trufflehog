@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int            { return 1 }
+func (Scanner) Version() int { return 2 }
 
 var (
 	client = common.SaneHttpClient()
