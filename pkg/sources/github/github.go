@@ -797,7 +797,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
 			}(now)
 
-			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, chunksChan); err != nil {
+			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
 				return nil
 			}
