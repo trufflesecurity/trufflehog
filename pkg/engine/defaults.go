@@ -305,6 +305,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
@@ -477,6 +478,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opsgenie"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/optimizely"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/overloop"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/owlbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/packagecloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pagerdutyapikey"
@@ -547,6 +549,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rentman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/repairshopr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replyio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
@@ -1560,6 +1563,7 @@ func DefaultDetectors() []detectors.Detector {
 		&sourcegraphcody.Scanner{},
 		voiceflow.Scanner{},
 		ip2location.Scanner{},
+		grafanaserviceaccount.Scanner{},
 		vagrantcloudpersonaltoken.Scanner{},
 		openvpn.Scanner{},
 		&metabase.Scanner{},
@@ -1572,11 +1576,12 @@ func DefaultDetectors() []detectors.Detector {
 		lemonsqueezy.Scanner{},
 		denodeploy.Scanner{},
 		budibase.Scanner{},
-		grafana.Scanner{},
+		requestfinance.Scanner{},
 		coda.Scanner{},
 		grafana.Scanner{},
 		logzio.Scanner{},
 		eventbrite.Scanner{},
+		&overloop.Scanner{},
 	}
 
 }
