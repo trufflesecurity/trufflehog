@@ -458,7 +458,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 2
-	chunkSpecificDetectors := make(map[detectorspb.DetectorType]detectors.Detector, avgDetectorsPerChunk)
+	chunkSpecificDetectors := make(map[DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
@@ -469,11 +469,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				for _, match := range e.ahoCorasickCore.MatchString(string(decoded.Chunk.Data)) {
-					if !e.ahoCorasickCore.PopulateDetectorsByMatch(match, chunkSpecificDetectors) {
-						continue
-					}
-				}
+				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
 
 				for k, detector := range chunkSpecificDetectors {
 					decoded.Chunk.Verify = e.verify
