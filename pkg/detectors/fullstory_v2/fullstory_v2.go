@@ -1,4 +1,4 @@
-package fullstory
+package fullstory_v2
 
 import (
 	"context"
@@ -18,13 +18,13 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (s Scanner) Version() int { return 1 }
+func (Scanner) Version() int { return 2 }
 
 var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"fullstory"}) + `\b([a-zA-Z-0-9/+]{88})\b`)
+	keyPat = regexp.MustCompile(`\b(na1\.[A-Za-z0-9\+\/]{100})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.fullstory.com/operations/v1", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.fullstory.com/v2/users", nil)
 			if err != nil {
 				continue
 			}

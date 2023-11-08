@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 	"testing"
 	"time"
@@ -34,7 +35,15 @@ func TestPostgres(t *testing.T) {
 			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{
+			input: fmt.Sprintf("//postgres:%s@localhost:5432/foo?sslmode=disable", postgresPass),
+			want:  result{pingOk: true, pingDeterminate: true},
+		},
+		{
 			input: "//localhost:5432/foo?sslmode=disable&user=" + postgresUser + "&password=" + postgresPass,
+			want:  result{pingOk: true, pingDeterminate: true},
+		},
+		{
+			input: fmt.Sprintf("//%s:%s@localhost:5432/foo?sslmode=disable", postgresUser, postgresPass),
 			want:  result{pingOk: true, pingDeterminate: true},
 		},
 		{

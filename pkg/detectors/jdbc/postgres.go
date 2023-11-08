@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/lib/pq"
 	"strings"
+
+	"github.com/lib/pq"
 )
 
 type postgresJDBC struct {
@@ -57,17 +58,33 @@ func joinKeyValues(m map[string]string, sep string) string {
 }
 
 func parsePostgres(subname string) (jdbc, error) {
-	// expected form: //HOST/DB?key=value&key=value
+	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 	hostAndDB, paramString, _ := strings.Cut(subname, "?")
 	if !strings.HasPrefix(hostAndDB, "//") {
 		return nil, errors.New("expected host to start with //")
 	}
-	hostAndDB = strings.TrimPrefix(hostAndDB, "//")
-	host, database, _ := strings.Cut(hostAndDB, "/")
+	userPassAndHostAndDB := strings.TrimPrefix(hostAndDB, "//")
+	userPass, hostAndDB, found := strings.Cut(userPassAndHostAndDB, "@")
+	var user, pass string
+	if found {
+		user, pass, _ = strings.Cut(userPass, ":")
+	} else {
+		hostAndDB = userPass
+	}
+	host, database, found := strings.Cut(hostAndDB, "/")
+	if !found {
+		return nil, errors.New("expected host and database to be separated by /")
+	}
 
 	params := map[string]string{
 		"host":   host,
 		"dbname": database,
+	}
+	if len(user) > 0 {
+		params["user"] = user
+	}
+	if len(pass) > 0 {
+		params["password"] = pass
 	}
 	for _, param := range strings.Split(paramString, "&") {
 		key, val, _ := strings.Cut(param, "=")
