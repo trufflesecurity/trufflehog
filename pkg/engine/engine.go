@@ -53,7 +53,7 @@ type Engine struct {
 	// CLI flags.
 	concurrency uint8
 	decoders    []decoders.Decoder
-	detectors   map[bool][]detectors.Detector
+	detectors   []detectors.Detector
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
@@ -87,6 +87,9 @@ type Engine struct {
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
 	dedupeCache *lru.Cache
+
+	// verify determines whether the scanner will attempt to verify candidate secrets
+	verify bool
 }
 
 // Option is used to configure the engine during initialization using functional options.
@@ -100,16 +103,9 @@ func WithConcurrency(concurrency uint8) Option {
 
 const ignoreTag = "trufflehog:ignore"
 
-func WithDetectors(verify bool, d ...detectors.Detector) Option {
+func WithDetectors(d ...detectors.Detector) Option {
 	return func(e *Engine) {
-		if e.detectors == nil {
-			e.detectors = make(map[bool][]detectors.Detector)
-		}
-		if e.detectors[verify] == nil {
-			e.detectors[true] = []detectors.Detector{}
-			e.detectors[false] = []detectors.Detector{}
-		}
-		e.detectors[verify] = append(e.detectors[verify], d...)
+		e.detectors = append(e.detectors, d...)
 	}
 }
 
@@ -166,8 +162,7 @@ func WithFilterDetectors(filterFunc func(detectors.Detector) bool) Option {
 		if e.detectors == nil {
 			return
 		}
-		e.detectors[true] = filterDetectors(filterFunc, e.detectors[true])
-		e.detectors[false] = filterDetectors(filterFunc, e.detectors[false])
+		e.detectors = filterDetectors(filterFunc, e.detectors)
 	}
 }
 
@@ -175,6 +170,13 @@ func WithFilterDetectors(filterFunc func(detectors.Detector) bool) Option {
 func WithPrinter(printer Printer) Option {
 	return func(e *Engine) {
 		e.printer = printer
+	}
+}
+
+// WithVerify configures whether the scanner will verify candidate secrets.
+func WithVerify(verify bool) Option {
+	return func(e *Engine) {
+		e.verify = verify
 	}
 }
 
@@ -277,8 +279,6 @@ func Start(ctx context.Context, options ...Option) (*Engine, error) {
 		return nil, err
 	}
 	e.setDefaults(ctx)
-	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore.Setup(ctx)
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
 
@@ -311,7 +311,10 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 		option(e)
 	}
 	ctx.Logger().V(4).Info("engine initialized")
+
+	ctx.Logger().V(4).Info("setting up aho-corasick core")
 	e.ahoCorasickCore = NewAhoCorasickCore(e.detectors)
+	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
 }
@@ -330,6 +333,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	e.sourceManager = sources.NewManager(
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithSourceUnits(),
 		sources.WithBufferedOutput(defaultChannelBuffer),
 	)
 
@@ -339,9 +343,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	}
 
 	if len(e.detectors) == 0 {
-		e.detectors = map[bool][]detectors.Detector{}
-		e.detectors[true] = DefaultDetectors()
-		e.detectors[false] = []detectors.Detector{}
+		e.detectors = DefaultDetectors()
 	}
 	ctx.Logger().V(4).Info("default engine options set")
 }
@@ -350,9 +352,8 @@ func (e *Engine) setDefaults(ctx context.Context) {
 // a detector has been configured in a way that isn't represented by
 // the DetectorID (type and version).
 func (e *Engine) sanityChecks(ctx context.Context) {
-	dets := append(e.detectors[true], e.detectors[false]...)
-	seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
-	for _, det := range dets {
+	seenDetectors := make(map[config.DetectorID]struct{}, len(e.detectors))
+	for _, det := range e.detectors {
 		id := config.GetDetectorID(det)
 		if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
 			ctx.Logger().Info("possible duplicate detector configured", "detector", id)
@@ -457,7 +458,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 2
-	chunkSpecificDetectors := make(map[detectorspb.DetectorType]DetectorInfo, avgDetectorsPerChunk)
+	chunkSpecificDetectors := make(map[DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
@@ -468,14 +469,10 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				for _, match := range e.ahoCorasickCore.MatchString(string(decoded.Chunk.Data)) {
-					if !e.ahoCorasickCore.PopulateDetectorsByMatch(match, chunkSpecificDetectors) {
-						continue
-					}
-				}
+				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
 
 				for k, detector := range chunkSpecificDetectors {
-					decoded.Chunk.Verify = detector.ShouldVerify
+					decoded.Chunk.Verify = e.verify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
 						chunk:    *decoded.Chunk,

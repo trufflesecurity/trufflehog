@@ -16,6 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func TestSource_Scan(t *testing.T) {
@@ -236,7 +237,7 @@ func TestSource_Chunks_Integration(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				err = s.git.ScanRepo(ctx, repo, repoPath, &tt.scanOptions, chunksCh)
+				err = s.git.ScanRepo(ctx, repo, repoPath, &tt.scanOptions, sources.ChanReporter{Ch: chunksCh})
 				if err != nil {
 					panic(err)
 				}
@@ -503,4 +504,73 @@ func TestGitURLParse(t *testing.T) {
 		assert.Equal(t, tt.path, u.Path)
 		assert.Equal(t, tt.scheme, u.Scheme)
 	}
+}
+
+func TestEnumerate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// Setup the connection to test enumeration.
+	units := []string{
+		"foo", "bar", "baz",
+		"/path/to/dir/", "/path/to/another/dir/",
+	}
+	conn, err := anypb.New(&sourcespb.Git{
+		Repositories: units[0:3],
+		Directories:  units[3:],
+	})
+	assert.NoError(t, err)
+
+	// Initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "test enumerate", 0, 0, true, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.NoError(t, err)
+
+	assert.Equal(t, len(units), len(reporter.Units))
+	assert.Equal(t, 0, len(reporter.UnitErrs))
+	for _, unit := range reporter.Units {
+		assert.Contains(t, units, unit.SourceUnitID())
+	}
+	for _, unit := range units[:3] {
+		assert.Contains(t, reporter.Units, SourceUnit{ID: unit, Kind: UnitRepo})
+	}
+	for _, unit := range units[3:] {
+		assert.Contains(t, reporter.Units, SourceUnit{ID: unit, Kind: UnitDir})
+	}
+}
+
+func TestChunkUnit(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	// Initialize the source.
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.Git{
+		Credential: &sourcespb.Git_Unauthenticated{},
+	})
+	assert.NoError(t, err)
+	err = s.Init(ctx, "test chunk", 0, 0, true, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+
+	// Happy path single repository.
+	err = s.ChunkUnit(ctx, SourceUnit{
+		ID:   "https://github.com/dustin-decker/secretsandstuff.git",
+		Kind: UnitRepo,
+	}, &reporter)
+	assert.NoError(t, err)
+
+	// Error path.
+	err = s.ChunkUnit(ctx, SourceUnit{
+		ID:   "/file/not/found",
+		Kind: UnitDir,
+	}, &reporter)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 11, len(reporter.Chunks))
+	assert.Equal(t, 1, len(reporter.ChunkErrs))
 }
