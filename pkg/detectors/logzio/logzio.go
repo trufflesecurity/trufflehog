@@ -1,7 +1,8 @@
-package prospectio
+package logzio
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -11,25 +12,26 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"prospect"}) + `\b([a-z0-9A-Z-]{50})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"logz"}) + `\b([0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"prospect"}
+	return []string{"logz"}
 }
 
-// FromData will find and optionally verify ProspectIO secrets in a given set of bytes.
+// FromData will find and optionally verify Logzio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -42,29 +44,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ProspectIO,
+			DetectorType: detectorspb.DetectorType_LogzIO,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.prospect.io/public/v1/prospects", nil)
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.logz.io/v2/whoami", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", resMatch)
-			req.Header.Add("Content-Type", "application/vnd.api+json; charset=utf-8")
+			req.Header.Add("X-API-TOKEN", resMatch)
+			req.Header.Add("Content-Type", "application/json; charset=utf-8")
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
+				} else if res.StatusCode == 401 {
+					// The secret is determinately not verified (nothing to do)
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
+					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 				}
+			} else {
+				s1.VerificationError = err
 			}
+		}
+
+		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s1)
@@ -74,5 +86,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ProspectIO
+	return detectorspb.DetectorType_LogzIO
 }

@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package zulipchat
+package eventbrite
 
 import (
 	"context"
@@ -17,17 +17,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestZulipChat_FromChunk(t *testing.T) {
+func TestEventbrite_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ZULIPCHAT")
-	domain := testSecrets.MustGetField("ZULIPCHAT_DOMAINV2")
-	id := testSecrets.MustGetField("ZULIPCHAT_ID")
-	inactiveSecret := testSecrets.MustGetField("ZULIPCHAT_INACTIVE")
+	secret := testSecrets.MustGetField("EVENTBRITE")
+	inactiveSecret := testSecrets.MustGetField("EVENTBRITE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -47,12 +45,12 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat %s", secret, id, domain)),
+				data:   []byte(fmt.Sprintf("You can find a eventbrite secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detectorspb.DetectorType_Eventbrite,
 					Verified:     true,
 				},
 			},
@@ -64,12 +62,12 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat %s but not valid", inactiveSecret, id, domain)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a eventbrite secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detectorspb.DetectorType_Eventbrite,
 					Verified:     false,
 				},
 			},
@@ -93,12 +91,12 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat %s", secret, id, domain)),
+				data:   []byte(fmt.Sprintf("You can find a eventbrite secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detectorspb.DetectorType_Eventbrite,
 					Verified:     false,
 				},
 			},
@@ -110,12 +108,12 @@ func TestZulipChat_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a zulipchat secret %s within zulipchat %s and zulipchat %s", secret, id, domain)),
+				data:   []byte(fmt.Sprintf("You can find a eventbrite secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ZulipChat,
+					DetectorType: detectorspb.DetectorType_Eventbrite,
 					Verified:     false,
 				},
 			},
@@ -127,7 +125,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Zulipchat.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Eventbrite.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -138,9 +136,9 @@ func TestZulipChat_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Zulipchat.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Eventbrite.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
