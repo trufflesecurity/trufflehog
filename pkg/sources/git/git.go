@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
+	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
@@ -25,6 +26,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -45,9 +47,6 @@ type Source struct {
 	sources.Progress
 	conn        *sourcespb.Git
 	scanOptions *ScanOptions
-	// Kludge to preserve engine.ScanGit functionality which doesn't expect
-	// the scanning to clean up the directory.
-	preserveTempDirs bool
 }
 
 type Git struct {
@@ -100,17 +99,9 @@ func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
-// WithScanOptions sets the scan options.
-func (s *Source) WithScanOptions(scanOptions *ScanOptions) {
+// withScanOptions sets the scan options.
+func (s *Source) withScanOptions(scanOptions *ScanOptions) {
 	s.scanOptions = scanOptions
-}
-
-// WithPreserveTempDirs sets whether to preserve temp directories when scanning
-// the provided list of s.conn.Directories. NOTE: This is *only* for
-// s.conn.Directories, not all temp directories created. This is also a kludge
-// and should be refactored away.
-func (s *Source) WithPreserveTempDirs(preserve bool) {
-	s.preserveTempDirs = preserve
 }
 
 // Init returns an initialized GitHub source.
@@ -128,14 +119,43 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
+	repoPath, _, err := prepareRepoSinceCommit(aCtx, conn.GetUri(), conn.GetBase())
+	if err != nil || repoPath == "" {
+		return fmt.Errorf("error preparing repo: %w", err)
+	}
+	conn.Directories = append(conn.Directories, repoPath)
+
+	filter, err := common.FilterFromFiles(conn.IncludePathsFile, conn.ExcludePathsFile)
+	if err != nil {
+		return fmt.Errorf("error creating filter: %w", err)
+	}
+	opts := []ScanOption{ScanOptionFilter(filter), ScanOptionLogOptions(new(gogit.LogOptions))}
+
+	if depth := conn.GetMaxDepth(); depth != 0 {
+		opts = append(opts, ScanOptionMaxDepth(depth))
+	}
+	if base := conn.GetBase(); base != "" {
+		opts = append(opts, ScanOptionBaseHash(base))
+	}
+	if head := conn.GetHead(); head != "" {
+		opts = append(opts, ScanOptionHeadCommit(head))
+	}
+	if globs := conn.GetExcludeGlobs(); globs != "" {
+		excludedGlobs := strings.Split(globs, ",")
+		opts = append(opts, ScanOptionExcludeGlobs(excludedGlobs))
+	}
+	if isBare := conn.GetBare(); isBare {
+		opts = append(opts, ScanOptionBare(isBare))
+	}
+	s.withScanOptions(NewScanOptions(opts...))
+
 	s.conn = &conn
 
 	if concurrency == 0 {
 		concurrency = runtime.NumCPU()
 	}
 
-	err := GitCmdCheck()
-	if err != nil {
+	if err = GitCmdCheck(); err != nil {
 		return err
 	}
 
@@ -261,7 +281,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 	}
 
 	err = func() error {
-		if !s.preserveTempDirs && strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) {
+		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) {
 			defer os.RemoveAll(gitDir)
 		}
 
@@ -798,8 +818,8 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 	return nil, fmt.Errorf("no base refs succeeded for base: %q", base)
 }
 
-// PrepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
-func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (string, bool, error) {
+// prepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
+func prepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (string, bool, error) {
 	if commitHash == "" {
 		return PrepareRepo(ctx, uriString)
 	}

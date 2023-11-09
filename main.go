@@ -30,7 +30,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
@@ -157,7 +156,7 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
-	//Support -h for help
+	// Support -h for help
 	cli.HelpFlag.Short('h')
 
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
@@ -416,34 +415,17 @@ func run(state overseer.State) {
 		logFatal(err, "error initializing engine")
 	}
 
-	var repoPath string
-	var remote bool
 	switch cmd {
 	case gitScan.FullCommand():
-		filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
-		if err != nil {
-			logFatal(err, "could not create filter")
-		}
-		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
-		if err != nil || repoPath == "" {
-			logFatal(err, "error preparing git repo for scanning")
-		}
-		if remote {
-			defer os.RemoveAll(repoPath)
-		}
-		excludedGlobs := []string{}
-		if *gitScanExcludeGlobs != "" {
-			excludedGlobs = strings.Split(*gitScanExcludeGlobs, ",")
-		}
-
 		cfg := sources.GitConfig{
-			RepoPath:     repoPath,
-			HeadRef:      *gitScanBranch,
-			BaseRef:      *gitScanSinceCommit,
-			MaxDepth:     *gitScanMaxDepth,
-			Bare:         *gitScanBare,
-			Filter:       filter,
-			ExcludeGlobs: excludedGlobs,
+			URI:              *gitScanURI,
+			IncludePathsFile: *gitScanIncludePaths,
+			ExcludePathsFile: *gitScanExcludePaths,
+			HeadRef:          *gitScanBranch,
+			BaseRef:          *gitScanSinceCommit,
+			MaxDepth:         *gitScanMaxDepth,
+			Bare:             *gitScanBare,
+			ExcludeGlobs:     *gitScanExcludeGlobs,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Git.")
