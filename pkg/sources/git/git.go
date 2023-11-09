@@ -119,11 +119,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
-	repoPath, _, err := prepareRepoSinceCommit(aCtx, conn.GetUri(), conn.GetBase())
-	if err != nil || repoPath == "" {
-		return fmt.Errorf("error preparing repo: %w", err)
+	if uri := conn.GetUri(); uri != "" {
+		repoPath, _, err := prepareRepoSinceCommit(aCtx, uri, conn.GetBase())
+		if err != nil || repoPath == "" {
+			return fmt.Errorf("error preparing repo: %w", err)
+		}
+		conn.Directories = append(conn.Directories, repoPath)
 	}
-	conn.Directories = append(conn.Directories, repoPath)
 
 	filter, err := common.FilterFromFiles(conn.IncludePathsFile, conn.ExcludePathsFile)
 	if err != nil {
