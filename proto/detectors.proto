@@ -971,6 +971,11 @@ enum DetectorType {
   Coda = 960;
   LogzIO = 961;
   Eventbrite = 962;
+  GrafanaServiceAccount = 963;
+  RequestFinance = 964;
+  Overloop = 965;
+  Ngrok = 966;
+  Replicate = 967;
 }
 
 message Result {
