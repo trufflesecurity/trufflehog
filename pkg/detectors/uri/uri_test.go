@@ -133,7 +133,7 @@ func TestURI_FromChunk(t *testing.T) {
 			// }
 			for i := range got {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Errorf("URI.FromData() error = %v, wantVerificationErr %v", got[i].VerificationError, tt.wantErr)
+					t.Errorf("URI.FromData() error = %v, wantVerificationErr %v", got[i].VerificationError(), tt.wantErr)
 					return
 				}
 				got[i].Raw = nil

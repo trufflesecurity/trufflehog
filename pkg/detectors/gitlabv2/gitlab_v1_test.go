@@ -96,10 +96,10 @@ func TestGitlabV2_FromChunk_WithV1Secrets(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError)
+					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", *_test.go)
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
