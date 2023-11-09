@@ -176,6 +176,7 @@ message Git {
   string exclude_paths_file = 10; // path to file containing newline separated list of paths
   string exclude_globs = 11; // comma separated list of globs
   int64  max_depth = 12;
+  string uri = 13; // repository URL. https://, file://, or ssh://
 }
 
 message GitLab {

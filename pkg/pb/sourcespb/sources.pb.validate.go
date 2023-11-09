@@ -1620,6 +1620,8 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for MaxDepth
 
+	// no validation rules for Uri
+
 	switch m.Credential.(type) {
 
 	case *Git_BasicAuth:
