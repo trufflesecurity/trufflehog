@@ -76,7 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else if res.StatusCode == 403 {
 						var r response
 						if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-							s1.VerificationError = err
+							s1.SetVerificationError(err, resMatch)
 							continue
 						}
 

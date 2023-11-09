@@ -92,7 +92,8 @@ matchLoop:
 			// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
 			// detectors to use tri-state verification.
 			if pingRes.err != nil && !pingRes.determinate {
-				s.VerificationError = pingRes.err
+				err = pingRes.err
+				s.SetVerificationError(err, jdbcConn)
 			}
 			// TODO: specialized redaction
 		}

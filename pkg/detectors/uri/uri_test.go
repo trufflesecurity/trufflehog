@@ -132,13 +132,13 @@ func TestURI_FromChunk(t *testing.T) {
 			// 	return
 			// }
 			for i := range got {
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Errorf("URI.FromData() error = %v, wantVerificationErr %v", got[i].VerificationError, tt.wantErr)
 					return
 				}
 				got[i].Raw = nil
 				got[i].RawV2 = nil
-				got[i].VerificationError = nil
+				got[i].SetVerificationError(nil)
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
