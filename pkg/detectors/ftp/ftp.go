@@ -70,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		rawURL.Path = ""
 		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
 
-		r := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FTP,
 			Raw:          []byte(rawURL.String()),
 			Redacted:     redact,
@@ -82,24 +82,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				timeout = defaultVerificationTimeout
 			}
 			verificationErr := verifyFTP(timeout, parsedURL)
-			r.Verified = verificationErr == nil
+			s1.Verified = verificationErr == nil
 			if !isErrDeterminate(verificationErr) {
-				r.VerificationError = verificationErr
+				s1.SetVerificationError(verificationErr, password)
 			}
 		}
 
-		if !r.Verified {
+		if !s1.Verified {
 			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
 			if strings.HasPrefix(password, "$") {
 				continue
 			}
 		}
 
-		if detectors.IsKnownFalsePositive(string(r.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
+		if detectors.IsKnownFalsePositive(string(s1.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
 			continue
 		}
 
-		results = append(results, r)
+		results = append(results, s1)
 	}
 
 	return results, nil

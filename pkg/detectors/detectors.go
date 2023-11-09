@@ -3,6 +3,8 @@ package detectors
 import (
 	"context"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"math/big"
 	"net/url"
 	"strings"
@@ -59,7 +61,42 @@ type Result struct {
 
 	// This field should only be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
-	VerificationError error
+	verificationError error
+}
+
+// SetVerificationError is the only way to set a verification error. Any sensetive values should be passed-in as secrets to be redacted.
+func (r *Result) SetVerificationError(err error, secrets ...string) {
+	if err != nil {
+		r.verificationError = redactSecrets(err, secrets...)
+	}
+}
+
+// Public accessors for the fields could also be provided if needed.
+func (r *Result) VerificationError() error {
+	return r.verificationError
+}
+
+// redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.
+func redactSecrets(err error, secrets ...string) error {
+	lastErr := unwrapToLast(err)
+	errStr := lastErr.Error()
+	for _, secret := range secrets {
+		errStr = strings.Replace(errStr, secret, "[REDACTED]", -1)
+	}
+	// return redactedError{err, errStr}
+	return fmt.Errorf("%s", errStr)
+}
+
+// unwrapToLast returns the last error in the chain of errors.
+func unwrapToLast(err error) error {
+	for {
+		unwrapped := errors.Unwrap(err)
+		if unwrapped == nil {
+			// We've reached the last error in the chain
+			return err
+		}
+		err = unwrapped
+	}
 }
 
 type ResultWithMetadata struct {

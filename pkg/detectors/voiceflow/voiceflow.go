@@ -80,11 +80,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err == nil {
 						bodyString = buf.String()
 					}
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response [status=%d, body=%s]", res.StatusCode, bodyString)
+					verificationErr := fmt.Errorf("unexpected HTTP response [status=%d, body=%s]", res.StatusCode, bodyString)
+					s1.SetVerificationError(verificationErr, resMatch)
 				}
 				_ = res.Body.Close()
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

@@ -79,10 +79,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else if res.StatusCode == 401 {
 						// 401 is expected for an invalid token, so there is nothing to do here.
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						s1.SetVerificationError(err, resMatch)
 					}
 				} else {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
 				// This is a server SDK key. Try to initialize using the SDK.
@@ -94,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else {
 					// If the error isn't nil or known, then this is likely a timeout error: ldclient.ErrInitializationTimeout
 					// But any other error here means we don't know if this key is valid.
-					s1.VerificationError = err
+					s1.SetVerificationError(err, resMatch)
 				}
 			}
 		}

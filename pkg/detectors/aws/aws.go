@@ -137,8 +137,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
-				s1.Verified = verified
+				isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
+				s1.Verified = isVerified
 				// It'd be good to log when calculated account value does not match
 				// the account value from verification. Should only be edge cases at most.
 				// if extraData["account"] != s1.ExtraData["account"] && extraData["account"] != "" {//log here}
@@ -148,7 +148,10 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for k, v := range extraData {
 					s1.ExtraData[k] = v
 				}
-				s1.VerificationError = verificationErr
+				// s1.VerificationError()=
+				if verificationErr != nil {
+					s1.SetVerificationError(verificationErr, resSecretMatch)
+				}
 			}
 
 			if !s1.Verified {
@@ -286,7 +289,7 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 				if strings.EqualFold(body.Error.Code, "InvalidClientTokenId") {
 					return false, nil, nil
 				} else {
-					return false, nil, fmt.Errorf("request to %v returned status %d with an unexpected reason (%s: %s)", res.Request.URL, res.StatusCode, body.Error.Code, body.Error.Message)
+					return false, nil, fmt.Errorf("request returned status %d with an unexpected reason (%s: %s)", res.StatusCode, body.Error.Code, body.Error.Message)
 				}
 			} else {
 				return false, nil, fmt.Errorf("couldn't parse the sts response body (%v)", err)
