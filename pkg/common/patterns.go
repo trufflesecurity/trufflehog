@@ -20,6 +20,7 @@ type RegexState struct {
 	compiledRegex *regexp.Regexp
 }
 
+
 // Custom Regex functions
 func BuildRegex(pattern string, specialChar string, length int) string {
 	return fmt.Sprintf(`\b([%s%s]{%s})\b`, pattern, specialChar, strconv.Itoa(length))
@@ -58,14 +59,14 @@ func (r RegexState) Matches(data []byte) []string {
 
 // UsernameRegexCheck constructs an username usernameRegex pattern from a given pattern of excluded characters.
 func UsernameRegexCheck(pattern string) RegexState {
-	raw := fmt.Sprintf(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})\b`, pattern)
+	raw := fmt.Sprintf(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v'"\s]{4,40})`, pattern)
 
 	return RegexState{regexp.MustCompile(raw)}
 }
 
 // PasswordRegexCheck constructs an username usernameRegex pattern from a given pattern of excluded characters.
 func PasswordRegexCheck(pattern string) RegexState {
-	raw := fmt.Sprintf(`(?im)(?:pass|password)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v]{4,40})`, pattern)
+	raw := fmt.Sprintf(`(?im)(?:pass)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:%+v'"\s]{4,40})`, pattern)
 
 	return RegexState{regexp.MustCompile(raw)}
 }

@@ -1053,6 +1053,7 @@ const (
 	DetectorType_Overloop                  DetectorType = 965
 	DetectorType_Ngrok                     DetectorType = 966
 	DetectorType_Replicate                 DetectorType = 967
+	DetectorType_Postgres                  DetectorType = 968
 )
 
 // Enum value maps for DetectorType.
@@ -2022,6 +2023,7 @@ var (
 		965: "Overloop",
 		966: "Ngrok",
 		967: "Replicate",
+		968: "Postgres",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                       0,
@@ -2988,6 +2990,7 @@ var (
 		"Overloop":                      965,
 		"Ngrok":                         966,
 		"Replicate":                     967,
+		"Postgres":                      968,
 	}
 )
 
