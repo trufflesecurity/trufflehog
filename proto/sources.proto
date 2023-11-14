@@ -176,6 +176,10 @@ message Git {
   string exclude_paths_file = 10; // path to file containing newline separated list of paths
   string exclude_globs = 11; // comma separated list of globs
   int64  max_depth = 12;
+  // This field is generally used by the CLI or within CI/CD systems to specify a single repository,
+  // whereas the repositories field is used by the enterprise config to specify multiple repositories.
+  // Passing a single repository via the uri field also allows for additional options to be specified
+  // like head, base, bare, etc.
   string uri = 13; // repository URL. https://, file://, or ssh://
 }
 
