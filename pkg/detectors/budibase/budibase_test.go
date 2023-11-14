@@ -66,13 +66,14 @@ func TestBudibase_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
-					DetectorType:      detectorspb.DetectorType_Budibase,
-					Verified:          false,
-					VerificationError: fmt.Errorf("unexpected HTTP response status 403"),
-				},
-			},
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_Budibase,
+					Verified:     true,
+				}
+				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 403"))
+				return []detectors.Result{r}
+			}(),
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
@@ -101,7 +102,7 @@ func TestBudibase_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")

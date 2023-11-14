@@ -132,7 +132,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				if (got[i].VerificationError()) != nil) != tt.wantVerificationErr {
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationErr = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
