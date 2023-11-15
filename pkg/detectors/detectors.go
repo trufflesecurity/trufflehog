@@ -3,12 +3,12 @@ package detectors
 import (
 	"context"
 	"crypto/rand"
-	"errors"
-	"fmt"
 	"math/big"
 	"net/url"
 	"strings"
 	"unicode"
+
+	"errors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -83,11 +83,12 @@ func redactSecrets(err error, secrets ...string) error {
 	for _, secret := range secrets {
 		errStr = strings.Replace(errStr, secret, "[REDACTED]", -1)
 	}
-	// return redactedError{err, errStr}
-	return fmt.Errorf("%s", errStr)
+	return errors.New(errStr)
 }
 
 // unwrapToLast returns the last error in the chain of errors.
+// This is added to exclude non-essential details (like URLs) for brevity and security.
+// Also helps us optimize performance in redaction and enhance log clarity.
 func unwrapToLast(err error) error {
 	for {
 		unwrapped := errors.Unwrap(err)
