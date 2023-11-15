@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base32"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -103,34 +101,6 @@ func GetHMAC(key []byte, data []byte) []byte {
 	return hasher.Sum(nil)
 }
 
-func GetAccountNumFromAWSID(AWSID string) (string, error) {
-	// Function to get the account number from an AWS ID (no verification required)
-	// Source: https://medium.com/@TalBeerySec/a-short-note-on-aws-key-id-f88cc4317489
-	if len(AWSID) < 4 {
-		return "", fmt.Errorf("AWSID is too short")
-	}
-	trimmed_AWSID := AWSID[4:]
-	x, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(trimmed_AWSID))
-	if err != nil {
-		return "", err
-	}
-
-	if len(x) < 6 {
-		return "", fmt.Errorf("Decoded AWSID is too short")
-	}
-	y := x[0:6]
-
-	var z uint64 = binary.BigEndian.Uint64(append(make([]byte, 8-len(y)), y...))
-	maskBytes, err := hex.DecodeString("7fffffffff80")
-	if err != nil {
-		return "", err
-	}
-
-	var mask uint64 = binary.BigEndian.Uint64(append(make([]byte, 8-len(maskBytes)), maskBytes...))
-	account_num := (z & mask) >> 7
-	return fmt.Sprintf("%012d", account_num), nil
-}
-
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -166,11 +136,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				},
 			}
 
-			account, err := GetAccountNumFromAWSID(resIDMatch)
-			if err == nil {
-				s1.ExtraData["account"] = account
-			}
-
 			if verify {
 				verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = verified
@@ -194,6 +159,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// Unverified results that look like hashes are probably not secrets
 				if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 					continue
+				}
+			}
+
+			// If we haven't already found an account number for this ID (via API), calculate one.
+			if _, ok := s1.ExtraData["account"]; !ok {
+				account, err := common.GetAccountNumFromAWSID(resIDMatch)
+				if err == nil {
+					s1.ExtraData["account"] = account
 				}
 			}
 
