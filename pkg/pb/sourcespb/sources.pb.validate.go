@@ -1606,6 +1606,12 @@ func (m *Git) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for Head
+
+	// no validation rules for Base
+
+	// no validation rules for Bare
+
 	switch m.Credential.(type) {
 
 	case *Git_BasicAuth:

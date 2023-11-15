@@ -52,6 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SumoLogicKey,
 				Raw:          []byte(resMatch),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/sumologic/",
+				},
 			}
 
 			if verify {
