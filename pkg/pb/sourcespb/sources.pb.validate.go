@@ -1612,6 +1612,16 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for Bare
 
+	// no validation rules for IncludePathsFile
+
+	// no validation rules for ExcludePathsFile
+
+	// no validation rules for ExcludeGlobs
+
+	// no validation rules for MaxDepth
+
+	// no validation rules for Uri
+
 	switch m.Credential.(type) {
 
 	case *Git_BasicAuth:
