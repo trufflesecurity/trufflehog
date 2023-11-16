@@ -24,7 +24,7 @@ const verifyURL = "https://api.pagerduty.com/users"
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pagerduty", "pager_duty", "pd_", "pd-"}) + `\b([a-zA-Z0-9_+-]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pagerduty", "pager_duty", "pd_", "pd-"}) + `\b(u\+[a-zA-Z0-9_+-]{18})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

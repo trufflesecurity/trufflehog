@@ -22,6 +22,22 @@ type scanner struct {
 	skipIDs            map[string]struct{}
 }
 
+// resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
+var resourceTypes = map[string]string{
+	"ABIA": "AWS STS service bearer token",
+	"ACCA": "Context-specific credential",
+	"AGPA": "User group",
+	"AIDA": "IAM user",
+	"AIPA": "Amazon EC2 instance profile",
+	"AKIA": "Access key",
+	"ANPA": "Managed policy",
+	"ANVA": "Version in a managed policy",
+	"APKA": "Public key",
+	"AROA": "Role",
+	"ASCA": "Certificate",
+	"ASIA": "Temporary (AWS STS) access key IDs",
+}
+
 func New(opts ...func(*scanner)) *scanner {
 	scanner := &scanner{
 		skipIDs: map[string]struct{}{},
@@ -53,7 +69,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Key types are from this list https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
-	idPat     = regexp.MustCompile(`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`)
+	idPat     = regexp.MustCompile(`\b((AKIA|ABIA|ACCA)[0-9A-Z]{16})\b`)
 	secretPat = regexp.MustCompile(`[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}`)
 	// Hashes, like those for git, do technically match the secret pattern.
 	// But they are extremely unlikely to be generated as an actual AWS secret.
@@ -93,7 +109,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, idMatch := range idMatches {
-		if len(idMatch) != 2 {
+		if len(idMatch) != 3 {
 			continue
 		}
 		resIDMatch := strings.TrimSpace(idMatch[1])
@@ -115,12 +131,23 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resIDMatch),
 				Redacted:     resIDMatch,
 				RawV2:        []byte(resIDMatch + resSecretMatch),
+				ExtraData: map[string]string{
+					"resource_type": resourceTypes[idMatch[2]],
+				},
 			}
 
 			if verify {
 				verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = verified
-				s1.ExtraData = extraData
+				//It'd be good to log when calculated account value does not match
+				//the account value from verification. Should only be edge cases at most.
+				//if extraData["account"] != s1.ExtraData["account"] && extraData["account"] != "" {//log here}
+
+				//Append the extraData to the existing ExtraData map.
+				// This will overwrite with the new verified values.
+				for k, v := range extraData {
+					s1.ExtraData[k] = v
+				}
 				s1.VerificationError = verificationErr
 			}
 
@@ -132,6 +159,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// Unverified results that look like hashes are probably not secrets
 				if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 					continue
+				}
+			}
+
+			// If we haven't already found an account number for this ID (via API), calculate one.
+			if _, ok := s1.ExtraData["account"]; !ok {
+				account, err := common.GetAccountNumFromAWSID(resIDMatch)
+				if err == nil {
+					s1.ExtraData["account"] = account
 				}
 			}
 
