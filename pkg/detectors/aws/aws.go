@@ -139,6 +139,10 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = verified
+				//It'd be good to log when calculated account value does not match
+				//the account value from verification. Should only be edge cases at most.
+				//if extraData["account"] != s1.ExtraData["account"] && extraData["account"] != "" {//log here}
+
 				//Append the extraData to the existing ExtraData map.
 				// This will overwrite with the new verified values.
 				for k, v := range extraData {
@@ -155,6 +159,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// Unverified results that look like hashes are probably not secrets
 				if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 					continue
+				}
+			}
+
+			// If we haven't already found an account number for this ID (via API), calculate one.
+			if _, ok := s1.ExtraData["account"]; !ok {
+				account, err := common.GetAccountNumFromAWSID(resIDMatch)
+				if err == nil {
+					s1.ExtraData["account"] = account
 				}
 			}
 

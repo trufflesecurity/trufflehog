@@ -150,6 +150,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 
+				// If we haven't already found an account number for this ID (via API), calculate one.
+				if _, ok := s1.ExtraData["account"]; !ok {
+					account, err := common.GetAccountNumFromAWSID(resIDMatch)
+					if err == nil {
+						s1.ExtraData["account"] = account
+					}
+				}
+
 				results = append(results, s1)
 				// If we've found a verified match with this ID, we don't need to look for any more. So move on to the next ID.
 				if s1.Verified {
