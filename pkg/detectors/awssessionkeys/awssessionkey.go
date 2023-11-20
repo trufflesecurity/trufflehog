@@ -130,6 +130,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(resIDMatch),
 					Redacted:     resIDMatch,
 					RawV2:        []byte(resIDMatch + resSecretMatch + resSessionMatch),
+					ExtraData:    map[string]string{},
 				}
 
 				if verify {
