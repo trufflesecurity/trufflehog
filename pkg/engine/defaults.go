@@ -356,6 +356,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jdbc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken_v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/juro"
@@ -1586,6 +1587,7 @@ func DefaultDetectors() []detectors.Detector {
 		&overloop.Scanner{},
 		ngrok.Scanner{},
 		replicate.Scanner{},
+		jiratoken_v2.Scanner{},
 	}
 
 }
