@@ -100,6 +100,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.ExtraData["scopes"] = res.Header.Get("X-OAuth-Scopes")
 						}
 					}
+				} else {
+					s1.VerificationError = err
 				}
 			}
 		}
