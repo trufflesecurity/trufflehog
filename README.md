@@ -69,6 +69,40 @@ curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scr
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
 
+# :closed_lock_with_key: Verifying the artifacts
+
+Checksums are applied to all artifacts, and the resulting checksum file is signed using cosign.
+
+You need the following tool to verify signature:
+
+- [Cosign](https://docs.sigstore.dev/cosign/installation/)
+
+Verification steps are as follow:
+
+1. Download the artifact files you want, and the following files from the [releases](https://github.com/trufflesecurity/trufflehog/releases) page.
+
+   - trufflehog\_{version}\_checksums.txt
+   - trufflehog\_{version}\_checksums.txt.pem
+   - trufflehog\_{version}\_checksums.txt.sig
+
+2. Verify the signature:
+
+   ```shell
+   cosign verify-blob <path to trufflehog_{version}_checksums.txt> \
+   --certificate <path to trufflehog_{version}_checksums.txt.pem> \
+   --signature <path to trufflehog_{version}_checksums.txt.sig> \
+   --certificate-identity-regexp 'https://github\.com/trufflesecurity/trufflehog/\.github/workflows/.+' \
+   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+   ```
+
+3. Once the signature is confirmed as valid, you can proceed to validate that the SHA256 sums align with the downloaded artifact:
+
+   ```shell
+   sha256sum --ignore-missing -c trufflehog_{version}_checksums.txt
+   ```
+
+Replace `{version}` with the downloaded files version
+
 # :rocket: Quick Start
 
 ## 1: Scan a repo for only verified secrets
