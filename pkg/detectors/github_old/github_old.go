@@ -38,6 +38,7 @@ type userRes struct {
 	SiteAdmin bool   `json:"site_admin"`
 	Name      string `json:"name"`
 	Company   string `json:"company"`
+	UserURL   string `json:"html_url"`
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -91,6 +92,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						res.Body.Close()
 						if err == nil {
 							s1.Verified = true
+
+							if err == nil {
+								s1.Verified = true
+								s1.ExtraData["username"] = userResponse.Login
+								s1.ExtraData["url"] = userResponse.UserURL
+								s1.ExtraData["account_type"] = userResponse.Type
+								s1.ExtraData["site_admin"] = fmt.Sprintf("%t", userResponse.SiteAdmin)
+								s1.ExtraData["name"] = userResponse.Name
+								s1.ExtraData["company"] = userResponse.Company
+								s1.ExtraData["scopes"] = res.Header.Get("X-OAuth-Scopes")
+							}
 						}
 					}
 				}

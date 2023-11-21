@@ -60,7 +60,7 @@ func (u *UnitHook) StartUnitChunking(ref JobProgressRef, unit SourceUnit, start 
 	u.metrics.Add(id, &UnitMetrics{
 		Unit:      unit,
 		Parent:    ref,
-		StartTime: start,
+		StartTime: &start,
 	})
 }
 
@@ -73,7 +73,7 @@ func (u *UnitHook) EndUnitChunking(ref JobProgressRef, unit SourceUnit, end time
 	if !ok {
 		return
 	}
-	metrics.EndTime = end
+	metrics.EndTime = &end
 }
 
 func (u *UnitHook) ReportChunk(ref JobProgressRef, unit SourceUnit, chunk *Chunk) {
@@ -168,17 +168,17 @@ func (u *UnitHook) UnitMetrics() []UnitMetrics {
 }
 
 type UnitMetrics struct {
-	Unit   SourceUnit
-	Parent JobProgressRef
+	Unit   SourceUnit     `json:"unit,omitempty"`
+	Parent JobProgressRef `json:"parent,omitempty"`
 	// Start and end time for chunking this unit.
-	StartTime time.Time
-	EndTime   time.Time
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
 	// Total number of chunks produced from this unit.
-	TotalChunks uint64
+	TotalChunks uint64 `json:"total_chunks,omitempty"`
 	// Total number of bytes produced from this unit.
-	TotalBytes uint64
+	TotalBytes uint64 `json:"total_bytes,omitempty"`
 	// All errors encountered by this unit.
-	Errors []error
+	Errors []error `json:"errors,omitempty"`
 	// Flag to mark that these metrics were intentionally evicted from
 	// the cache.
 	handled bool
@@ -192,13 +192,13 @@ func (u UnitMetrics) IsFinished() bool {
 // has been running. If it hasn't started yet, 0 is returned. If it has
 // finished, the total time is returned.
 func (u UnitMetrics) ElapsedTime() time.Duration {
-	if u.StartTime.IsZero() {
+	if u.StartTime == nil {
 		return 0
 	}
-	if u.EndTime.IsZero() {
-		return time.Since(u.StartTime)
+	if u.EndTime == nil {
+		return time.Since(*u.StartTime)
 	}
-	return u.EndTime.Sub(u.StartTime)
+	return u.EndTime.Sub(*u.StartTime)
 }
 
 // NoopHook implements JobProgressHook by doing nothing. This is useful for

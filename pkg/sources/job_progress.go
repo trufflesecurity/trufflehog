@@ -43,9 +43,9 @@ type JobProgressHook interface {
 // If the job supports it, the reference can also be used to cancel running via
 // CancelRun.
 type JobProgressRef struct {
-	JobID       JobID
-	SourceID    SourceID
-	SourceName  string
+	JobID       JobID    `json:"job_id"`
+	SourceID    SourceID `json:"source_id"`
+	SourceName  string   `json:"source_name"`
 	jobProgress *JobProgress
 }
 
@@ -120,28 +120,28 @@ type JobProgress struct {
 
 // JobProgressMetrics tracks the metrics of a job.
 type JobProgressMetrics struct {
-	StartTime time.Time
-	EndTime   time.Time
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
 	// Total number of units found by the Source.
-	TotalUnits uint64
+	TotalUnits uint64 `json:"total_units,omitempty"`
 	// Total number of units that have finished chunking.
-	FinishedUnits uint64
+	FinishedUnits uint64 `json:"finished_units,omitempty"`
 	// Total number of chunks produced. This metric updates before the
 	// chunk is sent on the output channel.
-	TotalChunks uint64
+	TotalChunks uint64 `json:"total_chunks,omitempty"`
 	// All errors encountered.
-	Errors []error
+	Errors []error `json:"errors,omitempty"`
 	// Set to true if the source supports enumeration and has finished
 	// enumerating. If the source does not support enumeration, this field
 	// is always false.
-	DoneEnumerating bool
+	DoneEnumerating bool `json:"done_enumerating,omitempty"`
 
 	// Progress information reported by the source.
-	SourcePercent           int64
-	SourceMessage           string
-	SourceEncodedResumeInfo string
-	SourceSectionsCompleted int32
-	SourceSectionsRemaining int32
+	SourcePercent           int64  `json:"source_percent,omitempty"`
+	SourceMessage           string `json:"source_message,omitempty"`
+	SourceEncodedResumeInfo string `json:"source_encoded_resume_info,omitempty"`
+	SourceSectionsCompleted int32  `json:"source_sections_completed,omitempty"`
+	SourceSectionsRemaining int32  `json:"source_sections_remaining,omitempty"`
 }
 
 // WithHooks adds hooks to be called when an event triggers.
@@ -189,14 +189,14 @@ func (jp *JobProgress) executeHooks(todo func(hook JobProgressHook)) {
 // without the JobProgressRef parameter.
 func (jp *JobProgress) Start(start time.Time) {
 	jp.metricsLock.Lock()
-	jp.metrics.StartTime = start
+	jp.metrics.StartTime = &start
 	jp.metricsLock.Unlock()
 
 	jp.executeHooks(func(hook JobProgressHook) { hook.Start(jp.Ref(), start) })
 }
 func (jp *JobProgress) End(end time.Time) {
 	jp.metricsLock.Lock()
-	jp.metrics.EndTime = end
+	jp.metrics.EndTime = &end
 	jp.metricsLock.Unlock()
 
 	jp.executeHooks(func(hook JobProgressHook) { hook.End(jp.Ref(), end) })
@@ -248,6 +248,17 @@ func (jp *JobProgress) Snapshot() JobProgressMetrics {
 	defer jp.metricsLock.Unlock()
 
 	metrics := jp.metrics
+
+	// Make a copy of the fields to make them read only.
+	if jp.metrics.StartTime != nil {
+		startTime := *jp.metrics.StartTime
+		metrics.StartTime = &startTime
+	}
+	if jp.metrics.EndTime != nil {
+		endTime := *jp.metrics.EndTime
+		metrics.EndTime = &endTime
+	}
+
 	metrics.Errors = make([]error, len(metrics.Errors))
 	copy(metrics.Errors, jp.metrics.Errors)
 
@@ -343,13 +354,13 @@ func (m JobProgressMetrics) PercentComplete() int {
 // has been running. If it hasn't started yet, 0 is returned. If it has
 // finished, the total time is returned.
 func (m JobProgressMetrics) ElapsedTime() time.Duration {
-	if m.StartTime.IsZero() {
+	if m.StartTime == nil {
 		return 0
 	}
-	if m.EndTime.IsZero() {
-		return time.Since(m.StartTime)
+	if m.EndTime == nil {
+		return time.Since(*m.StartTime)
 	}
-	return m.EndTime.Sub(m.StartTime)
+	return m.EndTime.Sub(*m.StartTime)
 }
 
 // ErrorsFor returns all the errors for the given SourceUnit. If there are no

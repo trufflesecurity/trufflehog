@@ -28,6 +28,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 	unverifiedGhu := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHU")
 	unverifiedGhs := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHS")
 	unverifiedGhr := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHR")
+	verifiedGhp := testSecrets.MustGetField("GITHUB_VERIFIED_GHP")
 
 	type args struct {
 		ctx    context.Context
@@ -42,6 +43,32 @@ func TestGitHub_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "found, verified ghp",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a github secret %s within", verifiedGhp)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Github,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"account_type":   "User",
+						"company":        "",
+						"name":           "",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"scopes":         "notifications",
+						"site_admin":     "false",
+						"url":            "https://github.com/truffle-sandbox",
+						"username":       "truffle-sandbox",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "found, unverified ghp",
 			s:    Scanner{},
 			args: args{
@@ -53,6 +80,9 @@ func TestGitHub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Github,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+					},
 				},
 			},
 			wantErr: false,
@@ -69,6 +99,9 @@ func TestGitHub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Github,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+					},
 				},
 			},
 			wantErr: false,
@@ -85,6 +118,9 @@ func TestGitHub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Github,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+					},
 				},
 			},
 			wantErr: false,
@@ -101,6 +137,9 @@ func TestGitHub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Github,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+					},
 				},
 			},
 			wantErr: false,
@@ -117,6 +156,9 @@ func TestGitHub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Github,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+					},
 				},
 			},
 			wantErr: false,
@@ -133,6 +175,9 @@ func TestGitHub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Github,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+					},
 				},
 			},
 			wantErr: false,

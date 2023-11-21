@@ -130,6 +130,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(resIDMatch),
 					Redacted:     resIDMatch,
 					RawV2:        []byte(resIDMatch + resSecretMatch + resSessionMatch),
+					ExtraData:    map[string]string{},
 				}
 
 				if verify {
@@ -147,6 +148,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Unverified results that look like hashes are probably not secrets
 					if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 						continue
+					}
+				}
+
+				// If we haven't already found an account number for this ID (via API), calculate one.
+				if _, ok := s1.ExtraData["account"]; !ok {
+					account, err := common.GetAccountNumFromAWSID(resIDMatch)
+					if err == nil {
+						s1.ExtraData["account"] = account
 					}
 				}
 

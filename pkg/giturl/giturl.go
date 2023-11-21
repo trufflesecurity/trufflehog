@@ -135,7 +135,25 @@ func GenerateLink(repo, commit, file string, line int64) string {
 		fallthrough
 	default:
 		var baseLink string
-		if file == "" {
+
+		//Gist links are formatted differently
+		if strings.HasPrefix(repo, "https://gist.github.com") {
+			baseLink = repo[:len(repo)-4] + "/"
+			if commit != "" {
+				baseLink += commit + "/"
+			}
+			if file != "" {
+				cleanedFileName := strings.ReplaceAll(file, ".", "-")
+				baseLink += "#file-" + cleanedFileName
+			}
+			if line > 0 {
+				if strings.Contains(baseLink, "#") {
+					baseLink += "-L" + strconv.FormatInt(line, 10)
+				} else {
+					baseLink += "#L" + strconv.FormatInt(line, 10)
+				}
+			}
+		} else if file == "" {
 			baseLink = repo[:len(repo)-4] + "/commit/" + commit
 		} else {
 			baseLink = repo[:len(repo)-4] + "/blob/" + commit + "/" + file

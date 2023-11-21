@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -45,7 +44,6 @@ func TestGitEngine(t *testing.T) {
 		branch   string
 		base     string
 		maxDepth int
-		filter   *common.Filter
 	}
 	for tName, tTest := range map[string]testProfile{
 		"all_secrets": {
@@ -55,14 +53,12 @@ func TestGitEngine(t *testing.T) {
 				"8afb0ecd4998b1179e428db5ebbcdc8221214432": {"369963c1434c377428ca8531fbc46c0c43d037a0", 3, false},
 				"27fbead3bf883cdb7de9d7825ed401f28f9398f1": {"ffc7e0f9400fb6300167009e42d2f842cd7956e2", 7, false},
 			},
-			filter: common.FilterEmpty(),
 		},
 		"base_commit": {
 			expected: map[string]expResult{
 				"70001020fab32b1fcf2f1f0e5c66424eae649826": {"AKIAXYZDQCEN4B6JSJQI", 2, true},
 			},
-			filter: common.FilterEmpty(),
-			base:   "2f251b8c1e72135a375b659951097ec7749d4af9",
+			base: "2f251b8c1e72135a375b659951097ec7749d4af9",
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
@@ -76,11 +72,10 @@ func TestGitEngine(t *testing.T) {
 			assert.Nil(t, err)
 
 			cfg := sources.GitConfig{
-				RepoPath: path,
+				URI:      path,
 				HeadRef:  tTest.branch,
 				BaseRef:  tTest.base,
 				MaxDepth: tTest.maxDepth,
-				Filter:   tTest.filter,
 			}
 			if err := e.ScanGit(ctx, cfg); err != nil {
 				return
@@ -141,10 +136,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// TODO: this is measuring the time it takes to initialize the source
 		// and not to do the full scan
-		cfg := sources.GitConfig{
-			RepoPath: path,
-			Filter:   common.FilterEmpty(),
-		}
+		cfg := sources.GitConfig{URI: path}
 		if err := e.ScanGit(ctx, cfg); err != nil {
 			return
 		}

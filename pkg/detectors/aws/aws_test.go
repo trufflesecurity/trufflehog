@@ -84,7 +84,10 @@ func TestAWS_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
-					ExtraData:    map[string]string{"resource_type": "Access key"},
+					ExtraData: map[string]string{
+						"resource_type": "Access key",
+						"account":       "171436882533",
+					},
 				},
 			},
 			wantErr: false,
@@ -115,6 +118,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJXYZ",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 				{
@@ -187,6 +191,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
@@ -221,6 +226,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
@@ -242,6 +248,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
@@ -263,6 +270,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
