@@ -50,6 +50,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/assemblyai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atera"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autodesk"
@@ -1586,6 +1587,7 @@ func DefaultDetectors() []detectors.Detector {
 		&overloop.Scanner{},
 		ngrok.Scanner{},
 		replicate.Scanner{},
+		atlassian.Scanner{},
 	}
 
 }
