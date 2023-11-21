@@ -123,6 +123,8 @@ func (s *SourceManager) asyncRun(ctx context.Context, sourceName string, source 
 	}
 	s.wg.Add(1)
 	go func() {
+		// Call Finish after the semaphore has been released.
+		defer progress.Finish()
 		defer s.sem.Release(1)
 		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
@@ -216,7 +218,6 @@ func (s *SourceManager) preflightChecks(ctx context.Context) error {
 // acquired resources. An error is returned if there was a fatal error during
 // the run. This information is also recorded in the JobProgress.
 func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress) error {
-	defer report.Finish()
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
 
