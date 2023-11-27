@@ -196,6 +196,14 @@ Use the `--image` flag multiple times to scan multiple images.
 trufflehog docker --image trufflesecurity/secrets --only-verified
 ```
 
+## 11: Scan in CI
+
+Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). The `--fail` flag will return an 183 error code if valid credentials are found.
+
+```bash
+trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
