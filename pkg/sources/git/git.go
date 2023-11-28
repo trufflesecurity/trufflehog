@@ -981,9 +981,12 @@ func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.Ch
 	if err != nil {
 		return err
 	}
+
+	bufferName := cleantemp.MkFilename()
+
 	defer fileReader.Close()
 
-	reader, err := diskbufferreader.New(fileReader)
+	reader, err := diskbufferreader.New(fileReader, bufferName)
 	if err != nil {
 		return err
 	}
