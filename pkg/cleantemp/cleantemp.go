@@ -14,6 +14,22 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
+func GetPids(artifactName string) ([]string, error) {
+	// Finds other trufflehog PIDs that may be running
+	var pids []string
+	procs, err := ps.Processes()
+	if err != nil {
+		return pids, fmt.Errorf("error getting jobs PIDs: %w", err)
+	}
+
+	for _, proc := range procs {
+		if strings.Contains(proc.Executable(), artifactName) {
+			pids = append(pids, strconv.Itoa(proc.Pid()))
+		}
+	}
+	return pids, err
+}
+
 // Returns a temporary directory path formatted as:
 // trufflehog-<pid>-<randint>
 func MkdirTemp() (string, error) {
@@ -26,27 +42,29 @@ func MkdirTemp() (string, error) {
 	return dir, nil
 }
 
+func MkfileTemp() (*os.File, error) {
+	pid := os.Getpid()
+	filename := fmt.Sprintf("%s-%d-", "trufflehog", pid)
+	tmpFile, err := os.CreateTemp(os.TempDir(), filename)
+	if err != nil {
+		return nil, err
+	}
+	return tmpFile, err
+}
+
 // Defines the interface for removing orphaned artifacts from aborted scans
 type CleanTemp interface {
-	//Removes orphaned directories from sources like Git
+	// Removes orphaned directories from sources like Git
 	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
-	//Removes orphaned files/artifacts from sources like Artifactory
+	// Removes orphaned files/artifacts from sources like Artifactory
 	CleanTempFiles(ctx context.Context, fileName string, pid int) error
 }
 
 // Deletes orphaned temp directories that do not contain running PID values
 func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
-	// Finds other trufflehog PIDs that may be running
-	var pids []string
-	procs, err := ps.Processes()
+	pids, err := GetPids(dirName)
 	if err != nil {
-		return fmt.Errorf("error getting jobs PIDs: %w", err)
-	}
-
-	for _, proc := range procs {
-		if strings.Contains(proc.Executable(), dirName) {
-			pids = append(pids, strconv.Itoa(proc.Pid()))
-		}
+		return err
 	}
 
 	tempDir := os.TempDir()
@@ -85,3 +103,5 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 	}
 	return nil
 }
+
+func CleanTempFile(ctx logContext.Context, fileName string, pid int) error {}
