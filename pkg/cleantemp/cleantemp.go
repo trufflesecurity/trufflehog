@@ -42,14 +42,13 @@ func MkdirTemp() (string, error) {
 	return dir, nil
 }
 
-func MkfileTemp() (*os.File, error) {
+// Unlike MkdirTemp, we only want to generate the filename string.
+// The tempfile creation in trufflehog we're interested in
+// is generally handled by "github.com/trufflesecurity/disk-buffer-reader"
+func MkFilename() string {
 	pid := os.Getpid()
 	filename := fmt.Sprintf("%s-%d-", "trufflehog", pid)
-	tmpFile, err := os.CreateTemp(os.TempDir(), filename)
-	if err != nil {
-		return nil, err
-	}
-	return tmpFile, err
+	return filename
 }
 
 // Defines the interface for removing orphaned artifacts from aborted scans
