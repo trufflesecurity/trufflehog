@@ -104,4 +104,44 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 	return nil
 }
 
-func CleanTempFile(ctx logContext.Context, fileName string, pid int) error {}
+func CleanTempFile(ctx logContext.Context, fileName string, pid int) error {
+	pids, err := GetPids(fileName)
+	if err != nil {
+		return err
+	}
+
+	tempDir := os.TempDir()
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		return fmt.Errorf("Error reading temp dir: %w", err)
+	}
+
+	// Current PID
+	pidStr := strconv.Itoa(pid)
+
+	pattern := `^trufflehog-\d+-\d+$`
+	re := regexp.MustCompile(pattern)
+
+	for _, file := range files {
+		// Make sure we don't delete the working file of the current PID
+		if !file.IsDir() && re.MatchString(file.Name()) && !strings.Contains(file.Name(), pidStr) {
+			shouldDelete := true
+			// If they match any live PIDs, mark as should not delete
+			for _, pidval := range pids {
+				if strings.Contains(file.Name(), pidval) {
+					shouldDelete = false
+					break
+				}
+			}
+			if shouldDelete {
+				filePath := filepath.Join(tempDir, file.Name())
+				// Delete orphaned files
+				if err := os.Remove(filePath); err != nil {
+					return fmt.Errorf("Error deleting temp file: %s", filePath)
+				}
+				ctx.Logger().V(1).Info("Deleted file", "file", filePath)
+			}
+		}
+	}
+	return nil
+}
