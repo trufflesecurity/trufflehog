@@ -130,13 +130,8 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(resIDMatch),
 					Redacted:     resIDMatch,
 					RawV2:        []byte(resIDMatch + resSecretMatch + resSessionMatch),
-					ExtraData:    map[string]string{},
+					ExtraData:    make(map[string]string),
 				}
-
-				// Just to be extra sure, we'll use `make`
-				// https://github.com/trufflesecurity/trufflehog/issues/2125
-				// https://github.com/trufflesecurity/trufflehog/pull/2117
-				s1.ExtraData = make(map[string]string)
 
 				if verify {
 					verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, true)
