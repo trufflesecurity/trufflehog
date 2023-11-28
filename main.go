@@ -191,6 +191,12 @@ func runCleanup(ctx context.Context, execName string) {
 		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
 	}
 
+	// Orphaned file cleanup when the scanner is invoked
+	err = cleantemp.CleanTempFile(ctx, execName, pid)
+	if err != nil {
+		ctx.Logger().Error(err, "Error cleaning up orphaned files ")
+	}
+
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
@@ -198,6 +204,11 @@ func runCleanup(ctx context.Context, execName string) {
 		err := cleantemp.CleanTempDir(ctx, execName, pid)
 		if err != nil {
 			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+		}
+
+		err = cleantemp.CleanTempFile(ctx, execName, pid)
+		if err != nil {
+			ctx.Logger().Error(err, "Error cleaning up orphaned files ")
 		}
 	}
 
