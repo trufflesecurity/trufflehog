@@ -439,8 +439,8 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 }
 
 // ScanChunk injects a chunk into the output stream of chunks to be scanned.
-// This method should rarely be used. TODO: Remove when dependencies no longer
-// rely on this functionality.
+// This method should rarely be used. TODO(THOG-1577): Remove when dependencies
+// no longer rely on this functionality.
 func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 	e.sourceManager.ScanChunk(chunk)
 }
