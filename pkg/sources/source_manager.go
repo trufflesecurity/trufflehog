@@ -99,11 +99,6 @@ func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sour
 // asynchronously runs it. Error information is stored and accessible via the
 // JobProgressRef as it becomes available.
 func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
-	return s.asyncRun(ctx, sourceName, source)
-}
-
-// asyncRun is a helper method to asynchronously run the Source.
-func (s *SourceManager) asyncRun(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
 	sourceID, jobID := source.SourceID(), source.JobID()
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
@@ -128,7 +123,6 @@ func (s *SourceManager) asyncRun(ctx context.Context, sourceName string, source 
 		defer s.sem.Release(1)
 		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
-			"job_id", jobID,
 			"source_manager_worker_id", common.RandomID(5),
 		)
 		defer common.Recover(ctx)
@@ -172,8 +166,8 @@ func (s *SourceManager) Wait() error {
 }
 
 // ScanChunk injects a chunk into the output stream of chunks to be scanned.
-// This method should rarely be used. TODO: Remove when dependencies no longer
-// rely on this functionality.
+// This method should rarely be used. TODO(THOG-1577): Remove when dependencies
+// no longer rely on this functionality.
 func (s *SourceManager) ScanChunk(chunk *Chunk) {
 	s.outputChunks <- chunk
 }
@@ -229,8 +223,10 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 
 	report.TrackProgress(source.GetProgress())
 	ctx = context.WithValues(ctx,
-		"source_type", source.Type().String(),
+		"job_id", report.JobID,
+		"source_id", report.SourceID,
 		"source_name", report.SourceName,
+		"source_type", source.Type().String(),
 	)
 	// Check for the preferred method of tracking source units.
 	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits {
