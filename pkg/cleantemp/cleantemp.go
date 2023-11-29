@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/go-ps"
 
@@ -35,7 +36,13 @@ type CleanTemp interface {
 }
 
 // Deletes orphaned temp directories that do not contain running PID values
-func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
+func CleanTempDir(ctx logContext.Context) error {
+	executablePath, err := os.Executable()
+	if err != nil {
+		executablePath = "trufflehog"
+	}
+	execName := filepath.Base(executablePath)
+
 	// Finds other trufflehog PIDs that may be running
 	var pids []string
 	procs, err := ps.Processes()
@@ -44,38 +51,35 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 	}
 
 	for _, proc := range procs {
-		if strings.Contains(proc.Executable(), dirName) {
+		if proc.Executable() == execName {
 			pids = append(pids, strconv.Itoa(proc.Pid()))
 		}
 	}
 
 	tempDir := os.TempDir()
-	files, err := os.ReadDir(tempDir)
+	dirs, err := os.ReadDir(tempDir)
 	if err != nil {
 		return fmt.Errorf("Error reading temp dir: %w", err)
 	}
 
-	// Current PID
-	pidStr := strconv.Itoa(pid)
-
 	pattern := `^trufflehog-\d+-\d+$`
 	re := regexp.MustCompile(pattern)
 
-	for _, file := range files {
-		// Make sure we don't delete the working dir of the current PID
-		if file.IsDir() && re.MatchString(file.Name()) && !strings.Contains(file.Name(), pidStr) {
+	for _, dir := range dirs {
+		// Ensure that all directories match the pattern
+		if re.MatchString(dir.Name()) {
 			// Mark these directories initially as ones that should be deleted
 			shouldDelete := true
 			// If they match any live PIDs, mark as should not delete
 			for _, pidval := range pids {
-				if strings.Contains(file.Name(), pidval) {
+				if strings.Contains(dir.Name(), fmt.Sprintf("-%s-", pidval)) {
 					shouldDelete = false
 					// break out so we can still delete directories even if no other Trufflehog processes are running
 					break
 				}
 			}
 			if shouldDelete {
-				dirPath := filepath.Join(tempDir, file.Name())
+				dirPath := filepath.Join(tempDir, dir.Name())
 				if err := os.RemoveAll(dirPath); err != nil {
 					return fmt.Errorf("Error deleting temp directory: %s", dirPath)
 				}
@@ -84,4 +88,23 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 		}
 	}
 	return nil
+}
+
+// RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds
+func RunCleanupLoop(ctx logContext.Context) {
+	err := CleanTempDir(ctx)
+	if err != nil {
+		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+	}
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		err := CleanTempDir(ctx)
+		if err != nil {
+			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+		}
+	}
+
 }
