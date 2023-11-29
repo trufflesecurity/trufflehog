@@ -185,7 +185,7 @@ type UnitMetrics struct {
 }
 
 func (u UnitMetrics) IsFinished() bool {
-	return !u.EndTime.IsZero()
+	return u.EndTime != nil
 }
 
 // ElapsedTime is a convenience method that provides the elapsed time the job
