@@ -57,7 +57,7 @@ func CleanTempDir(ctx logContext.Context) error {
 	}
 
 	tempDir := os.TempDir()
-	files, err := os.ReadDir(tempDir)
+	dirs, err := os.ReadDir(tempDir)
 	if err != nil {
 		return fmt.Errorf("Error reading temp dir: %w", err)
 	}
@@ -65,21 +65,21 @@ func CleanTempDir(ctx logContext.Context) error {
 	pattern := `^trufflehog-\d+-\d+$`
 	re := regexp.MustCompile(pattern)
 
-	for _, file := range files {
+	for _, dir := range dirs {
 		// Ensure that all directories match the pattern
-		if re.MatchString(file.Name()) {
+		if re.MatchString(dir.Name()) {
 			// Mark these directories initially as ones that should be deleted
 			shouldDelete := true
 			// If they match any live PIDs, mark as should not delete
 			for _, pidval := range pids {
-				if strings.Contains(file.Name(), fmt.Sprintf("-%s-", pidval)) {
+				if strings.Contains(dir.Name(), fmt.Sprintf("-%s-", pidval)) {
 					shouldDelete = false
 					// break out so we can still delete directories even if no other Trufflehog processes are running
 					break
 				}
 			}
 			if shouldDelete {
-				dirPath := filepath.Join(tempDir, file.Name())
+				dirPath := filepath.Join(tempDir, dir.Name())
 				if err := os.RemoveAll(dirPath); err != nil {
 					return fmt.Errorf("Error deleting temp directory: %s", dirPath)
 				}
