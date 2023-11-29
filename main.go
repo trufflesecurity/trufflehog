@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
@@ -180,30 +179,6 @@ func init() {
 	}
 }
 
-// Encloses temp artifact cleanup in a function so it can be pushed
-// to a goroutine
-func runCleanup(ctx context.Context, execName string) {
-	// Every 15 minutes, attempt to remove orphaned artifacts
-	pid := os.Getpid()
-	// Inital orphaned artifact cleanup when the scanner is invoked
-	err := cleantemp.CleanTempArtifacts(ctx, execName, pid)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned artifacts ")
-	}
-
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		err := cleantemp.CleanTempArtifacts(ctx, execName, pid)
-		if err != nil {
-			ctx.Logger().Error(err, "Error cleaning up orphaned artifacts ")
-		}
-
-	}
-
-}
-
 func main() {
 	// setup logger
 	logFormat := log.WithConsoleSink
@@ -244,10 +219,7 @@ func main() {
 
 	ctx := context.Background()
 
-	var execName = "trufflehog"
-
-	go runCleanup(ctx, execName)
-
+	go cleantemp.RunCleanupLoop(ctx)
 }
 
 func run(state overseer.State) {
