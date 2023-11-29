@@ -1,7 +1,6 @@
 package cleantemp
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -51,17 +50,9 @@ func MkFilename() string {
 	return filename
 }
 
-// Defines the interface for removing orphaned artifacts from aborted scans
-type CleanTemp interface {
-	// Removes orphaned directories from sources like Git
-	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
-	// Removes orphaned files/artifacts from sources like Artifactory
-	CleanTempFiles(ctx context.Context, fileName string, pid int) error
-}
-
-// Deletes orphaned temp directories that do not contain running PID values
-func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
-	pids, err := GetPids(dirName)
+// CleanTempArtifacts deletes orphaned temp directories and files that do not contain running PID values
+func CleanTempArtifacts(ctx logContext.Context, artifactName string, pid int) error {
+	pids, err := GetPids(artifactName)
 	if err != nil {
 		return err
 	}
@@ -69,7 +60,7 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 	tempDir := os.TempDir()
 	files, err := os.ReadDir(tempDir)
 	if err != nil {
-		return fmt.Errorf("Error reading temp dir: %w", err)
+		return fmt.Errorf("error reading temp dir: %w", err)
 	}
 
 	// Current PID
@@ -79,66 +70,31 @@ func CleanTempDir(ctx logContext.Context, dirName string, pid int) error {
 	re := regexp.MustCompile(pattern)
 
 	for _, file := range files {
-		// Make sure we don't delete the working dir of the current PID
-		if file.IsDir() && re.MatchString(file.Name()) && !strings.Contains(file.Name(), pidStr) {
-			// Mark these directories initially as ones that should be deleted
+		// Match files or directories excluding the current PID
+		if re.MatchString(file.Name()) && !strings.Contains(file.Name(), pidStr) {
 			shouldDelete := true
-			// If they match any live PIDs, mark as should not delete
-			for _, pidval := range pids {
-				if strings.Contains(file.Name(), pidval) {
-					shouldDelete = false
-					// break out so we can still delete directories even if no other Trufflehog processes are running
-					break
-				}
-			}
-			if shouldDelete {
-				dirPath := filepath.Join(tempDir, file.Name())
-				if err := os.RemoveAll(dirPath); err != nil {
-					return fmt.Errorf("Error deleting temp directory: %s", dirPath)
-				}
-				ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
-			}
-		}
-	}
-	return nil
-}
-
-func CleanTempFile(ctx logContext.Context, fileName string, pid int) error {
-	pids, err := GetPids(fileName)
-	if err != nil {
-		return err
-	}
-
-	tempDir := os.TempDir()
-	files, err := os.ReadDir(tempDir)
-	if err != nil {
-		return fmt.Errorf("Error reading temp dir: %w", err)
-	}
-
-	// Current PID
-	pidStr := strconv.Itoa(pid)
-
-	pattern := `^trufflehog-\d+-\d+$`
-	re := regexp.MustCompile(pattern)
-
-	for _, file := range files {
-		// Make sure we don't delete the working file of the current PID
-		if !file.IsDir() && re.MatchString(file.Name()) && !strings.Contains(file.Name(), pidStr) {
-			shouldDelete := true
-			// If they match any live PIDs, mark as should not delete
+			// Check if the name matches any live PIDs
 			for _, pidval := range pids {
 				if strings.Contains(file.Name(), pidval) {
 					shouldDelete = false
 					break
 				}
 			}
+
 			if shouldDelete {
-				filePath := filepath.Join(tempDir, file.Name())
-				// Delete orphaned files
-				if err := os.Remove(filePath); err != nil {
-					return fmt.Errorf("Error deleting temp file: %s", filePath)
+				artifactPath := filepath.Join(tempDir, file.Name())
+
+				var delErr error
+				if file.IsDir() {
+					delErr = os.RemoveAll(artifactPath)
+				} else {
+					delErr = os.Remove(artifactPath)
 				}
-				ctx.Logger().V(1).Info("Deleted file", "file", filePath)
+
+				if delErr != nil {
+					return fmt.Errorf("error deleting temp artifact: %s", artifactPath)
+				}
+				ctx.Logger().V(1).Info("Deleted artifact", "artifact", artifactPath)
 			}
 		}
 	}

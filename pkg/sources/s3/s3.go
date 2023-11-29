@@ -349,7 +349,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			bufferName := cleantemp.MkFilename()
 
 			defer res.Body.Close()
-			reader, err := diskbufferreader.New(res.Body, bufferName)
+			reader, err := diskbufferreader.New(res.Body, diskbufferreader.WithBufferName(bufferName))
 			if err != nil {
 				s.log.Error(err, "Could not create reader.")
 				return nil

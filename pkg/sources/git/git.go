@@ -986,7 +986,7 @@ func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.Ch
 
 	defer fileReader.Close()
 
-	reader, err := diskbufferreader.New(fileReader, bufferName)
+	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return err
 	}

@@ -156,7 +156,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
 
-	reReader, err := diskbufferreader.New(inputFile, bufferName)
+	reReader, err := diskbufferreader.New(inputFile, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return fmt.Errorf("could not create re-readable reader: %w", err)
 	}

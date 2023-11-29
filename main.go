@@ -180,36 +180,26 @@ func init() {
 	}
 }
 
-// Encloses tempdir cleanup in a function so it can be pushed
+// Encloses temp artifact cleanup in a function so it can be pushed
 // to a goroutine
 func runCleanup(ctx context.Context, execName string) {
-	// Every 15 minutes, attempt to remove dirs
+	// Every 15 minutes, attempt to remove orphaned artifacts
 	pid := os.Getpid()
-	// Inital orphaned dir cleanup when the scanner is invoked
-	err := cleantemp.CleanTempDir(ctx, execName, pid)
+	// Inital orphaned artifact cleanup when the scanner is invoked
+	err := cleantemp.CleanTempArtifacts(ctx, execName, pid)
 	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
-	}
-
-	// Orphaned file cleanup when the scanner is invoked
-	err = cleantemp.CleanTempFile(ctx, execName, pid)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned files ")
+		ctx.Logger().Error(err, "Error cleaning up orphaned artifacts ")
 	}
 
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		err := cleantemp.CleanTempDir(ctx, execName, pid)
+		err := cleantemp.CleanTempArtifacts(ctx, execName, pid)
 		if err != nil {
-			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+			ctx.Logger().Error(err, "Error cleaning up orphaned artifacts ")
 		}
 
-		err = cleantemp.CleanTempFile(ctx, execName, pid)
-		if err != nil {
-			ctx.Logger().Error(err, "Error cleaning up orphaned files ")
-		}
 	}
 
 }

@@ -371,7 +371,7 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 
 func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) ([]byte, error) {
 	bufferName := cleantemp.MkFilename()
-	reader, err := diskbufferreader.New(o, bufferName)
+	reader, err := diskbufferreader.New(o, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return nil, fmt.Errorf("error creating disk buffer reader: %w", err)
 	}
