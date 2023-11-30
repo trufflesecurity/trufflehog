@@ -15,7 +15,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// Returns a temporary directory path formatted as:
+// MkdirTemp returns a temporary directory path formatted as:
 // trufflehog-<pid>-<randint>
 func MkdirTemp() (string, error) {
 	pid := os.Getpid()
@@ -27,19 +27,23 @@ func MkdirTemp() (string, error) {
 	return dir, nil
 }
 
-// Defines the interface for removing orphaned artifacts from aborted scans
+// CleanTemp is used to remove orphaned artifacts from aborted scans.
 type CleanTemp interface {
-	//Removes orphaned directories from sources like Git
+	// CleanTempDir removes orphaned directories from sources. ex: Git
 	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
-	//Removes orphaned files/artifacts from sources like Artifactory
+	// CleanTempFiles removes orphaned files/artifacts from sources. ex: Artifactory
 	CleanTempFiles(ctx context.Context, fileName string, pid int) error
 }
 
-// Deletes orphaned temp directories that do not contain running PID values
+// Only compile during startup.
+var trufflehogRE = regexp.MustCompile(`^trufflehog-\d+-\d+$`)
+
+// CleanTempDir removes orphaned temp directories that do not contain running PID values.
 func CleanTempDir(ctx logContext.Context) error {
+	const defaultExecPath = "trufflehog"
 	executablePath, err := os.Executable()
 	if err != nil {
-		executablePath = "trufflehog"
+		executablePath = defaultExecPath
 	}
 	execName := filepath.Base(executablePath)
 
@@ -59,29 +63,26 @@ func CleanTempDir(ctx logContext.Context) error {
 	tempDir := os.TempDir()
 	dirs, err := os.ReadDir(tempDir)
 	if err != nil {
-		return fmt.Errorf("Error reading temp dir: %w", err)
+		return fmt.Errorf("error reading temp dir: %w", err)
 	}
 
-	pattern := `^trufflehog-\d+-\d+$`
-	re := regexp.MustCompile(pattern)
-
 	for _, dir := range dirs {
-		// Ensure that all directories match the pattern
-		if re.MatchString(dir.Name()) {
-			// Mark these directories initially as ones that should be deleted
+		// Ensure that all directories match the pattern.
+		if trufflehogRE.MatchString(dir.Name()) {
+			// Mark these directories initially as ones that should be deleted.
 			shouldDelete := true
-			// If they match any live PIDs, mark as should not delete
+			// If they match any live PIDs, mark as should not delete.
 			for _, pidval := range pids {
 				if strings.Contains(dir.Name(), fmt.Sprintf("-%s-", pidval)) {
 					shouldDelete = false
-					// break out so we can still delete directories even if no other Trufflehog processes are running
+					// break out so we can still delete directories even if no other Trufflehog processes are running.
 					break
 				}
 			}
 			if shouldDelete {
 				dirPath := filepath.Join(tempDir, dir.Name())
 				if err := os.RemoveAll(dirPath); err != nil {
-					return fmt.Errorf("Error deleting temp directory: %s", dirPath)
+					return fmt.Errorf("error deleting temp directory: %s", dirPath)
 				}
 				ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
 			}
@@ -92,19 +93,23 @@ func CleanTempDir(ctx logContext.Context) error {
 
 // RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds
 func RunCleanupLoop(ctx logContext.Context) {
-	err := CleanTempDir(ctx)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+	if err := CleanTempDir(ctx); err != nil {
+		ctx.Logger().Error(err, "error cleaning up orphaned directories ")
 	}
 
-	ticker := time.NewTicker(15 * time.Second)
+	const cleanupLoopInterval = 15 * time.Second
+	ticker := time.NewTicker(cleanupLoopInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		err := CleanTempDir(ctx)
-		if err != nil {
-			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
+	for {
+		select {
+		case <-ticker.C:
+			if err := CleanTempDir(ctx); err != nil {
+				ctx.Logger().Error(err, "error cleaning up orphaned directories")
+			}
+		case <-ctx.Done():
+			ctx.Logger().Info("Cleanup loop exiting due to context cancellation")
+			return
 		}
 	}
-
 }
