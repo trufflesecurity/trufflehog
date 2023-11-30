@@ -62,6 +62,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			url := "https://" + accountName + ".blob.core.windows.net/?comp=list"
 			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Set("x-ms-date", now)
 			req.Header.Set("x-ms-version", "2019-12-12")
 			req.Header.Set("Authorization", "SharedKey "+accountName+":"+signature)
