@@ -1,36 +1,78 @@
 name: 'TruffleHog OSS'
-description: 'Scan Github Actions with TruffleHog'
+description: 'Scan for secrets in Github Actions with TruffleHog.'
 author: Truffle Security Co. <support@trufflesec.com>
 
 inputs:
-  path:
-    description: Repository path
-    required: true
-  base:
-    description: Start scanning from here (usually main branch).
+  full_repo:
+    default: false
+    description: Run a TruffleHog scan against the entire repository.
     required: false
-    default: ''
-  head:
-    description: Scan commits until here (usually dev branch).
-    required: false
-  extra_args:
+  extra_truffle_args:
     default: ''
     description: Extra args to be passed to the trufflehog cli.
     required: false
+
 branding:
   icon: "shield"
   color: "green"
+
 runs:
-  using: "docker"
-  image: "docker://ghcr.io/trufflesecurity/trufflehog:latest"
-  args:
-    - git
-    - file://${{ inputs.path }}
-    - --since-commit
-    - ${{ inputs.base }}
-    - --branch
-    - ${{ inputs.head }}
-    - --fail
-    - --no-update
-    - --github-actions
-    - ${{ inputs.extra_args }}
+  using: "composite"
+  steps:
+      ###########################
+      ## SHALLOW CLONING STEPS ##
+      ###########################
+      ## Get count of commits in Push or PR and target branch.
+      - shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 1))" >> $GITHUB_ENV
+            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "depth=$((${{ github.event.pull_request.commits }}+1))" >> $GITHUB_ENV
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
+          fi
+        id: set_values
+        if: ${{ inputs.full_repo == 'false' }}
+
+      ## Checkout code with --depth and --branch args from the step above
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{env.branch}}
+          fetch-depth: ${{env.depth}}
+        if: ${{ inputs.full_repo == 'false' }}
+
+      ## Get the base commit from the shallow clone and set as env var since_commit
+      - shell: bash
+        run: echo "since_commit=$(git rev-list --max-parents=0 HEAD)" >> $GITHUB_ENV
+        if: ${{ inputs.full_repo == 'false' }}
+
+      ###########################
+      ## FULL REPO SCAN STEPS  ##
+      ###########################
+      ## Clone full repo
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+        if: ${{ inputs.full_repo == 'true' }}
+
+      ## Set since_commit env var to empty string (so it will scan the entire repo)
+      - shell: bash
+        run: echo "since_commit=''" >> $GITHUB_ENV
+        if: ${{ inputs.full_repo == 'true' }}
+
+      ################################
+      ## SCAN REPO WITH TRUFFLEHOG  ##
+      ################################
+      ## Pass in the env var since_commit derived in a prior step + any extra truffle args
+      - shell: bash
+        run: |
+          docker run --rm -v "$(pwd)":/tmp \
+          ghcr.io/trufflesecurity/trufflehog:latest \
+          git file:///tmp/ \
+          --since-commit ${{env.since_commit}} \
+          --fail \
+          --no-update \
+          --github-actions \
+          ${{ inputs.extra_truffle_args }}
