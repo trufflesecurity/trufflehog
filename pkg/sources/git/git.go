@@ -790,7 +790,7 @@ func stripPassword(u string) (string, error) {
 
 	repoURL, err := url.Parse(u)
 	if err != nil {
-		return "", fmt.Errorf("repo remote cannot be sniffed as URI: %w", err)
+		return "", fmt.Errorf("repo remote is not a URI: %w", err)
 	}
 
 	repoURL.User = nil
