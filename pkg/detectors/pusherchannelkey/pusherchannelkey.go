@@ -99,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					stringToSign := strings.Join([]string{method, path, usecd}, "\n")
 					signature := hex.EncodeToString(hmacBytes([]byte(stringToSign), []byte(ressecretMatch)))
 
-					md5Str := "https://api-ap1.pusher.com/apps/" + resappMatch + "/events?auth_key=" + reskeyMatch + "&auth_signature=" + signature + "&auth_timestamp=" + timestamp + "&auth_version=1.0&body_md5=" + md5
+					md5Str := "https://api-ap1.pusher.com/apps/" + resappMatch + "/events?auth_key=" + reskeyMatch + "&auth_signature=" + signature + "&auth_timestamp=" + timestamp + "&auth_version=1.0&body_md5=" + hash
 
 					req, err := http.NewRequestWithContext(ctx, method, md5Str, payload)
 					if err != nil {
