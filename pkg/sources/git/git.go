@@ -14,9 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
-	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
@@ -117,7 +115,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	var conn sourcespb.Git
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
-		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
 	if uri := conn.GetUri(); uri != "" {
@@ -132,7 +130,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	if err != nil {
 		return fmt.Errorf("error creating filter: %w", err)
 	}
-	opts := []ScanOption{ScanOptionFilter(filter), ScanOptionLogOptions(new(gogit.LogOptions))}
+	opts := []ScanOption{ScanOptionFilter(filter), ScanOptionLogOptions(new(git.LogOptions))}
 
 	if depth := conn.GetMaxDepth(); depth != 0 {
 		opts = append(opts, ScanOptionMaxDepth(depth))
@@ -389,7 +387,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	// Execute command and wait for the stdout / stderr.
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
-		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
+		err = fmt.Errorf("error executing git clone: %w", err)
 	}
 	logger.V(3).Info("git subcommand finished", "output", string(output))
 
@@ -743,14 +741,14 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error)
 		if !plumbing.IsHash(scanOptions.BaseHash) {
 			base, err := TryAdditionalBaseRefs(repo, scanOptions.BaseHash)
 			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
+				return fmt.Errorf("unable to resolve base ref: %w", err)
 			}
 			scanOptions.BaseHash = base.String()
 			baseCommit, _ = repo.CommitObject(plumbing.NewHash(scanOptions.BaseHash))
 		} else {
 			baseCommit, err = repo.CommitObject(baseHash)
 			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
+				return fmt.Errorf("unable to resolve base ref: %w", err)
 			}
 		}
 	}
@@ -761,14 +759,14 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error)
 		if !plumbing.IsHash(scanOptions.HeadHash) {
 			head, err := TryAdditionalBaseRefs(repo, scanOptions.HeadHash)
 			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
+				return fmt.Errorf("unable to resolve head ref: %w", err)
 			}
 			scanOptions.HeadHash = head.String()
 			headCommit, _ = repo.CommitObject(plumbing.NewHash(scanOptions.HeadHash))
 		} else {
 			headCommit, err = repo.CommitObject(headHash)
 			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
+				return fmt.Errorf("unable to resolve head ref: %w", err)
 			}
 		}
 	}
@@ -777,7 +775,7 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error)
 	if headCommit != nil && baseCommit != nil {
 		mergeBase, err := headCommit.MergeBase(baseCommit)
 		if err != nil || len(mergeBase) < 1 {
-			return errors.WrapPrefix(err, "could not find common base between the given references", 0)
+			return fmt.Errorf("unable to resolve merge base: %w", err)
 		}
 		scanOptions.BaseHash = mergeBase[0].Hash.String()
 	}
@@ -792,7 +790,7 @@ func stripPassword(u string) (string, error) {
 
 	repoURL, err := url.Parse(u)
 	if err != nil {
-		return "", errors.WrapPrefix(err, "repo remote cannot be sanitized as URI", 0)
+		return "", fmt.Errorf("repo remote cannot be sniffed as URI: %w", err)
 	}
 
 	repoURL.User = nil
