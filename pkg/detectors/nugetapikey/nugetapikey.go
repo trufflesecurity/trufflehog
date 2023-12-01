@@ -31,7 +31,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Nugetapikey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-					// we can either match on response code "400" or "Bad Request" response
+				// we can either match on response code "400" or "Bad Request" response
 				if res.StatusCode == 400 {
 					s1.Verified = true
 				} else {

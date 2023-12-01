@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -45,7 +46,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Ldap secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	// Check for matches in the URI + username + password format
 	uriMatches := uriPat.FindAllString(dataStr, -1)

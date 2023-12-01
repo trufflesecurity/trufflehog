@@ -8,11 +8,12 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/sync/errgroup"
 )
 
 // The maximum number of matches from one chunk. This const is used when
@@ -58,7 +59,7 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 var httpClient = common.SaneHttpClient()
 
 func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 	regexMatches := make(map[string][][]string, len(c.GetRegex()))
 
 	// Find all submatches for each regex.

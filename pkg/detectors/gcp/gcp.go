@@ -6,9 +6,10 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/oauth2/google"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/oauth2/google"
 )
 
 type Scanner struct{}
@@ -47,7 +48,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify GCP secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllString(dataStr, -1)
 

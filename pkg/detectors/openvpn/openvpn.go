@@ -25,8 +25,7 @@ var (
 
 	clientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"openvpn"}) + `\b([A-Za-z0-9-]{3,40}\.[A-Za-z0-9-]{3,40})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
-	domainPat = regexp.MustCompile(`\b(https?://[A-Za-z0-9-]+\.api\.openvpn\.com)\b`) 
-				
+	domainPat       = regexp.MustCompile(`\b(https?://[A-Za-z0-9-]+\.api\.openvpn\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,12 +36,12 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Openvpn secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 	clientIdMatches := clientIDPat.FindAllStringSubmatch(dataStr, -1)
 	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
-	
+
 	for _, clientIdMatch := range clientIdMatches {
 		clientIDRes := strings.TrimSpace(clientIdMatch[1])
 		for _, clientSecretMatch := range clientSecretMatches {
@@ -65,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					payload := strings.NewReader("grant_type=client_credentials")
 					// OpenVPN API is in beta, We'll have to update the API endpoint once
 					// Docs: https://openvpn.net/cloud-docs/developer/creating-api-credentials.html
-					req, err := http.NewRequestWithContext(ctx, "POST", domainRes + "/api/beta/oauth/token", payload)
+					req, err := http.NewRequestWithContext(ctx, "POST", domainRes+"/api/beta/oauth/token", payload)
 					if err != nil {
 						continue
 					}
@@ -97,8 +96,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-
-		
 	}
 
 	return results, nil

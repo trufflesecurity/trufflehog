@@ -5,10 +5,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/oauth2/github"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{ detectors.EndpointSetter }
@@ -34,7 +35,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	// Oauth2 client ID and secret
 	oauth2ClientIDMatches := oauth2ClientIDPat.FindAllStringSubmatch(dataStr, -1)

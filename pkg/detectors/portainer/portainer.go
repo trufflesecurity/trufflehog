@@ -23,7 +23,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	endpointPat = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(https?:\/\/\S+(:[0-9]{4,5})?)\b`)
-	tokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[0-9A-Za-z]{50,310}\.[0-9A-Z-a-z\-_]{43})\b`)
+	tokenPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[0-9A-Za-z]{50,310}\.[0-9A-Z-a-z\-_]{43})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,7 +34,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Portainer secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := tokenPat.FindAllStringSubmatch(dataStr, -1)
 	endpointMatches := endpointPat.FindAllStringSubmatch(dataStr, -1)
@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				req, err := http.NewRequestWithContext(ctx, "GET",  resEndpointMatch + "/api/endpoints", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", resEndpointMatch+"/api/endpoints", nil)
 				if err != nil {
 					continue
 				}
@@ -86,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if len(endpointMatches) > 0 {
 				results = append(results, s1)
 			}
-			
+
 		}
 	}
 

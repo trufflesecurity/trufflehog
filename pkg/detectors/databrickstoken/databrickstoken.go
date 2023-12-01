@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	client *http.Client
 }
 
@@ -24,7 +24,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))\b`)
-	keyPat    = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
+	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,7 +35,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Databrickstoken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	domainMatches := domain.FindAllStringSubmatch(dataStr, -1)
@@ -54,10 +54,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				client := s.client
-                        	if client == nil {
-                                	client = defaultClient
-                        	}
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://" + resDomainMatch + "/api/2.0/clusters/list", nil)
+				if client == nil {
+					client = defaultClient
+				}
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomainMatch+"/api/2.0/clusters/list", nil)
 				if err != nil {
 					continue
 				}

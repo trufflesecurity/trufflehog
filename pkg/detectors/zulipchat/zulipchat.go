@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	client *http.Client
 }
 
@@ -36,7 +36,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify ZulipChat secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
@@ -62,14 +62,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Raw:          []byte(resMatch),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s",resMatch, resIdMatch, resDomainMatch)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resMatch, resIdMatch, resDomainMatch)),
 				}
 
 				if verify {
 					client := s.client
-                        		if client == nil {
-                                		client = defaultClient
-                        		}
+					if client == nil {
+						client = defaultClient
+					}
 					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v1/users", resDomainMatch), nil)
 					if err != nil {
 						continue
@@ -91,9 +91,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.VerificationError = err
 					}
 				}
-                       		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-                                	continue
-                        	}
+				if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					continue
+				}
 
 				results = append(results, s1)
 			}

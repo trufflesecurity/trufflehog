@@ -31,7 +31,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Square secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	// Surprisingly there are still a lot of false positives! So, also doing substring check for square.
 	if !strings.Contains(strings.ToLower(dataStr), "square") {
@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", res))
 			req.Header.Add("Content-Type", "application/json")
 			// unclear if this version needs to be set or matters, seems to work without, but docs want it
-			//req.Header.Add("Square-Version", "2020-08-12")
+			// req.Header.Add("Square-Version", "2020-08-12")
 			res, err := client.Do(req)
 			if err == nil {
 				res.Body.Close() // The request body is unused.

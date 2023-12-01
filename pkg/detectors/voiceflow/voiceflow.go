@@ -25,7 +25,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Reference: https://developer.voiceflow.com/reference/project#dialog-manager-api-keys
 	//
-	//TODO: This includes Workspace and Legacy Workspace API keys; I haven't validated whether these actually work.
+	// TODO: This includes Workspace and Legacy Workspace API keys; I haven't validated whether these actually work.
 	// https://github.com/voiceflow/general-runtime/blob/master/tests/runtime/lib/DataAPI/utils.unit.ts
 	keyPat = regexp.MustCompile(`\b(VF\.(?:(?:DM|WS)\.)?[a-fA-F0-9]{24}\.[a-zA-Z0-9]{16})\b`)
 )
@@ -38,7 +38,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Voiceflow secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {

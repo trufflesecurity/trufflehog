@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"requestfinance"}) + `\b([0-9A-Z]{7}-[0-9A-Z]{7}-[0-9A-Z]{7}-[0-9A-Z]{7})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"requestfinance"}) + `\b([0-9A-Z]{7}-[0-9A-Z]{7}-[0-9A-Z]{7}-[0-9A-Z]{7})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -32,7 +32,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Requestfinance secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 

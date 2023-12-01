@@ -2,7 +2,6 @@ package githubapp
 
 import (
 	"context"
-
 	// b64 "encoding/base64"
 	"fmt"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -38,7 +38,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify GitHubApp secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
 

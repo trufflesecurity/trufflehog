@@ -38,7 +38,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Salesforce secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	instanceMatches := instancePat.FindAllStringSubmatch(dataStr, -1)
 	tokenMatches := accessTokenPat.FindAllStringSubmatch(dataStr, -1)

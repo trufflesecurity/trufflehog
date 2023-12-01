@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	
+
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"budibase"}) + `\b([a-f0-9]{32}-[a-f0-9]{78,80})\b`)
 )
 
@@ -33,7 +33,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Budibase secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			
 			// URL: https://docs.budibase.com/reference/appsearch
 			// API searches for the app with given name, since we only need to check api key, sending any appname will work.
 			payload := strings.NewReader(`{"name":"qwerty"}`)

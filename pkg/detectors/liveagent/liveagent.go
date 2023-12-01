@@ -37,7 +37,7 @@ type response struct {
 
 // FromData will find and optionally verify LiveAgent secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)

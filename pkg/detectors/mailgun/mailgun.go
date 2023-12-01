@@ -35,7 +35,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Mailgun secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	for _, tokenPat := range tokenPats {
 		matches := tokenPat.FindAllStringSubmatch(dataStr, -1)
@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				
+
 				// If resMatch has "key" prefix, use it as the username for basic auth.
 				if strings.HasPrefix(resMatch, "key-") {
 					req.SetBasicAuth("api", resMatch)

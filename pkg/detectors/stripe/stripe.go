@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	//doesn't include test keys with "sk_test"
+	// doesn't include test keys with "sk_test"
 	secretKey = regexp.MustCompile(`[rs]k_live_[a-zA-Z0-9]{20,30}`)
 )
 
@@ -30,7 +30,7 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Stripe secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := secretKey.FindAllString(dataStr, -1)
 

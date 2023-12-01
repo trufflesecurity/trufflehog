@@ -31,9 +31,9 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Mailchimp secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
-	//pretty standard regex match
+	// pretty standard regex match
 	matches := keyPat.FindAllString(dataStr, -1)
 
 	for _, match := range matches {

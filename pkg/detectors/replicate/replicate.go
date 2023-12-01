@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat = regexp.MustCompile(`\b(r8_[0-9A-Za-z-_]{37})\b`)
+	keyPat        = regexp.MustCompile(`\b(r8_[0-9A-Za-z-_]{37})\b`)
 )
 
 func (s Scanner) Keywords() []string {
@@ -29,7 +29,7 @@ func (s Scanner) Keywords() []string {
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 

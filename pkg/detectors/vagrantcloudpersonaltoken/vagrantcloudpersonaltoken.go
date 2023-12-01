@@ -33,7 +33,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Vagrantcloudpersonaltoken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_VagrantCloudPersonalToken, 
+			DetectorType: detectorspb.DetectorType_VagrantCloudPersonalToken,
 			Raw:          []byte(resMatch),
 		}
 
@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			
+
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.vagrantup.com/api/v2/authenticate", nil)
 			if err != nil {
 				continue

@@ -3,7 +3,6 @@ package telegrambottoken
 import (
 	"context"
 	"encoding/json"
-
 	//	"fmt"
 	"net/http"
 	"regexp"
@@ -37,7 +36,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify TelegramBotToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 

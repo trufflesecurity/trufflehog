@@ -23,9 +23,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	//KeyPat is client_id
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{40})\b`)
-	//Secretpat is Client_secret
+	// KeyPat is client_id
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{40})\b`)
+	// Secretpat is Client_secret
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{128})\b`)
 )
 
@@ -37,7 +37,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Instamojo secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 	clientIdmatches := keyPat.FindAllStringSubmatch(dataStr, -1)

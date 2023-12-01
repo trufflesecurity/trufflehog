@@ -31,7 +31,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify AppPosthog secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else if res.StatusCode == 401 {
-					//Try EU Endpoint only if other one fails.
+					// Try EU Endpoint only if other one fails.
 					res, err := client.Do(reqEU)
 					if err == nil {
 						defer res.Body.Close()

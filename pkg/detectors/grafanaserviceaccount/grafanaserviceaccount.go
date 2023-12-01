@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(glsa_[0-9a-zA-Z_]{41})\b`)
+	keyPat    = regexp.MustCompile(`\b(glsa_[0-9a-zA-Z_]{41})\b`)
 	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9-]+\.grafana\.net)\b`)
 )
 
@@ -34,7 +34,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Grafanaserviceaccount secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
@@ -45,16 +45,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		key := strings.TrimSpace(match[1])
 
-                for _, domainMatch := range domainMatches {
-                        if len(domainMatch) != 2 {
-                                continue
-                        }
+		for _, domainMatch := range domainMatches {
+			if len(domainMatch) != 2 {
+				continue
+			}
 			domainRes := strings.TrimSpace(domainMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GrafanaServiceAccount,
 				Raw:          []byte(key),
-				RawV2: []byte(fmt.Sprintf("%s:%s", domainRes, key)),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", domainRes, key)),
 			}
 
 			if verify {

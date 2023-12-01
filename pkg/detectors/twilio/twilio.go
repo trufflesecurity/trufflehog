@@ -33,7 +33,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Twilio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	identifierMatches := identifierPat.FindAllString(dataStr, -1)
 

@@ -4,13 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	_ "github.com/snowflakedb/gosnowflake"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"regexp"
 	"strings"
 	"unicode"
+
+	_ "github.com/snowflakedb/gosnowflake"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
@@ -65,7 +67,7 @@ func meetsSnowflakePasswordRequirements(password string) (string, bool) {
 
 // FromData will find and optionally verify Snowflake secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	accountMatches := accountIdentifierPat.FindAllStringSubmatch(dataStr, -1)
 

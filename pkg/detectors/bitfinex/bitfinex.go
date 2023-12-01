@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -39,7 +40,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Bitfinex secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	dataStr := common.BytesToString(data)
 
 	apiKeyMatches := apiKeyPat.FindAllStringSubmatch(dataStr, -1)
 	apiSecretMatches := apiSecretPat.FindAllStringSubmatch(dataStr, -1)
