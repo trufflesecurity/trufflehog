@@ -48,7 +48,10 @@ func TestBytesToString_LengthProperty(t *testing.T) {
 	assert.NoError(t, quick.Check(lengthProperty, nil))
 }
 
-func TestBytesToString_ImmutabilityProperty(t *testing.T) {
+// TestBytesToString_SharedDataConsistency checks if mutating the input byte slice
+// after conversion affects the string output from BytesToString, testing that the
+// underlying data sharing between the slice and the string is handled correctly.
+func TestBytesToString_SharedDataConsistency(t *testing.T) {
 	immutabilityProperty := func(b []byte) bool {
 		if len(b) == 0 {
 			return BytesToString(b) == string(b)
@@ -61,6 +64,8 @@ func TestBytesToString_ImmutabilityProperty(t *testing.T) {
 	assert.NoError(t, quick.Check(immutabilityProperty, nil))
 }
 
+// TestBytesToString_ConsistencyProperty checks if BytesToString returns consistent
+// results for the same byte slice input, ensuring deterministic behavior.
 func TestBytesToString_ConsistencyProperty(t *testing.T) {
 	consistencyProperty := func(b []byte) bool {
 		s1 := BytesToString(b)
