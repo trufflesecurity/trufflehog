@@ -305,7 +305,7 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 		}
 	}
 
-	out := []detectors.Result{}
+	var out []detectors.Result
 	for _, r := range idResults {
 		out = append(out, r)
 	}
