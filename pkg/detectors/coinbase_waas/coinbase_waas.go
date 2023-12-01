@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/api/googleapi"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
