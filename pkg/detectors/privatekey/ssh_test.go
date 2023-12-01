@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 func TestFirstResponseFromSSH(t *testing.T) {
