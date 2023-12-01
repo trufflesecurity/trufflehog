@@ -77,7 +77,11 @@ func TestArchiveHandler(t *testing.T) {
 		if err != nil || resp.StatusCode != http.StatusOK {
 			t.Error(err)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			// Ensure we drain the response body so this connection can be reused.
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}()
 
 		archive := Archive{}
 		archive.New()
@@ -118,7 +122,11 @@ func TestHandleFile(t *testing.T) {
 	// TODO: Embed a zip without making an HTTP request.
 	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 	archive := Archive{}
 	archive.New()
 	reader, err := diskbufferreader.New(resp.Body)

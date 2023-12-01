@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -247,7 +248,11 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 
 	res, err := client.Do(req)
 	if err == nil {
-		defer res.Body.Close()
+		defer func() {
+			// Ensure we drain the response body so this connection can be reused.
+			_, _ = io.Copy(io.Discard, res.Body)
+			_ = res.Body.Close()
+		}()
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
 			identityInfo := identityRes{}
 			err := json.NewDecoder(res.Body).Decode(&identityInfo)

@@ -3,6 +3,7 @@ package supabasetoken
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -48,22 +49,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.supabase.com/v1/projects", nil)
-			if err != nil {
+			isVerified, verificationErr := s.verifyMatch(ctx, resMatch)
+			s1.Verified = isVerified
+			s1.VerificationError = verificationErr
+		}
+
+		if !s1.Verified {
+			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+			if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
 			}
 		}
 
@@ -71,6 +65,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) verifyMatch(ctx context.Context, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.supabase.com/v1/projects", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil
+	}
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

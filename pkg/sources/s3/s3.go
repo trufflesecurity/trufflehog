@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -345,7 +346,11 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				return nil
 			}
 
-			defer res.Body.Close()
+			defer func() {
+				// Ensure we drain the response body so this connection can be reused.
+				_, _ = io.Copy(io.Discard, res.Body)
+				_ = res.Body.Close()
+			}()
 			reader, err := diskbufferreader.New(res.Body)
 			if err != nil {
 				s.log.Error(err, "Could not create reader.")

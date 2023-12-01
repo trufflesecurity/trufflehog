@@ -65,25 +65,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode == 200 {
 					s1.Verified = true
-
-					body, err := io.ReadAll(res.Body)
-					if err != nil {
+					var user userResponse
+					if err := json.NewDecoder(res.Body).Decode(&user); err != nil {
 						s1.VerificationError = err
 					} else {
-						var user userResponse
-						if err := json.Unmarshal(body, &user); err != nil {
-							fmt.Printf("Unmarshal error: %v\n", err)
-							s1.VerificationError = err
-						} else {
-							s1.ExtraData = map[string]string{
-								"login": user.Login,
-							}
+						s1.ExtraData = map[string]string{
+							"login": user.Login,
 						}
 					}
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					_, _ = io.Copy(io.Discard, res.Body)
+					if res.StatusCode == 401 {
+						// The secret is determinately not verified (nothing to do)
+					} else {
+						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					}
 				}
 			} else {
 				s1.VerificationError = err

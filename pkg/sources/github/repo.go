@@ -203,21 +203,18 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 	uniqueOrgs := map[string]struct{}{}
 
 	for {
-		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
+		someRepos, resp, err := listRepos(ctx, target, listOpts)
+		if handled := s.handleRateLimit(err, resp); handled {
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		if res == nil {
+		if resp == nil {
 			break
 		}
 
-		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
+		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", resp.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
@@ -240,10 +237,10 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
-		if res.NextPage == 0 {
+		if resp.NextPage == 0 {
 			break
 		}
-		opts.Page = res.NextPage
+		opts.Page = resp.NextPage
 	}
 
 	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))

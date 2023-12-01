@@ -3,6 +3,7 @@ package twitch
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -103,7 +104,11 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	switch res.StatusCode {
 	case http.StatusOK:

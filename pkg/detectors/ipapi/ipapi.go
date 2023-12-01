@@ -61,7 +61,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					bodyString := string(bodyBytes)
 					valid := strings.Contains(bodyString, "continent_code") || strings.Contains(bodyString, `"info":"Access Restricted - Your current Subscription Plan does not support HTTPS Encryption."`)
 
-					defer res.Body.Close()
+					defer func() {
+						// Ensure we drain the response body so this connection can be reused.
+						_, _ = io.Copy(io.Discard, res.Body)
+						_ = res.Body.Close()
+					}()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if valid {
 							s1.Verified = true

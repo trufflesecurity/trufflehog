@@ -3,6 +3,7 @@ package gitlab
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -96,7 +97,11 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error
 		if err != nil {
 			return false, err
 		}
-		defer res.Body.Close() // The request body is unused.
+		defer func() {
+			// Ensure we drain the response body so this connection can be reused.
+			_, _ = io.Copy(io.Discard, res.Body)
+			_ = res.Body.Close()
+		}()
 
 		// 200 means good key and has `read_user` scope
 		// 403 means good key but not the right scope

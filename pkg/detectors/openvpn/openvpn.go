@@ -4,6 +4,7 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -25,8 +26,7 @@ var (
 
 	clientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"openvpn"}) + `\b([A-Za-z0-9-]{3,40}\.[A-Za-z0-9-]{3,40})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
-	domainPat = regexp.MustCompile(`\b(https?://[A-Za-z0-9-]+\.api\.openvpn\.com)\b`) 
-				
+	domainPat       = regexp.MustCompile(`\b(https?://[A-Za-z0-9-]+\.api\.openvpn\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,7 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 	clientIdMatches := clientIDPat.FindAllStringSubmatch(dataStr, -1)
 	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
-	
+
 	for _, clientIdMatch := range clientIdMatches {
 		clientIDRes := strings.TrimSpace(clientIdMatch[1])
 		for _, clientSecretMatch := range clientSecretMatches {
@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					payload := strings.NewReader("grant_type=client_credentials")
 					// OpenVPN API is in beta, We'll have to update the API endpoint once
 					// Docs: https://openvpn.net/cloud-docs/developer/creating-api-credentials.html
-					req, err := http.NewRequestWithContext(ctx, "POST", domainRes + "/api/beta/oauth/token", payload)
+					req, err := http.NewRequestWithContext(ctx, "POST", domainRes+"/api/beta/oauth/token", payload)
 					if err != nil {
 						continue
 					}
@@ -77,7 +77,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					req.Header.Add("content-type", "application/x-www-form-urlencoded")
 					res, err := client.Do(req)
 					if err == nil {
-						defer res.Body.Close()
+						defer func() {
+							// Ensure we drain the response body so this connection can be reused.
+							_, _ = io.Copy(io.Discard, res.Body)
+							_ = res.Body.Close()
+						}()
+
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else if res.StatusCode == 401 {
@@ -97,8 +102,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-
-		
 	}
 
 	return results, nil

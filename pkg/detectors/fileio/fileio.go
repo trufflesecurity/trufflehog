@@ -60,7 +60,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err == nil {
 					isJson := json.Valid(bodyBytes)
-					defer res.Body.Close()
+					defer func() {
+						// Ensure we drain the response body so this connection can be reused.
+						_, _ = io.Copy(io.Discard, res.Body)
+						_ = res.Body.Close()
+					}()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						if isJson {
 							s1.Verified = true

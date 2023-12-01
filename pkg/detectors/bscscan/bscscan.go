@@ -54,23 +54,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
-                                bodyBytes, err := io.ReadAll(res.Body)
-                                if err != nil {
-                                        continue
-                                }
-                                body := string(bodyBytes)
+				defer func() {
+					// Ensure we drain the response body so this connection can be reused.
+					_, _ = io.Copy(io.Discard, res.Body)
+					_ = res.Body.Close()
+				}()
+				bodyBytes, err := io.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
+				body := string(bodyBytes)
 
-                                if !strings.Contains(body, "NOTOK") {
-                                        s1.Verified = true
-                                } else {
-                                        // This function will check false positives for common test words, but also it will make sur>
-                                        if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-                                                continue
-                                        }
-                                }
-                        }
-                }
+				if !strings.Contains(body, "NOTOK") {
+					s1.Verified = true
+				} else {
+					// This function will check false positives for common test words, but also it will make sur>
+					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						continue
+					}
+				}
+			}
+		}
 
 		results = append(results, s1)
 	}

@@ -28,7 +28,6 @@ func TestAzureContainerRegistry_FromChunk(t *testing.T) {
 	password := testSecrets.MustGetField("AZURE_CR_PASSWORD")
 	passwordInactive := testSecrets.MustGetField("AZURE_CR_PASSWORD_INACTIVE")
 
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -104,7 +103,7 @@ func TestAzureContainerRegistry_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw","Redacted", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "Redacted", "VerificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AzureContainerRegistry.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

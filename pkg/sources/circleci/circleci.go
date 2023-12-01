@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync/atomic"
 
@@ -146,7 +147,11 @@ func (s *Source) projects(_ context.Context) ([]project, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode > 399 && res.StatusCode < 500 {
 		return nil, fmt.Errorf("invalid credentials, status %d", res.StatusCode)
@@ -176,8 +181,11 @@ func (s *Source) buildsForProject(_ context.Context, proj project) ([]build, err
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
-
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	var builds []build
 	if err := json.NewDecoder(res.Body).Decode(&builds); err != nil {
 		return nil, err
@@ -208,8 +216,11 @@ func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]bu
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
-
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	type buildRes struct {
 		Steps []buildStep `json:"steps"`
 	}
@@ -231,8 +242,11 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
-
+	defer func() {
+		// Ensure we drain the response body so this connection can be reused.
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 
 	chunkReader := sources.NewChunkReader()

@@ -3,6 +3,7 @@ package ipinfo
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -60,7 +61,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				fmt.Println(res.Status, resMatch)
-				defer res.Body.Close()
+				defer func() {
+					// Ensure we drain the response body so this connection can be reused.
+					_, _ = io.Copy(io.Discard, res.Body)
+					_ = res.Body.Close()
+				}()
+
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else if res.StatusCode == 403 {

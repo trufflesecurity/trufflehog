@@ -3,6 +3,7 @@ package databrickstoken
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	client *http.Client
 }
 
@@ -24,7 +25,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))\b`)
-	keyPat    = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
+	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -54,17 +55,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				client := s.client
-                        	if client == nil {
-                                	client = defaultClient
-                        	}
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://" + resDomainMatch + "/api/2.0/clusters/list", nil)
+				if client == nil {
+					client = defaultClient
+				}
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomainMatch+"/api/2.0/clusters/list", nil)
 				if err != nil {
 					continue
 				}
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
+					defer func() {
+						// Ensure we drain the response body so this connection can be reused.
+						_, _ = io.Copy(io.Discard, res.Body)
+						_ = res.Body.Close()
+					}()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else if res.StatusCode == 403 {
