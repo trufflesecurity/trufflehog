@@ -30,7 +30,7 @@ require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-errors/errors v1.5.1
-	github.com/go-git/go-git/v5 v5.10.0
+	github.com/go-git/go-git/v5 v5.10.1
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/zapr v1.2.4
@@ -228,7 +228,7 @@ require (
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/sahilm/fuzzy v0.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.1 // indirect
-	github.com/skeema/knownhosts v1.2.0 // indirect
+	github.com/skeema/knownhosts v1.2.1 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
