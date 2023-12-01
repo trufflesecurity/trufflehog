@@ -30,7 +30,7 @@ func New(opts ...func(*Scanner)) *Scanner {
 
 func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 	return func(s *Scanner) {
-		ignorePatterns := []regexp.Regexp{}
+		var ignorePatterns []regexp.Regexp
 		for _, ignoreString := range ignoreStrings {
 			ignorePattern, err := regexp.Compile(ignoreString)
 			if err != nil {

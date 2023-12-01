@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
+	"golang.org/x/crypto/ssh"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/crypto/ssh"
 )
 
 type Scanner struct {
@@ -37,7 +38,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
-	results := []detectors.Result{}
+	var results []detectors.Result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllString(dataStr, -1)
@@ -81,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
-			verificationErrors := []string{}
+			var verificationErrors []string
 			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
 			if err == nil {
 				if data != nil {
