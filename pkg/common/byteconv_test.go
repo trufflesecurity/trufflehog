@@ -29,7 +29,7 @@ func TestBytesToString_IdentityProperty(t *testing.T) {
 	cfg := &quick.Config{
 		Values: func(values []reflect.Value, rand *rand.Rand) {
 			// 2% chance to return a nil slice.
-			if rand.Intn(10) == 0 {
+			if rand.Intn(2) == 0 {
 				values[0] = reflect.Zero(reflect.TypeOf([]byte{}))
 				return
 			}
