@@ -68,8 +68,8 @@ func TestBudibase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Budibase,
-					Verified:     false,
+					DetectorType:      detectorspb.DetectorType_Budibase,
+					Verified:          false,
 					VerificationError: fmt.Errorf("unexpected HTTP response status 403"),
 				},
 			},
@@ -88,7 +88,6 @@ func TestBudibase_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
-		
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
