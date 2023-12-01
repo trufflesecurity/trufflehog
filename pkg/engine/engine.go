@@ -181,13 +181,13 @@ func WithVerify(verify bool) Option {
 }
 
 func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors.Detector) []detectors.Detector {
-	var output []detectors.Detector
+	var out []detectors.Detector
 	for _, detector := range input {
 		if filterFunc(detector) {
-			output = append(output, detector)
+			out = append(out, detector)
 		}
 	}
-	return output
+	return out
 }
 
 // HasFoundResults returns true if any results are found.

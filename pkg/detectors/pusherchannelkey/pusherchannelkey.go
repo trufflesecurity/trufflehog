@@ -84,14 +84,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					payload := strings.NewReader(stringPayload)
 					_bodyMD5 := md5.New()
 					_bodyMD5.Write([]byte(stringPayload))
-					md5 := hex.EncodeToString(_bodyMD5.Sum(nil))
+					hash := hex.EncodeToString(_bodyMD5.Sum(nil))
 
 					timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 					params := url.Values{
 						"auth_key":       {reskeyMatch},
 						"auth_timestamp": {timestamp},
 						"auth_version":   {auth_version},
-						"body_md5":       {md5},
+						"body_md5":       {hash},
 					}
 
 					usecd, _ := url.QueryUnescape(params.Encode())
