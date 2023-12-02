@@ -304,7 +304,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 	)
 
 	// Used to filter out duplicate projects.
-	processProjectsFn := func(projList []*gitlab.Project) {
+	processProjects := func(projList []*gitlab.Project) {
 		for _, proj := range projList {
 			if _, exists := uniqueProjects[proj.ID]; !exists {
 				uniqueProjects[proj.ID] = proj
@@ -326,7 +326,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 		if err != nil {
 			return nil, fmt.Errorf("received error on listing user projects: %w", err)
 		}
-		processProjectsFn(userProjects)
+		processProjects(userProjects)
 		projectQueryOptions.Page = res.NextPage
 		if res.NextPage == 0 {
 			break
@@ -372,7 +372,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 				)
 				break
 			}
-			processProjectsFn(grpPrjs)
+			processProjects(grpPrjs)
 			listGroupProjectOptions.Page = res.NextPage
 			if res.NextPage == 0 {
 				break
