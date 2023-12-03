@@ -66,7 +66,7 @@ cd trufflehog; go install
 # Using installation script
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
-# Using installation script, verify checksum signature
+# Using installation script, verify checksum signature (requires cosign to be installed)
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
 
 # Using installation script to install a specific version
@@ -108,6 +108,7 @@ Verification steps are as follow:
 Replace `{version}` with the downloaded files version
 
 Alternatively, if you are using installation script, pass `-v` option to perform signature verification.
+This required Cosign binary to be installed prior to running installation script.
 
 # :rocket: Quick Start
 
