@@ -349,7 +349,7 @@ verify_sign() {
   cosign verify-blob "$1" \
   --certificate "$2" \
   --signature "$3" \
-  --certificate-identity-regexp 'https://github\.com/trufflesecurity/trufflehog/\.github/workflows/.+' \
+  --certificate-identity-regexp "https://github\.com/${OWNER}/${REPO}/\.github/workflows/.+" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 }
 
