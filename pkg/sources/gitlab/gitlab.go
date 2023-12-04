@@ -335,13 +335,13 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 
 	listGroupsOptions := gitlab.ListGroupsOptions{
 		ListOptions:  listOpts,
-		AllAvailable: gitlab.Bool(false), // This actually grabs public groups on public GitLab if set to true.
-		TopLevelOnly: gitlab.Bool(false),
-		Owned:        gitlab.Bool(false),
+		AllAvailable: gitlab.Ptr(false), // This actually grabs public groups on public GitLab if set to true.
+		TopLevelOnly: gitlab.Ptr(false),
+		Owned:        gitlab.Ptr(false),
 	}
 	const cloudBaseURL = "https://gitlab.com/"
 	if s.url != cloudBaseURL {
-		listGroupsOptions.AllAvailable = gitlab.Bool(true)
+		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
 	var groups []*gitlab.Group
@@ -360,8 +360,8 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 	for _, group := range groups {
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
 			ListOptions:      listOpts,
-			OrderBy:          gitlab.String(orderBy),
-			IncludeSubGroups: gitlab.Bool(true),
+			OrderBy:          gitlab.Ptr(orderBy),
+			IncludeSubGroups: gitlab.Ptr(true),
 		}
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
