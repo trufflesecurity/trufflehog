@@ -976,6 +976,11 @@ func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.Ch
 		return err
 	}
 
+	if common.SkipFile(file.Name) {
+		ctx.Logger().V(5).Info("skipping binary file", "path", path, "file_name", file.Name)
+		return nil
+	}
+
 	fileReader, err := file.Reader()
 	if err != nil {
 		return err
