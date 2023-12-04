@@ -320,7 +320,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 	)
 	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
 
-	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.String(orderBy), ListOptions: listOpts}
+	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
 	for {
 		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions)
 		if err != nil {
