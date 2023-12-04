@@ -965,27 +965,35 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 }
 
 func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	ctx.Logger().V(5).Info("handling binary file", "path", path)
-	commit, err := repo.CommitObject(commitHash)
-	if err != nil {
-		return err
-	}
+	ctx.Logger().Info("handling binary file", "path", path)
 
-	file, err := commit.File(path)
-	if err != nil {
-		return err
-	}
-
-	if common.SkipFile(file.Name) {
-		ctx.Logger().V(5).Info("skipping binary file", "path", path, "file_name", file.Name)
+	if common.SkipFile(path) {
+		ctx.Logger().V(5).Info("skipping binary file", "path", path)
 		return nil
 	}
 
-	fileReader, err := file.Reader()
+	const (
+		catFileArg = "cat-file"
+		blobArg    = "blob"
+	)
+	cmd := exec.Command("git", catFileArg, blobArg, commitHash.String()+":"+path)
+
+	fileReader, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	defer fileReader.Close()
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		if err := fileReader.Close(); err != nil {
+			ctx.Logger().Error(err, "Error closing fileReader")
+		}
+		if err := cmd.Wait(); err != nil {
+			ctx.Logger().Error(err, "Error waiting for command", "command", cmd.String())
+		}
+	}()
 
 	reader, err := diskbufferreader.New(fileReader)
 	if err != nil {
