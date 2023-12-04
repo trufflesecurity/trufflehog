@@ -71,7 +71,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.25
 	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/trufflesecurity/disk-buffer-reader v0.1.9
+	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/xanzy/go-gitlab v0.93.2
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/mock v0.3.0
