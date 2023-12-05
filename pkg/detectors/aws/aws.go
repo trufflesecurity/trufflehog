@@ -148,7 +148,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for k, v := range extraData {
 					s1.ExtraData[k] = v
 				}
-				// s1.VerificationError()=
 				if verificationErr != nil {
 					s1.SetVerificationError(verificationErr, resSecretMatch)
 				}

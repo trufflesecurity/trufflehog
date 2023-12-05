@@ -139,7 +139,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if extraData != nil {
 						s1.ExtraData = extraData
 					}
-					s1.SetVerificationError(verificationErr, resIDMatch, resSecretMatch, resSessionMatch)
+					s1.SetVerificationError(verificationErr, resSecretMatch)
 				}
 
 				if !s1.Verified {
