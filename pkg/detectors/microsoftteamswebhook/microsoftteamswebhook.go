@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, verificationErr := verifyWebhook(ctx, client, resMatch)
 			s1.Verified = isVerified
-			s1.VerificationError = verificationErr
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {
