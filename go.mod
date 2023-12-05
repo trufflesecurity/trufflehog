@@ -42,6 +42,7 @@ require (
 	github.com/google/go-containerregistry v0.17.0
 	github.com/google/go-github/v42 v42.0.0
 	github.com/google/go-github/v56 v56.0.0
+	github.com/google/go-github/v57 v57.0.0
 	github.com/google/uuid v1.4.0
 	github.com/googleapis/gax-go/v2 v2.12.0
 	github.com/h2non/filetype v1.1.3
