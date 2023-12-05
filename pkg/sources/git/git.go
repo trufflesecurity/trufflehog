@@ -740,18 +740,23 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 	return nil
 }
 
+// normalizeConfig updates scanOptions with the resolved base and head commit hashes.
+// It's designed to handle scenarios where BaseHash and HeadHash in scanOptions might be branch names or
+// other non-hash references. This ensures that both the base and head commits are resolved to actual commit hashes.
+// If either commit cannot be resolved, it returns early.
+// If both are resolved, it finds and sets the merge base in scanOptions.
 func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
-	baseCommit, foundBase, err := resolveCommit(repo, scanOptions.BaseHash)
+	baseCommit, baseSet, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
 	if err != nil {
 		return err
 	}
 
-	headCommit, foundHead, err := resolveCommit(repo, scanOptions.HeadHash)
+	headCommit, headSet, err := resolveAndSetCommit(repo, &scanOptions.HeadHash)
 	if err != nil {
 		return err
 	}
 
-	if !(foundBase || foundHead) {
+	if !(baseSet || headSet) {
 		return nil
 	}
 
@@ -765,29 +770,45 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 	return nil
 }
 
-// resolveCommit retrieves a commit from a repository using a hash, which can be a hash or a reference (e.g., branch name).
-// It returns the commit object (if found), a boolean indicating success, and any error encountered.
-// An empty hash input is treated as a valid case with no commit to resolve, returning (nil, false, nil).
-func resolveCommit(repo *git.Repository, hash string) (*object.Commit, bool, error) {
-	if len(hash) == 0 {
+// resolveAndSetCommit resolves a Git reference to a commit object and updates the reference if it was not a direct hash.
+// Returns the commit object, a boolean indicating if the commit was successfully set, and any error encountered.
+func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, bool, error) {
+	if repo == nil || ref == nil {
+		return nil, false, fmt.Errorf("repo and ref must be non-nil")
+	}
+	if len(*ref) == 0 {
 		return nil, false, nil
 	}
 
-	resolvedHash := hash
-	if !plumbing.IsHash(hash) {
-		resolvedRef, err := TryAdditionalBaseRefs(repo, hash)
-		if err != nil {
-			return nil, false, fmt.Errorf("unable to resolve ref: %w", err)
-		}
-		resolvedHash = resolvedRef.String()
-	}
-
-	commit, err := repo.CommitObject(plumbing.NewHash(resolvedHash))
+	originalRef := *ref
+	resolvedRef, err := resolveHash(repo, originalRef)
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to resolve ref: %w", err)
 	}
 
-	return commit, true, nil
+	commit, err := repo.CommitObject(plumbing.NewHash(resolvedRef))
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to resolve commit: %w", err)
+	}
+
+	wasSet := originalRef != resolvedRef
+	if wasSet {
+		*ref = resolvedRef
+	}
+
+	return commit, wasSet, nil
+}
+
+func resolveHash(repo *git.Repository, ref string) (string, error) {
+	if plumbing.IsHash(ref) {
+		return ref, nil
+	}
+
+	resolved, err := TryAdditionalBaseRefs(repo, ref)
+	if err != nil {
+		return "", err
+	}
+	return resolved.String(), nil
 }
 
 func stripPassword(u string) (string, error) {
