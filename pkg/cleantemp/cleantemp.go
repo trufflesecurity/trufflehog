@@ -13,7 +13,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// Returns a temporary directory path formatted as:
+// MkdirTemp returns a temporary directory path formatted as:
 // trufflehog-<pid>-<randint>
 func MkdirTemp() (string, error) {
 	pid := os.Getpid()
@@ -36,9 +36,23 @@ func MkFilename() string {
 
 // CleanTempArtifacts deletes orphaned temp directories and files that do not contain running PID values
 func CleanTempArtifacts(ctx logContext.Context) error {
+// CleanTemp is used to remove orphaned artifacts from aborted scans.
+type CleanTemp interface {
+	// CleanTempDir removes orphaned directories from sources. ex: Git
+	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
+	// CleanTempFiles removes orphaned files/artifacts from sources. ex: Artifactory
+	CleanTempFiles(ctx context.Context, fileName string, pid int) error
+}
+
+// Only compile during startup.
+var trufflehogRE = regexp.MustCompile(`^trufflehog-\d+-\d+$`)
+
+// CleanTempDir removes orphaned temp directories that do not contain running PID values.
+func CleanTempDir(ctx logContext.Context) error {
+	const defaultExecPath = "trufflehog"
 	executablePath, err := os.Executable()
 	if err != nil {
-		executablePath = "trufflehog"
+		executablePath = defaultExecPath
 	}
 	execName := filepath.Base(executablePath)
 
@@ -60,14 +74,11 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 		return fmt.Errorf("error reading temp dir: %w", err)
 	}
 
-	pattern := `^trufflehog-\d+-\d+$`
-	re := regexp.MustCompile(pattern)
-
 	for _, artifact := range artifacts {
-		if re.MatchString(artifact.Name()) {
-			// Mark these artifacts initially as ones that should be deleted
+		if trufflehogRE.MatchString(artifact.Name()) {
+			// Mark these artifacts initially as ones that should be deleted.
 			shouldDelete := true
-			// Check if the name matches any live PIDs
+			// Check if the name matches any live PIDs.
 			for _, pidval := range pids {
 				if strings.Contains(artifact.Name(), fmt.Sprintf("-%s-", pidval)) {
 					shouldDelete = false
@@ -79,7 +90,6 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 				artifactPath := filepath.Join(tempDir, artifact.Name())
 
 				var err error
-
 				if artifact.IsDir() {
 					err = os.RemoveAll(artifactPath)
 				} else {
@@ -91,6 +101,7 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -101,15 +112,19 @@ func RunCleanupLoop(ctx logContext.Context) {
 		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
 	}
 
-	ticker := time.NewTicker(15 * time.Second)
+	const cleanupLoopInterval = 15 * time.Second
+	ticker := time.NewTicker(cleanupLoopInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		err := CleanTempArtifacts(ctx)
-		if err != nil {
-			ctx.Logger().Error(err, "Error cleaning up orphaned artifacts ")
+	for {
+		select {
+		case <-ticker.C:
+			if err := CleanTempArtifacts(ctx); err != nil {
+				ctx.Logger().Error(err, "error cleaning up orphaned directories")
+			}
+		case <-ctx.Done():
+			ctx.Logger().Info("Cleanup loop exiting due to context cancellation")
+			return
 		}
-
 	}
-
 }

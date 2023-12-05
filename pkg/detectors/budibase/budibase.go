@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	
+
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"budibase"}) + `\b([a-f0-9]{32}-[a-f0-9]{78,80})\b`)
 )
 
@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			
 			// URL: https://docs.budibase.com/reference/appsearch
 			// API searches for the app with given name, since we only need to check api key, sending any appname will work.
 			payload := strings.NewReader(`{"name":"qwerty"}`)
@@ -74,10 +73,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

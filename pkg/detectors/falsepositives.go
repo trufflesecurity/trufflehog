@@ -105,9 +105,9 @@ func StringShannonEntropy(input string) float64 {
 
 // FilterResultsWithEntropy filters out determinately unverified results that have a shannon entropy below the given value.
 func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
-	filteredResults := []Result{}
+	var filteredResults []Result
 	for _, result := range results {
-		if !result.Verified && result.VerificationError == nil {
+		if !result.Verified && result.VerificationError() == nil {
 			if result.RawV2 != nil {
 				if StringShannonEntropy(string(result.RawV2)) >= entropy {
 					filteredResults = append(filteredResults, result)

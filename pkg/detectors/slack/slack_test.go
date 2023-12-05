@@ -120,11 +120,11 @@ func TestSlack_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.wantResults, ignoreOpts); diff != "" {
 				t.Errorf("Slack.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

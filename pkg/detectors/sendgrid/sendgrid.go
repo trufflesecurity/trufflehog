@@ -42,11 +42,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if len(match) != 2 {
 			continue
 		}
-		res := strings.TrimSpace(match[1])
+		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SendGrid,
-			Raw:          []byte(res),
+			Raw:          []byte(resMatch),
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/sendgrid/",
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", res))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
@@ -79,7 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
 					s1.Verified = true
 				} else if res.StatusCode != http.StatusUnauthorized {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			}
 		}

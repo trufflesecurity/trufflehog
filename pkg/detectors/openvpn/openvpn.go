@@ -25,8 +25,7 @@ var (
 
 	clientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"openvpn"}) + `\b([A-Za-z0-9-]{3,40}\.[A-Za-z0-9-]{3,40})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
-	domainPat = regexp.MustCompile(`\b(https?://[A-Za-z0-9-]+\.api\.openvpn\.com)\b`) 
-				
+	domainPat       = regexp.MustCompile(`\b(https?://[A-Za-z0-9-]+\.api\.openvpn\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,7 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 	clientIdMatches := clientIDPat.FindAllStringSubmatch(dataStr, -1)
 	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
-	
+
 	for _, clientIdMatch := range clientIdMatches {
 		clientIDRes := strings.TrimSpace(clientIdMatch[1])
 		for _, clientSecretMatch := range clientSecretMatches {
@@ -65,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					payload := strings.NewReader("grant_type=client_credentials")
 					// OpenVPN API is in beta, We'll have to update the API endpoint once
 					// Docs: https://openvpn.net/cloud-docs/developer/creating-api-credentials.html
-					req, err := http.NewRequestWithContext(ctx, "POST", domainRes + "/api/beta/oauth/token", payload)
+					req, err := http.NewRequestWithContext(ctx, "POST", domainRes+"/api/beta/oauth/token", payload)
 					if err != nil {
 						continue
 					}
@@ -83,10 +82,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						} else if res.StatusCode == 401 {
 							// The secret is determinately not verified (nothing to do)
 						} else {
-							s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+							err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+							s1.SetVerificationError(err, clientSecretRes)
 						}
 					} else {
-						s1.VerificationError = err
+						s1.SetVerificationError(err, clientSecretRes)
 					}
 				}
 				// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
@@ -97,8 +97,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-
-		
 	}
 
 	return results, nil
