@@ -1,4 +1,4 @@
-package maxmindlicense
+package maxmindlicense_v2
 
 import (
 	"context"
@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9]{2,7})\b`)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9A-Za-z]{16})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -29,7 +29,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"maxmind", "geoip"}
 }
 
-func (Scanner) Version() int { return 1 }
+func (Scanner) Version() int { return 2 }
 
 // FromData will find and optionally verify MaxMindLicense secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -47,12 +47,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			idRes := strings.TrimSpace(idMatch[1])
 
-			s1 := detectors.Result{
+			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MaxMindLicense,
 				Redacted:     idRes,
 				Raw:          []byte(keyRes),
 			}
-			s1.ExtraData = map[string]string{
+			s.ExtraData = map[string]string{
 				"rotation_guide": "https://support.maxmind.com/hc/en-us/articles/4407111898779-Deactivate-my-License-Key",
 			}
 
@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
+						s.Verified = true
 					} else {
 						if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
 							continue
@@ -75,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			results = append(results, s1)
+			results = append(results, s)
 		}
 	}
 
