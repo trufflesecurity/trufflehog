@@ -457,6 +457,8 @@ func (s *Git) CommitsScanned() uint64 {
 	return atomic.LoadUint64(&s.metrics.commitsScanned)
 }
 
+const gitDirName = ".git"
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	if err := GitCmdCheck(); err != nil {
 		return err
@@ -475,7 +477,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 
-	gitDir := filepath.Join(path, ".git")
+	gitDir := filepath.Join(path, gitDirName)
 
 	logger := ctx.Logger().WithValues("repo", urlMetadata)
 	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
@@ -635,7 +637,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	var depth int64
 	reachedBase := false
-	gitDir := filepath.Join(path, ".git")
+	gitDir := filepath.Join(path, gitDirName)
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
@@ -980,7 +982,7 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 		catFileArg = "cat-file"
 		blobArg    = "blob"
 
-		maxSize = 250 * 1024 * 1024 // 20MB
+		maxSize = 100 * 1024 * 1024 // 100 MB
 	)
 	cmd := exec.Command("git", "--git-dir="+gitDir, catFileArg, blobArg, commitHash.String()+":"+path)
 
