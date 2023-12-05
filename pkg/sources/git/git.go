@@ -982,9 +982,9 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 		catFileArg = "cat-file"
 		blobArg    = "blob"
 
-		maxSize = 100 * 1024 * 1024 // 100 MB
+		maxSize = 1 * 1024 * 1024 * 1024 // 1GB
 	)
-	cmd := exec.Command("git", "--git-dir="+gitDir, catFileArg, blobArg, commitHash.String()+":"+path)
+	cmd := exec.Command("git", "-C", gitDir, catFileArg, blobArg, commitHash.String()+":"+path)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

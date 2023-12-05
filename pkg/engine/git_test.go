@@ -106,7 +106,7 @@ func TestGitEngine(t *testing.T) {
 
 func BenchmarkGitEngine(b *testing.B) {
 	ctx := context.Background()
-	repoUrl := "https://github.com/trufflesecurity/trufflehog.git"
+	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
