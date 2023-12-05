@@ -741,17 +741,17 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 }
 
 func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
-	baseCommit, baseFound, err := resolveCommit(repo, scanOptions.BaseHash)
+	baseCommit, foundBase, err := resolveCommit(repo, scanOptions.BaseHash)
 	if err != nil {
 		return err
 	}
 
-	headCommit, headFound, err := resolveCommit(repo, scanOptions.HeadHash)
+	headCommit, foundHead, err := resolveCommit(repo, scanOptions.HeadHash)
 	if err != nil {
 		return err
 	}
 
-	if !(baseFound || headFound) {
+	if !(foundBase || foundHead) {
 		return nil
 	}
 
