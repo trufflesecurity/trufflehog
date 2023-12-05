@@ -81,10 +81,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// The secret is determinately not verified (nothing to do)
 					} else {
 						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-						s1.SetVerificationError(err, sid, key)
+						s1.SetVerificationError(err, key)
 					}
 				} else {
-					s1.SetVerificationError(err, sid, key)
+					s1.SetVerificationError(err, key)
 				}
 			}
 

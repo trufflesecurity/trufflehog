@@ -83,10 +83,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							// The secret is determinately not verified (nothing to do)
 						} else {
 							err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-							s1.SetVerificationError(err, clientIDRes, clientSecretRes)
+							s1.SetVerificationError(err, clientSecretRes)
 						}
 					} else {
-						s1.SetVerificationError(err, clientIDRes, clientSecretRes)
+						s1.SetVerificationError(err, clientSecretRes)
 					}
 				}
 				// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.

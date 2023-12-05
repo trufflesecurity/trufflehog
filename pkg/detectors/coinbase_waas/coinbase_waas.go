@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				isVerified, verificationErr := s.verifyMatch(ctx, resKeyNameMatch, resPrivKeyMatch)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, resKeyNameMatch, resPrivKeyMatch)
+				s1.SetVerificationError(verificationErr, resPrivKeyMatch)
 			}
 			results = append(results, s1)
 

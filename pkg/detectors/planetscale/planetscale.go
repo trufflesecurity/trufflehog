@@ -70,10 +70,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = false
 					} else {
 						err = fmt.Errorf("unexpected status code %d", res.StatusCode)
-						s1.SetVerificationError(err, username, password)
+						s1.SetVerificationError(err, password)
 					}
 				} else {
-					s1.SetVerificationError(err, username, password)
+					s1.SetVerificationError(err, password)
 				}
 			}
 

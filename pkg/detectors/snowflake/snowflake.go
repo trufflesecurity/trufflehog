@@ -121,7 +121,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if strings.Contains(err.Error(), "Incorrect username or password was specified") {
 							s1.Verified = false
 						} else {
-							s1.SetVerificationError(err, resAccountMatch, resUsernameMatch, resPasswordMatch)
+							s1.SetVerificationError(err, resPasswordMatch)
 						}
 					} else {
 						rows, err := db.Query(retrieveAllDatabasesQuery)
