@@ -337,11 +337,6 @@ type cloneParams struct {
 // The core cloning logic is delegated to a nested function, which returns errors to the
 // outer function for centralized error handling and cleanup.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args ...string) (string, *git.Repository, error) {
-	var err error
-	if err = GitCmdCheck(); err != nil {
-		return "", nil, err
-	}
-
 	clonePath, err := cleantemp.MkdirTemp()
 	if err != nil {
 		return "", nil, err
@@ -457,10 +452,6 @@ func (s *Git) CommitsScanned() uint64 {
 }
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	if err := GitCmdCheck(); err != nil {
-		return err
-	}
-
 	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
