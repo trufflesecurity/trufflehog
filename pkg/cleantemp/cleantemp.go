@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-ps"
+
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -34,21 +35,17 @@ func MkFilename() string {
 	return filename
 }
 
-// CleanTempArtifacts deletes orphaned temp directories and files that do not contain running PID values
-func CleanTempArtifacts(ctx logContext.Context) error {
 // CleanTemp is used to remove orphaned artifacts from aborted scans.
 type CleanTemp interface {
 	// CleanTempDir removes orphaned directories from sources. ex: Git
 	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
-	// CleanTempFiles removes orphaned files/artifacts from sources. ex: Artifactory
-	CleanTempFiles(ctx context.Context, fileName string, pid int) error
 }
 
 // Only compile during startup.
 var trufflehogRE = regexp.MustCompile(`^trufflehog-\d+-\d+$`)
 
-// CleanTempDir removes orphaned temp directories that do not contain running PID values.
-func CleanTempDir(ctx logContext.Context) error {
+// CleanTempArtifacts deletes orphaned temp directories and files that do not contain running PID values.
+func CleanTempArtifacts(ctx logContext.Context) error {
 	const defaultExecPath = "trufflehog"
 	executablePath, err := os.Executable()
 	if err != nil {
@@ -98,6 +95,8 @@ func CleanTempDir(ctx logContext.Context) error {
 				if err != nil {
 					return fmt.Errorf("Error deleting temp artifact: %s", artifactPath)
 				}
+
+				ctx.Logger().Info("Deleted orphaned temp artifact", "artifact", artifactPath)
 			}
 		}
 	}
@@ -105,7 +104,7 @@ func CleanTempDir(ctx logContext.Context) error {
 	return nil
 }
 
-// RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds
+// RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds.
 func RunCleanupLoop(ctx logContext.Context) {
 	err := CleanTempArtifacts(ctx)
 	if err != nil {
