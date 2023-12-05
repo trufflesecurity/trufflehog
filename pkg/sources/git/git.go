@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -978,6 +979,8 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 	const (
 		catFileArg = "cat-file"
 		blobArg    = "blob"
+
+		maxSize = 250 * 1024 * 1024 // 20MB
 	)
 	cmd := exec.Command("git", "--git-dir="+gitDir, catFileArg, blobArg, commitHash.String()+":"+path)
 
@@ -1006,7 +1009,25 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 		}
 	}()
 
-	reader, err := diskbufferreader.New(fileReader)
+	var fileContent bytes.Buffer
+	// Create a limited reader to ensure we don't read more than the max size.
+	lr := io.LimitReader(fileReader, int64(maxSize))
+
+	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
+	// for the method, due to the internal implementation of io.CopyBuffer, when
+	// *bytes.Buffer implements io.WriterTo or io.ReaderFrom, the provided buf
+	// is simply ignored. Thus, we can pass nil for the buf parameter.
+	_, err = io.CopyBuffer(&fileContent, lr, nil)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
+
+	if fileContent.Len() == maxSize {
+		ctx.Logger().V(2).Info("Max archive size reached.", "path", path)
+		ctx.Logger().Info("Max archive size reached.", "path", path)
+	}
+
+	reader, err := diskbufferreader.New(&fileContent)
 	if err != nil {
 		return err
 	}
