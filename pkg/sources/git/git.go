@@ -474,6 +474,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 
+	gitDir := filepath.Join(path, ".git")
+
 	logger := ctx.Logger().WithValues("repo", urlMetadata)
 	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
@@ -516,7 +518,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 				continue
@@ -632,6 +634,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	var depth int64
 	reachedBase := false
+	gitDir := filepath.Join(path, ".git")
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
@@ -679,7 +682,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
 				}
 				continue
@@ -964,8 +967,8 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	ctx.Logger().Info("handling binary file", "path", path)
+func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+	ctx.Logger().V(5).Info("handling binary file", "path", path)
 
 	if common.SkipFile(path) {
 		ctx.Logger().V(5).Info("skipping binary file", "path", path)
@@ -976,7 +979,10 @@ func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.Ch
 		catFileArg = "cat-file"
 		blobArg    = "blob"
 	)
-	cmd := exec.Command("git", catFileArg, blobArg, commitHash.String()+":"+path)
+	cmd := exec.Command("git", "--git-dir="+gitDir, catFileArg, blobArg, commitHash.String()+":"+path)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	fileReader, err := cmd.StdoutPipe()
 	if err != nil {
@@ -991,7 +997,12 @@ func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.Ch
 			ctx.Logger().Error(err, "Error closing fileReader")
 		}
 		if err := cmd.Wait(); err != nil {
-			ctx.Logger().Error(err, "Error waiting for command", "command", cmd.String())
+			ctx.Logger().Error(
+				err, "Error waiting for command",
+				"command", cmd.String(),
+				"stderr", stderr.String(),
+				"commit", commitHash,
+			)
 		}
 	}()
 
