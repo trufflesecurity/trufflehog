@@ -338,7 +338,7 @@ type cloneParams struct {
 // outer function for centralized error handling and cleanup.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args ...string) (string, *git.Repository, error) {
 	var err error
-	if err = GitCmdCheck(); err != nil {
+	if err = CmdCheck(); err != nil {
 		return "", nil, err
 	}
 
@@ -457,7 +457,7 @@ func (s *Git) CommitsScanned() uint64 {
 }
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	if err := GitCmdCheck(); err != nil {
+	if err := CmdCheck(); err != nil {
 		return err
 	}
 
