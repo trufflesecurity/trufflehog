@@ -156,7 +156,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		concurrency = runtime.NumCPU()
 	}
 
-	if err = GitCmdCheck(); err != nil {
+	if err = CmdCheck(); err != nil {
 		return err
 	}
 
@@ -414,7 +414,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 //
 // Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
 func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
-	if err := GitCmdCheck(); err != nil {
+	if err := CmdCheck(); err != nil {
 		return err
 	}
 	lsUrl, err := GitURLParse(gitUrl)
