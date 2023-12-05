@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	client *http.Client
 }
 
@@ -24,7 +24,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))\b`)
-	keyPat    = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
+	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -54,10 +54,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				client := s.client
-                        	if client == nil {
-                                	client = defaultClient
-                        	}
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://" + resDomainMatch + "/api/2.0/clusters/list", nil)
+				if client == nil {
+					client = defaultClient
+				}
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomainMatch+"/api/2.0/clusters/list", nil)
 				if err != nil {
 					continue
 				}
@@ -70,10 +70,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else if res.StatusCode == 403 {
 						// nothing to do here
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						s1.SetVerificationError(err, resMatch)
 					}
 				} else {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, resMatch)
 				}
 			}
 			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {

@@ -132,11 +132,11 @@ func TestMongoDB_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationErr = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationErr = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "verificationError")
 			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
 				t.Errorf("MongoDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

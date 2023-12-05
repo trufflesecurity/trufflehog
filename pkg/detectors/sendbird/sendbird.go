@@ -86,18 +86,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						var userResp userResp
 						err := json.NewDecoder(res.Body).Decode(&userResp)
 						if err != nil {
-							s1.VerificationError = fmt.Errorf("error decoding json response body: %w", err)
+							err = fmt.Errorf("error decoding json response body: %w", err)
+							s1.SetVerificationError(err, resMatch)
 						} else if userResp.Code != 400401 {
 							// https://sendbird.com/docs/chat/platform-api/v3/error-codes
 							// Sendbird always includes its own error codes with 400 responses
 							// 400401 (InvalidApiToken) is the only one that indicates a bad token
-							s1.VerificationError = fmt.Errorf("unexpected response code: %d", userResp.Code)
+							err = fmt.Errorf("unexpected response code: %d", userResp.Code)
+							s1.SetVerificationError(err, resMatch)
 						}
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						s1.SetVerificationError(err, resMatch)
 					}
 				} else {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, resMatch)
 				}
 			}
 
