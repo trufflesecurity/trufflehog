@@ -978,13 +978,8 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 		return nil
 	}
 
-	const (
-		catFileArg = "cat-file"
-		blobArg    = "blob"
-
-		maxSize = 1 * 1024 * 1024 * 1024 // 1GB
-	)
-	cmd := exec.Command("git", "-C", gitDir, catFileArg, blobArg, commitHash.String()+":"+path)
+	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -999,11 +994,11 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 	}
 	defer func() {
 		if err := fileReader.Close(); err != nil {
-			ctx.Logger().Error(err, "Error closing fileReader")
+			ctx.Logger().Error(err, "error closing fileReader")
 		}
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().Error(
-				err, "Error waiting for command",
+				err, "error waiting for command",
 				"command", cmd.String(),
 				"stderr", stderr.String(),
 				"commit", commitHash,
