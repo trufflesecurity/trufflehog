@@ -1026,7 +1026,6 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 
 	if fileContent.Len() == maxSize {
 		ctx.Logger().V(2).Info("Max archive size reached.", "path", path)
-		ctx.Logger().Info("Max archive size reached.", "path", path)
 	}
 
 	reader, err := diskbufferreader.New(&fileContent)
