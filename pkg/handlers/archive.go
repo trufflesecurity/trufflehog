@@ -447,7 +447,17 @@ func (a *Archive) handleExtractedFiles(ctx logContext.Context, env tempEnv, hand
 
 	var dataArchiveName string
 	for _, file := range extractedFiles {
-		name, err := handleFile(ctx, env, file.Name())
+		filename := file.Name()
+		filePath := filepath.Join(env.extractPath, filename)
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			return "", fmt.Errorf("unable to get file info for filename %s: %w", filename, err)
+		}
+		if fileInfo.IsDir() {
+			continue
+		}
+
+		name, err := handleFile(ctx, env, filename)
 		if err != nil {
 			return "", err
 		}
