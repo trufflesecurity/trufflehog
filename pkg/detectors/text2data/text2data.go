@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			data.Add("DocumentText", "Excellent location, opposite a very large mall with wide variety of shops, restaurants and more.")
 			data.Add("PrivateKey", resMatch)
 
-			req, err := http.NewRequestWithContext(ctx, "POST", "http://api.text2data.com/v3/Analyze", strings.NewReader(data.Encode()))
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.text2data.com/v3/Analyze", strings.NewReader(data.Encode()))
 			if err != nil {
 				continue
 			}

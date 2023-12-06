@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://www.heatmapapi.com/javascript/HeatmapAPI2.aspx?k=%s", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.heatmapapi.com/javascript/HeatmapAPI2.aspx?k=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
