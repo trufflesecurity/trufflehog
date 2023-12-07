@@ -232,12 +232,12 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits && len(targets) == 0 {
 		return s.runWithUnits(ctx, enumChunker, report)
 	}
-	return s.runWithoutUnits(ctx, source, report)
+	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
-func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress) error {
+func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
 	ch := make(chan *Chunk, 1)
 	var wg sync.WaitGroup
@@ -257,7 +257,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 	// stack.
 	defer wg.Wait()
 	defer close(ch)
-	if err := source.Chunks(ctx, ch); err != nil {
+	if err := source.Chunks(ctx, ch, targets...); err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
