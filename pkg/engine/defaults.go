@@ -316,7 +316,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gyazo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heatmapapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpscout"
@@ -644,7 +643,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/speechtextai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/splunkobservabilitytoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/spoonacular"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportradar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sportsmonk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sqlserver"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/square"
@@ -692,7 +690,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/telnyx"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/terraformcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/testingbot"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/text2data"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/textmagic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/theoddsapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/thinkific"
@@ -1176,7 +1173,6 @@ func DefaultDetectors() []detectors.Detector {
 		aylien.Scanner{},
 		shutterstock.Scanner{},
 		hereapi.Scanner{},
-		text2data.Scanner{},
 		readme.Scanner{},
 		pastebin.Scanner{},
 		vatlayer.Scanner{},
@@ -1467,7 +1463,6 @@ func DefaultDetectors() []detectors.Detector {
 		mux.Scanner{},
 		statuscake.Scanner{},
 		formcraft.Scanner{},
-		sportradar.Scanner{},
 		paperform.Scanner{},
 		zulipchat.Scanner{},
 		iexapis.Scanner{},
@@ -1524,7 +1519,6 @@ func DefaultDetectors() []detectors.Detector {
 		websitepulse.Scanner{},
 		scalr.Scanner{},
 		ecostruxureit.Scanner{},
-		heatmapapi.Scanner{},
 		appointedd.Scanner{},
 		twist.Scanner{},
 		prodpad.Scanner{},
