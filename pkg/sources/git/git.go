@@ -756,15 +756,19 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 		return err
 	}
 
-	if !(baseSet || headSet) {
+	if !(baseSet && headSet) {
 		return nil
 	}
 
 	// If baseCommit is an ancestor of headCommit, update c.BaseRef to be the common ancestor.
 	mergeBase, err := headCommit.MergeBase(baseCommit)
-	if err != nil || len(mergeBase) < 1 {
+	if err != nil {
 		return fmt.Errorf("unable to resolve merge base: %w", err)
 	}
+	if len(mergeBase) == 0 {
+		return fmt.Errorf("unable to resolve merge base: no merge base found")
+	}
+
 	scanOptions.BaseHash = mergeBase[0].Hash.String()
 
 	return nil
