@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -156,7 +157,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		concurrency = runtime.NumCPU()
 	}
 
-	if err = GitCmdCheck(); err != nil {
+	if err = CmdCheck(); err != nil {
 		return err
 	}
 
@@ -337,11 +338,6 @@ type cloneParams struct {
 // The core cloning logic is delegated to a nested function, which returns errors to the
 // outer function for centralized error handling and cleanup.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args ...string) (string, *git.Repository, error) {
-	var err error
-	if err = GitCmdCheck(); err != nil {
-		return "", nil, err
-	}
-
 	clonePath, err := cleantemp.MkdirTemp()
 	if err != nil {
 		return "", nil, err
@@ -414,7 +410,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 //
 // Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
 func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
-	if err := GitCmdCheck(); err != nil {
+	if err := CmdCheck(); err != nil {
 		return err
 	}
 	lsUrl, err := GitURLParse(gitUrl)
@@ -456,11 +452,9 @@ func (s *Git) CommitsScanned() uint64 {
 	return atomic.LoadUint64(&s.metrics.commitsScanned)
 }
 
-func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	if err := GitCmdCheck(); err != nil {
-		return err
-	}
+const gitDirName = ".git"
 
+func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
@@ -473,6 +467,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
 	var depth int64
+
+	gitDir := filepath.Join(path, gitDirName)
 
 	logger := ctx.Logger().WithValues("repo", urlMetadata)
 	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
@@ -516,7 +512,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 				continue
@@ -632,6 +628,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	var depth int64
 	reachedBase := false
+	gitDir := filepath.Join(path, gitDirName)
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
@@ -679,7 +676,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
 				}
 				continue
@@ -964,33 +961,69 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
 	ctx.Logger().V(5).Info("handling binary file", "path", path)
-	commit, err := repo.CommitObject(commitHash)
-	if err != nil {
-		return err
-	}
 
-	file, err := commit.File(path)
-	if err != nil {
-		return err
-	}
-
-	if common.SkipFile(file.Name) {
-		ctx.Logger().V(5).Info("skipping binary file", "path", path, "file_name", file.Name)
+	if common.SkipFile(path) {
+		ctx.Logger().V(5).Info("skipping binary file", "path", path)
 		return nil
 	}
 
-	fileReader, err := file.Reader()
+	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	fileReader, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
+<<<<<<< HEAD
 
 	bufferName := cleantemp.MkFilename()
 
 	defer fileReader.Close()
 
 	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
+=======
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		if err := fileReader.Close(); err != nil {
+			ctx.Logger().Error(err, "error closing fileReader")
+		}
+		if err := cmd.Wait(); err != nil {
+			ctx.Logger().Error(
+				err, "error waiting for command",
+				"command", cmd.String(),
+				"stderr", stderr.String(),
+				"commit", commitHash,
+			)
+		}
+	}()
+
+	var fileContent bytes.Buffer
+	// Create a limited reader to ensure we don't read more than the max size.
+	lr := io.LimitReader(fileReader, int64(maxSize))
+
+	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
+	// for the method, due to the internal implementation of io.CopyBuffer, when
+	// *bytes.Buffer implements io.WriterTo or io.ReaderFrom, the provided buf
+	// is simply ignored. Thus, we can pass nil for the buf parameter.
+	_, err = io.CopyBuffer(&fileContent, lr, nil)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
+
+	if fileContent.Len() == maxSize {
+		ctx.Logger().V(2).Info("Max archive size reached.", "path", path)
+	}
+
+	reader, err := diskbufferreader.New(&fileContent)
+>>>>>>> main
 	if err != nil {
 		return err
 	}

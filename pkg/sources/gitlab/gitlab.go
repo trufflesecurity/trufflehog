@@ -116,7 +116,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		s.url = "https://gitlab.com/"
 	}
 
-	err = git.GitCmdCheck()
+	err = git.CmdCheck()
 	if err != nil {
 		return err
 	}
