@@ -9,10 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -43,7 +44,7 @@ func TestAbuseIPDB_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a abuseipdb secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a abuseipdb secret %s within but verified", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -55,11 +56,47 @@ func TestAbuseIPDB_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found, real secrets, verification error due to timeout",
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a abuseipdb secret %s within", secret)),
+				verify: true,
+			},
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_AbuseIPDB,
+					Verified:     false,
+				}
+				r.SetVerificationError(fmt.Errorf("context deadline exceeded"))
+				return []detectors.Result{r}
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "found, real secrets, verification error due to unexpected api surface",
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "{}")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a abuseipdb secret %s within", secret)),
+				verify: true,
+			},
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_AbuseIPDB,
+					Verified:     false,
+				}
+				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 500"))
+				return []detectors.Result{r}
+			}(),
+			wantErr: false,
+		},
+		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a abuseipdb secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a abuseipdb secret %s within", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -84,8 +121,7 @@ func TestAbuseIPDB_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AbuseIPDB.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -94,9 +130,20 @@ func TestAbuseIPDB_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AbuseIPDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
