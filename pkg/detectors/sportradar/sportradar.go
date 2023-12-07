@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "http://api.sportradar.us/nba/trial/v7/en/league/2022/01/05/changes.xml?api_key="+resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.sportradar.us/nba/trial/v7/en/league/2022/01/05/changes.xml?api_key="+resMatch, nil)
 			if err != nil {
 				continue
 			}
