@@ -12,13 +12,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"adzuna"}) + `\b([a-z0-9]{32})\b`)
@@ -29,6 +31,13 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"adzuna"}
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
 }
 
 // FromData will find and optionally verify Adzuna secrets in a given set of bytes.
@@ -56,22 +65,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.adzuna.com/v1/api/jobs/gb/search/1?app_id=%s&app_key=%s", resIdMatch, resMatch), nil)
-				if err != nil {
-					continue
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
-					}
-				}
+				client := s.getClient()
+				isVerified, verificationErr := verifyAdzuna(ctx, client, resMatch, resIdMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
+			}
+
+			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+				continue
 			}
 
 			results = append(results, s1)
@@ -79,6 +81,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyAdzuna(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.adzuna.com/v1/api/jobs/gb/search/1?app_id=%s&app_key=%s", resIdMatch, resMatch), nil)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return true, nil
+	} else if res.StatusCode != http.StatusUnauthorized {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
