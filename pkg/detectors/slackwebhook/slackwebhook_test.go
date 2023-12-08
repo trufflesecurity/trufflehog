@@ -59,11 +59,29 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "deleted webhook",
+			name: "active webhook created by a deactivated user",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "deleted webhook",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", deletedWebhook)),
 				verify: true,
 			},
 			want: []detectors.Result{
