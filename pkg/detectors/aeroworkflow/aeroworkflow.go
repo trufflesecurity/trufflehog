@@ -98,9 +98,9 @@ func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resI
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	if res.StatusCode == http.StatusOK {
 		return true, nil
-	} else if res.StatusCode < http.StatusUnauthorized || res.StatusCode > http.StatusForbidden {
+	} else if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusForbidden {
 		// 401 for invalid API key, 403 for invalid Account ID
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
