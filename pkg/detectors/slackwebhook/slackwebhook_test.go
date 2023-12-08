@@ -51,6 +51,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
 					Verified:     true,
 				},
 			},
@@ -68,6 +69,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
 					Verified:     true,
 				},
 			},
@@ -85,6 +87,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
 					Verified:     true,
 				},
 			},
@@ -102,6 +105,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
 					Verified:     false,
 				},
 			},
@@ -131,6 +135,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
 					Verified:     false,
 				},
 			},
@@ -148,6 +153,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
 					Verified:     false,
 				},
 			},
@@ -165,6 +171,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
 					Verified:     false,
 				},
 			},
