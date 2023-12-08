@@ -174,6 +174,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	s.repos = repos
+	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	// We must sort the repos so we can resume later if necessary.
 	slices.Sort(s.repos)
 
@@ -412,7 +413,6 @@ func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Clien
 		return nil, errors.Errorf("unable to discover any repos"), true
 	}
 
-	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	return repos, nil, false
 }
 
