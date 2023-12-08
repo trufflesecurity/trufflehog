@@ -1,6 +1,7 @@
 package abuseipdb
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -92,8 +93,7 @@ func verifyAbuseIPDB(ctx context.Context, client *http.Client, resMatch string) 
 		if err != nil {
 			return false, err
 		}
-		bodyString := string(bodyBytes)
-		validResponse := strings.Contains(bodyString, `ipAddress`)
+		validResponse := bytes.Contains(bodyBytes, []byte("ipAddress"))
 		if validResponse {
 			return true, nil
 		} else {
