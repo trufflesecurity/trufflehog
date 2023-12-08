@@ -62,6 +62,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			url := "https://" + accountName + ".blob.core.windows.net/?comp=list"
 			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				continue
+			}
 			req.Header.Set("x-ms-date", now)
 			req.Header.Set("x-ms-version", "2019-12-12")
 			req.Header.Set("Authorization", "SharedKey "+accountName+":"+signature)
@@ -76,10 +79,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.Verified = true
 				} else if res.StatusCode == 403 {
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, accountKey)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, accountKey)
 			}
 		}
 

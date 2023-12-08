@@ -68,7 +68,6 @@ func TestInstamojo_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Instamojo,
-					VerificationError: fmt.Errorf("unexpected HTTP response status 401"),
 				},
 			},
 			wantErr:             false,
@@ -82,7 +81,7 @@ func TestInstamojo_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want: nil,
+			want:                nil,
 			wantErr:             false,
 			wantVerificationErr: true,
 		},

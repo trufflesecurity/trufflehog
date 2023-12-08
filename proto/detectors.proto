@@ -471,7 +471,7 @@ enum DetectorType {
   KakaoTalk = 460;
   RiteKit = 461;
   Shutterstock = 462;
-  Text2Data = 463;
+  Text2Data = 463 [deprecated = true];;
   YouNeedABudget = 464;
   Cricket = 465;
   Filestack = 466;
@@ -789,7 +789,7 @@ enum DetectorType {
   TimeCamp = 778;
   Userflow = 779;
   Wistia = 780;
-  SportRadar = 781;
+  SportRadar = 781 [deprecated = true];;
   UptimeRobot = 782;
   Codequiry = 783;
   ExtractorAPI = 784;
@@ -877,7 +877,7 @@ enum DetectorType {
   Copyscape = 866;
   Besnappy = 867;
   Salesmate = 868;
-  Heatmapapi = 869;
+  Heatmapapi = 869 [deprecated = true];;
   Websitepulse = 870;
   Uclassify = 871;
   Convert = 872;

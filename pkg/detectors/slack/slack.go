@@ -82,7 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					var authResponse authRes
 					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
-						s1.VerificationError = fmt.Errorf("failed to decode auth response: %w", err)
+						err = fmt.Errorf("failed to decode auth response: %w", err)
+						s1.SetVerificationError(err, token)
 					}
 
 					if authResponse.Ok {
@@ -91,10 +92,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else if authResponse.Error == "invalid_auth" {
 						// The secret is determinately not verified (nothing to do)
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected error auth response %+v", authResponse.Error)
+						err = fmt.Errorf("unexpected error auth response %+v", authResponse.Error)
+						s1.SetVerificationError(err, token)
 					}
 				} else {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, token)
 				}
 			}
 

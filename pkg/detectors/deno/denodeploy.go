@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"io"
 	"net/http"
 	"regexp"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
@@ -68,12 +69,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					body, err := io.ReadAll(res.Body)
 					if err != nil {
-						s1.VerificationError = err
+						s1.SetVerificationError(err, token)
 					} else {
 						var user userResponse
 						if err := json.Unmarshal(body, &user); err != nil {
 							fmt.Printf("Unmarshal error: %v\n", err)
-							s1.VerificationError = err
+							s1.SetVerificationError(err, token)
 						} else {
 							s1.ExtraData = map[string]string{
 								"login": user.Login,
@@ -83,10 +84,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, token)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, token)
 			}
 		}
 

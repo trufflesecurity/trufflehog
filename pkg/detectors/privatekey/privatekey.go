@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
+	"golang.org/x/crypto/ssh"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/crypto/ssh"
 )
 
 type Scanner struct {
@@ -37,7 +38,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
-	results := []detectors.Result{}
+	var results []detectors.Result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllString(dataStr, -1)
@@ -50,25 +51,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			continue
 		}
 
-		secret := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PrivateKey,
 			Raw:          []byte(token),
 			Redacted:     token[0:64],
 		}
 
-		secret.ExtraData = make(map[string]string)
+		s1.ExtraData = make(map[string]string)
 
 		var passphrase string
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
 		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
-			secret.ExtraData["encrypted"] = "true"
+			s1.ExtraData["encrypted"] = "true"
 			parsedKey, passphrase, err = crack([]byte(token))
 			if err != nil {
-				secret.VerificationError = err
+				s1.SetVerificationError(err, token)
 				continue
 			}
 			if passphrase != "" {
-				secret.ExtraData["cracked_encryption_passphrase"] = "true"
+				s1.ExtraData["cracked_encryption_passphrase"] = "true"
 			}
 		} else if err != nil {
 			// couldn't parse key, probably invalid
@@ -81,12 +82,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
-			verificationErrors := []string{}
+			var verificationErrors []string
 			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
 			if err == nil {
 				if data != nil {
-					secret.Verified = true
-					secret.ExtraData["certificate_urls"] = strings.Join(data.CertificateURLs, ", ")
+					s1.Verified = true
+					s1.ExtraData["certificate_urls"] = strings.Join(data.CertificateURLs, ", ")
 				}
 			} else {
 				verificationErrors = append(verificationErrors, err.Error())
@@ -97,8 +98,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				verificationErrors = append(verificationErrors, err.Error())
 			}
 			if user != nil {
-				secret.Verified = true
-				secret.ExtraData["github_user"] = *user
+				s1.Verified = true
+				s1.ExtraData["github_user"] = *user
 			}
 
 			user, err = verifyGitLabUser(parsedKey)
@@ -106,20 +107,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				verificationErrors = append(verificationErrors, err.Error())
 			}
 			if user != nil {
-				secret.Verified = true
-				secret.ExtraData["gitlab_user"] = *user
+				s1.Verified = true
+				s1.ExtraData["gitlab_user"] = *user
 			}
 
-			if !secret.Verified && len(verificationErrors) > 0 {
-				secret.VerificationError = fmt.Errorf("verification failures: %s", strings.Join(verificationErrors, ", "))
+			if !s1.Verified && len(verificationErrors) > 0 {
+				err = fmt.Errorf("verification failures: %s", strings.Join(verificationErrors, ", "))
+				s1.SetVerificationError(err, token)
 			}
 		}
 
-		if len(secret.ExtraData) == 0 {
-			secret.ExtraData = nil
+		if len(s1.ExtraData) == 0 {
+			s1.ExtraData = nil
 		}
 
-		results = append(results, secret)
+		results = append(results, s1)
 	}
 
 	return results, nil

@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				var r response
 				if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, resMatch)
 					continue
 				}
 				if res.StatusCode >= 200 && res.StatusCode < 300 && r.Screenshot != "" {

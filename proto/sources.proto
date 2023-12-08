@@ -62,6 +62,19 @@ message LocalSource {
   string scan_period = 6;
 }
 
+// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
+message Artifactory {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.BasicAuth basic_auth = 2;
+    string access_token = 3;
+    credentials.Unauthenticated unauthenticated = 7;
+  }
+  repeated string repositories = 4;
+  repeated string include_paths = 5;
+  repeated string ignore_paths = 6;
+}
+
 message AzureStorage {
   oneof credential {
     string connection_string = 1;
@@ -304,18 +317,6 @@ message Teams {
   repeated string channels = 4;
   repeated string ignoreList = 5;
   repeated string team_ids = 6;
-}
-
-// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
-message Artifactory {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
-  oneof credential {
-    credentials.BasicAuth basic_auth = 2;
-    string access_token = 3;
-  }
-  repeated string repositories = 4;
-  repeated string include_paths = 5;
-  repeated string ignore_paths = 6;
 }
 
 message Syslog {

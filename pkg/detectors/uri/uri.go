@@ -83,7 +83,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if s.client == nil {
 				s.client = defaultClient
 			}
-			s1.Verified, s1.VerificationError = verifyURL(ctx, s.client, parsedURL)
+			isVerified, verificationError := verifyURL(ctx, s.client, parsedURL)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationError, password)
 		}
 
 		if !s1.Verified {

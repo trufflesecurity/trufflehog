@@ -253,7 +253,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
 	}
 
-	err = git.GitCmdCheck()
+	err = git.CmdCheck()
 	if err != nil {
 		return err
 	}

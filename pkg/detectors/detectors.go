@@ -8,6 +8,8 @@ import (
 	"strings"
 	"unicode"
 
+	"errors"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -59,7 +61,43 @@ type Result struct {
 
 	// This field should only be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
-	VerificationError error
+	verificationError error
+}
+
+// SetVerificationError is the only way to set a verification error. Any sensetive values should be passed-in as secrets to be redacted.
+func (r *Result) SetVerificationError(err error, secrets ...string) {
+	if err != nil {
+		r.verificationError = redactSecrets(err, secrets...)
+	}
+}
+
+// Public accessors for the fields could also be provided if needed.
+func (r *Result) VerificationError() error {
+	return r.verificationError
+}
+
+// redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.
+func redactSecrets(err error, secrets ...string) error {
+	lastErr := unwrapToLast(err)
+	errStr := lastErr.Error()
+	for _, secret := range secrets {
+		errStr = strings.Replace(errStr, secret, "[REDACTED]", -1)
+	}
+	return errors.New(errStr)
+}
+
+// unwrapToLast returns the last error in the chain of errors.
+// This is added to exclude non-essential details (like URLs) for brevity and security.
+// Also helps us optimize performance in redaction and enhance log clarity.
+func unwrapToLast(err error) error {
+	for {
+		unwrapped := errors.Unwrap(err)
+		if unwrapped == nil {
+			// We've reached the last error in the chain
+			return err
+		}
+		err = unwrapped
+	}
 }
 
 type ResultWithMetadata struct {
