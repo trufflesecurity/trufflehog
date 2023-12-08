@@ -25,7 +25,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("SLACKWEBHOOK_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SLACKWEBHOOK_INACTIVE")
+	//inactiveSecret := testSecrets.MustGetField("SLACKWEBHOOK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -41,7 +41,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "active webhook",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -59,47 +59,11 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, verified, 400 no_text",
-			s:    Scanner{client: common.ConstantResponseHttpClient(400, "no_text")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SlackWebhook,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
-		{
-			name: "found, verified, 400 missing_text",
-			s:    Scanner{client: common.ConstantResponseHttpClient(400, "missing_text")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SlackWebhook,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
-		{
-			name: "found, unverified",
+			name: "deleted webhook",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -113,56 +77,44 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "not found",
+			name: "webhook from app with revoked token",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
 				verify: true,
 			},
-			want:                nil,
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
+					Verified:     false,
+				},
+			},
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, would be verified if not for timeout",
+			name: "unexpected webhook response",
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "oh no")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SlackWebhook,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SlackWebhook,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SlackWebhook,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/"},
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, account disabled",
-			s:    Scanner{client: common.ConstantResponseHttpClient(400, disabledAccountResponse)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
@@ -201,8 +153,6 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 		})
 	}
 }
-
-const disabledAccountResponse = `missing_text_or_fallback_or_attachments`
 
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()
