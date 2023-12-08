@@ -979,14 +979,6 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 	if err != nil {
 		return err
 	}
-<<<<<<< HEAD
-
-	bufferName := cleantemp.MkFilename()
-
-	defer fileReader.Close()
-
-	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
-=======
 
 	if err := cmd.Start(); err != nil {
 		return err
@@ -1023,7 +1015,6 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 	}
 
 	reader, err := diskbufferreader.New(&fileContent)
->>>>>>> main
 	if err != nil {
 		return err
 	}
