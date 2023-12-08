@@ -100,7 +100,7 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 	// https://www.aha.io/api
 	if res.StatusCode == http.StatusOK {
 		return true, nil
-	} else if res.StatusCode < http.StatusUnauthorized || res.StatusCode > http.StatusNotFound {
+	} else if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusNotFound {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 
