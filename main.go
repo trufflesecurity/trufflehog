@@ -591,11 +591,11 @@ func printAverageDetectorTime(e *engine.Engine) {
 
 // detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
 func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
-	output := make(map[config.DetectorID]struct{}, len(detectors))
+	out := make(map[config.DetectorID]struct{}, len(detectors))
 	for _, d := range detectors {
-		output[d] = struct{}{}
+		out[d] = struct{}{}
 	}
-	return output
+	return out
 }
 
 // getWithDetectorID is a helper function to get a value from a map using a

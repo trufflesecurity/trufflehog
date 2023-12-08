@@ -134,12 +134,12 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, true)
-					s1.Verified = verified
+					isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, true)
+					s1.Verified = isVerified
 					if extraData != nil {
 						s1.ExtraData = extraData
 					}
-					s1.VerificationError = verificationErr
+					s1.SetVerificationError(verificationErr, resSecretMatch)
 				}
 
 				if !s1.Verified {
@@ -305,7 +305,7 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 		}
 	}
 
-	out := []detectors.Result{}
+	var out []detectors.Result
 	for _, r := range idResults {
 		out = append(out, r)
 	}

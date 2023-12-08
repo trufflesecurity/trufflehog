@@ -98,7 +98,7 @@ func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sour
 // Run blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is stored and accessible via the
 // JobProgressRef as it becomes available.
-func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
+func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source, targets ...ChunkingTarget) (JobProgressRef, error) {
 	sourceID, jobID := source.SourceID(), source.JobID()
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
@@ -127,7 +127,7 @@ func (s *SourceManager) Run(ctx context.Context, sourceName string, source Sourc
 		)
 		defer common.Recover(ctx)
 		defer cancel(nil)
-		if err := s.run(ctx, source, progress); err != nil {
+		if err := s.run(ctx, source, progress, targets...); err != nil {
 			select {
 			case s.firstErr <- err:
 			default:
@@ -211,7 +211,7 @@ func (s *SourceManager) preflightChecks(ctx context.Context) error {
 // run is a helper method to sychronously run the source. It does not check for
 // acquired resources. An error is returned if there was a fatal error during
 // the run. This information is also recorded in the JobProgress.
-func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress) error {
+func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
 
@@ -229,15 +229,15 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 		"source_type", source.Type().String(),
 	)
 	// Check for the preferred method of tracking source units.
-	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits {
+	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits && len(targets) == 0 {
 		return s.runWithUnits(ctx, enumChunker, report)
 	}
-	return s.runWithoutUnits(ctx, source, report)
+	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
-func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress) error {
+func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
 	ch := make(chan *Chunk, 1)
 	var wg sync.WaitGroup
@@ -257,7 +257,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 	// stack.
 	defer wg.Wait()
 	defer close(ch)
-	if err := source.Chunks(ctx, ch); err != nil {
+	if err := source.Chunks(ctx, ch, targets...); err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}

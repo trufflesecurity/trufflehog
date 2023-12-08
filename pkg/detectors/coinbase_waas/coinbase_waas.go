@@ -6,15 +6,16 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"net/http"
+	"regexp"
+	"strings"
+
 	"github.com/coinbase/waas-client-library-go/auth"
 	"github.com/coinbase/waas-client-library-go/clients"
 	v1clients "github.com/coinbase/waas-client-library-go/clients/v1"
 	v1 "github.com/coinbase/waas-client-library-go/gen/go/coinbase/cloud/pools/v1"
 	"github.com/google/uuid"
 	"google.golang.org/api/googleapi"
-	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -73,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				isVerified, verificationErr := s.verifyMatch(ctx, resKeyNameMatch, resPrivKeyMatch)
 				s1.Verified = isVerified
-				s1.VerificationError = verificationErr
+				s1.SetVerificationError(verificationErr, resPrivKeyMatch)
 			}
 			results = append(results, s1)
 

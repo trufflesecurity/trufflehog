@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				url := s.getBraintreeURL()
 				isVerified, verificationErr := verifyBraintree(ctx, client, url, resIdMatch, resMatch)
 				s1.Verified = isVerified
-				s1.VerificationError = verificationErr
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key

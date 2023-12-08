@@ -79,10 +79,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.Verified = true
 				} else if res.StatusCode == 403 {
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, accountKey)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, accountKey)
 			}
 		}
 

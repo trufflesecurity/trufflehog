@@ -69,10 +69,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// The secret is determinately not verified
 						s1.Verified = false
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected status code %d", res.StatusCode)
+						err = fmt.Errorf("unexpected status code %d", res.StatusCode)
+						s1.SetVerificationError(err, password)
 					}
 				} else {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, password)
 				}
 			}
 

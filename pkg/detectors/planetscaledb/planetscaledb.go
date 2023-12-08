@@ -55,13 +55,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 					db, err := sql.Open("mysql", cfg.FormatDSN())
 					if err != nil {
-						s1.VerificationError = err
+						s1.SetVerificationError(err, password[0])
 					} else {
 						err = db.PingContext(ctx)
 						if err == nil {
 							s1.Verified = true
 						} else {
-							s1.VerificationError = err
+							s1.SetVerificationError(err, password[0])
 						}
 						db.Close()
 					}

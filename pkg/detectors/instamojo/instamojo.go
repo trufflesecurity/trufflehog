@@ -24,7 +24,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	//KeyPat is client_id
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{40})\b`)
 	//Secretpat is Client_secret
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{128})\b`)
 )
@@ -82,10 +82,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "access_token") {
 						s1.Verified = true
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						s1.SetVerificationError(err, resSecret)
 					}
 				} else {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, resSecret)
 				}
 			}
 
