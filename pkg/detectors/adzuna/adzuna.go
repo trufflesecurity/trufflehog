@@ -95,7 +95,7 @@ func verifyAdzuna(ctx context.Context, client *http.Client, resMatch, resIdMatch
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	if res.StatusCode == http.StatusOK {
 		return true, nil
 	} else if res.StatusCode != http.StatusUnauthorized {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
