@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
 
@@ -120,6 +121,30 @@ func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 
 func (a *Archive) handleNonArchiveContent(ctx context.Context, reader io.Reader, archiveChan chan []byte) error {
 	aCtx := logContext.AddLogger(ctx)
+
+	buffer := make([]byte, 512)
+	n, err := reader.Read(buffer)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	// Create a new reader that starts with the buffer we just read
+	// and continues with the rest of the original reader.
+	reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
+
+	mime := mimetype.Detect(buffer)
+	mimeT := mimeType(mime.String())
+
+	if mimeT == machOType {
+		aCtx.Logger().V(5).Info("skipping binary file", "ext", mimeT)
+		return nil
+	}
+
+	if common.SkipFile(mime.Extension()) {
+		aCtx.Logger().V(5).Info("skipping file", "ext", mimeT)
+		return nil
+	}
+
 	chunkReader := sources.NewChunkReader()
 	chunkResChan := chunkReader(aCtx, reader)
 	for data := range chunkResChan {
@@ -242,6 +267,7 @@ type mimeType string
 const (
 	arMimeType  mimeType = "application/x-unix-archive"
 	rpmMimeType mimeType = "application/x-rpm"
+	machOType   mimeType = "application/x-mach-binary"
 )
 
 // mimeTools maps MIME types to the necessary command-line tools to handle them.
