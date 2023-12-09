@@ -84,13 +84,6 @@ func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []b
 	return archiveChan
 }
 
-type decompressorInfo struct {
-	depth       int
-	reader      io.Reader
-	archiveChan chan []byte
-	archiver    archiver.Decompressor
-}
-
 // openArchive takes a reader and extracts the contents up to the maximum depth.
 func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
 	if depth >= maxDepth {
@@ -108,11 +101,14 @@ func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 
 	switch archive := format.(type) {
 	case archiver.Decompressor:
-		info := decompressorInfo{depth: depth, reader: arReader, archiveChan: archiveChan, archiver: archive}
-
-		return a.handleDecompressor(ctx, info)
+		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
+		compReader, err := archive.OpenReader(arReader)
+		if err != nil {
+			return err
+		}
+		return a.openArchive(ctx, depth+1, compReader, archiveChan)
 	case archiver.Extractor:
-		return archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, a.extractorHandler(archiveChan))
+		return archive.Extract(context.WithValue(ctx, depthKey, depth+1), arReader, nil, a.extractorHandler(archiveChan))
 	default:
 		return fmt.Errorf("unknown archive type: %s", format.Name())
 	}
@@ -132,18 +128,6 @@ func (a *Archive) handleNonArchiveContent(ctx context.Context, reader io.Reader,
 		}
 	}
 	return nil
-}
-
-func (a *Archive) handleDecompressor(ctx context.Context, info decompressorInfo) error {
-	compReader, err := info.archiver.OpenReader(info.reader)
-	if err != nil {
-		return err
-	}
-	fileBytes, err := a.ReadToMax(ctx, compReader)
-	if err != nil {
-		return err
-	}
-	return a.openArchive(ctx, info.depth+1, bytes.NewReader(fileBytes), info.archiveChan)
 }
 
 // IsFiletype returns true if the provided reader is an archive.
