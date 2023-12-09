@@ -14,11 +14,16 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
+const (
+	defaultExecPath             = "trufflehog"
+	defaultArtifactPrefixFormat = "%s-%d-"
+)
+
 // MkdirTemp returns a temporary directory path formatted as:
 // trufflehog-<pid>-<randint>
 func MkdirTemp() (string, error) {
 	pid := os.Getpid()
-	tmpdir := fmt.Sprintf("%s-%d-", "trufflehog", pid)
+	tmpdir := fmt.Sprintf(defaultArtifactPrefixFormat, defaultExecPath, pid)
 	dir, err := os.MkdirTemp(os.TempDir(), tmpdir)
 	if err != nil {
 		return "", err
@@ -31,7 +36,7 @@ func MkdirTemp() (string, error) {
 // is generally handled by "github.com/trufflesecurity/disk-buffer-reader"
 func MkFilename() string {
 	pid := os.Getpid()
-	filename := fmt.Sprintf("%s-%d-", "trufflehog", pid)
+	filename := fmt.Sprintf(defaultArtifactPrefixFormat, defaultExecPath, pid)
 	return filename
 }
 
@@ -40,7 +45,6 @@ var trufflehogRE = regexp.MustCompile(`^trufflehog-\d+-\d+$`)
 
 // CleanTempArtifacts deletes orphaned temp directories and files that do not contain running PID values.
 func CleanTempArtifacts(ctx logContext.Context) error {
-	const defaultExecPath = "trufflehog"
 	executablePath, err := os.Executable()
 	if err != nil {
 		executablePath = defaultExecPath
