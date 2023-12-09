@@ -35,12 +35,6 @@ func MkFilename() string {
 	return filename
 }
 
-// CleanTemp is used to remove orphaned artifacts from aborted scans.
-type CleanTemp interface {
-	// CleanTempDir removes orphaned directories from sources. ex: Git
-	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
-}
-
 // Only compile during startup.
 var trufflehogRE = regexp.MustCompile(`^trufflehog-\d+-\d+$`)
 
