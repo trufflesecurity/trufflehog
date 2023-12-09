@@ -139,7 +139,6 @@ func (a *Archive) handleDecompressor(ctx context.Context, info decompressorInfo)
 	if err != nil {
 		return err
 	}
-
 	fileBytes, err := a.ReadToMax(ctx, compReader)
 	if err != nil {
 		return err
