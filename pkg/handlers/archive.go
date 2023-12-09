@@ -185,9 +185,8 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 		if err != nil {
 			return err
 		}
-		fileContent := bytes.NewReader(fileBytes)
 
-		err = a.openArchive(ctx, depth, fileContent, archiveChan)
+		err = a.openArchive(ctx, depth, bytes.NewReader(fileBytes), archiveChan)
 		if err != nil {
 			return err
 		}
