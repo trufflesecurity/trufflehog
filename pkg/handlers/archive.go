@@ -109,6 +109,7 @@ func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 	switch archive := format.(type) {
 	case archiver.Decompressor:
 		info := decompressorInfo{depth: depth, reader: arReader, archiveChan: archiveChan, archiver: archive}
+
 		return a.handleDecompressor(ctx, info)
 	case archiver.Extractor:
 		return archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, a.extractorHandler(archiveChan))
@@ -138,12 +139,12 @@ func (a *Archive) handleDecompressor(ctx context.Context, info decompressorInfo)
 	if err != nil {
 		return err
 	}
+
 	fileBytes, err := a.ReadToMax(ctx, compReader)
 	if err != nil {
 		return err
 	}
-	newReader := bytes.NewReader(fileBytes)
-	return a.openArchive(ctx, info.depth+1, newReader, info.archiveChan)
+	return a.openArchive(ctx, info.depth+1, bytes.NewReader(fileBytes), info.archiveChan)
 }
 
 // IsFiletype returns true if the provided reader is an archive.
@@ -176,6 +177,11 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 		if err != nil {
 			return err
 		}
+		if common.SkipFile(f.Name()) {
+			logger.V(5).Info("skipping file", "filename", f.Name())
+			return nil
+		}
+
 		fileBytes, err := a.ReadToMax(ctx, fReader)
 		if err != nil {
 			return err
