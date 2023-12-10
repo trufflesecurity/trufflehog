@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"io"
 
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
@@ -26,8 +25,8 @@ type SpecializedHandler interface {
 }
 
 type Handler interface {
-	FromFile(context.Context, io.Reader) chan []byte
-	IsFiletype(context.Context, io.Reader) (io.Reader, bool)
+	FromFile(logContext.Context, io.Reader) chan []byte
+	IsFiletype(logContext.Context, io.Reader) (io.Reader, bool)
 	New()
 }
 
@@ -37,8 +36,7 @@ type Handler interface {
 // packages them in the provided chunk skeleton, and reports them to the chunk reporter.
 // The function returns true if processing was successful and false otherwise.
 // Context is used for cancellation, and the caller is responsible for canceling it if needed.
-func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
-	aCtx := logContext.AddLogger(ctx)
+func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
 	for _, h := range DefaultHandlers() {
 		h.New()
 
@@ -47,11 +45,11 @@ func HandleFile(ctx context.Context, file io.Reader, chunkSkel *sources.Chunk, r
 		// an io.MultiReader, which is used by the SpecializedHandler.
 		reReader, err := diskbufferreader.New(file)
 		if err != nil {
-			aCtx.Logger().Error(err, "error creating reusable reader")
+			ctx.Logger().Error(err, "error creating reusable reader")
 			return false
 		}
 
-		if success := processHandler(aCtx, h, reReader, chunkSkel, reporter); success {
+		if success := processHandler(ctx, h, reReader, chunkSkel, reporter); success {
 			return true
 		}
 	}
@@ -85,7 +83,7 @@ func processHandler(ctx logContext.Context, h Handler, reReader *diskbufferreade
 	return handleChunks(ctx, h.FromFile(ctx, reReader), chunkSkel, reporter)
 }
 
-func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
+func handleChunks(ctx logContext.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
 	for {
 		select {
 		case data, open := <-handlerChan:
@@ -94,7 +92,7 @@ func handleChunks(ctx context.Context, handlerChan chan []byte, chunkSkel *sourc
 			}
 			chunk := *chunkSkel
 			chunk.Data = data
-			if err := reporter.ChunkOk(logContext.AddLogger(ctx), chunk); err != nil {
+			if err := reporter.ChunkOk(ctx, chunk); err != nil {
 				return false
 			}
 		case <-ctx.Done():
