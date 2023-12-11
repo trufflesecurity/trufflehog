@@ -66,10 +66,10 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 }
 
 // FromFile extracts the files from an archive.
-func (a *Archive) FromFile(originalCtx context.Context, data io.Reader) chan []byte {
+func (a *Archive) FromFile(originalCtx logContext.Context, data io.Reader) chan []byte {
 	archiveChan := make(chan []byte, defaultBufferSize)
 	go func() {
-		ctx, cancel := context.WithTimeout(originalCtx, maxTimeout)
+		ctx, cancel := logContext.WithTimeout(originalCtx, maxTimeout)
 		logger := logContext.AddLogger(ctx).Logger()
 		defer cancel()
 		defer close(archiveChan)
@@ -92,7 +92,7 @@ type decompressorInfo struct {
 }
 
 // openArchive takes a reader and extracts the contents up to the maximum depth.
-func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
+func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
 	if depth >= maxDepth {
 		return fmt.Errorf(errMaxArchiveDepthReached)
 	}
@@ -109,21 +109,21 @@ func (a *Archive) openArchive(ctx context.Context, depth int, reader io.Reader, 
 	switch archive := format.(type) {
 	case archiver.Decompressor:
 		info := decompressorInfo{depth: depth, reader: arReader, archiveChan: archiveChan, archiver: archive}
+
 		return a.handleDecompressor(ctx, info)
 	case archiver.Extractor:
-		return archive.Extract(context.WithValue(ctx, depthKey, depth+1), reader, nil, a.extractorHandler(archiveChan))
+		return archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, a.extractorHandler(archiveChan))
 	default:
 		return fmt.Errorf("unknown archive type: %s", format.Name())
 	}
 }
 
-func (a *Archive) handleNonArchiveContent(ctx context.Context, reader io.Reader, archiveChan chan []byte) error {
-	aCtx := logContext.AddLogger(ctx)
+func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(aCtx, reader)
+	chunkResChan := chunkReader(ctx, reader)
 	for data := range chunkResChan {
 		if err := data.Error(); err != nil {
-			aCtx.Logger().Error(err, "error reading chunk")
+			ctx.Logger().Error(err, "error reading chunk")
 			continue
 		}
 		if err := common.CancellableWrite(ctx, archiveChan, data.Bytes()); err != nil {
@@ -133,7 +133,7 @@ func (a *Archive) handleNonArchiveContent(ctx context.Context, reader io.Reader,
 	return nil
 }
 
-func (a *Archive) handleDecompressor(ctx context.Context, info decompressorInfo) error {
+func (a *Archive) handleDecompressor(ctx logContext.Context, info decompressorInfo) error {
 	compReader, err := info.archiver.OpenReader(info.reader)
 	if err != nil {
 		return err
@@ -142,12 +142,11 @@ func (a *Archive) handleDecompressor(ctx context.Context, info decompressorInfo)
 	if err != nil {
 		return err
 	}
-	newReader := bytes.NewReader(fileBytes)
-	return a.openArchive(ctx, info.depth+1, newReader, info.archiveChan)
+	return a.openArchive(ctx, info.depth+1, bytes.NewReader(fileBytes), info.archiveChan)
 }
 
 // IsFiletype returns true if the provided reader is an archive.
-func (a *Archive) IsFiletype(_ context.Context, reader io.Reader) (io.Reader, bool) {
+func (a *Archive) IsFiletype(_ logContext.Context, reader io.Reader) (io.Reader, bool) {
 	format, readerB, err := archiver.Identify("", reader)
 	if err != nil {
 		return readerB, false
@@ -165,8 +164,8 @@ func (a *Archive) IsFiletype(_ context.Context, reader io.Reader) (io.Reader, bo
 // extractorHandler is applied to each file in an archiver.Extractor file.
 func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, f archiver.File) error {
-		logger := logContext.AddLogger(ctx).Logger()
-		logger.V(5).Info("Handling extracted file.", "filename", f.Name())
+		lCtx := logContext.AddLogger(ctx)
+		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
 		depth := 0
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
@@ -176,13 +175,17 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 		if err != nil {
 			return err
 		}
-		fileBytes, err := a.ReadToMax(ctx, fReader)
+		if common.SkipFile(f.Name()) {
+			lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
+			return nil
+		}
+
+		fileBytes, err := a.ReadToMax(lCtx, fReader)
 		if err != nil {
 			return err
 		}
-		fileContent := bytes.NewReader(fileBytes)
 
-		err = a.openArchive(ctx, depth, fileContent, archiveChan)
+		err = a.openArchive(lCtx, depth, bytes.NewReader(fileBytes), archiveChan)
 		if err != nil {
 			return err
 		}
@@ -191,12 +194,11 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 }
 
 // ReadToMax reads up to the max size.
-func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte, err error) {
+func (a *Archive) ReadToMax(ctx logContext.Context, reader io.Reader) (data []byte, err error) {
 	// Archiver v4 is in alpha and using an experimental version of
 	// rardecode. There is a bug somewhere with rar decoder format 29
 	// that can lead to a panic. An issue is open in rardecode repo
 	// https://github.com/nwaples/rardecode/issues/30.
-	logger := logContext.AddLogger(ctx).Logger()
 	defer func() {
 		if r := recover(); r != nil {
 			// Return an error from ReadToMax.
@@ -205,7 +207,7 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 			} else {
 				err = fmt.Errorf("panic occurred: %v", r)
 			}
-			logger.Error(err, "Panic occurred when reading archive")
+			ctx.Logger().Error(err, "Panic occurred when reading archive")
 		}
 	}()
 
@@ -227,42 +229,51 @@ func (a *Archive) ReadToMax(ctx context.Context, reader io.Reader) (data []byte,
 	}
 
 	if fileContent.Len() == maxSize {
-		logger.V(2).Info("Max archive size reached.")
+		ctx.Logger().V(2).Info("Max archive size reached.")
 	}
 
 	return fileContent.Bytes(), nil
 }
 
+type mimeType string
+
 const (
-	arMimeType  = "application/x-unix-archive"
-	rpmMimeType = "application/x-rpm"
+	arMimeType  mimeType = "application/x-unix-archive"
+	rpmMimeType mimeType = "application/x-rpm"
 )
 
-// Define a map of mime types to corresponding command-line tools
-var mimeTools = map[string][]string{
+// mimeTools maps MIME types to the necessary command-line tools to handle them.
+// This centralizes the tool requirements for different file types.
+var mimeTools = map[mimeType][]string{
 	arMimeType:  {"ar"},
 	rpmMimeType: {"rpm2cpio", "cpio"},
 }
 
-// Check if the command-line tool is installed.
-func isToolInstalled(tool string) bool {
-	_, err := exec.LookPath(tool)
-	return err == nil
+// extractToolCache stores the availability of extraction tools, eliminating the need for repeated filesystem lookups.
+var extractToolCache map[string]bool
+
+func init() {
+	// Preload the extractToolCache with the availability status of each required tool.
+	extractToolCache = make(map[string]bool)
+	for _, tools := range mimeTools {
+		for _, tool := range tools {
+			_, err := exec.LookPath(tool)
+			extractToolCache[tool] = err == nil
+		}
+	}
 }
 
-// Ensure all tools are available for given mime type.
-func ensureToolsForMimeType(mimeType string) error {
+func ensureToolsForMimeType(mimeType mimeType) error {
 	tools, exists := mimeTools[mimeType]
 	if !exists {
-		return fmt.Errorf("unsupported mime type")
+		return fmt.Errorf("unsupported mime type: %s", mimeType)
 	}
 
 	for _, tool := range tools {
-		if !isToolInstalled(tool) {
-			return fmt.Errorf("Required tool " + tool + " is not installed")
+		if installed := extractToolCache[tool]; !installed {
+			return fmt.Errorf("required tool %s is not installed", tool)
 		}
 	}
-
 	return nil
 }
 
@@ -389,9 +400,7 @@ func (a *Archive) handleNestedFileMIME(ctx logContext.Context, tempEnv tempEnv, 
 	}
 
 	switch mimeType {
-	case arMimeType:
-		_, _, err = a.HandleSpecialized(ctx, reader)
-	case rpmMimeType:
+	case arMimeType, rpmMimeType:
 		_, _, err = a.HandleSpecialized(ctx, reader)
 	default:
 		return "", nil
@@ -406,10 +415,12 @@ func (a *Archive) handleNestedFileMIME(ctx logContext.Context, tempEnv tempEnv, 
 
 // determineMimeType reads from the provided reader to detect the MIME type.
 // It returns the detected MIME type and a new reader that includes the read portion.
-func determineMimeType(reader io.Reader) (string, io.Reader, error) {
+func determineMimeType(reader io.Reader) (mimeType, io.Reader, error) {
+	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// If fewer bytes are read, MIME type detection may still succeed.
 	buffer := make([]byte, 512)
 	n, err := reader.Read(buffer)
-	if err != nil {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return "", nil, fmt.Errorf("unable to read file for MIME type detection: %w", err)
 	}
 
@@ -422,7 +433,7 @@ func determineMimeType(reader io.Reader) (string, io.Reader, error) {
 		return "", nil, fmt.Errorf("unable to determine file type: %w", err)
 	}
 
-	return kind.MIME.Value, reader, nil
+	return mimeType(kind.MIME.Value), reader, nil
 }
 
 // handleExtractedFiles processes each file in the extracted directory using a provided handler function.
@@ -438,7 +449,17 @@ func (a *Archive) handleExtractedFiles(ctx logContext.Context, env tempEnv, hand
 
 	var dataArchiveName string
 	for _, file := range extractedFiles {
-		name, err := handleFile(ctx, env, file.Name())
+		filename := file.Name()
+		filePath := filepath.Join(env.extractPath, filename)
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			return "", fmt.Errorf("unable to get file info for filename %s: %w", filename, err)
+		}
+		if fileInfo.IsDir() {
+			continue
+		}
+
+		name, err := handleFile(ctx, env, filename)
 		if err != nil {
 			return "", err
 		}
@@ -460,7 +481,7 @@ type tempEnv struct {
 // createTempEnv creates a temporary file and a temporary directory for extracting archives.
 // The caller is responsible for removing these temporary resources
 // (both the file and directory) when they are no longer needed.
-func (a *Archive) createTempEnv(ctx context.Context, file io.Reader) (tempEnv, error) {
+func (a *Archive) createTempEnv(ctx logContext.Context, file io.Reader) (tempEnv, error) {
 	tempFile, err := os.CreateTemp("", "tmp")
 	if err != nil {
 		return tempEnv{}, fmt.Errorf("unable to create temporary file: %w", err)

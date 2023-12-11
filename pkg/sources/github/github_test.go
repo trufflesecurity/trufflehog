@@ -78,7 +78,7 @@ func TestAddReposByOrg(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos: nil,
+		Repositories: nil,
 		IgnoreRepos:  []string{"secret/super-*-repo2"},
 	})
 	// gock works here because github.NewClient is using the default HTTP Transport
@@ -106,7 +106,7 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos:  []string{"secret/super*"},
+		Repositories:  []string{"secret/super*"},
 		Organizations: []string{"super-secret-org"},
 	})
 	// gock works here because github.NewClient is using the default HTTP Transport

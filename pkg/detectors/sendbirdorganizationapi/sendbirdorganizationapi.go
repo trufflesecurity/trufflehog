@@ -57,18 +57,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://gate.sendbird.com/api/v2/applications", nil)
 			if err != nil {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 			req.Header.Add("SENDBIRDORGANIZATIONAPITOKEN", resMatch)
 			res, err := client.Do(req)
 			if err != nil {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			} else {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else if res.StatusCode != http.StatusForbidden {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			}
 		}

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-errors/errors"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (

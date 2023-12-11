@@ -5,10 +5,11 @@ package ftp
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -136,11 +137,11 @@ func TestFTP_FromChunk(t *testing.T) {
 			for i := range got {
 				got[i].Raw = nil
 
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "VerificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("FTP.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -1,4 +1,4 @@
-PROTOS_IMAGE ?= trufflesecurity/protos:1.18-0
+PROTOS_IMAGE ?= trufflesecurity/protos:1.21-0
 
 .PHONY: check
 .PHONY: lint
@@ -52,14 +52,14 @@ run-debug:
 	CGO_ENABLED=0 go run . git file://. --json --debug
 
 protos:
-	docker run -u "$(shell id -u)" -v "$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; /pwd/scripts/gen_proto.sh"
+	docker run --rm -u "$(shell id -u)" -v "$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; /pwd/scripts/gen_proto.sh"
 
 protos-windows:
-	docker run -v "$(shell cygpath -w $(shell pwd))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; ./scripts/gen_proto.sh"
+	docker run --rm -v "$(shell cygpath -w $(shell pwd))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; ./scripts/gen_proto.sh"
 
 release-protos-image:
 	docker buildx build --push --platform=linux/amd64,linux/arm64 \
-	-t trufflesecurity/protos:1.18-0 -f hack/Dockerfile.protos .
+	-t trufflesecurity/protos:1.21-0 -f hack/Dockerfile.protos .
 
 snifftest:
 	./hack/snifftest/snifftest.sh

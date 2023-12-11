@@ -28,10 +28,7 @@ func (m fsModel) Cmd() string {
 	command = append(command, "trufflehog", "filesystem")
 
 	inputs := m.GetInputs()
-
-	if inputs["path"] != "" {
-		command = append(command, inputs["path"])
-	}
+	command = append(command, inputs["path"].Value)
 
 	return strings.Join(command, " ")
 }

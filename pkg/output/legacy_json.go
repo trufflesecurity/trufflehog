@@ -2,6 +2,7 @@ package output
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -172,7 +173,7 @@ func GenerateDiff(commit *object.Commit, fileName string) string {
 	// First grab the first parent of the commit. If there are none, we are at the first commit and should diff against
 	// an empty file.
 	parent, err := commit.Parent(0)
-	if err != object.ErrParentNotFound && err != nil {
+	if !errors.Is(err, object.ErrParentNotFound) && err != nil {
 		logger.Error(err, "could not find parent", "commit", commit.Hash.String())
 	}
 
@@ -180,7 +181,7 @@ func GenerateDiff(commit *object.Commit, fileName string) string {
 	var parentFile *object.File
 	if parent != nil {
 		parentFile, err = parent.File(fileName)
-		if err != nil && err != object.ErrFileNotFound {
+		if err != nil && !errors.Is(err, object.ErrFileNotFound) {
 			logger.Error(err, "could not get previous version of file")
 			return diff
 		}

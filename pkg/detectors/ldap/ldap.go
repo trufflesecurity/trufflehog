@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					verificationErr := verifyLDAP(username[1], password[1], ldapURL)
 					s1.Verified = verificationErr == nil
 					if !isErrDeterminate(verificationErr) {
-						s1.VerificationError = verificationErr
+						s1.SetVerificationError(verificationErr, password[1])
 					}
 				}
 
@@ -99,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			s1.Verified = verificationError == nil
 			if !isErrDeterminate(verificationError) {
-				s1.VerificationError = verificationError
+				s1.SetVerificationError(verificationError, password)
 			}
 		}
 

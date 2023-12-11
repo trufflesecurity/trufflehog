@@ -25,7 +25,7 @@ func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
 var (
 	// Oauth token
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
-	keyPat = regexp.MustCompile(`(?i)(?:github|gh|pat)[^\.].{0,40}[ =:'"]+([a-f0-9]{40})\b`)
+	keyPat = regexp.MustCompile(`(?i)(?:github|gh|pat|token)[^\.].{0,40}[ =:'"]+([a-f0-9]{40})\b`)
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
@@ -38,12 +38,13 @@ type userRes struct {
 	SiteAdmin bool   `json:"site_admin"`
 	Name      string `json:"name"`
 	Company   string `json:"company"`
+	UserURL   string `json:"html_url"`
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"github", "gh", "pat"}
+	return []string{"github", "gh", "pat", "token"}
 }
 
 // FromData will find and optionally verify GitHub secrets in a given set of bytes.
@@ -69,6 +70,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+		}
 
 		if verify {
 			client := common.SaneHttpClient()
@@ -88,6 +92,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						res.Body.Close()
 						if err == nil {
 							s1.Verified = true
+
+							if err == nil {
+								s1.Verified = true
+								s1.ExtraData["username"] = userResponse.Login
+								s1.ExtraData["url"] = userResponse.UserURL
+								s1.ExtraData["account_type"] = userResponse.Type
+								s1.ExtraData["site_admin"] = fmt.Sprintf("%t", userResponse.SiteAdmin)
+								s1.ExtraData["name"] = userResponse.Name
+								s1.ExtraData["company"] = userResponse.Company
+								s1.ExtraData["scopes"] = res.Header.Get("X-OAuth-Scopes")
+							}
 						}
 					}
 				}
