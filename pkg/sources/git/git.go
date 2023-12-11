@@ -18,11 +18,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -462,7 +463,16 @@ func (s *Git) CommitsScanned() uint64 {
 const gitDirName = ".git"
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
+	// Get the remote URL for reporting (may be empty)
+	remoteURL := getSafeRemoteURL(repo, "origin")
+	var repoCtx context.Context
+	if remoteURL != "" {
+		repoCtx = context.WithValue(ctx, "repo", remoteURL)
+	} else {
+		repoCtx = context.WithValue(ctx, "repo", path)
+	}
+
+	commitChan, err := gitparse.NewParser().RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -470,14 +480,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return nil
 	}
 
-	// get the URL metadata for reporting (may be empty)
-	urlMetadata := getSafeRemoteURL(repo, "origin")
-
 	var depth int64
-
 	gitDir := filepath.Join(path, gitDirName)
 
-	logger := ctx.Logger().WithValues("repo", urlMetadata)
+	logger := repoCtx.Logger()
 	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
 		if len(scanOptions.BaseHash) > 0 {
@@ -510,7 +516,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
 				commitHash := plumbing.NewHash(hash)
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, 0)
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -526,10 +532,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			}
 
 			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(ctx, diff, fileName, email, hash, when, urlMetadata, reporter)
+				s.gitChunk(ctx, diff, fileName, email, hash, when, remoteURL, reporter)
 				continue
 			}
-			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
+			metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, int64(diff.LineStart))
 			chunk := sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
