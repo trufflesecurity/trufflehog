@@ -78,15 +78,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				defer res.Body.Close()
 
-				if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices {
+				switch {
+				case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
 					// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
 					// we at least know the secret is verified.
 					s1.Verified = true
-				} else if res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")) {
+				case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
 					s1.Verified = true
-				} else if res.StatusCode == http.StatusNotFound {
+				case res.StatusCode == http.StatusNotFound:
 					// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
-				} else {
+					// You might want to handle this case or log it.
+				default:
 					err = fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
 					s1.SetVerificationError(err, resMatch)
 				}

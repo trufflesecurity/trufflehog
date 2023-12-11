@@ -20,12 +20,14 @@ import (
 func TestSlackWebhook_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("SLACKWEBHOOK_TOKEN")
-	//inactiveSecret := testSecrets.MustGetField("SLACKWEBHOOK_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField("SLACKWEBHOOK_INACTIVE")
+	deletedWebhook := testSecrets.MustGetField("SLACKWEBHOOK_DELETED")
+	deletedUserActiveWebhook := testSecrets.MustGetField("SLACKWEBHOOK_DELETED_USER_ACTIVE_WEBHOOK")
 
 	type args struct {
 		ctx    context.Context
@@ -63,7 +65,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", deletedUserActiveWebhook)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -99,7 +101,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a slackwebhook secret %s within", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
