@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -345,8 +346,10 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				return nil
 			}
 
+			bufferName := cleantemp.MkFilename()
+
 			defer res.Body.Close()
-			reader, err := diskbufferreader.New(res.Body)
+			reader, err := diskbufferreader.New(res.Body, diskbufferreader.WithBufferName(bufferName))
 			if err != nil {
 				s.log.Error(err, "Could not create reader.")
 				return nil

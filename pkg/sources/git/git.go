@@ -1047,10 +1047,14 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 		fileCtx.Logger().V(2).Info("Max archive size reached.")
 	}
 
-	reader, err := diskbufferreader.New(&fileContent)
+	bufferName := cleantemp.MkFilename()
+
+	reader, err := diskbufferreader.New(&fileContent, diskbufferreader.WithBufferName(bufferName))
+
 	if err != nil {
 		return err
 	}
+
 	defer reader.Close()
 
 	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter) {
