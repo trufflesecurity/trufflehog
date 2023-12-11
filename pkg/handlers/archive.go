@@ -175,6 +175,8 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 		if err != nil {
 			return err
 		}
+		defer fReader.Close()
+
 		if common.SkipFile(f.Name()) {
 			lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
 			return nil
@@ -185,11 +187,7 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 			return err
 		}
 
-		err = a.openArchive(lCtx, depth, bytes.NewReader(fileBytes), archiveChan)
-		if err != nil {
-			return err
-		}
-		return nil
+		return a.openArchive(lCtx, depth, bytes.NewReader(fileBytes), archiveChan)
 	}
 }
 
