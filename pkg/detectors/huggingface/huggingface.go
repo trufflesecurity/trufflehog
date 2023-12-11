@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\bhf_[a-zA-Z]{34}\b`)
+	keyPat = regexp.MustCompile(`\bhf_[a-zA-Z0-9]{34}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -68,10 +68,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
@@ -30,7 +29,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
@@ -157,7 +155,7 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
-	//Support -h for help
+	// Support -h for help
 	cli.HelpFlag.Short('h')
 
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
@@ -179,29 +177,6 @@ func init() {
 	case *debug:
 		log.SetLevel(2)
 	}
-}
-
-// Encloses tempdir cleanup in a function so it can be pushed
-// to a goroutine
-func runCleanup(ctx context.Context, execName string) {
-	// Every 15 minutes, attempt to remove dirs
-	pid := os.Getpid()
-	// Inital orphaned dir cleanup when the scanner is invoked
-	err := cleantemp.CleanTempDir(ctx, execName, pid)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
-	}
-
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		err := cleantemp.CleanTempDir(ctx, execName, pid)
-		if err != nil {
-			ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
-		}
-	}
-
 }
 
 func main() {
@@ -244,9 +219,7 @@ func main() {
 
 	ctx := context.Background()
 
-	var execName = "trufflehog"
-
-	go runCleanup(ctx, execName)
+	go cleantemp.RunCleanupLoop(ctx)
 
 }
 
@@ -416,34 +389,17 @@ func run(state overseer.State) {
 		logFatal(err, "error initializing engine")
 	}
 
-	var repoPath string
-	var remote bool
 	switch cmd {
 	case gitScan.FullCommand():
-		filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
-		if err != nil {
-			logFatal(err, "could not create filter")
-		}
-		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
-		if err != nil || repoPath == "" {
-			logFatal(err, "error preparing git repo for scanning")
-		}
-		if remote {
-			defer os.RemoveAll(repoPath)
-		}
-		excludedGlobs := []string{}
-		if *gitScanExcludeGlobs != "" {
-			excludedGlobs = strings.Split(*gitScanExcludeGlobs, ",")
-		}
-
 		cfg := sources.GitConfig{
-			RepoPath:     repoPath,
-			HeadRef:      *gitScanBranch,
-			BaseRef:      *gitScanSinceCommit,
-			MaxDepth:     *gitScanMaxDepth,
-			Bare:         *gitScanBare,
-			Filter:       filter,
-			ExcludeGlobs: excludedGlobs,
+			URI:              *gitScanURI,
+			IncludePathsFile: *gitScanIncludePaths,
+			ExcludePathsFile: *gitScanExcludePaths,
+			HeadRef:          *gitScanBranch,
+			BaseRef:          *gitScanSinceCommit,
+			MaxDepth:         *gitScanMaxDepth,
+			Bare:             *gitScanBare,
+			ExcludeGlobs:     *gitScanExcludeGlobs,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Git.")
@@ -635,11 +591,11 @@ func printAverageDetectorTime(e *engine.Engine) {
 
 // detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
 func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
-	output := make(map[config.DetectorID]struct{}, len(detectors))
+	out := make(map[config.DetectorID]struct{}, len(detectors))
 	for _, d := range detectors {
-		output[d] = struct{}{}
+		out[d] = struct{}{}
 	}
-	return output
+	return out
 }
 
 // getWithDetectorID is a helper function to get a value from a map using a

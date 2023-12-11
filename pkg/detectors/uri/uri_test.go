@@ -88,13 +88,15 @@ func TestURI_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a uri secret %s within", "https://httpwatch:pass@www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx")),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
+			want: func() []detectors.Result {
+				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_URI,
 					Verified:     false,
 					Redacted:     "https://httpwatch:********@www.httpwatch.com",
-				},
-			},
+				}
+				r.SetVerificationError(fmt.Errorf("context deadline exceeded"))
+				return []detectors.Result{r}
+			}(),
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
@@ -132,13 +134,12 @@ func TestURI_FromChunk(t *testing.T) {
 			// 	return
 			// }
 			for i := range got {
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Errorf("URI.FromData() error = %v, wantVerificationErr %v", got[i].VerificationError, tt.wantErr)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Errorf("URI.FromData() error = %v, wantVerificationErr %v", got[i].VerificationError(), tt.want[i])
 					return
 				}
 				got[i].Raw = nil
 				got[i].RawV2 = nil
-				got[i].VerificationError = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("URI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

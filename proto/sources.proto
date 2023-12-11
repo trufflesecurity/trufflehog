@@ -62,6 +62,19 @@ message LocalSource {
   string scan_period = 6;
 }
 
+// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
+message Artifactory {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.BasicAuth basic_auth = 2;
+    string access_token = 3;
+    credentials.Unauthenticated unauthenticated = 7;
+  }
+  repeated string repositories = 4;
+  repeated string include_paths = 5;
+  repeated string ignore_paths = 6;
+}
+
 message AzureStorage {
   oneof credential {
     string connection_string = 1;
@@ -172,6 +185,15 @@ message Git {
   string head = 6;
   string base = 7;
   bool bare = 8;
+  string include_paths_file = 9; // path to file containing newline separated list of paths
+  string exclude_paths_file = 10; // path to file containing newline separated list of paths
+  string exclude_globs = 11; // comma separated list of globs
+  int64  max_depth = 12;
+  // This field is generally used by the CLI or within CI/CD systems to specify a single repository,
+  // whereas the repositories field is used by the enterprise config to specify multiple repositories.
+  // Passing a single repository via the uri field also allows for additional options to be specified
+  // like head, base, bare, etc.
+  string uri = 13; // repository URL. https://, file://, or ssh://
 }
 
 message GitLab {
@@ -295,18 +317,6 @@ message Teams {
   repeated string channels = 4;
   repeated string ignoreList = 5;
   repeated string team_ids = 6;
-}
-
-// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
-message Artifactory {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
-  oneof credential {
-    credentials.BasicAuth basic_auth = 2;
-    string access_token = 3;
-  }
-  repeated string repositories = 4;
-  repeated string include_paths = 5;
-  repeated string ignore_paths = 6;
 }
 
 message Syslog {

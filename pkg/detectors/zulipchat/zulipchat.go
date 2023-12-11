@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	client *http.Client
 }
 
@@ -62,14 +62,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Raw:          []byte(resMatch),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s",resMatch, resIdMatch, resDomainMatch)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resMatch, resIdMatch, resDomainMatch)),
 				}
 
 				if verify {
 					client := s.client
-                        		if client == nil {
-                                		client = defaultClient
-                        		}
+					if client == nil {
+						client = defaultClient
+					}
 					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v1/users", resDomainMatch), nil)
 					if err != nil {
 						continue
@@ -85,15 +85,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						} else if res.StatusCode == 401 {
 							// This secret is determinately not verified, nothing to do here
 						} else {
-							s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+							s1.SetVerificationError(fmt.Errorf("unexpected HTTP response status %d", res.StatusCode), resMatch)
 						}
 					} else {
-						s1.VerificationError = err
+						s1.SetVerificationError(err, resMatch)
 					}
 				}
-                       		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-                                	continue
-                        	}
+				if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					continue
+				}
 
 				results = append(results, s1)
 			}

@@ -80,8 +80,8 @@ func (f *Filter) ShouldInclude(object string) bool {
 // shouldIncludeFromExclude checks for explicitly excluded paths. This should
 // only be called when the include list is empty.
 func (f *Filter) shouldIncludeFromExclude(object string) bool {
-	for _, glob := range f.exclude {
-		if glob.Match(object) {
+	for _, g := range f.exclude {
+		if g.Match(object) {
 			return false
 		}
 	}
@@ -91,8 +91,8 @@ func (f *Filter) shouldIncludeFromExclude(object string) bool {
 // shouldIncludeFromInclude checks for explicitly included paths. This should
 // only be called when the exclude list is empty.
 func (f *Filter) shouldIncludeFromInclude(object string) bool {
-	for _, glob := range f.include {
-		if glob.Match(object) {
+	for _, g := range f.include {
+		if g.Match(object) {
 			return true
 		}
 	}
@@ -104,14 +104,14 @@ func (f *Filter) shouldIncludeFromInclude(object string) bool {
 func (f *Filter) shouldIncludeFromBoth(object string) (bool, error) {
 	// Exclude takes precedence. If we find the object in the exclude list,
 	// we should not match.
-	for _, glob := range f.exclude {
-		if glob.Match(object) {
+	for _, g := range f.exclude {
+		if g.Match(object) {
 			return false, nil
 		}
 	}
 	// If we find the object in the include list, we should match.
-	for _, glob := range f.include {
-		if glob.Match(object) {
+	for _, g := range f.include {
+		if g.Match(object) {
 			return true, nil
 		}
 	}

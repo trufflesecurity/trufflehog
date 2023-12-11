@@ -154,21 +154,23 @@ type GCSConfig struct {
 
 // GitConfig defines the optional configuration for a git source.
 type GitConfig struct {
-	// RepoPath is the path to the repository to scan.
-	RepoPath,
 	// HeadRef is the head reference to use to scan from.
-	HeadRef,
+	HeadRef string
 	// BaseRef is the base reference to use to scan from.
 	BaseRef string
 	// MaxDepth is the maximum depth to scan the source.
 	MaxDepth int
 	// Bare is an indicator to handle bare repositories properly.
 	Bare bool
-	// Filter is the filter to use to scan the source.
-	Filter *common.Filter
-	// ExcludeGlobs is a list of globs to exclude from the scan.
+	// URI is the URI of the repository to scan. file://, http://, https:// and ssh:// are supported.
+	URI string
+	// IncludePathsFile is the path to a file containing a list of regexps to include in the scan.
+	IncludePathsFile string
+	// ExcludePathsFile is the path to a file containing a list of regexps to exclude from the scan.
+	ExcludePathsFile string
+	// ExcludeGlobs is a list of comma separated globs to exclude from the scan.
 	// This differs from the Filter exclusions as ExcludeGlobs is applied at the `git log -p` level
-	ExcludeGlobs []string
+	ExcludeGlobs string
 }
 
 // GithubConfig defines the optional configuration for a github source.

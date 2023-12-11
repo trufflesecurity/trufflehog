@@ -24,14 +24,14 @@ func New() Scanner {
 		`\b([/]{0,1}([\w]+[/])+[\w\.]*)\b`,                 // filepath
 		`([0-9A-F]{2}[:-]){5}([0-9A-F]{2})`,                // MAC addr
 		`\d{4}[-/]{1}([0]\d|1[0-2])[-/]{1}([0-2]\d|3[01])`, // date
-		`[v|\-]\d\.\d`, //version
-		`\d\.\d\.\d-`,  //version
+		`[v|\-]\d\.\d`, // version
+		`\d\.\d\.\d-`,  // version
 		`[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}`,      // IPs and OIDs
 		`[A-Fa-f0-9x]{2}:[A-Fa-f0-9x]{2}:[A-Fa-f0-9x]{2}`, // hex encoding
-		`[\w]+\([\w, ]+\)`,                                // function
+		`[\w]+\([\w, ]+\)`, // function
 	}
 
-	excludeMatchers := []*regexp.Regexp{}
+	var excludeMatchers []*regexp.Regexp
 	for _, pat := range excludePatterns {
 		excludeMatchers = append(excludeMatchers, regexp.MustCompile(pat))
 	}

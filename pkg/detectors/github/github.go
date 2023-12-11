@@ -97,8 +97,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.ExtraData["site_admin"] = fmt.Sprintf("%t", userResponse.SiteAdmin)
 							s1.ExtraData["name"] = userResponse.Name
 							s1.ExtraData["company"] = userResponse.Company
+							s1.ExtraData["scopes"] = res.Header.Get("X-OAuth-Scopes")
 						}
 					}
+				} else {
+					s1.SetVerificationError(err, token)
 				}
 			}
 		}

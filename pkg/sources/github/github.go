@@ -253,7 +253,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
 	}
 
-	err = git.GitCmdCheck()
+	err = git.CmdCheck()
 	if err != nil {
 		return err
 	}
@@ -1356,7 +1356,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.GetBody())),
+			Data:   []byte(sanitizer.UTF8(issue.GetTitle() + "\n" + issue.GetBody())),
 			Verify: s.verify,
 		}
 
@@ -1455,7 +1455,7 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(pr.GetBody())),
+			Data:   []byte(sanitizer.UTF8(pr.GetTitle() + "\n" + pr.GetBody())),
 			Verify: s.verify,
 		}
 

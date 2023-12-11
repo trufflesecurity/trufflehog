@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			err := verifyUri(resMatch, timeout)
 			s1.Verified = err == nil
 			if !isErrDeterminate(err) {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 		results = append(results, s1)

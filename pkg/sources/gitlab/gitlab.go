@@ -116,7 +116,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		s.url = "https://gitlab.com/"
 	}
 
-	err = git.GitCmdCheck()
+	err = git.CmdCheck()
 	if err != nil {
 		return err
 	}
@@ -148,6 +148,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	if err != nil {
 		return errors.New(err)
 	}
+
+	gitlabReposScanned.WithLabelValues(s.name).Set(0)
 	// Get repo within target.
 	repos, errs := normalizeRepos(s.repos)
 	for _, repoErr := range errs {
@@ -172,6 +174,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	s.repos = repos
+	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	// We must sort the repos so we can resume later if necessary.
 	slices.Sort(s.repos)
 
@@ -293,45 +296,62 @@ func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
 func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) ([]*gitlab.Project, error) {
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
-
 	if err != nil {
-		msg := fmt.Sprintf("unable to authenticate using: %s", s.authMethod)
-		return nil, errors.WrapPrefix(err, msg, 0)
+		return nil, fmt.Errorf("unable to authenticate using %s, %w", s.authMethod, err)
 	}
 
-	projects := map[int]*gitlab.Project{}
+	uniqueProjects := make(map[int]*gitlab.Project)
+	var (
+		projects              []*gitlab.Project
+		projectsWithNamespace []string
+	)
 
-	projectQueryOptions := &gitlab.ListProjectsOptions{
-		OrderBy: gitlab.String("last_activity_at"),
+	// Used to filter out duplicate projects.
+	processProjects := func(projList []*gitlab.Project) {
+		for _, proj := range projList {
+			if _, exists := uniqueProjects[proj.ID]; !exists {
+				uniqueProjects[proj.ID] = proj
+				projects = append(projects, proj)
+				projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
+			}
+		}
 	}
+
+	const (
+		orderBy         = "last_activity_at"
+		paginationLimit = 100 // Default is 20, max is 100.
+	)
+	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+
+	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
 	for {
 		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions)
 		if err != nil {
-			return nil, errors.Errorf("received error on listing user projects: %s\n", err)
+			return nil, fmt.Errorf("received error on listing user projects: %w", err)
 		}
-		for _, prj := range userProjects {
-			projects[prj.ID] = prj
-		}
+		processProjects(userProjects)
 		projectQueryOptions.Page = res.NextPage
 		if res.NextPage == 0 {
 			break
 		}
 	}
 
-	var groups []*gitlab.Group
-
 	listGroupsOptions := gitlab.ListGroupsOptions{
-		AllAvailable: gitlab.Bool(false), // This actually grabs public groups on public GitLab if set to true.
-		TopLevelOnly: gitlab.Bool(false),
-		Owned:        gitlab.Bool(false),
+		ListOptions:  listOpts,
+		AllAvailable: gitlab.Ptr(false), // This actually grabs public groups on public GitLab if set to true.
+		TopLevelOnly: gitlab.Ptr(false),
+		Owned:        gitlab.Ptr(false),
 	}
-	if s.url != "https://gitlab.com/" {
-		listGroupsOptions.AllAvailable = gitlab.Bool(true)
+	const cloudBaseURL = "https://gitlab.com/"
+	if s.url != cloudBaseURL {
+		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
+
+	var groups []*gitlab.Group
 	for {
 		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
 		if err != nil {
-			return nil, errors.Errorf("received error on listing groups, you probably don't have permissions to do that: %s\n", err)
+			return nil, fmt.Errorf("received error on listing groups, you probably don't have permissions to do that: %w", err)
 		}
 		groups = append(groups, groupList...)
 		listGroupsOptions.Page = res.NextPage
@@ -342,8 +362,9 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 
 	for _, group := range groups {
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
-			OrderBy:          gitlab.String("last_activity_at"),
-			IncludeSubGroups: gitlab.Bool(true),
+			ListOptions:      listOpts,
+			OrderBy:          gitlab.Ptr(orderBy),
+			IncludeSubGroups: gitlab.Ptr(true),
 		}
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
@@ -354,26 +375,18 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 				)
 				break
 			}
-			for _, prj := range grpPrjs {
-				projects[prj.ID] = prj
-			}
+			processProjects(grpPrjs)
 			listGroupProjectOptions.Page = res.NextPage
 			if res.NextPage == 0 {
 				break
 			}
 		}
 	}
-	var projectNamesWithNamespace []string
-	for _, project := range projects {
-		projectNamesWithNamespace = append(projectNamesWithNamespace, project.NameWithNamespace)
-	}
-	ctx.Logger().V(2).Info("Enumerated GitLab projects", "count", len(projects), "projects", projectNamesWithNamespace)
 
-	var projectList []*gitlab.Project
-	for _, project := range projects {
-		projectList = append(projectList, project)
-	}
-	return projectList, nil
+	ctx.Logger().Info("Enumerated GitLab projects", "count", len(projects))
+	ctx.Logger().V(2).Info("Enumerated GitLab projects", "projects", projectsWithNamespace)
+
+	return projects, nil
 }
 
 func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Client, ignoreRepo func(repo string) bool) ([]string, error, bool) {
@@ -399,6 +412,7 @@ func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Clien
 	if len(repos) == 0 {
 		return nil, errors.Errorf("unable to discover any repos"), true
 	}
+
 	return repos, nil, false
 }
 
@@ -457,6 +471,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				scanErrs.Add(err)
 				return nil
 			}
+			gitlabReposScanned.WithLabelValues(s.name).Inc()
 
 			logger.V(2).Info(fmt.Sprintf("Completed scanning repo %d/%d", i+1, len(s.repos)))
 			return nil

@@ -200,6 +200,8 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 		numRepos, numForks int
 	)
 
+	uniqueOrgs := map[string]struct{}{}
+
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
 		if err == nil {
@@ -220,7 +222,16 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
-			numForks++
+
+			if r.GetFork() {
+				numForks++
+			}
+
+			numRepos++
+
+			if r.GetOwner().GetType() == "Organization" {
+				uniqueOrgs[r.GetOwner().GetLogin()] = struct{}{}
+			}
 
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
 			s.repoSizes.addRepo(repoURL, r.GetSize())
@@ -234,7 +245,9 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 		}
 		opts.Page = res.NextPage
 	}
-	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks)
+
+	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
+	githubOrgsEnumerated.WithLabelValues(s.name).Set(float64(len(uniqueOrgs)))
 
 	return nil
 }
