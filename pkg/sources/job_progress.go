@@ -128,9 +128,9 @@ type JobProgressMetrics struct {
 	FinishedUnits uint64 `json:"finished_units,omitempty"`
 	// Total number of chunks produced. This metric updates before the
 	// chunk is sent on the output channel.
-	TotalChunks uint64 `json:"total_chunks,omitempty"`
+	TotalChunks uint64 `json:"total_chunks"`
 	// All errors encountered.
-	Errors []error `json:"errors,omitempty"`
+	Errors []error `json:"errors"`
 	// Set to true if the source supports enumeration and has finished
 	// enumerating. If the source does not support enumeration, this field
 	// is always false.
