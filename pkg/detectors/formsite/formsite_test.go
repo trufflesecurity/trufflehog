@@ -50,6 +50,10 @@ func TestFormsite_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Formsite,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_Formsite,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -62,6 +66,10 @@ func TestFormsite_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Formsite,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Formsite,
 					Verified:     false,

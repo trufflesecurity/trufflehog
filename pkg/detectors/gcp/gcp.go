@@ -87,6 +87,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
 		}
+		// Set the RotationGuideURL in the ExtraData
+		s.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
+			"project":        creds.ProjectID,
+		}
 
 		if verify {
 			credentials, err := google.CredentialsFromJSON(ctx, credBytes, "https://www.googleapis.com/auth/cloud-platform")

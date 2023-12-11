@@ -10,13 +10,14 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
 	"google.golang.org/protobuf/types/known/anypb"
-	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -28,7 +29,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
@@ -48,6 +48,7 @@ var (
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
 	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy       = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
@@ -85,8 +86,8 @@ var (
 	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
-	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue comments in scan.").Bool()
-	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request comments in scan.").Bool()
+	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue descriptions and comments in scan.").Bool()
+	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 	// githubScanMaxDepth     = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
 	githubScanSinceDate = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
@@ -141,6 +142,9 @@ var (
 
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+
+	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
+	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
 )
 
 func init() {
@@ -153,6 +157,9 @@ func init() {
 	}
 
 	cli.Version("trufflehog " + version.BuildVersion)
+
+	// Support -h for help
+	cli.HelpFlag.Short('h')
 
 	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
 		args := tui.Run()
@@ -212,6 +219,11 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
+
+	ctx := context.Background()
+
+	go cleantemp.RunCleanupLoop(ctx)
+
 }
 
 func run(state overseer.State) {
@@ -364,8 +376,9 @@ func run(state overseer.State) {
 	e, err := engine.Start(ctx,
 		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(!*noVerification, engine.DefaultDetectors()...),
-		engine.WithDetectors(!*noVerification, conf.Detectors...),
+		engine.WithDetectors(engine.DefaultDetectors()...),
+		engine.WithDetectors(conf.Detectors...),
+		engine.WithVerify(!*noVerification),
 		engine.WithFilterDetectors(includeFilter),
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
@@ -373,40 +386,24 @@ func run(state overseer.State) {
 		engine.WithOnlyVerified(*onlyVerified),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
+		engine.WithFilterEntropy(*filterEntropy),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")
 	}
 
-	var repoPath string
-	var remote bool
 	switch cmd {
 	case gitScan.FullCommand():
-		filter, err := common.FilterFromFiles(*gitScanIncludePaths, *gitScanExcludePaths)
-		if err != nil {
-			logFatal(err, "could not create filter")
-		}
-		repoPath, remote, err = git.PrepareRepoSinceCommit(ctx, *gitScanURI, *gitScanSinceCommit)
-		if err != nil || repoPath == "" {
-			logFatal(err, "error preparing git repo for scanning")
-		}
-		if remote {
-			defer os.RemoveAll(repoPath)
-		}
-		excludedGlobs := []string{}
-		if *gitScanExcludeGlobs != "" {
-			excludedGlobs = strings.Split(*gitScanExcludeGlobs, ",")
-		}
-
 		cfg := sources.GitConfig{
-			RepoPath:     repoPath,
-			HeadRef:      *gitScanBranch,
-			BaseRef:      *gitScanSinceCommit,
-			MaxDepth:     *gitScanMaxDepth,
-			Bare:         *gitScanBare,
-			Filter:       filter,
-			ExcludeGlobs: excludedGlobs,
-			SinceDate:    *gitScanSinceDate,
+			URI:              *gitScanURI,
+			IncludePathsFile: *gitScanIncludePaths,
+			ExcludePathsFile: *gitScanExcludePaths,
+			HeadRef:          *gitScanBranch,
+			BaseRef:          *gitScanSinceCommit,
+			MaxDepth:         *gitScanMaxDepth,
+			Bare:             *gitScanBare,
+			ExcludeGlobs:     *gitScanExcludeGlobs,
+			SinceDate:        *gitScanSinceDate,
 		}
 		if err = e.ScanGit(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Git.")
@@ -502,6 +499,10 @@ func run(state overseer.State) {
 		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			logFatal(err, "Failed to scan CircleCI.")
 		}
+	case travisCiScan.FullCommand():
+		if err := e.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+			logFatal(err, "Failed to scan TravisCI.")
+		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{
 			ProjectID:      *gcsProjectID,
@@ -596,11 +597,11 @@ func printAverageDetectorTime(e *engine.Engine) {
 
 // detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
 func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
-	output := make(map[config.DetectorID]struct{}, len(detectors))
+	out := make(map[config.DetectorID]struct{}, len(detectors))
 	for _, d := range detectors {
-		output[d] = struct{}{}
+		out[d] = struct{}{}
 	}
-	return output
+	return out
 }
 
 // getWithDetectorID is a helper function to get a value from a map using a

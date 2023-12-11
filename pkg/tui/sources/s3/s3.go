@@ -16,7 +16,7 @@ func GetFields() s3CmdModel {
 		Label:       "S3 bucket name(s)",
 		Key:         "buckets",
 		Required:    true,
-		Placeholder: "my-bucket-name",
+		Placeholder: "truffletestbucket",
 		Help:        "Buckets to scan. Separate by space if multiple.",
 	}
 
@@ -28,7 +28,7 @@ func (m s3CmdModel) Cmd() string {
 	command = append(command, "trufflehog", "s3")
 
 	inputs := m.GetInputs()
-	vals := inputs["buckets"]
+	vals := inputs["buckets"].Value
 	if vals != "" {
 		buckets := strings.Fields(vals)
 		for _, bucket := range buckets {

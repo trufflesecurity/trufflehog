@@ -1,6 +1,7 @@
 package source_configure
 
 import (
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -49,7 +50,7 @@ func GetTrufflehogConfiguration() truffleCmdModel {
 		Key:         "concurrency",
 		Required:    false,
 		Help:        "Number of concurrent workers.",
-		Placeholder: "1",
+		Placeholder: strconv.Itoa(runtime.NumCPU()),
 	}
 
 	return truffleCmdModel{textinputs.New([]textinputs.InputConfig{jsonOutput, verification, verifiedResults, excludeDetectors, concurrency}).SetSkip(true)}
@@ -59,25 +60,25 @@ func (m truffleCmdModel) Cmd() string {
 	var command []string
 	inputs := m.GetInputs()
 
-	if isTrue(inputs["json"]) {
+	if isTrue(inputs["json"].Value) {
 		command = append(command, "--json")
 	}
 
-	if isTrue(inputs["no-verification"]) {
+	if isTrue(inputs["no-verification"].Value) {
 		command = append(command, "--no-verification")
 	}
 
-	if isTrue(inputs["only-verified"]) {
+	if isTrue(inputs["only-verified"].Value) {
 		command = append(command, "--only-verified")
 	}
 
-	if inputs["exclude_detectors"] != "" {
-		cmd := "--exclude-detectors=" + strings.ReplaceAll(inputs["exclude_detectors"], " ", "")
+	if inputs["exclude_detectors"].Value != "" {
+		cmd := "--exclude-detectors=" + strings.ReplaceAll(inputs["exclude_detectors"].Value, " ", "")
 		command = append(command, cmd)
 	}
 
-	if inputs["concurrency"] != "" {
-		command = append(command, "--concurrency="+inputs["concurrency"])
+	if inputs["concurrency"].Value != "" {
+		command = append(command, "--concurrency="+inputs["concurrency"].Value)
 	}
 
 	return strings.Join(command, " ")
@@ -90,8 +91,8 @@ func (m truffleCmdModel) Summary() string {
 	inputs := m.GetInputs()
 	labels := m.GetLabels()
 	for _, key := range keys {
-		if inputs[key] != "" {
-			summary.WriteString("\t" + labels[key] + ": " + inputs[key] + "\n")
+		if inputs[key].Value != "" {
+			summary.WriteString("\t" + labels[key] + ": " + inputs[key].Value + "\n")
 		}
 	}
 

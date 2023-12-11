@@ -64,7 +64,8 @@ func TestScanGCS(t *testing.T) {
 			e, err := Start(ctx,
 				WithConcurrency(1),
 				WithDecoders(decoders.DefaultDecoders()...),
-				WithDetectors(false, DefaultDetectors()...),
+				WithDetectors(DefaultDetectors()...),
+				WithVerify(false),
 			)
 			assert.Nil(t, err)
 

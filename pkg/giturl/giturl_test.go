@@ -180,6 +180,26 @@ func TestGenerateLink(t *testing.T) {
 			},
 			want: "https://onprem.customdomain.com/org/repo/commit/xyz123",
 		},
+		{
+			name: "gist link gen",
+			args: args{
+				repo:   "https://gist.github.com/joeleonjr/be68e34b002e236160dbb394bbda86fb.git",
+				commit: "e94c5a1d5607e68f1cae4962bc4dce5de522371b",
+				file:   "test",
+				line:   int64(4),
+			},
+			want: "https://gist.github.com/joeleonjr/be68e34b002e236160dbb394bbda86fb/e94c5a1d5607e68f1cae4962bc4dce5de522371b/#file-test-L4",
+		},
+		{
+			name: "gist link gen - file with multiple extensions",
+			args: args{
+				repo:   "https://gist.github.com/joeleonjr/be68e34b002e236160dbb394bbda86fb.git",
+				commit: "c64bf2345256cca7d2621f9cb78401e8860f82c8",
+				file:   "test.txt.ps1",
+				line:   int64(4),
+			},
+			want: "https://gist.github.com/joeleonjr/be68e34b002e236160dbb394bbda86fb/c64bf2345256cca7d2621f9cb78401e8860f82c8/#file-test-txt-ps1-L4",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -250,6 +270,14 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 				newLine: int64(50),
 			},
 			want: "https://onprem.customdomain.com/org/repo/commit/xyz123#L50",
+		},
+		{
+			name: "Don't include line when it's 0",
+			args: args{
+				link:    "https://github.com/coinbase/cbpay-js/issues/181",
+				newLine: int64(0),
+			},
+			want: "https://github.com/coinbase/cbpay-js/issues/181",
 		},
 		{
 			name: "Invalid link",

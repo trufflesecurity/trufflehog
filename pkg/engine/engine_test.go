@@ -152,21 +152,27 @@ func TestDefaultDecoders(t *testing.T) {
 }
 
 func TestSupportsLineNumbers(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    sourcespb.SourceType
-		expected bool
+	tests := []struct {
+		name          string
+		sourceType    sourcespb.SourceType
+		expectedValue bool
 	}{
-		{"Git source type", sourcespb.SourceType_SOURCE_TYPE_GIT, true},
-		{"Github source type", sourcespb.SourceType_SOURCE_TYPE_GITHUB, true},
-		{"Gitlab source type", sourcespb.SourceType_SOURCE_TYPE_GITLAB, true},
+		{"Git source", sourcespb.SourceType_SOURCE_TYPE_GIT, true},
+		{"Github source", sourcespb.SourceType_SOURCE_TYPE_GITHUB, true},
+		{"Gitlab source", sourcespb.SourceType_SOURCE_TYPE_GITLAB, true},
+		{"Bitbucket source", sourcespb.SourceType_SOURCE_TYPE_BITBUCKET, true},
+		{"Gerrit source", sourcespb.SourceType_SOURCE_TYPE_GERRIT, true},
+		{"Github unauthenticated org source", sourcespb.SourceType_SOURCE_TYPE_GITHUB_UNAUTHENTICATED_ORG, true},
+		{"Public Git source", sourcespb.SourceType_SOURCE_TYPE_PUBLIC_GIT, true},
+		{"Filesystem source", sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM, true},
+		{"Azure Repos source", sourcespb.SourceType_SOURCE_TYPE_AZURE_REPOS, true},
+		{"Unsupported type", sourcespb.SourceType_SOURCE_TYPE_BUILDKITE, false},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if result := SupportsLineNumbers(tc.input); result != tc.expected {
-				t.Errorf("Expected %v for input %v, got %v", tc.expected, tc.input, result)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SupportsLineNumbers(tt.sourceType)
+			assert.Equal(t, tt.expectedValue, result)
 		})
 	}
 }
@@ -191,7 +197,8 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	e, err := Start(ctx,
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(true, DefaultDetectors()...),
+		WithDetectors(DefaultDetectors()...),
+		WithVerify(true),
 		WithPrinter(new(discardPrinter)),
 	)
 	assert.Nil(t, err)
@@ -242,6 +249,21 @@ func TestFragmentFirstLineAndLink(t *testing.T) {
 			},
 			expectedLine: 5,
 			expectedLink: "https://example.github.com",
+		},
+		{
+			name: "Test Azure Repos Metadata",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_AzureRepos{
+						AzureRepos: &source_metadatapb.AzureRepos{
+							Line: 5,
+							Link: "https://example.azure.com",
+						},
+					},
+				},
+			},
+			expectedLine: 5,
+			expectedLink: "https://example.azure.com",
 		},
 		{
 			name:         "Unsupported Type",
@@ -318,6 +340,17 @@ func TestSetLink(t *testing.T) {
 			wantLink: "file:///path/to/example#L3",
 		},
 		{
+			name: "Azure Repos link set",
+			input: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_AzureRepos{
+					AzureRepos: &source_metadatapb.AzureRepos{},
+				},
+			},
+			link:     "https://dev.azure.com/example",
+			line:     3,
+			wantLink: "https://dev.azure.com/example?line=3",
+		},
+		{
 			name: "Unsupported metadata type",
 			input: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
@@ -359,6 +392,8 @@ func TestSetLink(t *testing.T) {
 				assert.Equal(t, tt.wantLink, data.Bitbucket.Link, "Bitbucket link mismatch")
 			case *source_metadatapb.MetaData_Filesystem:
 				assert.Equal(t, tt.wantLink, data.Filesystem.Link, "Filesystem link mismatch")
+			case *source_metadatapb.MetaData_AzureRepos:
+				assert.Equal(t, tt.wantLink, data.AzureRepos.Link, "Azure Repos link mismatch")
 			}
 		})
 	}

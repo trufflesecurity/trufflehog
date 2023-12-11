@@ -45,6 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Netlify,
 			Raw:          []byte(resMatch),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
+		}
 
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.netlify.com/api/v1/sites", nil)
