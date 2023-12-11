@@ -994,10 +994,11 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 }
 
 func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	ctx.Logger().V(5).Info("handling binary file", "path", path)
+	fileCtx := context.WithValues(ctx, "commit", commitHash.String(), "path", path)
+	fileCtx.Logger().V(5).Info("handling binary file")
 
 	if common.SkipFile(path) {
-		ctx.Logger().V(5).Info("skipping binary file", "path", path)
+		fileCtx.Logger().V(5).Info("skipping binary file")
 		return nil
 	}
 
@@ -1043,7 +1044,7 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 	}
 
 	if fileContent.Len() == maxSize {
-		ctx.Logger().V(2).Info("Max archive size reached.", "path", path)
+		fileCtx.Logger().V(2).Info("Max archive size reached.")
 	}
 
 	bufferName := cleantemp.MkFilename()
@@ -1056,25 +1057,25 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 
 	defer reader.Close()
 
-	if handlers.HandleFile(ctx, reader, chunkSkel, reporter) {
+	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter) {
 		return nil
 	}
 
-	ctx.Logger().V(1).Info("binary file not handled, chunking raw", "path", path)
+	fileCtx.Logger().V(1).Info("binary file not handled, chunking raw")
 	if err := reader.Reset(); err != nil {
 		return err
 	}
 	reader.Stop()
 
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reader)
+	chunkResChan := chunkReader(fileCtx, reader)
 	for data := range chunkResChan {
 		chunk := *chunkSkel
 		chunk.Data = data.Bytes()
 		if err := data.Error(); err != nil {
 			return err
 		}
-		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+		if err := reporter.ChunkOk(fileCtx, chunk); err != nil {
 			return err
 		}
 	}
