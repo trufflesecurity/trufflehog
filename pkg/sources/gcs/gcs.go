@@ -20,6 +20,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -369,7 +370,8 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 }
 
 func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) ([]byte, error) {
-	reader, err := diskbufferreader.New(o)
+	bufferName := cleantemp.MkFilename()
+	reader, err := diskbufferreader.New(o, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return nil, fmt.Errorf("error creating disk buffer reader: %w", err)
 	}

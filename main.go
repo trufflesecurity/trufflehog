@@ -220,7 +220,6 @@ func main() {
 	ctx := context.Background()
 
 	go cleantemp.RunCleanupLoop(ctx)
-
 }
 
 func run(state overseer.State) {
