@@ -12,9 +12,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -133,8 +132,16 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
