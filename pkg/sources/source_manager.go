@@ -236,8 +236,8 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 		"source_type", source.Type().String(),
 	)
 	// Check for the preferred method of tracking source units.
-	useSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil && s.useSourceUnitsFunc()
-	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && useSourceUnits {
+	canUseSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil
+	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
 		return s.runWithUnits(ctx, enumChunker, report)
 	}
 	return s.runWithoutUnits(ctx, source, report, targets...)
