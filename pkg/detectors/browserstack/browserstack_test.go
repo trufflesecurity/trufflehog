@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -83,13 +83,16 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a BROWSERSTACK_ACCESS_KEY %s within BROWSERSTACK_USERNAME %s", secret, secretUser)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
+			want: func() []detectors.Result {
+				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_BrowserStack,
 					RawV2:        []byte(fmt.Sprintf("%s%s", secret, secretUser)),
 					Verified:     false,
-				},
-			},
+				}
+				r.SetVerificationError(fmt.Errorf("context deadline exceeded"), secret)
+				results := []detectors.Result{r}
+				return results
+			}(),
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
@@ -101,13 +104,37 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a BROWSERSTACK_ACCESS_KEY %s within BROWSERSTACK_USERNAME %s", secret, secretUser)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
+			want: func() []detectors.Result {
+				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_BrowserStack,
 					Verified:     false,
 					RawV2:        []byte(fmt.Sprintf("%s%s", secret, secretUser)),
-				},
+				}
+				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 404"), secret)
+				results := []detectors.Result{r}
+				return results
+			}(),
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, verified but blocked by browserstack",
+			s:    Scanner{client: common.SaneHttpClient()},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a BROWSERSTACK_ACCESS_KEY %s within BROWSERSTACK_USERNAME %s", secret, secretUser)),
+				verify: true,
 			},
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_BrowserStack,
+					Verified:     false,
+					RawV2:        []byte(fmt.Sprintf("%s%s", secret, secretUser)),
+				}
+				r.SetVerificationError(fmt.Errorf("blocked by browserstack"), secret)
+				results := []detectors.Result{r}
+				return results
+			}(),
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
@@ -134,8 +161,16 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
