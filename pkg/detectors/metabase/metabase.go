@@ -2,6 +2,8 @@ package metabase
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -65,7 +67,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
+					body, err := io.ReadAll(res.Body)
+					if err != nil {
+						continue
+					}
+					if res.StatusCode >= 200 && res.StatusCode < 300 && json.Valid(body) {
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
