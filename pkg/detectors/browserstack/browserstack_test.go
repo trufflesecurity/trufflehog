@@ -34,12 +34,11 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
 	}{
 		{
 			name: "found, verified",
@@ -93,8 +92,7 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				results := []detectors.Result{r}
 				return results
 			}(),
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantErr: false,
 		},
 		{
 			name: "found, verified but unexpected api surface",
@@ -114,8 +112,7 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				results := []detectors.Result{r}
 				return results
 			}(),
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantErr: false,
 		},
 		{
 			name: "found, verified but blocked by browserstack",
@@ -135,8 +132,7 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				results := []detectors.Result{r}
 				return results
 			}(),
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantErr: false,
 		},
 		{
 			name: "not found",

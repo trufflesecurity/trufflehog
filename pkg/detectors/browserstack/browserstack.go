@@ -40,6 +40,7 @@ func (s Scanner) getClient(cookieJar *cookiejar.Jar) *http.Client {
 		s.client.Jar = cookieJar
 		return s.client
 	}
+	// Using custom HTTP client instead of common.SaneHttpClient() here because, for unknown reasons, browserstack blocks those requests even with cookie jar attached
 	return &http.Client{
 		Jar: cookieJar,
 	}
