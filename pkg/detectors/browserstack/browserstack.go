@@ -102,7 +102,6 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.SetBasicAuth(username, accessKey)
-	fmt.Println(username, accessKey)
 
 	res, err := client.Do(req)
 	if err != nil {
