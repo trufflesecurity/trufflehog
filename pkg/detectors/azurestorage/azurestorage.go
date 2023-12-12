@@ -97,8 +97,7 @@ func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName
 
 	if res.StatusCode == http.StatusOK {
 		return true, nil
-	} else if res.StatusCode != 403 {
-		// 403 if account name or account key is invalid or if account is disabled
+	} else if res.StatusCode != http.StatusForbidden { // 403 if account id or key is invalid, or if account is disabled
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 
