@@ -98,13 +98,15 @@ func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode != http.StatusForbidden { // 403 if account id or key is invalid, or if account is disabled
+	case http.StatusForbidden:
+		// 403 if account id or key is invalid, or if the account is disabled
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
