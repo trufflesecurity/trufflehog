@@ -39,12 +39,11 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
 	}{
 		{
 			name: "found, verified",
@@ -58,10 +57,12 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
 				},
 			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			wantErr: false,
 		},
 		{
 			name: "found, unverified",
@@ -75,10 +76,12 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
 				},
 			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			wantErr: false,
 		},
 		{
 			name: "not found",
@@ -88,9 +91,8 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
+			want:    nil,
+			wantErr: false,
 		},
 		{
 			name: "found, would be verified if not for timeout",
@@ -104,12 +106,14 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
 				}
 				r.SetVerificationError(fmt.Errorf("context deadline exceeded"), secret)
 				return []detectors.Result{r}
 			}(),
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantErr: false,
 		},
 		{
 			name: "found, verified but unexpected api surface",
@@ -123,12 +127,14 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
 				}
 				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 404"), secret)
 				return []detectors.Result{r}
 			}(),
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantErr: false,
 		},
 		{
 			name: "found secret with invalid account name",
@@ -142,10 +148,12 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"account_name": "invalid",
+					},
 				},
 			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
