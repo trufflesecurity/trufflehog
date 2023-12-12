@@ -6,6 +6,8 @@ package azurestorage
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +28,10 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 	}
 	secret := testSecrets.MustGetField("AZURE_STORAGE")
 	inactiveSecret := testSecrets.MustGetField("AZURE_STORAGE_INACTIVE")
+
+	accountNamePat := regexp.MustCompile(`AccountName=(?P<account_name>[^;]+);AccountKey`)
+	accountName := accountNamePat.FindStringSubmatch(secret)[1]
+	validKeyInvalidAccountName := strings.Replace(secret, accountName, "invalid", 1)
 
 	type args struct {
 		ctx    context.Context
@@ -94,12 +100,14 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", secret)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
+			want: func() []detectors.Result {
+				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
-				},
-			},
+				}
+				r.SetVerificationError(fmt.Errorf("context deadline exceeded"), secret)
+				return []detectors.Result{r}
+			}(),
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
@@ -109,6 +117,25 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", secret)),
+				verify: true,
+			},
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_AzureStorage,
+					Verified:     false,
+				}
+				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 404"), secret)
+				return []detectors.Result{r}
+			}(),
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found secret with invalid account name",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", validKeyInvalidAccountName)),
 				verify: true,
 			},
 			want: []detectors.Result{

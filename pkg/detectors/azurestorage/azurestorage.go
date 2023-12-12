@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -23,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = http.DefaultClient
 	keyPat        = regexp.MustCompile(`DefaultEndpointsProtocol=https;AccountName=(?P<account_name>[^;]+);AccountKey=(?P<account_key>[^;]+);EndpointSuffix=core\.windows\.net`)
 )
 
@@ -57,7 +56,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			client := s.getClient()
-			isVerified, verificationErr := verifyAzureStorageAccount(ctx, client, accountName, accountKey)
+
+			isVerified, verificationErr := verifyAzureStorageKey(ctx, client, accountName, accountKey)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, accountKey)
 		}
@@ -68,11 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureStorage
-}
-
-func verifyAzureStorageAccount(ctx context.Context, client *http.Client, accountName, accountKey string) (bool, error) {
+func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName, accountKey string) (bool, error) {
 	now := time.Now().UTC().Format(http.TimeFormat)
 	stringToSign := "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:" + now + "\nx-ms-version:2019-12-12\n/" + accountName + "/\ncomp:list"
 	accountKeyBytes, _ := base64.StdEncoding.DecodeString(accountKey)
@@ -81,7 +77,7 @@ func verifyAzureStorageAccount(ctx context.Context, client *http.Client, account
 	signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
 
 	url := "https://" + accountName + ".blob.core.windows.net/?comp=list"
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false, err
 	}
@@ -91,15 +87,24 @@ func verifyAzureStorageAccount(ctx context.Context, client *http.Client, account
 
 	res, err := client.Do(req)
 	if err != nil {
+		// If the host is not found, we can assume that the accountName is not valid
+		if strings.Contains(err.Error(), "no such host") {
+			return false, nil
+		}
 		return false, err
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	if res.StatusCode == http.StatusOK {
 		return true, nil
-	} else if res.StatusCode == http.StatusForbidden {
-		return false, fmt.Errorf("forbidden access to Azure Storage account")
-	} else {
+	} else if res.StatusCode != 403 {
+		// 403 if account name or account key is invalid or if account is disabled
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
+
+	return false, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_AzureStorage
 }
