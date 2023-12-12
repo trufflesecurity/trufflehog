@@ -51,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AzureStorage,
-			Raw:          []byte(accountName),
+			Raw:          []byte(accountKey),
 		}
 
 		if verify {
