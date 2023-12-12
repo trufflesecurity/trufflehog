@@ -59,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", resURLMatch+"/api/user/current", nil)
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, resURLMatch+"/api/user/current", nil)
 				if err != nil {
 					continue
 				}
@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						continue
 					}
-					if res.StatusCode >= 200 && res.StatusCode < 300 && json.Valid(body) {
+					if res.StatusCode == http.StatusOK && json.Valid(body) {
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
