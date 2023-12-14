@@ -118,6 +118,10 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 // Supports GitHub, GitLab, Bitbucket, and Azure Repos.
 // If the provider supports hyperlinks to specific lines, the line number will be included.
 func GenerateLink(repo, commit, file string, line int64) string {
+	// Some paths contain '%' which breaks |url.Parse| if not encoded.
+	// https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding
+	file = strings.Replace(file, "%", "%25", -1)
+
 	switch determineProvider(repo) {
 	case providerBitbucket:
 		return repo[:len(repo)-4] + "/commits/" + commit

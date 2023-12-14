@@ -200,6 +200,16 @@ func TestGenerateLink(t *testing.T) {
 			},
 			want: "https://gist.github.com/joeleonjr/be68e34b002e236160dbb394bbda86fb/c64bf2345256cca7d2621f9cb78401e8860f82c8/#file-test-txt-ps1-L4",
 		},
+		{
+			name: "link gen - file percent in path",
+			args: args{
+				repo:   "https://github.com/GeekMasher/tree-sitter-hcl.git",
+				commit: "a7f23cc5795769262f5515e52902f86c1b768994",
+				file:   "example/real_world_stuff/coreos/coreos%tectonic-installer%installer%frontend%ui-tests%output%metal.tfvars",
+				line:   int64(1),
+			},
+			want: "https://github.com/GeekMasher/tree-sitter-hcl/blob/a7f23cc5795769262f5515e52902f86c1b768994/example/real_world_stuff/coreos/coreos%25tectonic-installer%25installer%25frontend%25ui-tests%25output%25metal.tfvars#L1",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
