@@ -17,10 +17,12 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+const aeroworkflowURL = "https://api.aeroworkflow.com"
 
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -86,7 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
-	req, err := http.NewRequest("GET", "https://api.aeroworkflow.com/api/"+resIdMatch+"/v1/AeroAppointments", nil)
+	req, err := http.NewRequest(http.MethodGet, aeroworkflowURL+"/api/"+resIdMatch+"/v1/AeroAppointments", nil)
 	if err != nil {
 		return false, err
 	}
@@ -98,14 +100,17 @@ func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resI
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusOK {
+	// https://api.aeroworkflow.com/swagger/index.html
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusForbidden {
-		// 401 for invalid API key, 403 for invalid Account ID
+	case http.StatusUnauthorized, http.StatusForbidden:
+		// 401 for invalid API key
+		// 403 for invalid Account ID
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

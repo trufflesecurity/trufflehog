@@ -17,10 +17,12 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+const abbysaleURL = "https://api.abyssale.com"
 
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -76,7 +78,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAbbysale(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.abyssale.com/ready", nil)
+	// https://developers.abyssale.com/rest-api/authentication
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, abbysaleURL+"/ready", nil)
 	if err != nil {
 		return false, err
 	}
@@ -86,13 +89,15 @@ func verifyAbbysale(ctx context.Context, client *http.Client, resMatch string) (
 		return false, err
 	}
 	defer res.Body.Close()
-	if res.StatusCode == http.StatusOK {
+
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode != http.StatusForbidden {
+	case http.StatusForbidden:
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

@@ -33,10 +33,12 @@ type alibabaResp struct {
 	Code      string `json:"Code"`
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+const alibabaURL = "https://ecs.aliyuncs.com"
 
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -126,7 +128,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAlibaba(ctx context.Context, client *http.Client, resIdMatch, resMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://ecs.aliyuncs.com/?", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, alibabaURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -161,20 +163,20 @@ func verifyAlibaba(ctx context.Context, client *http.Client, resIdMatch, resMatc
 		return false, err
 	}
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode < http.StatusBadRequest || res.StatusCode > http.StatusNotFound {
+	case http.StatusNotFound, http.StatusBadRequest:
 		// 400 used for most of error cases
 		// 404 used if the AccessKeyId is not valid
+		return false, nil
+	default:
 		err := fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		if alibabaResp.Message != "" {
 			err = fmt.Errorf("%s: %s, %s", err, alibabaResp.Message, alibabaResp.Code)
 		}
-
 		return false, err
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

@@ -16,10 +16,12 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+const adzunaURL = "https://api.adzuna.com"
 
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -84,7 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAdzuna(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.adzuna.com/v1/api/jobs/gb/search/1?app_id=%s&app_key=%s", resIdMatch, resMatch), nil)
+	// https://developer.adzuna.com/activedocs#!/adzuna/search
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, adzunaURL+fmt.Sprintf("/v1/api/jobs/us/search/1?app_id=%s&app_key=%s", resIdMatch, resMatch), nil)
 	if err != nil {
 		return false, err
 	}
@@ -95,13 +98,15 @@ func verifyAdzuna(ctx context.Context, client *http.Client, resMatch, resIdMatch
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusOK {
+	// https://developer.adzuna.com/overview
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode != http.StatusUnauthorized {
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

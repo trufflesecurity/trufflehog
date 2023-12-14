@@ -68,7 +68,7 @@ func TestAccuweather_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Accuweather,
 					Verified:     false,
 				}
-				r.SetVerificationError(fmt.Errorf("context deadline exceeded"))
+				r.SetVerificationError(context.DeadlineExceeded)
 				return []detectors.Result{r}
 			}(),
 			wantErr: false,

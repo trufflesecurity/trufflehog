@@ -17,10 +17,10 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -85,7 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, resMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resURLMatch+"/artifactory/api/storageinfo", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+resURLMatch+"/artifactory/api/storageinfo", nil)
 	if err != nil {
 		return false, err
 	}
@@ -95,16 +95,17 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 	if err != nil {
 		return false, err
 	}
-
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusOK {
-		fmt.Println(res.StatusCode)
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode != http.StatusForbidden {
+	case http.StatusForbidden:
+		// https://jfrog.com/help/r/jfrog-rest-apis/error-responses
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

@@ -17,10 +17,12 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+const agoraURL = "https://api.agora.io"
 
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -87,7 +89,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAgora(ctx context.Context, client *http.Client, resMatch, resSecret string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.agora.io/dev/v1/projects", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, agoraURL+"/dev/v1/projects", nil)
 	if err != nil {
 		return false, err
 	}
@@ -97,16 +99,17 @@ func verifyAgora(ctx context.Context, client *http.Client, resMatch, resSecret s
 	if err != nil {
 		return false, err
 	}
-
 	defer res.Body.Close()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	// https://docs.agora.io/en/voice-calling/reference/agora-console-rest-api#get-all-projects
+	switch res.StatusCode {
+	case http.StatusOK, http.StatusCreated:
 		return true, nil
-	} else if res.StatusCode < http.StatusUnauthorized || res.StatusCode > http.StatusForbidden {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

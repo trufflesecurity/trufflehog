@@ -69,7 +69,7 @@ func TestAha_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Aha,
 					Verified:     false,
 				}
-				r.SetVerificationError(fmt.Errorf("context deadline exceeded (Client.Timeout exceeded while awaiting headers)"))
+				r.SetVerificationError(context.DeadlineExceeded)
 				return []detectors.Result{r}
 			}(),
 			wantErr: false,

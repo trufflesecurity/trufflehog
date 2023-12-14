@@ -16,10 +16,10 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -85,7 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch string) (bool, error) {
 	url := fmt.Sprintf("https://%s/api/v1/me", resURLMatch)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false, err
 	}
@@ -98,13 +98,14 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 	defer res.Body.Close()
 
 	// https://www.aha.io/api
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode != http.StatusUnauthorized && res.StatusCode != http.StatusNotFound {
+	case http.StatusUnauthorized, http.StatusNotFound:
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

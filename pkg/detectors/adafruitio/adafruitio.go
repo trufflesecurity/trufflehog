@@ -17,10 +17,12 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+const adafruitioURL = "https://io.adafruit.com"
 
 var (
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -76,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAdafruitIO(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://io.adafruit.com/api/v2/ladybugtest/feeds/?x-aio-key="+resMatch, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, adafruitioURL+"/api/v2/ladybugtest/feeds/?x-aio-key="+resMatch, nil)
 	if err != nil {
 		return false, err
 	}
@@ -85,12 +87,16 @@ func verifyAdafruitIO(ctx context.Context, client *http.Client, resMatch string)
 		return false, err
 	}
 	defer res.Body.Close()
-	if res.StatusCode == http.StatusOK {
+
+	// https://learn.adafruit.com/adafruit-io/http-status-codes
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if res.StatusCode != http.StatusUnauthorized {
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
