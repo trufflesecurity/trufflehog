@@ -608,7 +608,7 @@ func pathFromBinaryLine(line []byte) string {
 		return ""
 	}
 	bRaw := sbytes[1]
-	return strings.TrimSpace(string(bRaw[:len(bRaw)-7])) // drop the "b/" and " differ"
+	return string(bRaw[:len(bRaw)-8]) // drop the "b/" and " differ\n"
 }
 
 // --- a/internal/addrs/move_endpoint_module.go

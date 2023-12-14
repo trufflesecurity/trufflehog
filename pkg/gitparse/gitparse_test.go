@@ -196,6 +196,10 @@ func TestLineChecks(t *testing.T) {
 					[]byte("diff --git a/pkg/sources/source_unit.go b/pkg/sources/source_unit.go"),
 				},
 				{
+					MessageEndLine,
+					[]byte("diff --git a/ Lunch and Learn - HCDiag.pdf b/ Lunch and Learn - HCDiag.pdf"),
+				},
+				{
 					BinaryFileLine,
 					[]byte("diff --git a/pkg/decoders/utf16_test.go b/pkg/decoders/utf16_test.go"),
 				},
@@ -291,6 +295,10 @@ func TestLineChecks(t *testing.T) {
 				{
 					IndexLine,
 					[]byte("Binary files /dev/null and b/plugin.sig differ"),
+				},
+				{
+					IndexLine,
+					[]byte("Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ"),
 				},
 			},
 			fails: []testCaseLine{
@@ -648,10 +656,16 @@ Co-authored-by: Sergey Beryozkin <sberyozkin@gmail.com>
 }
 
 func TestBinaryPathParse(t *testing.T) {
-	filename := pathFromBinaryLine([]byte("Binary files /dev/null and b/plugin.sig differ"))
-	expected := "plugin.sig"
-	if filename != expected {
-		t.Errorf("Expected: %s, Got: %s", expected, filename)
+	cases := map[string]string{
+		"Binary files /dev/null and b/plugin.sig differ\n":                    "plugin.sig",
+		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n": " Lunch and Learn - HCDiag.pdf",
+	}
+
+	for name, expected := range cases {
+		filename := pathFromBinaryLine([]byte(name))
+		if filename != expected {
+			t.Errorf("Expected: %s, Got: %s", expected, filename)
+		}
 	}
 }
 
