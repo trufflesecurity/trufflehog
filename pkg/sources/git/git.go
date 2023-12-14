@@ -462,12 +462,13 @@ type scanMetadata struct {
 	scanOptions *ScanOptions
 }
 
-// workerFunc is designed to abstract the processing logic for Git commits. It allows for flexible handling
-// of different commit processing scenarios within the Git scanning context. By encapsulating the Git instance,
-// scanning metadata, and commit channel, this abstraction enables reuse of common worker setup and synchronization
-// logic across different types of commit processing tasks (e.g., commitsWorker and stagedWorker).
-// This design simplifies the implementation of varied commit processing strategies while maintaining a consistent interface,
-// facilitating code maintainability and scalability in handling diverse Git scanning operations.
+// workerFunc is designed to abstract the processing logic for Git commits.
+// It allows for flexible handling of different commit processing scenarios within the Git scanning context.
+// By encapsulating the Git instance, scanning metadata, and commit channel, this abstraction enables
+// reuse of common worker setup and synchronization logic across different types of commit processing
+// tasks (e.g., commitsWorker and stagedWorker). This design simplifies the implementation of varied
+// commit processing strategies while maintaining a consistent interface, facilitating code maintainability
+// and scalability in handling diverse Git scanning operations.
 type workerFunc func(context.Context, *Git, scanMetadata, <-chan gitparse.Commit) error
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
