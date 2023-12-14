@@ -22,7 +22,6 @@ import (
 	"github.com/google/go-github/v42/github"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -58,7 +57,7 @@ type Git struct {
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
-	concurrency        *semaphore.Weighted
+	concurrency        int
 }
 
 type metrics struct {
@@ -75,7 +74,7 @@ func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sourc
 		jobID:              jobID,
 		sourceMetadataFunc: sourceMetadataFunc,
 		verify:             verify,
-		concurrency:        semaphore.NewWeighted(int64(concurrency)),
+		concurrency:        concurrency,
 	}
 }
 
@@ -495,7 +494,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 func (s *Git) startWorkers(ctx context.Context, meta scanMetadata, worker workerFunc, commitChan <-chan gitparse.Commit) {
 	var wg sync.WaitGroup
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < s.concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
