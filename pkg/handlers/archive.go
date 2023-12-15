@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
 
@@ -43,11 +44,14 @@ var _ SpecializedHandler = (*Archive)(nil)
 type Archive struct {
 	size         int
 	currentDepth int
+	skipBinaries bool
 }
 
-// New sets a default maximum size and current size counter.
-func (a *Archive) New() {
-	a.size = 0
+// New creates a new Archive handler with the provided options.
+func (a *Archive) New(opts ...Option) {
+	for _, opt := range opts {
+		opt(a)
+	}
 }
 
 // SetArchiveMaxSize sets the maximum size of the archive.
@@ -115,6 +119,33 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 }
 
 func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
+	if a.skipBinaries {
+		buffer := make([]byte, 512)
+		n, err := reader.Read(buffer)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return fmt.Errorf("unable to read file for MIME type detection: %w", err)
+		}
+
+		// Create a new reader that starts with the buffer we just read
+		// and continues with the rest of the original reader.
+		reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
+
+		mime := mimetype.Detect(buffer)
+		mimeT := mimeType(mime.String())
+
+		fmt.Println(mimeT)
+
+		if mimeT == machOType || mimeT == octetStream {
+			ctx.Logger().V(5).Info("skipping binary file", "ext", mimeT)
+			return nil
+		}
+
+		if common.SkipFile(mime.Extension()) {
+			ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
+			return nil
+		}
+	}
+
 	chunkReader := sources.NewChunkReader()
 	chunkResChan := chunkReader(ctx, reader)
 	for data := range chunkResChan {
@@ -161,9 +192,11 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 		}
 		defer fReader.Close()
 
-		if common.SkipFile(f.Name()) {
-			lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
-			return nil
+		if a.skipBinaries {
+			if common.SkipFile(f.Name()) {
+				lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
+				return nil
+			}
 		}
 
 		fileBytes, err := a.ReadToMax(lCtx, fReader)
@@ -222,6 +255,8 @@ type mimeType string
 const (
 	arMimeType  mimeType = "application/x-unix-archive"
 	rpmMimeType mimeType = "application/x-rpm"
+	machOType   mimeType = "application/x-mach-binary"
+	octetStream mimeType = "application/octet-stream"
 )
 
 // mimeTools maps MIME types to the necessary command-line tools to handle them.
