@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
 
@@ -43,11 +45,14 @@ var _ SpecializedHandler = (*Archive)(nil)
 type Archive struct {
 	size         int
 	currentDepth int
+	skipBinaries bool
 }
 
-// New sets a default maximum size and current size counter.
-func (a *Archive) New() {
-	a.size = 0
+// New creates a new Archive handler with the provided options.
+func (a *Archive) New(opts ...Option) {
+	for _, opt := range opts {
+		opt(a)
+	}
 }
 
 // SetArchiveMaxSize sets the maximum size of the archive.
@@ -114,9 +119,34 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 	}
 }
 
+const mimeTypeBufferSize = 512
+
 func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
+	bufReader := bufio.NewReaderSize(reader, mimeTypeBufferSize)
+	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// If fewer bytes are read, MIME type detection may still succeed.
+	buffer, err := bufReader.Peek(mimeTypeBufferSize)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	mime := mimetype.Detect(buffer)
+	mimeT := mimeType(mime.String())
+
+	if common.SkipFile(mime.Extension()) {
+		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
+		return nil
+	}
+
+	if a.skipBinaries {
+		if common.IsBinary(mime.Extension()) || mimeT == machOType || mimeT == octetStream {
+			ctx.Logger().V(5).Info("skipping binary file", "ext", mimeT)
+			return nil
+		}
+	}
+
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reader)
+	chunkResChan := chunkReader(ctx, bufReader)
 	for data := range chunkResChan {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")
@@ -163,6 +193,11 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 
 		if common.SkipFile(f.Name()) {
 			lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
+			return nil
+		}
+
+		if a.skipBinaries && common.IsBinary(f.Name()) {
+			lCtx.Logger().V(5).Info("skipping binary file", "filename", f.Name())
 			return nil
 		}
 
@@ -222,6 +257,8 @@ type mimeType string
 const (
 	arMimeType  mimeType = "application/x-unix-archive"
 	rpmMimeType mimeType = "application/x-rpm"
+	machOType   mimeType = "application/x-mach-binary"
+	octetStream mimeType = "application/octet-stream"
 )
 
 // mimeTools maps MIME types to the necessary command-line tools to handle them.
