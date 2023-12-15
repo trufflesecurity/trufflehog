@@ -522,12 +522,12 @@ func commitsWorker(ctx context.Context, s *Git, meta scanMetadata, commitChan <-
 			if len(meta.scanOptions.BaseHash) > 0 {
 				if commit.Hash == meta.scanOptions.BaseHash {
 					ctx.Logger().V(1).Info("reached base commit", "commit", commit.Hash)
-					break
+					return nil
 				}
 			}
 			if meta.scanOptions.MaxDepth > 0 && depth >= meta.scanOptions.MaxDepth {
 				ctx.Logger().V(1).Info("reached max depth", "depth", depth)
-				break
+				return nil
 			}
 			depth++
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
@@ -702,11 +702,11 @@ func stagedWorker(ctx context.Context, s *Git, meta scanMetadata, commitChan <-c
 
 				if meta.scanOptions.MaxDepth > 0 && depth >= meta.scanOptions.MaxDepth {
 					logger.V(1).Info("reached max depth")
-					break
+					return nil
 				}
 				depth++
 				if reachedBase && commit.Hash != meta.scanOptions.BaseHash {
-					break
+					return nil
 				}
 				if len(meta.scanOptions.BaseHash) > 0 {
 					if commit.Hash == meta.scanOptions.BaseHash {

@@ -252,7 +252,6 @@ func TestSource_Chunks_Integration(t *testing.T) {
 
 				if expectedData, exists := tt.expectedChunkData[key]; !exists {
 					continue
-					// t.Errorf("A chunk exists that was not expected with key %q", key)
 				} else {
 					if bytes.Equal(chunk.Data, expectedData.B) {
 						(*tt.expectedChunkData[key]).Found = true
