@@ -94,7 +94,11 @@ type ChunkError struct {
 }
 
 func (f ChunkError) Error() string {
-	return fmt.Sprintf("error chunking unit %q: %s", f.Unit.SourceUnitID(), f.Err.Error())
+	unit := "<nil>"
+	if f.Unit != nil {
+		unit = f.Unit.SourceUnitID()
+	}
+	return fmt.Sprintf("error chunking unit %q: %s", unit, f.Err.Error())
 }
 func (f ChunkError) Unwrap() error { return f.Err }
 
