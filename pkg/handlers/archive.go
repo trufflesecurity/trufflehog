@@ -146,8 +146,6 @@ func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Read
 		}
 	}
 
-	fmt.Println("HERE")
-
 	chunkReader := sources.NewChunkReader()
 	chunkResChan := chunkReader(ctx, reader)
 	for data := range chunkResChan {
