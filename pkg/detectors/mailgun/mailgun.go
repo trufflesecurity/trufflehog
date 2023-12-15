@@ -1,11 +1,12 @@
 package mailgun
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -55,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				
+
 				// If resMatch has "key" prefix, use it as the username for basic auth.
 				if strings.HasPrefix(resMatch, "key-") {
 					req.SetBasicAuth("api", resMatch)

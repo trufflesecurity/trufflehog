@@ -1,7 +1,6 @@
 package privatekey
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	"golang.org/x/crypto/ssh"

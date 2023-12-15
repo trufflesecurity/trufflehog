@@ -1,13 +1,14 @@
 package jdbc
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

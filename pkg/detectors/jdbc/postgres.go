@@ -1,10 +1,11 @@
 package jdbc
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/lib/pq"
 )

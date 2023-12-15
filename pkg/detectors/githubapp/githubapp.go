@@ -1,7 +1,7 @@
 package githubapp
 
 import (
-	"context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	// b64 "encoding/base64"
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

@@ -1,10 +1,12 @@
 package jdbc
 
 import (
-	"context"
 	"errors"
-	mssql "github.com/denisenkom/go-mssqldb"
 	"strings"
+
+	mssql "github.com/denisenkom/go-mssqldb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type sqlServerJDBC struct {

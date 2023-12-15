@@ -1,11 +1,12 @@
 package mesibo
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -13,6 +14,7 @@ import (
 )
 
 type Scanner struct{}
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 

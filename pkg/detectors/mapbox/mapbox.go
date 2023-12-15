@@ -1,7 +1,7 @@
 package mapbox
 
 import (
-	"context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	// "log"
 	"net/http"
 	"regexp"

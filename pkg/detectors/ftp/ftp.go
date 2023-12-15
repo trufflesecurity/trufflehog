@@ -1,13 +1,14 @@
 package ftp
 
 import (
-	"context"
 	"errors"
 	"net/textproto"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/jlaffaye/ftp"
 

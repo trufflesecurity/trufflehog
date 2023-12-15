@@ -1,9 +1,10 @@
 package abuseipdb
 
 import (
-	"context"
 	"io"
 	"net/http"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	// "log"
 	"regexp"
 	"strings"

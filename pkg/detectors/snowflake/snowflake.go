@@ -1,14 +1,16 @@
 package snowflake
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	_ "github.com/snowflakedb/gosnowflake"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

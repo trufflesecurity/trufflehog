@@ -1,13 +1,15 @@
 package docusign
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/go-errors/errors"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/go-errors/errors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

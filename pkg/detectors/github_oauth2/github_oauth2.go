@@ -1,14 +1,16 @@
 package github_oauth2
 
 import (
-	"context"
 	"regexp"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/oauth2/github"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{ detectors.EndpointSetter }

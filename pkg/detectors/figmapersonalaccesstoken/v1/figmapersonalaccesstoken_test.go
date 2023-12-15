@@ -4,13 +4,15 @@
 package figmapersonalaccesstoken
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

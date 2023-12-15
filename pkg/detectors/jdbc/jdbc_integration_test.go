@@ -4,7 +4,6 @@
 package jdbc
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,8 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )

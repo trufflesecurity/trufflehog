@@ -1,10 +1,11 @@
 package planetscaledb
 
 import (
-	"context"
 	"database/sql"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/go-sql-driver/mysql"
 

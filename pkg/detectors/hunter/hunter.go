@@ -1,7 +1,7 @@
 package hunter
 
 import (
-	"context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	// "fmt"
 	// "log"
 	"net/http"

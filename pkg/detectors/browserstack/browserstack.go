@@ -1,7 +1,6 @@
 package browserstack
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,9 +8,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
+	"golang.org/x/net/publicsuffix"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/net/publicsuffix"
 )
 
 type Scanner struct {

@@ -1,10 +1,12 @@
 package jdbc
 
 import (
-	"context"
 	"errors"
-	"github.com/go-sql-driver/mysql"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type mysqlJDBC struct {

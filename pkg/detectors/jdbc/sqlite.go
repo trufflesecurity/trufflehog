@@ -1,9 +1,10 @@
 package jdbc
 
 import (
-	"context"
 	"errors"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	_ "github.com/mattn/go-sqlite3"
 )

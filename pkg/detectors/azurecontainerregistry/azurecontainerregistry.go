@@ -1,11 +1,12 @@
 package azurecontainerregistry
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

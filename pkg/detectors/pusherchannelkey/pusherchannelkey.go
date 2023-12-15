@@ -1,7 +1,6 @@
 package pusherchannelkey
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/sha256"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

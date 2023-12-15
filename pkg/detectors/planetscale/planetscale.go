@@ -1,10 +1,11 @@
 package planetscale
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"regexp"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

@@ -5,12 +5,13 @@ package jdbc
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"os/exec"
 	"testing"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/stretchr/testify/assert"
 )

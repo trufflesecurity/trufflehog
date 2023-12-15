@@ -1,7 +1,6 @@
 package couchbase
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"regexp"
@@ -9,7 +8,10 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"github.com/couchbase/gocb/v2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

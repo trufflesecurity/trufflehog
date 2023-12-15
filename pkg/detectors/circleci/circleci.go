@@ -1,9 +1,10 @@
 package circleci
 
 import (
-	"context"
 	"net/http"
 	"regexp"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

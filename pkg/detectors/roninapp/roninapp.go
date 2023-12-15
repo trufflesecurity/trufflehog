@@ -1,10 +1,11 @@
 package roninapp
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	b64 "encoding/base64"
 	"net/http"

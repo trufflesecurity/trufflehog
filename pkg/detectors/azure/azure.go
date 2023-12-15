@@ -1,10 +1,11 @@
 package azure
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 

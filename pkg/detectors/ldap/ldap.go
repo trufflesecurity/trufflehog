@@ -1,7 +1,6 @@
 package ldap
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -10,7 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"github.com/go-ldap/ldap/v3"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )

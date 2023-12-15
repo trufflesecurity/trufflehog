@@ -1,10 +1,11 @@
 package rabbitmq
 
 import (
-	"context"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 

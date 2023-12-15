@@ -1,10 +1,11 @@
 package mongodb
 
 import (
-	"context"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

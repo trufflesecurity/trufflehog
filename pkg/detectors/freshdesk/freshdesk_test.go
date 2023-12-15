@@ -4,10 +4,11 @@
 package freshdesk
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/kylelemons/godebug/pretty"
 

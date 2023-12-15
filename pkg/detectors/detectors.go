@@ -1,15 +1,14 @@
 package detectors
 
 import (
-	"context"
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"net/url"
 	"strings"
 	"unicode"
 
-	"errors"
-
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"

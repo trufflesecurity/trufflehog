@@ -4,8 +4,9 @@
 package generic
 
 import (
-	"context"
 	"testing"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )

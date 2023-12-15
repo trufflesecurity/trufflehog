@@ -3,11 +3,12 @@ package generic
 // cat scanner/pkg/secrets/generic/top-1000.txt | awk 'length($0)>5' > scanner/pkg/secrets/generic/words.txt
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

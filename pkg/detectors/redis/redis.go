@@ -1,11 +1,12 @@
 package redis
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/go-redis/redis"
 

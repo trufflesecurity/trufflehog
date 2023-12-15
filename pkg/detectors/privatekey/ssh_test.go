@@ -1,12 +1,14 @@
 package privatekey
 
 import (
-	"context"
 	"testing"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"golang.org/x/crypto/ssh"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 func TestFirstResponseFromSSH(t *testing.T) {

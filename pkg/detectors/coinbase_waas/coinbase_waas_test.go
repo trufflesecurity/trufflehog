@@ -4,11 +4,12 @@
 package coinbase_waas
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

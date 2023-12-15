@@ -1,12 +1,14 @@
 package sqlserver
 
 import (
-	"context"
 	"database/sql"
 	"regexp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	mssql "github.com/denisenkom/go-mssqldb"
 	"github.com/denisenkom/go-mssqldb/msdsn"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

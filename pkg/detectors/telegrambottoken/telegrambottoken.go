@@ -1,8 +1,9 @@
 package telegrambottoken
 
 import (
-	"context"
 	"encoding/json"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	//	"fmt"
 	"net/http"

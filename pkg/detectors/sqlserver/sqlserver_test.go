@@ -4,10 +4,11 @@
 package sqlserver
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/google/go-cmp/cmp"
