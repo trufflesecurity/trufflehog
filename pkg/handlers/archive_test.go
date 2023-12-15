@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -200,7 +199,7 @@ func createBinaryArchive(t *testing.T) string {
 	err = tarWriter.WriteHeader(header)
 	assert.NoError(t, err)
 
-	fileContent, err := ioutil.ReadFile(f.Name())
+	fileContent, err := os.ReadFile(f.Name())
 	assert.NoError(t, err)
 
 	_, err = tarWriter.Write(fileContent)
