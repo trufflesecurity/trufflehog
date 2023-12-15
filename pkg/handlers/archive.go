@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -122,13 +121,15 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 const mimeTypeBufferSize = 512
 
 func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
-	bufReader := bufio.NewReaderSize(reader, mimeTypeBufferSize)
-	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
-	// If fewer bytes are read, MIME type detection may still succeed.
-	buffer, err := bufReader.Peek(mimeTypeBufferSize)
+	buffer := make([]byte, 512)
+	n, err := reader.Read(buffer)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
 	}
+
+	// Create a new reader that starts with the buffer we just read
+	// and continues with the rest of the original reader.
+	reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
 
 	mime := mimetype.Detect(buffer)
 	mimeT := mimeType(mime.String())
@@ -144,6 +145,8 @@ func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Read
 			return nil
 		}
 	}
+
+	fmt.Println("HERE")
 
 	chunkReader := sources.NewChunkReader()
 	chunkResChan := chunkReader(ctx, reader)
