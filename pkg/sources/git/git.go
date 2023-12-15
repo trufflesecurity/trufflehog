@@ -1001,10 +1001,15 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String(), "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
 
+	if common.SkipFile(path) {
+		fileCtx.Logger().V(5).Info("file contains ignored extension")
+		return nil
+	}
+
 	var handlerOpts []handlers.Option
 	if s.skipBinaries {
 		handlerOpts = append(handlerOpts, handlers.WithSkipBinaries(true))
-		if common.SkipFile(path) {
+		if common.IsBinary(path) {
 			fileCtx.Logger().V(5).Info("skipping binary file")
 			return nil
 		}

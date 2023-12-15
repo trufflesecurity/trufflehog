@@ -119,29 +119,27 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 }
 
 func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
+	buffer := make([]byte, 512)
+	n, err := reader.Read(buffer)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	// Create a new reader that starts with the buffer we just read
+	// and continues with the rest of the original reader.
+	reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
+
+	mime := mimetype.Detect(buffer)
+	mimeT := mimeType(mime.String())
+
+	if common.SkipFile(mime.Extension()) {
+		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
+		return nil
+	}
+
 	if a.skipBinaries {
-		buffer := make([]byte, 512)
-		n, err := reader.Read(buffer)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return fmt.Errorf("unable to read file for MIME type detection: %w", err)
-		}
-
-		// Create a new reader that starts with the buffer we just read
-		// and continues with the rest of the original reader.
-		reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
-
-		mime := mimetype.Detect(buffer)
-		mimeT := mimeType(mime.String())
-
-		fmt.Println(mimeT)
-
-		if mimeT == machOType || mimeT == octetStream {
+		if common.IsBinary(mime.Extension()) || mimeT == machOType || mimeT == octetStream {
 			ctx.Logger().V(5).Info("skipping binary file", "ext", mimeT)
-			return nil
-		}
-
-		if common.SkipFile(mime.Extension()) {
-			ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
 			return nil
 		}
 	}
@@ -192,11 +190,14 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 		}
 		defer fReader.Close()
 
-		if a.skipBinaries {
-			if common.SkipFile(f.Name()) {
-				lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
-				return nil
-			}
+		if common.SkipFile(f.Name()) {
+			lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
+			return nil
+		}
+
+		if a.skipBinaries && common.IsBinary(f.Name()) {
+			lCtx.Logger().V(5).Info("skipping binary file", "filename", f.Name())
+			return nil
 		}
 
 		fileBytes, err := a.ReadToMax(lCtx, fReader)
