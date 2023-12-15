@@ -24,10 +24,22 @@ type SpecializedHandler interface {
 	HandleSpecialized(logContext.Context, io.Reader) (io.Reader, bool, error)
 }
 
+// Option is a function type that applies a configuration to a Handler.
+type Option func(Handler)
+
+// WithSkipBinaries returns a Option that configures whether to skip binary files.
+func WithSkipBinaries(skip bool) Option {
+	return func(h Handler) {
+		if a, ok := h.(*Archive); ok {
+			a.skipBinaries = skip
+		}
+	}
+}
+
 type Handler interface {
 	FromFile(logContext.Context, io.Reader) chan []byte
 	IsFiletype(logContext.Context, io.Reader) (io.Reader, bool)
-	New()
+	New(...Option)
 }
 
 // HandleFile processes a given file by selecting an appropriate handler from DefaultHandlers.
@@ -36,9 +48,9 @@ type Handler interface {
 // packages them in the provided chunk skeleton, and reports them to the chunk reporter.
 // The function returns true if processing was successful and false otherwise.
 // Context is used for cancellation, and the caller is responsible for canceling it if needed.
-func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
+func HandleFile(ctx logContext.Context, file io.Reader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter, opts ...Option) bool {
 	for _, h := range DefaultHandlers() {
-		h.New()
+		h.New(opts...)
 
 		// The re-reader is used to reset the file reader after checking if the handler implements SpecializedHandler.
 		// This is necessary because the archive pkg doesn't correctly determine the file type when using

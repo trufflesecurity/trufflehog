@@ -201,7 +201,9 @@ func main() {
 								},
 							},
 						}
-					})
+					},
+					true,
+				)
 
 				logger.Info("scanning repo", "repo", r)
 				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), sources.ChanReporter{Ch: chunksChan})

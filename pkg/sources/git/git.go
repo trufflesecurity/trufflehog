@@ -58,6 +58,7 @@ type Git struct {
 	verify             bool
 	metrics            metrics
 	concurrency        *semaphore.Weighted
+	skipBinaries       bool
 }
 
 type metrics struct {
@@ -65,7 +66,7 @@ type metrics struct {
 }
 
 func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
-	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData,
+	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData, skipBinaries bool,
 ) *Git {
 	return &Git{
 		sourceType:         sourceType,
@@ -75,6 +76,7 @@ func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sourc
 		sourceMetadataFunc: sourceMetadataFunc,
 		verify:             verify,
 		concurrency:        semaphore.NewWeighted(int64(concurrency)),
+		skipBinaries:       skipBinaries,
 	}
 }
 
@@ -175,7 +177,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 					},
 				},
 			}
-		})
+		},
+		conn.GetSkipBinaries(),
+	)
 	return nil
 }
 
@@ -512,7 +516,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 				continue
@@ -676,7 +680,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
 				}
 				continue
@@ -993,13 +997,22 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String(), "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
 
 	if common.SkipFile(path) {
-		fileCtx.Logger().V(5).Info("skipping binary file")
+		fileCtx.Logger().V(5).Info("file contains ignored extension")
 		return nil
+	}
+
+	var handlerOpts []handlers.Option
+	if s.skipBinaries {
+		handlerOpts = append(handlerOpts, handlers.WithSkipBinaries(true))
+		if common.IsBinary(path) {
+			fileCtx.Logger().V(5).Info("skipping binary file")
+			return nil
+		}
 	}
 
 	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
@@ -1057,7 +1070,7 @@ func handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkRepo
 
 	defer reader.Close()
 
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter) {
+	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
 		return nil
 	}
 
