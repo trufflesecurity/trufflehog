@@ -24,7 +24,8 @@ type SourceManager struct {
 	// Max number of units to scan concurrently per source.
 	concurrentUnits int
 	// Run the sources using source unit enumeration / chunking if available.
-	useSourceUnits bool
+	// Checked at runtime to allow feature flagging.
+	useSourceUnitsFunc func() bool
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
 	// Set when Wait() returns.
@@ -67,7 +68,13 @@ func WithBufferedOutput(size int) func(*SourceManager) {
 // WithSourceUnits enables using source unit enumeration and chunking if the
 // source supports it.
 func WithSourceUnits() func(*SourceManager) {
-	return func(mgr *SourceManager) { mgr.useSourceUnits = true }
+	return func(mgr *SourceManager) {
+		mgr.useSourceUnitsFunc = func() bool { return true }
+	}
+}
+
+func WithSourceUnitsFunc(f func() bool) func(*SourceManager) {
+	return func(mgr *SourceManager) { mgr.useSourceUnitsFunc = f }
 }
 
 // WithConcurrentUnits limits the number of units to be scanned concurrently.
@@ -229,7 +236,8 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 		"source_type", source.Type().String(),
 	)
 	// Check for the preferred method of tracking source units.
-	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits && len(targets) == 0 {
+	canUseSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil
+	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
 		return s.runWithUnits(ctx, enumChunker, report)
 	}
 	return s.runWithoutUnits(ctx, source, report, targets...)
