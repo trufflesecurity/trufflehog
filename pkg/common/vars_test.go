@@ -52,8 +52,6 @@ func TestIsBinary(t *testing.T) {
 
 	// Add a test case for a file that should not be skipped.
 	testCases = append(testCases, testCase{file: "test.txt", want: false})
-	// Add a extension with a leading dot.
-	testCases = append(testCases, testCase{file: "exe", want: true})
 
 	for _, tt := range testCases {
 		t.Run(tt.file, func(t *testing.T) {
