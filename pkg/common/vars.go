@@ -48,37 +48,37 @@ var (
 		"ico",   // Icon file
 	}
 
-	binaryExtensions = []string{
+	binaryExtensions = map[string]struct{}{
 		// binaries
 		// These can theoretically contain secrets, but need decoding for users to make sense of them, and we don't have
 		// any such decoders right now.
-		"class",  // Java bytecode class file
-		"dll",    // Dynamic Link Library, Windows
-		"jdo",    // Java Data Object, Java serialization format
-		"jks",    // Java Key Store, Java keystore format
-		"ser",    // Java serialization format
-		"idx",    // Index file, often binary
-		"hprof",  // Java heap dump format
-		"exe",    // Executable, Windows
-		"bin",    // Binary, often used for compiled source code
-		"so",     // Shared object, Unix/Linux
-		"o",      // Object file from compilation/ intermediate object file
-		"a",      // Static library, Unix/Linux
-		"dylib",  // Dynamic library, macOS
-		"lib",    // Library, Unix/Linux
-		"obj",    // Object file, typically from compiled source code
-		"pdb",    // Program Database, Microsoft Visual Studio debugging format
-		"dat",    // Generic data file, often binary but not always
-		"elf",    // Executable and Linkable Format, common in Unix/Linux
-		"dmg",    // Disk Image for macOS
-		"iso",    // ISO image (optical disk image)
-		"img",    // Disk image files
-		"out",    // Common output file from compiled executable in Unix/Linux
-		"com",    // DOS command file, executable
-		"sys",    // Windows system file, often a driver
-		"vxd",    // Virtual device driver in Windows
-		"sfx",    // Self-extracting archive
-		"bundle", // Mac OS X application bundle
+		"class":  {}, // Java bytecode class file
+		"dll":    {}, // Dynamic Link Library, Windows
+		"jdo":    {}, // Java Data Object, Java serialization format
+		"jks":    {}, // Java Key Store, Java keystore format
+		"ser":    {}, // Java serialization format
+		"idx":    {}, // Index file, often binary
+		"hprof":  {}, // Java heap dump format
+		"exe":    {}, // Executable, Windows
+		"bin":    {}, // Binary, often used for compiled source code
+		"so":     {}, // Shared object, Unix/Linux
+		"o":      {}, // Object file from compilation/ intermediate object file
+		"a":      {}, // Static library, Unix/Linux
+		"dylib":  {}, // Dynamic library, macOS
+		"lib":    {}, // Library, Unix/Linux
+		"obj":    {}, // Object file, typically from compiled source code
+		"pdb":    {}, // Program Database, Microsoft Visual Studio debugging format
+		"dat":    {}, // Generic data file, often binary but not always
+		"elf":    {}, // Executable and Linkable Format, common in Unix/Linux
+		"dmg":    {}, // Disk Image for macOS
+		"iso":    {}, // ISO image (optical disk image)
+		"img":    {}, // Disk image files
+		"out":    {}, // Common output file from compiled executable in Unix/Linux
+		"com":    {}, // DOS command file, executable
+		"sys":    {}, // Windows system file, often a driver
+		"vxd":    {}, // Virtual device driver in Windows
+		"sfx":    {}, // Self-extracting archive
+		"bundle": {}, // Mac OS X application bundle
 	}
 )
 
@@ -93,10 +93,6 @@ func SkipFile(filename string) bool {
 
 // IsBinary returns true if the file extension is in the binaryExtensions list.
 func IsBinary(filename string) bool {
-	for _, ext := range binaryExtensions {
-		if strings.TrimPrefix(filepath.Ext(filename), ".") == ext {
-			return true
-		}
-	}
-	return false
+	_, ok := binaryExtensions[strings.ToLower(strings.TrimPrefix(filepath.Ext(filename), "."))]
+	return ok
 }
