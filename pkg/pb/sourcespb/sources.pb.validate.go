@@ -4679,6 +4679,8 @@ func (m *AzureRepos) validate(all bool) error {
 
 	// no validation rules for IncludeForks
 
+	// no validation rules for SkipBinaries
+
 	switch m.Credential.(type) {
 
 	case *AzureRepos_Token:
