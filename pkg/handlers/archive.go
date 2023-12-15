@@ -121,7 +121,7 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 const mimeTypeBufferSize = 512
 
 func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
-	buffer := make([]byte, 512)
+	buffer := make([]byte, mimeTypeBufferSize)
 	n, err := reader.Read(buffer)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
