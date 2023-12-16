@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v42/github"
@@ -58,9 +57,11 @@ type Source struct {
 	repos             []string
 	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
-	memberCache       map[string]struct{}
-	repoSizes         repoSize
-	totalRepoSize     int // total size of all repos in kb
+	// repos that _probably_ have wikis (see the comment on hasWiki).
+	reposWithWikis map[string]struct{}
+	memberCache    map[string]struct{}
+	repoSizes      repoSize
+	totalRepoSize  int // total size of all repos in kb
 
 	useCustomContentWriter bool
 	git                    *git.Git
@@ -229,6 +230,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
+	s.reposWithWikis = make(map[string]struct{})
 	s.memberCache = make(map[string]struct{})
 
 	s.repoSizes = newRepoSize()
@@ -355,6 +357,12 @@ func checkGitHubConnection(ctx context.Context, client *github.Client) error {
 }
 
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
+	// It isn't possible to get the visibility of a wiki.
+	// We must use the visibility of the corresponding repository.
+	if strings.HasSuffix(repoURL, ".wiki.git") {
+		repoURL = strings.TrimSuffix(repoURL, ".wiki.git") + ".git"
+	}
+
 	s.mu.Lock()
 	visibility, ok := s.publicMap[repoURL]
 	s.mu.Unlock()
@@ -784,52 +792,37 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			logger := s.log.WithValues("repo", repoURL)
-			logger.V(2).Info("attempting to clone repo")
-			var (
-				path string
-				repo *gogit.Repository
-				err  error
-			)
-
-			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
+			// Scan the repository
+			repoCtx := context.WithValues(ctx, "repo", repoURL)
+			duration, err := s.cloneAndScanRepo(repoCtx, installationClient, repoURL, chunksChan)
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
 
-			defer os.RemoveAll(path)
-			if err != nil {
-				scanErrs.Add(fmt.Errorf("error cloning repo %s: %w", repoURL, err))
-				return nil
-			}
+			// Scan the wiki, if enabled, and the repo has one.
+			if s.conn.IncludeWikis {
+				if _, ok := s.reposWithWikis[repoURL]; ok {
+					wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
+					wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
-			s.setScanOptions(s.conn.Base, s.conn.Head)
-
-			repoSize := s.repoSizes.getRepo(repoURL)
-			logger.V(2).Info("scanning repo", "repo_size_kb", repoSize)
-
-			now := time.Now()
-			scanFailed := false
-			defer func(start time.Time, failed *bool) {
-				if *failed {
-					return
+					_, err := s.cloneAndScanRepo(wikiCtx, installationClient, wikiURL, chunksChan)
+					if err != nil {
+						scanErrs.Add(err)
+						// Don't return, it still might be possible to scan comments.
+					}
 				}
-				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", time.Since(start).Seconds())
-			}(now, &scanFailed)
-
-			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
-				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
-				scanFailed = true
-				return nil
 			}
 
-			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
-				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
-				scanFailed = true
-				return nil
+			// Scan comments, if enabled.
+			if s.includeGistComments || s.includeIssueComments || s.includePRComments {
+				if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
+					scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
+					return nil
+				}
 			}
 
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", duration)
 			githubReposScanned.WithLabelValues(s.name).Inc()
 			atomic.AddUint64(&scannedCount, 1)
 			return nil
@@ -843,6 +836,37 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
 
 	return nil
+}
+
+func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, repoURL string, chunksChan chan *sources.Chunk) (time.Duration, error) {
+	var duration time.Duration
+
+	ctx.Logger().V(2).Info("attempting to clone repo")
+	path, repo, err := s.cloneRepo(ctx, repoURL, client)
+	if err != nil {
+		return duration, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+	}
+	defer os.RemoveAll(path)
+
+	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
+	s.setScanOptions(s.conn.Base, s.conn.Head)
+
+	// Repo size is not collected for wikis.
+	var logger logr.Logger
+	if !strings.HasSuffix(repoURL, ".wiki.git") {
+		repoSize := s.repoSizes.getRepo(repoURL)
+		logger = ctx.Logger().WithValues("repo_size_kb", repoSize)
+	} else {
+		logger = ctx.Logger()
+	}
+	logger.V(2).Info("scanning repo")
+
+	start := time.Now()
+	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
+		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
+	}
+	duration = time.Since(start)
+	return duration, nil
 }
 
 // handleRateLimit returns true if a rate limit was handled

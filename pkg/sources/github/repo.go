@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -198,9 +199,8 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	var (
 		numRepos, numForks int
+		uniqueOrgs         = map[string]struct{}{}
 	)
-
-	uniqueOrgs := map[string]struct{}{}
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
@@ -219,14 +219,12 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
-			if r.GetFork() && !s.conn.IncludeForks {
-				continue
-			}
-
 			if r.GetFork() {
+				if !s.conn.IncludeForks {
+					continue
+				}
 				numForks++
 			}
-
 			numRepos++
 
 			if r.GetOwner().GetType() == "Organization" {
@@ -237,6 +235,9 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			s.repoSizes.addRepo(repoURL, r.GetSize())
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
+			if s.conn.GetIncludeWikis() && s.hasWiki(ctx, r, repoURL) {
+				s.reposWithWikis[repoURL] = struct{}{}
+			}
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
@@ -250,6 +251,29 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 	githubOrgsEnumerated.WithLabelValues(s.name).Set(float64(len(uniqueOrgs)))
 
 	return nil
+}
+
+// hasWiki returns true if the "has_wiki" property is true AND https://github.com/$org/$repo/wiki is not redirected.
+// Unfortunately, this isn't 100% accurate. Some repositories meet both criteria yet don't have a cloneable wiki.
+func (s *Source) hasWiki(ctx context.Context, repo *github.Repository, repoURL string) bool {
+	if !repo.GetHasWiki() {
+		return false
+	}
+
+	wikiURL := strings.TrimSuffix(repoURL, ".git") + "/wiki"
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
+	if err != nil {
+		return false
+	}
+
+	res, err := s.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	_ = res.Body.Close()
+
+	// If the wiki is disabled, or is enabled but has no content, the request should be redirected.
+	return wikiURL == res.Request.URL.String()
 }
 
 // commitQuery represents the details required to fetch a commit.
