@@ -95,6 +95,7 @@ message Bitbucket {
   }
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
+  bool skip_binaries = 7;
 }
 
 message CircleCI {
@@ -194,6 +195,7 @@ message Git {
   // Passing a single repository via the uri field also allows for additional options to be specified
   // like head, base, bare, etc.
   string uri = 13; // repository URL. https://, file://, or ssh://
+  bool skip_binaries = 14;
 }
 
 message GitLab {
@@ -205,6 +207,7 @@ message GitLab {
   }
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
+  bool skip_binaries = 7;
 }
 
 message GitHub {
@@ -226,6 +229,7 @@ message GitHub {
   bool includePullRequestComments = 14;
   bool includeIssueComments = 15;
   bool includeGistComments = 16;
+  bool skip_binaries = 17;
 }
 
 message GoogleDrive {
@@ -296,6 +300,7 @@ message Gerrit {
     credentials.Unauthenticated unauthenticated = 3;
   }
   repeated string projects = 4;
+  bool skip_binaries = 5;
 }
 
 message Jenkins {
@@ -363,4 +368,5 @@ message AzureRepos {
   repeated string includeRepos = 9;
   repeated string includeProjects = 10;
   repeated string ignoreProjects = 11;
+  bool skip_binaries = 12;
 }

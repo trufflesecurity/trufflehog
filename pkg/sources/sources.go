@@ -171,48 +171,54 @@ type GitConfig struct {
 	// ExcludeGlobs is a list of comma separated globs to exclude from the scan.
 	// This differs from the Filter exclusions as ExcludeGlobs is applied at the `git log -p` level
 	ExcludeGlobs string
+	// SkipBinaries allows skipping binary files from the scan.
+	SkipBinaries bool
 }
 
 // GithubConfig defines the optional configuration for a github source.
 type GithubConfig struct {
 	// Endpoint is the endpoint of the source.
-	Endpoint,
+	Endpoint string
 	// Token is the token to use to authenticate with the source.
 	Token string
 	// IncludeForks indicates whether to include forks in the scan.
-	IncludeForks,
+	IncludeForks bool
 	// IncludeMembers indicates whether to include members in the scan.
 	IncludeMembers bool
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency int
 	// Repos is the list of repositories to scan.
-	Repos,
+	Repos []string
 	// Orgs is the list of organizations to scan.
-	Orgs,
+	Orgs []string
 	// ExcludeRepos is a list of repositories to exclude from the scan.
-	ExcludeRepos,
+	ExcludeRepos []string
 	// IncludeRepos is a list of repositories to include in the scan.
 	IncludeRepos []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// IncludeIssueComments indicates whether to include GitHub issue comments in the scan.
-	IncludeIssueComments,
+	IncludeIssueComments bool
 	// IncludePullRequestComments indicates whether to include GitHub pull request comments in the scan.
-	IncludePullRequestComments,
+	IncludePullRequestComments bool
 	// IncludeGistComments indicates whether to include GitHub gist comments in the scan.
 	IncludeGistComments bool
+	// SkipBinaries allows skipping binary files from the scan.
+	SkipBinaries bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
 type GitlabConfig struct {
 	// Endpoint is the endpoint of the source.
-	Endpoint,
+	Endpoint string
 	// Token is the token to use to authenticate with the source.
 	Token string
 	// Repos is the list of repositories to scan.
 	Repos []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+	// SkipBinaries allows skipping binary files from the scan.
+	SkipBinaries bool
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.
