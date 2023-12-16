@@ -82,7 +82,6 @@ var (
 		"bundle": {}, // Mac OS X application bundle
 		"pyo":    {}, // Compiled Python file
 		"pyc":    {}, // Compiled Python file
-		"whl":    {}, // Python wheel file
 		"sym":    {}, // Symbolic link, Unix/Linux
 	}
 )
