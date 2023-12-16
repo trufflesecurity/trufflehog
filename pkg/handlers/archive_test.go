@@ -383,7 +383,7 @@ func TestDetermineMimeType(t *testing.T) {
 		{
 			name:       "Text file",
 			input:      bytes.NewReader(textBytes),
-			expected:   mimeType("text/plain"),
+			expected:   mimeType("text/plain; charset=utf-8"),
 			shouldFail: false,
 		},
 		{
@@ -416,7 +416,7 @@ func TestDetermineMimeType(t *testing.T) {
 			}
 
 			if !tt.shouldFail {
-				assert.Equal(t, tt.expected, mime)
+				assert.Equal(t, tt.expected, mimeType(mime.String()))
 			}
 
 			// Ensure the reader still contains all the original data.
