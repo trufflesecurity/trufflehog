@@ -224,11 +224,11 @@ message GitHub {
   bool includeForks = 8;
   string head = 9;
   string base = 10;
-  repeated string ignoreRepos = 11;
-  repeated string includeRepos = 12;
-  bool includePullRequestComments = 14;
-  bool includeIssueComments = 15;
-  bool includeGistComments = 16;
+  repeated string ignore_repos = 11;
+  repeated string include_repos = 12;
+  bool include_pull_request_comments = 14;
+  bool include_issue_comments = 15;
+  bool include_gist_comments = 16;
   bool skip_binaries = 17;
 }
 
@@ -282,7 +282,7 @@ message Slack {
     credentials.SlackTokens tokens = 5;
   }
   repeated string channels = 3;
-  repeated string ignoreList = 4;
+  repeated string ignore_list = 4;
 }
 
 message Test{}
@@ -320,13 +320,13 @@ message Teams {
     credentials.Oauth2 oauth = 7;
   }
   repeated string channels = 4;
-  repeated string ignoreList = 5;
+  repeated string ignore_list = 5;
   repeated string team_ids = 6;
 }
 
 message Syslog {
   string protocol = 1;
-  string listenAddress = 2;
+  string listen_address = 2;
   string tlsCert = 3;
   string tlsKey = 4;
   string format = 5;
@@ -363,10 +363,10 @@ message AzureRepos {
   repeated string repositories = 4;
   repeated string organizations = 5;
   repeated string projects = 6;
-  bool includeForks = 7;
-  repeated string ignoreRepos = 8;
-  repeated string includeRepos = 9;
-  repeated string includeProjects = 10;
-  repeated string ignoreProjects = 11;
+  bool include_forks = 7;
+  repeated string ignore_repos = 8;
+  repeated string include_repos = 9;
+  repeated string include_projects = 10;
+  repeated string ignore_projects = 11;
   bool skip_binaries = 12;
 }
