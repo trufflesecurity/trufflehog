@@ -49,13 +49,6 @@ type Source struct {
 	scanOptions *ScanOptions
 }
 
-type binaryDiff struct {
-	fileName  string
-	gitDir    string
-	commit    plumbing.Hash // 20 bytes
-	chunkSkel *sources.Chunk
-}
-
 type Git struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
@@ -465,6 +458,15 @@ func (s *Git) CommitsScanned() uint64 {
 }
 
 const gitDirName = ".git"
+
+// binaryDiff contains the information needed to read a binary file from a git repository.
+// It is used to send binary diffs to the binaryDiffChan for asynchronous processing.
+type binaryDiff struct {
+	fileName  string
+	gitDir    string
+	commit    plumbing.Hash // 20 bytes
+	chunkSkel *sources.Chunk
+}
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter, binaryDiffChan chan<- binaryDiff) error {
 	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
