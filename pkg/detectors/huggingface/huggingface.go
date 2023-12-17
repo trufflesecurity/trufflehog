@@ -22,13 +22,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\bhf_[a-zA-Z0-9]{34}\b`)
+	keyPat = regexp.MustCompile(`\b(?:hf_|api_org_)[a-zA-Z0-9]{34}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"huggingface", "hugging_face", "hf"} // Huggingface docs occasionally use "hf" instead of "huggingface"
+	return []string{"huggingface", "hugging_face", "hf_", "api_org_"} // Huggingface docs occasionally use "hf" instead of "huggingface"
 }
 
 // FromData will find and optionally verify Huggingface secrets in a given set of bytes.
