@@ -1516,7 +1516,7 @@ func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarg
 func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
 	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
 	if !ok {
-		return fmt.Errorf("unable to cast metadata type for targetted scan")
+		return fmt.Errorf("unable to cast metadata type for targeted scan")
 	}
 	meta := metaType.Github
 
@@ -1547,6 +1547,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
+		SecretID:   target.SecretID,
 		Data:       []byte(res),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
