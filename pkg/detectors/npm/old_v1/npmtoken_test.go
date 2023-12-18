@@ -1,4 +1,4 @@
-package npmtokenv2
+package old_v1
 
 import (
 	"context"
@@ -12,12 +12,12 @@ import (
 )
 
 var (
-	validPattern   = "npm_hK0FJXBYCkejhEMY4Kp6bOOZn1DlfBOmtbJY"
-	invalidPattern = "npm_hK0FJXBYCkejhEMY?Kp6bOOZn1DlfBOmtbJY"
-	keyword        = "npmtokenv2"
+	validPattern   = "3aAcac6c-9847-23d9-ce65-917590b81cf0"
+	invalidPattern = "3aAcac6c?9847-23d9-ce65-917590b81cf0"
+	keyword        = "npmtoken"
 )
 
-func TestNpmToken_New_Pattern(t *testing.T) {
+func TestNpmToken_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,9 +26,19 @@ func TestNpmToken_New_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword npmtokenv2",
+			name:  "valid pattern - with keyword npmtoken",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
 			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern - ignore duplicate",
+			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
+			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			want:  []string{},
 		},
 		{
 			name:  "invalid pattern",

@@ -1,24 +1,25 @@
-package npmtoken
+package old_v1
 
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type scanner struct{}
 
-// Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
+// Ensure the scanner satisfies the interfaces at compile time.
+var _ detectors.Detector = (*scanner)(nil)
+var _ detectors.Versioner = (*scanner)(nil)
 
-func (s Scanner) Version() int { return 1 }
+func (s scanner) Version() int { return 1 }
 
 var (
 	client = common.SaneHttpClient()
@@ -29,12 +30,12 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
+func (s scanner) Keywords() []string {
 	return []string{"npm"}
 }
 
 // FromData will find and optionally verify NpmToken secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
@@ -72,10 +73,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
+func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_NpmToken
 }
 
-func (s Scanner) Description() string {
+func (s scanner) Description() string {
 	return "NPM tokens are used to authenticate and publish packages to the npm registry."
 }
