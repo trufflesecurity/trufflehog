@@ -24,6 +24,9 @@ type Chunk struct {
 	SourceID SourceID
 	// JobID is the ID of the job that the Chunk originated from.
 	JobID JobID
+	// SecretID is the ID of the secret, if it exists.
+	// Only secrets that are being reverified will have a SecretID.
+	SecretID int64
 	// SourceType is the type of Source that produced the chunk.
 	SourceType sourcespb.SourceType
 	// SourceMetadata holds the context of where the Chunk was found.
@@ -43,6 +46,8 @@ type Chunk struct {
 type ChunkingTarget struct {
 	// QueryCriteria represents specific parameters or conditions to target the chunking process.
 	QueryCriteria *source_metadatapb.MetaData
+	// SecretID is the ID of the secret.
+	SecretID int64
 }
 
 // Source defines the interface required to implement a source chunker.
