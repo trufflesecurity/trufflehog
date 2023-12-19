@@ -107,11 +107,6 @@ func TestGitEngine(t *testing.T) {
 func BenchmarkGitEngine(b *testing.B) {
 	ctx := context.Background()
 	repoUrl := "https://github.com/dustin-decker/secretsandstuff.git"
-	path, _, err := git.PrepareRepo(ctx, repoUrl)
-	if err != nil {
-		b.Error(err)
-	}
-	defer os.RemoveAll(path)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -132,11 +127,9 @@ func BenchmarkGitEngine(b *testing.B) {
 		}
 	}()
 
+	cfg := sources.GitConfig{URI: repoUrl}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// TODO: this is measuring the time it takes to initialize the source
-		// and not to do the full scan
-		cfg := sources.GitConfig{URI: path}
 		if err := e.ScanGit(ctx, cfg); err != nil {
 			return
 		}

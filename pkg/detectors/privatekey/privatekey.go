@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
@@ -37,16 +38,12 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
-	var results []detectors.Result
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllString(dataStr, -1)
-
 	for _, match := range matches {
-
 		token := normalize(match)
-
 		if len(token) < 64 {
 			continue
 		}
@@ -55,9 +52,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			DetectorType: detectorspb.DetectorType_PrivateKey,
 			Raw:          []byte(token),
 			Redacted:     token[0:64],
+			ExtraData:    make(map[string]string),
 		}
-
-		s1.ExtraData = make(map[string]string)
 
 		var passphrase string
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
@@ -82,43 +78,64 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
-			var verificationErrors []string
-			data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
-			if err == nil {
-				if data != nil {
-					s1.Verified = true
-					s1.ExtraData["certificate_urls"] = strings.Join(data.CertificateURLs, ", ")
+			var (
+				wg                 sync.WaitGroup
+				extraData          = newExtraData()
+				verificationErrors = newVerificationErrors()
+			)
+
+			// Look up certificate information.
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
+				if err == nil {
+					if data != nil {
+						extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
+					}
+				} else {
+					verificationErrors.Add(err)
+				}
+			}()
+
+			// Test SSH key against github.com
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				user, err := verifyGitHubUser(parsedKey)
+				if err != nil && !errors.Is(err, errPermissionDenied) {
+					verificationErrors.Add(err)
+				}
+				if user != nil {
+					extraData.Add("github_user", *user)
+				}
+			}()
+
+			// Test SSH key against gitlab.com
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				user, err := verifyGitLabUser(parsedKey)
+				if err != nil && !errors.Is(err, errPermissionDenied) {
+					verificationErrors.Add(err)
+				}
+				if user != nil {
+					extraData.Add("gitlab_user", *user)
+				}
+			}()
+
+			wg.Wait()
+			if len(extraData.data) > 0 {
+				s1.Verified = true
+				for k, v := range extraData.data {
+					s1.ExtraData[k] = v
 				}
 			} else {
-				verificationErrors = append(verificationErrors, err.Error())
+				s1.ExtraData = nil
 			}
-
-			user, err := verifyGitHubUser(parsedKey)
-			if err != nil && !errors.Is(err, errPermissionDenied) {
-				verificationErrors = append(verificationErrors, err.Error())
+			if len(verificationErrors.errors) > 0 {
+				s1.SetVerificationError(fmt.Errorf("verification failures: %s", strings.Join(verificationErrors.errors, ", ")), token)
 			}
-			if user != nil {
-				s1.Verified = true
-				s1.ExtraData["github_user"] = *user
-			}
-
-			user, err = verifyGitLabUser(parsedKey)
-			if err != nil && !errors.Is(err, errPermissionDenied) {
-				verificationErrors = append(verificationErrors, err.Error())
-			}
-			if user != nil {
-				s1.Verified = true
-				s1.ExtraData["gitlab_user"] = *user
-			}
-
-			if !s1.Verified && len(verificationErrors) > 0 {
-				err = fmt.Errorf("verification failures: %s", strings.Join(verificationErrors, ", "))
-				s1.SetVerificationError(err, token)
-			}
-		}
-
-		if len(s1.ExtraData) == 0 {
-			s1.ExtraData = nil
 		}
 
 		results = append(results, s1)
@@ -177,6 +194,40 @@ type DriftwoodResult struct {
 	GitHubSSHResults []struct {
 		Username string `json:"Username"`
 	} `json:"GitHubSSHResults"`
+}
+
+type extraData struct {
+	mutex sync.Mutex
+	data  map[string]string
+}
+
+func newExtraData() *extraData {
+	return &extraData{
+		data: make(map[string]string),
+	}
+}
+
+func (e *extraData) Add(key string, value string) {
+	e.mutex.Lock()
+	e.data[key] = value
+	e.mutex.Unlock()
+}
+
+type verificationErrors struct {
+	mutex  sync.Mutex
+	errors []string
+}
+
+func newVerificationErrors() *verificationErrors {
+	return &verificationErrors{
+		errors: make([]string, 0, 3),
+	}
+}
+
+func (e *verificationErrors) Add(err error) {
+	e.mutex.Lock()
+	e.errors = append(e.errors, err.Error())
+	e.mutex.Unlock()
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

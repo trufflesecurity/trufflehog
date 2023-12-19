@@ -1,7 +1,6 @@
 package cleantemp
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,11 +14,16 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
+const (
+	defaultExecPath             = "trufflehog"
+	defaultArtifactPrefixFormat = "%s-%d-"
+)
+
 // MkdirTemp returns a temporary directory path formatted as:
 // trufflehog-<pid>-<randint>
 func MkdirTemp() (string, error) {
 	pid := os.Getpid()
-	tmpdir := fmt.Sprintf("%s-%d-", "trufflehog", pid)
+	tmpdir := fmt.Sprintf(defaultArtifactPrefixFormat, defaultExecPath, pid)
 	dir, err := os.MkdirTemp(os.TempDir(), tmpdir)
 	if err != nil {
 		return "", err
@@ -27,27 +31,26 @@ func MkdirTemp() (string, error) {
 	return dir, nil
 }
 
-// CleanTemp is used to remove orphaned artifacts from aborted scans.
-type CleanTemp interface {
-	// CleanTempDir removes orphaned directories from sources. ex: Git
-	CleanTempDir(ctx logContext.Context, dirName string, pid int) error
-	// CleanTempFiles removes orphaned files/artifacts from sources. ex: Artifactory
-	CleanTempFiles(ctx context.Context, fileName string, pid int) error
+// Unlike MkdirTemp, we only want to generate the filename string.
+// The tempfile creation in trufflehog we're interested in
+// is generally handled by "github.com/trufflesecurity/disk-buffer-reader"
+func MkFilename() string {
+	pid := os.Getpid()
+	filename := fmt.Sprintf(defaultArtifactPrefixFormat, defaultExecPath, pid)
+	return filename
 }
 
 // Only compile during startup.
 var trufflehogRE = regexp.MustCompile(`^trufflehog-\d+-\d+$`)
 
-// CleanTempDir removes orphaned temp directories that do not contain running PID values.
-func CleanTempDir(ctx logContext.Context) error {
-	const defaultExecPath = "trufflehog"
+// CleanTempArtifacts deletes orphaned temp directories and files that do not contain running PID values.
+func CleanTempArtifacts(ctx logContext.Context) error {
 	executablePath, err := os.Executable()
 	if err != nil {
 		executablePath = defaultExecPath
 	}
 	execName := filepath.Base(executablePath)
 
-	// Finds other trufflehog PIDs that may be running
 	var pids []string
 	procs, err := ps.Processes()
 	if err != nil {
@@ -61,40 +64,53 @@ func CleanTempDir(ctx logContext.Context) error {
 	}
 
 	tempDir := os.TempDir()
-	dirs, err := os.ReadDir(tempDir)
+	artifacts, err := os.ReadDir(tempDir)
 	if err != nil {
 		return fmt.Errorf("error reading temp dir: %w", err)
 	}
 
-	for _, dir := range dirs {
-		// Ensure that all directories match the pattern.
-		if trufflehogRE.MatchString(dir.Name()) {
-			// Mark these directories initially as ones that should be deleted.
+	for _, artifact := range artifacts {
+		if len(pids) == 0 {
+			ctx.Logger().Info("No trufflehog processes were found")
+			continue
+		}
+		if trufflehogRE.MatchString(artifact.Name()) {
+			// Mark these artifacts initially as ones that should be deleted.
 			shouldDelete := true
-			// If they match any live PIDs, mark as should not delete.
+			// Check if the name matches any live PIDs.
 			for _, pidval := range pids {
-				if strings.Contains(dir.Name(), fmt.Sprintf("-%s-", pidval)) {
+				if strings.Contains(artifact.Name(), fmt.Sprintf("-%s-", pidval)) {
 					shouldDelete = false
-					// break out so we can still delete directories even if no other Trufflehog processes are running.
 					break
 				}
 			}
+
 			if shouldDelete {
-				dirPath := filepath.Join(tempDir, dir.Name())
-				if err := os.RemoveAll(dirPath); err != nil {
-					return fmt.Errorf("error deleting temp directory: %s", dirPath)
+				artifactPath := filepath.Join(tempDir, artifact.Name())
+
+				var err error
+				if artifact.IsDir() {
+					err = os.RemoveAll(artifactPath)
+				} else {
+					err = os.Remove(artifactPath)
 				}
-				ctx.Logger().V(1).Info("Deleted directory", "directory", dirPath)
+				if err != nil {
+					return fmt.Errorf("Error deleting temp artifact: %s", artifactPath)
+				}
+
+				ctx.Logger().Info("Deleted orphaned temp artifact", "artifact", artifactPath)
 			}
 		}
 	}
+
 	return nil
 }
 
-// RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds
+// RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds.
 func RunCleanupLoop(ctx logContext.Context) {
-	if err := CleanTempDir(ctx); err != nil {
-		ctx.Logger().Error(err, "error cleaning up orphaned directories ")
+	err := CleanTempArtifacts(ctx)
+	if err != nil {
+		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
 	}
 
 	const cleanupLoopInterval = 15 * time.Second
@@ -104,7 +120,7 @@ func RunCleanupLoop(ctx logContext.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			if err := CleanTempDir(ctx); err != nil {
+			if err := CleanTempArtifacts(ctx); err != nil {
 				ctx.Logger().Error(err, "error cleaning up orphaned directories")
 			}
 		case <-ctx.Done():
