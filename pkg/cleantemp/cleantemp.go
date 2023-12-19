@@ -70,31 +70,35 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 	}
 
 	for _, artifact := range artifacts {
-		if trufflehogRE.MatchString(artifact.Name()) {
-			// Mark these artifacts initially as ones that should be deleted.
-			shouldDelete := true
-			// Check if the name matches any live PIDs.
-			for _, pidval := range pids {
-				if strings.Contains(artifact.Name(), fmt.Sprintf("-%s-", pidval)) {
-					shouldDelete = false
-					break
-				}
-			}
-
-			if shouldDelete {
-				artifactPath := filepath.Join(tempDir, artifact.Name())
-
-				var err error
-				if artifact.IsDir() {
-					err = os.RemoveAll(artifactPath)
-				} else {
-					err = os.Remove(artifactPath)
-				}
-				if err != nil {
-					return fmt.Errorf("Error deleting temp artifact: %s", artifactPath)
+		if len(pids) == 0 {
+			ctx.Logger().Info("No trufflehog processes were found")
+		} else {
+			if trufflehogRE.MatchString(artifact.Name()) {
+				// Mark these artifacts initially as ones that should be deleted.
+				shouldDelete := true
+				// Check if the name matches any live PIDs.
+				for _, pidval := range pids {
+					if strings.Contains(artifact.Name(), fmt.Sprintf("-%s-", pidval)) {
+						shouldDelete = false
+						break
+					}
 				}
 
-				ctx.Logger().Info("Deleted orphaned temp artifact", "artifact", artifactPath)
+				if shouldDelete {
+					artifactPath := filepath.Join(tempDir, artifact.Name())
+
+					var err error
+					if artifact.IsDir() {
+						err = os.RemoveAll(artifactPath)
+					} else {
+						err = os.Remove(artifactPath)
+					}
+					if err != nil {
+						return fmt.Errorf("Error deleting temp artifact: %s", artifactPath)
+					}
+
+					ctx.Logger().Info("Deleted orphaned temp artifact", "artifact", artifactPath)
+				}
 			}
 		}
 	}
