@@ -70,6 +70,10 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 	}
 
 	for _, artifact := range artifacts {
+		if len(pids) == 0 {
+			ctx.Logger().Info("No trufflehog processes were found")
+			continue
+		}
 		if trufflehogRE.MatchString(artifact.Name()) {
 			// Mark these artifacts initially as ones that should be deleted.
 			shouldDelete := true
