@@ -216,14 +216,12 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
-
-	ctx := context.Background()
-
-	go cleantemp.RunCleanupLoop(ctx)
 }
 
 func run(state overseer.State) {
 	ctx := context.Background()
+	go cleantemp.RunCleanupLoop(ctx)
+
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger)
 
