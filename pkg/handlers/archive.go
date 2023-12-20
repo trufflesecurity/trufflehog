@@ -111,6 +111,9 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 		if err != nil {
 			return err
 		}
+
+		defer compReader.Close()
+
 		return a.openArchive(ctx, depth+1, compReader, archiveChan)
 	case archiver.Extractor:
 		return archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, a.extractorHandler(archiveChan))
