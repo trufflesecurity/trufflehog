@@ -63,6 +63,11 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 		}
 	}
 
+	if len(pids) == 0 {
+		ctx.Logger().V(5).Info("No trufflehog processes were found")
+		return nil
+	}
+
 	tempDir := os.TempDir()
 	artifacts, err := os.ReadDir(tempDir)
 	if err != nil {
@@ -70,10 +75,6 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 	}
 
 	for _, artifact := range artifacts {
-		if len(pids) == 0 {
-			ctx.Logger().V(5).Info("No trufflehog processes were found")
-			continue
-		}
 		if trufflehogRE.MatchString(artifact.Name()) {
 			// Mark these artifacts initially as ones that should be deleted.
 			shouldDelete := true
