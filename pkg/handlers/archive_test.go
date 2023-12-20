@@ -135,7 +135,7 @@ func TestHandleFile(t *testing.T) {
 }
 
 func BenchmarkHandleFile(b *testing.B) {
-	file, err := os.Open("testdata/dir-archive.zip")
+	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(b, err)
 	defer file.Close()
 
