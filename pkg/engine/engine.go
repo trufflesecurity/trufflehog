@@ -181,13 +181,13 @@ func WithVerify(verify bool) Option {
 }
 
 func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors.Detector) []detectors.Detector {
-	var output []detectors.Detector
+	var out []detectors.Detector
 	for _, detector := range input {
 		if filterFunc(detector) {
-			output = append(output, detector)
+			out = append(out, detector)
 		}
 	}
-	return output
+	return out
 }
 
 // HasFoundResults returns true if any results are found.
@@ -439,8 +439,8 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 }
 
 // ScanChunk injects a chunk into the output stream of chunks to be scanned.
-// This method should rarely be used. TODO: Remove when dependencies no longer
-// rely on this functionality.
+// This method should rarely be used. TODO(THOG-1577): Remove when dependencies
+// no longer rely on this functionality.
 func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 	e.sourceManager.ScanChunk(chunk)
 }

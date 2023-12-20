@@ -60,7 +60,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			payload := strings.NewReader(`{"text": ""}`)
+			// We don't want to actually send anything to webhooks we find. To verify them without spamming them, we
+			// send an intentionally malformed message and look for a particular expected error message.
+			payload := strings.NewReader(`intentionally malformed JSON from Trufflehog scan`)
 			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			if err != nil {
 				continue
@@ -76,15 +78,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				defer res.Body.Close()
 
-				if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (bytes.Equal(bodyBytes, []byte("no_text")) || bytes.Equal(bodyBytes, []byte("missing_text")))) {
+				switch {
+				case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
+					// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
+					// we at least know the secret is verified.
 					s1.Verified = true
-				} else if res.StatusCode == 401 || res.StatusCode == 403 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+				case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
+					s1.Verified = true
+				case res.StatusCode == http.StatusNotFound:
+					// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
+					// You might want to handle this case or log it.
+				default:
+					err = fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

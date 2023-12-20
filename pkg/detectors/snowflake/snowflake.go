@@ -4,14 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
+	"strings"
+	"unicode"
+
 	_ "github.com/snowflakedb/gosnowflake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"regexp"
-	"strings"
-	"time"
-	"unicode"
 )
 
 type Scanner struct {
@@ -125,7 +125,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if strings.Contains(err.Error(), "Incorrect username or password was specified") {
 							s1.Verified = false
 						} else {
-							s1.VerificationError = err
+							s1.SetVerificationError(err, resPasswordMatch)
 						}
 					} else {
 						rows, err := db.Query(retrieveAllDatabasesQuery)
@@ -146,7 +146,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 						s1.ExtraData["databases"] = strings.Join(databases, ", ")
 
-						if s1.VerificationError == nil {
+						if s1.VerificationError() == nil {
 							s1.Verified = true
 						}
 					}

@@ -82,7 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode == http.StatusBadRequest {
 					var resp response
 					if err = json.NewDecoder(res.Body).Decode(&resp); err != nil {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response body: %w", err)
+						err = fmt.Errorf("unexpected HTTP response body: %w", err)
+						s1.SetVerificationError(err, resMatch)
 						continue
 					}
 					if resp.Error.Message == "max_tokens_to_sample: field required" {
@@ -95,10 +96,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// The secret is determinately not verified (nothing to do)
 					// Anthropic returns 401 on all requests not containing a valid x-api-key header
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

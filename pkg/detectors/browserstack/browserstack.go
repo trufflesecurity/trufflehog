@@ -3,13 +3,15 @@ package browserstack
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"regexp"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"golang.org/x/net/publicsuffix"
 )
 
 type Scanner struct {
@@ -22,17 +24,26 @@ var _ detectors.Detector = (*Scanner)(nil)
 const browserStackAPIURL = "https://www.browserstack.com/automate/plan.json"
 
 var (
-	defaultClient = common.SaneHttpClient()
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "accessKey", "\"access_Key\":", "ACCESS_KEY", "key", "browserstackKey", "BS_AUTHKEY", "BROWSERSTACK_ACCESS_KEY"}) + `\b([0-9a-zA-Z]{20})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "userName", "\"username\":", "USER_NAME", "user", "browserstackUser", "BS_USERNAME", "BROWSERSTACK_USERNAME"}) + `\b([a-zA-Z\d]{3,18}[._-]?[a-zA-Z\d]{6,11})\b`)
+	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "userName", "\"username\":", "USER_NAME", "user", "browserstackUser", "BS_USERNAME", "BROWSERSTACK_USERNAME"}) + `\b([a-zA-Z\d]{3,18}[._-]*[a-zA-Z\d]{6,11})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"browserstack"}
+}
+
+func (s Scanner) getClient(cookieJar *cookiejar.Jar) *http.Client {
+	if s.client != nil {
+		s.client.Jar = cookieJar
+		return s.client
+	}
+	// Using custom HTTP client instead of common.SaneHttpClient() here because, for unknown reasons, browserstack blocks those requests even with cookie jar attached
+	return &http.Client{
+		Jar: cookieJar,
+	}
 }
 
 // FromData will find and optionally verify BrowserStack secrets in a given set of bytes.
@@ -61,14 +72,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
+				// browserstack (via cloudflare) requires cookies to be enabled
+				jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+				if err != nil {
+					return nil, err
 				}
+				client := s.getClient(jar)
 
 				isVerified, verificationErr := verifyBrowserStackCredentials(ctx, client, resUserMatch, resMatch)
 				s1.Verified = isVerified
-				s1.VerificationError = verificationErr
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
@@ -96,9 +109,18 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	if res.StatusCode == http.StatusOK {
 		return true, nil
-	} else if res.StatusCode != 401 {
+	} else if res.StatusCode == http.StatusForbidden {
+		// Sometimes browserstack (via Cloudflare) will block requests for security
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		if strings.Contains(string(body), "blocked") {
+			return false, fmt.Errorf("blocked by browserstack")
+		}
+	} else if res.StatusCode != http.StatusUnauthorized {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 
