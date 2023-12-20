@@ -148,6 +148,8 @@ func BenchmarkHandleFile(b *testing.B) {
 		reader, err := diskbufferreader.New(file)
 		assert.NoError(b, err)
 
+		b.StartTimer()
+
 		go func() {
 			defer close(sourceChan)
 			HandleFile(logContext.Background(), reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
@@ -155,6 +157,8 @@ func BenchmarkHandleFile(b *testing.B) {
 
 		for range sourceChan {
 		}
+
+		b.StopTimer()
 	}
 }
 
