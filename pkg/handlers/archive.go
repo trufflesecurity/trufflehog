@@ -91,6 +91,10 @@ func (a *Archive) FromFile(originalCtx logContext.Context, data io.Reader) chan 
 
 // openArchive takes a reader and extracts the contents up to the maximum depth.
 func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
+	if common.IsDone(ctx) {
+		return ctx.Err()
+	}
+
 	if depth >= maxDepth {
 		return fmt.Errorf(errMaxArchiveDepthReached)
 	}
@@ -183,6 +187,11 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 	return func(ctx context.Context, f archiver.File) error {
 		lCtx := logContext.AddLogger(ctx)
 		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
+
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+
 		depth := 0
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
