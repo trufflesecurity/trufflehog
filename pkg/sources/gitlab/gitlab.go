@@ -136,7 +136,9 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 					},
 				},
 			}
-		})
+		},
+		conn.GetSkipBinaries(),
+	)
 
 	return nil
 }
@@ -148,6 +150,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	if err != nil {
 		return errors.New(err)
 	}
+
+	gitlabReposScanned.WithLabelValues(s.name).Set(0)
 	// Get repo within target.
 	repos, errs := normalizeRepos(s.repos)
 	for _, repoErr := range errs {
@@ -172,6 +176,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	s.repos = repos
+	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	// We must sort the repos so we can resume later if necessary.
 	slices.Sort(s.repos)
 
@@ -409,6 +414,7 @@ func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Clien
 	if len(repos) == 0 {
 		return nil, errors.Errorf("unable to discover any repos"), true
 	}
+
 	return repos, nil, false
 }
 
@@ -467,6 +473,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				scanErrs.Add(err)
 				return nil
 			}
+			gitlabReposScanned.WithLabelValues(s.name).Inc()
 
 			logger.V(2).Info(fmt.Sprintf("Completed scanning repo %d/%d", i+1, len(s.repos)))
 			return nil

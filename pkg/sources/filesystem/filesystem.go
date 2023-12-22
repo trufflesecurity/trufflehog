@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -149,10 +150,13 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	if err != nil {
 		return fmt.Errorf("unable to open file: %w", err)
 	}
+
+	bufferName := cleantemp.MkFilename()
+
 	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
 
-	reReader, err := diskbufferreader.New(inputFile)
+	reReader, err := diskbufferreader.New(inputFile, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return fmt.Errorf("could not create re-readable reader: %w", err)
 	}

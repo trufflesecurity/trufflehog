@@ -34,7 +34,7 @@ func firstResponseFromSSH(parsedKey any, username, hostport string) (string, err
 
 	// Verify the server fingerprint to ensure that there is no MITM replay attack
 	config := &ssh.ClientConfig{
-		Timeout: 3 * time.Second,
+		Timeout: 5 * time.Second,
 		User:    username,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),

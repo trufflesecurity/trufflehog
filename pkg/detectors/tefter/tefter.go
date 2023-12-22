@@ -61,8 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				bodyString := string(bodyBytes)
-				validResponse := json.Valid([]byte(bodyString))
+				validResponse := json.Valid(bodyBytes)
 
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {

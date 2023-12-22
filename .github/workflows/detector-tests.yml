@@ -7,6 +7,7 @@ on:
 
 jobs:
   test-detectors:
+    if: ${{ github.repository == 'trufflesecurity/trufflehog' }}
     runs-on: ubuntu-latest
     permissions:
       actions: "read"

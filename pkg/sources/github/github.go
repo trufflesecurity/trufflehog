@@ -57,7 +57,6 @@ type Source struct {
 	jobID             sources.JobID
 	verify            bool
 	repos             []string
-	members           []string
 	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
 	memberCache       map[string]struct{}
@@ -276,7 +275,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 					},
 				},
 			}
-		})
+		},
+		conn.GetSkipBinaries(),
+	)
 
 	return nil
 }
@@ -632,7 +633,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	}
 
 	if s.conn.ScanUsers {
-		s.log.Info("Adding repos", "members", len(s.members), "orgs", s.orgsCache.Count())
+		s.log.Info("Adding repos", "members", len(s.memberCache), "orgs", s.orgsCache.Count())
 		s.addReposForMembers(ctx)
 		return nil
 	}
@@ -702,8 +703,8 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			if err != nil {
 				return nil, err
 			}
-			s.log.Info("Scanning repos", "org_members", len(s.members))
-			for _, member := range s.members {
+			s.log.Info("Scanning repos", "org_members", len(s.memberCache))
+			for member := range s.memberCache {
 				logger := s.log.WithValues("member", member)
 				if err := s.getReposByUser(ctx, member); err != nil {
 					logger.Error(err, "error fetching gists by user")
@@ -877,7 +878,7 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 }
 
 func (s *Source) addReposForMembers(ctx context.Context) {
-	s.log.Info("Fetching repos from members", "members", len(s.members))
+	s.log.Info("Fetching repos from members", "members", len(s.memberCache))
 	for member := range s.memberCache {
 		if err := s.addUserGistsToCache(ctx, member); err != nil {
 			s.log.Info("Unable to fetch gists by user", "user", member, "error", err)
@@ -1515,7 +1516,7 @@ func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarg
 func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
 	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
 	if !ok {
-		return fmt.Errorf("unable to cast metadata type for targetted scan")
+		return fmt.Errorf("unable to cast metadata type for targeted scan")
 	}
 	meta := metaType.Github
 
@@ -1546,6 +1547,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
+		SecretID:   target.SecretID,
 		Data:       []byte(res),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
