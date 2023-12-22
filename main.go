@@ -220,7 +220,11 @@ func main() {
 
 func run(state overseer.State) {
 	ctx := context.Background()
-	go cleantemp.CleanTempArtifacts(ctx)
+	go func() {
+		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+			ctx.Logger().Error(err, "error cleaning temporary artifacts")
+		}
+	}()
 
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger)
