@@ -1014,6 +1014,8 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
+	var handlerOpts []handlers.Option
+
 	if s.skipArchives {
 		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
 	}
@@ -1053,7 +1055,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter) {
+	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
 		return nil
 	}
 
