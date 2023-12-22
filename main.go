@@ -220,7 +220,7 @@ func main() {
 
 func run(state overseer.State) {
 	ctx := context.Background()
-	go cleantemp.RunCleanupLoop(ctx)
+	go cleantemp.CleanTempArtifacts(ctx)
 
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger)
