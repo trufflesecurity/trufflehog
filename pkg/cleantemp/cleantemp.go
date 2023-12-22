@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mitchellh/go-ps"
 
@@ -108,28 +107,4 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 	}
 
 	return nil
-}
-
-// RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds.
-func RunCleanupLoop(ctx logContext.Context) {
-	err := CleanTempArtifacts(ctx)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
-	}
-
-	const cleanupLoopInterval = 15 * time.Second
-	ticker := time.NewTicker(cleanupLoopInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := CleanTempArtifacts(ctx); err != nil {
-				ctx.Logger().Error(err, "error cleaning up orphaned directories")
-			}
-		case <-ctx.Done():
-			ctx.Logger().Info("Cleanup loop exiting due to context cancellation")
-			return
-		}
-	}
 }
