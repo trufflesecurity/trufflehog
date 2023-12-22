@@ -11,6 +11,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -424,6 +425,10 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
+
+	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+		ctx.Logger().Error(err, "error cleaning temp artifacts")
+	}
 
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
