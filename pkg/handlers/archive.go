@@ -213,12 +213,7 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 			return nil
 		}
 
-		fileBytes, err := a.ReadToMax(lCtx, fReader)
-		if err != nil {
-			return err
-		}
-
-		return a.openArchive(lCtx, depth, bytes.NewReader(fileBytes), archiveChan)
+		return a.openArchive(lCtx, depth, fReader, archiveChan)
 	}
 }
 
