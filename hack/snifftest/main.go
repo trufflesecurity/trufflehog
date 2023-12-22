@@ -203,6 +203,7 @@ func main() {
 						}
 					},
 					true,
+					false,
 				)
 
 				logger.Info("scanning repo", "repo", r)

@@ -46,6 +46,7 @@ type Archive struct {
 	size         int
 	currentDepth int
 	skipBinaries bool
+	skipArchives bool
 }
 
 // New creates a new Archive handler with the provided options.
@@ -72,6 +73,10 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 
 // FromFile extracts the files from an archive.
 func (a *Archive) FromFile(originalCtx logContext.Context, data io.Reader) chan []byte {
+	if a.skipArchives {
+		return nil
+	}
+
 	archiveChan := make(chan []byte, defaultBufferSize)
 	go func() {
 		ctx, cancel := logContext.WithTimeout(originalCtx, maxTimeout)

@@ -58,6 +58,7 @@ type Git struct {
 	metrics            metrics
 	concurrency        *semaphore.Weighted
 	skipBinaries       bool
+	skipArchives       bool
 }
 
 type metrics struct {
@@ -66,6 +67,7 @@ type metrics struct {
 
 func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData, skipBinaries bool,
+	skipArchives bool,
 ) *Git {
 	return &Git{
 		sourceType:         sourceType,
@@ -76,6 +78,7 @@ func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sourc
 		verify:             verify,
 		concurrency:        semaphore.NewWeighted(int64(concurrency)),
 		skipBinaries:       skipBinaries,
+		skipArchives:       skipArchives,
 	}
 }
 
@@ -178,6 +181,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 			}
 		},
 		conn.GetSkipBinaries(),
+		conn.GetSkipArchives(),
 	)
 	return nil
 }
@@ -1012,6 +1016,10 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 			fileCtx.Logger().V(5).Info("skipping binary file")
 			return nil
 		}
+	}
+
+	if s.skipArchives {
+		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
 	}
 
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)

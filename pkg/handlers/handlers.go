@@ -36,6 +36,15 @@ func WithSkipBinaries(skip bool) Option {
 	}
 }
 
+// WithSkipArchives returns a Option that configures whether to skip archive files.
+func WithSkipArchives(skip bool) Option {
+	return func(h Handler) {
+		if a, ok := h.(*Archive); ok {
+			a.skipArchives = skip
+		}
+	}
+}
+
 type Handler interface {
 	FromFile(logContext.Context, io.Reader) chan []byte
 	IsFiletype(logContext.Context, io.Reader) (io.Reader, bool)
@@ -84,6 +93,10 @@ func processHandler(ctx logContext.Context, h Handler, reReader *diskbufferreade
 }
 
 func handleChunks(ctx logContext.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
+	if handlerChan == nil {
+		return false
+	}
+
 	for {
 		select {
 		case data, open := <-handlerChan:
