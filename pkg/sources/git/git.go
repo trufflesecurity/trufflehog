@@ -1009,13 +1009,9 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	var handlerOpts []handlers.Option
 	if s.skipBinaries {
-		handlerOpts = append(handlerOpts, handlers.WithSkipBinaries(true))
-		if common.IsBinary(path) {
-			fileCtx.Logger().V(5).Info("skipping binary file")
-			return nil
-		}
+		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
+		return nil
 	}
 
 	if s.skipArchives {
@@ -1057,7 +1053,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
+	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter) {
 		return nil
 	}
 
