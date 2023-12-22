@@ -1010,8 +1010,6 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	var handlerOpts []handlers.Option
-
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 
 	var stderr bytes.Buffer
@@ -1047,7 +1045,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
+	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter) {
 		return nil
 	}
 
