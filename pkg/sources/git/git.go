@@ -1011,13 +1011,6 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 
 	var handlerOpts []handlers.Option
-	if s.skipBinaries {
-		handlerOpts = append(handlerOpts, handlers.WithSkipBinaries(true))
-		if common.IsBinary(path) {
-			fileCtx.Logger().V(5).Info("skipping binary file")
-			return nil
-		}
-	}
 
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 
