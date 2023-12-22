@@ -96,6 +96,7 @@ message Bitbucket {
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
   bool skip_binaries = 7;
+  bool skip_archives = 8;
 }
 
 message CircleCI {
@@ -196,6 +197,7 @@ message Git {
   // like head, base, bare, etc.
   string uri = 13; // repository URL. https://, file://, or ssh://
   bool skip_binaries = 14;
+  bool skip_archives = 15;
 }
 
 message GitLab {
@@ -208,6 +210,7 @@ message GitLab {
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
   bool skip_binaries = 7;
+  bool skip_archives = 8;
 }
 
 message GitHub {
@@ -230,6 +233,7 @@ message GitHub {
   bool include_issue_comments = 15;
   bool include_gist_comments = 16;
   bool skip_binaries = 17;
+  bool skip_archives = 18;
 }
 
 message GoogleDrive {
@@ -301,6 +305,7 @@ message Gerrit {
   }
   repeated string projects = 4;
   bool skip_binaries = 5;
+  bool skip_archives = 6;
 }
 
 message Jenkins {
@@ -369,4 +374,5 @@ message AzureRepos {
   repeated string include_projects = 10;
   repeated string ignore_projects = 11;
   bool skip_binaries = 12;
+  bool skip_archives = 13;
 }

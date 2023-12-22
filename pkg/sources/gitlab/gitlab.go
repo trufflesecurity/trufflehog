@@ -138,6 +138,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 			}
 		},
 		conn.GetSkipBinaries(),
+		conn.GetSkipArchives(),
 	)
 
 	return nil

@@ -311,6 +311,31 @@ func TestExtractDebContent(t *testing.T) {
 	assert.Equal(t, expectedLength, len(string(content)))
 }
 
+func TestSkipArchive(t *testing.T) {
+	file, err := os.Open("testdata/test.tgz")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
+	ctx := logContext.Background()
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		ok := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
+		assert.False(t, ok)
+	}()
+
+	wantCount := 0
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
 func TestExtractTarContent(t *testing.T) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)
