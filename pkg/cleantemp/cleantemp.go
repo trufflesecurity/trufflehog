@@ -76,7 +76,7 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 	defer dir.Close()
 
 	for {
-		entries, err := dir.Readdir(1) // read only one entry
+		entries, err := dir.ReadDir(1) // read only one entry
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -85,8 +85,6 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 		}
 		entry := entries[0]
 
-		// Get the full path
-		path := filepath.Join(tempDir, entry.Name())
 		if trufflehogRE.MatchString(entry.Name()) {
 
 			// Mark these artifacts initially as ones that should be deleted.
@@ -101,6 +99,7 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 			}
 
 			if shouldDelete {
+				path := filepath.Join(tempDir, entry.Name())
 				if entry.IsDir() {
 					err = os.RemoveAll(path)
 				} else {
