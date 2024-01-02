@@ -277,6 +277,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			}
 		},
 		conn.GetSkipBinaries(),
+		conn.GetSkipArchives(),
 	)
 
 	return nil
