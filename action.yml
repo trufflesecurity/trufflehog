@@ -58,7 +58,7 @@ runs:
       ##########################################
       else
         if [ "${{ github.event_name }}" == "push" ]; then
-          COMMIT_LENGTH=$(printenv COMMITS | jq length)
+          COMMIT_LENGTH=$(printenv COMMITS | jq length)
           if [ $COMMIT_LENGTH == "0" ]; then
             echo "No commits to scan"
             exit 0
