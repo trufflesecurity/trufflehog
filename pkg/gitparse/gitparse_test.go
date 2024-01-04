@@ -323,6 +323,13 @@ func TestLineChecks(t *testing.T) {
 					IndexLine,
 					[]byte("--- /dev/null"),
 				},
+				// New file (https://github.com/trufflesecurity/trufflehog/issues/2109)
+				// diff --git a/libs/Unfit-1.0 b/libs/Unfit-1.0
+				// new file mode 160000
+				{
+					ModeLine,
+					[]byte("--- /dev/null"),
+				},
 				// Uncommon but valid prefixes. Will these ever show up?
 				// https://stackoverflow.com/a/2530012
 				// https://git-scm.com/docs/git-config#Documentation/git-config.txt-diffmnemonicPrefix
@@ -1148,7 +1155,45 @@ func TestMaxCommitSize(t *testing.T) {
 
 }
 
-const commitLog = `commit 4727ffb7ad6dc5130bf4b4dd166e00705abdd018 (HEAD -> master)
+const commitLog = `commit fd6e99e7a80199b76a694603be57c5ade1de18e7
+Author: Jaliborc <jaliborc@gmail.com>
+Date:   Mon Apr 25 16:28:06 2011 +0100
+
+    Added Unusable coloring
+
+diff --git a/components/item.lua b/components/item.lua
+index fc74534..f8d7d50 100755
+--- a/components/item.lua
++++ b/components/item.lua
+@@ -9,6 +9,7 @@ ItemSlot:Hide()
+ Bagnon.ItemSlot = ItemSlot
+
+ local ItemSearch = LibStub('LibItemSearch-1.0')
++local Unfit = LibStub('Unfit-1.0')
+
+ local function hasBlizzQuestHighlight()
+        return GetContainerItemQuestInfo and true or false
+diff --git a/embeds.xml b/embeds.xml
+index d3f4e7c..0c2df69 100755
+--- a/embeds.xml
++++ b/embeds.xml
+@@ -6,6 +6,7 @@
+        <Include file="libs\AceConsole-3.0\AceConsole-3.0.xml"/>
+        <Include file="libs\AceLocale-3.0\AceLocale-3.0.xml"/>
+
++       <Script file="libs\Unfit-1.0\Unfit-1.0.lua"/>
+        <Script file="libs\LibDataBroker-1.1.lua"/>
+        <Script file="libs\LibItemSearch-1.0\LibItemSearch-1.0.lua"/>
+ </Ui>
+\ No newline at end of file
+diff --git a/libs/Unfit-1.0 b/libs/Unfit-1.0
+new file mode 160000
+--- /dev/null
++++ b/libs/Unfit-1.0
+@@ -0,0 +1 @@
++Subproject commit 0000000000000000000000000000000000000000
+
+commit 4727ffb7ad6dc5130bf4b4dd166e00705abdd018 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
 Date:   Tue Jul 11 22:26:11 2023 -0400
 
@@ -1539,6 +1584,33 @@ index 0000000..5af88a8
 // This throws a nasty panic if it's a top-level var.
 func expectedCommits() []Commit {
 	return []Commit{
+		// a
+		{
+			Hash:    "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+			Author:  "Jaliborc <jaliborc@gmail.com>",
+			Date:    newTime("Mon Apr 25 16:28:06 2011 +0100"),
+			Message: newStringBuilderValue("Added Unusable coloring\n"),
+			Diffs: []Diff{
+				{
+					PathB:     "components/item.lua",
+					LineStart: 9,
+					Content:   *bytes.NewBuffer([]byte("\n\nlocal Unfit = LibStub('Unfit-1.0')\n\n\n")),
+					IsBinary:  false,
+				},
+				{
+					PathB:     "embeds.xml",
+					LineStart: 6,
+					Content:   *bytes.NewBuffer([]byte("\n\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n\n\n\n")),
+					IsBinary:  false,
+				},
+				{
+					PathB:     "libs/Unfit-1.0",
+					LineStart: 1,
+					Content:   *bytes.NewBuffer([]byte("Subproject commit 0000000000000000000000000000000000000000\n")),
+					IsBinary:  false,
+				},
+			},
+		},
 		// Empty commit and message. Lord help us.
 		{
 			Hash:    "4727ffb7ad6dc5130bf4b4dd166e00705abdd018",
