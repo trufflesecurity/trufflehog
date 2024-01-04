@@ -342,6 +342,8 @@ func (m *VerifierConfig) validate(all bool) error {
 
 	// no validation rules for Unsafe
 
+	// no validation rules for HttpMethod
+
 	if len(errors) > 0 {
 		return VerifierConfigMultiError(errors)
 	}
