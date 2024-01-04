@@ -346,7 +346,7 @@ check_cosign_bin() {
 
 verify_sign() {
   log_debug "Verifying artifact $1"
-  cosign verify-blob "$1" \
+  ${COSIGN_BINARY} verify-blob "$1" \
   --certificate "$2" \
   --signature "$3" \
   --certificate-identity-regexp "https://github\.com/${OWNER}/${REPO}/\.github/workflows/.+" \
