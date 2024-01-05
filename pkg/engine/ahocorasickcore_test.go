@@ -20,6 +20,10 @@ func (d testDetectorV1) FromData(ctx context.Context, verify bool, data []byte) 
 	return make([]detectors.Result, 0), nil
 }
 
+func (d testDetectorV1) Info() detectors.Info {
+	return detectors.Info{}
+}
+
 func (d testDetectorV1) Keywords() []string {
 	return []string{"a", "b"}
 }
@@ -37,6 +41,10 @@ type testDetectorV2 struct {
 
 func (d testDetectorV2) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	return make([]detectors.Result, 0), nil
+}
+
+func (d testDetectorV2) Info() detectors.Info {
+	return detectors.Info{}
 }
 
 func (d testDetectorV2) Keywords() []string {
