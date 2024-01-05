@@ -146,3 +146,7 @@ func getCexIOPassphrase(apiSecret string, apiKey string, nonce string, userId st
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CexIO
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

@@ -105,3 +105,7 @@ func verifyToken(ctx context.Context, client *http.Client, token string) bool {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ShodanKey
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

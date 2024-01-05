@@ -261,3 +261,7 @@ func pingErr(ctx context.Context, driverName, conn string) error {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_JDBC
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

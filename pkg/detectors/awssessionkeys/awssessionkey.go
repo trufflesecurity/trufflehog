@@ -337,3 +337,7 @@ type identityRes struct {
 func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AWSSessionKey
 }
+
+func (s scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

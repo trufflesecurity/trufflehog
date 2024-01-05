@@ -136,3 +136,7 @@ func constructSignature(payload string, resSecretMatch string) string {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gemini
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

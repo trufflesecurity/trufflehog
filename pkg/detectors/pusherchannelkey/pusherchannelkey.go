@@ -138,3 +138,7 @@ func hmacBytes(toSign, secret []byte) []byte {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PusherChannelKey
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

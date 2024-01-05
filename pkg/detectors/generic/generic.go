@@ -136,3 +136,7 @@ func hasReMatch(matchers []*regexp.Regexp, token string) bool {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Generic
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

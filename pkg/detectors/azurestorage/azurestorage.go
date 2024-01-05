@@ -112,3 +112,7 @@ func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureStorage
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

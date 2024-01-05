@@ -233,3 +233,7 @@ func (e *verificationErrors) Add(err error) {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PrivateKey
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

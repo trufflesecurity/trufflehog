@@ -91,3 +91,7 @@ func verifyResult(ctx context.Context, client *http.Client, apiKey string) (bool
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Shortcut
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

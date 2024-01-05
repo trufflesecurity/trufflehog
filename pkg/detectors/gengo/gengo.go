@@ -123,3 +123,7 @@ func getGengoSignature(timeStamp string, secret string) string {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gengo
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

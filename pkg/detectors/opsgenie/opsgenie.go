@@ -76,3 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return detectors.CleanResults(results), nil
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

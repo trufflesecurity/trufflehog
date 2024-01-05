@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"math/big"
 	"net/url"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -16,6 +17,19 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+type CredentialData struct {
+	Regex          *regexp.Regexp
+	Min            int
+	Max            int
+	UniquePrefixes []string
+}
+
+type Info struct {
+	Name           string
+	MultiCred      bool
+	CredentialData []CredentialData
+}
+
 // Detector defines an interface for scanning for and verifying secrets.
 type Detector interface {
 	// FromData will scan bytes for results, and optionally verify them.
@@ -25,6 +39,9 @@ type Detector interface {
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+
+	// Info returns information about the detector.
+	Info() Info
 }
 
 // Versioner is an optional interface that a detector can implement to

@@ -101,3 +101,7 @@ type userResponse struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TelegramBotToken
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

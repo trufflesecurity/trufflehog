@@ -353,3 +353,7 @@ type identityRes struct {
 func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AWS
 }
+
+func (s scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

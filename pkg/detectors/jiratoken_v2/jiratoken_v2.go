@@ -135,3 +135,7 @@ func verifyJiratoken(ctx context.Context, client *http.Client, email, domain, to
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_JiraToken
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

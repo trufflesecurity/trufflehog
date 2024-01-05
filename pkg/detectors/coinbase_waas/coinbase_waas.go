@@ -141,3 +141,7 @@ func (s Scanner) verifyMatch(ctx context.Context, apiKeyName, privKey string) (b
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CoinbaseWaaS
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

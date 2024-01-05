@@ -113,3 +113,7 @@ func getBitmexSignature(timeStamp string, secret string, action string, path str
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Bitmex
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

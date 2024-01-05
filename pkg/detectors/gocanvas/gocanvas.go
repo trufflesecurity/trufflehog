@@ -108,3 +108,7 @@ type Response struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoCanvas
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

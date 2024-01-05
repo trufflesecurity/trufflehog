@@ -100,3 +100,7 @@ func verifyUri(uri string, timeout time.Duration) error {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MongoDB
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

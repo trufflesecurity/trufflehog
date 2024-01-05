@@ -122,3 +122,7 @@ func getKrakenSignature(url_path string, values url.Values, secret []byte) strin
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Kraken
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

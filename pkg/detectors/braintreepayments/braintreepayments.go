@@ -133,3 +133,7 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BraintreePayments
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

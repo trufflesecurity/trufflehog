@@ -130,3 +130,7 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BrowserStack
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

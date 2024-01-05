@@ -135,3 +135,7 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_KuCoin
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

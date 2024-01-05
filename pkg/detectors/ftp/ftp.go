@@ -128,3 +128,7 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FTP
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

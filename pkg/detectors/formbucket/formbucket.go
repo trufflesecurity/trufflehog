@@ -91,3 +91,7 @@ type Response struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FormBucket
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

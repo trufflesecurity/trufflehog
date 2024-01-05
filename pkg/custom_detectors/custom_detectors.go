@@ -248,3 +248,7 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 func (c *CustomRegexWebhook) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CustomRegex
 }
+
+func (c *CustomRegexWebhook) Info() detectors.Info {
+	return detectors.Info{}
+}

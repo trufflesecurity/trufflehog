@@ -88,3 +88,7 @@ type typeRes struct {
 		Parameters []any  `json:"parameters"`
 	} `json:"types"`
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

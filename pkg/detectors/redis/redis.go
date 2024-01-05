@@ -145,3 +145,7 @@ func verifyRedis(ctx context.Context, u *url.URL) bool {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Redis
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

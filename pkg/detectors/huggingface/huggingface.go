@@ -140,3 +140,7 @@ type auth struct {
 		Role        string `json:"role"`
 	} `json:"accessToken"`
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}

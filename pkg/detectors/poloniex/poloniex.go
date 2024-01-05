@@ -113,3 +113,7 @@ func getPoloniexSignature(secret string, payload string) string {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Poloniex
 }
+
+func (s Scanner) Info() detectors.Info {
+	return detectors.Info{}
+}
