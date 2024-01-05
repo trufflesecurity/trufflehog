@@ -21,16 +21,21 @@ var wordList []byte
 //go:embed "programmingbooks.txt"
 var programmingBookWords []byte
 
+//go:embed "uuids.txt"
+var uuidList []byte
+
 type Wordlists struct {
 	wordList             map[string]struct{}
 	badList              map[string]struct{}
 	programmingBookWords map[string]struct{}
+	uuidList             map[string]struct{}
 }
 
 var FalsePositiveWordlists = Wordlists{
 	wordList:             bytesToCleanWordList(wordList),
 	badList:              bytesToCleanWordList(badList),
 	programmingBookWords: bytesToCleanWordList(programmingBookWords),
+	uuidList:             bytesToCleanWordList(uuidList),
 }
 
 // IsKnownFalsePositives will not return a valid secret finding if any of the disqualifying conditions are met
@@ -62,6 +67,18 @@ func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordChec
 		if _, ok := FalsePositiveWordlists.programmingBookWords[lower]; ok {
 			return true
 		}
+	}
+	return false
+}
+
+func IsKnownFalsePositiveUuid(match string) bool {
+	if !utf8.ValidString(match) {
+		return true
+	}
+	lower := strings.ToLower(match)
+
+	if _, ok := FalsePositiveWordlists.badList[lower]; ok {
+		return true
 	}
 	return false
 }
