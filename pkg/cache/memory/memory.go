@@ -10,33 +10,64 @@ import (
 )
 
 const (
-	expirationInterval = 12 * time.Hour
-	purgeInterval      = 13 * time.Hour
-	defaultExpiration  = cache.DefaultExpiration
+	defaultExpirationInterval = 12 * time.Hour
+	defaultPurgeInterval      = 13 * time.Hour
+	defaultExpiration         = cache.DefaultExpiration
 )
 
-// Cache is a wrapper around the go-cache library.
+// Cache wraps the go-cache library to provide an in-memory key-value store.
 type Cache struct {
-	c *cache.Cache
+	c             *cache.Cache
+	expiration    time.Duration
+	purgeInterval time.Duration
 }
 
-// New constructs a new in-memory cache.
-func New() *Cache {
-	c := cache.New(expirationInterval, purgeInterval)
-	return &Cache{c: c}
+// CacheOption defines a function type used for configuring a Cache.
+type CacheOption func(*Cache)
+
+// WithExpirationInterval returns a CacheOption to set the expiration interval of cache items.
+// The interval determines the duration a cached item remains in the cache before it is expired.
+func WithExpirationInterval(interval time.Duration) CacheOption {
+	return func(c *Cache) { c.expiration = interval }
+}
+
+// WithPurgeInterval returns a CacheOption to set the interval at which the cache purges expired items.
+// Regular purging helps in freeing up memory by removing stale entries.
+func WithPurgeInterval(interval time.Duration) CacheOption {
+	return func(c *Cache) { c.purgeInterval = interval }
+}
+
+// New constructs a new in-memory cache instance with optional configurations.
+// By default, it sets the expiration and purge intervals to 12 and 13 hours, respectively.
+// These defaults can be overridden using the functional options: WithExpirationInterval and WithPurgeInterval.
+func New(opts ...CacheOption) *Cache {
+	instance := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
+	for _, opt := range opts {
+		opt(instance)
+	}
+
+	instance.c = cache.New(instance.expiration, instance.purgeInterval)
+	return instance
 }
 
 // NewWithData constructs a new in-memory cache with existing data.
-func NewWithData(ctx context.Context, data []string) *Cache {
+// It also accepts CacheOption parameters to override default configuration values.
+func NewWithData(ctx context.Context, data []string, opts ...CacheOption) *Cache {
 	ctx.Logger().V(3).Info("Loading cache", "num-items", len(data))
 
+	instance := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
+	for _, opt := range opts {
+		opt(instance)
+	}
+
+	// Convert data slice to map required by go-cache.
 	items := make(map[string]cache.Item, len(data))
 	for _, d := range data {
 		items[d] = cache.Item{Object: d, Expiration: int64(defaultExpiration)}
 	}
 
-	c := cache.NewFrom(expirationInterval, purgeInterval, items)
-	return &Cache{c: c}
+	instance.c = cache.NewFrom(instance.expiration, instance.purgeInterval, items)
+	return instance
 }
 
 // Set adds a key-value pair to the cache.
