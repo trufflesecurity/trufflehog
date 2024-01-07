@@ -2,7 +2,6 @@ package shortcut
 
 import (
 	"context"
-	"github.com/go-errors/errors"
 	"net/http"
 	"regexp"
 	"strings"
@@ -35,7 +34,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
@@ -48,39 +46,46 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.app.shortcut.com/api/v3/member", nil)
-			if err != nil {
+			isVerified, verificationErr := verifyResult(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
+		}
+
+		if !s1.Verified {
+			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+			if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Shortcut-Token", resMatch)
-			res, err := client.Do(req)
-
-			if err != nil {
-				return nil, errors.WrapPrefix(err, "Error making request", 0)
-			}
-
-			verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "name")
-			res.Body.Close()
-
-			if err != nil {
-				return nil, err
-			}
-
-			if err == nil {
-				if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
-			}
 		}
+
 		results = append(results, s1)
 	}
 	return results, nil
+}
+
+func verifyResult(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.app.shortcut.com/api/v3/member", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Shortcut-Token", apiKey)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "name")
+	_ = res.Body.Close()
+	if err != nil {
+		return false, err
+	}
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

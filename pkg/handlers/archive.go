@@ -46,6 +46,7 @@ type Archive struct {
 	size         int
 	currentDepth int
 	skipBinaries bool
+	skipArchives bool
 }
 
 // New creates a new Archive handler with the provided options.
@@ -72,6 +73,10 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 
 // FromFile extracts the files from an archive.
 func (a *Archive) FromFile(originalCtx logContext.Context, data io.Reader) chan []byte {
+	if a.skipArchives {
+		return nil
+	}
+
 	archiveChan := make(chan []byte, defaultBufferSize)
 	go func() {
 		ctx, cancel := logContext.WithTimeout(originalCtx, maxTimeout)
@@ -91,6 +96,10 @@ func (a *Archive) FromFile(originalCtx logContext.Context, data io.Reader) chan 
 
 // openArchive takes a reader and extracts the contents up to the maximum depth.
 func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
+	if common.IsDone(ctx) {
+		return ctx.Err()
+	}
+
 	if depth >= maxDepth {
 		return fmt.Errorf(errMaxArchiveDepthReached)
 	}
@@ -111,6 +120,9 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 		if err != nil {
 			return err
 		}
+
+		defer compReader.Close()
+
 		return a.openArchive(ctx, depth+1, compReader, archiveChan)
 	case archiver.Extractor:
 		return archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, a.extractorHandler(archiveChan))
@@ -180,6 +192,11 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 	return func(ctx context.Context, f archiver.File) error {
 		lCtx := logContext.AddLogger(ctx)
 		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
+
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+
 		depth := 0
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
@@ -201,12 +218,7 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 			return nil
 		}
 
-		fileBytes, err := a.ReadToMax(lCtx, fReader)
-		if err != nil {
-			return err
-		}
-
-		return a.openArchive(lCtx, depth, bytes.NewReader(fileBytes), archiveChan)
+		return a.openArchive(lCtx, depth, fReader, archiveChan)
 	}
 }
 

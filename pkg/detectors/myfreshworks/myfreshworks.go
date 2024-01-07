@@ -2,7 +2,9 @@ package myfreshworks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -82,7 +84,7 @@ func (s Scanner) getClient() *http.Client {
 }
 
 func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
 	if err != nil {
 		return false, err
 	}
@@ -95,7 +97,12 @@ func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resI
 	defer res.Body.Close()
 
 	if res.StatusCode == http.StatusOK {
-		return true, nil
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+
+		return json.Valid(body), nil
 	} else if !(res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden) {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}

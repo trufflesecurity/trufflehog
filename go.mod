@@ -28,9 +28,10 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.2
 	github.com/fatih/color v1.16.0
 	github.com/felixge/fgprof v0.9.3
+	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-errors/errors v1.5.1
-	github.com/go-git/go-git/v5 v5.10.1
+	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/zapr v1.3.0
@@ -75,7 +76,7 @@ require (
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/mock v0.3.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/crypto v0.16.0
+	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e
 	golang.org/x/net v0.19.0
 	golang.org/x/oauth2 v0.15.0
@@ -157,7 +158,6 @@ require (
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
-	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect

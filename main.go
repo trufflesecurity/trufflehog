@@ -5,10 +5,12 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
@@ -216,16 +218,38 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
-
-	ctx := context.Background()
-
-	go cleantemp.RunCleanupLoop(ctx)
 }
 
 func run(state overseer.State) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+
+	go func() {
+		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+			ctx.Logger().Error(err, "error cleaning temporary artifacts")
+		}
+	}()
+
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger)
+
+	killSignal := make(chan os.Signal, 1)
+	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		<-killSignal
+		logger.Info("Received signal, shutting down.")
+		cancel(fmt.Errorf("canceling context due to signal"))
+
+		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+			logger.Error(err, "error cleaning temporary artifacts")
+		} else {
+			logger.Info("cleaned temporary artifacts")
+		}
+
+		time.Sleep(time.Second * 10)
+		logger.Info("10 seconds elapsed. Forcing shutdown.")
+		os.Exit(0)
+	}()
 
 	logger.V(2).Info(fmt.Sprintf("trufflehog %s", version.BuildVersion))
 
