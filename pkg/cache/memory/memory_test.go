@@ -60,7 +60,10 @@ func TestCache(t *testing.T) {
 	}
 
 	// Test getting only the values.
-	vals := c.Values()
+	vals := make([]string, 0, c.Count())
+	for _, v := range c.Values() {
+		vals = append(vals, v.(string))
+	}
 	sort.Strings(vals)
 	sort.Strings(values)
 	if !cmp.Equal(values, vals) {
