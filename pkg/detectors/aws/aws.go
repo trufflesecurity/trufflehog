@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -111,6 +110,15 @@ func GetHMAC(key []byte, data []byte) []byte {
 	return hasher.Sum(nil)
 }
 
+// cacheItem represents an item stored in the cache, encompassing the outcome of a verification process.
+// It includes the verification result, ExtraData, and any VerificationErrors encountered during verification.
+// This struct facilitates the reconstruction of detectors.Result with values for previously verified credentials.
+type cacheItem struct {
+	extra           map[string]string
+	verificationErr error
+	verified        bool
+}
+
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -148,15 +156,25 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				},
 			}
 
-			if isVerified, ok := s.credsCache.Get(rawV2); ok {
-				s1.Verified = isVerified == "true"
+			if val, ok := s.credsCache.Get(rawV2); ok {
+				item, ok := val.(cacheItem)
+				if !ok {
+					continue
+				}
+				s1.Verified = item.verified
+				s1.ExtraData = item.extra
+				if item.verificationErr != nil {
+					s1.SetVerificationError(item.verificationErr, resSecretMatch)
+				}
 				results = append(results, s1)
 				continue
 			}
 
+			var cacheItem cacheItem
 			if verify {
 				isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = isVerified
+				cacheItem.verified = isVerified
 				// It'd be good to log when calculated account value does not match
 				// the account value from verification. Should only be edge cases at most.
 				// if extraData["account"] != s1.ExtraData["account"] && extraData["account"] != "" {//log here}
@@ -166,12 +184,15 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for k, v := range extraData {
 					s1.ExtraData[k] = v
 				}
+				cacheItem.extra = s1.ExtraData
 				if verificationErr != nil {
 					s1.SetVerificationError(verificationErr, resSecretMatch)
+					cacheItem.verificationErr = verificationErr
 				}
 			}
 
-			s.credsCache.Set(rawV2, strconv.FormatBool(s1.Verified))
+			// Cache the result.
+			s.credsCache.Set(rawV2, cacheItem)
 			if !s1.Verified {
 				// Unverified results that contain common test words are probably not secrets
 				if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
