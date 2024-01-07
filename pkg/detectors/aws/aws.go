@@ -192,7 +192,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			// Cache the result.
-			s.credsCache.Set(rawV2, cacheItem)
+			s.credsCache.Set(rawV2, &cacheItem)
 			if !s1.Verified {
 				// Unverified results that contain common test words are probably not secrets
 				if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
