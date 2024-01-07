@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,6 +23,8 @@ import (
 type scanner struct {
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
+
+	credsCache cache.Cache
 }
 
 // resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -46,6 +51,11 @@ func New(opts ...func(*scanner)) *scanner {
 
 		opt(scanner)
 	}
+
+	scanner.credsCache = memory.New(
+		memory.WithExpirationInterval(1*time.Hour),
+		memory.WithPurgeInterval(2*time.Hour),
+	)
 
 	return scanner
 }
@@ -126,14 +136,22 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
+			rawV2 := resIDMatch + resSecretMatch
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AWS,
 				Raw:          []byte(resIDMatch),
 				Redacted:     resIDMatch,
-				RawV2:        []byte(resIDMatch + resSecretMatch),
+				RawV2:        []byte(rawV2),
 				ExtraData: map[string]string{
 					"resource_type": resourceTypes[idMatch[2]],
 				},
+			}
+
+			if isVerified, ok := s.credsCache.Get(rawV2); ok {
+				s1.Verified = isVerified == "true"
+				results = append(results, s1)
+				continue
 			}
 
 			if verify {
@@ -153,6 +171,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
+			s.credsCache.Set(rawV2, strconv.FormatBool(s1.Verified))
 			if !s1.Verified {
 				// Unverified results that contain common test words are probably not secrets
 				if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
