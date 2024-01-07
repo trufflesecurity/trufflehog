@@ -97,7 +97,7 @@ func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) 
 
 // Set overrides the cache Set method of the cache to enable the persistence
 // of the cache contents the Progress of the source at given increments.
-func (c *persistableCache) Set(key, val string) {
+func (c *persistableCache) Set(key string, val any) {
 	c.Cache.Set(key, val)
 	if ok, contents := c.shouldPersist(); ok {
 		c.Progress.EncodedResumeInfo = contents

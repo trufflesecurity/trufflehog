@@ -71,17 +71,13 @@ func NewWithData(ctx context.Context, data []string, opts ...CacheOption) *Cache
 }
 
 // Set adds a key-value pair to the cache.
-func (c *Cache) Set(key, value string) {
+func (c *Cache) Set(key string, value any) {
 	c.c.Set(key, value, defaultExpiration)
 }
 
 // Get returns the value for the given key.
-func (c *Cache) Get(key string) (string, bool) {
-	res, ok := c.c.Get(key)
-	if !ok {
-		return "", ok
-	}
-	return res.(string), ok
+func (c *Cache) Get(key string) (any, bool) {
+	return c.c.Get(key)
 }
 
 // Exists returns true if the given key exists in the cache.
@@ -116,11 +112,11 @@ func (c *Cache) Keys() []string {
 }
 
 // Values returns all values in the cache.
-func (c *Cache) Values() []string {
+func (c *Cache) Values() []any {
 	items := c.c.Items()
-	res := make([]string, 0, len(items))
+	res := make([]any, 0, len(items))
 	for _, v := range items {
-		res = append(res, v.Object.(string))
+		res = append(res, v.Object)
 	}
 	return res
 }
