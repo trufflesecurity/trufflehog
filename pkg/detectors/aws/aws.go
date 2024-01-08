@@ -123,6 +123,13 @@ func newCacheItem(isVerified bool, verificationErr error, extra map[string]strin
 	return &cacheItem{verificationErr: verificationErr, isVerified: isVerified, extra: extra}
 }
 
+// populateResult populates the given detectors.Result with the values from the cacheItem.
+func (c *cacheItem) populateResult(result *detectors.Result) {
+	result.Verified = c.isVerified
+	result.ExtraData = c.extra
+	result.SetVerificationError(c.verificationErr)
+}
+
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -165,9 +172,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if !ok {
 					continue
 				}
-				s1.Verified = item.isVerified
-				s1.ExtraData = item.extra
-				s1.SetVerificationError(item.verificationErr, resSecretMatch)
+				item.populateResult(&s1)
 				results = append(results, s1)
 				continue
 			}
