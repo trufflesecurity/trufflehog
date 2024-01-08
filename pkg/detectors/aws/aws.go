@@ -120,11 +120,7 @@ type cacheItem struct {
 }
 
 func newCacheItem(isVerified bool, verificationErr error, extra map[string]string) *cacheItem {
-	item := &cacheItem{verificationErr: verificationErr, isVerified: isVerified}
-	if extra != nil {
-		item.extra = extra
-	}
-	return item
+	return &cacheItem{verificationErr: verificationErr, isVerified: isVerified, extra: extra}
 }
 
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
@@ -171,9 +167,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				s1.Verified = item.isVerified
 				s1.ExtraData = item.extra
-				if item.verificationErr != nil {
-					s1.SetVerificationError(item.verificationErr, resSecretMatch)
-				}
+				s1.SetVerificationError(item.verificationErr, resSecretMatch)
 				results = append(results, s1)
 				continue
 			}
