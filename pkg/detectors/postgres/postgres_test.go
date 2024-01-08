@@ -137,6 +137,26 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found with seperated credentials - no port, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`
+					POSTGRES_USER=%s
+					POSTGRES_PASSWORD=%s
+					POSTGRES_ADDRESS=%s
+					`, postgresUser, inactivePass, postgresHost)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "found with single line credentials, unverified",
 			s:    Scanner{},
 			args: args{
@@ -199,12 +219,11 @@ func TestPostgres_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
 				}
-				r.SetVerificationError(errors.New("connection refused"))
 				return []detectors.Result{r}
 			}(),
 			wantErr: false,
 		},
-		// TODO: This test seems take a long time to run (70s+) even with the timeout set to 1s. It's not clear why.
+		// This test seems take a long time to run (70s+) even with the timeout set to 1s. It's not clear why.
 		{
 			name: "found, unverified due to error - inactive host",
 			s:    Scanner{},
