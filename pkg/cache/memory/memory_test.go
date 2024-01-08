@@ -85,7 +85,8 @@ func TestCache(t *testing.T) {
 }
 
 func TestCache_NewWithData(t *testing.T) {
-	c := NewWithData(logContext.Background(), []string{"key1", "key2", "key3"})
+	data := []CacheEntry{{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}
+	c := NewWithData(logContext.Background(), data)
 
 	// Test the count.
 	if c.Count() != 3 {

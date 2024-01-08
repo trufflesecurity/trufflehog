@@ -297,7 +297,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	var c cache.Cache
 	if s.Progress.EncodedResumeInfo != "" {
-		c = memory.NewWithData(ctx, strings.Split(s.Progress.EncodedResumeInfo, ","))
+		keys := strings.Split(s.Progress.EncodedResumeInfo, ",")
+		entries := make([]memory.CacheEntry, len(keys))
+		for i, val := range keys {
+			entries[i] = memory.CacheEntry{Key: val, Value: val}
+		}
+
+		c = memory.NewWithData(ctx, entries)
 	} else {
 		c = memory.New()
 	}

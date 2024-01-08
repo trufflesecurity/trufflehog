@@ -50,9 +50,17 @@ func New(opts ...CacheOption) *Cache {
 	return instance
 }
 
+// CacheEntry represents a single entry in the cache, consisting of a key and its corresponding value.
+type CacheEntry struct {
+	// Key is the unique identifier for the entry.
+	Key string
+	// Value is the data stored in the entry.
+	Value any
+}
+
 // NewWithData constructs a new in-memory cache with existing data.
 // It also accepts CacheOption parameters to override default configuration values.
-func NewWithData(ctx context.Context, data []string, opts ...CacheOption) *Cache {
+func NewWithData(ctx context.Context, data []CacheEntry, opts ...CacheOption) *Cache {
 	ctx.Logger().V(3).Info("Loading cache", "num-items", len(data))
 
 	instance := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
@@ -63,7 +71,7 @@ func NewWithData(ctx context.Context, data []string, opts ...CacheOption) *Cache
 	// Convert data slice to map required by go-cache.
 	items := make(map[string]cache.Item, len(data))
 	for _, d := range data {
-		items[d] = cache.Item{Object: d, Expiration: int64(defaultExpiration)}
+		items[d.Key] = cache.Item{Object: d.Value, Expiration: int64(defaultExpiration)}
 	}
 
 	instance.c = cache.NewFrom(instance.expiration, instance.purgeInterval, items)
