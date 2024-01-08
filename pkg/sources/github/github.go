@@ -476,7 +476,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	for _, repo := range s.filteredRepoCache.Values() {
 		r, ok := repo.(string)
 		if !ok {
-			ctx.Logger().Error(fmt.Errorf("type assertion failed"), "repo not found in cache", "repo", repo)
+			ctx.Logger().Error(fmt.Errorf("type assertion failed"), "unexpected value in cache", "repo", repo)
 			continue
 		}
 		s.repos = append(s.repos, r)
