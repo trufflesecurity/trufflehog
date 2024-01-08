@@ -111,16 +111,16 @@ func GetHMAC(key []byte, data []byte) []byte {
 }
 
 // cacheItem represents an item stored in the cache, encompassing the outcome of a verification process.
-// It includes the verification result, ExtraData, and any VerificationErrors encountered during verification.
-// This struct facilitates the reconstruction of detectors.Result with values for previously verified credentials.
+// It includes the verification result, ExtraData, and VerificationErrors encountered during verification.
+// This facilitates the reconstruction of detectors.Result with values for previously verified creds.
 type cacheItem struct {
-	extra           map[string]string
-	verificationErr error
 	isVerified      bool
+	verificationErr error
+	extra           map[string]string
 }
 
 func newCacheItem(isVerified bool, verificationErr error, extra map[string]string) *cacheItem {
-	return &cacheItem{verificationErr: verificationErr, isVerified: isVerified, extra: extra}
+	return &cacheItem{isVerified, verificationErr, extra}
 }
 
 // populateResult populates the given detectors.Result with the values from the cacheItem.
