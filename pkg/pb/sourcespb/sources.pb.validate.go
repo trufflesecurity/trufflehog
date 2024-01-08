@@ -585,6 +585,10 @@ func (m *Bitbucket) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for SkipBinaries
+
+	// no validation rules for SkipArchives
+
 	switch m.Credential.(type) {
 
 	case *Bitbucket_Token:
@@ -1802,6 +1806,10 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for Uri
 
+	// no validation rules for SkipBinaries
+
+	// no validation rules for SkipArchives
+
 	switch m.Credential.(type) {
 
 	case *Git_BasicAuth:
@@ -2009,6 +2017,10 @@ func (m *GitLab) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for SkipBinaries
+
+	// no validation rules for SkipArchives
+
 	switch m.Credential.(type) {
 
 	case *GitLab_Token:
@@ -2201,6 +2213,10 @@ func (m *GitHub) validate(all bool) error {
 	// no validation rules for IncludeIssueComments
 
 	// no validation rules for IncludeGistComments
+
+	// no validation rules for SkipBinaries
+
+	// no validation rules for SkipArchives
 
 	switch m.Credential.(type) {
 
@@ -3584,6 +3600,10 @@ func (m *Gerrit) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for SkipBinaries
+
+	// no validation rules for SkipArchives
+
 	switch m.Credential.(type) {
 
 	case *Gerrit_BasicAuth:
@@ -4668,6 +4688,10 @@ func (m *AzureRepos) validate(all bool) error {
 	}
 
 	// no validation rules for IncludeForks
+
+	// no validation rules for SkipBinaries
+
+	// no validation rules for SkipArchives
 
 	switch m.Credential.(type) {
 

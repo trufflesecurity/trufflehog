@@ -2,7 +2,9 @@ package gitlab
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -18,9 +20,11 @@ type Scanner struct {
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.EndpointCustomizer = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.Versioner          = (*Scanner)(nil)
+)
 
 func (Scanner) Version() int            { return 1 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
@@ -91,19 +95,25 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error
 		if err != nil {
 			continue
 		}
+
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 		res, err := client.Do(req)
 		if err != nil {
 			return false, err
 		}
-		defer res.Body.Close() // The request body is unused.
+
+		defer res.Body.Close()
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
 
 		// 200 means good key and has `read_user` scope
 		// 403 means good key but not the right scope
 		// 401 is bad key
 		switch res.StatusCode {
 		case http.StatusOK:
-			return true, nil
+			return json.Valid(body), nil
 		case http.StatusForbidden:
 			// Good key but not the right scope
 			return true, nil

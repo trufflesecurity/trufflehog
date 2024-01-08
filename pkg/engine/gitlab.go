@@ -24,7 +24,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
-	connection := &sourcespb.GitLab{}
+	connection := &sourcespb.GitLab{SkipBinaries: c.SkipBinaries}
 
 	switch {
 	case len(c.Token) > 0:

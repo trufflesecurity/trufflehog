@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/h2non/filetype"
 	"github.com/mholt/archiver/v4"
 
@@ -43,11 +45,15 @@ var _ SpecializedHandler = (*Archive)(nil)
 type Archive struct {
 	size         int
 	currentDepth int
+	skipBinaries bool
+	skipArchives bool
 }
 
-// New sets a default maximum size and current size counter.
-func (a *Archive) New() {
-	a.size = 0
+// New creates a new Archive handler with the provided options.
+func (a *Archive) New(opts ...Option) {
+	for _, opt := range opts {
+		opt(a)
+	}
 }
 
 // SetArchiveMaxSize sets the maximum size of the archive.
@@ -67,6 +73,10 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 
 // FromFile extracts the files from an archive.
 func (a *Archive) FromFile(originalCtx logContext.Context, data io.Reader) chan []byte {
+	if a.skipArchives {
+		return nil
+	}
+
 	archiveChan := make(chan []byte, defaultBufferSize)
 	go func() {
 		ctx, cancel := logContext.WithTimeout(originalCtx, maxTimeout)
@@ -84,15 +94,12 @@ func (a *Archive) FromFile(originalCtx logContext.Context, data io.Reader) chan 
 	return archiveChan
 }
 
-type decompressorInfo struct {
-	depth       int
-	reader      io.Reader
-	archiveChan chan []byte
-	archiver    archiver.Decompressor
-}
-
 // openArchive takes a reader and extracts the contents up to the maximum depth.
 func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
+	if common.IsDone(ctx) {
+		return ctx.Err()
+	}
+
 	if depth >= maxDepth {
 		return fmt.Errorf(errMaxArchiveDepthReached)
 	}
@@ -108,19 +115,50 @@ func (a *Archive) openArchive(ctx logContext.Context, depth int, reader io.Reade
 
 	switch archive := format.(type) {
 	case archiver.Decompressor:
-		info := decompressorInfo{depth: depth, reader: arReader, archiveChan: archiveChan, archiver: archive}
+		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
+		compReader, err := archive.OpenReader(arReader)
+		if err != nil {
+			return err
+		}
 
-		return a.handleDecompressor(ctx, info)
+		defer compReader.Close()
+
+		return a.openArchive(ctx, depth+1, compReader, archiveChan)
 	case archiver.Extractor:
-		return archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, a.extractorHandler(archiveChan))
+		return archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, a.extractorHandler(archiveChan))
 	default:
 		return fmt.Errorf("unknown archive type: %s", format.Name())
 	}
 }
 
+const mimeTypeBufferSize = 512
+
 func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
+	bufReader := bufio.NewReaderSize(reader, mimeTypeBufferSize)
+	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// If fewer bytes are read, MIME type detection may still succeed.
+	buffer, err := bufReader.Peek(mimeTypeBufferSize)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	mime := mimetype.Detect(buffer)
+	mimeT := mimeType(mime.String())
+
+	if common.SkipFile(mime.Extension()) {
+		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
+		return nil
+	}
+
+	if a.skipBinaries {
+		if common.IsBinary(mime.Extension()) || mimeT == machOType || mimeT == octetStream {
+			ctx.Logger().V(5).Info("skipping binary file", "ext", mimeT)
+			return nil
+		}
+	}
+
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reader)
+	chunkResChan := chunkReader(ctx, bufReader)
 	for data := range chunkResChan {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")
@@ -131,18 +169,6 @@ func (a *Archive) handleNonArchiveContent(ctx logContext.Context, reader io.Read
 		}
 	}
 	return nil
-}
-
-func (a *Archive) handleDecompressor(ctx logContext.Context, info decompressorInfo) error {
-	compReader, err := info.archiver.OpenReader(info.reader)
-	if err != nil {
-		return err
-	}
-	fileBytes, err := a.ReadToMax(ctx, compReader)
-	if err != nil {
-		return err
-	}
-	return a.openArchive(ctx, info.depth+1, bytes.NewReader(fileBytes), info.archiveChan)
 }
 
 // IsFiletype returns true if the provided reader is an archive.
@@ -166,6 +192,11 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 	return func(ctx context.Context, f archiver.File) error {
 		lCtx := logContext.AddLogger(ctx)
 		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
+
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+
 		depth := 0
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
@@ -175,21 +206,19 @@ func (a *Archive) extractorHandler(archiveChan chan []byte) func(context.Context
 		if err != nil {
 			return err
 		}
+		defer fReader.Close()
+
 		if common.SkipFile(f.Name()) {
 			lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
 			return nil
 		}
 
-		fileBytes, err := a.ReadToMax(lCtx, fReader)
-		if err != nil {
-			return err
+		if a.skipBinaries && common.IsBinary(f.Name()) {
+			lCtx.Logger().V(5).Info("skipping binary file", "filename", f.Name())
+			return nil
 		}
 
-		err = a.openArchive(lCtx, depth, bytes.NewReader(fileBytes), archiveChan)
-		if err != nil {
-			return err
-		}
-		return nil
+		return a.openArchive(lCtx, depth, fReader, archiveChan)
 	}
 }
 
@@ -240,6 +269,8 @@ type mimeType string
 const (
 	arMimeType  mimeType = "application/x-unix-archive"
 	rpmMimeType mimeType = "application/x-rpm"
+	machOType   mimeType = "application/x-mach-binary"
+	octetStream mimeType = "application/octet-stream"
 )
 
 // mimeTools maps MIME types to the necessary command-line tools to handle them.
