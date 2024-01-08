@@ -351,12 +351,12 @@ func TestAWSFromDataCacheDuplicateCreds(t *testing.T) {
 		}),
 	}
 
-	s := scanner{verificationClient: mockClient, credsCache: memory.New()}
+	detector := scanner{verificationClient: mockClient, credsCache: memory.New()}
 
 	testData := []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id))
 
 	// First call - expect cache to be empty and an API call to be made.
-	_, err = s.FromData(context.Background(), true, testData)
+	_, err = detector.FromData(context.Background(), true, testData)
 	if err != nil {
 		t.Fatalf("Error processing data: %s", err)
 	}
@@ -365,7 +365,7 @@ func TestAWSFromDataCacheDuplicateCreds(t *testing.T) {
 	}
 
 	// Second call with the same data - expect cache to be used and no additional API calls.
-	_, err = s.FromData(context.Background(), true, testData)
+	_, err = detector.FromData(context.Background(), true, testData)
 	if err != nil {
 		t.Fatalf("Error processing data: %s", err)
 	}
