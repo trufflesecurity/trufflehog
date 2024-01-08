@@ -119,6 +119,14 @@ type cacheItem struct {
 	isVerified      bool
 }
 
+func newCacheItem(isVerified bool, verificationErr error, extra map[string]string) *cacheItem {
+	item := &cacheItem{verificationErr: verificationErr, isVerified: isVerified}
+	if extra != nil {
+		item.extra = extra
+	}
+	return item
+}
+
 // FromData will find and optionally verify AWS secrets in a given set of bytes.
 func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -170,11 +178,9 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 
-			var cacheItem cacheItem
 			if verify {
 				isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = isVerified
-				cacheItem.isVerified = isVerified
 				// It'd be good to log when calculated account value does not match
 				// the account value from verification. Should only be edge cases at most.
 				// if extraData["account"] != s1.ExtraData["account"] && extraData["account"] != "" {//log here}
@@ -184,15 +190,13 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for k, v := range extraData {
 					s1.ExtraData[k] = v
 				}
-				cacheItem.extra = s1.ExtraData
 				if verificationErr != nil {
 					s1.SetVerificationError(verificationErr, resSecretMatch)
-					cacheItem.verificationErr = verificationErr
 				}
 			}
 
 			// Cache the result.
-			s.credsCache.Set(rawV2, &cacheItem)
+			s.credsCache.Set(rawV2, newCacheItem(s1.Verified, s1.VerificationError(), s1.ExtraData))
 			if !s1.Verified {
 				// Unverified results that contain common test words are probably not secrets
 				if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
