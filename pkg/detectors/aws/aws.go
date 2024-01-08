@@ -168,7 +168,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if val, ok := s.credsCache.Get(rawV2); ok {
-				item, ok := val.(cacheItem)
+				item, ok := val.(*cacheItem)
 				if !ok {
 					continue
 				}
