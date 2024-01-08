@@ -41,13 +41,14 @@ func WithPurgeInterval(interval time.Duration) CacheOption {
 // By default, it sets the expiration and purge intervals to 12 and 13 hours, respectively.
 // These defaults can be overridden using the functional options: WithExpirationInterval and WithPurgeInterval.
 func New(opts ...CacheOption) *Cache {
-	instance := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
+	configurableCache := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
 	for _, opt := range opts {
-		opt(instance)
+		opt(configurableCache)
 	}
 
-	instance.c = cache.New(instance.expiration, instance.purgeInterval)
-	return instance
+	// The underlying cache is initialized with the configured expiration and purge intervals.
+	configurableCache.c = cache.New(configurableCache.expiration, configurableCache.purgeInterval)
+	return configurableCache
 }
 
 // CacheEntry represents a single entry in the cache, consisting of a key and its corresponding value.
