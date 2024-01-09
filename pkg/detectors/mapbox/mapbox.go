@@ -2,6 +2,7 @@ package mapbox
 
 import (
 	"context"
+
 	// "log"
 	"net/http"
 	"regexp"
@@ -16,6 +17,7 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Paranoid = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -27,6 +29,29 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"mapbox"}
+}
+
+func (s Scanner) About() detectors.DetectorInfo {
+	return detectors.DetectorInfo{
+		Name: "MapBox",
+		Credentials: []detectors.Credential{
+			{
+				Name:         "MapBox Secret Key",
+				CharacterMin: 80,
+				CharacterMax: 240,
+				UniquePrefix: "sk.",
+			},
+			{
+				Name:         "MapBox Secret ID",
+				CharacterMin: 4,
+				CharacterMax: 32,
+			},
+		},
+	}
+}
+
+func (s Scanner) FromDataParanoid(ctx context.Context, verify bool, data []byte, words []string) ([]detectors.Result, error) {
+	return s.FromData(ctx, verify, []byte(strings.Join(words, " ")))
 }
 
 // FromData will find and optionally verify MapBox secrets in a given set of bytes.

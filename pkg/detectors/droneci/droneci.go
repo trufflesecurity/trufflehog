@@ -16,6 +16,7 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Paranoid = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -30,6 +31,29 @@ func (s Scanner) Keywords() []string {
 	return []string{"droneci"}
 }
 
+func (s Scanner) About() detectors.DetectorInfo {
+	return detectors.DetectorInfo{
+		Name: "DroneCI",
+		Credentials: []detectors.Credential{
+			{
+				Name:         "DroneCI API Key",
+				CharacterMin: 32,
+				CharacterMax: 32,
+			},
+		},
+	}
+}
+
+func (s Scanner) FromDataParanoid(ctx context.Context, verify bool, data []byte, words []string) ([]detectors.Result, error) {
+    dataBuilder := strings.Builder{}
+    for _, word := range words {
+        dataBuilder.WriteString("droneci = ")
+        dataBuilder.WriteString(word)
+        dataBuilder.WriteString("\n")
+    }
+    return s.FromData(ctx, verify, []byte(dataBuilder.String()))
+}
+
 // FromData will find and optionally verify DroneCI secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -37,6 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
+		fmt.Println("match", match)
 		if len(match) != 2 {
 			continue
 		}

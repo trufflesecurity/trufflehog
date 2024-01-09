@@ -2,6 +2,7 @@
 dist
 .env
 *.test
+.DS_STORE
 
 # binary
 trufflehog

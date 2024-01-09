@@ -67,6 +67,10 @@ type Engine struct {
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *AhoCorasickCore
 
+	// paranoidCore manages the paranoid engine
+	paranoidMode bool
+	paranoidCore *ParanoidCore
+
 	// Engine synchronization primitives.
 	sourceManager        *sources.SourceManager
 	results              chan detectors.ResultWithMetadata
@@ -178,6 +182,14 @@ func WithPrinter(printer Printer) Option {
 func WithVerify(verify bool) Option {
 	return func(e *Engine) {
 		e.verify = verify
+	}
+}
+
+// WithFilterUnverified sets the filterUnverified flag on the engine. If set to
+// true, the engine will only return the first unverified result for a chunk for a detector.
+func WithParanoidMode(paranoidMode bool) Option {
+	return func(e *Engine) {
+		e.paranoidMode = paranoidMode
 	}
 }
 
@@ -317,6 +329,12 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	e.ahoCorasickCore = NewAhoCorasickCore(e.detectors)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
+	if e.paranoidMode {
+		ctx.Logger().V(4).Info("setting up paranoid core")
+		e.paranoidCore = NewParanoidCore(e.detectors)
+		ctx.Logger().V(4).Info("set up aho-corasick core")
+	}
+
 	return nil
 }
 
@@ -452,10 +470,11 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector detectors.Detector
-	chunk    sources.Chunk
-	decoder  detectorspb.DecoderType
-	wgDoneFn func()
+	detector        detectors.Detector
+	chunk           sources.Chunk
+	decoder         detectorspb.DecoderType
+	paranoidTargets []string
+	wgDoneFn        func()
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {
@@ -474,8 +493,23 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
+				// gather paranoid enabled detectors and associated targets
+				if e.paranoidMode {
+					targets := e.paranoidCore.inspect(string(decoded.Chunk.Data), 3.5, chunk)
+					paranoidDetectors := e.paranoidCore.getParanoidDetectors(targets)
+					for _, pd := range paranoidDetectors {
+						wgDetect.Add(1)
+						e.detectableChunksChan <- detectableChunk{
+							chunk:           *decoded.Chunk,
+							detector:        pd.detector,
+							decoder:         decoded.DecoderType,
+							wgDoneFn:        wgDetect.Done,
+							paranoidTargets: pd.targets,
+						}
+					}
+				}
 
+				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
 				for k, detector := range chunkSpecificDetectors {
 					decoded.Chunk.Verify = e.verify
 					wgDetect.Add(1)
@@ -503,6 +537,7 @@ func (e *Engine) detectChunks(ctx context.Context) {
 
 func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	var start time.Time
+	var err error
 	if e.printAvgDetectorTime {
 		start = time.Now()
 	}
@@ -510,10 +545,22 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
+	paranoidResults := []detectors.Result{}
+
+	d, ok := data.detector.(detectors.Paranoid)
+	if ok && e.paranoidMode && len(data.paranoidTargets) > 0 {
+		// scan the chunk with the paranoid detector
+		paranoidResults, err = d.FromDataParanoid(ctx, data.chunk.Verify, data.chunk.Data, data.paranoidTargets)
+		if err != nil {
+			ctx.Logger().Error(err, "error scanning chunk")
+		}
+	}
+
 	results, err := data.detector.FromData(ctx, data.chunk.Verify, data.chunk.Data)
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
 	}
+	results = append(results, paranoidResults...)
 
 	if e.printAvgDetectorTime && len(results) > 0 {
 		elapsed := time.Since(start)

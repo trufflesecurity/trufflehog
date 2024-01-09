@@ -62,6 +62,7 @@ var (
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
 	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.").String()
+	paranoidMode         = cli.Flag("paranoid-mode", "Enable paranoid mode, an experimental mode that does not rely on key words").Bool()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -407,6 +408,7 @@ func run(state overseer.State) {
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),
+		engine.WithParanoidMode(*paranoidMode),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")

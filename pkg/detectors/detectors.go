@@ -16,6 +16,23 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+type DetectorInfo struct {
+	Name        string
+	Credentials []Credential
+}
+
+type Credential struct {
+	Name         string
+	CharacterMin int
+	CharacterMax int
+	UniquePrefix string
+}
+
+type Paranoid interface {
+	FromDataParanoid(ctx context.Context, verify bool, data []byte, words []string) ([]Result, error)
+	About() DetectorInfo
+}
+
 // Detector defines an interface for scanning for and verifying secrets.
 type Detector interface {
 	// FromData will scan bytes for results, and optionally verify them.
