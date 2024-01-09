@@ -53,7 +53,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyPostgres(&pgURL)
+			timeoutInSeconds := getDeadlineInSeconds(ctx)
+			isVerified, verificationErr := verifyPostgres(&pgURL, timeoutInSeconds)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
 		}
@@ -65,6 +66,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	}
 
 	return results, nil
+}
+
+func getDeadlineInSeconds(ctx context.Context) int {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		// Context does not have a deadline
+		return 0
+	}
+
+	duration := time.Until(deadline)
+	return int(duration.Seconds())
 }
 
 func findUriMatches(dataStr string) url.URL {
@@ -185,7 +197,7 @@ func dedupMatches2(matches [][]string) []string {
 	return results
 }
 
-func verifyPostgres(pgURL *url.URL) (bool, error) {
+func verifyPostgres(pgURL *url.URL, timeoutInSeconds int) (bool, error) {
 	if pgURL.User == nil {
 		return false, nil
 	}
@@ -203,6 +215,10 @@ func verifyPostgres(pgURL *url.URL) (bool, error) {
 	sslmode := determineSSLMode(pgURL)
 
 	connStr := fmt.Sprintf("user=%s password=%s host=%s port=%s sslmode=%s", username, password, hostname, port, sslmode)
+	if timeoutInSeconds > 0 {
+		connStr = fmt.Sprintf("%s connect_timeout=%d", connStr, timeoutInSeconds)
+	}
+
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
@@ -229,7 +245,9 @@ func verifyPostgres(pgURL *url.URL) (bool, error) {
 
 func determineSSLMode(pgURL *url.URL) string {
 	// default ssl mode is "prefer" per https://www.postgresql.org/docs/current/libpq-ssl.html
-	sslmode := "prefer"
+	// but is currently not implemented in the driver per https://github.com/lib/pq/issues/1006
+	// default to "disable" for now as it is the least restrictive
+	sslmode := "disable"
 	if sslQuery, ok := pgURL.Query()["sslmode"]; ok && len(sslQuery) > 0 {
 		sslmode = sslQuery[0]
 	}

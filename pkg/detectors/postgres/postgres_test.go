@@ -227,17 +227,21 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found, unverified due to error - inactive host",
 			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, inactiveHost, postgresPort)),
-				verify: true,
-			},
+			args: func() args {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				return args{
+					ctx:    ctx,
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, inactiveHost, postgresPort)),
+					verify: true,
+				}
+			}(),
 			want: func() []detectors.Result {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
 				}
-				r.SetVerificationError(errors.New("operation timed out"))
+				r.SetVerificationError(errors.New("i/o timeout"))
 				return []detectors.Result{r}
 			}(),
 			wantErr: false,
