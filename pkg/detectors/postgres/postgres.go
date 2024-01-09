@@ -228,7 +228,8 @@ func verifyPostgres(pgURL *url.URL) (bool, error) {
 }
 
 func determineSSLMode(pgURL *url.URL) string {
-	sslmode := "disable"
+	// default ssl mode is "prefer" per https://www.postgresql.org/docs/current/libpq-ssl.html
+	sslmode := "prefer"
 	if sslQuery, ok := pgURL.Query()["sslmode"]; ok && len(sslQuery) > 0 {
 		sslmode = sslQuery[0]
 	}
