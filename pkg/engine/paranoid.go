@@ -69,7 +69,6 @@ func (pc *ParanoidCore) getParanoidDetectors(targets []string) []ParanoidDetecto
 	for _, target := range targets {
 		targetLen := len(target)
 		if detectors, exists := pc.TokenLengthLookup[targetLen]; exists {
-			// fmt.Println("found target and detector", target, detectors)
 			for _, detector := range detectors {
 				if pd, found := detectorMap[detector]; found {
 					// Append the target to the existing detector's targets
@@ -239,6 +238,8 @@ func ShannonEntropy(data string) (entropy float64) {
 	return entropy
 }
 
+// NOTE: This function is not used in the current implementation
+// but based on some tests it might be a good idea to include it in the future
 func countTripleConsonants(word string) int {
 	// Define a regular expression for three or more consecutive consonants
 	re := regexp.MustCompile(`(?i)[bcdfghjklmnpqrstvwxyz]{3,}`)

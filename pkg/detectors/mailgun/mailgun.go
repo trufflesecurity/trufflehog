@@ -16,6 +16,7 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Paranoid = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -31,6 +32,29 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"mailgun"}
+}
+
+func (s Scanner) About() detectors.DetectorInfo {
+	return detectors.DetectorInfo{
+		Name: "MailGun",
+		Credentials: []detectors.Credential{
+			{
+				Name:         "Mailgun API Key",
+				CharacterMin: 72,
+				CharacterMax: 72,
+			},
+		},
+	}
+}
+
+func (s Scanner) FromDataParanoid(ctx context.Context, verify bool, data []byte, words []string) ([]detectors.Result, error) {
+    dataBuilder := strings.Builder{}
+    for _, word := range words {
+        dataBuilder.WriteString("mailgun = ")
+        dataBuilder.WriteString(word)
+        dataBuilder.WriteString("\n")
+    }
+    return s.FromData(ctx, verify, []byte(dataBuilder.String()))
 }
 
 // FromData will find and optionally verify Mailgun secrets in a given set of bytes.
@@ -55,7 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				
 				// If resMatch has "key" prefix, use it as the username for basic auth.
 				if strings.HasPrefix(resMatch, "key-") {
 					req.SetBasicAuth("api", resMatch)
