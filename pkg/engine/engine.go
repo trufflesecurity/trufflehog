@@ -560,6 +560,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
 	}
+	// TODO we need to filter duplicates here
 	results = append(results, paranoidResults...)
 
 	if e.printAvgDetectorTime && len(results) > 0 {

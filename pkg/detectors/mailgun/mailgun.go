@@ -39,22 +39,33 @@ func (s Scanner) About() detectors.DetectorInfo {
 		Name: "MailGun",
 		Credentials: []detectors.Credential{
 			{
-				Name:         "Mailgun API Key",
+				Name:         "Original MailGun API Token",
 				CharacterMin: 72,
 				CharacterMax: 72,
+			},
+			{
+				Name:         "Key Prefix MailGun API Token",
+				CharacterMin: 36,
+				CharacterMax: 36,
+				UniquePrefix: "key-",
+			},
+			{
+				Name:         "Hex Based MailGun API Token",
+				CharacterMin: 50,
+				CharacterMax: 50,
 			},
 		},
 	}
 }
 
 func (s Scanner) FromDataParanoid(ctx context.Context, verify bool, data []byte, words []string) ([]detectors.Result, error) {
-    dataBuilder := strings.Builder{}
-    for _, word := range words {
-        dataBuilder.WriteString("mailgun = ")
-        dataBuilder.WriteString(word)
-        dataBuilder.WriteString("\n")
-    }
-    return s.FromData(ctx, verify, []byte(dataBuilder.String()))
+	dataBuilder := strings.Builder{}
+	for _, word := range words {
+		dataBuilder.WriteString("mailgun = ")
+		dataBuilder.WriteString(word)
+		dataBuilder.WriteString("\n")
+	}
+	return s.FromData(ctx, verify, []byte(dataBuilder.String()))
 }
 
 // FromData will find and optionally verify Mailgun secrets in a given set of bytes.
