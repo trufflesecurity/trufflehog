@@ -145,7 +145,8 @@ func findHosts(verify bool, hostnameMatches, portMatches [][]string) []string {
 	if verify {
 		var verifiedHosts []string
 		for _, host := range hosts {
-			hostname, port := strings.Split(host, ":")[0], strings.Split(host, ":")[1]
+			parts := strings.Split(host, ":")
+			hostname, port := parts[0], parts[1]
 			if postgresRunning(hostname, port) {
 				verifiedHosts = append(verifiedHosts, host)
 			}
