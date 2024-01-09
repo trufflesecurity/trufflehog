@@ -39,6 +39,8 @@ type userRes struct {
 	Name      string `json:"name"`
 	Company   string `json:"company"`
 	UserURL   string `json:"html_url"`
+	// Included in GitHub Enterprise Server.
+	LdapDN string `json:"ldap_dn"`
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -78,12 +80,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := common.SaneHttpClient()
 			// https://developer.github.com/v3/users/#get-the-authenticated-user
 			for _, url := range s.Endpoints(s.DefaultEndpoint()) {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/user", url), nil)
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/user", url), nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Content-Type", "application/json; charset=utf-8")
-				req.Header.Add("Authorization", fmt.Sprintf("token %s", token))
+				req.Header.Set("Content-Type", "application/json; charset=utf-8")
+				req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
 				res, err := client.Do(req)
 				if err == nil {
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
@@ -98,10 +100,28 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								s1.ExtraData["username"] = userResponse.Login
 								s1.ExtraData["url"] = userResponse.UserURL
 								s1.ExtraData["account_type"] = userResponse.Type
-								s1.ExtraData["site_admin"] = fmt.Sprintf("%t", userResponse.SiteAdmin)
-								s1.ExtraData["name"] = userResponse.Name
-								s1.ExtraData["company"] = userResponse.Company
-								s1.ExtraData["scopes"] = res.Header.Get("X-OAuth-Scopes")
+								if userResponse.SiteAdmin {
+									s1.ExtraData["site_admin"] = "true"
+								}
+								if userResponse.Name != "" {
+									s1.ExtraData["name"] = userResponse.Name
+								}
+								if userResponse.Company != "" {
+									s1.ExtraData["company"] = userResponse.Company
+								}
+								if userResponse.LdapDN != "" {
+									s1.ExtraData["ldap_dn"] = userResponse.LdapDN
+								}
+
+								// GitHub does not seem to consistently return this header.
+								scopes := res.Header.Get("X-OAuth-Scopes")
+								if scopes != "" {
+									s1.ExtraData["scopes"] = scopes
+								}
+								expiry := res.Header.Get("github-authentication-token-expiration")
+								if expiry != "" {
+									s1.ExtraData["expires_at"] = expiry
+								}
 							}
 						}
 					}

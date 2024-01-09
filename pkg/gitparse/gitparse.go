@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/go-logr/logr"
 	"io"
 	"os"
 	"os/exec"
@@ -92,6 +93,7 @@ func (state ParseState) String() string {
 		"BinaryFileLine",
 		"HunkLineNumberLine",
 		"HunkContentLine",
+		"ParseFailure",
 	}[state]
 }
 
@@ -313,7 +315,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isMessageLine(isStaged, latestState, line):
 			latestState = MessageLine
 
-			currentCommit.Message.Write(line[4:])
+			currentCommit.Message.Write(line[4:]) // Messages are indented with 4 spaces.
 		case isMessageEndLine(isStaged, latestState, line):
 			latestState = MessageEndLine
 			// NoOp
@@ -425,13 +427,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 
 			// Here be dragons...
 			// Build an informative error message.
-			var err error
+			err := fmt.Errorf(`invalid line "%s" after state "%s"`, line, latestState)
+			var logger logr.Logger
 			if currentCommit != nil && currentCommit.Hash != "" {
-				err = fmt.Errorf(`failed to parse line "%s" after state "%s" (commit=%s)`, line, latestState, currentCommit.Hash)
+				logger = ctx.Logger().WithValues("commit", currentCommit.Hash)
 			} else {
-				err = fmt.Errorf(`failed to parse line "%s" after state "%s"`, line, latestState)
+				logger = ctx.Logger()
 			}
-			ctx.Logger().V(2).Error(err, "Recovering at the latest commit or diff...\n")
+			logger.Error(err, "failed to parse Git input. Recovering at the latest commit or diff...")
 
 			latestState = ParseFailure
 		}
@@ -612,8 +615,9 @@ func pathFromBinaryLine(line []byte) string {
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
+// --- /dev/null
 func isFromFileLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if latestState != IndexLine {
+	if !(latestState == IndexLine || latestState == ModeLine) {
 		return false
 	}
 	if len(line) >= 6 && bytes.Equal(line[:4], []byte("--- ")) {

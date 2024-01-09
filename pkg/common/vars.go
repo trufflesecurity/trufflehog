@@ -28,6 +28,7 @@ var (
 		"wav",
 		"flac",
 		"webp",
+		"pdf",
 
 		// images
 		"png",
@@ -79,6 +80,9 @@ var (
 		"vxd":    {}, // Virtual device driver in Windows
 		"sfx":    {}, // Self-extracting archive
 		"bundle": {}, // Mac OS X application bundle
+		"pyo":    {}, // Compiled Python file
+		"pyc":    {}, // Compiled Python file
+		"sym":    {}, // Symbolic link, Unix/Linux
 	}
 )
 

@@ -31,6 +31,7 @@ runs:
       BASE: ${{ inputs.base }}
       HEAD: ${{ inputs.head }}
       ARGS: ${{ inputs.extra_args }}
+      COMMITS: ${{ toJson(github.event.commits) }}
     run: |
       ##########################################
       ## ADVANCED USAGE                       ##
@@ -57,7 +58,7 @@ runs:
       ##########################################
       else
         if [ "${{ github.event_name }}" == "push" ]; then
-          COMMIT_LENGTH=$(jq length <<< '${{ toJson(github.event.commits) }}')
+          COMMIT_LENGTH=$(printenv COMMITS | jq length)
           if [ $COMMIT_LENGTH == "0" ]; then
             echo "No commits to scan"
             exit 0
