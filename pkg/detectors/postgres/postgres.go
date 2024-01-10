@@ -240,6 +240,11 @@ func verifyPostgres(pgURL *url.URL, timeoutInSeconds int) (bool, error) {
 		return false, nil
 	}
 
+	// if ssl is not enabled, retry with sslmode=disable
+	if strings.Contains(err.Error(), "SSL is not enabled on the server") {
+		pgURL.RawQuery = fmt.Sprintf("sslmode=%s", "disable")
+		return verifyPostgres(pgURL, timeoutInSeconds)
+	}
 	return false, err
 }
 
@@ -247,7 +252,7 @@ func determineSSLMode(pgURL *url.URL) string {
 	// default ssl mode is "prefer" per https://www.postgresql.org/docs/current/libpq-ssl.html
 	// but is currently not implemented in the driver per https://github.com/lib/pq/issues/1006
 	// default to "disable" for now as it is the least restrictive
-	sslmode := "disable"
+	sslmode := "require"
 	if sslQuery, ok := pgURL.Query()["sslmode"]; ok && len(sslQuery) > 0 {
 		sslmode = sslQuery[0]
 	}
