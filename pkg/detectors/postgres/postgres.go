@@ -10,7 +10,6 @@ import (
 	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -25,6 +24,8 @@ var (
 	uriPattern                         = regexp.MustCompile(`\b(?i)postgresql://[\S]+\b`)
 	hostnamePattern                    = regexp.MustCompile(`(?i)(?:host|server|address).{0,40}?(\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\b)`)
 	portPattern                        = regexp.MustCompile(`(?i)(?:port|p).{0,40}?(\b[0-9]{1,5}\b)`)
+	usernamePattern                    = regexp.MustCompile(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:'"\s]{4,40})`)
+	passwordPattern                    = regexp.MustCompile(`(?im)(?:pass)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:'"\s]{4,40})`)
 )
 
 type Scanner struct{}
@@ -105,8 +106,8 @@ func postgresRunning(hostname, port string) bool {
 }
 
 func findComponentMatches(verify bool, dataStr string) []url.URL {
-	usernameMatches := common.UsernameRegexCheck("").Matches([]byte(dataStr))
-	passwordMatches := common.PasswordRegexCheck("").Matches([]byte(dataStr))
+	usernameMatches := usernamePattern.FindAllStringSubmatch(dataStr, -1)
+	passwordMatches := passwordPattern.FindAllStringSubmatch(dataStr, -1)
 	hostnameMatches := hostnamePattern.FindAllStringSubmatch(dataStr, -1)
 	portMatches := portPattern.FindAllStringSubmatch(dataStr, -1)
 
@@ -136,8 +137,8 @@ func findComponentMatches(verify bool, dataStr string) []url.URL {
 // if verification is turned on, and we can confirm that postgres is running on at least one host,
 // return only hosts where it's running. otherwise return all hosts.
 func findHosts(verify bool, hostnameMatches, portMatches [][]string) []string {
-	hostnames := dedupMatches2(hostnameMatches)
-	ports := dedupMatches2(portMatches)
+	hostnames := dedupMatches(hostnameMatches)
+	ports := dedupMatches(portMatches)
 	var hosts []string
 
 	if len(hostnames) < 1 {
@@ -172,20 +173,7 @@ func findHosts(verify bool, hostnameMatches, portMatches [][]string) []string {
 }
 
 // deduplicate matches in order to reduce the number of verification requests
-func dedupMatches(matches []string) []string {
-	setOfMatches := make(map[string]struct{})
-	for _, match := range matches {
-		setOfMatches[match] = struct{}{}
-	}
-	var results []string
-	for match := range setOfMatches {
-		results = append(results, match)
-	}
-	return results
-}
-
-// deduplicate matches in order to reduce the number of verification requests
-func dedupMatches2(matches [][]string) []string {
+func dedupMatches(matches [][]string) []string {
 	setOfMatches := make(map[string]struct{})
 	for _, match := range matches {
 		if len(match) > 1 {
