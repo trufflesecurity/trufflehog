@@ -133,8 +133,8 @@ func findComponentMatches(verify bool, dataStr string) []url.URL {
 	return pgURLs
 }
 
-// if verification is turned on, and we are able to verify at least one host, return only verified hosts
-// otherwise return all hosts
+// if verification is turned on, and we can confirm that postgres is running on at least one host,
+// return only hosts where it's running. otherwise return all hosts.
 func findHosts(verify bool, hostnameMatches, portMatches [][]string) []string {
 	hostnames := dedupMatches2(hostnameMatches)
 	ports := dedupMatches2(portMatches)
@@ -171,6 +171,7 @@ func findHosts(verify bool, hostnameMatches, portMatches [][]string) []string {
 	return hosts
 }
 
+// deduplicate matches in order to reduce the number of verification requests
 func dedupMatches(matches []string) []string {
 	setOfMatches := make(map[string]struct{})
 	for _, match := range matches {
@@ -183,6 +184,7 @@ func dedupMatches(matches []string) []string {
 	return results
 }
 
+// deduplicate matches in order to reduce the number of verification requests
 func dedupMatches2(matches [][]string) []string {
 	setOfMatches := make(map[string]struct{})
 	for _, match := range matches {
@@ -240,7 +242,7 @@ func verifyPostgres(pgURL *url.URL, timeoutInSeconds int) (bool, error) {
 		return false, nil
 	}
 
-	// if ssl is not enabled, fall-back to sslmode=disable
+	// if ssl is not enabled, manually fall-back to sslmode=disable
 	if strings.Contains(err.Error(), "SSL is not enabled on the server") {
 		pgURL.RawQuery = fmt.Sprintf("sslmode=%s", "disable")
 		return verifyPostgres(pgURL, timeoutInSeconds)
@@ -251,7 +253,7 @@ func verifyPostgres(pgURL *url.URL, timeoutInSeconds int) (bool, error) {
 func determineSSLMode(pgURL *url.URL) string {
 	// default ssl mode is "prefer" per https://www.postgresql.org/docs/current/libpq-ssl.html
 	// but is currently not implemented in the driver per https://github.com/lib/pq/issues/1006
-	// default for the driver is "require"
+	// default for the driver is "require". ideally we would use "allow" but that is also not supported by the driver.
 	sslmode := "require"
 	if sslQuery, ok := pgURL.Query()["sslmode"]; ok && len(sslQuery) > 0 {
 		sslmode = sslQuery[0]
