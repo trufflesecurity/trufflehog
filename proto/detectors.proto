@@ -976,6 +976,7 @@ enum DetectorType {
   Overloop = 965;
   Ngrok = 966;
   Replicate = 967;
+  Postgres = 968;
 }
 
 message Result {
