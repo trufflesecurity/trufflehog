@@ -560,8 +560,25 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
 	}
-	// TODO we need to filter duplicates here
-	results = append(results, paranoidResults...)
+
+	// TODO probably a better way to do this
+	resultKeys := map[string]bool{}
+	for _, res := range results {
+		key := fmt.Sprintf("%s%s%s%+v%+v", res.DetectorType.String(), res.Raw, res.RawV2, res.ExtraData, res.StructuredData)
+		resultKeys[key] = true
+	}
+
+	dedupedParanoidResults := []detectors.Result{}
+	if e.paranoidMode {
+		for _, res := range paranoidResults {
+			key := fmt.Sprintf("%s%s%s%+v%+v", res.DetectorType.String(), res.Raw, res.RawV2, res.ExtraData, res.StructuredData)
+			if _, ok := resultKeys[key]; !ok {
+				dedupedParanoidResults = append(dedupedParanoidResults, res)
+			}
+		}
+	}
+
+	results = append(results, dedupedParanoidResults...)
 
 	if e.printAvgDetectorTime && len(results) > 0 {
 		elapsed := time.Since(start)
