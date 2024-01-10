@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		hostport := pgURL.Host
 		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Postgres,
-			Raw:          []byte(username + password),
+			Raw:          []byte(hostport + username + password),
 			RawV2:        []byte(hostport + username + password),
 		}
 
