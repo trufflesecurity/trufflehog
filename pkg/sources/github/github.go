@@ -1,6 +1,7 @@
 package github
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
@@ -217,7 +217,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
-		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 	s.conn = &conn
 
@@ -323,7 +323,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
 		}
 	default:
-		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+		errs = append(errs, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
 	}
 
 	// Run a simple query to check if the client is actually valid
@@ -471,7 +471,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		}
 	default:
 		// TODO: move this error to Init
-		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+		return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
@@ -578,7 +578,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			continue
 		}
 		if err != nil {
-			return errors.New(err)
+			return fmt.Errorf("error getting user: %w", err)
 		}
 		break
 	}
@@ -655,12 +655,12 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp) (installationClient *github.Client, err error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	appID, err := strconv.ParseInt(app.AppId, 10, 64)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	// This client is required to create installation tokens for cloning.
@@ -673,16 +673,16 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		appID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 	appItr.BaseURL = apiEndpoint
 
 	// Does this need to be separate from |s.httpClient|?
-	instHttpClient := common.RetryableHttpClientTimeout(60)
-	instHttpClient.Transport = appItr
-	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHttpClient)
+	instHTTPClient := common.RetryableHttpClientTimeout(60)
+	instHTTPClient.Transport = appItr
+	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHTTPClient)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	// This client is used for most APIs.
@@ -692,14 +692,14 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		installationID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 	itr.BaseURL = apiEndpoint
 
 	s.httpClient.Transport = itr
 	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	// If no repos were provided, enumerate them.
@@ -1044,7 +1044,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 			continue
 		}
 		if err != nil || len(members) == 0 {
-			return errors.New("Could not list organization members: account may not have access to list organization members")
+			return fmt.Errorf("could not list organization members: account may not have access to list organization members %w", err)
 		}
 		if res == nil {
 			break
