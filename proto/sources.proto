@@ -157,6 +157,8 @@ message Filesystem {
   // paths when we no longer depend on the name in enterprise configs.
   repeated string directories = 1;
   repeated string paths = 2;
+  string include_paths_file = 3; // path to file containing newline separated list of paths
+  string exclude_paths_file = 4; // path to file containing newline separated list of paths
 }
 
 message GCS {

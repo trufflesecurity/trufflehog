@@ -71,11 +71,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	}
 	s.paths = append(conn.Paths, conn.Directories...)
 
-	return nil
-}
-
-func (s *Source) WithFilter(filter *common.Filter) {
+	filter, err := common.FilterFromFiles(conn.IncludePathsFile, conn.ExcludePathsFile)
+	if err != nil {
+		return fmt.Errorf("unable to create filter: %w", err)
+	}
 	s.filter = filter
+
+	return nil
 }
 
 // Chunks emits chunks of bytes over a channel.

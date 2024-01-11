@@ -1484,6 +1484,10 @@ func (m *Filesystem) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for IncludePathsFile
+
+	// no validation rules for ExcludePathsFile
+
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
 	}
