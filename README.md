@@ -538,7 +538,8 @@ then we look at each word). Those words are then put through a few secret checks
 Once we have a list of potential secrets, we can then use the potential secret length to look
 up detectors that have credential lengths within the range of said potential secret.
 
-TODO image
+<img width="1094" alt="Screenshot 2024-01-11 at 10 54 40 AM" src="https://github.com/trufflesecurity/trufflehog/assets/15034943/6e561c90-438e-44d1-a802-749c768ca676">
+
 
 Some things to note:
 - Not all detectors are supported.
