@@ -421,6 +421,12 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
 ## Pre-commit Hook
 
 Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
+
+**Key Usage Note:**
+
+- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures Trufflehog analyzes all intended changes.
+- **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
+
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
 
 ```yaml
