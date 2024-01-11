@@ -550,7 +550,6 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
-	var isGHE bool = apiEndpoint != "https://api.github.com"
 	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
 	if err != nil {
 		s.log.Error(err, "error creating GitHub client")
@@ -606,6 +605,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			s.log.Error(err, "error fetching repos by user")
 		}
 
+		isGHE := strings.EqualFold(apiEndpoint, "https://api.github.com")
 		if isGHE {
 			s.addAllVisibleOrgs(ctx)
 		} else {
@@ -969,7 +969,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 			continue
 		}
 		if err != nil {
-			s.log.Error(err, "Could not list all organizations")
+			s.log.Error(err, "could not list all organizations")
 			return
 		}
 		if len(orgs) == 0 {
@@ -981,11 +981,12 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 
 		for _, org := range orgs {
 			var name string
-			if org.Name != nil {
+			switch {
+			case org.Name != nil:
 				name = *org.Name
-			} else if org.Login != nil {
+			case org.Login != nil:
 				name = *org.Login
-			} else {
+			default:
 				continue
 			}
 			s.orgsCache.Set(name, name)
