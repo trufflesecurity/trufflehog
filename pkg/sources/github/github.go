@@ -730,19 +730,14 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	return installationClient, nil
 }
 
-func createGitHubClient(httpClient *http.Client, apiEndpoint string) (ghClient *github.Client, err error) {
+func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Client, error) {
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
 	if apiEndpoint == cloudEndpoint {
-		ghClient = github.NewClient(httpClient)
-	} else {
-		ghClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
-		if err != nil {
-			return nil, errors.New(err)
-		}
+		return github.NewClient(httpClient), nil
 	}
 
-	return ghClient, err
+	return github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
