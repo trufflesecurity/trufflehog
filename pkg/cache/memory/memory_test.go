@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestCache(t *testing.T) {
@@ -86,7 +84,7 @@ func TestCache(t *testing.T) {
 
 func TestCache_NewWithData(t *testing.T) {
 	data := []CacheEntry{{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}
-	c := NewWithData(logContext.Background(), data)
+	c := NewWithData(data)
 
 	// Test the count.
 	if c.Count() != 3 {
