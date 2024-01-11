@@ -472,7 +472,15 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	s.repos = s.filteredRepoCache.Values()
+	s.repos = make([]string, 0, s.filteredRepoCache.Count())
+	for _, repo := range s.filteredRepoCache.Values() {
+		r, ok := repo.(string)
+		if !ok {
+			ctx.Logger().Error(fmt.Errorf("type assertion failed"), "unexpected value in cache", "repo", repo)
+			continue
+		}
+		s.repos = append(s.repos, r)
+	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
 
