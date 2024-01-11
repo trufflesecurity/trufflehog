@@ -254,21 +254,21 @@ func ShannonEntropy(data string) (entropy float64) {
 
 // NOTE: This function is not used in the current implementation
 // but based on some tests it might be a good idea to include it in the future
-func countTripleConsonants(word string) int {
-	// Define a regular expression for three or more consecutive consonants
-	re := regexp.MustCompile(`(?i)[bcdfghjklmnpqrstvwxyz]{3,}`)
-	matches := re.FindAllString(word, -1)
-
-	// Initialize the count of occurrences
-	count := 0
-	for _, match := range matches {
-		// Increase the count by 1 for each three consecutive consonants,
-		// and by 1 more for each additional consecutive consonant
-		count += len(match) - 2
-	}
-
-	return count
-}
+// func countTripleConsonants(word string) int {
+// 	// Define a regular expression for three or more consecutive consonants
+// 	re := regexp.MustCompile(`(?i)[bcdfghjklmnpqrstvwxyz]{3,}`)
+// 	matches := re.FindAllString(word, -1)
+//
+// 	// Initialize the count of occurrences
+// 	count := 0
+// 	for _, match := range matches {
+// 		// Increase the count by 1 for each three consecutive consonants,
+// 		// and by 1 more for each additional consecutive consonant
+// 		count += len(match) - 2
+// 	}
+//
+// 	return count
+// }
 
 func anyRegexMatch(f string, res []*regexp.Regexp) bool {
 	for _, re := range res {
