@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 const (
@@ -41,14 +39,7 @@ func WithPurgeInterval(interval time.Duration) CacheOption {
 // By default, it sets the expiration and purge intervals to 12 and 13 hours, respectively.
 // These defaults can be overridden using the functional options: WithExpirationInterval and WithPurgeInterval.
 func New(opts ...CacheOption) *Cache {
-	configurableCache := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
-	for _, opt := range opts {
-		opt(configurableCache)
-	}
-
-	// The underlying cache is initialized with the configured expiration and purge intervals.
-	configurableCache.c = cache.New(configurableCache.expiration, configurableCache.purgeInterval)
-	return configurableCache
+	return NewWithData(nil, opts...)
 }
 
 // CacheEntry represents a single entry in the cache, consisting of a key and its corresponding value.
@@ -61,9 +52,7 @@ type CacheEntry struct {
 
 // NewWithData constructs a new in-memory cache with existing data.
 // It also accepts CacheOption parameters to override default configuration values.
-func NewWithData(ctx context.Context, data []CacheEntry, opts ...CacheOption) *Cache {
-	ctx.Logger().V(3).Info("Loading cache", "num-items", len(data))
-
+func NewWithData(data []CacheEntry, opts ...CacheOption) *Cache {
 	instance := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
 	for _, opt := range opts {
 		opt(instance)

@@ -303,7 +303,8 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 			entries[i] = memory.CacheEntry{Key: val, Value: val}
 		}
 
-		c = memory.NewWithData(ctx, entries)
+		c = memory.NewWithData(entries)
+		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
 	} else {
 		c = memory.New()
 	}
