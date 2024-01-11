@@ -92,15 +92,29 @@ func (s Scanner) verifyResult(ctx context.Context, apiKey string) (bool, map[str
 			return true, nil, err
 		}
 
-		t := whoamiRes.Auth.AccessToken
+		var tokenInfo string
+		switch {
+		case whoamiRes.Auth.AccessToken.DisplayName != "" || whoamiRes.Auth.AccessToken.Role != "":
+			// hf_xxxx token
+			t := whoamiRes.Auth.AccessToken
+			tokenInfo = fmt.Sprintf("%s (%s)", t.DisplayName, t.Role)
+
+		case whoamiRes.Auth.Type != "":
+			// api_org_xxxx token
+			tokenInfo = whoamiRes.Auth.Type
+
+		default:
+			tokenInfo = "Unknown Token Type"
+		}
+
 		extraData := map[string]string{
 			"Username": whoamiRes.Name,
 			"Email":    whoamiRes.Email,
-			"Token":    fmt.Sprintf("%s (%s)", t.DisplayName, t.Role),
+			"Token":    tokenInfo,
 		}
 
 		// Condense a list of organizations + roles.
-		var orgs []string
+		orgs := make([]string, 0, len(whoamiRes.Organizations))
 		for _, org := range whoamiRes.Organizations {
 			orgs = append(orgs, fmt.Sprintf("%s:%s", org.Name, org.Role))
 		}
@@ -136,7 +150,8 @@ type organization struct {
 
 type auth struct {
 	AccessToken struct {
-		DisplayName string `json:"displayName"`
-		Role        string `json:"role"`
-	} `json:"accessToken"`
+		DisplayName string `json:"displayName,omitempty"`
+		Role        string `json:"role,omitempty"`
+	} `json:"accessToken,omitempty"`
+	Type string `json:"type,omitempty"`
 }
