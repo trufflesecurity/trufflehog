@@ -450,6 +450,7 @@ func run(state overseer.State) {
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
+			SkipBinaries:               true,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")
@@ -470,10 +471,6 @@ func run(state overseer.State) {
 			logFatal(err, "Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
-		filter, err := common.FilterFromFiles(*filesystemScanIncludePaths, *filesystemScanExcludePaths)
-		if err != nil {
-			logFatal(err, "could not create filter")
-		}
 		if len(*filesystemDirectories) > 0 {
 			ctx.Logger().Info("--directory flag is deprecated, please pass directories as arguments")
 		}
@@ -481,8 +478,9 @@ func run(state overseer.State) {
 		paths = append(paths, *filesystemPaths...)
 		paths = append(paths, *filesystemDirectories...)
 		cfg := sources.FilesystemConfig{
-			Paths:  paths,
-			Filter: filter,
+			Paths:            paths,
+			IncludePathsFile: *filesystemScanIncludePaths,
+			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
 		if err = e.ScanFileSystem(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan filesystem")
