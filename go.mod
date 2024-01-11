@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/secretmanager v1.11.4
 	cloud.google.com/go/storage v1.35.1
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.1
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.19.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
