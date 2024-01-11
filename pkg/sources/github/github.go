@@ -419,11 +419,13 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 	return
 }
 
+const cloudEndpoint = "https://api.github.com"
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	apiEndpoint := s.conn.Endpoint
 	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
-		apiEndpoint = "https://api.github.com"
+		apiEndpoint = cloudEndpoint
 	}
 
 	// If targets are provided, we're only scanning the data in those targets.
@@ -605,7 +607,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			s.log.Error(err, "error fetching repos by user")
 		}
 
-		isGHE := strings.EqualFold(apiEndpoint, "https://api.github.com")
+		isGHE := !strings.EqualFold(apiEndpoint, cloudEndpoint)
 		if isGHE {
 			s.addAllVisibleOrgs(ctx)
 		} else {
@@ -731,7 +733,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 func createGitHubClient(httpClient *http.Client, apiEndpoint string) (ghClient *github.Client, err error) {
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
-	if apiEndpoint == "https://api.github.com" {
+	if apiEndpoint == cloudEndpoint {
 		ghClient = github.NewClient(httpClient)
 	} else {
 		ghClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
