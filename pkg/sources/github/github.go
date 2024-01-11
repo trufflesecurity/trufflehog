@@ -733,7 +733,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Client, error) {
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
-	if apiEndpoint == cloudEndpoint {
+	if strings.EqualFold(apiEndpoint, cloudEndpoint) {
 		return github.NewClient(httpClient), nil
 	}
 
