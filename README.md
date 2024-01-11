@@ -530,6 +530,20 @@ with HTTPServer(('', 8000), Verifier) as server:
         pass
 ```
 
+## Paranoid Scanning Mode (alpha)
+Paranoid Scanning mode is an experimental feature enabled on _some_ detectors.
+This feature offers broader and more thorough secret scanning. We accomplish this by
+lexing incoming code chunks for string literals and comments (if the chunk source is _not code_,
+then we look at each word). Those words are then put through a few secret checks like entropy and stop word filtering.
+Once we have a list of potential secrets, we can then use the potential secret length to look
+up detectors that have credential lengths within the range of said potential secret.
+
+TODO image
+
+Some things to note:
+- Not all detectors are supported.
+- This feature is not useful for secrets that have unique prefixes.
+
 # :heart: Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].

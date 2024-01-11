@@ -30,6 +30,31 @@ func (s Scanner) Keywords() []string {
 	return []string{"asana"}
 }
 
+var _ detectors.Paranoid = (*Scanner)(nil)
+
+func (s Scanner) About() detectors.DetectorInfo {
+	return detectors.DetectorInfo{
+		Name: "Asana OAuth",
+		Credentials: []detectors.Credential{
+			{
+				Name:         "Asana OAuth",
+				CharacterMin: 51,
+				CharacterMax: 51,
+			},
+		},
+	}
+}
+
+func (s Scanner) FromDataParanoid(ctx context.Context, verify bool, data []byte, words []string) ([]detectors.Result, error) {
+    dataBuilder := strings.Builder{}
+    for _, word := range words {
+        dataBuilder.WriteString("asana = ")
+        dataBuilder.WriteString(word)
+        dataBuilder.WriteString("\n")
+    }
+    return s.FromData(ctx, verify, []byte(dataBuilder.String()))
+}
+
 // FromData will find and optionally verify AsanaOauth secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)

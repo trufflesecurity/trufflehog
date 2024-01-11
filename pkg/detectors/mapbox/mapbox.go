@@ -31,6 +31,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"mapbox"}
 }
 
+
 func (s Scanner) About() detectors.DetectorInfo {
 	return detectors.DetectorInfo{
 		Name: "MapBox",

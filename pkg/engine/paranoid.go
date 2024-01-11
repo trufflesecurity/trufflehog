@@ -14,7 +14,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	// "github.com/trustelem/zxcvbn"
 )
 
 //go:embed words.txt
@@ -39,6 +38,16 @@ func NewParanoidCore(ds []detectors.Detector) *ParanoidCore {
 		WordList:          getWords(wordsTxt),
 		ShortWordList:     getWords(wordsShortTxt),
 		LongestWord:       100,
+		IgnorePaths: []*regexp.Regexp{
+			regexp.MustCompile(`(?i)node_modules`),
+			regexp.MustCompile(`(?i)vendor`),
+			regexp.MustCompile(`(?i)bower_components`),
+			regexp.MustCompile(`(?i)go\.sum`),
+			regexp.MustCompile(`(?i)go\.mod`),
+			regexp.MustCompile(`(?i)go\.mod`),
+			regexp.MustCompile(`(?i)assets`),
+			// TODO: add more ignore paths, maybe make this configurable
+		},
 	}
 	for _, d := range ds {
 		paranoidDetector, ok := d.(detectors.Paranoid)
@@ -110,7 +119,7 @@ func (pc *ParanoidCore) checks(word string, entropy float32) bool {
 		return false
 	}
 
-    // NOTE: zxcvbn significantly slows down the scan
+	// NOTE: zxcvbn significantly slows down the scan
 	// if zxcvbn.PasswordStrength(word, nil).Score < 3 {
 	// 	return false
 	// }
@@ -135,22 +144,27 @@ func (pc *ParanoidCore) getFileInfo(chunk *sources.Chunk) (string, string) {
 
 func (pc *ParanoidCore) inspect(data string, entropy float32, chunk *sources.Chunk) []string {
 	fileType, filePath := pc.getFileInfo(chunk)
-	// if anyRegexMatch(filePath, pc.IgnorePaths) {
-	// 	return []string{}
-	// }
+	if anyRegexMatch(filePath, pc.IgnorePaths) {
+		return []string{}
+	}
 
 	var l chroma.Lexer
 	if fileType != "" {
 		l = lexers.Get(fileType)
 		if l == nil {
-			return pc.inspectNoLexer(data, entropy, filePath)
+			// attempt to guess lexer based on the contents of data
+			l = lexers.Analyse(data)
 		}
+		if l == nil {
+			return []string{}
+			// TODO: enable no lexer inspection after seeing community
+			// feedback on this
+			// return pc.inspectNoLexer(data, entropy, filePath)
+		}
+
 		return pc.inspectLexer(data, entropy, filePath, l)
-		// } TODO might need this else {
-		// 	l = lexers.Analyse(data)
-		// }
 	}
-	return pc.inspectNoLexer(data, entropy, filePath)
+	return []string{}
 }
 
 func (pc *ParanoidCore) inspectLexer(data string, entropy float32, filePath string, l chroma.Lexer) []string {
