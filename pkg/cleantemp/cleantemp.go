@@ -100,13 +100,14 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 
 			if shouldDelete {
 				path := filepath.Join(tempDir, entry.Name())
-				if entry.IsDir() {
+				isDir := entry.IsDir()
+				if isDir {
 					err = os.RemoveAll(path)
 				} else {
 					err = os.Remove(path)
 				}
 				if err != nil {
-					return fmt.Errorf("error deleting temp artifact: %s", path)
+					return fmt.Errorf("error deleting temp artifact (dir: %v) %s: %w", isDir, path, err)
 				}
 
 				ctx.Logger().V(4).Info("Deleted orphaned temp artifact", "artifact", path)

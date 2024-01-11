@@ -6,18 +6,18 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2
 
 require (
 	cloud.google.com/go/secretmanager v1.11.4
-	cloud.google.com/go/storage v1.35.1
+	cloud.google.com/go/storage v1.36.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.1
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.19.0
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/aws/aws-sdk-go v1.48.12
+	github.com/aws/aws-sdk-go v1.49.19
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
-	github.com/bradleyfalzon/ghinstallation/v2 v2.8.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.9.0
 	github.com/charmbracelet/bubbles v0.16.1
 	github.com/charmbracelet/bubbletea v0.24.2
 	github.com/charmbracelet/glamour v0.6.0
@@ -29,7 +29,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.2
 	github.com/fatih/color v1.16.0
 	github.com/felixge/fgprof v0.9.3
-	github.com/gabriel-vasile/mimetype v1.4.2
+	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.11.0
@@ -58,7 +58,7 @@ require (
 	github.com/lrstanley/bubblezone v0.0.0-20230911164824-e3824f1adde9
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
-	github.com/mattn/go-sqlite3 v1.14.18
+	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
@@ -78,7 +78,7 @@ require (
 	go.uber.org/mock v0.3.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.17.0
-	golang.org/x/exp v0.0.0-20231127185646-65229373498e
+	golang.org/x/exp v0.0.0-20240110193028-0dcbfd608b1e
 	golang.org/x/net v0.19.0
 	golang.org/x/oauth2 v0.15.0
 	golang.org/x/sync v0.5.0
@@ -138,7 +138,7 @@ require (
 	github.com/bodgit/sevenzip v1.4.5 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cloudflare/circl v1.3.3 // indirect
+	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/couchbase/gocbcore/v10 v10.3.0 // indirect
@@ -155,7 +155,7 @@ require (
 	github.com/docker/docker v24.0.7+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
-	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
+	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
@@ -172,6 +172,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v23.1.21+incompatible // indirect
 	github.com/google/go-github/v56 v56.0.0 // indirect
+	github.com/google/go-github/v57 v57.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
