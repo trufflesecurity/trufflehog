@@ -5,52 +5,77 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 const (
-	expirationInterval = 12 * time.Hour
-	purgeInterval      = 13 * time.Hour
-	defaultExpiration  = cache.DefaultExpiration
+	defaultExpirationInterval = 12 * time.Hour
+	defaultPurgeInterval      = 13 * time.Hour
+	defaultExpiration         = cache.DefaultExpiration
 )
 
-// Cache is a wrapper around the go-cache library.
+// Cache wraps the go-cache library to provide an in-memory key-value store.
 type Cache struct {
-	c *cache.Cache
+	c             *cache.Cache
+	expiration    time.Duration
+	purgeInterval time.Duration
 }
 
-// New constructs a new in-memory cache.
-func New() *Cache {
-	c := cache.New(expirationInterval, purgeInterval)
-	return &Cache{c: c}
+// CacheOption defines a function type used for configuring a Cache.
+type CacheOption func(*Cache)
+
+// WithExpirationInterval returns a CacheOption to set the expiration interval of cache items.
+// The interval determines the duration a cached item remains in the cache before it is expired.
+func WithExpirationInterval(interval time.Duration) CacheOption {
+	return func(c *Cache) { c.expiration = interval }
+}
+
+// WithPurgeInterval returns a CacheOption to set the interval at which the cache purges expired items.
+// Regular purging helps in freeing up memory by removing stale entries.
+func WithPurgeInterval(interval time.Duration) CacheOption {
+	return func(c *Cache) { c.purgeInterval = interval }
+}
+
+// New constructs a new in-memory cache instance with optional configurations.
+// By default, it sets the expiration and purge intervals to 12 and 13 hours, respectively.
+// These defaults can be overridden using the functional options: WithExpirationInterval and WithPurgeInterval.
+func New(opts ...CacheOption) *Cache {
+	return NewWithData(nil, opts...)
+}
+
+// CacheEntry represents a single entry in the cache, consisting of a key and its corresponding value.
+type CacheEntry struct {
+	// Key is the unique identifier for the entry.
+	Key string
+	// Value is the data stored in the entry.
+	Value any
 }
 
 // NewWithData constructs a new in-memory cache with existing data.
-func NewWithData(ctx context.Context, data []string) *Cache {
-	ctx.Logger().V(3).Info("Loading cache", "num-items", len(data))
-
-	items := make(map[string]cache.Item, len(data))
-	for _, d := range data {
-		items[d] = cache.Item{Object: d, Expiration: int64(defaultExpiration)}
+// It also accepts CacheOption parameters to override default configuration values.
+func NewWithData(data []CacheEntry, opts ...CacheOption) *Cache {
+	instance := &Cache{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
+	for _, opt := range opts {
+		opt(instance)
 	}
 
-	c := cache.NewFrom(expirationInterval, purgeInterval, items)
-	return &Cache{c: c}
+	// Convert data slice to map required by go-cache.
+	items := make(map[string]cache.Item, len(data))
+	for _, d := range data {
+		items[d.Key] = cache.Item{Object: d.Value, Expiration: int64(defaultExpiration)}
+	}
+
+	instance.c = cache.NewFrom(instance.expiration, instance.purgeInterval, items)
+	return instance
 }
 
 // Set adds a key-value pair to the cache.
-func (c *Cache) Set(key, value string) {
+func (c *Cache) Set(key string, value any) {
 	c.c.Set(key, value, defaultExpiration)
 }
 
 // Get returns the value for the given key.
-func (c *Cache) Get(key string) (string, bool) {
-	res, ok := c.c.Get(key)
-	if !ok {
-		return "", ok
-	}
-	return res.(string), ok
+func (c *Cache) Get(key string) (any, bool) {
+	return c.c.Get(key)
 }
 
 // Exists returns true if the given key exists in the cache.
@@ -85,11 +110,11 @@ func (c *Cache) Keys() []string {
 }
 
 // Values returns all values in the cache.
-func (c *Cache) Values() []string {
+func (c *Cache) Values() []any {
 	items := c.c.Items()
-	res := make([]string, 0, len(items))
+	res := make([]any, 0, len(items))
 	for _, v := range items {
-		res = append(res, v.Object.(string))
+		res = append(res, v.Object)
 	}
 	return res
 }
