@@ -46,17 +46,19 @@ func TestPostgres_FromChunk(t *testing.T) {
 	tests := []struct {
 		name    string
 		s       Scanner
-		args    args
+		args    func() args
 		want    []detectors.Result
 		wantErr bool
 	}{
 		{
 			name: "not found",
 			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
+			args: func() args {
+				return args{
+					ctx:    context.Background(),
+					data:   []byte("You cannot find the secret within"),
+					verify: true,
+				}
 			},
 			want:    nil,
 			wantErr: false,
@@ -64,15 +66,17 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with seperated credentials, verified",
 			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
+			args: func() args {
+				return args{
+					ctx: context.Background(),
+					data: []byte(fmt.Sprintf(`
 					POSTGRES_USER=%s
 					POSTGRES_PASSWORD=%s
 					POSTGRES_ADDRESS=%s
 					POSTGRES_PORT=%s
 					`, postgresUser, postgresPass, postgresHost, postgresPort)),
-				verify: true,
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -85,10 +89,12 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with single line credentials, verified",
 			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, postgresHost, postgresPort)),
-				verify: true,
+			args: func() args {
+				return args{
+					ctx:    context.Background(),
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, postgresHost, postgresPort)),
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -101,11 +107,13 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with json credentials, verified",
 			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(
-					`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, postgresUser, postgresPass, postgresHost, postgresPort)),
-				verify: true,
+			args: func() args {
+				return args{
+					ctx: context.Background(),
+					data: []byte(fmt.Sprintf(
+						`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, postgresUser, postgresPass, postgresHost, postgresPort)),
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -118,15 +126,17 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with seperated credentials, unverified",
 			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
+			args: func() args {
+				return args{
+					ctx: context.Background(),
+					data: []byte(fmt.Sprintf(`
 					POSTGRES_USER=%s
 					POSTGRES_PASSWORD=%s
 					POSTGRES_ADDRESS=%s
 					POSTGRES_PORT=%s
 					`, postgresUser, inactivePass, postgresHost, postgresPort)),
-				verify: true,
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -139,14 +149,16 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with seperated credentials - no port, unverified",
 			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
+			args: func() args {
+				return args{
+					ctx: context.Background(),
+					data: []byte(fmt.Sprintf(`
 					POSTGRES_USER=%s
 					POSTGRES_PASSWORD=%s
 					POSTGRES_ADDRESS=%s
 					`, postgresUser, inactivePass, postgresHost)),
-				verify: true,
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -159,10 +171,12 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with single line credentials, unverified",
 			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, inactivePass, postgresHost, postgresPort)),
-				verify: true,
+			args: func() args {
+				return args{
+					ctx:    context.Background(),
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, inactivePass, postgresHost, postgresPort)),
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -175,11 +189,13 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with json credentials, unverified - inactive password",
 			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(
-					`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, postgresUser, inactivePass, postgresHost, postgresPort)),
-				verify: true,
+			args: func() args {
+				return args{
+					ctx: context.Background(),
+					data: []byte(fmt.Sprintf(
+						`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, postgresUser, inactivePass, postgresHost, postgresPort)),
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -192,11 +208,13 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found with json credentials, unverified - inactive user",
 			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(
-					`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, inactiveUser, postgresPass, postgresHost, postgresPort)),
-				verify: true,
+			args: func() args {
+				return args{
+					ctx: context.Background(),
+					data: []byte(fmt.Sprintf(
+						`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, inactiveUser, postgresPass, postgresHost, postgresPort)),
+					verify: true,
+				}
 			},
 			want: []detectors.Result{
 				{
@@ -209,10 +227,12 @@ func TestPostgres_FromChunk(t *testing.T) {
 		{
 			name: "found, unverified due to error - inactive port",
 			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, postgresHost, inactivePort)),
-				verify: true,
+			args: func() args {
+				return args{
+					ctx:    context.Background(),
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, postgresHost, inactivePort)),
+					verify: true,
+				}
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
@@ -234,7 +254,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, inactiveHost, postgresPort)),
 					verify: true,
 				}
-			}(),
+			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
@@ -259,7 +279,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 						postgresUser, postgresPass, postgresHost, postgresPort)),
 					verify: true,
 				}
-			}(),
+			},
 			want: func() []detectors.Result {
 				first := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
@@ -278,7 +298,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			args := tt.args()
+			got, err := s.FromData(args.ctx, args.verify, args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("postgres.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
