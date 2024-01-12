@@ -26,7 +26,7 @@ const (
 	postgresUser = "postgres"
 	postgresPass = "23201dabb56ca236f3dc6736c0f9afad"
 	postgresHost = "localhost"
-	postgresPort = "5433"
+	postgresPort = "5434" // don't use 5433 because it can conflict with local development in certain cases
 
 	inactiveUser = "inactive"
 	inactivePass = "inactive"
