@@ -99,29 +99,6 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found with single line credentials next to invalid credentials, verified",
-			s:    Scanner{},
-			args: func() args {
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				defer cancel()
-				return args{
-					ctx: ctx,
-					data: []byte(fmt.Sprintf(`
-						postgresql://user:secret@foobar.com:5432/mydb?sslmode=disable
-						postgresql://%s:%s@%s:%s/postgres`,
-						postgresUser, postgresPass, postgresHost, postgresPort)),
-					verify: true,
-				}
-			}(),
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name: "found with json credentials, verified",
 			s:    Scanner{},
 			args: args{
@@ -265,6 +242,35 @@ func TestPostgres_FromChunk(t *testing.T) {
 				}
 				r.SetVerificationError(errors.New("i/o timeout"))
 				return []detectors.Result{r}
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "verified credentials next to bad host credentials",
+			s:    Scanner{},
+			args: func() args {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				return args{
+					ctx: ctx,
+					data: []byte(fmt.Sprintf(`
+						postgresql://user:secret@foobar.com:5432/mydb?sslmode=disable
+						postgresql://%s:%s@%s:%s/postgres`,
+						postgresUser, postgresPass, postgresHost, postgresPort)),
+					verify: true,
+				}
+			}(),
+			want: func() []detectors.Result {
+				first := detectors.Result{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     false,
+				}
+				first.SetVerificationError(errors.New("i/o timeout"))
+				second := detectors.Result{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     true,
+				}
+				return []detectors.Result{first, second}
 			}(),
 			wantErr: false,
 		},

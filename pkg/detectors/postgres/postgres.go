@@ -36,8 +36,7 @@ func (s Scanner) Keywords() []string {
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	var results []detectors.Result
-	var pgURLs []url.URL
-	pgURLs = append(pgURLs, findUriMatches(string(data)))
+	pgURLs := findUriMatches(string(data))
 	pgURLs = append(pgURLs, findComponentMatches(verify, string(data))...)
 
 	for _, pgURL := range pgURLs {
@@ -80,18 +79,19 @@ func getDeadlineInSeconds(ctx context.Context) int {
 	return int(duration.Seconds())
 }
 
-func findUriMatches(dataStr string) url.URL {
-	var pgURL url.URL
-	for _, uri := range uriPattern.FindAllString(dataStr, -1) {
+func findUriMatches(dataStr string) []url.URL {
+	var results []url.URL
+	all := uriPattern.FindAllString(dataStr, -1)
+	for _, uri := range all {
 		pgURL, err := url.Parse(uri)
 		if err != nil {
 			continue
 		}
 		if pgURL.User != nil {
-			return *pgURL
+			results = append(results, *pgURL)
 		}
 	}
-	return pgURL
+	return results
 }
 
 // check if postgres is running
