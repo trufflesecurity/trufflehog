@@ -154,9 +154,9 @@ func verifyLDAP(username, password string, ldapURL *url.URL, iad bool) error {
 		}
 
 		if iad && err != nil {
-            // if we get a previous error we need to check if we can
-            // extract the full DN from the uri
-            // otherwise we will get an error for the IAS format
+			// if we get a previous error we need to check if we can
+			// extract the full DN from the uri
+			// otherwise we will get an error for the IAS format
 			splits := strings.Split(uri, "/")
 			bindDN = splits[len(splits)-1]
 		}
