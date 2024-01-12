@@ -76,36 +76,38 @@ func TestArchiveHandler(t *testing.T) {
 	}
 
 	for name, testCase := range tests {
-		resp, err := http.Get(testCase.archiveURL)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			t.Error(err)
-		}
-		defer resp.Body.Close()
-
-		archive := Archive{}
-		archive.New()
-
-		newReader, err := diskbufferreader.New(resp.Body)
-		if err != nil {
-			t.Errorf("error creating reusable reader: %s", err)
-		}
-		archiveChan := archive.FromFile(logContext.Background(), newReader)
-
-		count := 0
-		re := regexp.MustCompile(testCase.matchString)
-		matched := false
-		for chunk := range archiveChan {
-			count++
-			if re.Match(chunk) {
-				matched = true
+		t.Run(name, func(t *testing.T) {
+			resp, err := http.Get(testCase.archiveURL)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				t.Error(err)
 			}
-		}
-		if !matched && len(testCase.matchString) > 0 {
-			t.Errorf("%s: Expected string not found in archive.", name)
-		}
-		if count != testCase.expectedChunks {
-			t.Errorf("%s: Unexpected number of chunks. Got %d, expected: %d", name, count, testCase.expectedChunks)
-		}
+			defer resp.Body.Close()
+
+			archive := Archive{}
+			archive.New()
+
+			newReader, err := diskbufferreader.New(resp.Body)
+			if err != nil {
+				t.Errorf("error creating reusable reader: %s", err)
+			}
+			archiveChan := archive.FromFile(logContext.Background(), newReader)
+
+			count := 0
+			re := regexp.MustCompile(testCase.matchString)
+			matched := false
+			for chunk := range archiveChan {
+				count++
+				if re.Match(chunk) {
+					matched = true
+				}
+			}
+			if !matched && len(testCase.matchString) > 0 {
+				t.Errorf("%s: Expected string not found in archive.", name)
+			}
+			if count != testCase.expectedChunks {
+				t.Errorf("%s: Unexpected number of chunks. Got %d, expected: %d", name, count, testCase.expectedChunks)
+			}
+		})
 	}
 }
 
