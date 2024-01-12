@@ -246,7 +246,6 @@ func TestPostgres_FromChunk(t *testing.T) {
 			}(),
 			wantErr: false,
 		},
-		// This test seems take a long time to run (70s+) even with the timeout set to 1s. It's not clear why.
 		{
 			name: "found, unverified due to error - inactive host",
 			s:    Scanner{},
