@@ -29,7 +29,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"huggingface", "hugging_face", "hf_", "api_org_"} // Huggingface docs occasionally use "hf" instead of "huggingface"
+	return []string{"hf_", "api_org_"} // Huggingface docs occasionally use "hf" instead of "huggingface"
 }
 
 // FromData will find and optionally verify Huggingface secrets in a given set of bytes.
