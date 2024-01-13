@@ -35,10 +35,9 @@ func (s Scanner) Keywords() []string {
 	return []string{"parseur"}
 }
 
-func (s Scanner) ScanChunk(chunk sources.Chunk) bool {
-	// TODO: Can |chunk.SourceMetadata| be nil?
-	if m, ok := chunk.SourceMetadata.GetData().(sources.GitSourceMetadata); ok {
-		return !detectors.FilenameConditions.LockFiles.MatchString(m.GetFile())
+func (s Scanner) ShouldScanChunk(chunk sources.Chunk) bool {
+	if m, ok := sources.NewGitSourceMetadata(chunk.SourceType, chunk.SourceMetadata); ok {
+		return !detectors.Conditions.IsLockFile(m.File)
 	}
 	return true
 }

@@ -45,12 +45,40 @@ type Chunk struct {
 	Verify bool
 }
 
-// GitSourceMetadata defines a common interface for Git-based source metadata.
-// For example, this should match Git, Azure, Bitbucket, GitHub, and Gitlab.
-type GitSourceMetadata interface {
-	GetRepository() string
-	GetCommit() string
-	GetFile() string
+// GitSourceMetadata defines a common struct for Git-based source metadata.
+type GitSourceMetadata struct {
+	Repository string
+	Commit     string
+	File       string
+}
+
+func NewGitSourceMetadata(source sourcespb.SourceType, data *source_metadatapb.MetaData) (*GitSourceMetadata, bool) {
+	if data == nil {
+		return nil, false
+	}
+
+	switch source {
+	case sourcespb.SourceType_SOURCE_TYPE_GIT:
+		md := data.GetGit()
+		return &GitSourceMetadata{md.GetRepository(), md.GetCommit(), md.GetFile()}, true
+	case sourcespb.SourceType_SOURCE_TYPE_AZURE_REPOS:
+		md := data.GetAzureRepos()
+		return &GitSourceMetadata{md.GetRepository(), md.GetCommit(), md.GetFile()}, true
+	case sourcespb.SourceType_SOURCE_TYPE_BITBUCKET:
+		md := data.GetBitbucket()
+		return &GitSourceMetadata{md.GetRepository(), md.GetCommit(), md.GetFile()}, true
+	case sourcespb.SourceType_SOURCE_TYPE_GERRIT:
+		md := data.GetGerrit()
+		return &GitSourceMetadata{md.GetProject(), md.GetCommit(), md.GetFile()}, true
+	case sourcespb.SourceType_SOURCE_TYPE_GITHUB:
+		md := data.GetGithub()
+		return &GitSourceMetadata{md.GetRepository(), md.GetCommit(), md.GetFile()}, true
+	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
+		md := data.GetGitlab()
+		return &GitSourceMetadata{md.GetRepository(), md.GetCommit(), md.GetFile()}, true
+	default:
+		return nil, false
+	}
 }
 
 // ChunkingTarget specifies criteria for a targeted chunking process.

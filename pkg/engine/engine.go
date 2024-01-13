@@ -574,7 +574,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 				for k, detector := range chunkSpecificDetectors {
 					d, ok := detector.(detectors.ConditionalDetector)
-					if ok && !d.ScanChunk(*chunk) {
+					if ok && !d.ShouldScanChunk(*chunk) {
 						ctx.Logger().V(4).Info("skipping detector for chunk", "detector", detector.Type().String(), "chunk", chunk)
 						delete(chunkSpecificDetectors, k)
 						continue

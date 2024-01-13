@@ -31,18 +31,22 @@ type Detector interface {
 // ConditionalDetector is an optional interface that a detector can implement to
 // skip chunks based on specific criteria.
 type ConditionalDetector interface {
-	// ScanChunk determines whether the detector should run.
-	ScanChunk(chunk sources.Chunk) bool
+	// ShouldScanChunk determines whether the detector should run.
+	ShouldScanChunk(chunk sources.Chunk) bool
 }
 
-// FilenameConditions is a set of common conditions to be used by ConditionalDetector.
+var lockFilePat = regexp.MustCompile(`(^|/)(package(-lock)?\.json|yarn\.lock)$`)
+
+// Conditions is a set of common conditions to be used by ConditionalDetector.
 // (Using anonymous structs is weird, but Go has no concept of static members... https://stackoverflow.com/a/55390104)
-var FilenameConditions = struct {
+var Conditions = struct {
 	// LockFiles are a common source of false-positives.
 	// https://github.com/trufflesecurity/trufflehog/issues/1460
-	LockFiles *regexp.Regexp
+	IsLockFile func(path string) bool
 }{
-	LockFiles: regexp.MustCompile(`(^|/)(package(-lock)?\.json|yarn\.lock)$`),
+	IsLockFile: func(path string) bool {
+		return lockFilePat.MatchString(path)
+	},
 }
 
 // Versioner is an optional interface that a detector can implement to
