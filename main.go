@@ -366,7 +366,7 @@ func run(state overseer.State) {
 				"detector", id,
 			)
 		}
-		if !*customVerifiersOnly {
+		if !*customVerifiersOnly || len(urls) == 0 {
 			urls = append(urls, customizer.DefaultEndpoint())
 		}
 		if err := customizer.SetEndpoints(urls...); err != nil {
