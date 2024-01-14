@@ -57,6 +57,7 @@ var (
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
 	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
+	customVerifiersOnly  = cli.Flag("custom-verifiers-only", "Only use custom verification endpoints.").Bool()
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
@@ -365,8 +366,9 @@ func run(state overseer.State) {
 				"detector", id,
 			)
 		}
-		// TODO: Add flag to ignore the default endpoint.
-		urls = append(urls, customizer.DefaultEndpoint())
+		if !*customVerifiersOnly || len(urls) == 0 {
+			urls = append(urls, customizer.DefaultEndpoint())
+		}
 		if err := customizer.SetEndpoints(urls...); err != nil {
 			logFatal(err, "failed configuring custom endpoint for detector", "detector", id)
 		}
