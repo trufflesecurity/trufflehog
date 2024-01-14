@@ -524,7 +524,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/positionstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postageapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postbacks"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postgres"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/posthog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postmark"
@@ -1497,7 +1496,8 @@ func DefaultDetectors() []detectors.Detector {
 		speechtextai.Scanner{},
 		databox.Scanner{},
 		postbacks.Scanner{},
-		postgres.Scanner{},
+		// Too noisy, needs attention
+		// postgres.Scanner{},
 		collect2.Scanner{},
 		uclassify.Scanner{},
 		holistic.Scanner{},
