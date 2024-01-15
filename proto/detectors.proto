@@ -979,15 +979,15 @@ enum DetectorType {
   Postgres = 968;
   AzureActiveDirectoryApplicationSecret = 969;
   AzureCacheForRedisAccessKey = 970;
-  AzureCosmosdbKeyIdentifiable = 971;
+  AzureCosmosDBKeyIdentifiable = 971;
   AzureDevopsPersonalAccessToken = 972;
   AzureFunctionKey = 973;
-  AzureMlWebServiceClassicIdentifiableKey = 974;
+  AzureMLWebServiceClassicIdentifiableKey = 974;
   AzureSasToken = 975;
   AzureSearchAdminKey = 976;
   AzureSearchQueryKey = 977;
   AzureManagementCertificate = 978;
-  AzureSql = 979;
+  AzureSQL = 979;
 }
 
 message Result {
