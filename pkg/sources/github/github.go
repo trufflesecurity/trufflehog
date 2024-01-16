@@ -357,6 +357,10 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 		s.mu.Unlock()
 	}()
 	logger := s.log.WithValues("repo", repoURL)
+	if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
+		logger.V(3).Info("assuming unauthenticated scan has public visibility")
+		return source_metadatapb.Visibility_public
+	}
 	logger.V(2).Info("Checking public status")
 	u, err := url.Parse(repoURL)
 	if err != nil {
@@ -379,10 +383,6 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 			}
 		}
 		if err != nil || gist == nil {
-			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
-				logger.Info("Unauthenticated scans cannot determine if a repository is private.")
-				visibility = source_metadatapb.Visibility_private
-			}
 			logger.Error(err, "Could not get Github repository")
 			return
 		}
@@ -402,10 +402,6 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 		}
 		if err != nil || repo == nil {
 			logger.Error(err, "Could not get Github repository")
-			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
-				logger.Info("Unauthenticated scans cannot determine if a repository is private.")
-				visibility = source_metadatapb.Visibility_private
-			}
 			return
 		}
 		if *repo.Private {
