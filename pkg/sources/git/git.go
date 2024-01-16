@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -451,10 +452,17 @@ func CloneRepoUsingUnauthenticated(ctx context.Context, url string, args ...stri
 }
 
 // CloneRepoUsingSSH clones a repo using SSH.
-func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (string, *git.Repository, error) {
+func CloneRepoUsingSSH(ctx context.Context, gitURL string, args ...string) (string, *git.Repository, error) {
+	if isCodeCommitURL(gitURL) {
+		return CloneRepo(ctx, nil, gitURL, args...)
+	}
 	userInfo := url.User("git")
-	return CloneRepo(ctx, userInfo, gitUrl, args...)
+	return CloneRepo(ctx, userInfo, gitURL, args...)
 }
+
+var codeCommitRE = regexp.MustCompile(`ssh://git-codecommit\.[\w-]+\.amazonaws\.com`)
+
+func isCodeCommitURL(gitURL string) bool { return codeCommitRE.MatchString(gitURL) }
 
 func (s *Git) CommitsScanned() uint64 {
 	return atomic.LoadUint64(&s.metrics.commitsScanned)
