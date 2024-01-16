@@ -460,7 +460,7 @@ func CloneRepoUsingSSH(ctx context.Context, gitURL string, args ...string) (stri
 	return CloneRepo(ctx, userInfo, gitURL, args...)
 }
 
-var codeCommitRE = regexp.MustCompile(`ssh://git-codecommit\.[\w-]+\.amazonaws\.com/v1/repos`)
+var codeCommitRE = regexp.MustCompile(`ssh://git-codecommit\.[\w-]+\.amazonaws\.com`)
 
 func isCodeCommitURL(gitURL string) bool { return codeCommitRE.MatchString(gitURL) }
 
