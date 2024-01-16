@@ -131,13 +131,6 @@ type Parser struct {
 	dateFormat    string
 }
 
-// noOpCloser wraps an io.Reader to add a no-op Close method, forming an io.ReadCloser.
-type noOpCloser struct{ io.Reader }
-
-// Close performs no operation (no-op) and returns nil.
-// It's used to fulfill the io.Closer interface.
-func (noc *noOpCloser) Close() error { return nil }
-
 // DiffContentReadCloser returns an io.ReadCloser for reading the content of a Diff.
 // If the diff content size exceeds a predefined threshold, it is stored in a temporary file,
 // and the function returns an auto-deleting file reader (newAutoDeletingFileReader) to read from this file.
@@ -154,26 +147,21 @@ func DiffContentReadCloser(d *Diff) (io.ReadCloser, error) {
 		return newAutoDeletingFileReader(file), nil
 	}
 	// Data is in memory.
-	return &noOpCloser{Reader: bytes.NewReader(d.Content.Bytes())}, nil
+	return io.NopCloser(bytes.NewReader(d.Content.Bytes())), nil
 }
 
 // autoDeletingFileReader wraps an *os.File and deletes the file on Close
-type autoDeletingFileReader struct{ file *os.File }
+type autoDeletingFileReader struct{ *os.File }
 
 // newAutoDeletingFileReader creates a new autoDeletingFileReader
 func newAutoDeletingFileReader(file *os.File) *autoDeletingFileReader {
-	return &autoDeletingFileReader{file: file}
-}
-
-// Read implements the io.Reader interface
-func (r *autoDeletingFileReader) Read(p []byte) (int, error) {
-	return r.file.Read(p)
+	return &autoDeletingFileReader{File: file}
 }
 
 // Close implements the io.Closer interface, deletes the file after closing
 func (r *autoDeletingFileReader) Close() error {
-	defer os.Remove(r.file.Name()) // Delete the file after closing
-	return r.file.Close()
+	defer os.Remove(r.Name()) // Delete the file after closing
+	return r.File.Close()
 }
 
 type ParseState int
