@@ -185,7 +185,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "No File Created, Only Buffer Data",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data under the threshold
-				w.Write(ctx, []byte("small data"))
+				_, _ = w.Write(ctx, []byte("small data"))
 			},
 			expectFileContent: "",
 		},
@@ -193,7 +193,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, No Data in Buffer",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file
-				w.Write(ctx, []byte("large data is more than the threshold"))
+				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
 			},
 			expectFileContent: "large data is more than the threshold",
 		},
@@ -201,8 +201,8 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, Data in Buffer",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file, then write more data
-				w.Write(ctx, []byte("large data is more than the threshold"))
-				w.Write(ctx, []byte(" more data"))
+				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
+				_, _ = w.Write(ctx, []byte(" more data"))
 			},
 			expectFileContent: "large data is more than the threshold more data",
 		},
@@ -210,7 +210,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, Buffer Cleared",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file, then clear the buffer.
-				w.Write(ctx, []byte("large data is more than the threshold"))
+				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
 				w.buf.Reset()
 			},
 			expectFileContent: "large data is more than the threshold",
