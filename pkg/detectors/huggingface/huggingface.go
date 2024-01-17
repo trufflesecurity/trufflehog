@@ -23,13 +23,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\bhf_[a-zA-Z0-9]{34}\b`)
+	keyPat = regexp.MustCompile(`\b(?:hf_|api_org_)[a-zA-Z0-9]{34}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"huggingface", "hugging_face", "hf"} // Huggingface docs occasionally use "hf" instead of "huggingface"
+	return []string{"hf_", "api_org_"} // Huggingface docs occasionally use "hf" instead of "huggingface"
 }
 
 // FromData will find and optionally verify Huggingface secrets in a given set of bytes.
@@ -92,15 +92,29 @@ func (s Scanner) verifyResult(ctx context.Context, apiKey string) (bool, map[str
 			return true, nil, err
 		}
 
-		t := whoamiRes.Auth.AccessToken
+		var tokenInfo string
+		switch {
+		case whoamiRes.Auth.AccessToken.DisplayName != "" || whoamiRes.Auth.AccessToken.Role != "":
+			// hf_xxxx token
+			t := whoamiRes.Auth.AccessToken
+			tokenInfo = fmt.Sprintf("%s (%s)", t.DisplayName, t.Role)
+
+		case whoamiRes.Auth.Type != "":
+			// api_org_xxxx token
+			tokenInfo = whoamiRes.Auth.Type
+
+		default:
+			tokenInfo = "Unknown Token Type"
+		}
+
 		extraData := map[string]string{
 			"Username": whoamiRes.Name,
 			"Email":    whoamiRes.Email,
-			"Token":    fmt.Sprintf("%s (%s)", t.DisplayName, t.Role),
+			"Token":    tokenInfo,
 		}
 
 		// Condense a list of organizations + roles.
-		var orgs []string
+		orgs := make([]string, 0, len(whoamiRes.Organizations))
 		for _, org := range whoamiRes.Organizations {
 			orgs = append(orgs, fmt.Sprintf("%s:%s", org.Name, org.Role))
 		}
@@ -136,7 +150,8 @@ type organization struct {
 
 type auth struct {
 	AccessToken struct {
-		DisplayName string `json:"displayName"`
-		Role        string `json:"role"`
-	} `json:"accessToken"`
+		DisplayName string `json:"displayName,omitempty"`
+		Role        string `json:"role,omitempty"`
+	} `json:"accessToken,omitempty"`
+	Type string `json:"type,omitempty"`
 }
