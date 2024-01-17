@@ -783,8 +783,9 @@ func TestStagedDiffParsing(t *testing.T) {
 					IsBinary:      false,
 				},
 				{
-					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
-					IsBinary: true,
+					PathB:         "trufflehog_3.42.0_linux_arm64.tar.gz",
+					contentWriter: createBufferedFileWriterWithContent(nil),
+					IsBinary:      true,
 				},
 				{
 					PathB:         "tzu",

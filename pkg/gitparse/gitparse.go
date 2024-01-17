@@ -24,10 +24,10 @@ const (
 	defaultDateFormat = "Mon Jan 02 15:04:05 2006 -0700"
 
 	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-	defaultMaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 1GB
 
 	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
-	defaultMaxCommitSize = 1 * 1024 * 1024 * 1024 // 1GB
+	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 1GB
 )
 
 // Commit contains commit header info and diffs.

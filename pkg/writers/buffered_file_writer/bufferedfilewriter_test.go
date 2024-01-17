@@ -14,8 +14,8 @@ func TestBufferedFileWriterNewThreshold(t *testing.T) {
 	t.Parallel()
 
 	const (
-		defaultThreshold = 20 * 1024 * 1024 // 20MB
-		customThreshold  = 10 * 1024 * 1024 // 10MB
+		defaultThreshold = 10 * 1024 * 1024 // 10MB
+		customThreshold  = 20 * 1024 * 1024 // 20MB
 	)
 
 	tests := []struct {
@@ -122,7 +122,7 @@ func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 
 	assert.NotNil(t, writer.file)
 	assert.Len(t, writer.buf.Bytes(), 0)
-	fileContents, err := os.ReadFile(writer.file.Name())
+	fileContents, err := os.ReadFile(writer.filename)
 	assert.NoError(t, err)
 	assert.Equal(t, data, fileContents)
 }
@@ -144,9 +144,9 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	defer writer.Close()
 
 	// Get the file modification time after the initial write.
-	initialModTime, err := getFileModTime(t, writer.file.Name())
+	initialModTime, err := getFileModTime(t, writer.filename)
 	assert.NoError(t, err)
-	fileContents, err := os.ReadFile(writer.file.Name())
+	fileContents, err := os.ReadFile(writer.filename)
 	assert.NoError(t, err)
 	assert.Equal(t, initialData, fileContents)
 
@@ -155,7 +155,7 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, subsequentData, writer.buf.Bytes()) // Check buffer contents
-	finalModTime, err := getFileModTime(t, writer.file.Name())
+	finalModTime, err := getFileModTime(t, writer.filename)
 	assert.NoError(t, err)
 	assert.Equal(t, initialModTime, finalModTime) // File should not be modified again
 }
@@ -229,7 +229,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			assert.NoError(t, err)
 
 			if writer.file != nil {
-				fileContents, err := os.ReadFile(writer.file.Name())
+				fileContents, err := os.ReadFile(writer.filename)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectFileContent, string(fileContents))
 				return
