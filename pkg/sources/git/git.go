@@ -531,7 +531,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				continue
 			}
 
-			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
+			if diff.Len() > sources.ChunkSize+sources.PeekSize {
 				s.gitChunk(ctx, &diff, fileName, email, hash, when, remoteURL, reporter)
 				continue
 			}
@@ -539,14 +539,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			chunkData := func(d *gitparse.Diff) error {
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, int64(diff.LineStart))
 
-				reader, err := gitparse.DiffContentReadCloser(d)
+				reader, err := diff.ReadCloser()
 				if err != nil {
 					ctx.Logger().Error(err, "error creating reader for commits", "filename", fileName, "commit", hash, "file", diff.PathB)
 					return nil
 				}
 				defer reader.Close()
 
-				data := make([]byte, diff.Content.Len())
+				data := make([]byte, diff.Len())
 				if _, err := reader.Read(data); err != nil {
 					ctx.Logger().Error(err, "error reading diff content for commit", "filename", fileName, "commit", hash, "file", diff.PathB)
 					return nil
@@ -571,7 +571,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 }
 
 func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email, hash, when, urlMetadata string, reporter sources.ChunkReporter) {
-	reader, err := gitparse.DiffContentReadCloser(diff)
+	reader, err := diff.ReadCloser()
 	if err != nil {
 		ctx.Logger().Error(err, "error creating reader for chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
 		return
@@ -723,14 +723,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			chunkData := func(d *gitparse.Diff) error {
 				metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
 
-				reader, err := gitparse.DiffContentReadCloser(d)
+				reader, err := diff.ReadCloser()
 				if err != nil {
 					ctx.Logger().Error(err, "error creating reader for staged", "filename", fileName, "commit", hash, "file", diff.PathB)
 					return nil
 				}
 				defer reader.Close()
 
-				data := make([]byte, diff.Content.Len())
+				data := make([]byte, diff.Len())
 				if _, err := reader.Read(data); err != nil {
 					ctx.Logger().Error(err, "error reading diff content for staged", "filename", fileName, "commit", hash, "file", diff.PathB)
 					return nil
