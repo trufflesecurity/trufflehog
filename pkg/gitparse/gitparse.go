@@ -196,7 +196,6 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 		}
 	}
 	return true
-
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 type testCaseLine struct {
@@ -755,6 +756,7 @@ func TestIndividualCommitParsing(t *testing.T) {
 }
 
 func TestStagedDiffParsing(t *testing.T) {
+
 	expected := []Commit{
 		{
 			Hash:    "",
@@ -763,44 +765,44 @@ func TestStagedDiffParsing(t *testing.T) {
 			Message: strings.Builder{},
 			Diffs: []Diff{
 				{
-					PathB:     "aws",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
-					IsBinary:  false,
+					PathB:         "aws",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "aws2",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
-					IsBinary:  false,
+					PathB:         "aws2",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
-					LineStart: 3,
-					Content:   *bytes.NewBuffer([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
-					IsBinary:  false,
+					PathB:         "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
+					LineStart:     3,
+					contentWriter: createBufferedFileWriterWithContent([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
+					IsBinary:      false,
 				},
 				{
 					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
 					IsBinary: true,
 				},
 				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
+					PathB:         "tzu",
+					LineStart:     11,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "lao",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
-					IsBinary:  false,
+					PathB:         "lao",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "tzu",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
-					IsBinary:  false,
+					PathB:         "tzu",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+					IsBinary:      false,
 				},
 				// {
 				//	PathB:     "",
@@ -844,6 +846,15 @@ func TestStagedDiffParsing(t *testing.T) {
 	}
 }
 
+func createBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
+	writer := bufferedfilewriter.New() // Add options as needed
+	_, err := writer.Write(context.Background(), content)
+	if err != nil {
+		panic("Failed to write content: " + err.Error())
+	}
+	return writer
+}
+
 func TestCommitParseFailureRecovery(t *testing.T) {
 	expected := []Commit{
 		{
@@ -853,10 +864,10 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 			Message: newStringBuilderValue("Add travis testing\n"),
 			Diffs: []Diff{
 				{
-					PathB:     ".travis.yml",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
-					IsBinary:  false,
+					PathB:         ".travis.yml",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -874,10 +885,10 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 			Message: newStringBuilderValue("Change file\n"),
 			Diffs: []Diff{
 				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
+					PathB:         "tzu",
+					LineStart:     11,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -982,22 +993,22 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 			Message: strings.Builder{},
 			Diffs: []Diff{
 				{
-					PathB:     "aws",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
-					IsBinary:  false,
+					PathB:         "aws",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
+					PathB:         "tzu",
+					LineStart:     11,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "tzu",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
-					IsBinary:  false,
+					PathB:         "tzu",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -1129,8 +1140,8 @@ func TestMaxDiffSize(t *testing.T) {
 	}()
 
 	commit := <-commitChan
-	if commit.Diffs[0].Content.Len() > parser.maxDiffSize+1024 {
-		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.maxDiffSize+1024)
+	if commit.Diffs[0].Len() > parser.maxDiffSize+1024 {
+		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Len(), parser.maxDiffSize+1024)
 	}
 
 }
@@ -1592,22 +1603,22 @@ func expectedCommits() []Commit {
 			Message: newStringBuilderValue("Added Unusable coloring\n"),
 			Diffs: []Diff{
 				{
-					PathB:     "components/item.lua",
-					LineStart: 9,
-					Content:   *bytes.NewBuffer([]byte("\n\nlocal Unfit = LibStub('Unfit-1.0')\n\n\n")),
-					IsBinary:  false,
+					PathB:         "components/item.lua",
+					LineStart:     9,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\nlocal Unfit = LibStub('Unfit-1.0')\n\n\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "embeds.xml",
-					LineStart: 6,
-					Content:   *bytes.NewBuffer([]byte("\n\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n\n\n\n")),
-					IsBinary:  false,
+					PathB:         "embeds.xml",
+					LineStart:     6,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n\n\n\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "libs/Unfit-1.0",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("Subproject commit 0000000000000000000000000000000000000000\n")),
-					IsBinary:  false,
+					PathB:         "libs/Unfit-1.0",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("Subproject commit 0000000000000000000000000000000000000000\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -1634,10 +1645,10 @@ func expectedCommits() []Commit {
 			Message: strings.Builder{},
 			Diffs: []Diff{
 				{
-					PathB:     "sample.txt",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("Hello, world!\n")),
-					IsBinary:  false,
+					PathB:         "sample.txt",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("Hello, world!\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -1648,15 +1659,15 @@ func expectedCommits() []Commit {
 			Message: newStringBuilderValue("Add travis testing\n"),
 			Diffs: []Diff{
 				{
-					PathB:     ".gitignore",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n**/__pycache__/\n**/*.pyc\n")),
-					IsBinary:  false,
+					PathB:         ".gitignore",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\n**/__pycache__/\n**/*.pyc\n")),
+					IsBinary:      false,
 				},
 				{
 					PathB:     ".travis.yml",
 					LineStart: 1,
-					Content: *bytes.NewBuffer([]byte(`language: python
+					contentWriter: createBufferedFileWriterWithContent([]byte(`language: python
 python:
   - "2.6"
   - "2.7"
@@ -1683,7 +1694,7 @@ python:
 				{
 					PathB:     "Makefile",
 					LineStart: 1,
-					Content: *bytes.NewBuffer([]byte(`PROTOS_IMAGE=us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
+					contentWriter: createBufferedFileWriterWithContent([]byte(`PROTOS_IMAGE=us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
 
 .PHONY: check
 .PHONY: test
@@ -1727,10 +1738,10 @@ protos:
 			Message: newStringBuilderValue("Test toFile/plusLine parsing\n"),
 			Diffs: []Diff{
 				{
-					PathB:     "plusLine.txt",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("-- test\n++ test\n\n")),
-					IsBinary:  false,
+					PathB:         "plusLine.txt",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("-- test\n++ test\n\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -1741,41 +1752,41 @@ protos:
 			Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			Diffs: []Diff{
 				{
-					PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/BackChannelLogoutTokenCache.java",
-					LineStart: 45,
-					Content:   *bytes.NewBuffer([]byte("\n\n    public boolean containsTokenVerification(String token) {\n        return cacheMap.containsKey(token);\n    }\n\n\n\n\n")),
-					IsBinary:  false,
+					PathB:         "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/BackChannelLogoutTokenCache.java",
+					LineStart:     45,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n    public boolean containsTokenVerification(String token) {\n        return cacheMap.containsKey(token);\n    }\n\n\n\n\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
-					LineStart: 1023,
-					Content:   *bytes.NewBuffer([]byte("\n\n    private boolean isRpInitiatedLogout(RoutingContext context, TenantConfigContext configContext) {\n\n\n")),
-					IsBinary:  false,
+					PathB:         "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
+					LineStart:     1023,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n    private boolean isRpInitiatedLogout(RoutingContext context, TenantConfigContext configContext) {\n\n\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
-					LineStart: 1214,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\n    private class LogoutCall implements Function<SecurityIdentity, Uni<?>> {\n        RoutingContext context;\n        TenantConfigContext configContext;\n        String idToken;\n\n        LogoutCall(RoutingContext context, TenantConfigContext configContext, String idToken) {\n            this.context = context;\n            this.configContext = configContext;\n            this.idToken = idToken;\n        }\n\n        @Override\n        public Uni<Void> apply(SecurityIdentity identity) {\n            if (isRpInitiatedLogout(context, configContext)) {\n                LOG.debug(\"Performing an RP initiated logout\");\n                fireEvent(SecurityEvent.Type.OIDC_LOGOUT_RP_INITIATED, identity);\n                return buildLogoutRedirectUriUni(context, configContext, idToken);\n            }\n            if (isBackChannelLogoutPendingAndValid(configContext, identity)\n                    || isFrontChannelLogoutValid(context, configContext,\n                            identity)) {\n                return removeSessionCookie(context, configContext.oidcConfig)\n                        .map(new Function<Void, Void>() {\n                            @Override\n                            public Void apply(Void t) {\n                                throw new LogoutException();\n                            }\n                        });\n\n            }\n            return VOID_UNI;\n        }\n    }\n\n")),
-					IsBinary:  false,
+					PathB:         "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
+					LineStart:     1214,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\n\n    private class LogoutCall implements Function<SecurityIdentity, Uni<?>> {\n        RoutingContext context;\n        TenantConfigContext configContext;\n        String idToken;\n\n        LogoutCall(RoutingContext context, TenantConfigContext configContext, String idToken) {\n            this.context = context;\n            this.configContext = configContext;\n            this.idToken = idToken;\n        }\n\n        @Override\n        public Uni<Void> apply(SecurityIdentity identity) {\n            if (isRpInitiatedLogout(context, configContext)) {\n                LOG.debug(\"Performing an RP initiated logout\");\n                fireEvent(SecurityEvent.Type.OIDC_LOGOUT_RP_INITIATED, identity);\n                return buildLogoutRedirectUriUni(context, configContext, idToken);\n            }\n            if (isBackChannelLogoutPendingAndValid(configContext, identity)\n                    || isFrontChannelLogoutValid(context, configContext,\n                            identity)) {\n                return removeSessionCookie(context, configContext.oidcConfig)\n                        .map(new Function<Void, Void>() {\n                            @Override\n                            public Void apply(Void t) {\n                                throw new LogoutException();\n                            }\n                        });\n\n            }\n            return VOID_UNI;\n        }\n    }\n\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "integration-tests/oidc-wiremock/src/main/resources/application.properties",
-					LineStart: 20,
-					Content:   *bytes.NewBuffer([]byte("\n\n\nquarkus.oidc.code-flow.token.refresh-expired=true\nquarkus.oidc.code-flow.token.refresh-token-time-skew=5M\n\n\n")),
-					IsBinary:  false,
+					PathB:         "integration-tests/oidc-wiremock/src/main/resources/application.properties",
+					LineStart:     20,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\nquarkus.oidc.code-flow.token.refresh-expired=true\nquarkus.oidc.code-flow.token.refresh-token-time-skew=5M\n\n\n")),
+					IsBinary:      false,
 				},
 				// WTF, shouldn't this be filtered out?
 				{
-					PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
-					LineStart: 6,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\n\n\n")),
-					IsBinary:  false,
+					PathB:         "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
+					LineStart:     6,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\n\n\n\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
-					LineStart: 76,
-					Content:   *bytes.NewBuffer([]byte("\n\n            // Logout\n\n\n\n")),
-					IsBinary:  false,
+					PathB:         "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
+					LineStart:     76,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n            // Logout\n\n\n\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -1786,10 +1797,10 @@ protos:
 			Message: newStringBuilderValue("Add QuarkusApplication javadoc\n\n* Fix #34463\n"),
 			Diffs: []Diff{
 				{
-					PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
-					LineStart: 3,
-					Content:   *bytes.NewBuffer([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
-					IsBinary:  false,
+					PathB:         "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
+					LineStart:     3,
+					contentWriter: createBufferedFileWriterWithContent([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -1807,8 +1818,9 @@ protos:
 			Message: newStringBuilderValue("Change binary file\n"),
 			Diffs: []Diff{
 				{
-					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
-					IsBinary: true,
+					PathB:         "trufflehog_3.42.0_linux_arm64.tar.gz",
+					IsBinary:      true,
+					contentWriter: createBufferedFileWriterWithContent(nil),
 				},
 			},
 		},
@@ -1819,8 +1831,9 @@ protos:
 			Message: newStringBuilderValue("Add binary file\n"),
 			Diffs: []Diff{
 				{
-					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
-					IsBinary: true,
+					PathB:         "trufflehog_3.42.0_linux_arm64.tar.gz",
+					IsBinary:      true,
+					contentWriter: createBufferedFileWriterWithContent(nil),
 				},
 			},
 		},
@@ -1845,10 +1858,10 @@ protos:
 			Message: newStringBuilderValue("Change file\n"),
 			Diffs: []Diff{
 				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
+					PathB:         "tzu",
+					LineStart:     11,
+					contentWriter: createBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+					IsBinary:      false,
 				},
 			},
 		},
@@ -1859,16 +1872,16 @@ protos:
 			Message: newStringBuilderValue("Create files\n"),
 			Diffs: []Diff{
 				{
-					PathB:     "lao",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
-					IsBinary:  false,
+					PathB:         "lao",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
+					IsBinary:      false,
 				},
 				{
-					PathB:     "tzu",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
-					IsBinary:  false,
+					PathB:         "tzu",
+					LineStart:     1,
+					contentWriter: createBufferedFileWriterWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+					IsBinary:      false,
 				},
 			},
 		},
