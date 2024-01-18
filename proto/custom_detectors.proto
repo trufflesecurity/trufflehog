@@ -21,7 +21,8 @@ message VerifierConfig {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   bool unsafe = 2;
   string httpMethod = 3;
-  repeated string headers = 4;
-  repeated string successRanges = 5;
-  repeated string successBodyContains = 6;
+  bool directVerify = 4;
+  repeated string headers = 5;
+  repeated string successRanges = 6;
+  repeated string successBodyContains = 7;
 }

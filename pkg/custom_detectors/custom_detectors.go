@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -26,6 +25,7 @@ const maxTotalMatches = 100
 // initialization).
 type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
+	directVerifierCache map[string]bool
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -50,204 +50,13 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 		if err := ValidateVerifyHeaders(verify.Headers); err != nil {
 			return nil, err
 		}
-
-		fmt.Println("verify headers", verify.Headers)
 	}
 
 	// TODO: Copy only necessary data out of pb.
-	return &CustomRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{pb, make(map[string]bool)}, nil
 }
 
 var httpClient = common.SaneHttpClient()
-var validatorReplaceRegex = regexp.MustCompile(`(?i)\${([a-z0-9\-]{0,})}`)
-
-func removeDuplicateStr(strSlice []string) []string {
-	allKeys := make(map[string]bool)
-	list := []string{}
-	for _, item := range strSlice {
-		if _, value := allKeys[item]; !value {
-			allKeys[item] = true
-			list = append(list, item)
-		}
-	}
-	return list
-}
-
-// This function generates all combinations of header values
-func generateHeaderCombinations(setsOfHeaders map[string][]string) []map[string]string {
-	var keys []string
-	for k := range setsOfHeaders {
-		keys = append(keys, k)
-	}
-
-	// Start with a single empty combination
-	var combinations []map[string]string
-	combinations = append(combinations, make(map[string]string))
-
-	for _, key := range keys {
-		newCombinations := []map[string]string{}
-		for _, oldValueMap := range combinations {
-			for _, value := range setsOfHeaders[key] {
-				// Copy the old combination and add a new value for the current key
-				newValueMap := make(map[string]string)
-				for k, v := range oldValueMap {
-					newValueMap[k] = v
-				}
-				newValueMap[key] = value
-				newCombinations = append(newCombinations, newValueMap)
-			}
-		}
-		combinations = newCombinations
-	}
-	return combinations
-}
-
-func (c *CustomRegexWebhook) doDirectVerify(ctx context.Context, matches []map[string][]string) (results []detectors.Result, err error) {
-	verifier := c.GetVerify()[0]
-	endpoints := []string{}
-	// check if enpoint contains substituion strings
-	if strings.Contains(verifier.Endpoint, "{$") {
-		for _, matchSet := range matches {
-			endpoint := verifier.Endpoint
-			for k, v := range matchSet {
-				// replace all the substitution strings with the actual values
-				endpoint = strings.ReplaceAll(endpoint, "{$"+k+"}", v[0])
-			}
-			endpoints = append(endpoints, endpoint)
-		}
-	}
-	endpoints = removeDuplicateStr(endpoints)
-	fmt.Println("endpoints: ", endpoints)
-
-	headersMap := map[string][]string{}
-	for _, header := range verifier.Headers {
-		key, value, found := strings.Cut(header, ":")
-		if found {
-			headersMap[key] = append(headersMap[key], strings.TrimLeft(value, " "))
-		}
-	}
-
-	// now check headers
-	for headerKey, headerValue := range headersMap {
-		for _, matchSet := range matches {
-			for k, v := range matchSet {
-				vals := headersMap[headerKey]
-
-				// check if header exists in vals already
-				skip := false
-				for _, val := range vals {
-					if val == strings.ReplaceAll(headerValue[0], "{$"+k+"}", v[0]) {
-						skip = true
-					}
-				}
-				if skip {
-					continue
-				}
-
-				headersMap[headerKey] = append(headersMap[headerKey],
-					strings.ReplaceAll(headerValue[0], "{$"+k+"}", v[0]))
-			}
-		}
-	}
-
-	// finally, remove the first element of each header in the headerMap since that is the substitution string
-	for headerKey, headerValue := range headersMap {
-		// check if the header has a substitution strings
-		if strings.Contains(headerValue[0], "{$") {
-			headersMap[headerKey] = headerValue[1:]
-		}
-	}
-
-	headerCombinations := generateHeaderCombinations(headersMap)
-	// fmt.Println("header combinations: ", headerCombinations)
-
-	g := new(errgroup.Group)
-	resultsCh := make(chan detectors.Result, maxTotalMatches)
-	for _, endpoint := range endpoints {
-		for _, headerSet := range headerCombinations {
-			fmt.Println("header set: ", headerSet, "endpoint: ", endpoint)
-			g.Go(func() error {
-				return c.createResultsDirect(ctx, endpoint, headerSet, true, resultsCh)
-			})
-		}
-	}
-
-	_ = g.Wait()
-	close(resultsCh)
-
-	for result := range resultsCh {
-		// NOTE: I don't believe this is being set anywhere else, hence the map assignment.
-		result.ExtraData = map[string]string{
-			"name": c.GetName(),
-		}
-		results = append(results, result)
-	}
-
-	return results, nil
-}
-
-func (c *CustomRegexWebhook) createResultsDirect(ctx context.Context, endpoint string, headerSet map[string]string, verify bool, results chan<- detectors.Result) error {
-	if common.IsDone(ctx) {
-		// TODO: Log we're possibly leaving out results.
-		return ctx.Err()
-	}
-	var raw string
-	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType_CustomRegex,
-		DetectorName: c.GetName(),
-		Raw:          []byte(raw),
-	}
-
-	if !verify {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case results <- result:
-			return nil
-		}
-	}
-	if common.IsDone(ctx) {
-		// TODO: Log we're possibly leaving out results.
-		return ctx.Err()
-	}
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, nil)
-	if err != nil {
-        return err
-	}
-	for k, v := range headerSet {
-		req.Header.Add(k, v)
-	}
-	res, err := httpClient.Do(req)
-	if err != nil {
-        return err
-	}
-	// TODO: Read response body.
-	res.Body.Close()
-	if res.StatusCode == http.StatusOK {
-		result.Verified = true
-	}
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case results <- result:
-		return nil
-	}
-}
-
-func (c *CustomRegexWebhook) shouldDirectVerify() bool {
-	verifier := c.GetVerify()[0]
-	for _, header := range verifier.Headers {
-		if strings.Contains(header, "{$") {
-			return true
-		}
-	}
-	if strings.Contains(verifier.Endpoint, "{$") {
-		return true
-	}
-	return false
-
-}
 
 func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -260,7 +69,15 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 			// This will only happen if the regex is invalid.
 			return nil, err
 		}
-		regexMatches[name] = regex.FindAllStringSubmatch(dataStr, -1)
+		if c.DirectVerifyEnabled() {
+			// TODO handle this more robustly
+			raw := regex.FindAllStringSubmatch(dataStr, -1)
+			for _, values := range raw {
+				regexMatches[name] = append(regexMatches[name], values[1:])
+			}
+		} else {
+			regexMatches[name] = regex.FindAllStringSubmatch(dataStr, -1)
+		}
 	}
 
 	// Permutate each individual match.
@@ -275,14 +92,13 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	// ]
 	matches := permutateMatches(regexMatches)
 
-	if c.shouldDirectVerify() {
-		c.doDirectVerify(ctx, matches)
+	if c.DirectVerifyEnabled() {
+		return c.DirectVerify(ctx, matches)
 	}
-
-	g := new(errgroup.Group)
 
 	// Create result object and test for verification.
 	resultsCh := make(chan detectors.Result, maxTotalMatches)
+	g := new(errgroup.Group)
 	for _, match := range matches {
 		match := match
 		g.Go(func() error {
@@ -439,7 +255,6 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 		}
 		matches = append(matches, candidate)
 	}
-	fmt.Println("what the fuck is matches", matches)
 
 	return matches
 }
