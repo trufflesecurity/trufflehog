@@ -18,6 +18,9 @@ type (
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.
 type Chunk struct {
+	// Data is the data to decode and scan.
+	Data []byte
+
 	// SourceName is the name of the Source that produced the chunk.
 	SourceName string
 	// SourceID is the ID of the source that the Chunk originated from.
@@ -27,13 +30,12 @@ type Chunk struct {
 	// SecretID is the ID of the secret, if it exists.
 	// Only secrets that are being reverified will have a SecretID.
 	SecretID int64
-	// SourceType is the type of Source that produced the chunk.
-	SourceType sourcespb.SourceType
+
 	// SourceMetadata holds the context of where the Chunk was found.
 	SourceMetadata *source_metadatapb.MetaData
+	// SourceType is the type of Source that produced the chunk.
+	SourceType sourcespb.SourceType
 
-	// Data is the data to decode and scan.
-	Data []byte
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
 }
