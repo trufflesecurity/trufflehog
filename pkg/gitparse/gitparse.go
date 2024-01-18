@@ -67,7 +67,7 @@ func NewDiff(opts ...diffOption) *Diff {
 }
 
 // Len returns the length of the storage.
-func (d *Diff) Len() int { return d.contentWriter.Len() }
+func (d *Diff) Len() int { return d.contentWriter.Size() }
 
 // ReadCloser returns a ReadCloser for the contentWriter.
 func (d *Diff) ReadCloser() (io.ReadCloser, error) { return d.contentWriter.ReadCloser() }

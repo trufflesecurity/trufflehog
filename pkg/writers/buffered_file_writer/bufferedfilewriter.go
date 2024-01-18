@@ -49,8 +49,8 @@ func New(opts ...Option) *BufferedFileWriter {
 	return w
 }
 
-// Len returns the number of bytes in the buffer.
-func (w *BufferedFileWriter) Len() int { return w.buf.Len() }
+// Size returns the number of bytes written to the buffer or file.
+func (w *BufferedFileWriter) Size() int { return int(w.size) }
 
 // String returns the contents of the buffer as a string.
 func (w *BufferedFileWriter) String() string { return w.buf.String() }

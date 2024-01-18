@@ -604,7 +604,7 @@ index 090c6ba6..38d67dd2 100644
 --- a/pkg/engine/engine.go
 +++ b/pkg/engine/engine.go
 @@ -165,7 +165,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
-                seenDetectors := make(map[config.DetectorID]struct{}, Len(dets))
+                seenDetectors := make(map[config.DetectorID]struct{}, Size(dets))
                 for _, det := range dets {
                         id := config.GetDetectorID(det)
 -                       if _, ok := seenDetectors[id]; ok {
