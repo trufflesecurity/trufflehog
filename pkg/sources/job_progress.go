@@ -8,6 +8,20 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+)
+
+var (
+	hooksExecTime = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "hooks_exec_time_ms",
+		Help:      "Time spent executing hooks (ms)",
+		Buckets:   []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000},
+	}, nil)
 )
 
 type JobProgressHook interface {
@@ -183,6 +197,10 @@ func (jp *JobProgress) TrackProgress(progress *Progress) {
 // executeHooks is a helper method to execute all the hooks for the given
 // closure.
 func (jp *JobProgress) executeHooks(todo func(hook JobProgressHook)) {
+	defer func(start time.Time) {
+		elapsed := time.Since(start).Milliseconds()
+		hooksExecTime.WithLabelValues().Observe(float64(elapsed))
+	}(time.Now())
 	for _, hook := range jp.hooks {
 		// TODO: Non-blocking?
 		todo(hook)
