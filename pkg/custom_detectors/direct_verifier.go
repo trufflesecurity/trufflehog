@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -22,7 +21,8 @@ type Target struct {
 	SuccessBodyContains []string
 }
 
-var validatorReplaceRegex = regexp.MustCompile(`(?i)\${([a-z0-9\-]{0,})}`)
+// Note: could be used to do the replacement rather than using strings
+// var validatorReplaceRegex = regexp.MustCompile(`(?i)\${([a-z0-9\-]{0,})}`)
 
 func DirectVerifyTargets(ctx context.Context, c *CustomRegexWebhook, matches []map[string][]string) []Target {
 	var targets []Target
