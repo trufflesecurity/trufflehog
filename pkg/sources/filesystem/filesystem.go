@@ -223,6 +223,26 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // filepath or a directory.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
+		fileInfo, err := os.Stat(filepath.Clean(path))
+		if err != nil {
+			if err := reporter.UnitErr(ctx, err); err != nil {
+				return err
+			}
+			continue
+		}
+		if fileInfo.IsDir() {
+			return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
+				if err != nil || relativePath == "." {
+					return nil
+				}
+				fullPath := filepath.Join(path, relativePath)
+				item := sources.CommonSourceUnit{ID: fullPath}
+				if err := reporter.UnitOk(ctx, item); err != nil {
+					return err
+				}
+				return nil
+			})
+		}
 		item := sources.CommonSourceUnit{ID: path}
 		if err := reporter.UnitOk(ctx, item); err != nil {
 			return err
