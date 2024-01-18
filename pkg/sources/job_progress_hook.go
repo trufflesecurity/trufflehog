@@ -3,7 +3,6 @@ package sources
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,19 +13,27 @@ import (
 // UnitHook implements JobProgressHook for tracking the progress of each
 // individual unit.
 type UnitHook struct {
-	metrics *lru.Cache[string, *UnitMetrics]
-	mu      sync.Mutex
+	metrics         *lru.Cache[string, *UnitMetrics]
+	mu              sync.Mutex
+	finishedMetrics chan UnitMetrics
 	NoopHook
 }
 
 type UnitHookOpt func(*UnitHook)
 
-func WithUnitHookCache(cache *lru.Cache[string, *UnitMetrics]) UnitHookOpt {
-	return func(hook *UnitHook) { hook.metrics = cache }
+// WithUnitHookFinishBufferSize sets the buffer size for handling finished
+// metrics (default is 1024). If the buffer fills, then scanning will stop
+// until there is room.
+func WithUnitHookFinishBufferSize(buf int) UnitHookOpt {
+	return func(hook *UnitHook) {
+		hook.finishedMetrics = make(chan UnitMetrics, buf)
+	}
 }
 
-func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) *UnitHook {
-	// lru.NewWithEvict can only fail if the size is < 0.
+func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) (*UnitHook, <-chan UnitMetrics) {
+	// lru.NewWithEvict can only fail if the size is < 0. This is the
+	// maximum number of concurrent in-progress units that this hook can
+	// handle.
 	cache, _ := lru.NewWithEvict(1024, func(key string, value *UnitMetrics) {
 		if value.handled {
 			return
@@ -36,11 +43,14 @@ func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) *UnitHook {
 			"metric", value,
 		)
 	})
-	hook := UnitHook{metrics: cache}
+	hook := UnitHook{
+		metrics:         cache,
+		finishedMetrics: make(chan UnitMetrics, 1024),
+	}
 	for _, opt := range opts {
 		opt(&hook)
 	}
-	return &hook
+	return &hook, hook.finishedMetrics
 }
 
 // id is a helper method to generate an ID for the given job and unit.
@@ -66,14 +76,28 @@ func (u *UnitHook) StartUnitChunking(ref JobProgressRef, unit SourceUnit, start 
 
 func (u *UnitHook) EndUnitChunking(ref JobProgressRef, unit SourceUnit, end time.Time) {
 	id := u.id(ref, unit)
+
+	metrics, ok := u.finishUnit(id)
+	if !ok {
+		return
+	}
+	metrics.EndTime = &end
+	// Intentionally block the hook from returning to supply back-pressure
+	// to the source.
+	u.finishedMetrics <- *metrics
+}
+
+func (u *UnitHook) finishUnit(id string) (*UnitMetrics, bool) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
 	metrics, ok := u.metrics.Get(id)
 	if !ok {
-		return
+		return nil, false
 	}
-	metrics.EndTime = &end
+	metrics.handled = true
+	u.metrics.Remove(id)
+	return metrics, true
 }
 
 func (u *UnitHook) ReportChunk(ref JobProgressRef, unit SourceUnit, chunk *Chunk) {
@@ -122,49 +146,38 @@ func (u *UnitHook) ReportError(ref JobProgressRef, err error) {
 }
 
 func (u *UnitHook) Finish(ref JobProgressRef) {
-	u.mu.Lock()
-	defer u.mu.Unlock()
 	// Clear out any metrics on this job. This covers the case for the
 	// source running without unit support.
-	prefix := u.id(ref, nil)
-	for _, id := range u.metrics.Keys() {
-		if !strings.HasPrefix(id, prefix) {
-			continue
-		}
-		metric, ok := u.metrics.Get(id)
-		if !ok {
-			continue
-		}
-		// If the unit is nil, the source does not support units.
-		// Use the overall job metrics instead.
-		if metric.Unit == nil {
-			snap := ref.Snapshot()
-			metric.StartTime = snap.StartTime
-			metric.EndTime = snap.EndTime
-			metric.Errors = snap.Errors
-		}
+	id := u.id(ref, nil)
+	metrics, ok := u.finishUnit(id)
+	if !ok {
+		return
 	}
+	snap := ref.Snapshot()
+	metrics.StartTime = snap.StartTime
+	metrics.EndTime = snap.EndTime
+	metrics.Errors = snap.Errors
+	// Intentionally block the hook from returning to supply back-pressure
+	// to the source.
+	u.finishedMetrics <- *metrics
 }
 
-// UnitMetrics gets all the currently active or newly finished metrics for this
-// job. If a unit returned from this method has finished, it will be removed
-// from the cache and no longer returned in successive calls to UnitMetrics().
-func (u *UnitHook) UnitMetrics() []UnitMetrics {
+// InProgressSnapshot gets all the currently active metrics across all jobs.
+func (u *UnitHook) InProgressSnapshot() []UnitMetrics {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	output := make([]UnitMetrics, 0, u.metrics.Len())
 	for _, id := range u.metrics.Keys() {
-		metric, ok := u.metrics.Get(id)
-		if !ok {
-			continue
-		}
-		output = append(output, *metric)
-		if metric.IsFinished() {
-			metric.handled = true
-			u.metrics.Remove(id)
+		if metrics, ok := u.metrics.Get(id); ok {
+			output = append(output, *metrics)
 		}
 	}
 	return output
+}
+
+func (u *UnitHook) Close() error {
+	close(u.finishedMetrics)
+	return nil
 }
 
 type UnitMetrics struct {
