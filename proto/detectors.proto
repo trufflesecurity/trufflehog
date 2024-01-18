@@ -976,6 +976,18 @@ enum DetectorType {
   Overloop = 965;
   Ngrok = 966;
   Replicate = 967;
+  Postgres = 968;
+  AzureActiveDirectoryApplicationSecret = 969;
+  AzureCacheForRedisAccessKey = 970;
+  AzureCosmosDBKeyIdentifiable = 971;
+  AzureDevopsPersonalAccessToken = 972;
+  AzureFunctionKey = 973;
+  AzureMLWebServiceClassicIdentifiableKey = 974;
+  AzureSasToken = 975;
+  AzureSearchAdminKey = 976;
+  AzureSearchQueryKey = 977;
+  AzureManagementCertificate = 978;
+  AzureSQL = 979;
 }
 
 message Result {

@@ -1496,6 +1496,8 @@ func DefaultDetectors() []detectors.Detector {
 		speechtextai.Scanner{},
 		databox.Scanner{},
 		postbacks.Scanner{},
+		// Too noisy, needs attention
+		// postgres.Scanner{},
 		collect2.Scanner{},
 		uclassify.Scanner{},
 		holistic.Scanner{},

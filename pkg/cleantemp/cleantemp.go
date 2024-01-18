@@ -2,12 +2,12 @@ package cleantemp
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mitchellh/go-ps"
 
@@ -63,65 +63,57 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 		}
 	}
 
-	tempDir := os.TempDir()
-	artifacts, err := os.ReadDir(tempDir)
-	if err != nil {
-		return fmt.Errorf("error reading temp dir: %w", err)
+	if len(pids) == 0 {
+		ctx.Logger().V(5).Info("No trufflehog processes were found")
+		return nil
 	}
 
-	for _, artifact := range artifacts {
-		if trufflehogRE.MatchString(artifact.Name()) {
+	tempDir := os.TempDir()
+	dir, err := os.Open(tempDir)
+	if err != nil {
+		return fmt.Errorf("error opening temp dir: %w", err)
+	}
+	defer dir.Close()
+
+	for {
+		entries, err := dir.ReadDir(1) // read only one entry
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			continue
+		}
+		entry := entries[0]
+
+		if trufflehogRE.MatchString(entry.Name()) {
+
 			// Mark these artifacts initially as ones that should be deleted.
 			shouldDelete := true
 			// Check if the name matches any live PIDs.
+			// Potential race condition here if a PID is started and creates tmp data after the initial check.
 			for _, pidval := range pids {
-				if strings.Contains(artifact.Name(), fmt.Sprintf("-%s-", pidval)) {
+				if strings.Contains(entry.Name(), fmt.Sprintf("-%s-", pidval)) {
 					shouldDelete = false
 					break
 				}
 			}
 
 			if shouldDelete {
-				artifactPath := filepath.Join(tempDir, artifact.Name())
-
-				var err error
-				if artifact.IsDir() {
-					err = os.RemoveAll(artifactPath)
+				path := filepath.Join(tempDir, entry.Name())
+				isDir := entry.IsDir()
+				if isDir {
+					err = os.RemoveAll(path)
 				} else {
-					err = os.Remove(artifactPath)
+					err = os.Remove(path)
 				}
 				if err != nil {
-					return fmt.Errorf("Error deleting temp artifact: %s", artifactPath)
+					return fmt.Errorf("error deleting temp artifact (dir: %v) %s: %w", isDir, path, err)
 				}
 
-				ctx.Logger().Info("Deleted orphaned temp artifact", "artifact", artifactPath)
+				ctx.Logger().V(4).Info("Deleted orphaned temp artifact", "artifact", path)
 			}
 		}
 	}
 
 	return nil
-}
-
-// RunCleanupLoop runs a loop that cleans up orphaned directories every 15 seconds.
-func RunCleanupLoop(ctx logContext.Context) {
-	err := CleanTempArtifacts(ctx)
-	if err != nil {
-		ctx.Logger().Error(err, "Error cleaning up orphaned directories ")
-	}
-
-	const cleanupLoopInterval = 15 * time.Second
-	ticker := time.NewTicker(cleanupLoopInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := CleanTempArtifacts(ctx); err != nil {
-				ctx.Logger().Error(err, "error cleaning up orphaned directories")
-			}
-		case <-ctx.Done():
-			ctx.Logger().Info("Cleanup loop exiting due to context cancellation")
-			return
-		}
-	}
 }

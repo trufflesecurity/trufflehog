@@ -76,36 +76,38 @@ func TestArchiveHandler(t *testing.T) {
 	}
 
 	for name, testCase := range tests {
-		resp, err := http.Get(testCase.archiveURL)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			t.Error(err)
-		}
-		defer resp.Body.Close()
-
-		archive := Archive{}
-		archive.New()
-
-		newReader, err := diskbufferreader.New(resp.Body)
-		if err != nil {
-			t.Errorf("error creating reusable reader: %s", err)
-		}
-		archiveChan := archive.FromFile(logContext.Background(), newReader)
-
-		count := 0
-		re := regexp.MustCompile(testCase.matchString)
-		matched := false
-		for chunk := range archiveChan {
-			count++
-			if re.Match(chunk) {
-				matched = true
+		t.Run(name, func(t *testing.T) {
+			resp, err := http.Get(testCase.archiveURL)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				t.Error(err)
 			}
-		}
-		if !matched && len(testCase.matchString) > 0 {
-			t.Errorf("%s: Expected string not found in archive.", name)
-		}
-		if count != testCase.expectedChunks {
-			t.Errorf("%s: Unexpected number of chunks. Got %d, expected: %d", name, count, testCase.expectedChunks)
-		}
+			defer resp.Body.Close()
+
+			archive := Archive{}
+			archive.New()
+
+			newReader, err := diskbufferreader.New(resp.Body)
+			if err != nil {
+				t.Errorf("error creating reusable reader: %s", err)
+			}
+			archiveChan := archive.FromFile(logContext.Background(), newReader)
+
+			count := 0
+			re := regexp.MustCompile(testCase.matchString)
+			matched := false
+			for chunk := range archiveChan {
+				count++
+				if re.Match(chunk) {
+					matched = true
+				}
+			}
+			if !matched && len(testCase.matchString) > 0 {
+				t.Errorf("%s: Expected string not found in archive.", name)
+			}
+			if count != testCase.expectedChunks {
+				t.Errorf("%s: Unexpected number of chunks. Got %d, expected: %d", name, count, testCase.expectedChunks)
+			}
+		})
 	}
 }
 
@@ -115,7 +117,9 @@ func TestHandleFile(t *testing.T) {
 	// Context cancels the operation.
 	canceledCtx, cancel := logContext.WithCancel(logContext.Background())
 	cancel()
-	assert.False(t, HandleFile(canceledCtx, strings.NewReader("file"), &sources.Chunk{}, reporter))
+	reader, err := diskbufferreader.New(strings.NewReader("file"))
+	assert.NoError(t, err)
+	assert.False(t, HandleFile(canceledCtx, reader, &sources.Chunk{}, reporter))
 
 	// Only one chunk is sent on the channel.
 	// TODO: Embed a zip without making an HTTP request.
@@ -124,12 +128,40 @@ func TestHandleFile(t *testing.T) {
 	defer resp.Body.Close()
 	archive := Archive{}
 	archive.New()
-	reader, err := diskbufferreader.New(resp.Body)
+	reader, err = diskbufferreader.New(resp.Body)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(reporter.Ch))
 	assert.True(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
 	assert.Equal(t, 1, len(reporter.Ch))
+}
+
+func BenchmarkHandleFile(b *testing.B) {
+	file, err := os.Open("testdata/test.tgz")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	archive := Archive{}
+	archive.New()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sourceChan := make(chan *sources.Chunk, 1)
+		reader, err := diskbufferreader.New(file)
+		assert.NoError(b, err)
+
+		b.StartTimer()
+
+		go func() {
+			defer close(sourceChan)
+			HandleFile(logContext.Background(), reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+		}()
+
+		for range sourceChan {
+		}
+
+		b.StopTimer()
+	}
 }
 
 func TestHandleFileSkipBinaries(t *testing.T) {
@@ -139,13 +171,16 @@ func TestHandleFileSkipBinaries(t *testing.T) {
 	file, err := os.Open(filename)
 	assert.NoError(t, err)
 
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
 	ctx, cancel := logContext.WithTimeout(logContext.Background(), 5*time.Second)
 	defer cancel()
 	sourceChan := make(chan *sources.Chunk, 1)
 
 	go func() {
 		defer close(sourceChan)
-		HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan}, WithSkipBinaries(true))
+		HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan}, WithSkipBinaries(true))
 	}()
 
 	count := 0
@@ -278,17 +313,45 @@ func TestExtractDebContent(t *testing.T) {
 	assert.Equal(t, expectedLength, len(string(content)))
 }
 
-func TestExtractTarContent(t *testing.T) {
+func TestSkipArchive(t *testing.T) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)
 	defer file.Close()
+
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
 
 	ctx := logContext.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		ok := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		ok := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
+		assert.False(t, ok)
+	}()
+
+	wantCount := 0
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestExtractTarContent(t *testing.T) {
+	file, err := os.Open("testdata/test.tgz")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
+	ctx := logContext.Background()
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		ok := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.True(t, ok)
 	}()
 
@@ -335,13 +398,16 @@ func TestNestedDirArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
 	ctx, cancel := logContext.WithTimeout(logContext.Background(), 5*time.Second)
 	defer cancel()
 	sourceChan := make(chan *sources.Chunk, 1)
 
 	go func() {
 		defer close(sourceChan)
-		HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+		HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
 	}()
 
 	count := 0

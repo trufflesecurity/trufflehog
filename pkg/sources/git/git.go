@@ -5,11 +5,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -19,11 +19,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -59,6 +60,7 @@ type Git struct {
 	metrics            metrics
 	concurrency        *semaphore.Weighted
 	skipBinaries       bool
+	skipArchives       bool
 }
 
 type metrics struct {
@@ -67,6 +69,7 @@ type metrics struct {
 
 func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData, skipBinaries bool,
+	skipArchives bool,
 ) *Git {
 	return &Git{
 		sourceType:         sourceType,
@@ -77,6 +80,7 @@ func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sourc
 		verify:             verify,
 		concurrency:        semaphore.NewWeighted(int64(concurrency)),
 		skipBinaries:       skipBinaries,
+		skipArchives:       skipArchives,
 	}
 }
 
@@ -179,6 +183,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 			}
 		},
 		conn.GetSkipBinaries(),
+		conn.GetSkipArchives(),
 	)
 	return nil
 }
@@ -447,10 +452,17 @@ func CloneRepoUsingUnauthenticated(ctx context.Context, url string, args ...stri
 }
 
 // CloneRepoUsingSSH clones a repo using SSH.
-func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (string, *git.Repository, error) {
+func CloneRepoUsingSSH(ctx context.Context, gitURL string, args ...string) (string, *git.Repository, error) {
+	if isCodeCommitURL(gitURL) {
+		return CloneRepo(ctx, nil, gitURL, args...)
+	}
 	userInfo := url.User("git")
-	return CloneRepo(ctx, userInfo, gitUrl, args...)
+	return CloneRepo(ctx, userInfo, gitURL, args...)
 }
+
+var codeCommitRE = regexp.MustCompile(`ssh://git-codecommit\.[\w-]+\.amazonaws\.com`)
+
+func isCodeCommitURL(gitURL string) bool { return codeCommitRE.MatchString(gitURL) }
 
 func (s *Git) CommitsScanned() uint64 {
 	return atomic.LoadUint64(&s.metrics.commitsScanned)
@@ -459,7 +471,16 @@ func (s *Git) CommitsScanned() uint64 {
 const gitDirName = ".git"
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
+	// Get the remote URL for reporting (may be empty)
+	remoteURL := getSafeRemoteURL(repo, "origin")
+	var repoCtx context.Context
+	if remoteURL != "" {
+		repoCtx = context.WithValue(ctx, "repo", remoteURL)
+	} else {
+		repoCtx = context.WithValue(ctx, "repo", path)
+	}
+
+	commitChan, err := gitparse.NewParser().RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -467,14 +488,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return nil
 	}
 
-	// get the URL metadata for reporting (may be empty)
-	urlMetadata := getSafeRemoteURL(repo, "origin")
-
 	var depth int64
-
 	gitDir := filepath.Join(path, gitDirName)
 
-	logger := ctx.Logger().WithValues("repo", urlMetadata)
+	logger := repoCtx.Logger()
 	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
 	for commit := range commitChan {
 		if len(scanOptions.BaseHash) > 0 {
@@ -507,7 +524,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
 				commitHash := plumbing.NewHash(hash)
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, 0)
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -523,10 +540,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			}
 
 			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(ctx, diff, fileName, email, hash, when, urlMetadata, reporter)
+				s.gitChunk(ctx, diff, fileName, email, hash, when, remoteURL, reporter)
 				continue
 			}
-			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
+			metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, int64(diff.LineStart))
 			chunk := sources.Chunk{
 				SourceName:     s.sourceName,
 				SourceID:       s.sourceID,
@@ -1006,16 +1023,17 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	var handlerOpts []handlers.Option
 	if s.skipBinaries {
-		handlerOpts = append(handlerOpts, handlers.WithSkipBinaries(true))
-		if common.IsBinary(path) {
-			fileCtx.Logger().V(5).Info("skipping binary file")
-			return nil
-		}
+		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
+		return nil
 	}
 
-	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
+	var handlerOpts []handlers.Option
+
+	if s.skipArchives {
+		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
+	}
+
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 
 	var stderr bytes.Buffer
@@ -1043,31 +1061,12 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		}
 	}()
 
-	var fileContent bytes.Buffer
-	// Create a limited reader to ensure we don't read more than the max size.
-	lr := io.LimitReader(fileReader, int64(maxSize))
-
-	// Using io.CopyBuffer for performance advantages. Though buf is mandatory
-	// for the method, due to the internal implementation of io.CopyBuffer, when
-	// *bytes.Buffer implements io.WriterTo or io.ReaderFrom, the provided buf
-	// is simply ignored. Thus, we can pass nil for the buf parameter.
-	_, err = io.CopyBuffer(&fileContent, lr, nil)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return err
-	}
-
-	if fileContent.Len() == maxSize {
-		fileCtx.Logger().V(2).Info("Max archive size reached.")
-	}
-
 	bufferName := cleantemp.MkFilename()
 
-	reader, err := diskbufferreader.New(&fileContent, diskbufferreader.WithBufferName(bufferName))
-
+	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return err
 	}
-
 	defer reader.Close()
 
 	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
