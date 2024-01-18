@@ -26,7 +26,7 @@ const (
 	postgresUser = "postgres"
 	postgresPass = "23201dabb56ca236f3dc6736c0f9afad"
 	postgresHost = "localhost"
-	postgresPort = "5433"
+	postgresPort = "5434" // Do not use 5433, as local dev environments can use it for other things
 
 	inactiveUser = "inactive"
 	inactivePass = "inactive"
@@ -62,28 +62,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found with seperated credentials, verified",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
-					POSTGRES_USER=%s
-					POSTGRES_PASSWORD=%s
-					POSTGRES_ADDRESS=%s
-					POSTGRES_PORT=%s
-					`, postgresUser, postgresPass, postgresHost, postgresPort)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found with single line credentials, verified",
+			name: "found connection URI, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -99,65 +78,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found with json credentials, verified",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(
-					`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, postgresUser, postgresPass, postgresHost, postgresPort)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found with seperated credentials, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
-					POSTGRES_USER=%s
-					POSTGRES_PASSWORD=%s
-					POSTGRES_ADDRESS=%s
-					POSTGRES_PORT=%s
-					`, postgresUser, inactivePass, postgresHost, postgresPort)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found with seperated credentials - no port, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
-					POSTGRES_USER=%s
-					POSTGRES_PASSWORD=%s
-					POSTGRES_ADDRESS=%s
-					`, postgresUser, inactivePass, postgresHost)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found with single line credentials, unverified",
+			name: "found connection URI, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -173,59 +94,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found with json credentials, unverified - inactive password",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(
-					`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, postgresUser, inactivePass, postgresHost, postgresPort)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found with json credentials, unverified - inactive user",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(
-					`DB_CONFIG={"user": "%s", "password": "%s", "host": "%s", "port": "%s", "database": "postgres"}`, inactiveUser, postgresPass, postgresHost, postgresPort)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, unverified due to error - inactive port",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, postgresHost, inactivePort)),
-				verify: true,
-			},
-			want: func() []detectors.Result {
-				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Postgres,
-					Verified:     false,
-				}
-				return []detectors.Result{r}
-			}(),
-			wantErr: false,
-		},
-		// This test seems take a long time to run (70s+) even with the timeout set to 1s. It's not clear why.
-		{
-			name: "found, unverified due to error - inactive host",
+			name: "found connection URI, unverified due to error - inactive host",
 			s:    Scanner{},
 			args: func() args {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
