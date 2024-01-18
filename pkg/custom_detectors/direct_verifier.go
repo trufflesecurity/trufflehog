@@ -40,8 +40,6 @@ func DirectVerifyTargets(ctx context.Context, c *CustomRegexWebhook, matches []m
 		}
 	}
 
-	fmt.Println("endpoints: ", endpoints)
-
 	// don't need duplicate endpoints per chunk
 	endpoints = removeDuplicateStr(endpoints)
 
@@ -220,7 +218,13 @@ func checkStatusRanges(statusCode int, statusRanges []string) bool {
 }
 
 func (c *CustomRegexWebhook) DirectVerifyEnabled() bool {
-	verifier := c.GetVerify()[0]
+	// Note: dunno why this is a slice
+	verifiers := c.GetVerify()
+	if len(verifiers) == 0 {
+		return false
+	}
+
+	verifier := verifiers[0]
 	if verifier == nil {
 		return false
 	}
