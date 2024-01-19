@@ -13,11 +13,13 @@ import (
 )
 
 const (
+	// Convert to int64 to handle potential negative size differences correctly.
 	sizeofChunk  = int64(unsafe.Sizeof(Chunk{}))
 	maxChunkSize = 80
 )
 
-var _ = [1]bool{}[sizeofChunk-maxChunkSize]
+// compileTimeAssertSize causes a compile-time error if the size of Chunk exceeds 80 bytes.
+var _ = [1]bool{}[(maxChunkSize-sizeofChunk)^((maxChunkSize-sizeofChunk)>>63)]
 
 type (
 	SourceID int64
