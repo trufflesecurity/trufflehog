@@ -35,7 +35,13 @@ const (
 )
 
 func TestPostgres_FromChunk(t *testing.T) {
-	startPostgres()
+	if err := startPostgres(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			t.Fatalf("could not start local postgres: %v w/stderr:\n%s", err, string(exitErr.Stderr))
+		} else {
+			t.Fatalf("could not start local postgres: %v", err)
+		}
+	}
 	defer stopPostgres()
 
 	type args struct {
