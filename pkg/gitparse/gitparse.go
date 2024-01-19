@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,7 +54,7 @@ func (b *buffer) Write(_ context.Context, data []byte) (int, error) {
 }
 
 func (b *buffer) ReadCloser() (io.ReadCloser, error) {
-	return ioutil.NopCloser(bytes.NewReader(b.Bytes())), nil
+	return io.NopCloser(bytes.NewReader(b.Bytes())), nil
 }
 
 func (b *buffer) Close() error { return nil }
