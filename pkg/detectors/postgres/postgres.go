@@ -88,9 +88,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				params["connect_timeout"] = strconv.Itoa(timeout)
 			}
 
-			// We'd like the 'allow' mode but pq doesn't support it (https://github.com/lib/pq/issues/776)
-			// To kludge it we first try with 'require' and then fall back to 'disable' if there's an SSL error
-			params["sslmode"] = "require"
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
@@ -162,6 +159,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	} else if strings.Contains(err.Error(), "password authentication failed") {
 		return false, nil
 	} else if errors.Is(err, pq.ErrSSLNotSupported) {
+		// Do not merge until this kludge is collectively sanctioned!
 		params["sslmode"] = "disable"
 		return verifyPostgres(params)
 	} else if isErrorDatabaseNotFound(err, params["dbname"]) {
