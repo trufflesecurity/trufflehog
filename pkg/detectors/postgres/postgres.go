@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -134,6 +135,15 @@ func getDeadlineInSeconds(ctx context.Context) int {
 	return int(duration.Seconds())
 }
 
+func isErrorDatabaseNotFound(err error, dbName string) bool {
+	if dbName == "" {
+		dbName = "postgres"
+	}
+	missingDbErrorText := fmt.Sprintf("database \"%s\" does not exist", dbName)
+
+	return strings.Contains(err.Error(), missingDbErrorText)
+}
+
 func verifyPostgres(params map[string]string) (bool, error) {
 	var connStr string
 	for key, value := range params {
@@ -151,9 +161,11 @@ func verifyPostgres(params map[string]string) (bool, error) {
 		return true, nil
 	} else if strings.Contains(err.Error(), "password authentication failed") {
 		return false, nil
-	} else if strings.Contains(err.Error(), "SSL is not enabled on the server") {
+	} else if errors.Is(err, pq.ErrSSLNotSupported) {
 		params["sslmode"] = "disable"
 		return verifyPostgres(params)
+	} else if isErrorDatabaseNotFound(err, params["dbname"]) {
+		return true, nil // If we know this, we were able to authenticate
 	}
 
 	return false, err

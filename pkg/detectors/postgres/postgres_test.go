@@ -44,6 +44,18 @@ func TestPostgres_FromChunk(t *testing.T) {
 	}
 	defer stopPostgres()
 
+	// The detector is written to connect to the database 'postgres' if no explicit database is found in the candidate
+	// secret (because pq uses 'postgres' as a default if no database is specified). If the target cluster doesn't
+	// actually have a database with this name, we should still be able to verify the candidate secret, because if we
+	// can authenticate, Postgres will tell us that the database is missing, and if we can't, it will just tell us that
+	// we can't authenticate.
+	//
+	// Unfortunately, directly validating this in the automated tests is awkward because the docker image's POSTGRES_DB
+	// environment variable doesn't appear to work: The database created is always named 'postgres', no matter what
+	// POSTGRES_DB is set to. This means that we can't replicate a cluster without a database named 'postgres', so we
+	// can't directly test what happens if we see one. To work around this, all the automated tests try to connect to
+	// the nonexistent database 'postgres2'. In this way, we test the logic of attempting to connect to a non-existent
+	// database, even though the test cases are the inverse of what we'd see in the wild.
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -72,7 +84,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			s:    Scanner{detectLoopback: true},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, postgresHost, postgresPort)),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -88,7 +100,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			s:    Scanner{detectLoopback: true},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, inactivePass, postgresHost, postgresPort)),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, inactivePass, postgresHost, postgresPort)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -104,7 +116,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, "localhost", postgresPort)),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, "localhost", postgresPort)),
 				verify: true,
 			},
 			want:    nil,
@@ -115,7 +127,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, "127.0.0.1", postgresPort)),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, "127.0.0.1", postgresPort)),
 				verify: true,
 			},
 			want:    nil,
@@ -129,7 +141,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				defer cancel()
 				return args{
 					ctx:    ctx,
-					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, inactiveHost, postgresPort)),
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, inactiveHost, postgresPort)),
 					verify: true,
 				}
 			}(),
