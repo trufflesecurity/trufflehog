@@ -119,12 +119,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 		// Skip over non-regular files. We do this check here to suppress noisy
 		// logs for trying to scan directories and other non-regular files in
 		// our traversal.
-		fileStat, err := os.Stat(fullPath)
-		if err != nil {
-			ctx.Logger().Info("unable to stat file", "path", fullPath, "error", err)
-			return nil
-		}
-		if !fileStat.Mode().IsRegular() {
+		if !d.Type().IsRegular() {
 			return nil
 		}
 		if s.filter != nil && !s.filter.Pass(fullPath) {
@@ -232,15 +227,12 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		}
 		if fileInfo.IsDir() {
 			return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
-				if err != nil || relativePath == "." {
+				if err != nil || d.IsDir() {
 					return nil
 				}
 				fullPath := filepath.Join(path, relativePath)
 				item := sources.CommonSourceUnit{ID: fullPath}
-				if err := reporter.UnitOk(ctx, item); err != nil {
-					return err
-				}
-				return nil
+				return reporter.UnitOk(ctx, item)
 			})
 		}
 		item := sources.CommonSourceUnit{ID: path}
