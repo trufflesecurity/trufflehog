@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 const (
@@ -40,12 +40,31 @@ type Commit struct {
 	Size    int // in bytes
 }
 
+type contentWriter interface {
+	Write(ctx context.Context, data []byte) (int, error)
+	ReadCloser() (io.ReadCloser, error)
+	Close() error
+	Len() int
+	String() string
+}
+
+type buffer struct{ bytes.Buffer }
+
+func (b *buffer) Write(_ context.Context, data []byte) (int, error) {
+	return b.Buffer.Write(data)
+}
+
+func (b *buffer) ReadCloser() (io.ReadCloser, error) {
+	return ioutil.NopCloser(bytes.NewReader(b.Bytes())), nil
+}
+
+func (b *buffer) Close() error { return nil }
+
 // Diff contains the info about a file diff in a commit.
 type Diff struct {
-	PathB     string
-	LineStart int
-	// Used to keep small diffs in memory and larger diffs in a file.
-	contentWriter *bufferedfilewriter.BufferedFileWriter
+	PathB         string
+	LineStart     int
+	contentWriter contentWriter
 	IsBinary      bool
 }
 
@@ -55,19 +74,18 @@ type diffOption func(*Diff)
 func withPathB(pathB string) diffOption { return func(d *Diff) { d.PathB = pathB } }
 
 // NewDiff creates a new Diff with a threshold.
-func NewDiff(opts ...diffOption) *Diff {
-	const defaultThreshold = 20 * 1024 * 1024 // 20MB
-	d := new(Diff)
+func NewDiff(cr contentWriter, opts ...diffOption) *Diff {
+	diff := new(Diff)
+	diff.contentWriter = cr
 	for _, opt := range opts {
-		opt(d)
+		opt(diff)
 	}
-	d.contentWriter = bufferedfilewriter.New(bufferedfilewriter.WithThreshold(defaultThreshold))
 
-	return d
+	return diff
 }
 
 // Len returns the length of the storage.
-func (d *Diff) Len() int { return d.contentWriter.Size() }
+func (d *Diff) Len() int { return d.contentWriter.Len() }
 
 // ReadCloser returns a ReadCloser for the contentWriter.
 func (d *Diff) ReadCloser() (io.ReadCloser, error) { return d.contentWriter.ReadCloser() }
@@ -83,11 +101,14 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // This method should be called to release resources, especially when writing to a file.
 func (d *Diff) finalize() error { return d.contentWriter.Close() }
 
+type ContentWriterFactory func() contentWriter
+
 // Parser sets values used in GitParse.
 type Parser struct {
 	maxDiffSize   int
 	maxCommitSize int
 	dateFormat    string
+	contentWriter contentWriter
 }
 
 type ParseState int
@@ -134,6 +155,13 @@ func (state ParseState) String() string {
 	}[state]
 }
 
+// WithContentWriter sets the ContentWriter for the Parser.
+func WithContentWriter(writer contentWriter) Option {
+	return func(parser *Parser) {
+		parser.contentWriter = writer
+	}
+}
+
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
 func WithMaxDiffSize(maxDiffSize int) Option {
@@ -160,6 +188,7 @@ func NewParser(options ...Option) *Parser {
 		dateFormat:    defaultDateFormat,
 		maxDiffSize:   defaultMaxDiffSize,
 		maxCommitSize: defaultMaxCommitSize,
+		contentWriter: new(buffer),
 	}
 	for _, option := range options {
 		option(parser)
@@ -294,7 +323,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		totalLogSize int
 	)
 	var latestState = Initial
-	currentDiff := NewDiff()
+	currentDiff := NewDiff(c.contentWriter)
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -326,7 +355,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = NewDiff()
+			currentDiff = NewDiff(c.contentWriter)
 			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
@@ -388,7 +417,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = NewDiff()
+			currentDiff = NewDiff(c.contentWriter)
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -418,7 +447,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
-			currentDiff = NewDiff(withPathB(currentDiff.PathB))
+			currentDiff = NewDiff(c.contentWriter, withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
