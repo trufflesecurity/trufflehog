@@ -225,19 +225,25 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			}
 			continue
 		}
-		if fileInfo.IsDir() {
-			return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
-				if err != nil || d.IsDir() {
-					return nil
-				}
-				fullPath := filepath.Join(path, relativePath)
-				item := sources.CommonSourceUnit{ID: fullPath}
-				return reporter.UnitOk(ctx, item)
-			})
+		if !fileInfo.IsDir() {
+			item := sources.CommonSourceUnit{ID: path}
+			if err := reporter.UnitOk(ctx, item); err != nil {
+				return err
+			}
+			continue
 		}
-		item := sources.CommonSourceUnit{ID: path}
-		if err := reporter.UnitOk(ctx, item); err != nil {
-			return err
+		err = fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			fullPath := filepath.Join(path, relativePath)
+			item := sources.CommonSourceUnit{ID: fullPath}
+			return reporter.UnitOk(ctx, item)
+		})
+		if err != nil {
+			if err := reporter.UnitErr(ctx, err); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
