@@ -39,27 +39,47 @@ type Commit struct {
 	Size    int // in bytes
 }
 
-type contentWriter interface {
+// contentWriter defines a common interface for writing, reading, and managing diff content.
+// It abstracts the underlying storage mechanism, allowing flexibility in how content is handled.
+// This interface enables the use of different content storage strategies (e.g., in-memory buffer, file-based storage)
+// based on performance needs or resource constraints, providing a unified way to interact with different content types.
+type contentWriter interface { // Write appends data to the content storage.
+	// Write appends data to the content storage.
 	Write(ctx context.Context, data []byte) (int, error)
+	// ReadCloser provides a reader for accessing stored content.
 	ReadCloser() (io.ReadCloser, error)
+	// Close finalizes the content storage, performing cleanup if necessary.
 	Close() error
+	// Len returns the current size of the content.
 	Len() int
+	// String returns the content as a string.
 	String() string
 }
 
+// buffer is a wrapper around bytes.Buffer, implementing the contentWriter interface.
+// This allows bytes.Buffer to be used wherever a contentWriter is required, ensuring compatibility
+// with the contentWriter interface while leveraging the existing implementation of bytes.Buffer.
 type buffer struct{ bytes.Buffer }
 
-func (b *buffer) Write(_ context.Context, data []byte) (int, error) {
-	return b.Buffer.Write(data)
-}
+// Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
+// The context is included to satisfy the contentWriter interface, allowing for future extensions
+// where context handling might be necessary (e.g., for timeouts or cancellation).
+func (b *buffer) Write(_ context.Context, data []byte) (int, error) { return b.Buffer.Write(data) }
 
+// ReadCloser provides a read-closer for the buffer's content.
+// It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
+// as closing a bytes.Buffer is a no-op.
 func (b *buffer) ReadCloser() (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(b.Bytes())), nil
 }
 
+// Close is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
 func (b *buffer) Close() error { return nil }
 
-// Diff contains the info about a file diff in a commit.
+// Diff contains the information about a file diff in a commit.
+// It abstracts the underlying content representation, allowing for flexible handling of diff content.
+// The use of contentWriter enables the management of diff data either in memory or on disk,
+// based on its size, optimizing resource usage and performance.
 type Diff struct {
 	PathB         string
 	LineStart     int
