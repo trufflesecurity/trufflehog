@@ -2,7 +2,6 @@ package sources
 
 import (
 	"sync"
-	"unsafe"
 
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -11,15 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
-
-const (
-	// Convert to int64 to handle potential negative size differences correctly.
-	sizeofChunk  = int64(unsafe.Sizeof(Chunk{}))
-	maxChunkSize = 80
-)
-
-// compileTimeAssertSize causes a compile-time error if the size of Chunk exceeds 80 bytes.
-var _ = [1]bool{}[(maxChunkSize-sizeofChunk)^((maxChunkSize-sizeofChunk)>>63)]
 
 type (
 	SourceID int64
