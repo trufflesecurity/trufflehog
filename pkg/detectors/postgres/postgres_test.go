@@ -63,7 +63,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found connection URI, verified",
-			s:    Scanner{},
+			s:    Scanner{detectLoopback: true},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, postgresHost, postgresPort)),
@@ -79,7 +79,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found connection URI, unverified",
-			s:    Scanner{},
+			s:    Scanner{detectLoopback: true},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, inactivePass, postgresHost, postgresPort)),
@@ -91,6 +91,28 @@ func TestPostgres_FromChunk(t *testing.T) {
 					Verified:     false,
 				},
 			},
+			wantErr: false,
+		},
+		{
+			name: "ignored localhost",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, "localhost", postgresPort)),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "ignored 127.0.0.1",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres`, postgresUser, postgresPass, "127.0.0.1", postgresPort)),
+				verify: true,
+			},
+			want:    nil,
 			wantErr: false,
 		},
 		{
@@ -118,8 +140,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("postgres.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return

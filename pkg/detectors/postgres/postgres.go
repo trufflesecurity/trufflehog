@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,7 +35,9 @@ var (
 	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectLoopback bool // Automated tests run against localhost, but we don't consider those real results in the wild
+}
 
 func (s Scanner) Keywords() []string {
 	return []string{"postgres"}
@@ -55,13 +58,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			continue
 		}
 
-		hostport, ok := params["host"]
+		host, ok := params["host"]
 		if !ok {
 			continue
 		}
+		if !s.detectLoopback {
+			if host == "localhost" {
+				continue
+			}
+			if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+				continue
+			}
+		}
 
+		hostport := host
 		if port, ok := params["port"]; ok {
-			hostport = hostport + ":" + port
+			hostport = host + ":" + port
 		}
 
 		result := detectors.Result{
