@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,7 +28,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -62,7 +60,9 @@ type Source struct {
 	memberCache       map[string]struct{}
 	repoSizes         repoSize
 	totalRepoSize     int // total size of all repos in kb
-	git               *git.Git
+
+	useCustomContentWriter bool
+	git                    *git.Git
 
 	scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
@@ -84,6 +84,9 @@ type Source struct {
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
@@ -259,26 +262,32 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.publicMap = map[string]source_metadatapb.Visibility{}
 
-	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+	cfg := &git.Config{
+		SourceName:   s.name,
+		JobID:        s.jobID,
+		SourceID:     s.sourceID,
+		SourceType:   s.Type(),
+		Verify:       s.verify,
+		SkipBinaries: conn.GetSkipBinaries(),
+		SkipArchives: conn.GetSkipArchives(),
+		Concurrency:  concurrency,
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Github{
-					Github: &source_metadatapb.Github{
+				Data: &source_metadatapb.MetaData_Git{
+					Git: &source_metadatapb.Git{
 						Commit:     sanitizer.UTF8(commit),
 						File:       sanitizer.UTF8(file),
 						Email:      sanitizer.UTF8(email),
 						Repository: sanitizer.UTF8(repository),
-						Link:       giturl.GenerateLink(repository, commit, file, line),
 						Timestamp:  sanitizer.UTF8(timestamp),
 						Line:       line,
-						Visibility: s.visibilityOf(aCtx, repository),
 					},
 				},
 			}
 		},
-		conn.GetSkipBinaries(),
-		conn.GetSkipArchives(),
-	)
+		UseCustomContentWriter: s.useCustomContentWriter,
+	}
+	s.git = git.NewGit(cfg)
 
 	return nil
 }
