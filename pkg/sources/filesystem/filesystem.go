@@ -233,7 +233,10 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			continue
 		}
 		err = fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
+			if err != nil {
+				return reporter.UnitErr(ctx, err)
+			}
+			if d.IsDir() {
 				return nil
 			}
 			fullPath := filepath.Join(path, relativePath)

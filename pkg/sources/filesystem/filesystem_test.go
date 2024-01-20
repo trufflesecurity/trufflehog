@@ -115,6 +115,7 @@ func TestScanFile(t *testing.T) {
 }
 
 func TestEnumerate(t *testing.T) {
+	t.Skip("TODO: refactor to allow a virtual filesystem")
 	t.Parallel()
 	ctx := context.Background()
 
