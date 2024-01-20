@@ -95,11 +95,6 @@ type diffOption func(*Diff)
 // withPathB sets the PathB option.
 func withPathB(pathB string) diffOption { return func(d *Diff) { d.PathB = pathB } }
 
-// withContentWriter sets the contentWriter option.
-func withContentWriter(writer contentWriter) diffOption {
-	return func(d *Diff) { d.contentWriter = writer }
-}
-
 // NewDiff creates a new Diff with a threshold.
 func NewDiff(opts ...diffOption) *Diff {
 	diff := new(Diff)
