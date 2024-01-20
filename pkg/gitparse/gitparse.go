@@ -53,7 +53,7 @@ type contentWriter interface { // Write appends data to the content storage.
 	// Len returns the current size of the content.
 	Len() int
 	// String returns the content as a string.
-	String() string
+	String(ctx context.Context) string
 }
 
 // buffer is a wrapper around bytes.Buffer, implementing the contentWriter interface.
@@ -76,6 +76,9 @@ func (b *buffer) ReadCloser() (io.ReadCloser, error) {
 // Close is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
 func (b *buffer) Close() error { return nil }
 
+// String returns the buffer's content as a string.
+func (b *buffer) String(_ context.Context) string { return b.Buffer.String() }
+
 // Diff contains the information about a file diff in a commit.
 // It abstracts the underlying content representation, allowing for flexible handling of diff content.
 // The use of contentWriter enables the management of diff data either in memory or on disk,
@@ -92,10 +95,15 @@ type diffOption func(*Diff)
 // withPathB sets the PathB option.
 func withPathB(pathB string) diffOption { return func(d *Diff) { d.PathB = pathB } }
 
+// withContentWriter sets the contentWriter option.
+func withContentWriter(writer contentWriter) diffOption {
+	return func(d *Diff) { d.contentWriter = writer }
+}
+
 // NewDiff creates a new Diff with a threshold.
-func NewDiff(cr contentWriter, opts ...diffOption) *Diff {
+func NewDiff(opts ...diffOption) *Diff {
 	diff := new(Diff)
-	diff.contentWriter = cr
+	diff.contentWriter = new(buffer)
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -216,7 +224,7 @@ func NewParser(options ...Option) *Parser {
 }
 
 // Equal compares the content of two Commits to determine if they are the same.
-func (c1 *Commit) Equal(c2 *Commit) bool {
+func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
 	switch {
 	case c1.Hash != c2.Hash:
 		return false
@@ -229,6 +237,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 	case len(c1.Diffs) != len(c2.Diffs):
 		return false
 	}
+
 	for i := range c1.Diffs {
 		d1 := c1.Diffs[i]
 		d2 := c2.Diffs[i]
@@ -237,7 +246,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 			return false
 		case d1.LineStart != d2.LineStart:
 			return false
-		case d1.contentWriter.String() != d2.contentWriter.String():
+		case d1.contentWriter.String(ctx) != d2.contentWriter.String(ctx):
 			return false
 		case d1.IsBinary != d2.IsBinary:
 			return false
@@ -342,7 +351,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		totalLogSize int
 	)
 	var latestState = Initial
-	currentDiff := NewDiff(c.contentWriter)
+	currentDiff := NewDiff()
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -374,7 +383,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = NewDiff(c.contentWriter)
+			currentDiff = NewDiff()
 			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
@@ -436,7 +445,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = NewDiff(c.contentWriter)
+			currentDiff = NewDiff()
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -466,7 +475,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
-			currentDiff = NewDiff(c.contentWriter, withPathB(currentDiff.PathB))
+			currentDiff = NewDiff(withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {

@@ -40,26 +40,53 @@ func TestBufferedFileWriterNewThreshold(t *testing.T) {
 func TestBufferedFileWriterString(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name        string
-		input       []byte
-		expectedStr string
+		name            string
+		input           []byte
+		expectedStr     string
+		additionalInput []byte
+		threshold       uint64
 	}{
 		{name: "Empty", input: []byte(""), expectedStr: ""},
 		{name: "Nil", input: nil, expectedStr: ""},
-		{name: "Small content", input: []byte("hello"), expectedStr: "hello"},
-		{name: "Large content", input: []byte("longer string with more characters"), expectedStr: "longer string with more characters"},
+		{name: "Small content, buffer only", input: []byte("hello"), expectedStr: "hello"},
+		{
+			name:        "Large content, buffer only",
+			input:       []byte("longer string with more characters"),
+			expectedStr: "longer string with more characters",
+		},
+		{
+			name:        "Large content, file only",
+			input:       []byte("longer string with more characters"),
+			expectedStr: "longer string with more characters",
+			threshold:   5,
+		},
+		{
+			name:            "Content in both file and buffer",
+			input:           []byte("initial content exceeding threshold"),
+			additionalInput: []byte(" more content in buffer"),
+			expectedStr:     "initial content exceeding threshold more content in buffer",
+			threshold:       10, // Set a threshold that the initial content exceeds
+		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New()
-			_, err := writer.Write(context.Background(), tc.input)
+			ctx := context.Background()
+			writer := New(WithThreshold(tc.threshold))
+			// First write, should go to file if it exceeds the threshold.
+			_, err := writer.Write(ctx, tc.input)
 			assert.NoError(t, err)
 
-			str := writer.String()
-			assert.Equal(t, tc.expectedStr, str, "String content mismatch")
+			// Second write, should go to buffer
+			if tc.additionalInput != nil {
+				_, err = writer.Write(ctx, tc.additionalInput)
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tc.expectedStr, writer.String(ctx), "String content mismatch")
+
 		})
 	}
 }

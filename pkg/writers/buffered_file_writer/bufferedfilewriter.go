@@ -52,8 +52,35 @@ func New(opts ...Option) *BufferedFileWriter {
 // Len returns the number of bytes written to the buffer or file.
 func (w *BufferedFileWriter) Len() int { return int(w.size) }
 
-// String returns the contents of the buffer as a string.
-func (w *BufferedFileWriter) String() string { return w.buf.String() }
+// String returns all the data written to the buffer or file as a string.
+func (w *BufferedFileWriter) String(ctx context.Context) string {
+	if w.file == nil {
+		return w.buf.String()
+	}
+
+	// Data is in a file, read from the file.
+	file, err := os.Open(w.filename)
+	if err != nil {
+		ctx.Logger().Error(err, "error opening file")
+		return ""
+	}
+	defer file.Close()
+
+	// Create a buffer large enough to hold file data and additional buffer data, if any.
+	fileSize := w.size
+	buf := bytes.NewBuffer(make([]byte, 0, fileSize))
+
+	// Read the file contents into the buffer.
+	if _, err := io.Copy(buf, file); err != nil {
+		ctx.Logger().Error(err, "error reading file")
+		return ""
+	}
+
+	// Append buffer data, if any, to the end of the file contents.
+	buf.Write(w.buf.Bytes())
+
+	return buf.String()
+}
 
 // Write writes data to the buffer or a file, depending on the size.
 func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error) {
