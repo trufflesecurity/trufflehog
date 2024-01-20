@@ -756,7 +756,7 @@ func TestIndividualCommitParsing(t *testing.T) {
 
 func newBufferWithContent(content []byte) *buffer {
 	var b buffer
-	b.Write(context.Background(), content) // Using Write method to add content
+	_, _ = b.Write(context.Background(), content) // Using Write method to add content
 	return &b
 }
 
