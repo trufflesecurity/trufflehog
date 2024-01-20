@@ -128,8 +128,6 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // This method should be called to release resources, especially when writing to a file.
 func (d *Diff) finalize() error { return d.contentWriter.Close() }
 
-type ContentWriterFactory func() contentWriter
-
 // Parser sets values used in GitParse.
 type Parser struct {
 	maxDiffSize   int
