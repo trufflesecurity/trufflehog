@@ -6,10 +6,11 @@ package sourcegraph
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
@@ -24,15 +25,24 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SOURCEGRAPH")
-	inactiveSecret := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE")
+
+	secretV1 := testSecrets.MustGetField("SOURCEGRAPH_V1")
+	secretV2 := testSecrets.MustGetField("SOURCEGRAPH_V2")
+	secretV3 := testSecrets.MustGetField("SOURCEGRAPH_V3")
+
+	inactiveSecretV1 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V1")
+	inactiveSecretV2 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V2")
+	inactiveSecretV3 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V3")
+
+	secrets := []string{secretV1, secretV2, secretV3, inactiveSecretV1, inactiveSecretV2, inactiveSecretV3}
 
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
-	tests := []struct {
+	for _, secret := range secrets {
+	tests = append(tests, []struct {
 		name                string
 		s                   Scanner
 		args                args
@@ -121,6 +131,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 	}
+}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
@@ -132,11 +143,11 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Sourcegraph.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

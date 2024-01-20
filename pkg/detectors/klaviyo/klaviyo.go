@@ -88,18 +88,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							// Thus, the key is verified, but it is up to the user to determine what scopes the key has.
 							s1.Verified = true
 						} else {
-							s1.VerificationError = fmt.Errorf("errors expected")
+							s1.SetVerificationError(fmt.Errorf("errors expected"), resMatch)
 						}
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected API JSON response")
+						s1.SetVerificationError(fmt.Errorf("unexpected API JSON response"), resMatch)
 					}
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

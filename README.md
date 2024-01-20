@@ -16,7 +16,7 @@
 
 ---
 
-# :mag*right: \_Now Scanning*
+# :mag_right: _Now Scanning_
 
 <div align="center">
 
@@ -65,6 +65,10 @@ cd trufflehog; go install
 
 # Using installation script
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+# Using installation script, verify checksum signature (requires cosign to be installed)
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
+
 # Using installation script to install a specific version
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
@@ -102,6 +106,9 @@ Verification steps are as follow:
    ```
 
 Replace `{version}` with the downloaded files version
+
+Alternatively, if you are using installation script, pass `-v` option to perform signature verification.
+This required Cosign binary to be installed prior to running installation script.
 
 # :rocket: Quick Start
 
@@ -336,6 +343,62 @@ Exit Codes:
 
 ## :octocat: TruffleHog Github Action
 
+### General Usage
+
+```
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Secret Scanning
+      uses: trufflesecurity/trufflehog@main
+      with:
+        extra_args: --only-verified
+```
+
+In the example config above, we're scanning for live secrets in all PRs and Pushes to `main`. Only code changes in the referenced commits are scanned. If you'd like to scan an entire branch, please see the "Advanced Usage" section below.
+
+
+### Shallow Cloning
+
+If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example for how to do it:
+
+```
+...
+      - shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 2))" >> $GITHUB_ENV
+            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "depth=$((${{ github.event.pull_request.commits }}+2))" >> $GITHUB_ENV
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
+          fi
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{env.branch}}
+          fetch-depth: ${{env.depth}}
+      - uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+...
+```
+
+Depending on the event type (push or PR), we calculate the number of commits present. Then we add 2, so that we can reference a base commit before our code changes. We pass that integer value to the `fetch-depth` flag in the checkout action in addition to the relevant branch. Now our checkout process should be much shorter.
+
+### Advanced Usage
+
 ```yaml
 - name: TruffleHog
   uses: trufflesecurity/trufflehog@main
@@ -350,34 +413,27 @@ Exit Codes:
     extra_args: --debug --only-verified
 ```
 
-The TruffleHog OSS Github Action can be used to scan a range of commits for leaked credentials. The action will fail if
-any results are found.
+If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
 
-For example, to scan the contents of pull requests you could use the following workflow:
-
-```yaml
-name: TruffleHog Secrets Scan
-on: [pull_request]
-jobs:
-  TruffleHog:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: TruffleHog OSS
+#### Advanced Usage: Scan entire branch
+```
+- name: scan-push
         uses: trufflesecurity/trufflehog@main
         with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
+          base: ""
+          head: ${{ github.ref_name }}
+          extra_args: --only-verified
 ```
 
 ## Pre-commit Hook
 
 Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
+
+**Key Usage Note:**
+
+- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures Trufflehog analyzes all intended changes.
+- **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
+
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
 
 ```yaml

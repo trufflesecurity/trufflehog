@@ -12,16 +12,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"parseur"}) + `\b([a-f0-9]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"parseur[^il]"}) + `\b([a-f0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,35 +37,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
 
+		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Parseur,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.parseur.com/", nil)
-			if err != nil {
-				continue
+			if s.client == nil {
+				s.client = defaultClient
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Token %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
+			isVerified, verificationErr := verifyResult(ctx, s.client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
+		}
+
+		if !s1.Verified {
+			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+			if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+				continue
 			}
 		}
 
@@ -71,6 +68,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyResult(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.parseur.com/", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer res.Body.Close()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

@@ -2,6 +2,7 @@ package huggingface
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -22,13 +23,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\bhf_[a-zA-Z]{34}\b`)
+	keyPat = regexp.MustCompile(`\b(?:hf_|api_org_)[a-zA-Z0-9]{34}\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"huggingface", "hugging_face", "hf"} // Huggingface docs occasionally use "hf" instead of "huggingface"
+	return []string{"hf_", "api_org_"} // Huggingface docs occasionally use "hf" instead of "huggingface"
 }
 
 // FromData will find and optionally verify Huggingface secrets in a given set of bytes.
@@ -49,30 +50,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://huggingface.co/api/whoami-v2", nil)
-			if err != nil {
-				continue
-			}
-
-			req.Header.Set("Authorization", "Bearer "+resMatch)
-
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-				}
-			} else {
-				s1.VerificationError = err
-			}
+			isVerified, extraData, verificationErr := s.verifyResult(ctx, resMatch)
+			s1.Verified = isVerified
+			s1.ExtraData = extraData
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
@@ -86,6 +67,91 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func (s Scanner) verifyResult(ctx context.Context, apiKey string) (bool, map[string]string, error) {
+	client := s.client
+	if client == nil {
+		client = defaultClient
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://huggingface.co/api/whoami-v2", nil)
+	if err != nil {
+		return false, nil, nil
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+
+	defer res.Body.Close()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		whoamiRes := whoamiResponse{}
+		err := json.NewDecoder(res.Body).Decode(&whoamiRes)
+		if err != nil {
+			return true, nil, err
+		}
+
+		var tokenInfo string
+		switch {
+		case whoamiRes.Auth.AccessToken.DisplayName != "" || whoamiRes.Auth.AccessToken.Role != "":
+			// hf_xxxx token
+			t := whoamiRes.Auth.AccessToken
+			tokenInfo = fmt.Sprintf("%s (%s)", t.DisplayName, t.Role)
+
+		case whoamiRes.Auth.Type != "":
+			// api_org_xxxx token
+			tokenInfo = whoamiRes.Auth.Type
+
+		default:
+			tokenInfo = "Unknown Token Type"
+		}
+
+		extraData := map[string]string{
+			"Username": whoamiRes.Name,
+			"Email":    whoamiRes.Email,
+			"Token":    tokenInfo,
+		}
+
+		// Condense a list of organizations + roles.
+		orgs := make([]string, 0, len(whoamiRes.Organizations))
+		for _, org := range whoamiRes.Organizations {
+			orgs = append(orgs, fmt.Sprintf("%s:%s", org.Name, org.Role))
+		}
+		if len(orgs) > 0 {
+			extraData["Organizations"] = strings.Join(orgs, ", ")
+		}
+		return true, extraData, nil
+	} else if res.StatusCode == 401 {
+		// The secret is determinately not verified (nothing to do)
+		return false, nil, nil
+	} else {
+		err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, nil, err
+	}
+}
+
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_HuggingFace
+}
+
+// https://huggingface.co/docs/hub/api#get-apiwhoami-v2
+type whoamiResponse struct {
+	Name          string         `json:"name"`
+	Email         string         `json:"email"`
+	Organizations []organization `json:"orgs"`
+	Auth          auth           `json:"auth"`
+}
+
+type organization struct {
+	Name string `json:"name"`
+	Role string `json:"roleInOrg"`
+}
+
+type auth struct {
+	AccessToken struct {
+		DisplayName string `json:"displayName,omitempty"`
+		Role        string `json:"role,omitempty"`
+	} `json:"accessToken,omitempty"`
+	Type string `json:"type,omitempty"`
 }

@@ -100,7 +100,7 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Airtable.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

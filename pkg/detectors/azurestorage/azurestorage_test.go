@@ -6,15 +6,16 @@ package azurestorage
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -28,18 +29,21 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("AZURE_STORAGE")
 	inactiveSecret := testSecrets.MustGetField("AZURE_STORAGE_INACTIVE")
 
+	accountNamePat := regexp.MustCompile(`AccountName=(?P<account_name>[^;]+);AccountKey`)
+	accountName := accountNamePat.FindStringSubmatch(secret)[1]
+	validKeyInvalidAccountName := strings.Replace(secret, accountName, "invalid", 1)
+
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
 	}{
 		{
 			name: "found, verified",
@@ -53,10 +57,12 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
 				},
 			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			wantErr: false,
 		},
 		{
 			name: "found, unverified",
@@ -70,10 +76,12 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
 				},
 			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			wantErr: false,
 		},
 		{
 			name: "not found",
@@ -83,9 +91,8 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
+			want:    nil,
+			wantErr: false,
 		},
 		{
 			name: "found, would be verified if not for timeout",
@@ -95,14 +102,18 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", secret)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
+			want: func() []detectors.Result {
+				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
+				}
+				r.SetVerificationError(fmt.Errorf("context deadline exceeded"), secret)
+				return []detectors.Result{r}
+			}(),
+			wantErr: false,
 		},
 		{
 			name: "found, verified but unexpected api surface",
@@ -112,14 +123,37 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", secret)),
 				verify: true,
 			},
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_AzureStorage,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"account_name": "teststoragebytruffle",
+					},
+				}
+				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 404"), secret)
+				return []detectors.Result{r}
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "found secret with invalid account name",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a azurestorage secret %s within", validKeyInvalidAccountName)),
+				verify: true,
+			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_AzureStorage,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"account_name": "invalid",
+					},
 				},
 			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -133,11 +167,19 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Azurestorage.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
