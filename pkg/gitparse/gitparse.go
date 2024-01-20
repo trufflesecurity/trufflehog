@@ -182,13 +182,6 @@ func (state ParseState) String() string {
 	}[state]
 }
 
-// WithContentWriter sets the ContentWriter for the Parser.
-func WithContentWriter(writer contentWriter) Option {
-	return func(parser *Parser) {
-		parser.contentWriter = writer
-	}
-}
-
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
 func WithMaxDiffSize(maxDiffSize int) Option {
