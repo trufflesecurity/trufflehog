@@ -29,16 +29,6 @@ const (
 	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 1GB
 )
 
-// Commit contains commit header info and diffs.
-type Commit struct {
-	Hash    string
-	Author  string
-	Date    time.Time
-	Message strings.Builder
-	Diffs   []Diff
-	Size    int // in bytes
-}
-
 // contentWriter defines a common interface for writing, reading, and managing diff content.
 // It abstracts the underlying storage mechanism, allowing flexibility in how content is handled.
 // This interface enables the use of different content storage strategies (e.g., in-memory buffer, file-based storage)
@@ -122,6 +112,48 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
 func (d *Diff) finalize() error { return d.contentWriter.Close() }
+
+// Commit contains commit header info and diffs.
+type Commit struct {
+	Hash    string
+	Author  string
+	Date    time.Time
+	Message strings.Builder
+	Diffs   []Diff
+	Size    int // in bytes
+}
+
+// Equal compares the content of two Commits to determine if they are the same.
+func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
+	switch {
+	case c1.Hash != c2.Hash:
+		return false
+	case c1.Author != c2.Author:
+		return false
+	case !c1.Date.Equal(c2.Date):
+		return false
+	case c1.Message.String() != c2.Message.String():
+		return false
+	case len(c1.Diffs) != len(c2.Diffs):
+		return false
+	}
+
+	for i := range c1.Diffs {
+		d1 := c1.Diffs[i]
+		d2 := c2.Diffs[i]
+		switch {
+		case d1.PathB != d2.PathB:
+			return false
+		case d1.LineStart != d2.LineStart:
+			return false
+		case d1.contentWriter.String(ctx) != d2.contentWriter.String(ctx):
+			return false
+		case d1.IsBinary != d2.IsBinary:
+			return false
+		}
+	}
+	return true
+}
 
 // Parser sets values used in GitParse.
 type Parser struct {
@@ -214,38 +246,6 @@ func NewParser(options ...Option) *Parser {
 		option(parser)
 	}
 	return parser
-}
-
-// Equal compares the content of two Commits to determine if they are the same.
-func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
-	switch {
-	case c1.Hash != c2.Hash:
-		return false
-	case c1.Author != c2.Author:
-		return false
-	case !c1.Date.Equal(c2.Date):
-		return false
-	case c1.Message.String() != c2.Message.String():
-		return false
-	case len(c1.Diffs) != len(c2.Diffs):
-		return false
-	}
-
-	for i := range c1.Diffs {
-		d1 := c1.Diffs[i]
-		d2 := c2.Diffs[i]
-		switch {
-		case d1.PathB != d2.PathB:
-			return false
-		case d1.LineStart != d2.LineStart:
-			return false
-		case d1.contentWriter.String(ctx) != d2.contentWriter.String(ctx):
-			return false
-		case d1.IsBinary != d2.IsBinary:
-			return false
-		}
-	}
-	return true
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
