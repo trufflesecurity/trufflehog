@@ -95,11 +95,6 @@ type diffOption func(*Diff)
 // withPathB sets the PathB option.
 func withPathB(pathB string) diffOption { return func(d *Diff) { d.PathB = pathB } }
 
-// withContentWriter sets the contentWriter option.
-func withContentWriter(writer contentWriter) diffOption {
-	return func(d *Diff) { d.contentWriter = writer }
-}
-
 // NewDiff creates a new Diff with a threshold.
 func NewDiff(opts ...diffOption) *Diff {
 	diff := new(Diff)
@@ -127,8 +122,6 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
 func (d *Diff) finalize() error { return d.contentWriter.Close() }
-
-type ContentWriterFactory func() contentWriter
 
 // Parser sets values used in GitParse.
 type Parser struct {
