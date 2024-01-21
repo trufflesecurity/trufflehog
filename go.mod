@@ -25,7 +25,7 @@ require (
 	github.com/couchbase/gocb/v2 v2.7.1
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/denisenkom/go-mssqldb v0.12.3
-	github.com/envoyproxy/protoc-gen-validate v1.0.2
+	github.com/envoyproxy/protoc-gen-validate v1.0.4
 	github.com/fatih/color v1.16.0
 	github.com/felixge/fgprof v0.9.3
 	github.com/gabriel-vasile/mimetype v1.4.3
