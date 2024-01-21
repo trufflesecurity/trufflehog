@@ -32,6 +32,7 @@ func createTestSource(src *sourcespb.GCS) (*Source, *anypb.Any) {
 }
 
 func TestSourceInit(t *testing.T) {
+	t.Parallel()
 	source, conn := createTestSource(&sourcespb.GCS{
 		ProjectId: testProjectID,
 		IncludeBuckets: []string{
@@ -52,6 +53,7 @@ func TestSourceInit(t *testing.T) {
 }
 
 func TestConfigureGCSManager(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		conn    *sourcespb.GCS
@@ -117,7 +119,9 @@ func TestConfigureGCSManager(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			got, err := configureGCSManager(ctx, tc.conn, 8)
 			if err != nil && !tc.wantErr {
@@ -137,6 +141,7 @@ func TestConfigureGCSManager(t *testing.T) {
 }
 
 func TestSourceOauth2Client(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		creds   *credentialspb.Oauth2
@@ -186,7 +191,9 @@ func TestSourceOauth2Client(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			got, err := oauth2Client(ctx, tc.creds)
 			if (err != nil) != tc.wantErr {
@@ -293,6 +300,7 @@ func createTestSourceChunk(id int) *sources.Chunk {
 }
 
 func TestSourceChunks_ListObjects(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	chunksCh := make(chan *sources.Chunk, 1)
 
@@ -343,6 +351,7 @@ func TestSourceChunks_ListObjects(t *testing.T) {
 }
 
 func TestSourceInit_Enumerate(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	source := &Source{gcsManager: &mockObjectManager{numObjects: 5}}
 
@@ -356,6 +365,7 @@ func TestSourceInit_Enumerate(t *testing.T) {
 }
 
 func TestSourceChunks_ListObjects_Error(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	source := &Source{gcsManager: &mockObjectManager{wantErr: true}}
 
@@ -367,6 +377,7 @@ func TestSourceChunks_ListObjects_Error(t *testing.T) {
 }
 
 func TestSourceChunks_ProgressSet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	chunksCh := make(chan *sources.Chunk, 1)
 	source := &Source{
@@ -421,6 +432,7 @@ func TestSourceChunks_ProgressSet(t *testing.T) {
 }
 
 func TestSource_CachePersistence(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	wantObjCnt := 4 // ensure we have less objects than the cache increment

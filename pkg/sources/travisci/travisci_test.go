@@ -15,6 +15,7 @@ import (
 )
 
 func TestSource_Scan(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	secret, err := common.GetTestSecret(ctx)
@@ -60,9 +61,14 @@ func TestSource_Scan(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			s := Source{}
+
+			ctx := context.Background()
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {

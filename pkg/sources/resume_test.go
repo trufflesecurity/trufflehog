@@ -6,6 +6,7 @@ import (
 )
 
 func TestRemoveRepoFromResumeInfo(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		startingResumeInfoSlice []string
 		repoURL                 string
@@ -29,14 +30,20 @@ func TestRemoveRepoFromResumeInfo(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		gotResumeInfoSlice := RemoveRepoFromResumeInfo(tt.startingResumeInfoSlice, tt.repoURL)
-		if !reflect.DeepEqual(gotResumeInfoSlice, tt.wantResumeInfoSlice) {
-			t.Errorf("RemoveRepoFromResumeInfo() got: %v, want: %v", gotResumeInfoSlice, tt.wantResumeInfoSlice)
-		}
+		tt := tt
+		t.Run(tt.repoURL, func(t *testing.T) {
+			t.Parallel()
+
+			gotResumeInfoSlice := RemoveRepoFromResumeInfo(tt.startingResumeInfoSlice, tt.repoURL)
+			if !reflect.DeepEqual(gotResumeInfoSlice, tt.wantResumeInfoSlice) {
+				t.Errorf("RemoveRepoFromResumeInfo() got: %v, want: %v", gotResumeInfoSlice, tt.wantResumeInfoSlice)
+			}
+		})
 	}
 }
 
 func TestEncodeResumeInfo(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		startingResumeInfoSlice []string
 		wantEncodedResumeInfo   string
@@ -52,14 +59,20 @@ func TestEncodeResumeInfo(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		gotEncodedResumeInfo := EncodeResumeInfo(tt.startingResumeInfoSlice)
-		if gotEncodedResumeInfo != tt.wantEncodedResumeInfo {
-			t.Errorf("EncodeResumeInfo() got: %q, want: %q", gotEncodedResumeInfo, tt.wantEncodedResumeInfo)
-		}
+		tt := tt
+		t.Run(tt.wantEncodedResumeInfo, func(t *testing.T) {
+			t.Parallel()
+
+			gotEncodedResumeInfo := EncodeResumeInfo(tt.startingResumeInfoSlice)
+			if gotEncodedResumeInfo != tt.wantEncodedResumeInfo {
+				t.Errorf("EncodeResumeInfo() got: %q, want: %q", gotEncodedResumeInfo, tt.wantEncodedResumeInfo)
+			}
+		})
 	}
 }
 
 func Test_decodeResumeInfo(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		resumeInfo          string
 		wantResumeInfoSlice []string
@@ -75,14 +88,19 @@ func Test_decodeResumeInfo(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		gotResumeInfoSlice := DecodeResumeInfo(tt.resumeInfo)
-		if !reflect.DeepEqual(gotResumeInfoSlice, tt.wantResumeInfoSlice) {
-			t.Errorf("DecodeResumeInfo() got: %v, want: %v", gotResumeInfoSlice, tt.wantResumeInfoSlice)
-		}
+		tt := tt
+		t.Run(tt.resumeInfo, func(t *testing.T) {
+			t.Parallel()
+			gotResumeInfoSlice := DecodeResumeInfo(tt.resumeInfo)
+			if !reflect.DeepEqual(gotResumeInfoSlice, tt.wantResumeInfoSlice) {
+				t.Errorf("DecodeResumeInfo() got: %v, want: %v", gotResumeInfoSlice, tt.wantResumeInfoSlice)
+			}
+		})
 	}
 }
 
 func Test_filterReposToResume(t *testing.T) {
+	t.Parallel()
 	startingRepos := []string{"a", "b", "c", "d", "e", "f", "g"}
 
 	tests := map[string]struct {
@@ -123,12 +141,16 @@ func Test_filterReposToResume(t *testing.T) {
 	}
 
 	for name, tt := range tests {
-		gotReposToScan, gotProgressOffsetCount := FilterReposToResume(startingRepos, tt.resumeInfo)
-		if !reflect.DeepEqual(gotReposToScan, tt.wantReposToScan) {
-			t.Errorf("FilterReposToResume() name: %q got: %v, want: %v", name, gotReposToScan, tt.wantReposToScan)
-		}
-		if gotProgressOffsetCount != tt.wantProgressOffsetCount {
-			t.Errorf("FilterReposToResume() name: %q got: %d, want: %d", name, gotProgressOffsetCount, tt.wantProgressOffsetCount)
-		}
+		name, tt := name, tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			gotReposToScan, gotProgressOffsetCount := FilterReposToResume(startingRepos, tt.resumeInfo)
+			if !reflect.DeepEqual(gotReposToScan, tt.wantReposToScan) {
+				t.Errorf("FilterReposToResume() name: %q got: %v, want: %v", name, gotReposToScan, tt.wantReposToScan)
+			}
+			if gotProgressOffsetCount != tt.wantProgressOffsetCount {
+				t.Errorf("FilterReposToResume() name: %q got: %d, want: %d", name, gotProgressOffsetCount, tt.wantProgressOffsetCount)
+			}
+		})
 	}
 }

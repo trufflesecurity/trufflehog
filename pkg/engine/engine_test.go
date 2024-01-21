@@ -17,6 +17,7 @@ import (
 )
 
 func TestFragmentLineOffset(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		chunk        *sources.Chunk
@@ -93,7 +94,9 @@ func TestFragmentLineOffset(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			lineOffset, isIgnored := FragmentLineOffset(tt.chunk, tt.result)
 			if lineOffset != tt.expectedLine {
 				t.Errorf("Expected line offset to be %d, got %d", tt.expectedLine, lineOffset)
@@ -145,6 +148,7 @@ func BenchmarkFragmentLineOffsetEnd(b *testing.B) {
 // Test to make sure that DefaultDecoders always returns the UTF8 decoder first.
 // Technically a decoder test but we want this to run and fail in CI
 func TestDefaultDecoders(t *testing.T) {
+	t.Parallel()
 	ds := decoders.DefaultDecoders()
 	if _, ok := ds[0].(*decoders.UTF8); !ok {
 		t.Errorf("DefaultDecoders() = %v, expected UTF8 decoder to be first", ds)
@@ -152,6 +156,7 @@ func TestDefaultDecoders(t *testing.T) {
 }
 
 func TestSupportsLineNumbers(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		sourceType    sourcespb.SourceType
@@ -170,7 +175,9 @@ func TestSupportsLineNumbers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := SupportsLineNumbers(tt.sourceType)
 			assert.Equal(t, tt.expectedValue, result)
 		})
@@ -186,6 +193,7 @@ func BenchmarkSupportsLineNumbersLoop(b *testing.B) {
 
 // TestEngine_DuplicatSecrets is a test that detects ALL duplicate secrets with the same decoder.
 func TestEngine_DuplicatSecrets(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	absPath, err := filepath.Abs("./testdata")
@@ -215,6 +223,7 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 }
 
 func TestFragmentFirstLineAndLink(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		chunk        *sources.Chunk
@@ -274,7 +283,9 @@ func TestFragmentFirstLineAndLink(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			line, linePtr, link := FragmentFirstLineAndLink(tt.chunk)
 			assert.Equal(t, tt.expectedLink, link, "Mismatch in link")
 			assert.Equal(t, tt.expectedLine, line, "Mismatch in line")
@@ -287,6 +298,7 @@ func TestFragmentFirstLineAndLink(t *testing.T) {
 }
 
 func TestSetLink(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    *source_metadatapb.MetaData
@@ -373,7 +385,9 @@ func TestSetLink(t *testing.T) {
 	ctx := context.Background()
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := UpdateLink(ctx, tt.input, tt.link, tt.line)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Unexpected error: %v", err)

@@ -1,11 +1,9 @@
 package gcs
 
 import (
-	"fmt"
 	"net/http"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -31,6 +29,7 @@ const (
 )
 
 func TestNewGcsManager(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -338,7 +337,9 @@ func TestNewGcsManager(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := newGCSManager(tc.projID, tc.opts...)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("newGCSManager() error = %v, wantErr %v", err, tc.wantErr)
@@ -365,6 +366,7 @@ func TestNewGcsManager(t *testing.T) {
 }
 
 func TestGCSManagerStats(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -414,7 +416,9 @@ func TestGCSManagerStats(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			gm, err := newGCSManager(tc.projectID, tc.opts...)
 			if err != nil {
 				t.Fatalf("newGCSManager() error = %v", err)
@@ -432,24 +436,8 @@ func TestGCSManagerStats(t *testing.T) {
 	}
 }
 
-func TestGCSManagerStats_Time(t *testing.T) {
-	ctx := context.Background()
-
-	opts := []gcsManagerOption{withDefaultADC(ctx)}
-	gm, err := newGCSManager(testProjectID, opts...)
-	if err != nil {
-		t.Fatalf("newGCSManager() error = %v", err)
-	}
-
-	start := time.Now()
-	var stats *attributes
-	stats, _ = gm.Attributes(ctx)
-	end := time.Since(start).Seconds()
-
-	fmt.Printf("Time taken to get %d objects: %f seconds\n", stats.numObjects, end)
-}
-
 func TestGCSManagerListObjects(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -686,7 +674,9 @@ func TestGCSManagerListObjects(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			mgr, err := newGCSManager(tc.projectID, tc.opts...)
 			assert.Nil(t, err)
 
@@ -738,6 +728,7 @@ func TestGCSManagerListObjects(t *testing.T) {
 }
 
 func TestGCSManagerListObjects_Resuming(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -774,7 +765,9 @@ func TestGCSManagerListObjects_Resuming(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			mgr, err := newGCSManager(tc.projectID, tc.opts...)
 			assert.Nil(t, err)
 
@@ -826,6 +819,7 @@ func TestGCSManagerListObjects_Resuming(t *testing.T) {
 }
 
 func Test_isObjectTypeValid(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		objName string
@@ -850,7 +844,9 @@ func Test_isObjectTypeValid(t *testing.T) {
 
 	ctx := context.Background()
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := isObjectTypeValid(ctx, tc.objName)
 			assert.Equal(t, tc.want, got)
 		})
@@ -858,6 +854,7 @@ func Test_isObjectTypeValid(t *testing.T) {
 }
 
 func Test_isObjectSizeValid(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		objSize int64
@@ -902,12 +899,15 @@ func Test_isObjectSizeValid(t *testing.T) {
 
 	ctx := context.Background()
 	for _, tc := range testCases {
-		g := &gcsManager{
-			maxObjectSize: maxObjectSizeLimit,
-		}
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			got := g.isObjectSizeValid(ctx, tc.objSize)
-			assert.Equal(t, tc.want, got)
+			t.Parallel()
+
+			g := &gcsManager{maxObjectSize: maxObjectSizeLimit}
+			t.Run(tc.name, func(t *testing.T) {
+				got := g.isObjectSizeValid(ctx, tc.objSize)
+				assert.Equal(t, tc.want, got)
+			})
 		})
 	}
 }

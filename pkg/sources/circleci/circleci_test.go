@@ -16,6 +16,7 @@ import (
 )
 
 func TestSource_Scan(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
@@ -60,6 +61,7 @@ func TestSource_Scan(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}

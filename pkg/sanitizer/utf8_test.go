@@ -3,6 +3,7 @@ package sanitizer
 import "testing"
 
 func TestUTF8(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		in string
 	}
@@ -33,8 +34,11 @@ func TestUTF8(t *testing.T) {
 			want: "no  nulls because postgres does not support it in text fields",
 		},
 	}
+
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := UTF8(tt.args.in); got != tt.want {
 				t.Errorf("UTF8() = %v, want %v", got, tt.want)
 			}

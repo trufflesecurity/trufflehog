@@ -17,6 +17,7 @@ import (
 )
 
 func TestChunker(t *testing.T) {
+	t.Parallel()
 	byteBuffer := bytes.NewBuffer(make([]byte, ChunkSize*9))
 	reReader, err := diskbufferreader.New(byteBuffer)
 	if err != nil {
@@ -72,6 +73,7 @@ func BenchmarkChunker(b *testing.B) {
 }
 
 func TestNewChunkedReader(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		input      string
@@ -155,7 +157,9 @@ func TestNewChunkedReader(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			readerFunc := NewChunkReader(WithChunkSize(tt.chunkSize), WithPeekSize(tt.peekSize))
 			reader := strings.NewReader(tt.input)
 			ctx := context.Background()
@@ -202,6 +206,7 @@ func BenchmarkChunkReader(b *testing.B) {
 }
 
 func TestFlakyChunkReader(t *testing.T) {
+	t.Parallel()
 	a := "aaaa"
 	b := "bbbb"
 
@@ -222,6 +227,7 @@ func TestFlakyChunkReader(t *testing.T) {
 }
 
 func TestReadInChunksWithCancellation(t *testing.T) {
+	t.Parallel()
 	largeData := strings.Repeat("large test data ", 1024*1024) // Large data string.
 
 	for i := 0; i < 10; i++ {

@@ -23,6 +23,7 @@ import (
 )
 
 func TestArchiveHandler(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		archiveURL     string
 		expectedChunks int
@@ -76,7 +77,9 @@ func TestArchiveHandler(t *testing.T) {
 	}
 
 	for name, testCase := range tests {
+		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			resp, err := http.Get(testCase.archiveURL)
 			if err != nil || resp.StatusCode != http.StatusOK {
 				t.Error(err)
@@ -112,6 +115,7 @@ func TestArchiveHandler(t *testing.T) {
 }
 
 func TestHandleFile(t *testing.T) {
+	t.Parallel()
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 2)}
 
 	// Context cancels the operation.
@@ -165,6 +169,7 @@ func BenchmarkHandleFile(b *testing.B) {
 }
 
 func TestHandleFileSkipBinaries(t *testing.T) {
+	t.Parallel()
 	filename := createBinaryArchive(t)
 	defer os.Remove(filename)
 
@@ -244,6 +249,7 @@ func createBinaryArchive(t *testing.T) string {
 }
 
 func TestReadToMax(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    []byte
@@ -269,7 +275,9 @@ func TestReadToMax(t *testing.T) {
 	a := &Archive{}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			reader := bytes.NewReader(tt.input)
 			output, err := a.ReadToMax(logContext.Background(), reader)
 			assert.Nil(t, err)
@@ -296,6 +304,7 @@ func BenchmarkReadToMax(b *testing.B) {
 }
 
 func TestExtractDebContent(t *testing.T) {
+	t.Parallel()
 	// Open the sample .deb file from the testdata folder.
 	file, err := os.Open("testdata/test.deb")
 	assert.Nil(t, err)
@@ -314,6 +323,7 @@ func TestExtractDebContent(t *testing.T) {
 }
 
 func TestSkipArchive(t *testing.T) {
+	t.Parallel()
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)
 	defer file.Close()
@@ -339,6 +349,7 @@ func TestSkipArchive(t *testing.T) {
 }
 
 func TestExtractTarContent(t *testing.T) {
+	t.Parallel()
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)
 	defer file.Close()
@@ -364,6 +375,7 @@ func TestExtractTarContent(t *testing.T) {
 }
 
 func TestExtractRPMContent(t *testing.T) {
+	t.Parallel()
 	// Open the sample .rpm file from the testdata folder.
 	file, err := os.Open("testdata/test.rpm")
 	assert.Nil(t, err)
@@ -382,6 +394,7 @@ func TestExtractRPMContent(t *testing.T) {
 }
 
 func TestOpenInvalidArchive(t *testing.T) {
+	t.Parallel()
 	reader := strings.NewReader("invalid archive")
 
 	ctx := logContext.AddLogger(context.Background())
@@ -394,6 +407,7 @@ func TestOpenInvalidArchive(t *testing.T) {
 }
 
 func TestNestedDirArchive(t *testing.T) {
+	t.Parallel()
 	file, err := os.Open("testdata/dir-archive.zip")
 	assert.Nil(t, err)
 	defer file.Close()
@@ -419,6 +433,7 @@ func TestNestedDirArchive(t *testing.T) {
 }
 
 func TestDetermineMimeType(t *testing.T) {
+	t.Parallel()
 	filetype.AddMatcher(filetype.NewType("txt", "text/plain"), func(buf []byte) bool {
 		return strings.HasPrefix(string(buf), "text:")
 	})
@@ -472,7 +487,9 @@ func TestDetermineMimeType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			originalData, _ := io.ReadAll(io.TeeReader(tt.input, &bytes.Buffer{}))
 			tt.input = bytes.NewReader(originalData) // Reset the reader
 

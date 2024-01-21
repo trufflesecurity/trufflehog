@@ -8,6 +8,7 @@ import (
 )
 
 func TestNewScanErrors(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		projects int
@@ -37,7 +38,9 @@ func TestNewScanErrors(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := NewScanErrors()
 
 			if !errors.Is(got.Errors(), tc.want.Errors()) {
@@ -48,6 +51,7 @@ func TestNewScanErrors(t *testing.T) {
 }
 
 func TestScanErrorsAdd(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		concurrency int
@@ -76,7 +80,9 @@ func TestScanErrorsAdd(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			se := NewScanErrors()
 
 			var wg sync.WaitGroup
@@ -99,6 +105,7 @@ func TestScanErrorsAdd(t *testing.T) {
 }
 
 func TestScanErrorsCount(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		concurrency int
@@ -127,7 +134,9 @@ func TestScanErrorsCount(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			se := NewScanErrors()
 
 			var wg sync.WaitGroup
@@ -150,6 +159,7 @@ func TestScanErrorsCount(t *testing.T) {
 }
 
 func TestScanErrorsString(t *testing.T) {
+	t.Parallel()
 	se := NewScanErrors()
 	se.Add(nil)
 	want := "[<nil>]"

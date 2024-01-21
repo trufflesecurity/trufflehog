@@ -21,6 +21,7 @@ type testCase struct {
 }
 
 func TestLineChecks(t *testing.T) {
+	t.Parallel()
 	tests := map[string]testCase{
 		"commitLine": {
 			passes: []testCaseLine{
@@ -549,16 +550,21 @@ func TestLineChecks(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		for _, pass := range test.passes {
-			if !test.function(false, pass.latestState, pass.line) {
-				t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
+		name, test := name, test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, pass := range test.passes {
+				if !test.function(false, pass.latestState, pass.line) {
+					t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
+				}
 			}
-		}
-		for _, fail := range test.fails {
-			if test.function(false, fail.latestState, fail.line) {
-				t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
+			for _, fail := range test.fails {
+				if test.function(false, fail.latestState, fail.line) {
+					t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -568,6 +574,7 @@ type messageParsingTestCase struct {
 }
 
 func TestMessageParsing(t *testing.T) {
+	t.Parallel()
 	tests := []messageParsingTestCase{
 		{
 			data: `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
@@ -647,32 +654,43 @@ Co-authored-by: Sergey Beryozkin <sberyozkin@gmail.com>
 	}
 
 	for _, test := range tests {
-		r := bytes.NewReader([]byte(test.data))
-		commitChan := make(chan Commit)
-		parser := NewParser()
+		test := test
+		t.Run(test.data, func(t *testing.T) {
+			t.Parallel()
 
-		go func() {
-			parser.FromReader(context.Background(), r, commitChan, false)
-		}()
-		for commit := range commitChan {
-			if commit.Message.String() != test.expected {
-				t.Errorf("Message does not match. Got:\n%s\nexpected:\n%s", commit.Message.String(), test.expected)
+			r := bytes.NewReader([]byte(test.data))
+			commitChan := make(chan Commit)
+			parser := NewParser()
+
+			go func() {
+				parser.FromReader(context.Background(), r, commitChan, false)
+			}()
+			for commit := range commitChan {
+				if commit.Message.String() != test.expected {
+					t.Errorf("Message does not match. Got:\n%s\nexpected:\n%s", commit.Message.String(), test.expected)
+				}
 			}
-		}
+		})
 	}
 }
 
 func TestBinaryPathParse(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"Binary files /dev/null and b/plugin.sig differ\n":                    "plugin.sig",
 		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n": " Lunch and Learn - HCDiag.pdf",
 	}
 
 	for name, expected := range cases {
-		filename := pathFromBinaryLine([]byte(name))
-		if filename != expected {
-			t.Errorf("Expected: %s, Got: %s", expected, filename)
-		}
+		name, expected := name, expected
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			filename := pathFromBinaryLine([]byte(name))
+			if filename != expected {
+				t.Errorf("Expected: %s, Got: %s", expected, filename)
+			}
+		})
 	}
 }
 
@@ -688,6 +706,7 @@ func newStringBuilderValue(value string) strings.Builder {
 }
 
 func TestCommitParsing(t *testing.T) {
+	t.Parallel()
 	expected := expectedCommits()
 
 	r := bytes.NewReader([]byte(commitLog))
@@ -711,6 +730,7 @@ func TestCommitParsing(t *testing.T) {
 }
 
 func TestIndividualCommitParsing(t *testing.T) {
+	t.Parallel()
 	// Arrange
 	expected := expectedCommits()
 	commits := strings.Split(commitLog, "\ncommit ")
@@ -755,6 +775,7 @@ func TestIndividualCommitParsing(t *testing.T) {
 }
 
 func TestStagedDiffParsing(t *testing.T) {
+	t.Parallel()
 	expected := []Commit{
 		{
 			Hash:    "",
@@ -845,6 +866,7 @@ func TestStagedDiffParsing(t *testing.T) {
 }
 
 func TestCommitParseFailureRecovery(t *testing.T) {
+	t.Parallel()
 	expected := []Commit{
 		{
 			Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
@@ -974,6 +996,7 @@ index 5af88a8..c729cdb 100644
 `
 
 func TestDiffParseFailureRecovery(t *testing.T) {
+	t.Parallel()
 	expected := []Commit{
 		{
 			Hash:    "",
@@ -1111,6 +1134,7 @@ index 0000000..5af88a8
 `
 
 func TestMaxDiffSize(t *testing.T) {
+	t.Parallel()
 	parser := NewParser()
 	builder := strings.Builder{}
 	builder.WriteString(singleCommitSingleDiff)
@@ -1140,6 +1164,7 @@ func TestMaxDiffSize(t *testing.T) {
 }
 
 func TestMaxCommitSize(t *testing.T) {
+	t.Parallel()
 	parser := NewParser(WithMaxCommitSize(1))
 	commitText := bytes.Buffer{}
 	commitText.WriteString(singleCommitMultiDiff)

@@ -11,6 +11,7 @@ import (
 )
 
 func TestJobProgressFatalErrors(t *testing.T) {
+	t.Parallel()
 	var jp JobProgress
 
 	// Add a non-fatal error.
@@ -36,6 +37,7 @@ func TestJobProgressFatalErrors(t *testing.T) {
 }
 
 func TestJobProgressRef(t *testing.T) {
+	t.Parallel()
 	jp := NewJobProgress(123, 456, "source name")
 	ref := jp.Ref()
 	assert.Equal(t, JobID(123), ref.JobID)
@@ -57,6 +59,7 @@ func TestJobProgressRef(t *testing.T) {
 }
 
 func TestJobProgressHook(t *testing.T) {
+	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -108,6 +111,7 @@ func TestJobProgressHook(t *testing.T) {
 }
 
 func TestJobProgressDone(t *testing.T) {
+	t.Parallel()
 	ref := JobProgressRef{}
 	select {
 	case <-ref.Done():
@@ -117,6 +121,7 @@ func TestJobProgressDone(t *testing.T) {
 }
 
 func TestJobProgressElapsedTime(t *testing.T) {
+	t.Parallel()
 	metrics := JobProgressMetrics{}
 	assert.Equal(t, time.Duration(0), metrics.ElapsedTime())
 
@@ -130,6 +135,7 @@ func TestJobProgressElapsedTime(t *testing.T) {
 }
 
 func TestJobProgressErrorsFor(t *testing.T) {
+	t.Parallel()
 	metrics := JobProgressMetrics{
 		Errors: []error{
 			Fatal{ChunkError{

@@ -10,6 +10,7 @@ import (
 )
 
 func TestBase64_FromChunk(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		chunk *sources.Chunk
 		want  *sources.Chunk
@@ -124,8 +125,11 @@ func TestBase64_FromChunk(t *testing.T) {
 			},
 		},
 	}
+
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			d := &Base64{}
 			got := d.FromChunk(tt.chunk)
 			if tt.want != nil {

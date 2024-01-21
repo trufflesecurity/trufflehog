@@ -9,6 +9,7 @@ import (
 )
 
 func TestUTF8_FromChunk(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		chunk *sources.Chunk
 	}
@@ -47,8 +48,11 @@ func TestUTF8_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			d := &UTF8{}
 			got := d.FromChunk(tt.args.chunk)
 			if got != nil && tt.want != nil {

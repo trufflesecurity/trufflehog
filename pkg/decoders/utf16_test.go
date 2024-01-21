@@ -9,6 +9,7 @@ import (
 )
 
 func TestUTF16Decoder(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name      string
 		input     []byte
@@ -42,7 +43,9 @@ func TestUTF16Decoder(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			chunk := &sources.Chunk{Data: tc.input}
 			decoder := &UTF16{}
 			decodedChunk := decoder.FromChunk(chunk)
@@ -65,6 +68,7 @@ func TestUTF16Decoder(t *testing.T) {
 }
 
 func TestDLL(t *testing.T) {
+	t.Parallel()
 	data, err := os.ReadFile("utf16_test.dll")
 	if err != nil {
 		t.Errorf("Failed to read test data: %v", err)

@@ -103,6 +103,7 @@ func tryRead(ch <-chan *Chunk) (*Chunk, error) {
 }
 
 func TestSourceManagerRun(t *testing.T) {
+	t.Parallel()
 	mgr := NewManager(WithBufferedOutput(8))
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
@@ -121,6 +122,7 @@ func TestSourceManagerRun(t *testing.T) {
 }
 
 func TestSourceManagerWait(t *testing.T) {
+	t.Parallel()
 	mgr := NewManager()
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
@@ -139,6 +141,7 @@ func TestSourceManagerWait(t *testing.T) {
 }
 
 func TestSourceManagerError(t *testing.T) {
+	t.Parallel()
 	mgr := NewManager()
 	source, err := buildDummy(errorChunker{fmt.Errorf("oops")})
 	assert.NoError(t, err)
@@ -150,6 +153,7 @@ func TestSourceManagerError(t *testing.T) {
 }
 
 func TestSourceManagerReport(t *testing.T) {
+	t.Parallel()
 	for _, opts := range [][]func(*SourceManager){
 		{WithBufferedOutput(8)},
 		{WithBufferedOutput(8), WithSourceUnits()},
@@ -214,6 +218,7 @@ func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkR
 }
 
 func TestSourceManagerNonFatalError(t *testing.T) {
+	t.Parallel()
 	input := []unitChunk{
 		{unit: "one", output: "bar"},
 		{unit: "two", err: "oh no"},
@@ -234,6 +239,7 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 }
 
 func TestSourceManagerContextCancelled(t *testing.T) {
+	t.Parallel()
 	mgr := NewManager(WithBufferedOutput(8))
 	source, err := buildDummy(&counterChunker{count: 100})
 	assert.NoError(t, err)
@@ -273,6 +279,7 @@ func (c callbackChunker) Enumerate(context.Context, UnitReporter) error         
 func (c callbackChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) error { return nil }
 
 func TestSourceManagerCancelRun(t *testing.T) {
+	t.Parallel()
 	mgr := NewManager(WithBufferedOutput(8))
 	var returnedErr error
 	source, err := buildDummy(callbackChunker{func(ctx context.Context, _ chan *Chunk) error {
@@ -295,6 +302,7 @@ func TestSourceManagerCancelRun(t *testing.T) {
 }
 
 func TestSourceManagerAvailableCapacity(t *testing.T) {
+	t.Parallel()
 	mgr := NewManager(WithConcurrentSources(1337))
 	start, end := make(chan struct{}), make(chan struct{})
 	source, err := buildDummy(callbackChunker{func(context.Context, chan *Chunk) error {
@@ -316,6 +324,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 }
 
 func TestSourceManagerUnitHook(t *testing.T) {
+	t.Parallel()
 	hook := NewUnitHook(context.TODO())
 
 	input := []unitChunk{
@@ -369,6 +378,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 // TestSourceManagerUnitHookNoBlock tests that the UnitHook drops metrics if
 // they aren't handled fast enough.
 func TestSourceManagerUnitHookNoBlock(t *testing.T) {
+	t.Parallel()
 	var evictedKeys []string
 	cache, _ := lru.NewWithEvict(1, func(key string, _ *UnitMetrics) {
 		evictedKeys = append(evictedKeys, key)
@@ -400,6 +410,7 @@ func TestSourceManagerUnitHookNoBlock(t *testing.T) {
 // TestSourceManagerUnitHookNoUnits tests whether the UnitHook works for
 // sources that don't support units.
 func TestSourceManagerUnitHookNoUnits(t *testing.T) {
+	t.Parallel()
 	hook := NewUnitHook(context.TODO())
 
 	mgr := NewManager(
