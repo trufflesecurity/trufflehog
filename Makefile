@@ -10,6 +10,7 @@ PROTOS_IMAGE ?= trufflesecurity/protos:1.21-0
 .PHONY: protos-windows
 .PHONY: vendor
 .PHONY: dogfood
+.PHONY: test-no-cache
 
 dogfood:
 	CGO_ENABLED=0 go run . git file://. --json --debug
@@ -29,6 +30,9 @@ test-failing:
 
 test:
 	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
+
+test-no-cache:
+	CGO_ENABLED=0 go test -count=1 -timeout=2m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)
 
 test-integration:
 	CGO_ENABLED=0 go test -timeout=5m -tags=integration $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors)

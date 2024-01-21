@@ -20,7 +20,6 @@ import (
 )
 
 func TestSource_Scan(t *testing.T) {
-	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -123,14 +122,10 @@ func TestSource_Scan(t *testing.T) {
 			wantErr: false,
 		},
 	}
-
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			s := Source{}
 
-			ctx := context.Background()
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
 				t.Fatal(err)
@@ -160,7 +155,8 @@ func TestSource_Scan(t *testing.T) {
 // We ran into an issue where upgrading a dependency caused the git patch chunking to break
 // So this test exists to make sure that when something changes, we know about it.
 func TestSource_Chunks_Integration(t *testing.T) {
-	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	type init struct {
 		name       string
 		verify     bool
@@ -222,14 +218,9 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			s := Source{}
-
-			ctx := context.Background()
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -281,7 +272,6 @@ func TestSource_Chunks_Integration(t *testing.T) {
 }
 
 func TestSource_Chunks_Edge_Cases(t *testing.T) {
-	t.Parallel()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -370,14 +360,9 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			s := Source{}
-
-			ctx := context.Background()
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -405,7 +390,6 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 }
 
 func TestPrepareRepo(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		uri    string
 		path   bool
@@ -439,21 +423,17 @@ func TestPrepareRepo(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.uri, func(t *testing.T) {
-			t.Parallel()
-			ctx := context.Background()
-			repo, b, err := PrepareRepo(ctx, tt.uri)
-			var repoLen bool
-			if len(repo) > 0 {
-				repoLen = true
-			} else {
-				repoLen = false
-			}
-			if repoLen != tt.path || b != tt.remote {
-				t.Errorf("PrepareRepo(%v) got: %v, %v, %v want: %v, %v, %v", tt.uri, repo, b, err, tt.path, tt.remote, tt.err)
-			}
-		})
+		ctx := context.Background()
+		repo, b, err := PrepareRepo(ctx, tt.uri)
+		var repoLen bool
+		if len(repo) > 0 {
+			repoLen = true
+		} else {
+			repoLen = false
+		}
+		if repoLen != tt.path || b != tt.remote {
+			t.Errorf("PrepareRepo(%v) got: %v, %v, %v want: %v, %v, %v", tt.uri, repo, b, err, tt.path, tt.remote, tt.err)
+		}
 	}
 }
 
@@ -466,7 +446,6 @@ func BenchmarkPrepareRepo(b *testing.B) {
 }
 
 func TestGitURLParse(t *testing.T) {
-	t.Parallel()
 	for _, tt := range []struct {
 		url      string
 		host     string
