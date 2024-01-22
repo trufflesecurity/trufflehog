@@ -91,6 +91,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
+					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				},
 			},
 			wantErr: false,
@@ -107,6 +108,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
+					ExtraData:    map[string]string{"sslmode": "prefer"},
 				},
 			},
 			wantErr: false,
@@ -123,6 +125,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
+					ExtraData:    map[string]string{"sslmode": "allow"},
 				},
 			},
 			wantErr: false,
@@ -139,6 +142,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
+					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				},
 			},
 			wantErr: false,
@@ -155,6 +159,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
+					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				},
 			},
 			wantErr: false,
@@ -197,6 +202,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
+					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				}
 				r.SetVerificationError(errors.New("i/o timeout"))
 				return []detectors.Result{r}
@@ -219,6 +225,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
+					ExtraData:    map[string]string{"sslmode": "require"},
 				}
 				r.SetVerificationError(pq.ErrSSLNotSupported)
 				return []detectors.Result{r}

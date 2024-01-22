@@ -91,6 +91,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
+			sslmode := params["sslmode"]
+			if sslmode == "" {
+				sslmode = "<unset>"
+			}
+			result.ExtraData = map[string]string{
+				"sslmode": sslmode,
+			}
 		}
 
 		if !result.Verified && detectors.IsKnownFalsePositive(password, detectors.DefaultFalsePositives, true) {
@@ -146,6 +153,11 @@ func verifyPostgres(params map[string]string) (bool, error) {
 		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
 		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
 		delete(params, "sslmode")
+
+		// We still want to save the original sslmode in ExtraData, so we'll re-add it before returning.
+		defer func() {
+			params["sslmode"] = sslmode
+		}()
 	}
 
 	var connStr string
@@ -165,8 +177,11 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	} else if strings.Contains(err.Error(), "password authentication failed") {
 		return false, nil
 	} else if errors.Is(err, pq.ErrSSLNotSupported) && params["sslmode"] == "" {
-		// Do not merge until this kludge is collectively sanctioned!
+		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
+		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
+		// connections are acceptable, so now we try a connection without SSL to see if it works.
 		params["sslmode"] = "disable"
+		defer delete(params, "sslmode") // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgres(params)
 	} else if isErrorDatabaseNotFound(err, params["dbname"]) {
 		return true, nil // If we know this, we were able to authenticate
