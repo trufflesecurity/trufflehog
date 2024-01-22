@@ -741,16 +741,6 @@ func TestIndividualCommitParsing(t *testing.T) {
 			}
 			j++
 		}
-		// for _, pass := range test.passes {
-		//	if !test.function(false, pass.latestState, pass.line) {
-		//		t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
-		//	}
-		// }
-		// for _, fail := range test.fails {
-		//	if test.function(false, fail.latestState, fail.line) {
-		//		t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
-		//	}
-		// }
 	}
 }
 
@@ -802,24 +792,6 @@ func TestStagedDiffParsing(t *testing.T) {
 					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
 					IsBinary:  false,
 				},
-				// {
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				// },
-				// {
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				// },
-				// {
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				// },
 			},
 		},
 	}
