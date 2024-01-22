@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 

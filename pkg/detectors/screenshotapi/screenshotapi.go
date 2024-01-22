@@ -3,8 +3,8 @@ package screenshotapi
 import (
 	"context"
 	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	// "fmt"
 	// "log"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
