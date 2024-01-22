@@ -32,7 +32,7 @@ const (
 	pg_sslmode_require = "require"
 	pg_user            = "user"
 
-	sslmode_unset = "<unset>"
+	sslmode_unset = "<unset>" // Ths is how we report an unset sslmode in ExtraData (it's not a postgres string)
 )
 
 // This detector currently only finds Postgres connection string URIs
