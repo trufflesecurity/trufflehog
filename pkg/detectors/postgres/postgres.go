@@ -72,15 +72,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			}
 		}
 
-		hostport := host
-		if port, ok := params["port"]; ok {
-			hostport = host + ":" + port
+		port, ok := params["port"]
+		if !ok {
+			params["port"] = "5432"
 		}
+
+		raw := []byte(fmt.Sprintf("postgresql://%s:%s@%s:%s", host, port, user, password))
 
 		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Postgres,
-			Raw:          []byte(hostport + user + password),
-			RawV2:        []byte(hostport + user + password),
+			Raw:          raw,
+			RawV2:        raw,
 		}
 
 		if verify {
