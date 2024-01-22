@@ -21,10 +21,23 @@ var bufferPool = sync.Pool{
 	New: func() any { return new(bytes.Buffer) },
 }
 
+// state represents the current mode of BufferedFileWriter.
+type state int
+
+const (
+	// writeOnly indicates the BufferedFileWriter is in write-only mode.
+	writeOnly state = iota
+	// readOnly indicates the BufferedFileWriter has been closed and is in read-only mode.
+	readOnly
+)
+
 // BufferedFileWriter manages a buffer for writing data, flushing to a file when a threshold is exceeded.
+// It supports either write-only or read-only mode, indicated by its state.
 type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
+
+	state state // Current state of the writer. (writeOnly or readOnly)
 
 	buf      bytes.Buffer   // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
@@ -42,7 +55,7 @@ func WithThreshold(threshold uint64) Option {
 // New creates a new BufferedFileWriter with the given options.
 func New(opts ...Option) *BufferedFileWriter {
 	const defaultThreshold = 10 * 1024 * 1024 // 10MB
-	w := &BufferedFileWriter{threshold: defaultThreshold}
+	w := &BufferedFileWriter{threshold: defaultThreshold, state: writeOnly}
 	for _, opt := range opts {
 		opt(w)
 	}
@@ -84,6 +97,10 @@ func (w *BufferedFileWriter) String(ctx context.Context) string {
 
 // Write writes data to the buffer or a file, depending on the size.
 func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error) {
+	if w.state != writeOnly {
+		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
+	}
+
 	size := uint64(len(data))
 	defer func() {
 		w.size += size
@@ -143,8 +160,10 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 	return w.file.Write(data)
 }
 
-// Close flushes any remaining data in the buffer to the file and closes the file if it was created.
+// Close flushes any remaining data in the buffer to the file, closes the file if created,
+// and transitions the BufferedFileWriter to read-only mode.
 func (w *BufferedFileWriter) Close() error {
+	defer func() { w.state = readOnly }()
 	if w.file == nil {
 		return nil
 	}
@@ -164,7 +183,12 @@ func (w *BufferedFileWriter) Close() error {
 // reader is returned. For in-memory data, it returns a custom reader that handles returning
 // the buffer to the pool.
 // The caller should call Close() on the returned io.Reader when done to ensure files are cleaned up.
+// It can only be used when the BufferedFileWriter is in read-only mode.
 func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
+	if w.state != readOnly {
+		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
+	}
+
 	if w.file != nil {
 		// Data is in a file, read from the file.
 		file, err := os.Open(w.filename)

@@ -33,6 +33,8 @@ func TestBufferedFileWriterNewThreshold(t *testing.T) {
 			t.Parallel()
 			writer := New(tc.options...)
 			assert.Equal(t, tc.expectedThreshold, writer.threshold)
+			// The state should always be writeOnly when created.
+			assert.Equal(t, writeOnly, writer.state)
 		})
 	}
 }
@@ -266,4 +268,33 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			assert.Equal(t, tc.expectFileContent, "")
 		})
 	}
+}
+
+func TestBufferedFileWriterStateTransitionOnClose(t *testing.T) {
+	t.Parallel()
+	writer := New()
+
+	// Initially, the writer should be in write-only mode.
+	assert.Equal(t, writeOnly, writer.state)
+
+	// Perform some write operation.
+	_, err := writer.Write(context.Background(), []byte("test data"))
+	assert.NoError(t, err)
+
+	// Close the writer.
+	err = writer.Close()
+	assert.NoError(t, err)
+
+	// After closing, the writer should be in read-only mode.
+	assert.Equal(t, readOnly, writer.state)
+}
+
+func TestBufferedFileWriterWriteInReadOnlyState(t *testing.T) {
+	t.Parallel()
+	writer := New()
+	_ = writer.Close() // Transition to read-only mode
+
+	// Attempt to write in read-only mode.
+	_, err := writer.Write(context.Background(), []byte("should fail"))
+	assert.Error(t, err)
 }

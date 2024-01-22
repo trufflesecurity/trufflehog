@@ -139,8 +139,8 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		Concurrency:  concurrency,
 		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Git{
-					Git: &source_metadatapb.Git{
+				Data: &source_metadatapb.MetaData_Gitlab{
+					Gitlab: &source_metadatapb.Gitlab{
 						Commit:     sanitizer.UTF8(commit),
 						File:       sanitizer.UTF8(file),
 						Email:      sanitizer.UTF8(email),
