@@ -211,7 +211,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	} else if errors.Is(err, pq.ErrSSLNotSupported) && params[pg_sslmode] == "" {
 		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
 		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
-		// connections are acceptable, so now we try a connection without SSL to see if it works.
+		// connections are acceptable, so now we try a connection without SSL.
 		params[pg_sslmode] = pg_sslmode_disable
 		defer delete(params, pg_sslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgres(params)
