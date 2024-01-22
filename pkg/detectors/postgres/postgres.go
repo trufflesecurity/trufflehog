@@ -18,6 +18,21 @@ import (
 
 const (
 	defaultPort = "5432"
+
+	pg_connect_timeout = "connect_timeout"
+	pg_dbname          = "dbname"
+	pg_host            = "host"
+	pg_password        = "password"
+	pg_port            = "port"
+	pg_requiressl      = "requiressl"
+	pg_sslmode         = "sslmode"
+	pg_sslmode_allow   = "allow"
+	pg_sslmode_disable = "disable"
+	pg_sslmode_prefer  = "prefer"
+	pg_sslmode_require = "require"
+	pg_user            = "user"
+
+	sslmode_unset = "<unset>"
 )
 
 // This detector currently only finds Postgres connection string URIs
@@ -49,17 +64,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	candidateParamSets := findUriMatches(data)
 
 	for _, params := range candidateParamSets {
-		user, ok := params["user"]
+		user, ok := params[pg_user]
 		if !ok {
 			continue
 		}
 
-		password, ok := params["password"]
+		password, ok := params[pg_password]
 		if !ok {
 			continue
 		}
 
-		host, ok := params["host"]
+		host, ok := params[pg_host]
 		if !ok {
 			continue
 		}
@@ -72,9 +87,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			}
 		}
 
-		port, ok := params["port"]
+		port, ok := params[pg_port]
 		if !ok {
-			params["port"] = "5432"
+			port = defaultPort
+			params[pg_port] = port
 		}
 
 		raw := []byte(fmt.Sprintf("postgresql://%s:%s@%s:%s", user, password, host, port))
@@ -89,17 +105,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		// do it for us - but we will do it anyway here so that when we later capture sslmode into ExtraData we will
 		// capture it post-normalization. (The detector's behavior is undefined for candidate secrets that have both
 		// requiressl and sslmode set.)
-		if requiressl := params["requiressl"]; requiressl == "0" {
-			params["sslmode"] = "prefer"
+		if requiressl := params[pg_requiressl]; requiressl == "0" {
+			params[pg_sslmode] = pg_sslmode_prefer
 		} else if requiressl == "1" {
-			params["sslmode"] = "require"
+			params[pg_sslmode] = pg_sslmode_require
 		}
 
 		if verify {
 			// pq appears to ignore the context deadline, so we copy any timeout that's been set into the connection
 			// parameters themselves.
 			if timeout := getDeadlineInSeconds(ctx); timeout != 0 {
-				params["connect_timeout"] = strconv.Itoa(timeout)
+				params[pg_connect_timeout] = strconv.Itoa(timeout)
 			}
 
 			isVerified, verificationErr := verifyPostgres(params)
@@ -108,12 +124,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		// We gather SSL information into ExtraData in case it's useful for later reporting.
-		sslmode := params["sslmode"]
+		sslmode := params[pg_sslmode]
 		if sslmode == "" {
-			sslmode = "<unset>"
+			sslmode = sslmode_unset
 		}
 		result.ExtraData = map[string]string{
-			"sslmode": sslmode,
+			pg_sslmode: sslmode,
 		}
 
 		if !result.Verified && detectors.IsKnownFalsePositive(password, detectors.DefaultFalsePositives, true) {
@@ -165,14 +181,14 @@ func isErrorDatabaseNotFound(err error, dbName string) bool {
 }
 
 func verifyPostgres(params map[string]string) (bool, error) {
-	if sslmode := params["sslmode"]; sslmode == "allow" || sslmode == "prefer" {
+	if sslmode := params[pg_sslmode]; sslmode == pg_sslmode_allow || sslmode == pg_sslmode_prefer {
 		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
 		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
-		delete(params, "sslmode")
+		delete(params, pg_sslmode)
 
 		// We still want to save the original sslmode in ExtraData, so we'll re-add it before returning.
 		defer func() {
-			params["sslmode"] = sslmode
+			params[pg_sslmode] = sslmode
 		}()
 	}
 
@@ -192,14 +208,14 @@ func verifyPostgres(params map[string]string) (bool, error) {
 		return true, nil
 	} else if strings.Contains(err.Error(), "password authentication failed") {
 		return false, nil
-	} else if errors.Is(err, pq.ErrSSLNotSupported) && params["sslmode"] == "" {
+	} else if errors.Is(err, pq.ErrSSLNotSupported) && params[pg_sslmode] == "" {
 		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
 		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
 		// connections are acceptable, so now we try a connection without SSL to see if it works.
-		params["sslmode"] = "disable"
-		defer delete(params, "sslmode") // We want to return with the original params map intact (for ExtraData)
+		params[pg_sslmode] = pg_sslmode_disable
+		defer delete(params, pg_sslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgres(params)
-	} else if isErrorDatabaseNotFound(err, params["dbname"]) {
+	} else if isErrorDatabaseNotFound(err, params[pg_dbname]) {
 		return true, nil // If we know this, we were able to authenticate
 	}
 

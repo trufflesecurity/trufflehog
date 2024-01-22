@@ -241,6 +241,31 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found connection URI, unverified due to error - wrong port",
+			s:    Scanner{detectLoopback: true},
+			args: func() args {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				return args{
+					ctx:    ctx,
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s/postgres2`, postgresUser, postgresPass, postgresHost)),
+					verify: true,
+				}
+			}(),
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     false,
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5432"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5432"),
+					ExtraData:    map[string]string{"sslmode": "<unset>"},
+				}
+				r.SetVerificationError(errors.New("connection refused"))
+				return []detectors.Result{r}
+			}(),
+			wantErr: false,
+		},
+		{
 			name: "found connection URI, unverified due to error - ssl not supported (using sslmode)",
 			s:    Scanner{detectLoopback: true},
 			args: func() args {
