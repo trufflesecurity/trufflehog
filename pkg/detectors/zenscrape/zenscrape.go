@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.zenscrape.com/api/v1/get?url=http://www.google.com", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.zenscrape.com/api/v1/status", nil)
 			if err != nil {
 				continue
 			}
