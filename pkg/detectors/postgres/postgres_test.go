@@ -91,8 +91,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
-					Raw:          []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				},
 			},
@@ -110,8 +110,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
-					Raw:          []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "prefer"},
 				},
 			},
@@ -129,8 +129,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
-					Raw:          []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "allow"},
 				},
 			},
@@ -148,8 +148,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
-					Raw:          []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "prefer"},
 				},
 			},
@@ -167,8 +167,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     true,
-					Raw:          []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				},
 			},
@@ -186,8 +186,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
-					Raw:          []byte("postgresql://localhost:5434@postgres:inactive"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:inactive"),
+					Raw:          []byte("postgresql://postgres:inactive@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:inactive@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				},
 			},
@@ -231,8 +231,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
-					Raw:          []byte("postgresql://192.0.2.0:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://192.0.2.0:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@192.0.2.0:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@192.0.2.0:5434"),
 					ExtraData:    map[string]string{"sslmode": "<unset>"},
 				}
 				r.SetVerificationError(errors.New("i/o timeout"))
@@ -256,8 +256,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
-					Raw:          []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "require"},
 				}
 				r.SetVerificationError(pq.ErrSSLNotSupported)
@@ -281,8 +281,8 @@ func TestPostgres_FromChunk(t *testing.T) {
 				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Postgres,
 					Verified:     false,
-					Raw:          []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
-					RawV2:        []byte("postgresql://localhost:5434@postgres:23201da=b56ca236f3dc6736c0f9afad"),
+					Raw:          []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
+					RawV2:        []byte("postgresql://postgres:23201da=b56ca236f3dc6736c0f9afad@localhost:5434"),
 					ExtraData:    map[string]string{"sslmode": "require"},
 				}
 				r.SetVerificationError(pq.ErrSSLNotSupported)
