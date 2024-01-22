@@ -183,6 +183,10 @@ func (jp *JobProgress) TrackProgress(progress *Progress) {
 // executeHooks is a helper method to execute all the hooks for the given
 // closure.
 func (jp *JobProgress) executeHooks(todo func(hook JobProgressHook)) {
+	defer func(start time.Time) {
+		elapsed := time.Since(start).Milliseconds()
+		hooksExecTime.WithLabelValues().Observe(float64(elapsed))
+	}(time.Now())
 	for _, hook := range jp.hooks {
 		// TODO: Non-blocking?
 		todo(hook)
