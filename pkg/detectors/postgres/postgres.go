@@ -37,7 +37,7 @@ var (
 )
 
 type Scanner struct {
-	detectLoopback bool // Automated tests run against localhost, but we don't consider those real results in the wild
+	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
 }
 
 func (s Scanner) Keywords() []string {
