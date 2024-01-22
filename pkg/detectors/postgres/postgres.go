@@ -85,6 +85,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			RawV2:        raw,
 		}
 
+		// We don't need to normalize the (deprecated) requiressl option into the (up-to-date) sslmode option - pq can
+		// do it for us - but we will do it anyway here so that when we later capture sslmode into ExtraData we will
+		// capture it post-normalization. (The detector's behavior is undefined for candidate secrets that have both
+		// requiressl and sslmode set.)
+		if requiressl := params["requiressl"]; requiressl == "0" {
+			params["sslmode"] = "prefer"
+		} else if requiressl == "1" {
+			params["sslmode"] = "require"
+		}
+
 		if verify {
 			// pq appears to ignore the context deadline, so we copy any timeout that's been set into the connection
 			// parameters themselves.
@@ -95,13 +105,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
-			sslmode := params["sslmode"]
-			if sslmode == "" {
-				sslmode = "<unset>"
-			}
-			result.ExtraData = map[string]string{
-				"sslmode": sslmode,
-			}
+		}
+
+		// We gather SSL information into ExtraData in case it's useful for later reporting.
+		sslmode := params["sslmode"]
+		if sslmode == "" {
+			sslmode = "<unset>"
+		}
+		result.ExtraData = map[string]string{
+			"sslmode": sslmode,
 		}
 
 		if !result.Verified && detectors.IsKnownFalsePositive(password, detectors.DefaultFalsePositives, true) {

@@ -137,6 +137,25 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "found connection URI with requiressl=0, verified",
+			s:    Scanner{detectLoopback: true},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?requiressl=0`, postgresUser, postgresPass, postgresHost, postgresPort)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     true,
+					Raw:          []byte("postgresql://localhost:5434@postgres:23201dabb56ca236f3dc6736c0f9afad"),
+					RawV2:        []byte("postgresql://localhost:5434@postgres:23201dabb56ca236f3dc6736c0f9afad"),
+					ExtraData:    map[string]string{"sslmode": "prefer"},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "found connection URI without database, verified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
@@ -222,7 +241,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found connection URI, unverified due to error - ssl not supported",
+			name: "found connection URI, unverified due to error - ssl not supported (using sslmode)",
 			s:    Scanner{detectLoopback: true},
 			args: func() args {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -230,6 +249,31 @@ func TestPostgres_FromChunk(t *testing.T) {
 				return args{
 					ctx:    ctx,
 					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?sslmode=require`, postgresUser, postgresPass, postgresHost, postgresPort)),
+					verify: true,
+				}
+			}(),
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     false,
+					Raw:          []byte("postgresql://localhost:5434@postgres:23201dabb56ca236f3dc6736c0f9afad"),
+					RawV2:        []byte("postgresql://localhost:5434@postgres:23201dabb56ca236f3dc6736c0f9afad"),
+					ExtraData:    map[string]string{"sslmode": "require"},
+				}
+				r.SetVerificationError(pq.ErrSSLNotSupported)
+				return []detectors.Result{r}
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "found connection URI, unverified due to error - ssl not supported (using requiressl)",
+			s:    Scanner{detectLoopback: true},
+			args: func() args {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				return args{
+					ctx:    ctx,
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?requiressl=1`, postgresUser, postgresPass, postgresHost, postgresPort)),
 					verify: true,
 				}
 			}(),
