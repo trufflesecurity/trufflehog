@@ -142,6 +142,12 @@ func isErrorDatabaseNotFound(err error, dbName string) bool {
 }
 
 func verifyPostgres(params map[string]string) (bool, error) {
+	if sslmode := params["sslmode"]; sslmode == "allow" || sslmode == "prefer" {
+		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
+		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
+		delete(params, "sslmode")
+	}
+
 	var connStr string
 	for key, value := range params {
 		connStr += fmt.Sprintf("%s='%s'", key, value)
@@ -158,7 +164,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 		return true, nil
 	} else if strings.Contains(err.Error(), "password authentication failed") {
 		return false, nil
-	} else if errors.Is(err, pq.ErrSSLNotSupported) {
+	} else if errors.Is(err, pq.ErrSSLNotSupported) && params["sslmode"] == "" {
 		// Do not merge until this kludge is collectively sanctioned!
 		params["sslmode"] = "disable"
 		return verifyPostgres(params)

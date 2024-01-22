@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/lib/pq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -46,13 +47,12 @@ func TestPostgres_FromChunk(t *testing.T) {
 
 	// The detector is written to connect to the database 'postgres' if no explicit database is found in the candidate
 	// secret (because pq uses 'postgres' as a default if no database is specified). If the target cluster doesn't
-	// actually have a database with this name, we should still be able to verify the candidate secret, because if we
-	// can authenticate, Postgres will tell us that the database is missing, and if we can't, it will just tell us that
-	// we can't authenticate.
+	// actually have a database with this name, but our credentials are good, then Postgres will give us a "missing
+	// database" error message instead of an authentication failure.
 	//
 	// Unfortunately, directly validating this in the automated tests is awkward because the docker image's POSTGRES_DB
 	// environment variable doesn't appear to work: The database created is always named 'postgres', no matter what
-	// POSTGRES_DB is set to. This means that we can't replicate a cluster without a database named 'postgres', so we
+	// POSTGRES_DB is set to. This means that we can't replicate a cluster that has no database named 'postgres', so we
 	// can't directly test what happens if we see one. To work around this, all the automated tests try to connect to
 	// the nonexistent database 'postgres2'. In this way, we test the logic of attempting to connect to a non-existent
 	// database, even though the test cases are the inverse of what we'd see in the wild.
@@ -80,11 +80,59 @@ func TestPostgres_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found connection URI, verified",
+			name: "found connection URI with ssl mode unset, verified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, postgresHost, postgresPort)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found connection URI with ssl mode 'prefer', verified",
+			s:    Scanner{detectLoopback: true},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?sslmode=prefer`, postgresUser, postgresPass, postgresHost, postgresPort)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found connection URI with ssl mode 'allow', verified",
+			s:    Scanner{detectLoopback: true},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?sslmode=allow`, postgresUser, postgresPass, postgresHost, postgresPort)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found connection URI without database, verified",
+			s:    Scanner{detectLoopback: true},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -151,6 +199,28 @@ func TestPostgres_FromChunk(t *testing.T) {
 					Verified:     false,
 				}
 				r.SetVerificationError(errors.New("i/o timeout"))
+				return []detectors.Result{r}
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "found connection URI, unverified due to error - ssl not supported",
+			s:    Scanner{detectLoopback: true},
+			args: func() args {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				return args{
+					ctx:    ctx,
+					data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?sslmode=require`, postgresUser, postgresPass, postgresHost, postgresPort)),
+					verify: true,
+				}
+			}(),
+			want: func() []detectors.Result {
+				r := detectors.Result{
+					DetectorType: detectorspb.DetectorType_Postgres,
+					Verified:     false,
+				}
+				r.SetVerificationError(pq.ErrSSLNotSupported)
 				return []detectors.Result{r}
 			}(),
 			wantErr: false,
