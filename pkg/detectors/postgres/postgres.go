@@ -86,6 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		}
 
 		if verify {
+			// pq appears to ignore the context deadline, so we copy any timeout that's been set into the connection
+			// parameters themselves.
 			if timeout := getDeadlineInSeconds(ctx); timeout != 0 {
 				params["connect_timeout"] = strconv.Itoa(timeout)
 			}
