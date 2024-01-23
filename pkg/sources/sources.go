@@ -17,6 +17,11 @@ type (
 )
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.
+//
+// **Important:** The order of the fields in this struct is specifically designed to optimize
+// struct alignment and minimize memory usage. Do not change the field order without carefully considering
+// the potential impact on memory consumption.
+// Ex: https://go.dev/play/p/Azf4a7O-DhC
 type Chunk struct {
 	// Data is the data to decode and scan.
 	Data []byte
