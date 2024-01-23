@@ -147,8 +147,8 @@ func findUriMatches(data []byte) []map[string]string {
 			continue
 		}
 
-		params := make(map[string]string)
 		parts := connStrPartPattern.FindAllStringSubmatch(connStr, -1)
+		params := make(map[string]string, len(parts))
 		for _, part := range parts {
 			params[part[1]] = part[2]
 		}
