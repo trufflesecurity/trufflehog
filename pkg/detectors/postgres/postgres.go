@@ -202,22 +202,23 @@ func verifyPostgres(params map[string]string) (bool, error) {
 	defer db.Close()
 
 	err = db.Ping()
-	if err == nil {
+	switch {
+	case err == nil:
 		return true, nil
-	} else if strings.Contains(err.Error(), "password authentication failed") {
+	case strings.Contains(err.Error(), "password authentication failed"):
 		return false, nil
-	} else if errors.Is(err, pq.ErrSSLNotSupported) && params[pg_sslmode] == "" {
+	case errors.Is(err, pq.ErrSSLNotSupported) && params[pg_sslmode] == "":
 		// If the sslmode is unset, then either it was unset in the candidate secret, or we've intentionally unset it
 		// because it was specified as 'allow' or 'prefer', neither of which pq supports. In all of these cases, non-SSL
 		// connections are acceptable, so now we try a connection without SSL.
 		params[pg_sslmode] = pg_sslmode_disable
 		defer delete(params, pg_sslmode) // We want to return with the original params map intact (for ExtraData)
 		return verifyPostgres(params)
-	} else if isErrorDatabaseNotFound(err, params[pg_dbname]) {
+	case isErrorDatabaseNotFound(err, params[pg_dbname]):
 		return true, nil // If we know this, we were able to authenticate
+	default:
+		return false, err
 	}
-
-	return false, err
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
