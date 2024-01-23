@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -13,6 +12,14 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
+
+type response struct {
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Workplace struct {
+		Name string `json:"name"`
+	} `json:"workplace"`
+}
 
 type Scanner struct{}
 
@@ -70,28 +77,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-
-					body, err := io.ReadAll(res.Body)
-					if err != nil {
-						body = []byte{}
+					var r response
+					if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+						s1.SetVerificationError(err, resMatch)
+						continue
 					}
-
-					var data map[string]interface{}
-					err = json.Unmarshal(body, &data)
-					if err != nil {
-						data = map[string]interface{}{}
+					if r.Type != "" {
+						s1.ExtraData["key type"] = r.Type
 					}
-
-					keyType, ok := data["type"].(string)
-					if ok {
-						s1.ExtraData["key type"] = keyType
-					}
-					workplaceData, ok := data["workplace"].(map[string]interface{})
-					if ok {
-						name, ok := workplaceData["name"].(string)
-						if ok {
-							s1.ExtraData["workplace"] = name
-						}
+					if r.Workplace.Name != "" {
+						s1.ExtraData["workplace"] = r.Workplace.Name
 					}
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
