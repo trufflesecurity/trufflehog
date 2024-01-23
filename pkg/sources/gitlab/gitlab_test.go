@@ -57,7 +57,7 @@ func TestSource_Scan(t *testing.T) {
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source",
 			},
-			wantReposScanned: 4,
+			wantReposScanned: 5,
 		},
 		{
 			name: "token auth, enumerate repo, with glob ignore",
@@ -74,7 +74,7 @@ func TestSource_Scan(t *testing.T) {
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source",
 			},
-			wantReposScanned: 4,
+			wantReposScanned: 5,
 		},
 		{
 			name: "token auth, scoped repo",
