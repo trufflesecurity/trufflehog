@@ -227,6 +227,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/edamam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/edenai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eightxeight"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticemail"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enablex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enigma"
@@ -1001,6 +1002,7 @@ func DefaultDetectors() []detectors.Detector {
 		&workstack.Scanner{},
 		&clockify.Scanner{},
 		&karmacrm.Scanner{},
+		&elasticcloud.Scanner{},
 		&revampcrm.Scanner{},
 		// &apollo.Scanner{},
 		&artsy.Scanner{},
