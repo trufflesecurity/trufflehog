@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 

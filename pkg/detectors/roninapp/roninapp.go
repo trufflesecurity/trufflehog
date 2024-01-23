@@ -3,7 +3,7 @@ package roninapp
 import (
 	"context"
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	b64 "encoding/base64"
