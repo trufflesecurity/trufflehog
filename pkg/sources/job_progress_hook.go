@@ -57,6 +57,18 @@ func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) (*UnitHook, <-chan Un
 	for _, opt := range opts {
 		opt(&hook)
 	}
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				hooksChannelSize.WithLabelValues().Set(float64(len(hook.finishedMetrics)))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 	return &hook, hook.finishedMetrics
 }
 
