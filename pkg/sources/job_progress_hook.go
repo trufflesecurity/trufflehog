@@ -16,6 +16,7 @@ type UnitHook struct {
 	metrics         *lru.Cache[string, *UnitMetrics]
 	mu              sync.Mutex
 	finishedMetrics chan UnitMetrics
+	logBackPressure func()
 	NoopHook
 }
 
@@ -43,9 +44,15 @@ func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) (*UnitHook, <-chan Un
 			"metric", value,
 		)
 	})
+	var once sync.Once
 	hook := UnitHook{
 		metrics:         cache,
 		finishedMetrics: make(chan UnitMetrics, 1024),
+		logBackPressure: func() {
+			once.Do(func() {
+				ctx.Logger().Info("back pressure detected in unit hook")
+			})
+		},
 	}
 	for _, opt := range opts {
 		opt(&hook)
@@ -60,6 +67,18 @@ func (u *UnitHook) id(ref JobProgressRef, unit SourceUnit) string {
 		unitID = unit.SourceUnitID()
 	}
 	return fmt.Sprintf("%d/%d/%s", ref.SourceID, ref.JobID, unitID)
+}
+
+func (u *UnitHook) ejectFinishedMetric(metric UnitMetrics) {
+	// Intentionally block the hook from returning to supply back-pressure
+	// to the source.
+	select {
+	case u.finishedMetrics <- metric:
+		return
+	default:
+		u.logBackPressure()
+	}
+	u.finishedMetrics <- metric
 }
 
 func (u *UnitHook) StartUnitChunking(ref JobProgressRef, unit SourceUnit, start time.Time) {
@@ -82,9 +101,7 @@ func (u *UnitHook) EndUnitChunking(ref JobProgressRef, unit SourceUnit, end time
 		return
 	}
 	metrics.EndTime = &end
-	// Intentionally block the hook from returning to supply back-pressure
-	// to the source.
-	u.finishedMetrics <- *metrics
+	u.ejectFinishedMetric(*metrics)
 }
 
 func (u *UnitHook) finishUnit(id string) (*UnitMetrics, bool) {
@@ -157,9 +174,7 @@ func (u *UnitHook) Finish(ref JobProgressRef) {
 	metrics.StartTime = snap.StartTime
 	metrics.EndTime = snap.EndTime
 	metrics.Errors = snap.Errors
-	// Intentionally block the hook from returning to supply back-pressure
-	// to the source.
-	u.finishedMetrics <- *metrics
+	u.ejectFinishedMetric(*metrics)
 }
 
 // InProgressSnapshot gets all the currently active metrics across all jobs.
