@@ -61,6 +61,9 @@ func GetAccountNumFromAWSID(AWSID string) (string, error) {
 	if len(AWSID) < 4 {
 		return "", fmt.Errorf("AWSID is too short")
 	}
+	if AWSID[4] == 'I' || AWSID[4] == 'J' {
+		return "", fmt.Errorf("Can't get account number from AKIAJ/ASIAJ or AKIAI/ASIAI keys")
+	}
 	trimmedAWSID := AWSID[4:]
 	decodedBytes, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(trimmedAWSID))
 	if err != nil {
