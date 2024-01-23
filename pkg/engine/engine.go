@@ -476,6 +476,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
 
+				results := make([][]string, 0, len(chunkSpecificDetectors))
 				for k, detector := range chunkSpecificDetectors {
 					decoded.Chunk.Verify = e.verify
 					wgDetect.Add(1)
