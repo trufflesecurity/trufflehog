@@ -363,7 +363,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				if err := currentDiff.finalize(); err != nil {
-					ctx.Logger().Error(err, "failed to finalize diff")
+					ctx.Logger().Error(
+						err,
+						"failed to finalize diff",
+						"commit", currentCommit.Hash,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
+					)
 				}
 				commitChan <- *currentCommit
 				totalLogSize += currentCommit.Size
