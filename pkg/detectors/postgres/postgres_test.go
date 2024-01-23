@@ -29,9 +29,7 @@ const (
 	postgresHost = "localhost"
 	postgresPort = "5434" // Do not use 5433, as local dev environments can use it for other things
 
-	inactiveUser = "inactive"
 	inactivePass = "inactive"
-	inactivePort = "61000"
 	inactiveHost = "192.0.2.0"
 )
 
