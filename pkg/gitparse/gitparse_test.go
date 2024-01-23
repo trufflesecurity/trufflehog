@@ -1111,7 +1111,7 @@ func TestMaxDiffSize(t *testing.T) {
 	select {
 	case commit := <-commitChan:
 		if commit.Diffs[0].Len() > parser.maxDiffSize+1024 {
-			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.maxDiffSize+1024)
+			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Len(), parser.maxDiffSize+1024)
 		}
 	case <-ctx.Done():
 		t.Fatal("Test timed out")
