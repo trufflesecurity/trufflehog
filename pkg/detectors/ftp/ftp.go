@@ -3,9 +3,9 @@ package ftp
 import (
 	"context"
 	"errors"
+	regexp "github.com/wasilibs/go-re2"
 	"net/textproto"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
