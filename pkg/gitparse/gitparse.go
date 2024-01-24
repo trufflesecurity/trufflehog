@@ -23,10 +23,10 @@ const (
 	defaultDateFormat = "Mon Jan 02 15:04:05 2006 -0700"
 
 	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 1GB
+	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 2GB
 
 	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
-	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 1GB
+	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 2GB
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -42,8 +42,8 @@ type contentWriter interface { // Write appends data to the content storage.
 	Close() error
 	// Len returns the current size of the content.
 	Len() int
-	// String returns the content as a string.
-	String(ctx context.Context) string
+	// String returns the content as a string or an error if the content cannot be converted to a string.
+	String() (string, error)
 }
 
 // buffer is a wrapper around bytes.Buffer, implementing the contentWriter interface.
@@ -67,7 +67,7 @@ func (b *buffer) ReadCloser() (io.ReadCloser, error) {
 func (b *buffer) Close() error { return nil }
 
 // String returns the buffer's content as a string.
-func (b *buffer) String(_ context.Context) string { return b.Buffer.String() }
+func (b *buffer) String() (string, error) { return b.Buffer.String(), nil }
 
 // Diff contains the information about a file diff in a commit.
 // It abstracts the underlying content representation, allowing for flexible handling of diff content.
@@ -124,7 +124,7 @@ type Commit struct {
 }
 
 // Equal compares the content of two Commits to determine if they are the same.
-func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
+func (c1 *Commit) Equal(c2 *Commit) bool {
 	switch {
 	case c1.Hash != c2.Hash:
 		return false
@@ -138,6 +138,19 @@ func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
 		return false
 	}
 
+	// isEqualString handles the error-prone String() method calls and compares the results.
+	isEqualContentString := func(s1, s2 contentWriter) (bool, error) {
+		str1, err := s1.String()
+		if err != nil {
+			return false, err
+		}
+		str2, err := s2.String()
+		if err != nil {
+			return false, err
+		}
+		return str1 == str2, nil
+	}
+
 	for i := range c1.Diffs {
 		d1 := c1.Diffs[i]
 		d2 := c2.Diffs[i]
@@ -146,10 +159,13 @@ func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
 			return false
 		case d1.LineStart != d2.LineStart:
 			return false
-		case d1.contentWriter.String(ctx) != d2.contentWriter.String(ctx):
-			return false
 		case d1.IsBinary != d2.IsBinary:
 			return false
+		default:
+			equal, err := isEqualContentString(d1.contentWriter, d2.contentWriter)
+			if err != nil || !equal {
+				return false
+			}
 		}
 	}
 	return true
@@ -370,7 +386,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				if err := currentDiff.finalize(); err != nil {
-					ctx.Logger().Error(err, "failed to finalize diff")
+					ctx.Logger().Error(
+						err,
+						"failed to finalize diff",
+						"commit", currentCommit.Hash,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
+					)
 				}
 				commitChan <- *currentCommit
 				totalLogSize += currentCommit.Size

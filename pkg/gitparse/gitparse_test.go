@@ -704,7 +704,7 @@ func TestCommitParsing(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(context.Background(), &expected[i]) {
+		if !commit.Equal(&expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Message.String(), commit, commit.Message.String())
 		}
 		i++
@@ -737,21 +737,11 @@ func TestIndividualCommitParsing(t *testing.T) {
 			}
 
 			// Assert
-			if !commit.Equal(context.Background(), &expected[i]) {
+			if !commit.Equal(&expected[i]) {
 				t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[j].Message.String(), commit, commit.Message.String())
 			}
 			j++
 		}
-		// for _, pass := range test.passes {
-		//	if !test.function(false, pass.latestState, pass.line) {
-		//		t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
-		//	}
-		// }
-		// for _, fail := range test.fails {
-		//	if test.function(false, fail.latestState, fail.line) {
-		//		t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
-		//	}
-		// }
 	}
 }
 
@@ -819,24 +809,6 @@ func TestStagedDiffParsing(t *testing.T) {
 					contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
 					IsBinary:      false,
 				},
-				// {
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				// },
-				// {
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				// },
-				// {
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				// },
 			},
 		},
 	}
@@ -854,7 +826,7 @@ func TestStagedDiffParsing(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(context.Background(), &expected[i]) {
+		if !commit.Equal(&expected[i]) {
 			t.Errorf("Commit does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], commit)
 		}
 		i++
@@ -986,7 +958,7 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(context.Background(), &expected[i]) {
+		if !commit.Equal(&expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++
@@ -1165,7 +1137,7 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(context.Background(), &expected[i]) {
+		if !commit.Equal(&expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++
@@ -1311,27 +1283,31 @@ index 0000000..5af88a8
 
 func TestMaxDiffSize(t *testing.T) {
 	parser := NewParser()
-	bigBytes := bytes.Buffer{}
-	bigBytes.WriteString(singleCommitSingleDiff)
-	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
-		bigBytes.WriteString("+")
-		for n := 0; n < 1024; n++ {
-			bigBytes.Write([]byte("0"))
-		}
-		bigBytes.WriteString("\n")
-	}
-	bigReader := bytes.NewReader(bigBytes.Bytes())
+	builder := strings.Builder{}
+	builder.WriteString(singleCommitSingleDiff)
 
-	commitChan := make(chan Commit)
+	// Generate a diff that is larger than the maxDiffSize.
+	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
+		builder.WriteString("+" + strings.Repeat("0", 1024) + "\n")
+	}
+	bigReader := strings.NewReader(builder.String())
+
+	commitChan := make(chan Commit, 1)                                      // Buffer to prevent blocking
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // Timeout to prevent long wait
+	defer cancel()
+
 	go func() {
-		parser.FromReader(context.Background(), bigReader, commitChan, false)
+		parser.FromReader(ctx, bigReader, commitChan, false)
 	}()
 
-	commit := <-commitChan
-	if commit.Diffs[0].Len() > parser.maxDiffSize+1024 {
-		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Len(), parser.maxDiffSize+1024)
+	select {
+	case commit := <-commitChan:
+		if commit.Diffs[0].Len() > parser.maxDiffSize+1024 {
+			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Len(), parser.maxDiffSize+1024)
+		}
+	case <-ctx.Done():
+		t.Fatal("Test timed out")
 	}
-
 }
 
 func TestMaxCommitSize(t *testing.T) {
