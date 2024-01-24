@@ -899,7 +899,7 @@ func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(context.Background(), &expected[i]) {
+		if !commit.Equal(&expected[i]) {
 			t.Errorf("Commit does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], commit)
 		}
 		i++
@@ -1017,7 +1017,7 @@ func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(context.Background(), &expected[i]) {
+		if !commit.Equal(&expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++
@@ -1187,7 +1187,7 @@ func TestDiffParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(context.Background(), &expected[i]) {
+		if !commit.Equal(&expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++

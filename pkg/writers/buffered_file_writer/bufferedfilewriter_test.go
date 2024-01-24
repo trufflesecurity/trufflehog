@@ -87,7 +87,10 @@ func TestBufferedFileWriterString(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, tc.expectedStr, writer.String(ctx), "String content mismatch")
+			got, err := writer.String()
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.expectedStr, got, "String content mismatch")
 
 		})
 	}
