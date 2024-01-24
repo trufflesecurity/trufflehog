@@ -3,7 +3,7 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 
 	mssql "github.com/denisenkom/go-mssqldb"
 	"github.com/denisenkom/go-mssqldb/msdsn"

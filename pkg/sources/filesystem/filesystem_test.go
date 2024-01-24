@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -115,13 +116,35 @@ func TestScanFile(t *testing.T) {
 }
 
 func TestEnumerate(t *testing.T) {
+	// TODO: refactor to allow a virtual filesystem.
 	t.Parallel()
 	ctx := context.Background()
 
 	// Setup the connection to test enumeration.
+	dir, err := os.MkdirTemp("", "trufflehog-test-enumerate")
+	assert.NoError(t, err)
+	defer os.RemoveAll(dir)
+
 	units := []string{
 		"/one", "/two", "/three",
 		"/path/to/dir/", "/path/to/another/dir/",
+	}
+	// Prefix the units with the tempdir and create files on disk.
+	for i, unit := range units {
+		fullPath := filepath.Join(dir, unit)
+		units[i] = fullPath
+		if i < 3 {
+			f, err := os.Create(fullPath)
+			assert.NoError(t, err)
+			f.Close()
+		} else {
+			assert.NoError(t, os.MkdirAll(fullPath, 0755))
+			// Create a file in the directory for enumeration to find.
+			f, err := os.CreateTemp(fullPath, "file")
+			assert.NoError(t, err)
+			units[i] = f.Name()
+			f.Close()
+		}
 	}
 	conn, err := anypb.New(&sourcespb.Filesystem{
 		Paths:       units[0:3],
