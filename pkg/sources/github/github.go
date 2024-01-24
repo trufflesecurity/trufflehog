@@ -1,6 +1,7 @@
 package github
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
@@ -57,7 +57,6 @@ type Source struct {
 	jobID             sources.JobID
 	verify            bool
 	repos             []string
-	members           []string
 	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
 	memberCache       map[string]struct{}
@@ -218,7 +217,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	var conn sourcespb.GitHub
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
-		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 	s.conn = &conn
 
@@ -253,7 +252,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
 	}
 
-	err = git.GitCmdCheck()
+	err = git.CmdCheck()
 	if err != nil {
 		return err
 	}
@@ -276,7 +275,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 					},
 				},
 			}
-		})
+		},
+		conn.GetSkipBinaries(),
+		conn.GetSkipArchives(),
+	)
 
 	return nil
 }
@@ -321,7 +323,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
 		}
 	default:
-		errs = append(errs, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+		errs = append(errs, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
 	}
 
 	// Run a simple query to check if the client is actually valid
@@ -355,6 +357,10 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 		s.mu.Unlock()
 	}()
 	logger := s.log.WithValues("repo", repoURL)
+	if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
+		logger.V(3).Info("assuming unauthenticated scan has public visibility")
+		return source_metadatapb.Visibility_public
+	}
 	logger.V(2).Info("Checking public status")
 	u, err := url.Parse(repoURL)
 	if err != nil {
@@ -377,10 +383,6 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 			}
 		}
 		if err != nil || gist == nil {
-			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
-				logger.Info("Unauthenticated scans cannot determine if a repository is private.")
-				visibility = source_metadatapb.Visibility_private
-			}
 			logger.Error(err, "Could not get Github repository")
 			return
 		}
@@ -400,10 +402,6 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 		}
 		if err != nil || repo == nil {
 			logger.Error(err, "Could not get Github repository")
-			if _, unauthenticated := s.conn.GetCredential().(*sourcespb.GitHub_Unauthenticated); unauthenticated {
-				logger.Info("Unauthenticated scans cannot determine if a repository is private.")
-				visibility = source_metadatapb.Visibility_private
-			}
 			return
 		}
 		if *repo.Private {
@@ -417,11 +415,13 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 	return
 }
 
+const cloudEndpoint = "https://api.github.com"
+
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	apiEndpoint := s.conn.Endpoint
 	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
-		apiEndpoint = "https://api.github.com"
+		apiEndpoint = cloudEndpoint
 	}
 
 	// If targets are provided, we're only scanning the data in those targets.
@@ -467,10 +467,18 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		}
 	default:
 		// TODO: move this error to Init
-		return nil, errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+		return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
-	s.repos = s.filteredRepoCache.Values()
+	s.repos = make([]string, 0, s.filteredRepoCache.Count())
+	for _, repo := range s.filteredRepoCache.Values() {
+		r, ok := repo.(string)
+		if !ok {
+			ctx.Logger().Error(fmt.Errorf("type assertion failed"), "unexpected value in cache", "repo", repo)
+			continue
+		}
+		s.repos = append(s.repos, r)
+	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
 
@@ -540,7 +548,6 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
-	var isGHE bool = apiEndpoint != "https://api.github.com"
 	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
 	if err != nil {
 		s.log.Error(err, "error creating GitHub client")
@@ -567,7 +574,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			continue
 		}
 		if err != nil {
-			return errors.New(err)
+			return fmt.Errorf("error getting user: %w", err)
 		}
 		break
 	}
@@ -596,6 +603,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 			s.log.Error(err, "error fetching repos by user")
 		}
 
+		isGHE := !strings.EqualFold(apiEndpoint, cloudEndpoint)
 		if isGHE {
 			s.addAllVisibleOrgs(ctx)
 		} else {
@@ -632,7 +640,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	}
 
 	if s.conn.ScanUsers {
-		s.log.Info("Adding repos", "members", len(s.members), "orgs", s.orgsCache.Count())
+		s.log.Info("Adding repos", "members", len(s.memberCache), "orgs", s.orgsCache.Count())
 		s.addReposForMembers(ctx)
 		return nil
 	}
@@ -643,12 +651,12 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp) (installationClient *github.Client, err error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	appID, err := strconv.ParseInt(app.AppId, 10, 64)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	// This client is required to create installation tokens for cloning.
@@ -661,16 +669,16 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		appID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 	appItr.BaseURL = apiEndpoint
 
 	// Does this need to be separate from |s.httpClient|?
-	instHttpClient := common.RetryableHttpClientTimeout(60)
-	instHttpClient.Transport = appItr
-	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHttpClient)
+	instHTTPClient := common.RetryableHttpClientTimeout(60)
+	instHTTPClient.Transport = appItr
+	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHTTPClient)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	// This client is used for most APIs.
@@ -680,14 +688,14 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 		installationID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 	itr.BaseURL = apiEndpoint
 
 	s.httpClient.Transport = itr
 	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
 	if err != nil {
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	// If no repos were provided, enumerate them.
@@ -702,8 +710,8 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			if err != nil {
 				return nil, err
 			}
-			s.log.Info("Scanning repos", "org_members", len(s.members))
-			for _, member := range s.members {
+			s.log.Info("Scanning repos", "org_members", len(s.memberCache))
+			for member := range s.memberCache {
 				logger := s.log.WithValues("member", member)
 				if err := s.getReposByUser(ctx, member); err != nil {
 					logger.Error(err, "error fetching gists by user")
@@ -718,19 +726,14 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	return installationClient, nil
 }
 
-func createGitHubClient(httpClient *http.Client, apiEndpoint string) (ghClient *github.Client, err error) {
+func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Client, error) {
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
-	if apiEndpoint == "https://api.github.com" {
-		ghClient = github.NewClient(httpClient)
-	} else {
-		ghClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
-		if err != nil {
-			return nil, errors.New(err)
-		}
+	if strings.EqualFold(apiEndpoint, cloudEndpoint) {
+		return github.NewClient(httpClient), nil
 	}
 
-	return ghClient, err
+	return github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
@@ -877,7 +880,7 @@ func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
 }
 
 func (s *Source) addReposForMembers(ctx context.Context) {
-	s.log.Info("Fetching repos from members", "members", len(s.members))
+	s.log.Info("Fetching repos from members", "members", len(s.memberCache))
 	for member := range s.memberCache {
 		if err := s.addUserGistsToCache(ctx, member); err != nil {
 			s.log.Info("Unable to fetch gists by user", "user", member, "error", err)
@@ -959,7 +962,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 			continue
 		}
 		if err != nil {
-			s.log.Error(err, "Could not list all organizations")
+			s.log.Error(err, "could not list all organizations")
 			return
 		}
 		if len(orgs) == 0 {
@@ -971,11 +974,12 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 
 		for _, org := range orgs {
 			var name string
-			if org.Name != nil {
+			switch {
+			case org.Name != nil:
 				name = *org.Name
-			} else if org.Login != nil {
+			case org.Login != nil:
 				name = *org.Login
-			} else {
+			default:
 				continue
 			}
 			s.orgsCache.Set(name, name)
@@ -1036,7 +1040,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 			continue
 		}
 		if err != nil || len(members) == 0 {
-			return errors.New("Could not list organization members: account may not have access to list organization members")
+			return fmt.Errorf("could not list organization members: account may not have access to list organization members %w", err)
 		}
 		if res == nil {
 			break
@@ -1356,7 +1360,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(issue.GetBody())),
+			Data:   []byte(sanitizer.UTF8(issue.GetTitle() + "\n" + issue.GetBody())),
 			Verify: s.verify,
 		}
 
@@ -1455,7 +1459,7 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 					},
 				},
 			},
-			Data:   []byte(sanitizer.UTF8(pr.GetBody())),
+			Data:   []byte(sanitizer.UTF8(pr.GetTitle() + "\n" + pr.GetBody())),
 			Verify: s.verify,
 		}
 
@@ -1515,7 +1519,7 @@ func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarg
 func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
 	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
 	if !ok {
-		return fmt.Errorf("unable to cast metadata type for targetted scan")
+		return fmt.Errorf("unable to cast metadata type for targeted scan")
 	}
 	meta := metaType.Github
 
@@ -1546,6 +1550,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
+		SecretID:   target.SecretID,
 		Data:       []byte(res),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},

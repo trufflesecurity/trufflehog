@@ -6,9 +6,9 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -87,7 +87,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "http://ecs.aliyuncs.com/?", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://ecs.aliyuncs.com/?", nil)
 				if err != nil {
 					continue
 				}

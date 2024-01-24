@@ -66,13 +66,14 @@ func TestBudibase_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
+			want: func() []detectors.Result {
+				r := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Budibase,
-					Verified:     false,
-					VerificationError: fmt.Errorf("unexpected HTTP response status 403"),
-				},
-			},
+					Verified:     true,
+				}
+				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 403"))
+				return []detectors.Result{r}
+			}(),
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
@@ -88,7 +89,6 @@ func TestBudibase_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
-		
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,11 +101,11 @@ func TestBudibase_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Budibase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

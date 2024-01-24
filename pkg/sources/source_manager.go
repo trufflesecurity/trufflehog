@@ -24,7 +24,8 @@ type SourceManager struct {
 	// Max number of units to scan concurrently per source.
 	concurrentUnits int
 	// Run the sources using source unit enumeration / chunking if available.
-	useSourceUnits bool
+	// Checked at runtime to allow feature flagging.
+	useSourceUnitsFunc func() bool
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
 	// Set when Wait() returns.
@@ -67,7 +68,13 @@ func WithBufferedOutput(size int) func(*SourceManager) {
 // WithSourceUnits enables using source unit enumeration and chunking if the
 // source supports it.
 func WithSourceUnits() func(*SourceManager) {
-	return func(mgr *SourceManager) { mgr.useSourceUnits = true }
+	return func(mgr *SourceManager) {
+		mgr.useSourceUnitsFunc = func() bool { return true }
+	}
+}
+
+func WithSourceUnitsFunc(f func() bool) func(*SourceManager) {
+	return func(mgr *SourceManager) { mgr.useSourceUnitsFunc = f }
 }
 
 // WithConcurrentUnits limits the number of units to be scanned concurrently.
@@ -98,12 +105,7 @@ func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sour
 // Run blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is stored and accessible via the
 // JobProgressRef as it becomes available.
-func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
-	return s.asyncRun(ctx, sourceName, source)
-}
-
-// asyncRun is a helper method to asynchronously run the Source.
-func (s *SourceManager) asyncRun(ctx context.Context, sourceName string, source Source) (JobProgressRef, error) {
+func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source, targets ...ChunkingTarget) (JobProgressRef, error) {
 	sourceID, jobID := source.SourceID(), source.JobID()
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
@@ -123,15 +125,16 @@ func (s *SourceManager) asyncRun(ctx context.Context, sourceName string, source 
 	}
 	s.wg.Add(1)
 	go func() {
+		// Call Finish after the semaphore has been released.
+		defer progress.Finish()
 		defer s.sem.Release(1)
 		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
-			"job_id", jobID,
 			"source_manager_worker_id", common.RandomID(5),
 		)
 		defer common.Recover(ctx)
 		defer cancel(nil)
-		if err := s.run(ctx, source, progress); err != nil {
+		if err := s.run(ctx, source, progress, targets...); err != nil {
 			select {
 			case s.firstErr <- err:
 			default:
@@ -170,8 +173,8 @@ func (s *SourceManager) Wait() error {
 }
 
 // ScanChunk injects a chunk into the output stream of chunks to be scanned.
-// This method should rarely be used. TODO: Remove when dependencies no longer
-// rely on this functionality.
+// This method should rarely be used. TODO(THOG-1577): Remove when dependencies
+// no longer rely on this functionality.
 func (s *SourceManager) ScanChunk(chunk *Chunk) {
 	s.outputChunks <- chunk
 }
@@ -215,8 +218,7 @@ func (s *SourceManager) preflightChecks(ctx context.Context) error {
 // run is a helper method to sychronously run the source. It does not check for
 // acquired resources. An error is returned if there was a fatal error during
 // the run. This information is also recorded in the JobProgress.
-func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress) error {
-	defer report.Finish()
+func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
 
@@ -227,20 +229,36 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 	}()
 
 	report.TrackProgress(source.GetProgress())
-	ctx = context.WithValues(ctx,
-		"source_type", source.Type().String(),
-		"source_name", report.SourceName,
-	)
+	if ctx.Value("job_id") == "" {
+		ctx = context.WithValue(ctx, "job_id", report.JobID)
+	}
+	if ctx.Value("source_id") == "" {
+		ctx = context.WithValue(ctx, "source_id", report.SourceID)
+	}
+	if ctx.Value("source_name") == "" {
+		ctx = context.WithValue(ctx, "source_name", report.SourceName)
+	}
+	if ctx.Value("source_type") == "" {
+		ctx = context.WithValue(ctx, "source_type", source.Type().String())
+	}
+
 	// Check for the preferred method of tracking source units.
-	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits {
+	canUseSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil
+	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
+		ctx.Logger().Info("running source",
+			"with_units", true)
 		return s.runWithUnits(ctx, enumChunker, report)
 	}
-	return s.runWithoutUnits(ctx, source, report)
+	ctx.Logger().Info("running source",
+		"with_units", false,
+		"target_count", len(targets),
+		"source_manager_units_configurable", s.useSourceUnitsFunc != nil)
+	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
-func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress) error {
+func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
 	ch := make(chan *Chunk, 1)
 	var wg sync.WaitGroup
@@ -260,7 +278,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 	// stack.
 	defer wg.Wait()
 	defer close(ch)
-	if err := source.Chunks(ctx, ch); err != nil {
+	if err := source.Chunks(ctx, ch, targets...); err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}

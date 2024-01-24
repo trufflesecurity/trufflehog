@@ -3,8 +3,8 @@ package surveybot
 import (
 	"context"
 	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					var r response
 					if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-						s1.VerificationError = err
+						s1.SetVerificationError(err, resMatch)
 						continue
 					}
 					if len(r.Surveys) > 0 {

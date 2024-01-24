@@ -3,8 +3,8 @@ package privacy
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -66,10 +66,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else if res.StatusCode == 401 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

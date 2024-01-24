@@ -7,8 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -130,13 +130,16 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(resIDMatch),
 					Redacted:     resIDMatch,
 					RawV2:        []byte(resIDMatch + resSecretMatch + resSessionMatch),
+					ExtraData:    make(map[string]string),
 				}
 
 				if verify {
-					verified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, true)
-					s1.Verified = verified
-					s1.ExtraData = extraData
-					s1.VerificationError = verificationErr
+					isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, resSessionMatch, true)
+					s1.Verified = isVerified
+					if extraData != nil {
+						s1.ExtraData = extraData
+					}
+					s1.SetVerificationError(verificationErr, resSecretMatch)
 				}
 
 				if !s1.Verified {
@@ -147,6 +150,14 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Unverified results that look like hashes are probably not secrets
 					if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 						continue
+					}
+				}
+
+				// If we haven't already found an account number for this ID (via API), calculate one.
+				if _, ok := s1.ExtraData["account"]; !ok {
+					account, err := common.GetAccountNumFromAWSID(resIDMatch)
+					if err == nil {
+						s1.ExtraData["account"] = account
 					}
 				}
 
@@ -294,7 +305,7 @@ func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
 		}
 	}
 
-	out := []detectors.Result{}
+	var out []detectors.Result
 	for _, r := range idResults {
 		out = append(out, r)
 	}

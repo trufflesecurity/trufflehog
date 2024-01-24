@@ -11,6 +11,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -181,13 +182,13 @@ func WithVerify(verify bool) Option {
 }
 
 func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors.Detector) []detectors.Detector {
-	var output []detectors.Detector
+	var out []detectors.Detector
 	for _, detector := range input {
 		if filterFunc(detector) {
-			output = append(output, detector)
+			out = append(out, detector)
 		}
 	}
-	return output
+	return out
 }
 
 // HasFoundResults returns true if any results are found.
@@ -425,6 +426,10 @@ func (e *Engine) Finish(ctx context.Context) error {
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
 
+	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+		ctx.Logger().Error(err, "error cleaning temp artifacts")
+	}
+
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
 	return err
@@ -439,8 +444,8 @@ func (e *Engine) ResultsChan() chan detectors.ResultWithMetadata {
 }
 
 // ScanChunk injects a chunk into the output stream of chunks to be scanned.
-// This method should rarely be used. TODO: Remove when dependencies no longer
-// rely on this functionality.
+// This method should rarely be used. TODO(THOG-1577): Remove when dependencies
+// no longer rely on this functionality.
 func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 	e.sourceManager.ScanChunk(chunk)
 }

@@ -74,7 +74,7 @@ func main() {
 		selectedScanners := map[string]detectors.Detector{}
 		allScanners := getAllScanners()
 
-		decoders := decoders.DefaultDecoders()
+		allDecoders := decoders.DefaultDecoders()
 
 		input := strings.ToLower(*scanCmdDetector)
 		if input == "all" {
@@ -121,7 +121,7 @@ func main() {
 
 				for chunk := range chunksChan {
 					for name, scanner := range selectedScanners {
-						for _, dec := range decoders {
+						for _, dec := range allDecoders {
 							decoded := dec.FromChunk(&sources.Chunk{Data: chunk.Data})
 							if decoded != nil {
 								foundKeyword := false
@@ -201,7 +201,10 @@ func main() {
 								},
 							},
 						}
-					})
+					},
+					true,
+					false,
+				)
 
 				logger.Info("scanning repo", "repo", r)
 				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), sources.ChanReporter{Ch: chunksChan})

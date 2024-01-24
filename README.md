@@ -16,7 +16,7 @@
 
 ---
 
-# :mag*right: \_Now Scanning*
+# :mag_right: _Now Scanning_
 
 <div align="center">
 
@@ -65,9 +65,50 @@ cd trufflehog; go install
 
 # Using installation script
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+# Using installation script, verify checksum signature (requires cosign to be installed)
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
+
 # Using installation script to install a specific version
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
+
+# :closed_lock_with_key: Verifying the artifacts
+
+Checksums are applied to all artifacts, and the resulting checksum file is signed using cosign.
+
+You need the following tool to verify signature:
+
+- [Cosign](https://docs.sigstore.dev/cosign/installation/)
+
+Verification steps are as follow:
+
+1. Download the artifact files you want, and the following files from the [releases](https://github.com/trufflesecurity/trufflehog/releases) page.
+
+   - trufflehog\_{version}\_checksums.txt
+   - trufflehog\_{version}\_checksums.txt.pem
+   - trufflehog\_{version}\_checksums.txt.sig
+
+2. Verify the signature:
+
+   ```shell
+   cosign verify-blob <path to trufflehog_{version}_checksums.txt> \
+   --certificate <path to trufflehog_{version}_checksums.txt.pem> \
+   --signature <path to trufflehog_{version}_checksums.txt.sig> \
+   --certificate-identity-regexp 'https://github\.com/trufflesecurity/trufflehog/\.github/workflows/.+' \
+   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+   ```
+
+3. Once the signature is confirmed as valid, you can proceed to validate that the SHA256 sums align with the downloaded artifact:
+
+   ```shell
+   sha256sum --ignore-missing -c trufflehog_{version}_checksums.txt
+   ```
+
+Replace `{version}` with the downloaded files version
+
+Alternatively, if you are using installation script, pass `-v` option to perform signature verification.
+This required Cosign binary to be installed prior to running installation script.
 
 # :rocket: Quick Start
 
@@ -162,6 +203,14 @@ Use the `--image` flag multiple times to scan multiple images.
 trufflehog docker --image trufflesecurity/secrets --only-verified
 ```
 
+## 11: Scan in CI
+
+Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
+
+```bash
+trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -211,21 +260,46 @@ usage: TruffleHog git [<flags>] <uri>
 Find credentials in git repositories.
 
 Flags:
-      --help                     Show context-sensitive help (also try --help-long and --help-man).
-      --debug                    Run in debug mode.
-      --trace                    Run in trace mode.
-      --profile                  Enables profiling and sets a pprof and fgprof server on :18066.
-  -j, --json                     Output in JSON format.
-      --json-legacy              Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
-      --concurrency=10           Number of concurrent workers.
-      --no-verification          Don't verify the results.
-      --only-verified            Only output verified results.
-      --filter-unverified        Only output first unverified result per chunk per detector if there is more than one result.
+  -h, --help                Show context-sensitive help (also try --help-long and --help-man).
+      --debug               Run in debug mode.
+      --trace               Run in trace mode.
+      --profile             Enables profiling and sets a pprof and fgprof server on :18066.
+  -j, --json                Output in JSON format.
+      --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
+      --github-actions      Output in GitHub Actions format.
+      --concurrency=8       Number of concurrent workers.
+      --no-verification     Don't verify the results.
+      --only-verified       Only output verified results.
+      --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
+      --filter-entropy=FILTER-ENTROPY
+                                 Filter unverified results with Shannon entropy. Start with 3.0.
       --config=CONFIG            Path to configuration file.
-      --print-avg-detector-time  Print the average time spent on each detector.
-      --no-update                Don't check for updates.
-      --fail                     Exit with code 183 if results are found.
-      --version                  Show application version.
+      --print-avg-detector-time
+                                 Print the average time spent on each detector.
+      --no-update           Don't check for updates.
+      --fail                Exit with code 183 if results are found.
+      --verifier=VERIFIER ...    Set custom verification endpoints.
+      --archive-max-size=ARCHIVE-MAX-SIZE
+                                 Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
+      --archive-max-depth=ARCHIVE-MAX-DEPTH
+                                 Maximum depth of archive to scan.
+      --archive-timeout=ARCHIVE-TIMEOUT
+                                 Maximum time to spend extracting an archive.
+      --include-detectors="all"  Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.
+      --exclude-detectors=EXCLUDE-DETECTORS
+                                 Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.
+      --version             Show application version.
+  -i, --include-paths=INCLUDE-PATHS
+                                 Path to file with newline separated regexes for files to include in scan.
+  -x, --exclude-paths=EXCLUDE-PATHS
+                                 Path to file with newline separated regexes for files to exclude in scan.
+      --exclude-globs=EXCLUDE-GLOBS
+                                 Comma separated list of globs to exclude in scan. This option filters at the `git log` level, resulting in faster scans.
+      --since-commit=SINCE-COMMIT
+                                 Commit to start scan from.
+      --branch=BRANCH            Branch to scan.
+      --max-depth=MAX-DEPTH      Maximum depth of commits to scan.
+      --bare                Scan bare repository (e.g. useful while using in pre-receive hooks)
 
 Args:
   <uri>  Git repository URL. https://, file://, or ssh:// schema expected.
@@ -269,6 +343,62 @@ Exit Codes:
 
 ## :octocat: TruffleHog Github Action
 
+### General Usage
+
+```
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Secret Scanning
+      uses: trufflesecurity/trufflehog@main
+      with:
+        extra_args: --only-verified
+```
+
+In the example config above, we're scanning for live secrets in all PRs and Pushes to `main`. Only code changes in the referenced commits are scanned. If you'd like to scan an entire branch, please see the "Advanced Usage" section below.
+
+
+### Shallow Cloning
+
+If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example for how to do it:
+
+```
+...
+      - shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 2))" >> $GITHUB_ENV
+            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "depth=$((${{ github.event.pull_request.commits }}+2))" >> $GITHUB_ENV
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
+          fi
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{env.branch}}
+          fetch-depth: ${{env.depth}}
+      - uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+...
+```
+
+Depending on the event type (push or PR), we calculate the number of commits present. Then we add 2, so that we can reference a base commit before our code changes. We pass that integer value to the `fetch-depth` flag in the checkout action in addition to the relevant branch. Now our checkout process should be much shorter.
+
+### Advanced Usage
+
 ```yaml
 - name: TruffleHog
   uses: trufflesecurity/trufflehog@main
@@ -283,34 +413,27 @@ Exit Codes:
     extra_args: --debug --only-verified
 ```
 
-The TruffleHog OSS Github Action can be used to scan a range of commits for leaked credentials. The action will fail if
-any results are found.
+If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
 
-For example, to scan the contents of pull requests you could use the following workflow:
-
-```yaml
-name: TruffleHog Secrets Scan
-on: [pull_request]
-jobs:
-  TruffleHog:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: TruffleHog OSS
+#### Advanced Usage: Scan entire branch
+```
+- name: scan-push
         uses: trufflesecurity/trufflehog@main
         with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
+          base: ""
+          head: ${{ github.ref_name }}
+          extra_args: --only-verified
 ```
 
 ## Pre-commit Hook
 
 Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
+
+**Key Usage Note:**
+
+- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures Trufflehog analyzes all intended changes.
+- **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
+
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
 
 ```yaml

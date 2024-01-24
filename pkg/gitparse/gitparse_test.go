@@ -196,6 +196,10 @@ func TestLineChecks(t *testing.T) {
 					[]byte("diff --git a/pkg/sources/source_unit.go b/pkg/sources/source_unit.go"),
 				},
 				{
+					MessageEndLine,
+					[]byte("diff --git a/ Lunch and Learn - HCDiag.pdf b/ Lunch and Learn - HCDiag.pdf"),
+				},
+				{
 					BinaryFileLine,
 					[]byte("diff --git a/pkg/decoders/utf16_test.go b/pkg/decoders/utf16_test.go"),
 				},
@@ -292,6 +296,10 @@ func TestLineChecks(t *testing.T) {
 					IndexLine,
 					[]byte("Binary files /dev/null and b/plugin.sig differ"),
 				},
+				{
+					IndexLine,
+					[]byte("Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ"),
+				},
 			},
 			fails: []testCaseLine{
 				{
@@ -313,6 +321,13 @@ func TestLineChecks(t *testing.T) {
 				},
 				{
 					IndexLine,
+					[]byte("--- /dev/null"),
+				},
+				// New file (https://github.com/trufflesecurity/trufflehog/issues/2109)
+				// diff --git a/libs/Unfit-1.0 b/libs/Unfit-1.0
+				// new file mode 160000
+				{
+					ModeLine,
 					[]byte("--- /dev/null"),
 				},
 				// Uncommon but valid prefixes. Will these ever show up?
@@ -648,10 +663,16 @@ Co-authored-by: Sergey Beryozkin <sberyozkin@gmail.com>
 }
 
 func TestBinaryPathParse(t *testing.T) {
-	filename := pathFromBinaryLine([]byte("Binary files /dev/null and b/plugin.sig differ"))
-	expected := "plugin.sig"
-	if filename != expected {
-		t.Errorf("Expected: %s, Got: %s", expected, filename)
+	cases := map[string]string{
+		"Binary files /dev/null and b/plugin.sig differ\n":                    "plugin.sig",
+		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n": " Lunch and Learn - HCDiag.pdf",
+	}
+
+	for name, expected := range cases {
+		filename := pathFromBinaryLine([]byte(name))
+		if filename != expected {
+			t.Errorf("Expected: %s, Got: %s", expected, filename)
+		}
 	}
 }
 
@@ -720,16 +741,6 @@ func TestIndividualCommitParsing(t *testing.T) {
 			}
 			j++
 		}
-		//for _, pass := range test.passes {
-		//	if !test.function(false, pass.latestState, pass.line) {
-		//		t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
-		//	}
-		//}
-		//for _, fail := range test.fails {
-		//	if test.function(false, fail.latestState, fail.line) {
-		//		t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
-		//	}
-		//}
 	}
 }
 
@@ -781,24 +792,6 @@ func TestStagedDiffParsing(t *testing.T) {
 					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
 					IsBinary:  false,
 				},
-				//{
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				//},
-				//{
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				//},
-				//{
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				//},
 			},
 		},
 	}
@@ -1091,27 +1084,31 @@ index 0000000..5af88a8
 
 func TestMaxDiffSize(t *testing.T) {
 	parser := NewParser()
-	bigBytes := bytes.Buffer{}
-	bigBytes.WriteString(singleCommitSingleDiff)
-	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
-		bigBytes.WriteString("+")
-		for n := 0; n < 1024; n++ {
-			bigBytes.Write([]byte("0"))
-		}
-		bigBytes.WriteString("\n")
-	}
-	bigReader := bytes.NewReader(bigBytes.Bytes())
+	builder := strings.Builder{}
+	builder.WriteString(singleCommitSingleDiff)
 
-	commitChan := make(chan Commit)
+	// Generate a diff that is larger than the maxDiffSize.
+	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
+		builder.WriteString("+" + strings.Repeat("0", 1024) + "\n")
+	}
+	bigReader := strings.NewReader(builder.String())
+
+	commitChan := make(chan Commit, 1)                                      // Buffer to prevent blocking
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // Timeout to prevent long wait
+	defer cancel()
+
 	go func() {
-		parser.FromReader(context.Background(), bigReader, commitChan, false)
+		parser.FromReader(ctx, bigReader, commitChan, false)
 	}()
 
-	commit := <-commitChan
-	if commit.Diffs[0].Content.Len() > parser.maxDiffSize+1024 {
-		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.maxDiffSize+1024)
+	select {
+	case commit := <-commitChan:
+		if commit.Diffs[0].Content.Len() > parser.maxDiffSize+1024 {
+			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.maxDiffSize+1024)
+		}
+	case <-ctx.Done():
+		t.Fatal("Test timed out")
 	}
-
 }
 
 func TestMaxCommitSize(t *testing.T) {
@@ -1134,7 +1131,45 @@ func TestMaxCommitSize(t *testing.T) {
 
 }
 
-const commitLog = `commit 4727ffb7ad6dc5130bf4b4dd166e00705abdd018 (HEAD -> master)
+const commitLog = `commit fd6e99e7a80199b76a694603be57c5ade1de18e7
+Author: Jaliborc <jaliborc@gmail.com>
+Date:   Mon Apr 25 16:28:06 2011 +0100
+
+    Added Unusable coloring
+
+diff --git a/components/item.lua b/components/item.lua
+index fc74534..f8d7d50 100755
+--- a/components/item.lua
++++ b/components/item.lua
+@@ -9,6 +9,7 @@ ItemSlot:Hide()
+ Bagnon.ItemSlot = ItemSlot
+
+ local ItemSearch = LibStub('LibItemSearch-1.0')
++local Unfit = LibStub('Unfit-1.0')
+
+ local function hasBlizzQuestHighlight()
+        return GetContainerItemQuestInfo and true or false
+diff --git a/embeds.xml b/embeds.xml
+index d3f4e7c..0c2df69 100755
+--- a/embeds.xml
++++ b/embeds.xml
+@@ -6,6 +6,7 @@
+        <Include file="libs\AceConsole-3.0\AceConsole-3.0.xml"/>
+        <Include file="libs\AceLocale-3.0\AceLocale-3.0.xml"/>
+
++       <Script file="libs\Unfit-1.0\Unfit-1.0.lua"/>
+        <Script file="libs\LibDataBroker-1.1.lua"/>
+        <Script file="libs\LibItemSearch-1.0\LibItemSearch-1.0.lua"/>
+ </Ui>
+\ No newline at end of file
+diff --git a/libs/Unfit-1.0 b/libs/Unfit-1.0
+new file mode 160000
+--- /dev/null
++++ b/libs/Unfit-1.0
+@@ -0,0 +1 @@
++Subproject commit 0000000000000000000000000000000000000000
+
+commit 4727ffb7ad6dc5130bf4b4dd166e00705abdd018 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
 Date:   Tue Jul 11 22:26:11 2023 -0400
 
@@ -1525,6 +1560,33 @@ index 0000000..5af88a8
 // This throws a nasty panic if it's a top-level var.
 func expectedCommits() []Commit {
 	return []Commit{
+		// a
+		{
+			Hash:    "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+			Author:  "Jaliborc <jaliborc@gmail.com>",
+			Date:    newTime("Mon Apr 25 16:28:06 2011 +0100"),
+			Message: newStringBuilderValue("Added Unusable coloring\n"),
+			Diffs: []Diff{
+				{
+					PathB:     "components/item.lua",
+					LineStart: 9,
+					Content:   *bytes.NewBuffer([]byte("\n\nlocal Unfit = LibStub('Unfit-1.0')\n\n\n")),
+					IsBinary:  false,
+				},
+				{
+					PathB:     "embeds.xml",
+					LineStart: 6,
+					Content:   *bytes.NewBuffer([]byte("\n\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n\n\n\n")),
+					IsBinary:  false,
+				},
+				{
+					PathB:     "libs/Unfit-1.0",
+					LineStart: 1,
+					Content:   *bytes.NewBuffer([]byte("Subproject commit 0000000000000000000000000000000000000000\n")),
+					IsBinary:  false,
+				},
+			},
+		},
 		// Empty commit and message. Lord help us.
 		{
 			Hash:    "4727ffb7ad6dc5130bf4b4dd166e00705abdd018",
