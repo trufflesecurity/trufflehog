@@ -2,7 +2,7 @@ package mongodb
 
 import (
 	"context"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"time"
 

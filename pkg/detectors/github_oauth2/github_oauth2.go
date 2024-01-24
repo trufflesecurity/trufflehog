@@ -2,7 +2,7 @@ package github_oauth2
 
 import (
 	"context"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
