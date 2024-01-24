@@ -81,16 +81,16 @@ func (u *UnitHook) id(ref JobProgressRef, unit SourceUnit) string {
 	return fmt.Sprintf("%d/%d/%s", ref.SourceID, ref.JobID, unitID)
 }
 
-func (u *UnitHook) ejectFinishedMetric(metric UnitMetrics) {
+func (u *UnitHook) ejectFinishedMetrics(metrics UnitMetrics) {
 	// Intentionally block the hook from returning to supply back-pressure
 	// to the source.
 	select {
-	case u.finishedMetrics <- metric:
+	case u.finishedMetrics <- metrics:
 		return
 	default:
 		u.logBackPressure()
 	}
-	u.finishedMetrics <- metric
+	u.finishedMetrics <- metrics
 }
 
 func (u *UnitHook) StartUnitChunking(ref JobProgressRef, unit SourceUnit, start time.Time) {
@@ -113,7 +113,7 @@ func (u *UnitHook) EndUnitChunking(ref JobProgressRef, unit SourceUnit, end time
 		return
 	}
 	metrics.EndTime = &end
-	u.ejectFinishedMetric(*metrics)
+	u.ejectFinishedMetrics(*metrics)
 }
 
 func (u *UnitHook) finishUnit(id string) (*UnitMetrics, bool) {
@@ -186,7 +186,7 @@ func (u *UnitHook) Finish(ref JobProgressRef) {
 	metrics.StartTime = snap.StartTime
 	metrics.EndTime = snap.EndTime
 	metrics.Errors = snap.Errors
-	u.ejectFinishedMetric(*metrics)
+	u.ejectFinishedMetrics(*metrics)
 }
 
 // InProgressSnapshot gets all the currently active metrics across all jobs.
