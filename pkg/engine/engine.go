@@ -552,6 +552,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	// Reuse the same map to avoid allocations.
 	const avg = 8
 	dupes := make(map[string]struct{}, avg)
+	detectorsWithResult := make(map[detectors.Detector]struct{}, avg)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
@@ -561,6 +562,12 @@ nextChunk:
 			if err != nil {
 				ctx.Logger().Error(err, "error verifying chunk")
 			}
+
+			if len(results) == 0 {
+				continue
+			}
+			detectorsWithResult[detector] = struct{}{}
+
 			for _, res := range results {
 				var val []byte
 				if res.RawV2 != nil {
@@ -570,7 +577,7 @@ nextChunk:
 				}
 
 				// TODO: use leveinshtein distance to compare similar tokens
-				// Below is a hack to remove the first len(val)/8 characters from the token.
+				// Below is a hack to remove the first len()/8 characters from the token.
 				// We do this to detect similar credentials regardless of unique prefix.
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
@@ -599,7 +606,7 @@ nextChunk:
 			}
 		}
 
-		for _, detector := range chunk.detectors {
+		for detector := range detectorsWithResult {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
