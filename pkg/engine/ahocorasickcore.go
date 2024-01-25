@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -65,12 +66,17 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 // PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
 // provided input. This method populates an existing map rather than allocating a new one because
 // it will be called once per chunk and that many allocations has a noticeable performance cost.
-func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors map[DetectorKey]detectors.Detector) {
+func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[DetectorKey]detectors.Detector) []detectors.Detector {
+	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
+	d := make([]detectors.Detector, 0, len(matches))
 	for _, m := range ac.prefilter.MatchString(strings.ToLower(chunkData)) {
 		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
-			detectors[k] = ac.detectorsByKey[k]
+			dts[k] = ac.detectorsByKey[k]
+			d = append(d, ac.detectorsByKey[k])
 		}
 	}
+
+	return d
 }
 
 // createDetectorKey creates a unique key for each detector from its type, version, and, for

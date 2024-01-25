@@ -68,12 +68,14 @@ type Engine struct {
 	ahoCorasickCore *AhoCorasickCore
 
 	// Engine synchronization primitives.
-	sourceManager        *sources.SourceManager
-	results              chan detectors.ResultWithMetadata
-	detectableChunksChan chan detectableChunk
-	workersWg            sync.WaitGroup
-	wgDetectorWorkers    sync.WaitGroup
-	WgNotifier           sync.WaitGroup
+	sourceManager          *sources.SourceManager
+	results                chan detectors.ResultWithMetadata
+	detectableChunksChan   chan detectableChunk
+	reverifiableChunksChan chan reVerifiableChunk
+	workersWg              sync.WaitGroup
+	reverifiersWg          sync.WaitGroup
+	wgDetectorWorkers      sync.WaitGroup
+	WgNotifier             sync.WaitGroup
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -303,6 +305,7 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// Channels are used for communication between different parts of the engine,
 	// ensuring that data flows smoothly without race conditions.
 	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer)
+	e.reverifiableChunksChan = make(chan reVerifiableChunk, defaultChannelBuffer)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
 	e.dedupeCache = cache
 	e.printer = new(output.PlainPrinter)
@@ -392,6 +395,18 @@ func (e *Engine) startWorkers(ctx context.Context) {
 		}()
 	}
 
+	// reverifiers...
+	ctx.Logger().V(2).Info("starting reverifier workers", "count", e.concurrency)
+	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
+		e.reverifiersWg.Add(1)
+		go func() {
+			ctx := context.WithValue(ctx, "secret_worker_id", common.RandomID(5))
+			defer common.Recover(ctx)
+			defer e.reverifiersWg.Done()
+			e.reverifierWorker(ctx)
+		}()
+	}
+
 	// Notifier workers communicate detected issues to the user or any downstream systems.
 	// We want 1/4th of the notifier workers as the number of scanner workers.
 	const notifierWorkerRatio = 4
@@ -420,11 +435,19 @@ func (e *Engine) Finish(ctx context.Context) error {
 	err := e.sourceManager.Wait()
 
 	e.workersWg.Wait() // Wait for the workers to finish scanning chunks.
+
+	close(e.reverifiableChunksChan)
+	e.reverifiersWg.Wait()
+
 	close(e.detectableChunksChan)
 	e.wgDetectorWorkers.Wait() // Wait for the detector workers to finish detecting chunks.
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
+
+	fmt.Printf("counter: %d\n", counter)
+	// fmt.Printf("total: %d\n", total)
+	// fmt.Printf("max: %d\n", max)
 
 	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 		ctx.Logger().Error(err, "error cleaning temp artifacts")
@@ -458,8 +481,20 @@ type detectableChunk struct {
 	wgDoneFn func()
 }
 
+type reVerifiableChunk struct {
+	chunk            sources.Chunk
+	decoder          detectorspb.DecoderType
+	detectors        []detectors.Detector
+	reverifyWgDoneFn func()
+}
+
+var counter uint64
+var total uint64
+var max uint64
+
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
+	var wgReverify sync.WaitGroup
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 2
@@ -474,7 +509,41 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
+				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
+				// newValue := uint64(len(chunkSpecificDetectors))
+				// for {
+				// 	currentMax := atomic.LoadUint64(&max) // Read current max value atomically
+				// 	if newValue <= currentMax {
+				// 		// New value is not greater, no need to swap, exit loop
+				// 		break
+				// 	}
+				// 	// Attempt to swap if currentMax is still the actual max value
+				// 	if atomic.CompareAndSwapUint64(&max, currentMax, newValue) {
+				// 		// Swap was successful, exit loop
+				// 		break
+				// 	}
+				// 	// If swap failed, it means another goroutine updated max in the meantime.
+				// 	// Loop will re-attempt to load the new max and compare again.
+				// }
+				// if newValue > 1 {
+				// 	atomic.AddUint64(&counter, 1)
+				// 	atomic.AddUint64(&total, uint64(len(chunkSpecificDetectors)))
+				// 	atomic.CompareAndSwapUint64(&max, atomic.LoadUint64(&max), uint64(len(chunkSpecificDetectors)))
+				// }
+				if len(chunkSpecificDetectors) > 1 {
+					wgReverify.Add(1)
+					e.reverifiableChunksChan <- reVerifiableChunk{
+						chunk:            *decoded.Chunk,
+						detectors:        matchingDetectors,
+						decoder:          decoded.DecoderType,
+						reverifyWgDoneFn: wgReverify.Done,
+					}
+					// Empty the map.
+					for k := range chunkSpecificDetectors {
+						delete(chunkSpecificDetectors, k)
+					}
+					continue
+				}
 
 				for k, detector := range chunkSpecificDetectors {
 					decoded.Chunk.Verify = e.verify
@@ -491,8 +560,65 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
+
+	wgReverify.Wait()
 	wgDetect.Wait()
 	ctx.Logger().V(4).Info("finished scanning chunks")
+}
+
+func (e *Engine) reverifierWorker(ctx context.Context) {
+	var wgDetect sync.WaitGroup
+	// Reuse the same map to avoid allocations.
+	const avg = 20
+	dupes := make(map[string]struct{}, avg)
+
+nextChunk:
+	for chunk := range e.reverifiableChunksChan {
+		for _, detector := range chunk.detectors {
+			// DO NOT VERIFY at this stage of the pipeline.
+			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
+			if err != nil {
+				ctx.Logger().Error(err, "error verifying chunk")
+			}
+			for _, res := range results {
+				var val []byte
+				if res.RawV2 != nil {
+					val = res.RawV2
+				} else {
+					val = res.Raw
+				}
+
+				if _, ok := dupes[string(val)]; ok {
+					// This indicates that the same secret was found by multiple detectors.
+					// We should NOT continue to process this chunk.
+					atomic.AddUint64(&counter, 1)
+					chunk.reverifyWgDoneFn()
+					continue nextChunk
+				}
+				dupes[string(res.Raw)] = struct{}{}
+			}
+		}
+
+		for _, detector := range chunk.detectors {
+			wgDetect.Add(1)
+			chunk.chunk.Verify = e.verify
+			e.detectableChunksChan <- detectableChunk{
+				chunk:    chunk.chunk,
+				detector: detector,
+				decoder:  chunk.decoder,
+				wgDoneFn: wgDetect.Done,
+			}
+		}
+
+		// Empty the dupes map.
+		for k := range dupes {
+			delete(dupes, k)
+		}
+		chunk.reverifyWgDoneFn()
+	}
+
+	wgDetect.Wait()
+	ctx.Logger().V(4).Info("finished reverifying chunks")
 }
 
 func (e *Engine) detectChunks(ctx context.Context) {
