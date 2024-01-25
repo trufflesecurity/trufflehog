@@ -614,11 +614,6 @@ nextChunk:
 				}
 
 				// TODO: use leveinshtein distance to compare similar tokens
-<<<<<<< HEAD
-=======
-				// Below is a hack to remove the first len()/8 characters from the token.
-				// We do this to detect similar credentials regardless of unique prefix.
->>>>>>> 83e6c8d4b83fa57714eab24fe04a7e6cbecd572e
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
