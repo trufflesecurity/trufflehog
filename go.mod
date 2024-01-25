@@ -72,6 +72,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
+	github.com/wasilibs/go-re2 v1.4.1
 	github.com/xanzy/go-gitlab v0.94.0
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/mock v0.3.0
@@ -239,7 +240,6 @@ require (
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
-	github.com/wasilibs/go-re2 v1.4.1 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
