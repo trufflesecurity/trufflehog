@@ -563,9 +563,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 }
 
 // There has got to be a better way, my brain is fried
-func normalizeVal(s string) string {
+func normalizeVal(b []byte) []byte {
+	length := len(b)
 	var n int
-	length := len(s)
 	switch {
 	case length <= 20:
 		n = 10
@@ -578,9 +578,9 @@ func normalizeVal(s string) string {
 	}
 
 	if n > length {
-		return s
+		return b
 	}
-	return s[len(s)-n:]
+	return b[len(b)-n:]
 }
 
 func (e *Engine) reverifierWorker(ctx context.Context) {
@@ -619,9 +619,7 @@ nextChunk:
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// normalizeVal is a hack to only look at the last n characters of the secret. _ideally_ this normalizes
 				// the secret enough to compare similar secrets
-				val = []byte(normalizeVal(string(val)))
-
-				if _, ok := dupes[string(val)]; ok {
+				if _, ok := dupes[string(normalizeVal(val))]; ok {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
