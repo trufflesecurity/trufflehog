@@ -45,6 +45,7 @@ enum SourceType {
   SOURCE_TYPE_GCS_UNAUTHED = 30;
   SOURCE_TYPE_AZURE_REPOS = 31;
   SOURCE_TYPE_TRAVISCI = 32;
+  SOURCE_TYPE_POSTMAN = 33;
 }
 
 message LocalSource {
@@ -377,4 +378,18 @@ message AzureRepos {
   repeated string ignore_projects = 11;
   bool skip_binaries = 12;
   bool skip_archives = 13;
+}
+
+message Postman {
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 1;
+    string token = 2;
+  }
+  string target = 3; 
+  // 1. Pass in the collection_uuid, workspace_uuid, environment_uuid to use with API
+  // 2. Pass a file path to an individual collection or env json file or the Postman export zip.
+  repeated string exclude_collections = 4; // comma separated list of collection uuids
+  repeated string exclude_environments = 5; // comma separated list of environment uuids
+  repeated string include_collections = 6; // comma separated list of collection uuids
+  repeated string include_environments = 7; // comma separated list of environment uuids
 }

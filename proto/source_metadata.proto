@@ -277,6 +277,21 @@ message AzureRepos {
   string organization = 11;
 }
 
+message Postman {
+  string link = 1;
+  string workspace_uuid = 2;
+  string workspace_name = 3;
+  string collection_uuid = 4;
+  string collection_name = 5;
+  string environment_uuid = 6;
+  string environment_name = 7;
+  string request_name = 8;
+  string request_uuid = 9;
+  string field_type = 10;
+  string field_name = 11;
+  string variable_type = 12;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -307,5 +322,6 @@ message MetaData {
     GoogleDrive googleDrive = 26;
     AzureRepos azureRepos = 27;
     TravisCI travisCI = 28;
+    Postman postman = 29;
   }
 }
