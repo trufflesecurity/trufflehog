@@ -44,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			fmt.Println(resUrl)
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureFunctionKey,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(resMatch + resUrl),
 			}
 
 			if verify {
