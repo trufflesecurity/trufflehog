@@ -3,9 +3,10 @@ package aha
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -104,6 +105,8 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 	case http.StatusUnauthorized, http.StatusNotFound:
 		return false, nil
 	default:
+		// 403 is a known case where an account is inactive bc of a trial ending or payment issue
+		// this is still indeterminate as the key could be valid when the account is reactivated
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
