@@ -453,8 +453,6 @@ func (e *Engine) Finish(ctx context.Context) error {
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
 
-	fmt.Printf("counter: %d\n", counter)
-
 	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 		ctx.Logger().Error(err, "error cleaning temp artifacts")
 	}
@@ -493,8 +491,6 @@ type reVerifiableChunk struct {
 	detectors        []detectors.Detector
 	reverifyWgDoneFn func()
 }
-
-var counter uint64
 
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
@@ -588,7 +584,6 @@ nextChunk:
 				if _, ok := dupes[string(val)]; ok {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
-					atomic.AddUint64(&counter, 1)
 					chunk.reverifyWgDoneFn()
 					wgDetect.Add(1)
 					chunk.chunk.Verify = false // DO NOT VERIFY
