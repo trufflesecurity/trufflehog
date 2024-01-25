@@ -2,8 +2,8 @@ package rabbitmq
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/url"
-	"regexp"
 	"strings"
 
 	amqp "github.com/rabbitmq/amqp091-go"

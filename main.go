@@ -57,6 +57,7 @@ var (
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
 	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
+	customVerifiersOnly  = cli.Flag("custom-verifiers-only", "Only use custom verification endpoints.").Bool()
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
@@ -365,8 +366,9 @@ func run(state overseer.State) {
 				"detector", id,
 			)
 		}
-		// TODO: Add flag to ignore the default endpoint.
-		urls = append(urls, customizer.DefaultEndpoint())
+		if !*customVerifiersOnly || len(urls) == 0 {
+			urls = append(urls, customizer.DefaultEndpoint())
+		}
 		if err := customizer.SetEndpoints(urls...); err != nil {
 			logFatal(err, "failed configuring custom endpoint for detector", "detector", id)
 		}
@@ -470,10 +472,6 @@ func run(state overseer.State) {
 			logFatal(err, "Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
-		filter, err := common.FilterFromFiles(*filesystemScanIncludePaths, *filesystemScanExcludePaths)
-		if err != nil {
-			logFatal(err, "could not create filter")
-		}
 		if len(*filesystemDirectories) > 0 {
 			ctx.Logger().Info("--directory flag is deprecated, please pass directories as arguments")
 		}
@@ -481,8 +479,9 @@ func run(state overseer.State) {
 		paths = append(paths, *filesystemPaths...)
 		paths = append(paths, *filesystemDirectories...)
 		cfg := sources.FilesystemConfig{
-			Paths:  paths,
-			Filter: filter,
+			Paths:            paths,
+			IncludePathsFile: *filesystemScanIncludePaths,
+			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
 		if err = e.ScanFileSystem(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan filesystem")

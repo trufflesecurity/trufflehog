@@ -17,7 +17,15 @@ type (
 )
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.
+//
+// **Important:** The order of the fields in this struct is specifically designed to optimize
+// struct alignment and minimize memory usage. Do not change the field order without carefully considering
+// the potential impact on memory consumption.
+// Ex: https://go.dev/play/p/Azf4a7O-DhC
 type Chunk struct {
+	// Data is the data to decode and scan.
+	Data []byte
+
 	// SourceName is the name of the Source that produced the chunk.
 	SourceName string
 	// SourceID is the ID of the source that the Chunk originated from.
@@ -27,13 +35,12 @@ type Chunk struct {
 	// SecretID is the ID of the secret, if it exists.
 	// Only secrets that are being reverified will have a SecretID.
 	SecretID int64
-	// SourceType is the type of Source that produced the chunk.
-	SourceType sourcespb.SourceType
+
 	// SourceMetadata holds the context of where the Chunk was found.
 	SourceMetadata *source_metadatapb.MetaData
+	// SourceType is the type of Source that produced the chunk.
+	SourceType sourcespb.SourceType
 
-	// Data is the data to decode and scan.
-	Data []byte
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
 }
@@ -230,8 +237,10 @@ type GitlabConfig struct {
 type FilesystemConfig struct {
 	// Paths is the list of files and directories to scan.
 	Paths []string
-	// Filter is the filter to use to scan the source.
-	Filter *common.Filter
+	// IncludePathsFile is the path to a file containing a list of regexps to include in the scan.
+	IncludePathsFile string
+	// ExcludePathsFile is the path to a file containing a list of regexps to exclude from the scan.
+	ExcludePathsFile string
 }
 
 // S3Config defines the optional configuration for an S3 source.

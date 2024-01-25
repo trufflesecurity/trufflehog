@@ -3,7 +3,7 @@ package gcp
 import (
 	"context"
 	"encoding/json"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

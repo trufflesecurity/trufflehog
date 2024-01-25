@@ -2,8 +2,8 @@ package newrelicpersonalapikey
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			req.Header.Add("X-Api-Key", resMatch)
 			reqEU.Header.Add("X-Api-Key", resMatch)
-			
+
 			res, err := client.Do(req)
 			resEU, errEU := client.Do(reqEU)
 

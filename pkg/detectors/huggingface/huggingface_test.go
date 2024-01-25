@@ -53,6 +53,11 @@ func TestHuggingface_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_HuggingFace,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"Email":    "zubair.khan@trufflesec.com",
+						"Token":    "another_one (read)",
+						"Username": "zubairkhan",
+					},
 				},
 			},
 			wantErr:             false,
@@ -122,6 +127,56 @@ func TestHuggingface_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 	}
+
+	// Add tests for invalid UTF-8 sequences.
+	invalidUTF8Sequences := [][]byte{
+		{0x80},
+		{0xC0, 0xAF},
+		{0xFE},
+		{0xE2, 0x82},
+		{0xED, 0xA0, 0x80},
+		{0xF0, 0x28},
+	}
+
+	for _, invalidSeq := range invalidUTF8Sequences {
+		// Inject invalid sequence into the test string
+		testData := fmt.Sprintf("you can find a huggingface secret %s%s%s more valid text",
+			string(invalidSeq),
+			secret,
+			string(invalidSeq))
+
+		tests = append(tests, struct {
+			name                string
+			s                   Scanner
+			args                args
+			want                []detectors.Result
+			wantErr             bool
+			wantVerificationErr bool
+		}{
+			name: fmt.Sprintf("Test with invalid UTF-8 sequence: %v", invalidSeq),
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(testData),
+				verify: true, // or true based on your test scenario
+			},
+
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_HuggingFace,
+					Verified:     true,
+					ExtraData: map[string]string{
+						"Email":    "zubair.khan@trufflesec.com",
+						"Token":    "another_one (read)",
+						"Username": "zubairkhan",
+					},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		})
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
