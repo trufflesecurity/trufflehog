@@ -506,26 +506,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-				// newValue := uint64(len(chunkSpecificDetectors))
-				// for {
-				// 	currentMax := atomic.LoadUint64(&max) // Read current max value atomically
-				// 	if newValue <= currentMax {
-				// 		// New value is not greater, no need to swap, exit loop
-				// 		break
-				// 	}
-				// 	// Attempt to swap if currentMax is still the actual max value
-				// 	if atomic.CompareAndSwapUint64(&max, currentMax, newValue) {
-				// 		// Swap was successful, exit loop
-				// 		break
-				// 	}
-				// 	// If swap failed, it means another goroutine updated max in the meantime.
-				// 	// Loop will re-attempt to load the new max and compare again.
-				// }
-				// if newValue > 1 {
-				// 	atomic.AddUint64(&counter, 1)
-				// 	atomic.AddUint64(&total, uint64(len(chunkSpecificDetectors)))
-				// 	atomic.CompareAndSwapUint64(&max, atomic.LoadUint64(&max), uint64(len(chunkSpecificDetectors)))
-				// }
 				if len(chunkSpecificDetectors) > 1 {
 					wgReverify.Add(1)
 					e.reverifiableChunksChan <- reVerifiableChunk{
