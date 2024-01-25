@@ -62,6 +62,7 @@ type Engine struct {
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
 	filterEntropy        *float64
 	onlyVerified         bool
+	forceReverification  bool
 	printAvgDetectorTime bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
@@ -180,6 +181,13 @@ func WithPrinter(printer Printer) Option {
 func WithVerify(verify bool) Option {
 	return func(e *Engine) {
 		e.verify = verify
+	}
+}
+
+// WithForceReverification TODO comment
+func WithForceReverification(forceReverification bool) Option {
+	return func(e *Engine) {
+		e.forceReverification = forceReverification
 	}
 }
 
@@ -506,7 +514,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-				if len(chunkSpecificDetectors) > 1 {
+				if len(chunkSpecificDetectors) > 1 && !e.forceReverification {
 					wgReverify.Add(1)
 					e.reverifiableChunksChan <- reVerifiableChunk{
 						chunk:            *decoded.Chunk,
@@ -544,6 +552,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
+
 	// Reuse the same map to avoid allocations.
 	const avg = 8
 	dupes := make(map[string]struct{}, avg)
@@ -564,6 +573,18 @@ nextChunk:
 					val = res.Raw
 				}
 
+				// TODO: use leveinshtein distance to compare similar tokens
+				// Below is a hack to remove the first len(val)/8 characters from the token.
+				// We do this to detect similar credentials regardless of unique prefix.
+				// Ex:
+				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+				//
+				// if len(val) < 20 it likely doesn't have a unique prefix.
+				if len(val) > 20 {
+					val = val[len(val)/10:]
+				}
+
 				if _, ok := dupes[string(val)]; ok {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
@@ -579,7 +600,7 @@ nextChunk:
 					}
 					continue nextChunk
 				}
-				dupes[string(res.Raw)] = struct{}{}
+				dupes[string(val)] = struct{}{}
 			}
 		}
 
