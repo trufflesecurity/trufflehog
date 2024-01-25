@@ -446,8 +446,6 @@ func (e *Engine) Finish(ctx context.Context) error {
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
 
 	fmt.Printf("counter: %d\n", counter)
-	// fmt.Printf("total: %d\n", total)
-	// fmt.Printf("max: %d\n", max)
 
 	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 		ctx.Logger().Error(err, "error cleaning temp artifacts")
@@ -489,8 +487,6 @@ type reVerifiableChunk struct {
 }
 
 var counter uint64
-var total uint64
-var max uint64
 
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
