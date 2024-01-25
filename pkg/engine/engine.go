@@ -566,9 +566,17 @@ nextChunk:
 
 				if _, ok := dupes[string(val)]; ok {
 					// This indicates that the same secret was found by multiple detectors.
-					// We should NOT continue to process this chunk.
+					// We should NOT VERIFY this chunk's data.
 					atomic.AddUint64(&counter, 1)
 					chunk.reverifyWgDoneFn()
+					wgDetect.Add(1)
+					chunk.chunk.Verify = false // DO NOT VERIFY
+					e.detectableChunksChan <- detectableChunk{
+						chunk:    chunk.chunk,
+						detector: detector,
+						decoder:  chunk.decoder,
+						wgDoneFn: wgDetect.Done,
+					}
 					continue nextChunk
 				}
 				dupes[string(res.Raw)] = struct{}{}
