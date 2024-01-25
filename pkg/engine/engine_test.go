@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -212,6 +213,44 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(5)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+func TestReverifcationChunk(t *testing.T) {
+	ctx := context.Background()
+
+	absPath, err := filepath.Abs("./testdata/reverification_secrets.txt")
+	assert.Nil(t, err)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	confPath, err := filepath.Abs("./testdata/reverification_detectors.yaml")
+	assert.Nil(t, err)
+	conf, err := config.Read(confPath)
+	assert.Nil(t, err)
+
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(conf.Detectors...),
+		WithVerify(true),
+		WithPrinter(new(discardPrinter)),
+		withReverificationTracking(),
+	)
+	assert.Nil(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	// Wait for all the chunks to be processed.
+	assert.Nil(t, e.Finish(ctx))
+	want := uint64(1)
+	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+
+	wantDupe := 1
+	assert.Equal(t, wantDupe, e.reverificationTracking.reverificationDuplicateCount)
 }
 
 func TestFragmentFirstLineAndLink(t *testing.T) {

@@ -1,0 +1,13 @@
+# config.yaml
+detectors:
+  - name: detector1
+    keywords:
+      - PMAK
+    regex:
+      api_key: \b(PMAK-[a-zA-Z-0-9]{59})\b
+
+  - name: detector2
+    keywords:
+      - ost 
+    regex:
+      api_key: \b([a-zA-Z-0-9]{59})\b

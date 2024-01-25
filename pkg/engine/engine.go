@@ -94,6 +94,14 @@ type Engine struct {
 
 	// verify determines whether the scanner will attempt to verify candidate secrets
 	verify bool
+
+	// Note: bad hack only used for testing
+	reverificationTracking *reverificationTracking
+}
+
+type reverificationTracking struct {
+	reverificationDuplicateCount int
+	mu                           sync.Mutex
 }
 
 // Option is used to configure the engine during initialization using functional options.
@@ -181,6 +189,14 @@ func WithPrinter(printer Printer) Option {
 func WithVerify(verify bool) Option {
 	return func(e *Engine) {
 		e.verify = verify
+	}
+}
+
+func withReverificationTracking() Option {
+	return func(e *Engine) {
+		e.reverificationTracking = &reverificationTracking{
+			reverificationDuplicateCount: 0,
+		}
 	}
 }
 
@@ -546,6 +562,27 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
+// There has got to be a better way, my brain is fried
+func normalizeVal(s string) string {
+	var n int
+	length := len(s)
+	switch {
+	case length <= 20:
+		n = 10
+	case length <= 40:
+		n = 30
+	case length <= 70:
+		n = 50
+	default:
+		n = 60
+	}
+
+	if n > length {
+		return s
+	}
+	return s[len(s)-n:]
+}
+
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
@@ -570,20 +607,21 @@ nextChunk:
 				}
 
 				// TODO: use leveinshtein distance to compare similar tokens
-				// Below is a hack to remove the first len(val)/8 characters from the token.
-				// We do this to detect similar credentials regardless of unique prefix.
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				//
-				// if len(val) < 20 it likely doesn't have a unique prefix.
-				if len(val) > 20 {
-					val = val[len(val)/10:]
-				}
+				// normalizeVal is a hack to only look at the last n characters of the secret. _ideally_ this normalizes
+				// the secret enough to compare similar secrets
+				val = []byte(normalizeVal(string(val)))
 
 				if _, ok := dupes[string(val)]; ok {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
+					if e.reverificationTracking != nil {
+						e.reverificationTracking.mu.Lock()
+						e.reverificationTracking.reverificationDuplicateCount++
+						e.reverificationTracking.mu.Unlock()
+					}
 					chunk.reverifyWgDoneFn()
 					wgDetect.Add(1)
 					chunk.chunk.Verify = false // DO NOT VERIFY
@@ -593,6 +631,7 @@ nextChunk:
 						decoder:  chunk.decoder,
 						wgDoneFn: wgDetect.Done,
 					}
+
 					continue nextChunk
 				}
 				dupes[string(val)] = struct{}{}
