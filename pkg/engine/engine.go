@@ -545,7 +545,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	// Reuse the same map to avoid allocations.
-	const avg = 20
+	const avg = 8
 	dupes := make(map[string]struct{}, avg)
 
 nextChunk:
