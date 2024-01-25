@@ -3261,17 +3261,19 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for WorkspaceName
 
-	// no validation rules for CollectionUuid
+	// no validation rules for GlobalsId
+
+	// no validation rules for CollectionId
 
 	// no validation rules for CollectionName
 
-	// no validation rules for EnvironmentUuid
+	// no validation rules for EnvironmentId
 
 	// no validation rules for EnvironmentName
 
-	// no validation rules for RequestName
+	// no validation rules for RequestId
 
-	// no validation rules for RequestUuid
+	// no validation rules for RequestName
 
 	// no validation rules for FieldType
 

@@ -281,15 +281,16 @@ message Postman {
   string link = 1;
   string workspace_uuid = 2;
   string workspace_name = 3;
-  string collection_uuid = 4;
-  string collection_name = 5;
-  string environment_uuid = 6;
-  string environment_name = 7;
-  string request_name = 8;
-  string request_uuid = 9;
-  string field_type = 10;
-  string field_name = 11;
-  string variable_type = 12;
+  string globals_id = 4;
+  string collection_id = 5;
+  string collection_name = 6;
+  string environment_id = 7;
+  string environment_name = 8;
+  string request_id =  9;
+  string request_name = 10;
+  string field_type = 11;
+  string field_name = 12;
+  string variable_type = 13;
 }
 
 message MetaData {

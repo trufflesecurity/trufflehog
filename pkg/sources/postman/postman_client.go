@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 )
 
 const (
@@ -23,6 +22,21 @@ const (
 	//We'll shift this once that behavior is resolved and stable.
 	defaultContentType = "*"
 )
+
+type Variable struct {
+	Key          string      `json:"key"`
+	Value        interface{} `json:"value"`
+	Enabled      bool        `json:"enabled,omitempty"`
+	Type         string      `json:"type,omitempty"`
+	SessionValue string      `json:"sessionValue,omitempty"`
+}
+
+type GlobalVariables struct {
+	Data struct {
+		ID     string     `json:"id"`
+		Values []Variable `json:"values"`
+	} `json:"data"`
+}
 
 // type Collection struct {
 // 	Collection struct {
@@ -48,9 +62,6 @@ type Client struct {
 
 	// Headers to attach to every requests made with the client.
 	Headers map[string]string
-
-	// URL for API request
-	URL *url.URL
 }
 
 // NewClient returns a new Postman API client.
@@ -100,26 +111,12 @@ func checkResponseStatus(r *http.Response) error {
 	return fmt.Errorf("Postman Request failed with status code: %d", r.StatusCode)
 }
 
-// parseResponseJSON parses the JSON response from the API.
-func parseResponseJSON(r *http.Response) (map[string]interface{}, error) {
-	//Consider using structs for this instead of just assigning to a map
-	body, err := io.ReadAll(r.Body)
+func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Response, error) {
+	req, err := c.NewRequest(url, headers)
 	if err != nil {
 		return nil, err
 	}
-	data := make(map[string]interface{})
 
-	// Parse the JSON data into a map
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return nil, err
-	}
-	return data, nil
-}
-
-// postmanDo sends an API request and returns the API response after checking for errors.
-func (c *Client) postmanDo(req *http.Request) (*http.Response, error) {
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -128,79 +125,47 @@ func (c *Client) postmanDo(req *http.Request) (*http.Response, error) {
 	if err := checkResponseStatus(resp); err != nil {
 		return nil, err
 	}
-
 	return resp, nil
 }
 
 // GetGlobals returns the global variables for a given workspace
-func (c *Client) GetGlobals(workspace_uuid string) (map[string]interface{}, error) {
+func (c *Client) GetGlobals(workspace_uuid string) (GlobalVariables, error) {
+	var globalVars GlobalVariables
+
 	url := fmt.Sprintf(GLOBAL_VARS_URL, workspace_uuid)
-	req, err := c.NewRequest(url, map[string]string{"User-Agent": alt_userAgent})
+	r, err := c.getPostmanReq(url, map[string]string{"User-Agent": alt_userAgent})
 	if err != nil {
-		return nil, err
+		err = fmt.Errorf("could not get global variables for workspace: %s", workspace_uuid)
+		return globalVars, err
 	}
-	resp, err := c.postmanDo(req)
+
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return nil, err
+		err = fmt.Errorf("could not read response body for workspace: %s", workspace_uuid)
+		return globalVars, err
 	}
-	json, err := parseResponseJSON(resp)
-	if err != nil {
-		return nil, err
+
+	if err := json.Unmarshal([]byte(body), &globalVars); err != nil {
+		err = fmt.Errorf("could not unmarshal global variables JSON for workspace: %s", workspace_uuid)
+		return globalVars, err
 	}
-	return json, nil
+	return globalVars, nil
 }
 
-// GetEnvironment returns the environment variables for a given environment
-func (c *Client) GetEnvironment(environment_uuid string) (map[string]interface{}, error) {
-	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
-	req, err := c.NewRequest(url, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.postmanDo(req)
-	if err != nil {
-		return nil, err
-	}
-	json, err := parseResponseJSON(resp)
-	if err != nil {
-		return nil, err
-	}
-	return json, nil
-}
+// // GetEnvironment returns the environment variables for a given environment
+// func (c *Client) GetEnvironment(environment_uuid string) (map[string]interface{}, error) {
+// 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
+// 	return c.getURLParseJSON(url, nil)
+// }
 
-// GetCollection returns the collection for a given collection
-func (c *Client) GetCollection(collection_uuid string) (map[string]interface{}, error) {
-	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
-	req, err := c.NewRequest(url, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.postmanDo(req)
-	if err != nil {
-		return nil, err
-	}
-	json, err := parseResponseJSON(resp)
-	if err != nil {
-		return nil, err
-	}
-	return json, nil
-}
+// // GetCollection returns the collection for a given collection
+// func (c *Client) GetCollection(collection_uuid string) (map[string]interface{}, error) {
+// 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
+// 	return c.getURLParseJSON(url, nil)
+// }
 
-// GetWorkspace returns the workspace for a given workspace
-func (c *Client) GetWorkspace(workspace_uuid string) (map[string]interface{}, error) {
-	url := fmt.Sprintf(WORKSPACE_URL, workspace_uuid)
-	req, err := c.NewRequest(url, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.postmanDo(req)
-	if err != nil {
-		return nil, err
-	}
-	json, err := parseResponseJSON(resp)
-	if err != nil {
-		return nil, err
-	}
-	return json, nil
-
-}
+// // GetWorkspace returns the workspace for a given workspace
+// func (c *Client) GetWorkspace(workspace_uuid string) (map[string]interface{}, error) {
+// 	url := fmt.Sprintf(WORKSPACE_URL, workspace_uuid)
+// 	return c.getURLParseJSON(url, nil)
+// }
