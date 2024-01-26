@@ -3,8 +3,8 @@ package square
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -49,6 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Square,
 			Raw:          []byte(res),
 		}
+		s.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/square/",
+		}
 
 		if verify {
 			// there are a few endpoints we can check, but templates seems the least sensitive.
@@ -65,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", res))
 			req.Header.Add("Content-Type", "application/json")
 			// unclear if this version needs to be set or matters, seems to work without, but docs want it
-			//req.Header.Add("Square-Version", "2020-08-12")
+			// req.Header.Add("Square-Version", "2020-08-12")
 			res, err := client.Do(req)
 			if err == nil {
 				res.Body.Close() // The request body is unused.

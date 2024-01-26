@@ -8,8 +8,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -96,7 +96,7 @@ func constructRequest(secret, keyID string) (*http.Request, error) {
 		return nil, err
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"request": accountDetail,
 		"nonce":   time.Now().UnixNano(),
 	}

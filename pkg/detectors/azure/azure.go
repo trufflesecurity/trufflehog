@@ -3,7 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -56,6 +56,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(clientSecret[2]),
 					RawV2:        []byte(clientID[2] + clientSecret[2] + tenantID[2]),
 					Redacted:     clientID[2],
+				}
+				// Set the RotationGuideURL in the ExtraData
+				s.ExtraData = map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/azure/",
 				}
 
 				if verify {

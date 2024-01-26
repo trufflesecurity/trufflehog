@@ -100,14 +100,14 @@ func NewCustomTransport(T http.RoundTripper) *CustomTransport {
 	return &CustomTransport{T}
 }
 
-func ConstantStatusHttpClient(statusCode int) *http.Client {
+func ConstantResponseHttpClient(statusCode int, body string) *http.Client {
 	return &http.Client{
 		Timeout: DefaultResponseTimeout,
 		Transport: FakeTransport{
 			CreateResponse: func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					Request:    req,
-					Body:       io.NopCloser(strings.NewReader("")),
+					Body:       io.NopCloser(strings.NewReader(body)),
 					StatusCode: statusCode,
 				}, nil
 			},

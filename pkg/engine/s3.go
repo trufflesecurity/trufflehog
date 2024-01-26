@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/go-errors/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -48,6 +46,11 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	if len(c.Buckets) > 0 {
 		connection.Buckets = c.Buckets
 	}
+
+	if len(c.Roles) > 0 {
+		connection.Roles = c.Roles
+	}
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
@@ -55,23 +58,13 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 		return err
 	}
 
-	s3Source := s3.Source{}
-	ctx = context.WithValues(ctx,
-		"source_type", s3Source.Type().String(),
-		"source_name", "s3",
-	)
-	err = s3Source.Init(ctx, "trufflehog - s3", 0, int64(sourcespb.SourceType_SOURCE_TYPE_S3), true, &conn, runtime.NumCPU())
-	if err != nil {
-		return errors.WrapPrefix(err, "failed to init S3 source", 0)
-	}
+	sourceName := "trufflehog - s3"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, s3.SourceType)
 
-	e.sourcesWg.Go(func() error {
-		defer common.RecoverWithExit(ctx)
-		err := s3Source.Chunks(ctx, e.ChunksChan())
-		if err != nil {
-			return fmt.Errorf("error scanning S3: %w", err)
-		}
-		return nil
-	})
-	return nil
+	s3Source := &s3.Source{}
+	if err := s3Source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+		return err
+	}
+	_, err = e.sourceManager.Run(ctx, sourceName, s3Source)
+	return err
 }

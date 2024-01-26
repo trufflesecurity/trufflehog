@@ -2,18 +2,23 @@ package context
 
 import (
 	"context"
-	"fmt"
-	"runtime/debug"
-	"sync"
+	"os"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 )
 
 var (
 	// defaultLogger can be set via SetDefaultLogger.
-	defaultLogger logr.Logger = logr.Discard()
+	// It is initialized to write to stderr. To disable, you can call
+	// SetDefaultLogger with logr.Discard().
+	defaultLogger logr.Logger
 )
+
+func init() {
+	defaultLogger, _ = log.New("context", log.WithConsoleSink(os.Stderr))
+}
 
 // Context wraps context.Context and includes an additional Logger() method.
 type Context interface {
@@ -21,29 +26,21 @@ type Context interface {
 	Logger() logr.Logger
 }
 
-// CancelFunc is a type alias to context.CancelFunc to allow use as if they are
-// the same types.
+// CancelFunc and CancelCauseFunc are type aliases to allow use as if they are
+// the same types as the standard library variants.
 type CancelFunc = context.CancelFunc
+type CancelCauseFunc = context.CancelCauseFunc
 
 // logCtx implements Context.
 type logCtx struct {
 	// Embed context.Context to get all methods for free.
 	context.Context
-	log     logr.Logger
-	err     *error
-	errLock *sync.Mutex
+	log logr.Logger
 }
 
 // Logger returns a structured logger.
 func (l logCtx) Logger() logr.Logger {
 	return l.log
-}
-
-func (l logCtx) Err() error {
-	if l.err != nil && *l.err != nil {
-		return *l.err
-	}
-	return l.Context.Err()
 }
 
 // Background returns context.Background with a default logger.
@@ -69,7 +66,17 @@ func WithCancel(parent Context) (Context, context.CancelFunc) {
 		log:     parent.Logger(),
 		Context: ctx,
 	}
-	return captureCancelCallstack(lCtx, cancel)
+	return lCtx, cancel
+}
+
+// WithCancelCause returns context.WithCancelCause with the log object propagated.
+func WithCancelCause(parent Context) (Context, context.CancelCauseFunc) {
+	ctx, cancel := context.WithCancelCause(parent)
+	lCtx := logCtx{
+		log:     parent.Logger(),
+		Context: ctx,
+	}
+	return lCtx, cancel
 }
 
 // WithDeadline returns context.WithDeadline with the log object propagated and
@@ -80,7 +87,18 @@ func WithDeadline(parent Context, d time.Time) (Context, context.CancelFunc) {
 		log:     parent.Logger().WithValues("deadline", d),
 		Context: ctx,
 	}
-	return captureCancelCallstack(lCtx, cancel)
+	return lCtx, cancel
+}
+
+// WithDeadlineCause returns context.WithDeadlineCause with the log object
+// propagated and the deadline added to the structured log values.
+func WithDeadlineCause(parent Context, d time.Time, cause error) (Context, context.CancelFunc) {
+	ctx, cancel := context.WithDeadlineCause(parent, d, cause)
+	lCtx := logCtx{
+		log:     parent.Logger().WithValues("deadline", d),
+		Context: ctx,
+	}
+	return lCtx, cancel
 }
 
 // WithTimeout returns context.WithTimeout with the log object propagated and
@@ -91,7 +109,23 @@ func WithTimeout(parent Context, timeout time.Duration) (Context, context.Cancel
 		log:     parent.Logger().WithValues("timeout", timeout),
 		Context: ctx,
 	}
-	return captureCancelCallstack(lCtx, cancel)
+	return lCtx, cancel
+}
+
+// WithTimeoutCause returns context.WithTimeoutCause with the log object
+// propagated and the timeout added to the structured log values.
+func WithTimeoutCause(parent Context, timeout time.Duration, cause error) (Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeoutCause(parent, timeout, cause)
+	lCtx := logCtx{
+		log:     parent.Logger().WithValues("timeout", timeout),
+		Context: ctx,
+	}
+	return lCtx, cancel
+}
+
+// Cause returns the context.Cause of the context.
+func Cause(ctx context.Context) error {
+	return context.Cause(ctx)
 }
 
 // WithValue returns context.WithValue with the log object propagated and
@@ -136,33 +170,9 @@ func AddLogger(parent context.Context) Context {
 }
 
 // SetupDefaultLogger sets the package-level global default logger that will be
-// used for Background and TODO contexts.
+// used for Background and TODO contexts. On startup, the default logger will
+// be configured to output logs to stderr. Use logr.Discard() to disable all
+// logs from Contexts.
 func SetDefaultLogger(l logr.Logger) {
 	defaultLogger = l
-}
-
-// captureCancelCallstack is a helper function to capture the callstack where
-// the cancel function was first called.
-func captureCancelCallstack(ctx logCtx, f context.CancelFunc) (Context, context.CancelFunc) {
-	if ctx.err == nil {
-		var err error
-		ctx.err = &err
-		ctx.errLock = &sync.Mutex{}
-	}
-	return ctx, func() {
-		ctx.errLock.Lock()
-		defer ctx.errLock.Unlock()
-		// We must check Err() before calling f() since f() sets the error.
-		// If there's already an error, do nothing special.
-		if ctx.Err() != nil {
-			f()
-			return
-		}
-		f()
-		// Set the error with the stacktrace if the err pointer is non-nil.
-		*ctx.err = fmt.Errorf(
-			"%w (canceled at %v\n%s)",
-			ctx.Err(), time.Now(), string(debug.Stack()),
-		)
-	}
 }

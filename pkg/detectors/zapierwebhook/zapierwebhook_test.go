@@ -24,7 +24,7 @@ func TestZapierWebhook_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("ZAPIERWEBHOOK_TOKEN")
-	//inactiveSecret := testSecrets.MustGetField("ZAPIERWEBHOOK_INACTIVE")
+	// inactiveSecret := testSecrets.MustGetField("ZAPIERWEBHOOK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -108,6 +108,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

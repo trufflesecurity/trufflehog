@@ -2,8 +2,10 @@ package detectors
 
 import (
 	_ "embed"
+	"math"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
@@ -20,9 +22,9 @@ var wordList []byte
 var programmingBookWords []byte
 
 type Wordlists struct {
-	wordList             []string
-	badList              []string
-	programmingBookWords []string
+	wordList             map[string]struct{}
+	badList              map[string]struct{}
+	programmingBookWords map[string]struct{}
 }
 
 var FalsePositiveWordlists = Wordlists{
@@ -35,36 +37,29 @@ var FalsePositiveWordlists = Wordlists{
 // Currently that includes: No number, english word in key, or matches common example pattens.
 // Only the secret key material should be passed into this function
 func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) bool {
-
+	if !utf8.ValidString(match) {
+		return true
+	}
+	lower := strings.ToLower(match)
 	for _, fp := range falsePositives {
-		if strings.Contains(strings.ToLower(match), string(fp)) {
+		if strings.Contains(lower, string(fp)) {
 			return true
 		}
 	}
 
 	if wordCheck {
 		// check against common substring badlist
-		if hasDictWord(FalsePositiveWordlists.badList, match) {
+		if _, ok := FalsePositiveWordlists.badList[lower]; ok {
 			return true
 		}
 
 		// check for dictionary word substrings
-		if hasDictWord(FalsePositiveWordlists.wordList, match) {
+		if _, ok := FalsePositiveWordlists.wordList[lower]; ok {
 			return true
 		}
 
 		// check for programming book token substrings
-		if hasDictWord(FalsePositiveWordlists.programmingBookWords, match) {
-			return true
-		}
-	}
-	return false
-}
-
-func hasDictWord(wordList []string, token string) bool {
-	lower := strings.ToLower(token)
-	for _, word := range wordList {
-		if strings.Contains(lower, word) {
+		if _, ok := FalsePositiveWordlists.programmingBookWords[lower]; ok {
 			return true
 		}
 	}
@@ -81,12 +76,48 @@ func HasDigit(key string) bool {
 	return false
 }
 
-func bytesToCleanWordList(data []byte) []string {
-	words := []string{}
+func bytesToCleanWordList(data []byte) map[string]struct{} {
+	words := make(map[string]struct{})
 	for _, word := range strings.Split(string(data), "\n") {
 		if strings.TrimSpace(word) != "" {
-			words = append(words, strings.TrimSpace(strings.ToLower(word)))
+			words[strings.TrimSpace(strings.ToLower(word))] = struct{}{}
 		}
 	}
 	return words
+}
+
+func StringShannonEntropy(input string) float64 {
+	chars := make(map[rune]float64)
+	inverseTotal := 1 / float64(len(input)) // precompute the inverse
+
+	for _, char := range input {
+		chars[char]++
+	}
+
+	entropy := 0.0
+	for _, count := range chars {
+		probability := count * inverseTotal
+		entropy += probability * math.Log2(probability)
+	}
+
+	return -entropy
+}
+
+// FilterResultsWithEntropy filters out determinately unverified results that have a shannon entropy below the given value.
+func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
+	var filteredResults []Result
+	for _, result := range results {
+		if !result.Verified && result.VerificationError() == nil {
+			if result.RawV2 != nil {
+				if StringShannonEntropy(string(result.RawV2)) >= entropy {
+					filteredResults = append(filteredResults, result)
+				}
+			} else {
+				if StringShannonEntropy(string(result.Raw)) >= entropy {
+					filteredResults = append(filteredResults, result)
+				}
+			}
+		}
+	}
+	return filteredResults
 }

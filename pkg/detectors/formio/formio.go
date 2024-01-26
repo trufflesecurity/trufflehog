@@ -2,8 +2,8 @@ package formio
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formio"}) + `\b(eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[0-9A-Za-z]{310}\.[0-9A-Z-a-z\-_]{43}[ \r\n]{1})`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formio"}) + `\b(eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[0-9A-Za-z]{220,310}\.[0-9A-Z-a-z\-_]{43}[ \r\n]{1})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

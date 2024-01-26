@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -19,7 +21,7 @@ import (
 func TestAlchemy_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -104,7 +106,7 @@ func TestAlchemy_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantStatusHttpClient(404)},
+			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a alchemy secret %s within", secret)),
@@ -131,13 +133,12 @@ func TestAlchemy_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf("verification error = %v, wantVerificationError %v", got[i].VerificationError, tt.wantVerificationErr)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
-				got[i].VerificationError = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Alchemy.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -149,6 +150,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

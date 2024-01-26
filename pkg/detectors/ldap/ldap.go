@@ -3,8 +3,10 @@ package ldap
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	regexp "github.com/wasilibs/go-re2"
+	"net"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -63,7 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					s1.Verified = verifyLDAP(ctx, username[1], password[1], ldapURL)
+					verificationErr := verifyLDAP(username[1], password[1], ldapURL)
+					s1.Verified = verificationErr == nil
+					if !isErrDeterminate(verificationErr) {
+						s1.SetVerificationError(verificationErr, password[1])
+					}
 				}
 
 				results = append(results, s1)
@@ -89,7 +95,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			s1.Verified = verifyLDAP(ctx, username, password, ldapURL)
+			verificationError := verifyLDAP(username, password, ldapURL)
+
+			s1.Verified = verificationError == nil
+			if !isErrDeterminate(verificationError) {
+				s1.SetVerificationError(verificationError, password)
+			}
 		}
 
 		results = append(results, s1)
@@ -98,7 +109,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL) bool {
+func isErrDeterminate(err error) bool {
+	switch e := err.(type) {
+	case *ldap.Error:
+		switch e.Err.(type) {
+		case *net.OpError:
+			return false
+		}
+	}
+
+	return true
+}
+
+func verifyLDAP(username, password string, ldapURL *url.URL) error {
 	// Tests with non-TLS, TLS, and STARTTLS
 
 	ldap.DefaultTimeout = 5 * time.Second
@@ -109,38 +132,35 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 	case "ldap":
 		// Non-TLS dial
 		l, err := ldap.DialURL(uri)
-		if err == nil {
-			defer l.Close()
-			// Non-TLS verify
-			err = l.Bind(username, password)
-			if err == nil {
-				return true
-			}
-
-			// STARTTLS
-			err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
-			if err == nil {
-				// STARTTLS verify
-				err = l.Bind(username, password)
-				if err == nil {
-					return true
-				}
-			}
+		if err != nil {
+			return err
 		}
+		defer l.Close()
+		// Non-TLS verify
+		err = l.Bind(username, password)
+		if err == nil {
+			return nil
+		}
+
+		// STARTTLS
+		err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		// STARTTLS verify
+		return l.Bind(username, password)
 	case "ldaps":
 		// TLS dial
 		l, err := ldap.DialTLS("tcp", uri, &tls.Config{InsecureSkipVerify: true})
-		if err == nil {
-			defer l.Close()
-			// TLS verify
-			err = l.Bind(username, password)
-			if err == nil {
-				return true
-			}
+		if err != nil {
+			return err
 		}
+		defer l.Close()
+		// TLS verify
+		return l.Bind(username, password)
 	}
 
-	return false
+	return fmt.Errorf("unknown ldap scheme %q", ldapURL.Scheme)
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

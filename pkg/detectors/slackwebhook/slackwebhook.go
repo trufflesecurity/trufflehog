@@ -1,10 +1,12 @@
 package slackwebhook
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -12,14 +14,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`)
 )
@@ -46,9 +49,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_SlackWebhook,
 			Raw:          []byte(resMatch),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/",
+		}
 
 		if verify {
-			payload := strings.NewReader(`{"text": ""}`)
+
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+
+			// We don't want to actually send anything to webhooks we find. To verify them without spamming them, we
+			// send an intentionally malformed message and look for a particular expected error message.
+			payload := strings.NewReader(`intentionally malformed JSON from Trufflehog scan`)
 			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			if err != nil {
 				continue
@@ -61,10 +75,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) || (res.StatusCode == 400 && (strings.Contains(body, "no_text") || strings.Contains(body, "missing_text"))) {
+
+				defer res.Body.Close()
+
+				switch {
+				case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
+					// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
+					// we at least know the secret is verified.
 					s1.Verified = true
+				case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
+					s1.Verified = true
+				case res.StatusCode == http.StatusNotFound:
+					// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
+					// You might want to handle this case or log it.
+				default:
+					err = fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
+					s1.SetVerificationError(err, resMatch)
 				}
+			} else {
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

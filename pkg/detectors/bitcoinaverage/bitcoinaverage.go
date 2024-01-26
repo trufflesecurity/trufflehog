@@ -2,8 +2,9 @@ package bitcoinaverage
 
 import (
 	"context"
+	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -29,6 +30,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"bitcoinaverage"}
 }
 
+type response struct {
+	Msg     string `json:"msg"`
+	Success bool   `json:"success"`
+}
+
 // FromData will find and optionally verify BitcoinAverage secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -46,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://apiv2.bitcoinaverage.com/websocket/get_ticket", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://apiv2.bitcoinaverage.com/websocket/v3/get_ticket", nil)
 			if err != nil {
 				continue
 			}
@@ -55,7 +61,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
+					resp := &response{}
+					if err = json.NewDecoder(res.Body).Decode(resp); err != nil {
+						s1.SetVerificationError(err, resMatch)
+						continue
+					}
+					if resp.Success {
+						s1.Verified = true
+					}
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

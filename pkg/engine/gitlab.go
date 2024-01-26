@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -26,7 +24,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
-	connection := &sourcespb.GitLab{}
+	connection := &sourcespb.GitLab{SkipBinaries: c.SkipBinaries}
 
 	switch {
 	case len(c.Token) > 0:
@@ -52,24 +50,14 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 		return err
 	}
 
-	gitlabSource := gitlab.Source{}
-	ctx = context.WithValues(ctx,
-		"source_type", gitlabSource.Type().String(),
-		"source_name", "gitlab",
-	)
-	err = gitlabSource.Init(ctx, "trufflehog - gitlab", 0, int64(sourcespb.SourceType_SOURCE_TYPE_GITLAB), true, &conn, runtime.NumCPU())
-	if err != nil {
-		return errors.WrapPrefix(err, "could not init GitLab source", 0)
+	sourceName := "trufflehog - gitlab"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gitlab.SourceType)
+
+	gitlabSource := &gitlab.Source{}
+	if err := gitlabSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+		return err
 	}
 	gitlabSource.WithScanOptions(scanOptions)
-
-	e.sourcesWg.Go(func() error {
-		defer common.RecoverWithExit(ctx)
-		err := gitlabSource.Chunks(ctx, e.ChunksChan())
-		if err != nil {
-			return fmt.Errorf("error scanning GitLab: %w", err)
-		}
-		return nil
-	})
-	return nil
+	_, err = e.sourceManager.Run(ctx, sourceName, gitlabSource)
+	return err
 }

@@ -1,64 +1,71 @@
 package sources
 
 import (
-	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/marusama/semaphore/v2"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"golang.org/x/sync/errgroup"
 )
 
-// handle uniquely identifies a Source given to the manager to manage. If the
-// SourceManager is connected to the API, it will be equivalent to the unique
-// source ID, otherwise it behaves as a counter.
-type handle int64
-
-// SourceInitFunc is a function that takes a source and job ID and returns an
-// initialized Source.
-type SourceInitFunc func(ctx context.Context, sourceID int64, jobID int64) (Source, error)
-
 type SourceManager struct {
-	api apiClient
-	// Map of handle to source initializer.
-	handles     map[handle]SourceInitFunc
-	handlesLock sync.Mutex
-	// Map of handle to job reports.
-	// TODO: Manage culling and flushing to the API.
-	report     map[handle]*JobReport
-	reportLock sync.Mutex
+	api   apiClient
+	hooks []JobProgressHook
 	// Pool limiting the amount of concurrent sources running.
-	pool            errgroup.Group
+	sem         semaphore.Semaphore
+	prioritySem semaphore.Semaphore
+	wg          sync.WaitGroup
+	// Max number of units to scan concurrently per source.
 	concurrentUnits int
 	// Run the sources using source unit enumeration / chunking if available.
-	useSourceUnits bool
+	// Checked at runtime to allow feature flagging.
+	useSourceUnitsFunc func() bool
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
 	// Set when Wait() returns.
-	done    bool
-	doneErr error
+	firstErr chan error
+	waitErr  error
+	done     bool
 }
 
 // apiClient is an interface for optionally communicating with an external API.
 type apiClient interface {
-	// RegisterSource lets the API know we have a source and it returns a unique source ID for it.
-	RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error)
-	// GetJobID queries the API for an existing job or new job ID.
-	GetJobID(ctx context.Context, id int64) (int64, error)
+	// GetIDs informs the API of the source that's about to run and returns
+	// two identifiers used during source initialization.
+	GetIDs(ctx context.Context, name string, kind sourcespb.SourceType) (SourceID, JobID, error)
 }
 
-// WithAPI adds an API client to the manager for tracking jobs and progress.
+// WithAPI adds an API client to the manager for tracking jobs and progress. If
+// the API is also a JobProgressHook, it will be added to the list of event hooks.
 func WithAPI(api apiClient) func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.api = api }
 }
 
-// WithConcurrency limits the concurrent number of sources a manager can run.
-func WithConcurrency(concurrency int) func(*SourceManager) {
-	return func(mgr *SourceManager) { mgr.pool.SetLimit(concurrency) }
+func WithReportHook(hook JobProgressHook) func(*SourceManager) {
+	return func(mgr *SourceManager) {
+		mgr.hooks = append(mgr.hooks, hook)
+	}
+}
+
+// WithConcurrentSources limits the concurrent number of sources a manager can run.
+func WithConcurrentSources(concurrency int) func(*SourceManager) {
+	return func(mgr *SourceManager) {
+		mgr.sem.SetLimit(concurrency)
+	}
+}
+
+// WithConcurrentTargets limits the concurrent number of targets a manager can run.
+func WithConcurrentTargets(concurrency int) func(*SourceManager) {
+	return func(mgr *SourceManager) {
+		mgr.prioritySem.SetLimit(concurrency)
+	}
 }
 
 // WithBufferedOutput sets the size of the buffer used for the Chunks() channel.
@@ -69,7 +76,13 @@ func WithBufferedOutput(size int) func(*SourceManager) {
 // WithSourceUnits enables using source unit enumeration and chunking if the
 // source supports it.
 func WithSourceUnits() func(*SourceManager) {
-	return func(mgr *SourceManager) { mgr.useSourceUnits = true }
+	return func(mgr *SourceManager) {
+		mgr.useSourceUnitsFunc = func() bool { return true }
+	}
+}
+
+func WithSourceUnitsFunc(f func() bool) func(*SourceManager) {
+	return func(mgr *SourceManager) { mgr.useSourceUnitsFunc = f }
 }
 
 // WithConcurrentUnits limits the number of units to be scanned concurrently.
@@ -83,9 +96,10 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	mgr := SourceManager{
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
-		handles:      make(map[handle]SourceInitFunc),
-		report:       make(map[handle]*JobReport),
+		sem:          semaphore.New(runtime.NumCPU()),
+		prioritySem:  semaphore.New(runtime.NumCPU()),
 		outputChunks: make(chan *Chunk),
+		firstErr:     make(chan error, 1),
 	}
 	for _, opt := range opts {
 		opt(&mgr)
@@ -93,73 +107,54 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	return &mgr
 }
 
-// Enroll informs the SourceManager to track and manage a Source.
-func (s *SourceManager) Enroll(ctx context.Context, name string, kind sourcespb.SourceType, f SourceInitFunc) (handle, error) {
-	if s.done {
-		return 0, fmt.Errorf("manager is done")
-	}
-	id, err := s.api.RegisterSource(ctx, name, kind)
-	if err != nil {
-		return 0, err
-	}
-	handleID := handle(id)
-	s.handlesLock.Lock()
-	defer s.handlesLock.Unlock()
-	if _, ok := s.handles[handleID]; ok {
-		// TODO: smartly handle this?
-		return 0, fmt.Errorf("handle ID '%d' already in use", handleID)
-	}
-	s.handles[handleID] = f
-	return handleID, nil
+func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sourcespb.SourceType) (SourceID, JobID, error) {
+	return s.api.GetIDs(ctx, sourceName, kind)
 }
 
 // Run blocks until a resource is available to run the source, then
-// synchronously runs it.
-func (s *SourceManager) Run(ctx context.Context, handle handle) error {
+// asynchronously runs it. Error information is stored and accessible via the
+// JobProgressRef as it becomes available.
+func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source, targets ...ChunkingTarget) (JobProgressRef, error) {
+	sourceID, jobID := source.SourceID(), source.JobID()
 	// Do preflight checks before waiting on the pool.
-	if err := s.preflightChecks(ctx, handle); err != nil {
-		return err
+	if err := s.preflightChecks(ctx); err != nil {
+		return JobProgressRef{
+			SourceName: sourceName,
+			SourceID:   sourceID,
+			JobID:      jobID,
+		}, err
 	}
-	ch := make(chan error)
-	s.pool.Go(func() error {
-		defer common.Recover(ctx)
-		report, err := s.run(ctx, handle)
-		if report != nil {
-			s.reportLock.Lock()
-			s.report[handle] = report
-			s.reportLock.Unlock()
-		}
-		if err != nil {
-			ch <- err
-			return nil
-		}
-		ch <- report.Errors()
-		return nil
-	})
-	return <-ch
-}
-
-// ScheduleRun blocks until a resource is available to run the source, then
-// asynchronously runs it. Error information is stored and returned by Wait().
-func (s *SourceManager) ScheduleRun(ctx context.Context, handle handle) error {
-	// Do preflight checks before waiting on the pool.
-	if err := s.preflightChecks(ctx, handle); err != nil {
-		return err
+	// Create a JobProgress object for tracking progress.
+	sem := s.sem
+	if len(targets) > 0 {
+		sem = s.prioritySem
 	}
-	s.pool.Go(func() error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
+	if err := sem.Acquire(ctx, 1); err != nil {
+		// Context cancelled.
+		progress.ReportError(Fatal{err})
+		return progress.Ref(), Fatal{err}
+	}
+	s.wg.Add(1)
+	go func() {
+		// Call Finish after the semaphore has been released.
+		defer progress.Finish()
+		defer sem.Release(1)
+		defer s.wg.Done()
+		ctx := context.WithValues(ctx,
+			"source_manager_worker_id", common.RandomID(5),
+		)
 		defer common.Recover(ctx)
-		// The error is already saved in the report, so we can ignore
-		// it here.
-		report, _ := s.run(ctx, handle)
-		if report != nil {
-			s.reportLock.Lock()
-			s.report[handle] = report
-			s.reportLock.Unlock()
+		defer cancel(nil)
+		if err := s.run(ctx, source, progress, targets...); err != nil {
+			select {
+			case s.firstErr <- err:
+			default:
+			}
 		}
-		return nil
-	})
-	// TODO: Maybe wait for a signal here that initialization was successful?
-	return nil
+	}()
+	return progress.Ref(), nil
 }
 
 // Chunks returns the read only channel of all the chunks produced by all of
@@ -168,112 +163,126 @@ func (s *SourceManager) Chunks() <-chan *Chunk {
 	return s.outputChunks
 }
 
-// Wait blocks until all running sources are completed and returns an error if
-// any of the sources had fatal errors. It also closes the channel returned by
-// Chunks(). The manager should not be reused after calling this method.
+// Wait blocks until all running sources are completed and closes the channel
+// returned by Chunks(). The manager should not be reused after calling this
+// method. This current implementation is not thread safe and should only be
+// called by one thread.
 func (s *SourceManager) Wait() error {
 	// Check if the manager has been Waited.
 	if s.done {
-		return s.doneErr
+		return s.waitErr
 	}
-	defer close(s.outputChunks)
-	defer func() { s.done = true }()
+	s.done = true
 
-	// We are only using the errgroup for limiting concurrency.
-	// TODO: Maybe switch to using a semaphore.Weighted.
-	_ = s.pool.Wait()
-
-	// Aggregate all errors from all job reports.
-	// TODO: This should probably only be the fatal errors. We'll also need
-	//       to rewrite this for when the reports start getting culled.
-	s.reportLock.Lock()
-	defer s.reportLock.Unlock()
-	errs := make([]error, 0, len(s.report))
-	for _, report := range s.report {
-		errs = append(errs, report.Errors())
+	// Return the first error returned by run.
+	s.wg.Wait()
+	select {
+	case s.waitErr = <-s.firstErr:
+	default:
 	}
-	s.doneErr = errors.Join(errs...)
-	return s.doneErr
+	close(s.outputChunks)
+	close(s.firstErr)
+	return s.waitErr
 }
 
-// Report retrieves a scan report for a given handle. If no report exists or
-// the Source has not finished, nil will be returned.
-func (s *SourceManager) Report(handle handle) *JobReport {
-	s.reportLock.Lock()
-	defer s.reportLock.Unlock()
-	return s.report[handle]
+// ScanChunk injects a chunk into the output stream of chunks to be scanned.
+// This method should rarely be used. TODO(THOG-1577): Remove when dependencies
+// no longer rely on this functionality.
+func (s *SourceManager) ScanChunk(chunk *Chunk) {
+	s.outputChunks <- chunk
+}
+
+// AvailableCapacity returns the number of concurrent jobs the manager can
+// accommodate at this time.
+func (s *SourceManager) AvailableCapacity() int {
+	return s.sem.GetLimit() - s.sem.GetCount()
+}
+
+// MaxConcurrentSources returns the maximum configured limit of concurrent
+// sources the manager will run.
+func (s *SourceManager) MaxConcurrentSources() int {
+	return s.sem.GetLimit()
+}
+
+// ConcurrentSources returns the current number of concurrently running
+// sources.
+func (s *SourceManager) ConcurrentSources() int {
+	return s.sem.GetCount()
+}
+
+// SetMaxConcurrentSources sets the maximum number of concurrently running
+// sources. If the count is lower than the already existing number of
+// concurrently running sources, no sources will be scheduled to run until the
+// existing sources complete.
+func (s *SourceManager) SetMaxConcurrentSources(maxRunCount int) {
+	s.sem.SetLimit(maxRunCount)
 }
 
 // preflightChecks is a helper method to check the Manager or the context isn't
-// done and that the handle is valid.
-func (s *SourceManager) preflightChecks(ctx context.Context, handle handle) error {
+// done.
+func (s *SourceManager) preflightChecks(ctx context.Context) error {
 	// Check if the manager has been Waited.
 	if s.done {
 		return fmt.Errorf("manager is done")
-	}
-	// Check the handle is valid.
-	if _, ok := s.getInitFunc(handle); !ok {
-		return fmt.Errorf("unrecognized handle")
 	}
 	return ctx.Err()
 }
 
 // run is a helper method to sychronously run the source. It does not check for
-// acquired resources. Possible return values are:
-//
-//   - *JobReport, nil
-//     Successfully ran the source, but the report could have errors.
-//
-//   - *JobReport, error
-//     There was an error calling Init or Chunks. This sort of error indicates
-//     a fatal error and is also recorded in the report.
-//
-//   - nil, error:
-//     There was an error from the API or the handle is invalid. The latter of
-//     which should never happen due to the preflightChecks.
-func (s *SourceManager) run(ctx context.Context, handle handle) (*JobReport, error) {
-	jobID, err := s.api.GetJobID(ctx, int64(handle))
-	if err != nil {
-		return nil, err
-	}
-	initFunc, ok := s.getInitFunc(handle)
-	if !ok {
-		return nil, fmt.Errorf("unrecognized handle")
-	}
-	// Create a report for this run.
-	report := &JobReport{
-		SourceID:  int64(handle),
-		JobID:     jobID,
-		StartTime: time.Now(),
-	}
-	defer func() { report.EndTime = time.Now() }()
+// acquired resources. An error is returned if there was a fatal error during
+// the run. This information is also recorded in the JobProgress.
+func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
+	report.Start(time.Now())
+	defer func() { report.End(time.Now()) }()
 
-	// Initialize the source.
-	source, err := initFunc(ctx, jobID, int64(handle))
-	if err != nil {
-		report.AddError(err)
-		return report, err
+	defer func() {
+		if err := context.Cause(ctx); err != nil {
+			report.ReportError(Fatal{err})
+		}
+	}()
+
+	report.TrackProgress(source.GetProgress())
+	if ctx.Value("job_id") == "" {
+		ctx = context.WithValue(ctx, "job_id", report.JobID)
 	}
+	if ctx.Value("source_id") == "" {
+		ctx = context.WithValue(ctx, "source_id", report.SourceID)
+	}
+	if ctx.Value("source_name") == "" {
+		ctx = context.WithValue(ctx, "source_name", report.SourceName)
+	}
+	if ctx.Value("source_type") == "" {
+		ctx = context.WithValue(ctx, "source_type", source.Type().String())
+	}
+
 	// Check for the preferred method of tracking source units.
-	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits {
-		return s.runWithUnits(ctx, handle, enumChunker, report)
+	canUseSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil
+	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
+		ctx.Logger().Info("running source",
+			"with_units", true)
+		return s.runWithUnits(ctx, enumChunker, report)
 	}
-	return s.runWithoutUnits(ctx, handle, source, report)
+	ctx.Logger().Info("running source",
+		"with_units", false,
+		"target_count", len(targets),
+		"source_manager_units_configurable", s.useSourceUnitsFunc != nil)
+	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
-func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, source Source, report *JobReport) (*JobReport, error) {
+func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
-	ch := make(chan *Chunk)
+	ch := make(chan *Chunk, 1)
 	var wg sync.WaitGroup
 	// Consume chunks and export chunks.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for chunk := range ch {
-			atomic.AddUint64(&report.TotalChunks, 1)
-			_ = common.CancellableWrite(ctx, s.outputChunks, chunk)
+			chunk.JobID = source.JobID()
+			report.ReportChunk(nil, chunk)
+			s.outputChunks <- chunk
 		}
 	}()
 	// Don't return from this function until the goroutine has finished
@@ -282,26 +291,40 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, handle handle, sour
 	// stack.
 	defer wg.Wait()
 	defer close(ch)
-	if err := source.Chunks(ctx, ch); err != nil {
-		report.AddError(err)
-		return report, err
+	if err := source.Chunks(ctx, ch, targets...); err != nil {
+		report.ReportError(Fatal{err})
+		return Fatal{err}
 	}
-	return report, nil
+	return nil
 }
 
 // runWithUnits is a helper method to run a Source that is also a
 // SourceUnitEnumChunker. This allows better introspection of what is getting
 // scanned and any errors encountered.
-func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source SourceUnitEnumChunker, report *JobReport) (*JobReport, error) {
-	reporter := &mgrUnitReporter{
-		unitCh: make(chan SourceUnit),
+func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumChunker, report *JobProgress) error {
+	unitReporter := &mgrUnitReporter{
+		unitCh: make(chan SourceUnit, 1),
+		report: report,
+	}
+	// Create a function that will save the first error encountered (if
+	// any) and discard the rest.
+	fatalErr := make(chan error, 1)
+	catchFirstFatal := func(err error) {
+		select {
+		case fatalErr <- err:
+		default:
+		}
 	}
 	// Produce units.
 	go func() {
 		// TODO: Catch panics and add to report.
-		defer close(reporter.unitCh)
-		if err := source.Enumerate(ctx, reporter); err != nil {
-			report.AddError(err)
+		report.StartEnumerating(time.Now())
+		defer func() { report.EndEnumerating(time.Now()) }()
+		defer close(unitReporter.unitCh)
+		ctx.Logger().V(2).Info("enumerating source")
+		if err := source.Enumerate(ctx, unitReporter); err != nil {
+			report.ReportError(Fatal{err})
+			catchFirstFatal(Fatal{err})
 		}
 	}()
 	var wg sync.WaitGroup
@@ -311,18 +334,23 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		// Negative values indicated no limit.
 		unitPool.SetLimit(s.concurrentUnits)
 	}
-	for unit := range reporter.unitCh {
-		reporter := &mgrChunkReporter{
-			unitID:  unit.SourceUnitID(),
-			chunkCh: make(chan *Chunk),
-		}
+	for unit := range unitReporter.unitCh {
 		unit := unit
+		chunkReporter := &mgrChunkReporter{
+			unit:    unit,
+			chunkCh: make(chan *Chunk, 1),
+			report:  report,
+		}
 		// Consume units and produce chunks.
 		unitPool.Go(func() error {
+			report.StartUnitChunking(unit, time.Now())
 			// TODO: Catch panics and add to report.
-			defer close(reporter.chunkCh)
-			if err := source.ChunkUnit(ctx, unit, reporter); err != nil {
-				report.AddError(err)
+			defer close(chunkReporter.chunkCh)
+			ctx := context.WithValue(ctx, "unit", unit.SourceUnitID())
+			ctx.Logger().V(3).Info("chunking unit")
+			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
+				report.ReportError(Fatal{err})
+				catchFirstFatal(Fatal{err})
 			}
 			return nil
 		})
@@ -330,75 +358,64 @@ func (s *SourceManager) runWithUnits(ctx context.Context, handle handle, source 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for chunk := range reporter.chunkCh {
-				// TODO: Introspect on the chunks we got from this unit.
-				atomic.AddUint64(&report.TotalChunks, 1)
-				_ = common.CancellableWrite(ctx, s.outputChunks, chunk)
+			defer func() { report.EndUnitChunking(unit, time.Now()) }()
+			for chunk := range chunkReporter.chunkCh {
+				if src, ok := source.(Source); ok {
+					chunk.JobID = src.JobID()
+				}
+				s.outputChunks <- chunk
 			}
 		}()
 	}
 	wg.Wait()
-	// TODO: Return fatal errors.
-	return report, nil
-}
-
-// getInitFunc is a helper method for safe concurrent access to the
-// map[handle]SourceInitFunc map.
-func (s *SourceManager) getInitFunc(handle handle) (SourceInitFunc, bool) {
-	s.handlesLock.Lock()
-	defer s.handlesLock.Unlock()
-	f, ok := s.handles[handle]
-	return f, ok
+	select {
+	case err := <-fatalErr:
+		return err
+	default:
+		return nil
+	}
 }
 
 // headlessAPI implements the apiClient interface locally.
 type headlessAPI struct {
-	// Counters for assigning handle and job IDs.
+	// Counters for assigning source and job IDs.
 	sourceIDCounter int64
 	jobIDCounter    int64
 }
 
-func (api *headlessAPI) RegisterSource(ctx context.Context, name string, kind sourcespb.SourceType) (int64, error) {
-	return atomic.AddInt64(&api.sourceIDCounter, 1), nil
-}
-
-func (api *headlessAPI) GetJobID(ctx context.Context, id int64) (int64, error) {
-	return atomic.AddInt64(&api.jobIDCounter, 1), nil
+func (api *headlessAPI) GetIDs(context.Context, string, sourcespb.SourceType) (SourceID, JobID, error) {
+	return SourceID(atomic.AddInt64(&api.sourceIDCounter, 1)), JobID(atomic.AddInt64(&api.jobIDCounter, 1)), nil
 }
 
 // mgrUnitReporter implements the UnitReporter interface.
 type mgrUnitReporter struct {
-	unitCh       chan SourceUnit
-	unitErrs     []error
-	unitErrsLock sync.Mutex
+	unitCh chan SourceUnit
+	report *JobProgress
 }
 
 func (s *mgrUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
+	s.report.ReportUnit(unit)
 	return common.CancellableWrite(ctx, s.unitCh, unit)
 }
 
 func (s *mgrUnitReporter) UnitErr(ctx context.Context, err error) error {
-	s.unitErrsLock.Lock()
-	defer s.unitErrsLock.Unlock()
-	s.unitErrs = append(s.unitErrs, err)
+	s.report.ReportError(err)
 	return nil
 }
 
 // mgrChunkReporter implements the ChunkReporter interface.
 type mgrChunkReporter struct {
-	unitID        string
-	chunkCh       chan *Chunk
-	chunkErrs     []error
-	chunkErrsLock sync.Mutex
+	unit    SourceUnit
+	chunkCh chan *Chunk
+	report  *JobProgress
 }
 
 func (s *mgrChunkReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
+	s.report.ReportChunk(s.unit, &chunk)
 	return common.CancellableWrite(ctx, s.chunkCh, &chunk)
 }
 
 func (s *mgrChunkReporter) ChunkErr(ctx context.Context, err error) error {
-	s.chunkErrsLock.Lock()
-	defer s.chunkErrsLock.Unlock()
-	s.chunkErrs = append(s.chunkErrs, err)
+	s.report.ReportError(ChunkError{s.unit, err})
 	return nil
 }

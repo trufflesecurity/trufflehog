@@ -2,8 +2,8 @@ package timezoneapi
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"timezoneapi"}) + `\b([a-zA-Z0-9]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"timezoneapi"}) + `\b([a-zA-Z]{20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -54,8 +54,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			res, err := client.Do(req)
 			if err == nil {
+				verifiedBodyResponse, err := common.ResponseContainsSubstring(res.Body, "date")
+				if err != nil {
+					return nil, err
+				}
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
 					s1.Verified = true
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.

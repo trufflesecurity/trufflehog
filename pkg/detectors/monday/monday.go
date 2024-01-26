@@ -2,8 +2,8 @@ package monday
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"monday"}) + `\b(ey[a-zA-Z0-9_.]{210,225})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"monday"}) + `\b(eyJ[A-Za-z0-9-_]{15,100}\.eyJ[A-Za-z0-9-_]{100,300}\.[A-Za-z0-9-_]{25,100})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

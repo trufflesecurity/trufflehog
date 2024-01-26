@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/go-logr/logr"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -91,6 +93,7 @@ func (state ParseState) String() string {
 		"BinaryFileLine",
 		"HunkLineNumberLine",
 		"HunkContentLine",
+		"ParseFailure",
 	}[state]
 }
 
@@ -160,7 +163,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string) (chan Commit, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan Commit, error) {
 	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -177,7 +180,21 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	cmd := exec.Command("git", args...)
 	absPath, err := filepath.Abs(source)
 	if err == nil {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+		if !isBare {
+			cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+		} else {
+			cmd.Env = append(cmd.Env,
+				"GIT_DIR="+absPath,
+			)
+			// We need those variables to handle incoming commits
+			// while using trufflehog in pre-receive hooks
+			if dir := os.Getenv("GIT_OBJECT_DIRECTORY"); dir != "" {
+				cmd.Env = append(cmd.Env, "GIT_OBJECT_DIRECTORY="+dir)
+			}
+			if dir := os.Getenv("GIT_ALTERNATE_OBJECT_DIRECTORIES"); dir != "" {
+				cmd.Env = append(cmd.Env, "GIT_ALTERNATE_OBJECT_DIRECTORIES="+dir)
+			}
+		}
 	}
 
 	return c.executeCommand(ctx, cmd, false)
@@ -237,7 +254,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	outReader := bufio.NewReader(stdOut)
 	var (
 		currentCommit *Commit
-		currentDiff   *Diff
+		currentDiff   Diff
 
 		totalLogSize int
 	)
@@ -260,8 +277,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = CommitLine
 
 			// If there is a currentDiff, add it to currentCommit.
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				currentCommit.Size += currentDiff.Content.Len()
 			}
 			// If there is a currentCommit, send it to the channel.
@@ -270,7 +287,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = &Diff{}
+			currentDiff = Diff{}
 			currentCommit = &Commit{
 				Message: strings.Builder{},
 			}
@@ -298,7 +315,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isMessageLine(isStaged, latestState, line):
 			latestState = MessageLine
 
-			currentCommit.Message.Write(line[4:])
+			currentCommit.Message.Write(line[4:]) // Messages are indented with 4 spaces.
 		case isMessageEndLine(isStaged, latestState, line):
 			latestState = MessageEndLine
 			// NoOp
@@ -309,8 +326,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if currentCommit == nil {
 				currentCommit = &Commit{}
 			}
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
 				totalSize := 0
 				for _, diff := range currentCommit.Diffs {
@@ -331,7 +348,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = &Diff{}
+			currentDiff = Diff{}
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -341,8 +358,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isBinaryLine(isStaged, latestState, line):
 			latestState = BinaryFileLine
 
-			currentDiff.IsBinary = true
 			currentDiff.PathB = pathFromBinaryLine(line)
+
+			// Don't do anything if the file is deleted. (pathA has file path, pathB is /dev/null)
+			if currentDiff.PathB != "" {
+				currentDiff.IsBinary = true
+			}
 		case isFromFileLine(isStaged, latestState, line):
 			latestState = FromFileLine
 			// NoOp
@@ -354,15 +375,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isHunkLineNumberLine(isStaged, latestState, line):
 			latestState = HunkLineNumberLine
 
-			// TODO: Is it still necessary to check whether the currentDiff is nil?
-			if currentDiff != nil && currentDiff.Content.Len() > 0 {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
+				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
 			}
-			newDiff := &Diff{
+			currentDiff = Diff{
 				PathB: currentDiff.PathB,
 			}
-
-			currentDiff = newDiff
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -409,13 +427,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 
 			// Here be dragons...
 			// Build an informative error message.
-			var err error
+			err := fmt.Errorf(`invalid line "%s" after state "%s"`, line, latestState)
+			var logger logr.Logger
 			if currentCommit != nil && currentCommit.Hash != "" {
-				err = fmt.Errorf(`failed to parse line "%s" after state "%s" (commit=%s)`, line, latestState, currentCommit.Hash)
+				logger = ctx.Logger().WithValues("commit", currentCommit.Hash)
 			} else {
-				err = fmt.Errorf(`failed to parse line "%s" after state "%s"`, line, latestState)
+				logger = ctx.Logger()
 			}
-			ctx.Logger().V(2).Error(err, "Recovering at the latest commit or diff...\n")
+			logger.Error(err, "failed to parse Git input. Recovering at the latest commit or diff...")
 
 			latestState = ParseFailure
 		}
@@ -427,7 +446,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 	}
-	cleanupParse(currentCommit, currentDiff, commitChan, &totalLogSize)
+	cleanupParse(currentCommit, &currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
@@ -592,12 +611,13 @@ func pathFromBinaryLine(line []byte) string {
 		return ""
 	}
 	bRaw := sbytes[1]
-	return string(bRaw[:len(bRaw)-7]) // drop the "b/" and " differ"
+	return string(bRaw[:len(bRaw)-8]) // drop the "b/" and " differ\n"
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
+// --- /dev/null
 func isFromFileLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if latestState != IndexLine {
+	if !(latestState == IndexLine || latestState == ModeLine) {
 		return false
 	}
 	if len(line) >= 6 && bytes.Equal(line[:4], []byte("--- ")) {
@@ -698,7 +718,7 @@ func isCommitSeparatorLine(isStaged bool, latestState ParseState, line []byte) b
 
 func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
 	// Ignore empty or binary diffs (this condition may be redundant).
-	if currentDiff != nil && currentDiff.Content.Len() > 0 {
+	if currentDiff != nil && (currentDiff.Content.Len() > 0 || currentDiff.IsBinary) {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 	}
 	if currentCommit != nil {

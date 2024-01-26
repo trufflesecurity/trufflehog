@@ -2,10 +2,8 @@ package appfollow
 
 import (
 	"context"
-	b64 "encoding/base64"
-	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appfollow"}) + `\b([0-9A-Za-z]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appfollow"}) + `\b(eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9\.[0-9A-Za-z]{74}\.[0-9A-Z-a-z\-_]{43})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -49,13 +47,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			data := fmt.Sprintf("%s:", resMatch)
-			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.appfollow.io/test", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.appfollow.io/api/v2/account/users", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
+			req.Header.Add("X-AppFollow-API-Token", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()

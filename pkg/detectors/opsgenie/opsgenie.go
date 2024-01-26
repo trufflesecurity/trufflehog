@@ -3,8 +3,8 @@ package opsgenie
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/users", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/alerts", nil)
 			if err != nil {
 				continue
 			}

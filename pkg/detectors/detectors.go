@@ -2,12 +2,13 @@ package detectors
 
 import (
 	"context"
+	"crypto/rand"
+	"math/big"
 	"net/url"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"unicode"
+
+	"errors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -60,14 +61,50 @@ type Result struct {
 
 	// This field should only be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
-	VerificationError error
+	verificationError error
+}
+
+// SetVerificationError is the only way to set a verification error. Any sensetive values should be passed-in as secrets to be redacted.
+func (r *Result) SetVerificationError(err error, secrets ...string) {
+	if err != nil {
+		r.verificationError = redactSecrets(err, secrets...)
+	}
+}
+
+// Public accessors for the fields could also be provided if needed.
+func (r *Result) VerificationError() error {
+	return r.verificationError
+}
+
+// redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.
+func redactSecrets(err error, secrets ...string) error {
+	lastErr := unwrapToLast(err)
+	errStr := lastErr.Error()
+	for _, secret := range secrets {
+		errStr = strings.Replace(errStr, secret, "[REDACTED]", -1)
+	}
+	return errors.New(errStr)
+}
+
+// unwrapToLast returns the last error in the chain of errors.
+// This is added to exclude non-essential details (like URLs) for brevity and security.
+// Also helps us optimize performance in redaction and enhance log clarity.
+func unwrapToLast(err error) error {
+	for {
+		unwrapped := errors.Unwrap(err)
+		if unwrapped == nil {
+			// We've reached the last error in the chain
+			return err
+		}
+		err = unwrapped
+	}
 }
 
 type ResultWithMetadata struct {
 	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceID is the ID of the source that the API uses to map secrets to specific sources.
-	SourceID int64
+	SourceID sources.SourceID
 	// SourceType is the type of Source.
 	SourceType sourcespb.SourceType
 	// SourceName is the name of the Source.
@@ -140,23 +177,30 @@ func KeyIsRandom(key string) bool {
 }
 
 func MustGetBenchmarkData() map[string][]byte {
-	_, filename, _, _ := runtime.Caller(0)
-	dir := filepath.Dir(filename)
-	small := make([]byte, 0)
-	medium, err := os.ReadFile(filepath.Join(dir, "detectors.go"))
-	if err != nil {
-		panic(err)
+	sizes := map[string]int{
+		"xsmall":  10,          // 10 bytes
+		"small":   100,         // 100 bytes
+		"medium":  1024,        // 1KB
+		"large":   10 * 1024,   // 10KB
+		"xlarge":  100 * 1024,  // 100KB
+		"xxlarge": 1024 * 1024, // 1MB
 	}
-	big := make([]byte, 0)
-	for i := 0; i < 25; i++ {
-		big = append(big, medium...)
+	data := make(map[string][]byte)
+
+	for key, size := range sizes {
+		// Generating a byte slice of a specific size with random data.
+		content := make([]byte, size)
+		for i := 0; i < size; i++ {
+			randomByte, err := rand.Int(rand.Reader, big.NewInt(256))
+			if err != nil {
+				panic(err)
+			}
+			content[i] = byte(randomByte.Int64())
+		}
+		data[key] = content
 	}
 
-	return map[string][]byte{
-		"small":  small,
-		"medium": medium,
-		"big":    big,
-	}
+	return data
 }
 
 func RedactURL(u url.URL) string {

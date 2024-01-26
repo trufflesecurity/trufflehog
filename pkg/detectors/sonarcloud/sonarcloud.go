@@ -2,9 +2,9 @@ package sonarcloud
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -21,13 +21,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sonarcloud"}) + `\b([0-9a-z]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sonar"}) + `\b([0-9a-z]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sonarcloud"}
+	return []string{"sonar"}
 }
 
 // FromData will find and optionally verify SonarCloud secrets in a given set of bytes.

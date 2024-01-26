@@ -8,8 +8,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
@@ -75,7 +78,7 @@ func TestAddReposByOrg(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos: nil,
+		Repositories: nil,
 		IgnoreRepos:  []string{"secret/super-*-repo2"},
 	})
 	// gock works here because github.NewClient is using the default HTTP Transport
@@ -103,7 +106,7 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos:  []string{"secret/super*"},
+		Repositories:  []string{"secret/super*"},
 		Organizations: []string{"super-secret-org"},
 	})
 	// gock works here because github.NewClient is using the default HTTP Transport
@@ -187,13 +190,13 @@ func TestAddMembersByApp(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/app/installations").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
 		})
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/members").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"login": "ssm1"},
 			{"login": "ssm2"},
 			{"login": "ssm3"},
@@ -218,7 +221,7 @@ func TestAddReposByApp(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/installation/repositories").
 		Reply(200).
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"repositories": []map[string]string{
 				{"clone_url": "https://github/ssr1.git", "full_name": "ssr1"},
 				{"clone_url": "https://github/ssr2.git", "full_name": "ssr2"},
@@ -244,7 +247,7 @@ func TestAddOrgsByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"login": "sso2"},
 		})
 
@@ -707,5 +710,55 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
 			}
 		})
+	}
+}
+
+func TestProcessRepoComments(t *testing.T) {
+	tests := []struct {
+		name       string
+		trimmedURL []string
+		wantErr    bool
+	}{
+		{
+			name:       "URL with missing owner and/or repo",
+			trimmedURL: []string{"https://github.com/"},
+			wantErr:    true,
+		},
+		{
+			name:       "URL with complete owner and repo",
+			trimmedURL: []string{"https://github.com/", "owner", "repo"},
+			wantErr:    false,
+		},
+		// TODO: Add more test cases to cover other scenarios.
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Source{}
+			repoURL, _ := url.Parse(strings.Join(tt.trimmedURL, "/"))
+			chunksChan := make(chan *sources.Chunk)
+
+			err := s.processRepoComments(context.Background(), "repoPath", tt.trimmedURL, repoURL, chunksChan)
+			assert.Equal(t, tt.wantErr, err != nil)
+		})
+	}
+}
+
+func TestGetGistID(t *testing.T) {
+	tests := []struct {
+		trimmedURL []string
+		expected   string
+		err        bool
+	}{
+		{[]string{"https://gist.github.com", "12345"}, "12345", false},
+		{[]string{"https://gist.github.com", "owner", "12345"}, "12345", false},
+		{[]string{"https://gist.github.com"}, "", true},
+		{[]string{"https://gist.github.com", "owner", "12345", "extra"}, "", true},
+	}
+
+	for _, tt := range tests {
+		got, err := extractGistID(tt.trimmedURL)
+		assert.Equal(t, tt.err, err != nil)
+		assert.Equal(t, tt.expected, got)
 	}
 }

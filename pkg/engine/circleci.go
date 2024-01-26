@@ -1,14 +1,11 @@
 package engine
 
 import (
-	"fmt"
 	"runtime"
 
-	"github.com/go-errors/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
@@ -29,23 +26,13 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 		return err
 	}
 
-	circleSource := circleci.Source{}
-	ctx = context.WithValues(ctx,
-		"source_type", circleSource.Type().String(),
-		"source_name", "Circle CI",
-	)
-	err = circleSource.Init(ctx, "trufflehog - Circle CI", 0, int64(sourcespb.SourceType_SOURCE_TYPE_CIRCLECI), true, &conn, runtime.NumCPU())
-	if err != nil {
-		return errors.WrapPrefix(err, "failed to init Circle CI source", 0)
-	}
+	sourceName := "trufflehog - Circle CI"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, circleci.SourceType)
 
-	e.sourcesWg.Go(func() error {
-		defer common.RecoverWithExit(ctx)
-		err := circleSource.Chunks(ctx, e.ChunksChan())
-		if err != nil {
-			return fmt.Errorf("error scanning CircleCI: %w", err)
-		}
-		return nil
-	})
-	return nil
+	circleSource := &circleci.Source{}
+	if err := circleSource.Init(ctx, "trufflehog - Circle CI", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+		return err
+	}
+	_, err = e.sourceManager.Run(ctx, sourceName, circleSource)
+	return err
 }

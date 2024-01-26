@@ -3,8 +3,9 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 
+	mssql "github.com/denisenkom/go-mssqldb"
 	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
@@ -40,7 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		detected := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SQLServer,
 			Raw:          []byte(paramsUnsafe.Password),
 			RawV2:        []byte(paramsUnsafe.URL().String()),
@@ -48,14 +49,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			verified, err := ping(paramsUnsafe)
-			if err != nil {
+			isVerified, err := ping(paramsUnsafe)
+
+			s1.Verified = isVerified
+
+			if mssqlErr, isMssqlErr := err.(mssql.Error); isMssqlErr && mssqlErr.Number == 18456 {
+				// Login failed
+				// Number taken from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
+				// Nothing to do; determinate failure to verify
 			} else {
-				detected.Verified = verified
+				s1.SetVerificationError(err, paramsUnsafe.Password)
 			}
 		}
 
-		results = append(results, detected)
+		results = append(results, s1)
 	}
 
 	return results, nil

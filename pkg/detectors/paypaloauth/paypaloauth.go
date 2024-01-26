@@ -4,8 +4,8 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,8 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	idPat  = regexp.MustCompile(`\b([A-Za-z0-9_\.]{7}-[A-Za-z0-9_\.]{72})\b`)
-	keyPat = regexp.MustCompile(`\b([A-Za-z0-9_\.]{69}-[A-Za-z0-9_\.]{10})\b`)
+	idPat  = regexp.MustCompile(`\b([A-Za-z0-9_\.]{7}-[A-Za-z0-9_\.]{72}|[A-Za-z0-9_\.]{5}-[A-Za-z0-9_\.]{38})\b`)
+	keyPat = regexp.MustCompile(`\b([A-Za-z0-9_\.\-]{44,80})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,24 +39,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idmatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, idMatch := range idmatches {
+		if len(idMatch) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
-		for _, idMatch := range idmatches {
-			if len(idMatch) != 2 {
+		resIDMatch := strings.TrimSpace(idMatch[1])
+		for _, secretMatch := range matches {
+			if len(secretMatch) != 2 {
 				continue
 			}
-			residMatch := strings.TrimSpace(idMatch[1])
+			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PaypalOauth,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(resSecretMatch),
 			}
 
 			if verify {
-				data := fmt.Sprintf("%s:%s", residMatch, resMatch)
+				data := fmt.Sprintf("%s:%s", resIDMatch, resSecretMatch)
 				encoded := b64.StdEncoding.EncodeToString([]byte(data))
 				payload := strings.NewReader("grant_type=client_credentials")
 				req, err := http.NewRequestWithContext(ctx, "POST", "https://api-m.sandbox.paypal.com/v1/oauth2/token", payload)
@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive(resIDMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}

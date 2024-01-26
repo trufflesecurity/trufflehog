@@ -2,9 +2,10 @@ package currencycloud
 
 import (
 	"context"
+	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -54,28 +55,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CurrencyCloud,
 				Raw:          []byte(resMatch),
 			}
-
+			environments := []string{"devapi", "api"}
 			if verify {
-				// Get authentication token
-				payload := strings.NewReader(`{"login_id":"` + resEmailMatch + `","api_key":"` + resMatch + `"`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://devapi.currencycloud.com/v2/authenticate/api", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					bodyBytes, err := io.ReadAll(res.Body)
+				for _, env := range environments {
+					// Get authentication token
+					payload := strings.NewReader(`{"login_id":"` + resEmailMatch + `","api_key":"` + resMatch + `"`)
+					req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".currencycloud.com/v2/authenticate/api", payload)
 					if err != nil {
 						continue
 					}
-					body := string(bodyBytes)
-					if strings.Contains(body, "auth_token") {
-						s1.Verified = true
-					} else {
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					req.Header.Add("Content-Type", "application/json")
+					res, err := client.Do(req)
+					if err == nil {
+						defer res.Body.Close()
+						bodyBytes, err := io.ReadAll(res.Body)
+						if err != nil {
 							continue
+						}
+						body := string(bodyBytes)
+						if strings.Contains(body, "auth_token") {
+							s1.Verified = true
+							s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.currencycloud.com", env)}
+							break
+						} else {
+							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+								continue
+							}
 						}
 					}
 				}

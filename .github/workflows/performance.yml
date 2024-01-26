@@ -1,4 +1,4 @@
-name: Performance Test 
+name: Performance Test
 
 on: [pull_request]
 
@@ -7,16 +7,16 @@ jobs:
     #   skip if PR is from a fork.
     # TODO: this could probabaly be refactored a bit so that it runs on forks
     if: ${{ ! github.event.pull_request.head.repo.fork }}
-    
+
     runs-on: ubuntu-latest
     steps:
     - name: Install Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.21'
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         ref: ${{ github.head_ref }}
@@ -52,7 +52,7 @@ jobs:
         echo PREVIOUS_TAG=$(cat previous_tag.txt) >> $GITHUB_ENV
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         ref: ${{ env.PREVIOUS_TAG }}

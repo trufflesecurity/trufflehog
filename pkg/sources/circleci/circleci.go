@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync/atomic"
 
@@ -20,13 +19,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const baseURL = "https://circleci.com/api/v1.1/"
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
+
+	baseURL = "https://circleci.com/api/v1.1/"
+)
 
 type Source struct {
 	name     string
 	token    string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	jobPool  *errgroup.Group
 	sources.Progress
@@ -41,19 +44,19 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
 // Init returns an initialized CircleCI source.
-func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -76,7 +79,7 @@ func (s *Source) Init(_ context.Context, name string, jobId, sourceId int64, ver
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	projects, err := s.projects(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting projects: %w", err)
@@ -219,7 +222,7 @@ func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]bu
 	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(_ context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
 	req, err := http.NewRequest("GET", act.OutputURL, nil)
 	if err != nil {
 		return err
@@ -229,34 +232,40 @@ func (s *Source) chunkAction(_ context.Context, proj project, bld build, act act
 		return err
 	}
 	defer res.Body.Close()
-	logOutput, err := io.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
 
 	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
 
-	chunk := &sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		Data:       removeCircleSha1Line(logOutput),
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Circleci{
-				Circleci: &source_metadatapb.CircleCI{
-					VcsType:     proj.VCS,
-					Username:    proj.Username,
-					Repository:  proj.RepoName,
-					BuildNumber: int64(bld.BuildNum),
-					BuildStep:   stepName,
-					Link:        linkURL,
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, res.Body)
+	for data := range chunkResChan {
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			Data:       removeCircleSha1Line(data.Bytes()),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Circleci{
+					Circleci: &source_metadatapb.CircleCI{
+						VcsType:     proj.VCS,
+						Username:    proj.Username,
+						Repository:  proj.RepoName,
+						BuildNumber: int64(bld.BuildNum),
+						BuildStep:   stepName,
+						Link:        linkURL,
+					},
 				},
 			},
-		},
-		Verify: s.verify,
+			Verify: s.verify,
+		}
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
+		}
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
+		}
 	}
-
-	chunksChan <- chunk
 
 	return nil
 }

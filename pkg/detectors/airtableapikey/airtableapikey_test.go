@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -99,8 +100,9 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("AirtableApiKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("Airtable.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
@@ -111,6 +113,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

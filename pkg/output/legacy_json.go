@@ -2,11 +2,13 @@ package output
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -19,7 +21,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func PrintLegacyJSON(ctx context.Context, r *detectors.ResultWithMetadata) error {
+// LegacyJSONPrinter is a printer that prints results in legacy JSON format for backwards compatibility.
+type LegacyJSONPrinter struct{ mu sync.Mutex }
+
+func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
 	var repo string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
@@ -41,7 +46,7 @@ func PrintLegacyJSON(ctx context.Context, r *detectors.ResultWithMetadata) error
 		defer os.RemoveAll(repoPath)
 	}
 
-	legacy, err := ConvertToLegacyJSON(r, repoPath)
+	legacy, err := convertToLegacyJSON(r, repoPath)
 	if err != nil {
 		return fmt.Errorf("could not convert to legacy JSON: %w", err)
 	}
@@ -49,11 +54,14 @@ func PrintLegacyJSON(ctx context.Context, r *detectors.ResultWithMetadata) error
 	if err != nil {
 		return fmt.Errorf("could not marshal result: %w", err)
 	}
+
+	p.mu.Lock()
 	fmt.Println(string(out))
+	p.mu.Unlock()
 	return nil
 }
 
-func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*LegacyJSONOutput, error) {
+func convertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*LegacyJSONOutput, error) {
 	var source LegacyJSONCompatibleSource
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
@@ -126,7 +134,7 @@ func BranchHeads(repo *gogit.Repository) (map[string]*object.Commit, error) {
 		}
 		headCommit, err := repo.CommitObject(*headHash)
 		if err != nil {
-			logger.Error(err, "unable to get commit", "commit", headCommit.String())
+			logger.Error(err, "unable to get commit", "head_hash", headHash.String())
 			return nil
 		}
 		branches[branchName] = headCommit
@@ -165,7 +173,7 @@ func GenerateDiff(commit *object.Commit, fileName string) string {
 	// First grab the first parent of the commit. If there are none, we are at the first commit and should diff against
 	// an empty file.
 	parent, err := commit.Parent(0)
-	if err != object.ErrParentNotFound && err != nil {
+	if !errors.Is(err, object.ErrParentNotFound) && err != nil {
 		logger.Error(err, "could not find parent", "commit", commit.Hash.String())
 	}
 
@@ -173,7 +181,7 @@ func GenerateDiff(commit *object.Commit, fileName string) string {
 	var parentFile *object.File
 	if parent != nil {
 		parentFile, err = parent.File(fileName)
-		if err != nil && err != object.ErrFileNotFound {
+		if err != nil && !errors.Is(err, object.ErrFileNotFound) {
 			logger.Error(err, "could not get previous version of file")
 			return diff
 		}

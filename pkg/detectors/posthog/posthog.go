@@ -2,8 +2,8 @@ package posthog
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,13 +20,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(phc_[a-zA-Z0-9_]{43})\b`)
+	keyPat = regexp.MustCompile(`\b(phx_[a-zA-Z0-9_]{43})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"phc_"}
+	return []string{"phx_"}
 }
 
 // FromData will find and optionally verify AppPosthog secrets in a given set of bytes.
@@ -47,20 +47,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(` {
-				"api_key": "` + resMatch + `",
-				"distinct_id": "1234"
-				}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://app.posthog.com/decide/", payload)
-			if err != nil {
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.posthog.com/api/event/?personal_api_key="+resMatch, nil)
+			reqEU, errEU := http.NewRequestWithContext(ctx, "GET", "https://eu.posthog.com/api/event/?personal_api_key="+resMatch, nil)
+
+			if err != nil || errEU != nil {
 				continue
 			}
 			req.Header.Add("Content-Type", "application/json")
+			reqEU.Header.Add("Content-Type", "application/json")
+
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
+				} else if res.StatusCode == 401 {
+					// Try EU Endpoint only if other one fails.
+					res, err := client.Do(reqEU)
+					if err == nil {
+						defer res.Body.Close()
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							s1.Verified = true
+						} else {
+							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+								continue
+							}
+						}
+					}
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

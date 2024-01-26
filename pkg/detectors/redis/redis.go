@@ -2,8 +2,9 @@ package redis
 
 import (
 	"context"
+	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/go-redis/redis"
@@ -18,7 +19,8 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\bredis://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat        = regexp.MustCompile(`\bredi[s]{1,2}://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	azureRedisPat = regexp.MustCompile(`\b([\w\d.-]{1,100}\.redis\.cache\.windows\.net:6380),password=([^,]{44}),ssl=True,abortConnect=False\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -32,6 +34,51 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	azureMatches := azureRedisPat.FindAllStringSubmatch(dataStr, -1)
+
+	for _, match := range azureMatches {
+		host := match[1]
+		password := match[2]
+		urlMatch := fmt.Sprintf("rediss://:%s@%s", password, host)
+
+		// Skip findings where the password only has "*" characters, this is a redacted password
+		if strings.Trim(password, "*") == "" {
+			continue
+		}
+
+		parsedURL, err := url.Parse(urlMatch)
+		if err != nil {
+			continue
+		}
+		if _, ok := parsedURL.User.Password(); !ok {
+			continue
+		}
+
+		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "*******", -1))
+
+		s := detectors.Result{
+			DetectorType: detectorspb.DetectorType_Redis,
+			Raw:          []byte(urlMatch),
+			Redacted:     redact,
+		}
+
+		if verify {
+			s.Verified = verifyRedis(ctx, parsedURL)
+		}
+
+		if !s.Verified {
+			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
+			if strings.HasPrefix(password, "$") {
+				continue
+			}
+		}
+
+		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
+			continue
+		}
+
+		results = append(results, s)
+	}
 
 	for _, match := range matches {
 		urlMatch := match[0]
@@ -50,7 +97,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "********", -1))
+		redact := strings.TrimSpace(strings.Replace(urlMatch, password, "*******", -1))
 
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Redis,

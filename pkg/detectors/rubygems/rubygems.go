@@ -2,8 +2,8 @@ package rubygems
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://rubygems.org/api/v1/gems", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://rubygems.org/api/v1/gems.json", nil)
 			if err != nil {
 				continue
 			}
@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				if res.StatusCode >= 200 && res.StatusCode < 300 || res.StatusCode == http.StatusForbidden {
 					s1.Verified = true
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.

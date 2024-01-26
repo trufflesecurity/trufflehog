@@ -1,12 +1,9 @@
 package virustotal
 
 import (
-	"bytes"
 	"context"
-	"io"
-	"mime/multipart"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -50,41 +47,34 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			body := &bytes.Buffer{}
-			writer := multipart.NewWriter(body)
-			fw, err := writer.CreateFormField("url")
-			if err != nil {
+			s1.Verified = verifyToken(ctx, client, resMatch)
+			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 				continue
-			}
-			_, err = io.Copy(fw, strings.NewReader("https://www.amazon.com"))
-			if err != nil {
-				continue
-			}
-			writer.Close()
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://www.virustotal.com/api/v3/urls", bytes.NewReader(body.Bytes()))
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", writer.FormDataContentType())
-			req.Header.Add("x-apikey", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
 			}
 		}
-
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyToken(ctx context.Context, client *http.Client, token string) bool {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.virustotal.com/api/v3/metadata", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Add("x-apikey", token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return false
+	}
+	return true
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

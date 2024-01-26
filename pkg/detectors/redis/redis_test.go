@@ -61,9 +61,6 @@ func TestURI_FromChunk(t *testing.T) {
 				t.Errorf("URI.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// if os.Getenv("FORCE_PASS_DIFF") == "true" {
-			// 	return
-			// }
 			for i := range got {
 				got[i].Raw = nil
 			}
@@ -79,6 +76,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

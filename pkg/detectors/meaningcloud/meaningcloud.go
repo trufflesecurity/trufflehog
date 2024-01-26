@@ -3,10 +3,11 @@ package meaningcloud
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -30,6 +31,10 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"meaningcloud"}
+}
+
+type response struct {
+	DeepTime float64 `json:"deepTime"`
 }
 
 // FromData will find and optionally verify MeaningCloud secrets in a given set of bytes.
@@ -78,7 +83,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
+					var r response
+					if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+						s1.SetVerificationError(err, resMatch)
+						continue
+					}
+					if r.DeepTime > 0 {
+						s1.Verified = true
+					}
 				} else {
 					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {

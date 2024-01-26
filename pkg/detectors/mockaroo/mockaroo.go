@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -83,8 +83,8 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 type typeRes struct {
 	Types []struct {
-		Name       string        `json:"name"`
-		Type       interface{}   `json:"type"`
-		Parameters []interface{} `json:"parameters"`
+		Name       string `json:"name"`
+		Type       any    `json:"type"`
+		Parameters []any  `json:"parameters"`
 	} `json:"types"`
 }

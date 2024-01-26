@@ -32,11 +32,12 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
@@ -81,6 +82,42 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
+		{
+			name: "found, valid but unexpected api response",
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a launchdarkly secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LaunchDarkly,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		// TODO: enable this test and add the sdk token
+		/*
+			{
+				name: "found, valid sdk token",
+				s:    Scanner{},
+				args: args{
+					ctx:    context.Background(),
+					data:   []byte(fmt.Sprintf("You can find a launchdarkly sdk secret %s within", sdkSecret)),
+					verify: true,
+				},
+				want: []detectors.Result{
+					{
+						DetectorType: detectorspb.DetectorType_LaunchDarkly,
+						Verified:     true,
+					},
+				},
+				wantErr: false,
+			},
+		*/
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -108,6 +145,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

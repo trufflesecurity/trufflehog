@@ -1,14 +1,12 @@
 package engine
 
 import (
-	"fmt"
 	"runtime"
 
-	gogit "github.com/go-git/go-git/v5"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -16,63 +14,31 @@ import (
 
 // ScanGit scans any git source.
 func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
-	logOptions := &gogit.LogOptions{}
-	opts := []git.ScanOption{
-		git.ScanOptionFilter(c.Filter),
-		git.ScanOptionLogOptions(logOptions),
+	connection := &sourcespb.Git{
+		Head:             c.HeadRef,
+		Base:             c.BaseRef,
+		Bare:             c.Bare,
+		Uri:              c.URI,
+		ExcludeGlobs:     c.ExcludeGlobs,
+		IncludePathsFile: c.IncludePathsFile,
+		ExcludePathsFile: c.ExcludePathsFile,
+		MaxDepth:         int64(c.MaxDepth),
+		SkipBinaries:     c.SkipBinaries,
+	}
+	var conn anypb.Any
+	if err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{}); err != nil {
+		ctx.Logger().Error(err, "failed to marshal git connection")
+		return err
 	}
 
-	options := &gogit.PlainOpenOptions{
-		DetectDotGit:          true,
-		EnableDotGitCommonDir: true,
+	sourceName := "trufflehog - git"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, git.SourceType)
+
+	gitSource := &git.Source{}
+	if err := gitSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+		return err
 	}
 
-	repo, err := gogit.PlainOpenWithOptions(c.RepoPath, options)
-	if err != nil {
-		return fmt.Errorf("could not open repo: %s: %w", c.RepoPath, err)
-	}
-
-	if c.MaxDepth != 0 {
-		opts = append(opts, git.ScanOptionMaxDepth(int64(c.MaxDepth)))
-	}
-	if c.BaseRef != "" {
-		opts = append(opts, git.ScanOptionBaseHash(c.BaseRef))
-	}
-	if c.HeadRef != "" {
-		opts = append(opts, git.ScanOptionHeadCommit(c.HeadRef))
-	}
-	if c.ExcludeGlobs != nil {
-		opts = append(opts, git.ScanOptionExcludeGlobs(c.ExcludeGlobs))
-	}
-	scanOptions := git.NewScanOptions(opts...)
-
-	gitSource := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "trufflehog - git", true, runtime.NumCPU(),
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
-			return &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Git{
-					Git: &source_metadatapb.Git{
-						Commit:     commit,
-						File:       file,
-						Email:      email,
-						Repository: repository,
-						Timestamp:  timestamp,
-						Line:       line,
-					},
-				},
-			}
-		})
-
-	ctx = context.WithValues(ctx,
-		"source_type", sourcespb.SourceType_SOURCE_TYPE_GIT.String(),
-		"source_name", "git",
-	)
-	e.sourcesWg.Go(func() error {
-		defer common.RecoverWithExit(ctx)
-		err := gitSource.ScanRepo(ctx, repo, c.RepoPath, scanOptions, e.ChunksChan())
-		if err != nil {
-			return fmt.Errorf("could not scan repo: %w", err)
-		}
-		return nil
-	})
-	return nil
+	_, err := e.sourceManager.Run(ctx, sourceName, gitSource)
+	return err
 }

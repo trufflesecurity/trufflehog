@@ -44,6 +44,16 @@ message CircleCI {
   string email = 7;
 }
 
+message TravisCI {
+  string username = 2;
+  string repository = 3;
+  string build_number = 4;
+  string job_number  = 5;
+  string link = 6;
+  bool public = 7;
+}
+
+
 message Confluence {
   string page = 1;
   string space = 2;
@@ -225,9 +235,11 @@ message Syslog {
   string facility = 6;
 }
 
-message PublicEventMonitoring {
+message Forager {
   oneof metadata {
     Github github = 1;
+    NPM npm = 2;
+    PyPi pypi = 3;
   }
 }
 
@@ -290,9 +302,10 @@ message MetaData {
     Teams teams = 21;
     Artifactory artifactory = 22;
     Syslog syslog = 23;
-    PublicEventMonitoring publicEventMonitoring = 24;
+    Forager forager = 24;
     SharePoint sharepoint = 25;
     GoogleDrive googleDrive = 26;
     AzureRepos azureRepos = 27;
+    TravisCI travisCI = 28;
   }
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -13,13 +13,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Check that the Slack scanner implements the SecretScanner interface at compile time.
 var _ detectors.Detector = Scanner{}
 
 var (
-	tokenPats = map[string]*regexp.Regexp{
+	defaultClient = common.SaneHttpClient()
+	tokenPats     = map[string]*regexp.Regexp{
 		"Slack Bot Token":               regexp.MustCompile(`xoxb\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
 		"Slack User Token":              regexp.MustCompile(`xoxp\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
 		"Slack Workspace Access Token":  regexp.MustCompile(`xoxa\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
@@ -53,34 +56,59 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		tokens := tokenPat.FindAllString(dataStr, -1)
 
 		for _, token := range tokens {
-			s := detectors.Result{
+			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Slack,
 				Raw:          []byte(token),
 			}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+			}
 			if verify {
-				client := common.SaneHttpClient()
+				client := s.client
+				if s.client == nil {
+					client = defaultClient
+				}
+
 				req, err := http.NewRequestWithContext(ctx, "POST", verifyURL, nil)
 				if err != nil {
 					continue
 				}
+
 				req.Header.Add("Content-Type", "application/json; charset=utf-8")
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
 					var authResponse authRes
 					if err := json.NewDecoder(res.Body).Decode(&authResponse); err != nil {
-						continue
+						err = fmt.Errorf("failed to decode auth response: %w", err)
+						s1.SetVerificationError(err, token)
 					}
-					s.Verified = authResponse.Ok
+
+					if authResponse.Ok {
+						s1.Verified = true
+						// Slack API returns 200 even if the token is invalid. We need to check the error field.
+					} else if authResponse.Error == "invalid_auth" {
+						// The secret is determinately not verified (nothing to do)
+					} else {
+						err = fmt.Errorf("unexpected error auth response %+v", authResponse.Error)
+						s1.SetVerificationError(err, token)
+					}
+				} else {
+					s1.SetVerificationError(err, token)
 				}
 			}
 
-			results = append(results, s)
+			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
+				continue
+			}
+
+			results = append(results, s1)
 		}
 	}
 
-	return
+	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

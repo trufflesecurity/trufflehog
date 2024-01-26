@@ -49,12 +49,8 @@ func (s *Source) cloneRepo(
 		}
 
 	case *sourcespb.GitHub_Token:
-		// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
-		if s.githubUser == "" || s.githubToken == "" {
-			s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
-			if err != nil {
-				return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-			}
+		if err := s.getUserAndToken(ctx, repoURL, installationClient); err != nil {
+			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
 		}
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
 		if err != nil {
@@ -64,6 +60,20 @@ func (s *Source) cloneRepo(
 		return "", nil, fmt.Errorf("unhandled credential type for repo %s", repoURL)
 	}
 	return path, repo, nil
+}
+
+func (s *Source) getUserAndToken(ctx context.Context, repoURL string, installationClient *github.Client) error {
+	// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
+	s.userMu.Lock()
+	defer s.userMu.Unlock()
+	if s.githubUser == "" || s.githubToken == "" {
+		var err error
+		s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
+		if err != nil {
+			return fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
+		}
+	}
+	return nil
 }
 
 func (s *Source) userAndToken(ctx context.Context, installationClient *github.Client) (string, string, error) {
@@ -190,6 +200,8 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 		numRepos, numForks int
 	)
 
+	uniqueOrgs := map[string]struct{}{}
+
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
 		if err == nil {
@@ -210,13 +222,22 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			if r.GetFork() && !s.conn.IncludeForks {
 				continue
 			}
-			numForks++
+
+			if r.GetFork() {
+				numForks++
+			}
+
+			numRepos++
+
+			if r.GetOwner().GetType() == "Organization" {
+				uniqueOrgs[r.GetOwner().GetLogin()] = struct{}{}
+			}
 
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
 			s.repoSizes.addRepo(repoURL, r.GetSize())
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
-			logger.V(3).Info("repo attributes", "name", repoName, "size", r.GetSize(), "repo_url", repoURL)
+			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
 		if res.NextPage == 0 {
@@ -224,9 +245,58 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 		}
 		opts.Page = res.NextPage
 	}
-	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks)
+
+	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
+	githubOrgsEnumerated.WithLabelValues(s.name).Set(float64(len(uniqueOrgs)))
 
 	return nil
+}
+
+// commitQuery represents the details required to fetch a commit.
+type commitQuery struct {
+	repo     string
+	owner    string
+	sha      string
+	filename string
+}
+
+// getDiffForFileInCommit retrieves the diff for a specified file in a commit.
+// If the file or its diff is not found, it returns an error.
+func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
+	commit, resp, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+	if handled := s.handleRateLimit(err, resp); handled {
+		return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
+	}
+	if err != nil {
+		return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+	}
+
+	if len(commit.Files) == 0 {
+		return "", fmt.Errorf("commit %s does not contain any files", query.sha)
+	}
+
+	res := new(strings.Builder)
+	// Only return the diff if the file is in the commit.
+	for _, file := range commit.Files {
+		if *file.Filename != query.filename {
+			continue
+		}
+
+		if file.Patch == nil {
+			return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
+		}
+
+		if _, err := res.WriteString(*file.Patch); err != nil {
+			return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
+		}
+		res.WriteString("\n")
+	}
+
+	if res.Len() == 0 {
+		return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
+	}
+
+	return res.String(), nil
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {

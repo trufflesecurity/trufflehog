@@ -81,7 +81,7 @@ func TestSource_Token(t *testing.T) {
 }
 
 func TestSource_ScanComments(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	secret, err := common.GetTestSecret(ctx)
@@ -190,7 +190,7 @@ func TestSource_ScanComments(t *testing.T) {
 				return
 			}
 
-			chunksCh := make(chan *sources.Chunk, 5)
+			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
 				// Close the channel
 				defer close(chunksCh)
@@ -219,6 +219,77 @@ func TestSource_ScanComments(t *testing.T) {
 				t.Errorf("did not complete all chunks, got %d, want %d", i, tt.numExpectedChunks)
 			}
 
+		})
+	}
+}
+
+func TestSource_ScanChunks(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	// For the personal access token test.
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	type init struct {
+		name       string
+		verify     bool
+		connection *sourcespb.GitHub
+	}
+	tests := []struct {
+		name       string
+		init       init
+		wantChunks int
+	}{
+		{
+			name: "token authenticated, 4 repos",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{
+						"https://github.com/truffle-test-integration-org/another-test-repo.git",
+						"https://github.com/trufflesecurity/trufflehog.git",
+						"https://github.com/Akash-goyal-github/Inventory-Management-System.git",
+						"https://github.com/R1ck404/Crypto-Exchange-Example.git",
+						"https://github.com/Stability-AI/generative-models.git",
+						"https://github.com/bloomberg/blazingmq.git",
+						"https://github.com/Kong/kong.git",
+					},
+					Credential: &sourcespb.GitHub_Token{Token: githubToken},
+				},
+			},
+			wantChunks: 20000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			assert.Nil(t, err)
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh)
+				assert.Nil(t, err)
+			}()
+
+			i := 0
+			for range chunksCh {
+				i++
+			}
+			assert.GreaterOrEqual(t, i, tt.wantChunks)
 		})
 	}
 }
@@ -767,3 +838,125 @@ func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testin
 // 		})
 // 	}
 // }
+
+func TestSource_Chunks_TargetedScan(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3000)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	type init struct {
+		name          string
+		verify        bool
+		connection    *sourcespb.GitHub
+		queryCriteria *source_metadatapb.MetaData
+	}
+	tests := []struct {
+		name       string
+		init       init
+		wantChunks int
+	}{
+		{
+			name: "targeted scan, one file in small commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "https://github.com/trufflesecurity/test_keys/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "keys",
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
+			name: "targeted scan, one file in med commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/trufflehog.git",
+							Link:       "https://github.com/trufflesecurity/trufflehog/blob/33eed42e17fda8b1a66feaeafcd57efccff26c11/pkg/sources/s3/s3_test.go#L78",
+							Commit:     "33eed42e17fda8b1a66feaeafcd57efccff26c11",
+							File:       "pkg/sources/s3/s3_test.go",
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
+			name: "no file in commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "https://github.com/trufflesecurity/test_keys/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "not-the-file",
+						},
+					},
+				},
+			},
+			wantChunks: 0,
+		},
+		{
+			name: "invalid query criteria, malformed link",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "malformed-link",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "not-the-file",
+						},
+					},
+				},
+			},
+			wantChunks: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			assert.Nil(t, err)
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			assert.Nil(t, err)
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh, sources.ChunkingTarget{QueryCriteria: tt.init.queryCriteria})
+				assert.Nil(t, err)
+			}()
+
+			i := 0
+			for range chunksCh {
+				i++
+			}
+			assert.Equal(t, tt.wantChunks, i)
+		})
+	}
+}

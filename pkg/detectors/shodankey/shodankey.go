@@ -2,8 +2,10 @@ package shodankey
 
 import (
 	"context"
+	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -48,29 +50,56 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.shodan.io/shodan/host/count?key="+resMatch+"&query=port:22&facets=org,os", nil)
-			if err != nil {
+			s1.Verified = verifyToken(ctx, client, resMatch)
+			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 				continue
 			}
-
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
-			}
 		}
-
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+type shodanInfoRes struct {
+	ScanCredits int `json:"scan_credits"`
+	UsageLimits struct {
+		ScanCredits  int `json:"scan_credits"`
+		QueryCredits int `json:"query_credits"`
+		MonitoredIps int `json:"monitored_ips"`
+	} `json:"usage_limits"`
+	Plan         string `json:"plan"`
+	HTTPS        bool   `json:"https"`
+	Unlocked     bool   `json:"unlocked"`
+	QueryCredits int    `json:"query_credits"`
+	MonitoredIps int    `json:"monitored_ips"`
+	UnlockedLeft int    `json:"unlocked_left"`
+	Telnet       bool   `json:"telnet"`
+}
+
+func verifyToken(ctx context.Context, client *http.Client, token string) bool {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.shodan.io/api-info?key="+token, nil)
+	if err != nil {
+		return false
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return false
+	}
+
+	bytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false
+	}
+
+	var info shodanInfoRes
+	return json.Unmarshal(bytes, &info) == nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

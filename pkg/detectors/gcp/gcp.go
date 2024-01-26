@@ -3,7 +3,7 @@ package gcp
 import (
 	"context"
 	"encoding/json"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -86,6 +86,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          raw,
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
+		}
+		// Set the RotationGuideURL in the ExtraData
+		s.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
+			"project":        creds.ProjectID,
 		}
 
 		if verify {
