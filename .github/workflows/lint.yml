@@ -43,4 +43,4 @@ jobs:
     if: (github.actor != 'dependabot[bot]')
     steps:
       - uses: actions/checkout@v4
-      - run: semgrep --config=hack/semgrep-rules.yaml pkg/detectors/
+      - run: semgrep --config=hack/semgrep-rules/detectors.yaml pkg/detectors/
