@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -21,8 +22,9 @@ import (
 )
 
 const (
-	SourceType    = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
-	LINK_BASE_URL = "https://go.postman.co/"
+	SourceType      = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
+	LINK_BASE_URL   = "https://go.postman.co/"
+	KEYWORD_PADDING = 50
 )
 
 type Source struct {
@@ -156,6 +158,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	default:
 		return errors.New("credential type not implemented for Postman")
 	}
+
 	return nil
 }
 
@@ -221,54 +224,103 @@ func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Ch
 	}
 	ctx.Logger().V(2).Info("starting scanning global variables")
 
-	// Map key=value pairs for subsitution later in workspace processing
+	// Write function to filter out localKeywords that don't exist as keywords in pkg/detectors/*
+	// Finally, append and a string containing all values for secrets that need a second cred.
+
+	//Pre-process each key=var pair
+	// 1. Map key=value pairs for substitution later in workspace processing
+	// 2. Create slice of strings (keys and values) for use in processing variables
+	// ex: API_KEY=<AN_OPENWEATHERMAP_API_KEY>, then there is a URI=https://openweathermap.com
+	//     or another key is OPENWEATHER_ID={{no_data}}; either way we need both keys and values
+	//     within 40 chars of the API Key.
+	// 3. Create a value string of all values.
+	//    We need to append all of these values for secrets that need a second cred. Like AWS or Shopify URLs.
+	//    But we don't want one value to trigger another value in the wrong var, so pad with 50 spaces.
 	varSubstitutions := map[string]string{}
+	localKeywords := append([]string{}, extraKeywords...)
+	allValues := " "
+	for _, globalVar := range globalVars.Data.Values {
+		localKeywords = append(localKeywords, globalVar.Key)
+		localKeywords = append(localKeywords, fmt.Sprintf("%v", globalVar.Value))
+		varSubstitutions[globalVar.Key] = fmt.Sprintf("%v", globalVar.Value)
+		allValues += (strings.Repeat(" ", KEYWORD_PADDING) + fmt.Sprintf("%v", globalVar.Value))
+		if globalVar.SessionValue != "" {
+			localKeywords = append(localKeywords, fmt.Sprintf("%v", globalVar.SessionValue))
+			varSubstitutions[globalVar.Key] = fmt.Sprintf("%v", globalVar.SessionValue)
+			allValues += (strings.Repeat(" ", KEYWORD_PADDING) + fmt.Sprintf("%v", globalVar.SessionValue))
+		}
+	}
+
+	// Filter out keywords that don't exist in pkg/detectors/*
+	localKeywords = filterKeywords(localKeywords, s.conn.DetectorKeywords)
+
 	// Create slice of objects to scan (both context & data)
 	pmObjToScan := []PMScanObject{}
 	for _, globalVar := range globalVars.Data.Values {
-		key := globalVar.Key
-		value := globalVar.Value
-		variableType := globalVar.Type
-		// Add to map for substitution later
-		varSubstitutions[key] = fmt.Sprintf("%v", value)
-		// Create scan object
+		var data string
+		for _, keyword := range localKeywords {
+			data += fmt.Sprintf("%s:%s ", keyword, fmt.Sprintf("%v", globalVar.Value))
+			data += strings.Repeat(" ", KEYWORD_PADDING)
+		}
+		data += allValues
 		preScanObj := PMScanObject{
-			Link:          LINK_BASE_URL + globalVars.Data.ID,
+			Link:          LINK_BASE_URL + "globals/" + globalVars.Data.ID,
 			WorkspaceUUID: workspaceUUID,
 			GlobalID:      globalVars.Data.ID,
 			FieldType:     "Global Variable",
-			FieldName:     key,
-			VarType:       variableType,
-			Data:          fmt.Sprintf("%s:%v\n", key, value),
+			FieldName:     globalVar.Key,
+			VarType:       globalVar.Type,
+			Data:          data,
 		}
 		pmObjToScan = append(pmObjToScan, preScanObj)
-		// For each extra keyword, sub in keywords as key for key=value pair
-		for _, keyword := range extraKeywords {
-			preScanObj.Data = fmt.Sprintf("%s:%v\n", keyword, value)
-			pmObjToScan = append(pmObjToScan, preScanObj)
-		}
-
 		// This is a legacy field from Postman. But they can still exist (although invisible in UI).
 		if globalVar.SessionValue != "" {
-			// In rare cases where sessionValue isn't empty, we'll overwrite with the substitution value.
-			varSubstitutions[key] = fmt.Sprintf("%v", globalVar.SessionValue)
-			// Create scan object and add to slice
-			preScanObj.Data = fmt.Sprintf("%s:%v\n", key, globalVar.SessionValue)
-			pmObjToScan = append(pmObjToScan, preScanObj)
-			for _, keyword := range extraKeywords {
-				// Same process as above for keywords
-				preScanObj.Data = fmt.Sprintf("%s:%v\n", keyword, globalVar.SessionValue)
-				pmObjToScan = append(pmObjToScan, preScanObj)
+			var data string
+			for _, keyword := range localKeywords {
+				data += fmt.Sprintf("%s:%v\n", keyword, globalVar.SessionValue)
+				data += strings.Repeat(" ", KEYWORD_PADDING)
 			}
+			data += allValues
+			preScanObj.Data = data
+			preScanObj.VarType = "Session Value (hidden from UI)"
+			pmObjToScan = append(pmObjToScan, preScanObj)
 		}
 	}
+
+	// If no keys match keywords, it's possible we'll end up with  multiple objects all containing the same
+	// string, which would just be the values of all variables. We only need to process one, but we can't be sure
+	// which variable is at fault, so for those objects, we'll "" the FieldName. Then we'll remove duplicates.
+	// This is a bit of a hack, but it's the best we can do without a better way to identify the variable.
+
+	var dataCount = make(map[string]int)
+
+	for _, obj := range pmObjToScan {
+		dataCount[obj.Data]++
+	}
+	for i, obj := range pmObjToScan {
+		if dataCount[obj.Data] > 1 {
+			pmObjToScan[i].FieldName = ""
+		}
+	}
+	//Remove duplicates
+	uniqueMap := make(map[PMScanObject]struct{})
+	uniqueObjects := []PMScanObject{}
+
+	// Iterate through the input slice and add unique objects to the map
+	for _, obj := range pmObjToScan {
+		if _, exists := uniqueMap[obj]; !exists {
+			uniqueMap[obj] = struct{}{}
+			uniqueObjects = append(uniqueObjects, obj)
+		}
+	}
+
 	// Add to slice of maps for substitution later
 	*varSubMap = append(*varSubMap, varSubstitutions)
 	// Process each object.
 	done := make(chan struct{})
 
 	// Process each object concurrently.
-	for _, obj := range pmObjToScan {
+	for _, obj := range uniqueObjects {
 		go func(obj PMScanObject) {
 			defer func() {
 				done <- struct{}{} // Signal that the goroutine has completed.
@@ -278,14 +330,14 @@ func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Ch
 	}
 
 	// Wait for all goroutines to finish.
-	for range pmObjToScan {
+	for range uniqueObjects {
 		<-done
 	}
 	ctx.Logger().V(2).Info("finished scanning global variables")
 }
 
 func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o PMScanObject) {
-	fmt.Println(o)
+	fmt.Println(o.Data + "\n")
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
@@ -463,3 +515,44 @@ func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk,
 // //maybe a process object function that takes a chunk and processes it?
 
 // // Need a function to get globals and process them, and then teh same for the rest
+
+func filterKeywords(keys []string, detectorKeywords []string) []string {
+	// Filter out keywords that don't exist in pkg/detectors/*
+	keywords := []string{}
+	for _, key := range keys {
+		for _, detectorKey := range detectorKeywords {
+			if strings.Contains(key, detectorKey) {
+				keywords = append(keywords, key)
+			}
+		}
+	}
+	// Remove duplicates, but these are defined as situations like this:
+	// openweathermap.com, openweather and api.openweathermap.com
+	// In this scenario only openweather needs to remain
+	// Create a map to store canonical names
+	canonicalNames := make(map[string]string)
+
+	// Iterate through the input slice
+	for _, name := range keywords {
+		// Check if a similar canonical name already exists
+		for key := range canonicalNames {
+			if strings.Contains(key, name) || strings.Contains(name, key) {
+				// A similar name is found, skip adding it to the map
+				goto NextName
+			}
+		}
+
+		// No similar canonical name found, add it to the map
+		canonicalNames[name] = name
+
+	NextName:
+	}
+
+	// Extract the unique canonical names from the map
+	uniqueKeywords := []string{}
+	for _, name := range canonicalNames {
+		uniqueKeywords = append(uniqueKeywords, name)
+	}
+
+	return uniqueKeywords
+}

@@ -392,5 +392,6 @@ message Postman {
   repeated string exclude_environments = 7; // comma separated list of environment uuids
   repeated string include_collections = 8; // comma separated list of collection uuids
   repeated string include_environments = 9; // comma separated list of environment uuids
+  repeated string detector_keywords = 10; // [internal use] list of detector keywords for filtering
 }
  

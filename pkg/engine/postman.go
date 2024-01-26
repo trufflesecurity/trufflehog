@@ -36,6 +36,13 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 		return nil
 	}
 
+	// Turn AhoCorasick keywordsToDetectors into a map of keywords
+	keywords := []string{}
+	for key := range e.ahoCorasickCore.keywordsToDetectors {
+		keywords = append(keywords, key)
+	}
+	connection.DetectorKeywords = keywords
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
