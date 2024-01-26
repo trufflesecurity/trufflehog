@@ -42,4 +42,5 @@ jobs:
       image: returntocorp/semgrep
     if: (github.actor != 'dependabot[bot]')
     steps:
+      - uses: actions/checkout@v4
       - run: semgrep --config=hack/semgrep-rules.yaml pkg/detectors/
