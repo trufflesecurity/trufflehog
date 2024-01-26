@@ -573,12 +573,14 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 func likelyDuplicate(val string, dupesSlice []string) bool {
 	for _, v := range dupesSlice {
 		if v == val {
+			fmt.Println("found exact duplicate", val, v)
 			return true
 		}
 		similarity := strutil.Similarity(val, v, metrics.NewLevenshtein())
 
 		// close enough
 		if similarity > 0.9 {
+			fmt.Println("found similar duplicate", val, v, similarity)
 			return true
 		}
 	}
@@ -635,6 +637,9 @@ nextChunk:
 						wgDoneFn: wgDetect.Done,
 					}
 
+					// Empty the dupes and detectors slice
+					chunkSecrets = chunkSecrets[:0]
+					detectorsWithResult = detectorsWithResult[:0]
 					continue nextChunk
 				}
 				chunkSecrets = append(chunkSecrets, string(val))
