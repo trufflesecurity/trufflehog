@@ -570,9 +570,9 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func likelyDuplicate(val []byte, dupesSlice []string) bool {
+func likelyDuplicate(val []byte, dupesSlice [][]byte) bool {
 	for _, v := range dupesSlice {
-		similarity := strutil.Similarity(string(val), v, metrics.NewLevenshtein())
+		similarity := strutil.Similarity(string(val), string(v), metrics.NewLevenshtein())
 		// close enough
 		if similarity > 0.9 {
 			return true
@@ -587,7 +587,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
 	detectorsWithResult := make([]detectors.Detector, 0, avgSecretsPerDetector)
-	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
+	chunkSecrets := make([][]byte, 0, avgSecretsPerDetector)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
@@ -633,7 +633,7 @@ nextChunk:
 
 					continue nextChunk
 				}
-				chunkSecrets = append(chunkSecrets, string(val))
+				chunkSecrets = append(chunkSecrets, val)
 			}
 		}
 
