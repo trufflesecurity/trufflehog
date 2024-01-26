@@ -652,7 +652,7 @@ nextChunk:
 			}
 		}
 
-		// Empty the dupes sliace and the detectorsWithResult map.
+		// Empty the dupes and detectors slice
 		chunkSecrets = chunkSecrets[:0]
 		detectorsWithResult = detectorsWithResult[:0]
 
