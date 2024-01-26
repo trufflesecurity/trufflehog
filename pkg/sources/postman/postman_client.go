@@ -24,27 +24,27 @@ const (
 )
 
 type Workspace struct {
-	Collections  []Collection  `json:"collections"`
-	CreatedAt    string        `json:"createdAt"`
-	CreatedBy    string        `json:"createdBy"`
-	Description  string        `json:"description"`
-	Environments []Environment `json:"environments"`
-	Id           string        `json:"id"`
-	Name         string        `json:"name"`
-	Type         string        `json:"type"`
-	UpdatedAt    string        `json:"updatedAt"`
-	UpdatedBy    string        `json:"updatedBy"`
-	Visibility   string        `json:"visibility"`
-}
-
-type Collection struct {
-	Name string `json:"name,omitempty"`
-	Uid  string `json:"uid"`
-}
-
-type Environment struct {
-	Name string `json:"name,omitempty"`
-	Uid  string `json:"uid"`
+	Workspace struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		Description string `json:"description"`
+		Visibility  string `json:"visibility"`
+		CreatedBy   string `json:"createdBy"`
+		UpdatedBy   string `json:"updatedBy"`
+		CreatedAt   string `json:"createdAt"`
+		UpdatedAt   string `json:"updatedAt"`
+		Collections []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+			UID  string `json:"uid"`
+		} `json:"collections"`
+		Environments []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+			UID  string `json:"uid"`
+		} `json:"environments"`
+	} `json:"workspace"`
 }
 
 type Variable struct {

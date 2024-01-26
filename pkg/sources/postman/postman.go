@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	SourceType = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
+	SourceType    = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
+	LINK_BASE_URL = "https://go.postman.co/"
 )
 
 type Source struct {
@@ -153,14 +154,12 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		s.client = nil
 		// No client needed if reading from local
 	default:
-		return errors.New("credential type not implemented for Travis CI")
+		return errors.New("credential type not implemented for Postman")
 	}
-
 	return nil
 }
 
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	defer close(chunksChan)
 	// Prep all of the objects to scan. Then scan them.
 	if s.conn.Workspaces != nil {
 		for _, workspace := range s.conn.Workspaces {
@@ -193,7 +192,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		logger.V(2).Info("scanning workspace")
 
 		varSubMap := []map[string]string{}
-		extraKeywords := []string{workspace.Name}
+		extraKeywords := []string{workspace.Workspace.Name}
 		s.scanGlobalVars(ctx, chunksChan, wrkspc, extraKeywords, &varSubMap)
 	} else {
 		// Check if user provided a valid Postman export zip file
@@ -215,6 +214,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 }
 
 func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Chunk, workspaceUUID string, extraKeywords []string, varSubMap *[]map[string]string) {
+	// Might also want to add long string where the other keys and values are nearby.
 	globalVars, err := s.client.GetGlobals(workspaceUUID)
 	if err != nil {
 		s.log.Error(err, "could not get global variables object", "workspace_uuid", workspaceUUID)
@@ -233,7 +233,7 @@ func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Ch
 		varSubstitutions[key] = fmt.Sprintf("%v", value)
 		// Create scan object
 		preScanObj := PMScanObject{
-			Link:          "https://go.postman.com/globals/" + globalVars.Data.ID,
+			Link:          LINK_BASE_URL + globalVars.Data.ID,
 			WorkspaceUUID: workspaceUUID,
 			GlobalID:      globalVars.Data.ID,
 			FieldType:     "Global Variable",
@@ -285,6 +285,7 @@ func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Ch
 }
 
 func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o PMScanObject) {
+	fmt.Println(o)
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
