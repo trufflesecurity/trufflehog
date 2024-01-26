@@ -592,22 +592,56 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorsWithResult := make([]detectors.Detector, 0, avgSecretsPerDetector)
+
+	detectorsToVerify := make(map[string]detectors.Detector, avgSecretsPerDetector)
 	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
 
-nextChunk:
+	var wgReverify sync.WaitGroup
+	dMu := sync.Mutex{}
+	detectorResults := make(map[string][]detectors.Result, avgSecretsPerDetector)
+
 	for chunk := range e.reverifiableChunksChan {
 		for _, detector := range chunk.detectors {
-			// DO NOT VERIFY at this stage of the pipeline.
-			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
-			if err != nil {
-				ctx.Logger().Error(err, "error verifying chunk")
-			}
+			detectorsToVerify[detector.Type().String()] = detector
+			detector := detector
+			wgReverify.Add(1)
+			go func() {
+				defer wgReverify.Done()
+				// DO NOT VERIFY at this stage of the pipeline.
+				results, err := detector.FromData(ctx, false, chunk.chunk.Data)
+				if err != nil {
+					ctx.Logger().Error(err, "error verifying chunk")
+				}
+				if len(results) == 0 {
+					return
+				}
+				dMu.Lock()
+				detectorResults[detector.Type().String()] = results
+				dMu.Unlock()
+				// detectorsWithResult = append(detectorsWithResult, detector)
+			}()
+		}
+		wgReverify.Wait()
 
-			if len(results) == 0 {
-				continue
+		for _, detector := range chunk.detectors {
+			nextDetector := false
+			results := detectorResults[detector.Type().String()]
+
+			// get all the results that are NOT part of this detector
+			for k, v := range detectorResults {
+				if k == detector.Type().String() {
+					continue
+				}
+				for _, res := range v {
+					var val []byte
+					if res.RawV2 != nil {
+						val = res.RawV2
+					} else {
+						val = res.Raw
+					}
+					chunkSecrets = append(chunkSecrets, string(val))
+				}
 			}
-			detectorsWithResult = append(detectorsWithResult, detector)
 
 			for _, res := range results {
 				var val []byte
@@ -627,7 +661,6 @@ nextChunk:
 					if e.reverificationTracking != nil {
 						e.reverificationTracking.increment()
 					}
-					chunk.reverifyWgDoneFn()
 					wgDetect.Add(1)
 					chunk.chunk.Verify = false // DO NOT VERIFY
 					e.detectableChunksChan <- detectableChunk{
@@ -637,30 +670,36 @@ nextChunk:
 						wgDoneFn: wgDetect.Done,
 					}
 
+					delete(detectorsToVerify, detector.Type().String())
+
 					// Empty the dupes and detectors slice
 					chunkSecrets = chunkSecrets[:0]
-					detectorsWithResult = detectorsWithResult[:0]
-					continue nextChunk
+					nextDetector = true
 				}
-				chunkSecrets = append(chunkSecrets, string(val))
+				if nextDetector {
+					break
+				}
 			}
-		}
 
-		for _, detector := range detectorsWithResult {
-			wgDetect.Add(1)
-			chunk.chunk.Verify = e.verify
-			e.detectableChunksChan <- detectableChunk{
-				chunk:    chunk.chunk,
-				detector: detector,
-				decoder:  chunk.decoder,
-				wgDoneFn: wgDetect.Done,
+			for k, detector := range detectorsToVerify {
+				wgDetect.Add(1)
+				chunk.chunk.Verify = e.verify
+				e.detectableChunksChan <- detectableChunk{
+					chunk:    chunk.chunk,
+					detector: detector,
+					decoder:  chunk.decoder,
+					wgDoneFn: wgDetect.Done,
+				}
+				delete(detectorsToVerify, k)
 			}
+
+			// for k := range detectorsToVerify {
+			// 	delete(detectorsToVerify, k)
+			// }
 		}
-
-		// Empty the dupes and detectors slice
-		chunkSecrets = chunkSecrets[:0]
-		detectorsWithResult = detectorsWithResult[:0]
-
+		for k := range detectorResults {
+			delete(detectorResults, k)
+		}
 		chunk.reverifyWgDoneFn()
 	}
 
