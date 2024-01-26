@@ -52,7 +52,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
-			RawV2:        []byte(token),
 		}
 
 		if verify {
@@ -99,10 +98,10 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 		}
 
 		extraData := map[string]string{
-			"Google_email":   token.Email,
-			"Email_verified": token.EmailVerified,
-			"Scope":          token.Scope,
-			"Access_type":    token.AccessType,
+			"google_email":   token.Email,
+			"email_verified": token.EmailVerified,
+			"scope":          token.Scope,
+			"access_type":    token.AccessType,
 		}
 
 		exp, err := strconv.ParseInt(token.Expiry, 10, 64)
