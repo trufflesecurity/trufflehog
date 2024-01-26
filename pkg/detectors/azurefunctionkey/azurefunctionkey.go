@@ -22,8 +22,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat      = regexp.MustCompile(`\b[a-zA-Z0-9_-]{54,56}==`)
-	azureUrlPat = regexp.MustCompile(`\bhttps:\/\/([a-zA-Z0-9-]{2,50})\.azurewebsites\.net\/api\/([a-zA-Z0-9-]{2,20})\b`)
+	keyPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9_-]{20,56})\b={0,2}`)
+	azureUrlPat = regexp.MustCompile(`\bhttps:\/\/([a-zA-Z0-9-]{2,30})\.azurewebsites\.net\/api\/([a-zA-Z0-9-]{2,30})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,10 +38,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	urlMatches := azureUrlPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[0])
+		resTrim := strings.Split(strings.TrimSpace(match[0]), " ")
+		resMatch := resTrim[len(resTrim)-1]
 		for _, urlMatch := range urlMatches {
 			resUrl := strings.TrimSpace(urlMatch[0])
-			fmt.Println(resUrl)
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureFunctionKey,
 				Raw:          []byte(resMatch + resUrl),
