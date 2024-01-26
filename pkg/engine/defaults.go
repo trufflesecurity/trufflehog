@@ -418,6 +418,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mattermostpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mavenlink"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense_v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meaningcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
@@ -823,6 +824,7 @@ func DefaultDetectors() []detectors.Detector {
 		&jdbc.Scanner{},
 		&privatekey.Scanner{},
 		&maxmindlicense.Scanner{},
+		&maxmindlicense_v2.Scanner{},
 		&airtableapikey.Scanner{},
 		&bitfinex.Scanner{},
 		&telegrambottoken.Scanner{},
