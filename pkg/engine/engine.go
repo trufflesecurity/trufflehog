@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/glaslos/ssdeep"
 	lru "github.com/hashicorp/golang-lru"
 	"google.golang.org/protobuf/proto"
 
@@ -613,13 +614,19 @@ nextChunk:
 					val = res.Raw
 				}
 
+				hash, err := ssdeep.FuzzyBytes(val)
+				if err != nil {
+					ctx.Logger().Error(err, "error hashing secret")
+					continue
+				}
+
 				// TODO: use leveinshtein distance to compare similar tokens
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// normalizeVal is a hack to only look at the last n characters of the secret. _ideally_ this normalizes
 				// the secret enough to compare similar secrets
-				if _, ok := detectorSecrets[string(normalizeVal(val))]; ok {
+				if _, ok := detectorSecrets[hash]; ok {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
