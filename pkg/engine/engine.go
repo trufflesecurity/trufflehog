@@ -427,7 +427,8 @@ func (e *Engine) startWorkers(ctx context.Context) {
 		}()
 	}
 
-	// reverifiers...
+	// Reverifier workers handle verification of chunks that have been detected by multiple detectors.
+	// They ensure that verification is disabled for any secrets that have been detected by multiple detectors.
 	ctx.Logger().V(2).Info("starting reverifier workers", "count", e.concurrency)
 	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.reverifiersWg.Add(1)
@@ -509,6 +510,9 @@ type detectableChunk struct {
 	wgDoneFn func()
 }
 
+// reVerifiableChunk is a decoded chunk that has multiple detectors that match it.
+// It will be initially processed with verification disabled, and then reprocessed with verification
+// enabled if the same secret was not found by multiple detectors.
 type reVerifiableChunk struct {
 	chunk            sources.Chunk
 	decoder          detectorspb.DecoderType
@@ -643,7 +647,7 @@ nextChunk:
 						wgDoneFn: wgDetect.Done,
 					}
 
-					// Empty the dupes and detectors slice
+					// Empty the dupes and detectors slice.
 					chunkSecrets = chunkSecrets[:0]
 					detectorsWithResult = detectorsWithResult[:0]
 					continue nextChunk
