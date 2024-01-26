@@ -430,7 +430,7 @@ func (e *Engine) startWorkers(ctx context.Context) {
 	// Reverifier workers handle verification of chunks that have been detected by multiple detectors.
 	// They ensure that verification is disabled for any secrets that have been detected by multiple detectors.
 	ctx.Logger().V(2).Info("starting reverifier workers", "count", e.concurrency)
-	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
+	for worker := uint64(0); worker < uint64(e.concurrency)*100; worker++ {
 		e.reverifiersWg.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "secret_worker_id", common.RandomID(5))
