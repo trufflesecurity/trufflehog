@@ -572,7 +572,11 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 func likelyDuplicate(val []byte, dupesSlice [][]byte) bool {
 	for _, v := range dupesSlice {
+		if bytes.Equal(val, v) {
+			return true
+		}
 		similarity := strutil.Similarity(string(val), string(v), metrics.NewLevenshtein())
+
 		// close enough
 		if similarity > 0.9 {
 			return true
@@ -648,7 +652,7 @@ nextChunk:
 			}
 		}
 
-		// Empty the dupes sliace and the detectorsWithResult map.
+		// Empty the dupes and detectors slice
 		chunkSecrets = chunkSecrets[:0]
 		detectorsWithResult = detectorsWithResult[:0]
 
