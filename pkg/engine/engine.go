@@ -468,7 +468,6 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
-	fmt.Printf("max %d\n", max)
 
 	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 		ctx.Logger().Error(err, "error cleaning temp artifacts")
@@ -583,8 +582,6 @@ func normalizeVal(b []byte) []byte {
 	}
 	return b[len(b)-n:]
 }
-
-var max uint64
 
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
