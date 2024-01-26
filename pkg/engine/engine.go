@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/adrg/strutil"
+	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru"
 	"google.golang.org/protobuf/proto"
 
@@ -102,6 +104,12 @@ type Engine struct {
 type reverificationTracking struct {
 	reverificationDuplicateCount int
 	mu                           sync.Mutex
+}
+
+func (r *reverificationTracking) increment() {
+	r.mu.Lock()
+	r.reverificationDuplicateCount++
+	r.mu.Unlock()
 }
 
 // Option is used to configure the engine during initialization using functional options.
@@ -583,16 +591,27 @@ func normalizeVal(s string) string {
 	return s[len(s)-n:]
 }
 
+func likelyDuplicate(val []byte, dupesSlice []string) bool {
+	for _, v := range dupesSlice {
+		similarity := strutil.Similarity(string(val), v, metrics.NewLevenshtein())
+		// close enough
+		if similarity > 0.9 {
+			return true
+		}
+	}
+	return false
+}
+
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
 	// Reuse the same map to avoid allocations.
 	const avg = 8
-	dupes := make(map[string]struct{}, avg)
 	detectorsWithResult := make(map[detectors.Detector]struct{}, avg)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
+		dupes := make([]string, 0, avg)
 		for _, detector := range chunk.detectors {
 			// DO NOT VERIFY at this stage of the pipeline.
 			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
@@ -613,21 +632,15 @@ nextChunk:
 					val = res.Raw
 				}
 
-				// TODO: use leveinshtein distance to compare similar tokens
+				// Use levenstein distance to determine if the secret is likely the same.
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				// normalizeVal is a hack to only look at the last n characters of the secret. _ideally_ this normalizes
-				// the secret enough to compare similar secrets
-				val = []byte(normalizeVal(string(val)))
-
-				if _, ok := dupes[string(val)]; ok {
+				if likelyDuplicate(val, dupes) {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
-						e.reverificationTracking.mu.Lock()
-						e.reverificationTracking.reverificationDuplicateCount++
-						e.reverificationTracking.mu.Unlock()
+						e.reverificationTracking.increment()
 					}
 					chunk.reverifyWgDoneFn()
 					wgDetect.Add(1)
@@ -641,7 +654,7 @@ nextChunk:
 
 					continue nextChunk
 				}
-				dupes[string(val)] = struct{}{}
+				dupes = append(dupes, string(val))
 			}
 		}
 
@@ -656,10 +669,6 @@ nextChunk:
 			}
 		}
 
-		// Empty the dupes map.
-		for k := range dupes {
-			delete(dupes, k)
-		}
 		chunk.reverifyWgDoneFn()
 	}
 
