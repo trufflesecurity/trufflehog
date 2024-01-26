@@ -576,6 +576,11 @@ func likelyDuplicate(ctx context.Context, val string, dupesSlice []string) bool 
 			ctx.Logger().V(2).Info("found exact duplicate", "val", val, "v", v)
 			return true
 		}
+		// Avoid comparing strings of vastly different lengths.
+		if len(v)*10 < len(val)*9 || len(v)*10 > len(val)*11 {
+			continue
+		}
+
 		similarity := strutil.Similarity(val, v, metrics.NewLevenshtein())
 
 		// close enough
