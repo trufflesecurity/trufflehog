@@ -584,7 +584,7 @@ func likelyDuplicate(val []byte, dupesSlice []string) bool {
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
-	// Reuse the same map to avoid allocations.
+	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
 	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
 	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
@@ -637,9 +637,6 @@ nextChunk:
 			}
 		}
 
-		// reset the slice
-		chunkSecrets = chunkSecrets[:0]
-
 		for detector := range detectorsWithResult {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
@@ -649,6 +646,13 @@ nextChunk:
 				decoder:  chunk.decoder,
 				wgDoneFn: wgDetect.Done,
 			}
+		}
+
+		// Empty the dupes sliace and the detectorsWithResult map.
+		chunkSecrets = chunkSecrets[:0]
+
+		for k := range detectorsWithResult {
+			delete(detectorsWithResult, k)
 		}
 
 		chunk.reverifyWgDoneFn()
