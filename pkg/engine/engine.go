@@ -570,15 +570,17 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func likelyDuplicate(val []byte, dupesSlice [][]byte) bool {
+func likelyDuplicate(val string, dupesSlice []string) bool {
 	for _, v := range dupesSlice {
-		if bytes.Equal(val, v) {
+		if v == val {
+			fmt.Println("found exact duplicate", val, v)
 			return true
 		}
 		similarity := strutil.Similarity(string(val), string(v), metrics.NewLevenshtein())
 
 		// close enough
 		if similarity > 0.9 {
+			fmt.Println("found similar duplicate", val, v, similarity)
 			return true
 		}
 	}
@@ -591,7 +593,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
 	detectorsWithResult := make([]detectors.Detector, 0, avgSecretsPerDetector)
-	chunkSecrets := make([][]byte, 0, avgSecretsPerDetector)
+	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
@@ -619,7 +621,8 @@ nextChunk:
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				if likelyDuplicate(val, chunkSecrets) {
+				valStr := string(val)
+				if likelyDuplicate(valStr, chunkSecrets) {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
@@ -635,9 +638,12 @@ nextChunk:
 						wgDoneFn: wgDetect.Done,
 					}
 
+					// Empty the dupes and detectors slice
+					chunkSecrets = chunkSecrets[:0]
+					detectorsWithResult = detectorsWithResult[:0]
 					continue nextChunk
 				}
-				chunkSecrets = append(chunkSecrets, val)
+				chunkSecrets = append(chunkSecrets, valStr)
 			}
 		}
 
