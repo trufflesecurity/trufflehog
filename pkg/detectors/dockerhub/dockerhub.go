@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/golang-jwt/jwt/v4"
 
@@ -127,9 +128,9 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 
 		if claims, ok := token.Claims.(*hubJwtClaims); ok {
 			extraData := map[string]string{
-				"Hub_username": username,
-				"Hub_email":    claims.HubClaims.Email,
-				"Hub_scope":    claims.Scope,
+				"hub_username": username,
+				"hub_email":    claims.HubClaims.Email,
+				"hub_scope":    claims.Scope,
 			}
 			return true, extraData, nil
 		}
@@ -142,7 +143,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 		}
 
 		extraData := map[string]string{
-			"Hub_username": username,
+			"hub_username": username,
 			"2fa_required": "true",
 		}
 		return true, extraData, nil
