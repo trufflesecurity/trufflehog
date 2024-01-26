@@ -590,7 +590,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
+	detectorsWithResult := make([]detectors.Detector, 0, avgSecretsPerDetector)
 	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
 
 nextChunk:
@@ -605,7 +605,7 @@ nextChunk:
 			if len(results) == 0 {
 				continue
 			}
-			detectorsWithResult[detector] = struct{}{}
+			detectorsWithResult = append(detectorsWithResult, detector)
 
 			for _, res := range results {
 				var val []byte
@@ -641,7 +641,7 @@ nextChunk:
 			}
 		}
 
-		for detector := range detectorsWithResult {
+		for _, detector := range detectorsWithResult {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
@@ -654,10 +654,7 @@ nextChunk:
 
 		// Empty the dupes sliace and the detectorsWithResult map.
 		chunkSecrets = chunkSecrets[:0]
-
-		for k := range detectorsWithResult {
-			delete(detectorsWithResult, k)
-		}
+		detectorsWithResult = detectorsWithResult[:0]
 
 		chunk.reverifyWgDoneFn()
 	}
