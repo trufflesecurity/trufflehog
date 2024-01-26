@@ -624,7 +624,6 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 		wgReverify.Wait()
 
 		for _, detector := range chunk.detectors {
-			nextDetector := false
 			results := detectorResults[detector.Type().String()]
 
 			// get all the results that are NOT part of this detector
@@ -642,6 +641,8 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 					chunkSecrets = append(chunkSecrets, string(val))
 				}
 			}
+
+			likelyDup := false
 
 			for _, res := range results {
 				var val []byte
@@ -661,42 +662,39 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 					if e.reverificationTracking != nil {
 						e.reverificationTracking.increment()
 					}
-					wgDetect.Add(1)
-					chunk.chunk.Verify = false // DO NOT VERIFY
-					e.detectableChunksChan <- detectableChunk{
-						chunk:    chunk.chunk,
-						detector: detector,
-						decoder:  chunk.decoder,
-						wgDoneFn: wgDetect.Done,
-					}
-
-					delete(detectorsToVerify, detector.Type().String())
-
-					// Empty the dupes and detectors slice
-					chunkSecrets = chunkSecrets[:0]
-					nextDetector = true
-				}
-				if nextDetector {
-					break
+					likelyDup = true
 				}
 			}
 
-			for k, detector := range detectorsToVerify {
+			if likelyDup {
 				wgDetect.Add(1)
-				chunk.chunk.Verify = e.verify
+				chunk.chunk.Verify = false // DO NOT VERIFY
 				e.detectableChunksChan <- detectableChunk{
 					chunk:    chunk.chunk,
 					detector: detector,
 					decoder:  chunk.decoder,
 					wgDoneFn: wgDetect.Done,
 				}
-				delete(detectorsToVerify, k)
-			}
 
-			// for k := range detectorsToVerify {
-			// 	delete(detectorsToVerify, k)
-			// }
+				delete(detectorsToVerify, detector.Type().String())
+
+				// Empty the dupes and detectors slice
+				chunkSecrets = chunkSecrets[:0]
+			}
 		}
+
+		for k, detector := range detectorsToVerify {
+			wgDetect.Add(1)
+			chunk.chunk.Verify = e.verify
+			e.detectableChunksChan <- detectableChunk{
+				chunk:    chunk.chunk,
+				detector: detector,
+				decoder:  chunk.decoder,
+				wgDoneFn: wgDetect.Done,
+			}
+			delete(detectorsToVerify, k)
+		}
+
 		for k := range detectorResults {
 			delete(detectorResults, k)
 		}
