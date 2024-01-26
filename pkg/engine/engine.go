@@ -563,27 +563,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-// There has got to be a better way, my brain is fried
-func normalizeVal(b []byte) []byte {
-	length := len(b)
-	var n int
-	switch {
-	case length <= 20:
-		n = 10
-	case length <= 40:
-		n = 30
-	case length <= 70:
-		n = 50
-	default:
-		n = 60
-	}
-
-	if n > length {
-		return b
-	}
-	return b[len(b)-n:]
-}
-
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
