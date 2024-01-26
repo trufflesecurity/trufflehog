@@ -570,27 +570,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-// There has got to be a better way, my brain is fried
-func normalizeVal(s string) string {
-	var n int
-	length := len(s)
-	switch {
-	case length <= 20:
-		n = 10
-	case length <= 40:
-		n = 30
-	case length <= 70:
-		n = 50
-	default:
-		n = 60
-	}
-
-	if n > length {
-		return s
-	}
-	return s[len(s)-n:]
-}
-
 func likelyDuplicate(val []byte, dupesSlice []string) bool {
 	for _, v := range dupesSlice {
 		similarity := strutil.Similarity(string(val), v, metrics.NewLevenshtein())
@@ -606,12 +585,12 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
 	// Reuse the same map to avoid allocations.
-	const avg = 8
-	detectorsWithResult := make(map[detectors.Detector]struct{}, avg)
+	const avgSecretsPerDetector = 8
+	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
+	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
-		dupes := make([]string, 0, avg)
 		for _, detector := range chunk.detectors {
 			// DO NOT VERIFY at this stage of the pipeline.
 			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
@@ -636,7 +615,7 @@ nextChunk:
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				if likelyDuplicate(val, dupes) {
+				if likelyDuplicate(val, chunkSecrets) {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
@@ -654,9 +633,12 @@ nextChunk:
 
 					continue nextChunk
 				}
-				dupes = append(dupes, string(val))
+				chunkSecrets = append(chunkSecrets, string(val))
 			}
 		}
+
+		// reset the slice
+		chunkSecrets = chunkSecrets[:0]
 
 		for detector := range detectorsWithResult {
 			wgDetect.Add(1)
