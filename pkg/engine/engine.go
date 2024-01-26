@@ -570,9 +570,13 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func likelyDuplicate(val []byte, dupesSlice []string) bool {
+func likelyDuplicate(val string, dupesSlice []string) bool {
 	for _, v := range dupesSlice {
-		similarity := strutil.Similarity(string(val), v, metrics.NewLevenshtein())
+		if v == val {
+			return true
+		}
+		similarity := strutil.Similarity(val, v, metrics.NewLevenshtein())
+
 		// close enough
 		if similarity > 0.9 {
 			return true
@@ -615,7 +619,7 @@ nextChunk:
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				if likelyDuplicate(val, chunkSecrets) {
+				if likelyDuplicate(string(val), chunkSecrets) {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
