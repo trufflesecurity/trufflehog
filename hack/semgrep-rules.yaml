@@ -1,0 +1,10 @@
+rules:
+  - id: no-printing-in-detectors
+    patterns:
+      - pattern-either:
+          - pattern: fmt.Println(...)
+          - pattern: fmt.Printf(...)
+          - pattern: import("log")
+    message: "Do not print or log inside of detectors."
+    languages: [go]
+    severity: ERROR

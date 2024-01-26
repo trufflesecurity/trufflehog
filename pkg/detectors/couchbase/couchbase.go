@@ -3,11 +3,11 @@ package couchbase
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
-	"log"
 	"strings"
 	"time"
 	"unicode"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/couchbase/gocb/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -107,7 +107,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// when accessing Capella from a different Wide Area Network
 					// or Availability Zone (e.g. your laptop).
 					if err := options.ApplyProfile(gocb.ClusterConfigProfileWanDevelopment); err != nil {
-						log.Fatal("apply profile err", err)
+						continue
 					}
 
 					// Initialize the Connection
