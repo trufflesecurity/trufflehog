@@ -468,6 +468,7 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
+	fmt.Printf("max %d\n", max)
 
 	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 		ctx.Logger().Error(err, "error cleaning temp artifacts")
@@ -583,13 +584,15 @@ func normalizeVal(b []byte) []byte {
 	return b[len(b)-n:]
 }
 
+var max uint64
+
 func (e *Engine) reverifierWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
 	// Reuse the same map to avoid allocations.
-	const avg = 8
-	dupes := make(map[string]struct{}, avg)
-	detectorsWithResult := make(map[detectors.Detector]struct{}, avg)
+	const avgSecretsPerDetector = 8
+	detectorSecrets := make(map[string]struct{}, avgSecretsPerDetector)
+	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
@@ -619,7 +622,7 @@ nextChunk:
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// normalizeVal is a hack to only look at the last n characters of the secret. _ideally_ this normalizes
 				// the secret enough to compare similar secrets
-				if _, ok := dupes[string(normalizeVal(val))]; ok {
+				if _, ok := detectorSecrets[string(normalizeVal(val))]; ok {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
@@ -639,7 +642,7 @@ nextChunk:
 
 					continue nextChunk
 				}
-				dupes[string(val)] = struct{}{}
+				detectorSecrets[string(val)] = struct{}{}
 			}
 		}
 
@@ -654,10 +657,14 @@ nextChunk:
 			}
 		}
 
-		// Empty the dupes map.
-		for k := range dupes {
-			delete(dupes, k)
+		// Empty the dupes map and the detectorsWithResult map.
+		for k := range detectorSecrets {
+			delete(detectorSecrets, k)
 		}
+		for k := range detectorsWithResult {
+			delete(detectorsWithResult, k)
+		}
+
 		chunk.reverifyWgDoneFn()
 	}
 
