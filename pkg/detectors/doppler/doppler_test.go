@@ -50,6 +50,10 @@ func TestDoppler_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Doppler,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"key type":  "personal",
+						"workplace": "test",
+					},
 				},
 			},
 			wantErr: false,
