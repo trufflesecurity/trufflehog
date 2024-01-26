@@ -17,6 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -65,7 +66,7 @@ type Engine struct {
 	printAvgDetectorTime bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
-	ahoCorasickCore *AhoCorasickCore
+	ahoCorasickCore *ahocorasick.AhoCorasickCore
 
 	// Engine synchronization primitives.
 	sourceManager        *sources.SourceManager
@@ -314,7 +315,7 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	ctx.Logger().V(4).Info("engine initialized")
 
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = NewAhoCorasickCore(e.detectors)
+	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
@@ -463,7 +464,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 2
-	chunkSpecificDetectors := make(map[DetectorKey]detectors.Detector, avgDetectorsPerChunk)
+	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
