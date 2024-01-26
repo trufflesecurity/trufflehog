@@ -3,8 +3,9 @@ package rabbitmq
 import (
 	"context"
 	"net/url"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -59,9 +60,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			_, err := amqp.Dial(urlMatch)
+			conn, err := amqp.Dial(urlMatch)
 			if err == nil {
 				s.Verified = true
+			}
+			if conn != nil {
+				conn.Close()
 			}
 		}
 

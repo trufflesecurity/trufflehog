@@ -3,7 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"

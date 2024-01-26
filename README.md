@@ -65,6 +65,10 @@ cd trufflehog; go install
 
 # Using installation script
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+# Using installation script, verify checksum signature (requires cosign to be installed)
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
+
 # Using installation script to install a specific version
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
@@ -102,6 +106,9 @@ Verification steps are as follow:
    ```
 
 Replace `{version}` with the downloaded files version
+
+Alternatively, if you are using installation script, pass `-v` option to perform signature verification.
+This required Cosign binary to be installed prior to running installation script.
 
 # :rocket: Quick Start
 
@@ -421,6 +428,12 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
 ## Pre-commit Hook
 
 Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
+
+**Key Usage Note:**
+
+- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures Trufflehog analyzes all intended changes.
+- **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
+
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
 
 ```yaml

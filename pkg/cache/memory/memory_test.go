@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestCache(t *testing.T) {
@@ -34,7 +32,7 @@ func TestCache(t *testing.T) {
 	// Test delete.
 	c.Delete("key1")
 	v, ok = c.Get("key1")
-	if ok || v != "" {
+	if ok || v != nil {
 		t.Fatalf("Unexpected value for key1 after delete: %v, %v", v, ok)
 	}
 
@@ -42,7 +40,7 @@ func TestCache(t *testing.T) {
 	c.Set("key10", "key10")
 	c.Clear()
 	v, ok = c.Get("key10")
-	if ok || v != "" {
+	if ok || v != nil {
 		t.Fatalf("Unexpected value for key10 after clear: %v, %v", v, ok)
 	}
 
@@ -60,7 +58,10 @@ func TestCache(t *testing.T) {
 	}
 
 	// Test getting only the values.
-	vals := c.Values()
+	vals := make([]string, 0, c.Count())
+	for _, v := range c.Values() {
+		vals = append(vals, v.(string))
+	}
 	sort.Strings(vals)
 	sort.Strings(values)
 	if !cmp.Equal(values, vals) {
@@ -82,7 +83,8 @@ func TestCache(t *testing.T) {
 }
 
 func TestCache_NewWithData(t *testing.T) {
-	c := NewWithData(logContext.Background(), []string{"key1", "key2", "key3"})
+	data := []CacheEntry{{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}
+	c := NewWithData(data)
 
 	// Test the count.
 	if c.Count() != 3 {

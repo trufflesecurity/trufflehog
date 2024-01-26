@@ -65,6 +65,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
@@ -305,6 +306,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
@@ -525,6 +527,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/positionstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postageapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postbacks"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postgres"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/posthog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postmark"
@@ -1498,6 +1501,7 @@ func DefaultDetectors() []detectors.Detector {
 		speechtextai.Scanner{},
 		databox.Scanner{},
 		postbacks.Scanner{},
+		postgres.Scanner{},
 		collect2.Scanner{},
 		uclassify.Scanner{},
 		holistic.Scanner{},
@@ -1602,6 +1606,8 @@ func DefaultDetectors() []detectors.Detector {
 		azurestorage.Scanner{},
 		planetscaledb.Scanner{},
 		jiratoken_v2.Scanner{},
+		&googleoauth2.Scanner{},
+		&azuredevopspersonalaccesstoken.Scanner{},
 	}
 
 }

@@ -2,10 +2,10 @@ package zenscrape
 
 import (
 	"context"
-	"io"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.zenscrape.com/api/v1/get?url=http://www.google.com", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.zenscrape.com/api/v1/status", nil)
 			if err != nil {
 				continue
 			}
@@ -56,20 +56,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-
-				if !strings.Contains(body, "Not enough requests.") {
+				if (res.StatusCode >= 200 && res.StatusCode < 300) || res.StatusCode == 429 {
 					s1.Verified = true
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
 					}
 				}
-
 			}
 		}
 
