@@ -23,6 +23,30 @@ const (
 	defaultContentType = "*"
 )
 
+type Workspace struct {
+	Collections  []Collection  `json:"collections"`
+	CreatedAt    string        `json:"createdAt"`
+	CreatedBy    string        `json:"createdBy"`
+	Description  string        `json:"description"`
+	Environments []Environment `json:"environments"`
+	Id           string        `json:"id"`
+	Name         string        `json:"name"`
+	Type         string        `json:"type"`
+	UpdatedAt    string        `json:"updatedAt"`
+	UpdatedBy    string        `json:"updatedBy"`
+	Visibility   string        `json:"visibility"`
+}
+
+type Collection struct {
+	Name string `json:"name,omitempty"`
+	Uid  string `json:"uid"`
+}
+
+type Environment struct {
+	Name string `json:"name,omitempty"`
+	Uid  string `json:"uid"`
+}
+
 type Variable struct {
 	Key          string      `json:"key"`
 	Value        interface{} `json:"value"`
@@ -128,6 +152,30 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 	return resp, nil
 }
 
+// GetWorkspace returns the workspace for a given workspace
+func (c *Client) GetWorkspace(workspace_uuid string) (Workspace, error) {
+	var workspace Workspace
+
+	url := fmt.Sprintf(WORKSPACE_URL, workspace_uuid)
+	r, err := c.getPostmanReq(url, nil)
+	if err != nil {
+		err = fmt.Errorf("could not get workspace: %s", workspace_uuid)
+		return workspace, err
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		err = fmt.Errorf("could not read response body for workspace: %s", workspace_uuid)
+		return workspace, err
+	}
+
+	if err := json.Unmarshal([]byte(body), &workspace); err != nil {
+		err = fmt.Errorf("could not unmarshal workspace JSON for workspace: %s", workspace_uuid)
+		return workspace, err
+	}
+	return workspace, nil
+}
+
 // GetGlobals returns the global variables for a given workspace
 func (c *Client) GetGlobals(workspace_uuid string) (GlobalVariables, error) {
 	var globalVars GlobalVariables
@@ -161,11 +209,5 @@ func (c *Client) GetGlobals(workspace_uuid string) (GlobalVariables, error) {
 // // GetCollection returns the collection for a given collection
 // func (c *Client) GetCollection(collection_uuid string) (map[string]interface{}, error) {
 // 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
-// 	return c.getURLParseJSON(url, nil)
-// }
-
-// // GetWorkspace returns the workspace for a given workspace
-// func (c *Client) GetWorkspace(workspace_uuid string) (map[string]interface{}, error) {
-// 	url := fmt.Sprintf(WORKSPACE_URL, workspace_uuid)
 // 	return c.getURLParseJSON(url, nil)
 // }

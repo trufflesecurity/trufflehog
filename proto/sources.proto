@@ -385,11 +385,12 @@ message Postman {
     credentials.Unauthenticated unauthenticated = 1;
     string token = 2;
   }
-  string target = 3; 
-  // 1. Pass in the collection_uuid, workspace_uuid, environment_uuid to use with API
-  // 2. Pass a file path to an individual collection or env json file or the Postman export zip.
-  repeated string exclude_collections = 4; // comma separated list of collection uuids
-  repeated string exclude_environments = 5; // comma separated list of environment uuids
-  repeated string include_collections = 6; // comma separated list of collection uuids
-  repeated string include_environments = 7; // comma separated list of environment uuids
+  repeated string workspaces = 3; 
+  repeated string collections = 4;
+  repeated string environments = 5;
+  repeated string exclude_collections = 6; // comma separated list of collection uuids
+  repeated string exclude_environments = 7; // comma separated list of environment uuids
+  repeated string include_collections = 8; // comma separated list of collection uuids
+  repeated string include_environments = 9; // comma separated list of environment uuids
 }
+ 

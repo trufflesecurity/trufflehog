@@ -4833,8 +4833,6 @@ func (m *Postman) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Target
-
 	switch m.Credential.(type) {
 
 	case *Postman_Unauthenticated:
