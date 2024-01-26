@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(keyRes),
 			}
 			s1.ExtraData = map[string]string{
-				"rotation_guide": "https://support.maxmind.com/hc/en-us/articles/4407111898779-Deactivate-my-License-Key",
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 			}
 
 			if verify {

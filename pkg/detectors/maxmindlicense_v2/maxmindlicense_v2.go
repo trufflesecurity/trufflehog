@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9]{2,7})\b`)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
+	keyPat = regexp.MustCompile(`\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -51,9 +51,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_MaxMindLicense,
 				Redacted:     idRes,
 				Raw:          []byte(keyRes),
+				RawV2:        []byte(keyRes + idRes),
 			}
 			s.ExtraData = map[string]string{
-				"rotation_guide": "https://support.maxmind.com/hc/en-us/articles/4407111898779-Deactivate-my-License-Key",
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 			}
 
 			if verify {

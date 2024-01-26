@@ -53,7 +53,7 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 					Redacted:     "662034",
 					Verified:     true,
 					ExtraData: map[string]string{
-						"rotation_guide": "https://support.maxmind.com/hc/en-us/articles/4407111898779-Deactivate-my-License-Key",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 					},
 				},
 			},
@@ -73,7 +73,7 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 					Redacted:     "662034",
 					Verified:     false,
 					ExtraData: map[string]string{
-						"rotation_guide": "https://support.maxmind.com/hc/en-us/articles/4407111898779-Deactivate-my-License-Key",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 					},
 				},
 			},
