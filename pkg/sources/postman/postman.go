@@ -22,9 +22,12 @@ import (
 )
 
 const (
-	SourceType      = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
-	LINK_BASE_URL   = "https://go.postman.co/"
-	KEYWORD_PADDING = 50
+	SourceType       = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
+	LINK_BASE_URL    = "https://go.postman.co/"
+	KEYWORD_PADDING  = 50
+	GLOBAL_TYPE      = "global"
+	ENVIRONMENT_TYPE = "environment"
+	REQUEST_TYPE     = "request"
 )
 
 type Source struct {
@@ -39,6 +42,7 @@ type Source struct {
 	client  *Client
 	conn    *sourcespb.Postman
 	sources.CommonSourceUnitUnmarshaller
+	detectorKeywords map[string]struct{}
 }
 
 //ToDo: Update this to match the proto file
@@ -70,23 +74,25 @@ func IsValidUUID(u string) bool {
 	return err == nil
 }
 
-func verifyPostmanExportZip(filepath string) bool {
+func verifyPostmanExportZip(filepath string) ArchiveJSON {
+	var archiveData ArchiveJSON
+
 	// Open the ZIP archive.
 	r, err := zip.OpenReader(filepath)
 	if err != nil {
 		fmt.Println("Error opening ZIP file:", err)
-		return false
+		return archiveData
 	}
 	defer r.Close()
 
 	// Iterate through the files in the ZIP archive.
 	for _, file := range r.File {
-		if file.Name == "archive.json" {
+		if strings.HasSuffix(file.Name, "archive.json") {
 			// Open the file within the ZIP archive.
 			rc, err := file.Open()
 			if err != nil {
 				fmt.Println("Error opening archive.json:", err)
-				return false
+				return archiveData
 			}
 			defer rc.Close()
 
@@ -94,21 +100,20 @@ func verifyPostmanExportZip(filepath string) bool {
 			contents, err := io.ReadAll(rc)
 			if err != nil {
 				fmt.Println("Error reading archive.json:", err)
-				return false
+				return archiveData
 			}
 
 			// Unmarshal the JSON contents into the ArchiveJSON struct.
-			var archiveData ArchiveJSON
 			if err := json.Unmarshal(contents, &archiveData); err != nil {
 				fmt.Println("Error decoding JSON:", err)
-				return false
+				return archiveData
 			}
 
 			// Check if the structure matches your requirements.
-			return archiveData.Collection != nil || archiveData.Environment != nil
+			return archiveData
 		}
 	}
-	return false
+	return archiveData
 }
 
 // Type returns the type of source.
@@ -141,6 +146,12 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 	s.conn = &conn
 
+	keywords := make(map[string]struct{})
+	for _, key := range s.conn.DetectorKeywords {
+		keywords[key] = struct{}{}
+	}
+	s.detectorKeywords = keywords
+
 	switch conn.Credential.(type) {
 	case *sourcespb.Postman_Token:
 		if conn.GetToken() == "" {
@@ -148,10 +159,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		}
 		s.client = NewClient(conn.GetToken())
 		s.client.HTTPClient = common.RetryableHttpClientTimeout(3)
-
-		// I think we should check access to the workspace
-
-		//Consider adding an auth check here. But even if token is valid, doesn't mean we have access to the target source. So unnecssary?
 	case *sourcespb.Postman_Unauthenticated:
 		s.client = nil
 		// No client needed if reading from local
@@ -185,47 +192,87 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, wrkspc string) error {
-	logger := ctx.Logger().WithValues("workspace", wrkspc)
-	if IsValidUUID(wrkspc) {
-		// User provided a valid UUID for interaction with API
-		workspace, err := s.client.GetWorkspace(wrkspc)
-		if err != nil {
-			s.log.Error(err, "could not get workspace object", "workspace_uuid", wrkspc)
-		}
-		logger.V(2).Info("scanning workspace")
+	// var workspace WorkspaceObj
+	var varSubMap []map[string]string
+	extraKeywords := []map[string]interface{}{}
 
-		varSubMap := []map[string]string{}
-		extraKeywords := []string{workspace.Workspace.Name}
-		s.scanGlobalVars(ctx, chunksChan, wrkspc, extraKeywords, &varSubMap)
-	} else {
-		// Check if user provided a valid Postman export zip file
-		isWorkspace := verifyPostmanExportZip(wrkspc)
-		if !isWorkspace {
-			logger.Error(errors.New("invalid workspace"), "invalid workspace", "workspace", wrkspc)
-			return errors.New("invalid workspace filepath")
-		}
-		// No Global Vars to scan when providing a local file
+	logger := ctx.Logger().WithValues("workspace", wrkspc)
+
+	// Used the IsValidUUID function below to check
+	// if the user passed in a UUID (for interaction with API)
+	// or a filepath (for interaction with local file)
+	// if IsValidUUID(wrkspc) {
+
+	w, err := s.client.GetWorkspace(wrkspc)
+	if err != nil {
+		s.log.Error(err, "could not get workspace object", "workspace_uuid", wrkspc)
 	}
-	// Get all collections in workspace
-	// Filter out collections
-	//scanCollection(ctx, chunksChan)
-	// Get all environments in workspace
-	// Filter out enviroments
-	// Get all globals in workspace
-	// Scan workspace name
+	logger.V(2).Info("scanning workspace")
+
+	// Scan global vars
+	ctx.Logger().V(2).Info("starting scanning global variables")
+	extraKeywords = append(extraKeywords, map[string]interface{}{w.Workspace.Name: struct{}{}})
+	globalVars, err := s.client.GetGlobals(wrkspc)
+	if err != nil {
+		s.log.Error(err, "could not get global variables object", "workspace_uuid", wrkspc)
+	}
+	s.scanVars(ctx, chunksChan, wrkspc, globalVars.VariableData, GLOBAL_TYPE, extraKeywords, &varSubMap)
+	ctx.Logger().V(2).Info("finished scanning global variables")
+
+	// Filter Enviroments
+	environments := filterItemsByUUID(w.Workspace.Environments, s.conn.ExcludeEnvironments, s.conn.IncludeEnvironments)
+
+	// Scan Environments
+	for _, env := range environments {
+		envVars, err := s.client.GetEnvironment(env.UUID)
+		if err != nil {
+			s.log.Error(err, "could not get environment object", "environment_uuid", env.UUID)
+		}
+		s.scanEnvironment(ctx, chunksChan, wrkspc, env.UUID, envVars, extraKeywords, &varSubMap)
+	}
+
+	// Filter Collections
+	collections := filterItemsByUUID(w.Workspace.Collections, s.conn.ExcludeCollections, s.conn.IncludeCollections)
+	fmt.Println(collections)
+
+	// Else Clause to handle local files
+	// } else {
+	// 	// Check if user provided a valid Postman export zip file
+	// 	archiveJSON := verifyPostmanExportZip(wrkspc)
+	// 	if archiveJSON.Collection == nil && archiveJSON.Environment == nil {
+	// 		logger.Error(errors.New("invalid workspace"), "invalid workspace", "workspace", wrkspc)
+	// 		return errors.New("invalid workspace filepath")
+	// 	}
+	// 	// No Global Vars to scan when providing a local file
+	// 	// Put ArchiveJSON into Workspace struct for consistency
+	// 	workspace.Workspace.ID = wrkspc
+	// 	for collection := range archiveJSON.Collection {
+	// 		workspace.Workspace.Collections = append(workspace.Workspace.Collections, IDNameUUID{ID: collection})
+	// 	}
+	// 	for environment := range archiveJSON.Environment {
+	// 		workspace.Workspace.Environments = append(workspace.Workspace.Environments, IDNameUUID{ID: environment})
+	// 	}
+	// }
+
 	return nil
 }
 
-func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Chunk, workspaceUUID string, extraKeywords []string, varSubMap *[]map[string]string) {
-	// Might also want to add long string where the other keys and values are nearby.
-	globalVars, err := s.client.GetGlobals(workspaceUUID)
-	if err != nil {
-		s.log.Error(err, "could not get global variables object", "workspace_uuid", workspaceUUID)
+func (s *Source) scanEnvironment(ctx context.Context, chunksChan chan *sources.Chunk, workspaceUUID string, environmentUUID string, envVars Environment, extraKeywords []map[string]interface{}, varSubMap *[]map[string]string) {
+	// Note: we won't have a envUUID, but we want to use the local path, so keep that in mind.
+	logger := ctx.Logger().WithValues("workspace", workspaceUUID)
+	logger.V(2).Info("scanning environment", "environment_uuid", environmentUUID)
+	for _, word := range strings.Split(envVars.VariableData.Name, " ") {
+		extraKeywords = append(extraKeywords, map[string]interface{}{string(word): struct{}{}})
 	}
-	ctx.Logger().V(2).Info("starting scanning global variables")
+	s.scanVars(ctx, chunksChan, workspaceUUID, envVars.VariableData, ENVIRONMENT_TYPE, extraKeywords, nil)
+	logger.V(2).Info("finished scanning environment", "environment_uuid", environmentUUID)
+}
 
-	// Write function to filter out localKeywords that don't exist as keywords in pkg/detectors/*
-	// Finally, append and a string containing all values for secrets that need a second cred.
+func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, workspaceUUID string, variables VariableData, variable_type string, extraKeywords []map[string]interface{}, varSubMap *[]map[string]string) {
+	// Question: Despite lots of efforts to avoid duplicates, they'll still exist.
+	// Is there a way to adjust the scanning mechanism so that for only Postman
+	// we avoid duplicates? It's kind of just the nature of dealing with
+	// user-generated key-value pairs.
 
 	//Pre-process each key=var pair
 	// 1. Map key=value pairs for substitution later in workspace processing
@@ -237,47 +284,69 @@ func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Ch
 	//    We need to append all of these values for secrets that need a second cred. Like AWS or Shopify URLs.
 	//    But we don't want one value to trigger another value in the wrong var, so pad with 50 spaces.
 	varSubstitutions := map[string]string{}
-	localKeywords := append([]string{}, extraKeywords...)
-	allValues := " "
-	for _, globalVar := range globalVars.Data.Values {
-		localKeywords = append(localKeywords, globalVar.Key)
-		localKeywords = append(localKeywords, fmt.Sprintf("%v", globalVar.Value))
-		varSubstitutions[globalVar.Key] = fmt.Sprintf("%v", globalVar.Value)
-		allValues += (strings.Repeat(" ", KEYWORD_PADDING) + fmt.Sprintf("%v", globalVar.Value))
-		if globalVar.SessionValue != "" {
-			localKeywords = append(localKeywords, fmt.Sprintf("%v", globalVar.SessionValue))
-			varSubstitutions[globalVar.Key] = fmt.Sprintf("%v", globalVar.SessionValue)
-			allValues += (strings.Repeat(" ", KEYWORD_PADDING) + fmt.Sprintf("%v", globalVar.SessionValue))
+	localKeywords := make(map[string]struct{})
+	for _, m := range extraKeywords {
+		for k := range m {
+			localKeywords[k] = struct{}{}
 		}
 	}
 
+	allValuesMap := make(map[string]struct{})
+	for _, globalVar := range variables.KeyValues {
+		key := globalVar.Key
+		value := fmt.Sprintf("%v", globalVar.Value)
+
+		localKeywords[key] = struct{}{}
+		localKeywords[value] = struct{}{}
+		allValuesMap[value] = struct{}{}
+		varSubstitutions[key] = value
+
+		if globalVar.SessionValue != "" {
+			sessionValue := fmt.Sprintf("%v", globalVar.SessionValue)
+			localKeywords[sessionValue] = struct{}{}
+			allValuesMap[sessionValue] = struct{}{}
+			varSubstitutions[key] = sessionValue
+		}
+	}
+
+	allValues := " "
+	for value := range allValuesMap {
+		allValues += (strings.Repeat(" ", KEYWORD_PADDING) + value)
+	}
+
 	// Filter out keywords that don't exist in pkg/detectors/*
-	localKeywords = filterKeywords(localKeywords, s.conn.DetectorKeywords)
+	localKeywords = filterKeywords(localKeywords, s.detectorKeywords)
 
 	// Create slice of objects to scan (both context & data)
 	pmObjToScan := []PMScanObject{}
-	for _, globalVar := range globalVars.Data.Values {
+	for _, v := range variables.KeyValues {
 		var data string
-		for _, keyword := range localKeywords {
-			data += fmt.Sprintf("%s:%s ", keyword, fmt.Sprintf("%v", globalVar.Value))
+		for keyword := range localKeywords {
+			if keyword == fmt.Sprintf("%v", v.Value) {
+				continue
+			}
+			data += fmt.Sprintf("%s:%s ", keyword, fmt.Sprintf("%v", v.Value))
 			data += strings.Repeat(" ", KEYWORD_PADDING)
 		}
 		data += allValues
 		preScanObj := PMScanObject{
-			Link:          LINK_BASE_URL + "globals/" + globalVars.Data.ID,
+			Link:          LINK_BASE_URL + variable_type + "s/" + variables.ID,
 			WorkspaceUUID: workspaceUUID,
-			GlobalID:      globalVars.Data.ID,
-			FieldType:     "Global Variable",
-			FieldName:     globalVar.Key,
-			VarType:       globalVar.Type,
+			GlobalID:      variables.ID,
+			FieldType:     variable_type + " variable",
+			FieldName:     v.Key,
+			VarType:       v.Type,
 			Data:          data,
 		}
 		pmObjToScan = append(pmObjToScan, preScanObj)
 		// This is a legacy field from Postman. But they can still exist (although invisible in UI).
-		if globalVar.SessionValue != "" {
+		if v.SessionValue != "" {
 			var data string
-			for _, keyword := range localKeywords {
-				data += fmt.Sprintf("%s:%v\n", keyword, globalVar.SessionValue)
+			for keyword := range localKeywords {
+				if keyword == fmt.Sprintf("%v", v.SessionValue) {
+					continue
+				}
+				data += fmt.Sprintf("%s:%v\n", keyword, v.SessionValue)
 				data += strings.Repeat(" ", KEYWORD_PADDING)
 			}
 			data += allValues
@@ -302,20 +371,24 @@ func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Ch
 			pmObjToScan[i].FieldName = ""
 		}
 	}
-	//Remove duplicates
+	// Add to slice of maps for substitution later
+	*varSubMap = append(*varSubMap, varSubstitutions)
+	s.scanObjects(ctx, chunksChan, pmObjToScan)
+}
+
+func (s *Source) scanObjects(ctx context.Context, chunksChan chan *sources.Chunk, objects []PMScanObject) {
+	//Remove duplicate objects to scan
 	uniqueMap := make(map[PMScanObject]struct{})
 	uniqueObjects := []PMScanObject{}
 
 	// Iterate through the input slice and add unique objects to the map
-	for _, obj := range pmObjToScan {
+	for _, obj := range objects {
 		if _, exists := uniqueMap[obj]; !exists {
 			uniqueMap[obj] = struct{}{}
 			uniqueObjects = append(uniqueObjects, obj)
 		}
 	}
 
-	// Add to slice of maps for substitution later
-	*varSubMap = append(*varSubMap, varSubstitutions)
 	// Process each object.
 	done := make(chan struct{})
 
@@ -333,11 +406,12 @@ func (s *Source) scanGlobalVars(ctx context.Context, chunksChan chan *sources.Ch
 	for range uniqueObjects {
 		<-done
 	}
-	ctx.Logger().V(2).Info("finished scanning global variables")
 }
 
 func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o PMScanObject) {
+	fmt.Println("#########START OBJECT#########")
 	fmt.Println(o.Data + "\n")
+	fmt.Println("#########END OBJECT#########")
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
@@ -516,43 +590,88 @@ func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk,
 
 // // Need a function to get globals and process them, and then teh same for the rest
 
-func filterKeywords(keys []string, detectorKeywords []string) []string {
+func filterKeywords(keys map[string]struct{}, detectorKeywords map[string]struct{}) map[string]struct{} {
 	// Filter out keywords that don't exist in pkg/detectors/*
-	keywords := []string{}
-	for _, key := range keys {
-		for _, detectorKey := range detectorKeywords {
+	filteredKeywords := make(map[string]struct{})
+
+	// Iterate through the input keys
+	for key := range keys {
+		// Check if the key contains any detectorKeyword
+		containsDetector := false
+		for detectorKey := range detectorKeywords {
 			if strings.Contains(key, detectorKey) {
-				keywords = append(keywords, key)
+				containsDetector = true
+				break
 			}
 		}
+		if containsDetector {
+			filteredKeywords[key] = struct{}{}
+		}
 	}
+
 	// Remove duplicates, but these are defined as situations like this:
 	// openweathermap.com, openweather and api.openweathermap.com
 	// In this scenario only openweather needs to remain
-	// Create a map to store canonical names
-	canonicalNames := make(map[string]string)
+	uniqueKeywords := make(map[string]struct{})
 
-	// Iterate through the input slice
-	for _, name := range keywords {
-		// Check if a similar canonical name already exists
-		for key := range canonicalNames {
+	// Iterate through the filtered keywords
+	for name := range filteredKeywords {
+		foundSimilar := false
+
+		// Check if the name is similar to any of the unique canonical names
+		for key := range uniqueKeywords {
 			if strings.Contains(key, name) || strings.Contains(name, key) {
 				// A similar name is found, skip adding it to the map
-				goto NextName
+				foundSimilar = true
+				break
 			}
 		}
 
-		// No similar canonical name found, add it to the map
-		canonicalNames[name] = name
-
-	NextName:
-	}
-
-	// Extract the unique canonical names from the map
-	uniqueKeywords := []string{}
-	for _, name := range canonicalNames {
-		uniqueKeywords = append(uniqueKeywords, name)
+		if !foundSimilar {
+			// No similar name found, add it to the map
+			uniqueKeywords[name] = struct{}{}
+		}
 	}
 
 	return uniqueKeywords
+}
+
+// Used to filter out collections and environments that are not wanted for scanning.
+func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclude []string) []IDNameUUID {
+	var result []IDNameUUID
+
+	// Include takes precedence over exclude
+	if uuidsToInclude != nil {
+		// Create map of UUIDs to include for efficiency
+		uuidSet := make(map[string]struct{})
+		for _, uuid := range uuidsToInclude {
+			uuidSet[uuid] = struct{}{}
+		}
+
+		// Iterate through the slice and add items that match the UUIDs to include
+		for _, item := range slice {
+			if _, exists := uuidSet[item.UUID]; exists {
+				result = append(result, item)
+			}
+		}
+		return result
+	}
+
+	if uuidsToRemove != nil {
+		// Create map of UUIDs to remove for efficiency
+		uuidSet := make(map[string]struct{})
+		for _, uuid := range uuidsToRemove {
+			uuidSet[uuid] = struct{}{}
+		}
+
+		// Iterate through the slice and add items that don't match the UUIDs to remove
+		for _, item := range slice {
+			if _, exists := uuidSet[item.UUID]; !exists {
+				result = append(result, item)
+			}
+		}
+		return result
+	}
+
+	return slice
 }

@@ -23,31 +23,29 @@ const (
 	defaultContentType = "*"
 )
 
-type Workspace struct {
+type WorkspaceObj struct {
 	Workspace struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Type        string `json:"type"`
-		Description string `json:"description"`
-		Visibility  string `json:"visibility"`
-		CreatedBy   string `json:"createdBy"`
-		UpdatedBy   string `json:"updatedBy"`
-		CreatedAt   string `json:"createdAt"`
-		UpdatedAt   string `json:"updatedAt"`
-		Collections []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-			UID  string `json:"uid"`
-		} `json:"collections"`
-		Environments []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-			UID  string `json:"uid"`
-		} `json:"environments"`
+		ID           string       `json:"id"`
+		Name         string       `json:"name"`
+		Type         string       `json:"type"`
+		Description  string       `json:"description"`
+		Visibility   string       `json:"visibility"`
+		CreatedBy    string       `json:"createdBy"`
+		UpdatedBy    string       `json:"updatedBy"`
+		CreatedAt    string       `json:"createdAt"`
+		UpdatedAt    string       `json:"updatedAt"`
+		Collections  []IDNameUUID `json:"collections"`
+		Environments []IDNameUUID `json:"environments"`
 	} `json:"workspace"`
 }
 
-type Variable struct {
+type IDNameUUID struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	UUID string `json:"uid"`
+}
+
+type KeyValue struct {
 	Key          string      `json:"key"`
 	Value        interface{} `json:"value"`
 	Enabled      bool        `json:"enabled,omitempty"`
@@ -55,11 +53,22 @@ type Variable struct {
 	SessionValue string      `json:"sessionValue,omitempty"`
 }
 
-type GlobalVariables struct {
-	Data struct {
-		ID     string     `json:"id"`
-		Values []Variable `json:"values"`
-	} `json:"data"`
+type VariableData struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	KeyValues []KeyValue `json:"values"`
+	Owner     string     `json:"owner"`
+	IsPublic  bool       `json:"isPublic"`
+	CreatedAt string     `json:"createdAt"`
+	UpdatedAt string     `json:"updatedAt"`
+}
+
+type Environment struct {
+	VariableData `json:"environment"`
+}
+
+type GlobalVars struct {
+	VariableData `json:"data"`
 }
 
 // type Collection struct {
@@ -153,8 +162,8 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 }
 
 // GetWorkspace returns the workspace for a given workspace
-func (c *Client) GetWorkspace(workspace_uuid string) (Workspace, error) {
-	var workspace Workspace
+func (c *Client) GetWorkspace(workspace_uuid string) (WorkspaceObj, error) {
+	var workspace WorkspaceObj
 
 	url := fmt.Sprintf(WORKSPACE_URL, workspace_uuid)
 	r, err := c.getPostmanReq(url, nil)
@@ -177,8 +186,8 @@ func (c *Client) GetWorkspace(workspace_uuid string) (Workspace, error) {
 }
 
 // GetGlobals returns the global variables for a given workspace
-func (c *Client) GetGlobals(workspace_uuid string) (GlobalVariables, error) {
-	var globalVars GlobalVariables
+func (c *Client) GetGlobals(workspace_uuid string) (GlobalVars, error) {
+	var globalVars GlobalVars
 
 	url := fmt.Sprintf(GLOBAL_VARS_URL, workspace_uuid)
 	r, err := c.getPostmanReq(url, map[string]string{"User-Agent": alt_userAgent})
@@ -200,11 +209,32 @@ func (c *Client) GetGlobals(workspace_uuid string) (GlobalVariables, error) {
 	return globalVars, nil
 }
 
-// // GetEnvironment returns the environment variables for a given environment
-// func (c *Client) GetEnvironment(environment_uuid string) (map[string]interface{}, error) {
-// 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
-// 	return c.getURLParseJSON(url, nil)
-// }
+// GetEnvironment returns the environment variables for a given environment
+func (c *Client) GetEnvironment(environment_uuid string) (Environment, error) {
+	var env Environment
+
+	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
+	fmt.Println(url)
+	r, err := c.getPostmanReq(url, nil)
+	if err != nil {
+		fmt.Println(err)
+		err = fmt.Errorf("could not get env variables for environment: %s", environment_uuid)
+		return env, err
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		err = fmt.Errorf("could not read env var response body for environment: %s", environment_uuid)
+		return env, err
+	}
+	fmt.Println(string(body))
+	if err := json.Unmarshal([]byte(body), &env); err != nil {
+		err = fmt.Errorf("could not unmarshal env variables JSON for environment: %s", environment_uuid)
+		return env, err
+	}
+	return env, nil
+
+}
 
 // // GetCollection returns the collection for a given collection
 // func (c *Client) GetCollection(collection_uuid string) (map[string]interface{}, error) {
