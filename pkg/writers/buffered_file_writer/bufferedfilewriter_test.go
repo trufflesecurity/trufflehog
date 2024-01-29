@@ -150,7 +150,7 @@ func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 	_, err := writer.Write(ctx, data)
 	assert.NoError(t, err)
 
-	defer writer.Close()
+	defer writer.CloseForWriting()
 
 	assert.NotNil(t, writer.file)
 	assert.Len(t, writer.buf.Bytes(), 0)
@@ -173,7 +173,7 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	_, err := writer.Write(ctx, initialData)
 	assert.NoError(t, err)
 
-	defer writer.Close()
+	defer writer.CloseForWriting()
 
 	// Get the file modification time after the initial write.
 	initialModTime, err := getFileModTime(t, writer.filename)
@@ -257,7 +257,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 
 			tc.prepareWriter(writer)
 
-			err := writer.Close()
+			err := writer.CloseForWriting()
 			assert.NoError(t, err)
 
 			if writer.file != nil {
@@ -285,7 +285,7 @@ func TestBufferedFileWriterStateTransitionOnClose(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Close the writer.
-	err = writer.Close()
+	err = writer.CloseForWriting()
 	assert.NoError(t, err)
 
 	// After closing, the writer should be in read-only mode.
@@ -295,7 +295,7 @@ func TestBufferedFileWriterStateTransitionOnClose(t *testing.T) {
 func TestBufferedFileWriterWriteInReadOnlyState(t *testing.T) {
 	t.Parallel()
 	writer := New()
-	_ = writer.Close() // Transition to read-only mode
+	_ = writer.CloseForWriting() // Transition to read-only mode
 
 	// Attempt to write in read-only mode.
 	_, err := writer.Write(context.Background(), []byte("should fail"))

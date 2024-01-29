@@ -158,9 +158,9 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 	return w.file.Write(data)
 }
 
-// Close flushes any remaining data in the buffer to the file, closes the file if created,
+// CloseForWriting flushes any remaining data in the buffer to the file, closes the file if created,
 // and transitions the BufferedFileWriter to read-only mode.
-func (w *BufferedFileWriter) Close() error {
+func (w *BufferedFileWriter) CloseForWriting() error {
 	defer func() { w.state = readOnly }()
 	if w.file == nil {
 		return nil
