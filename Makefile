@@ -1,4 +1,4 @@
-PROTOS_IMAGE ?= trufflesecurity/protos:1.21-0
+PROTOS_IMAGE ?= trufflesecurity/protos:1.21-1
 
 .PHONY: check
 .PHONY: lint
@@ -59,7 +59,7 @@ protos-windows:
 
 release-protos-image:
 	docker buildx build --push --platform=linux/amd64,linux/arm64 \
-	-t trufflesecurity/protos:1.21-0 -f hack/Dockerfile.protos .
+	-t trufflesecurity/protos:1.21-1 -f hack/Dockerfile.protos .
 
 snifftest:
 	./hack/snifftest/snifftest.sh
