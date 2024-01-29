@@ -22,7 +22,7 @@ var bufferPool = sync.Pool{
 }
 
 // state represents the current mode of BufferedFileWriter.
-type state int
+type state uint8
 
 const (
 	// writeOnly indicates the BufferedFileWriter is in write-only mode.
