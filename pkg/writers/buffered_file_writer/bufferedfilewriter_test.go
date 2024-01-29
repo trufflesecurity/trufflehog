@@ -91,7 +91,6 @@ func TestBufferedFileWriterString(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tc.expectedStr, got, "String content mismatch")
-
 		})
 	}
 }
@@ -150,7 +149,10 @@ func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 	_, err := writer.Write(ctx, data)
 	assert.NoError(t, err)
 
-	defer writer.CloseForWriting()
+	defer func() {
+		err := writer.CloseForWriting()
+		assert.NoError(t, err)
+	}()
 
 	assert.NotNil(t, writer.file)
 	assert.Len(t, writer.buf.Bytes(), 0)
@@ -173,7 +175,10 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	_, err := writer.Write(ctx, initialData)
 	assert.NoError(t, err)
 
-	defer writer.CloseForWriting()
+	defer func() {
+		err := writer.CloseForWriting()
+		assert.NoError(t, err)
+	}()
 
 	// Get the file modification time after the initial write.
 	initialModTime, err := getFileModTime(t, writer.filename)
