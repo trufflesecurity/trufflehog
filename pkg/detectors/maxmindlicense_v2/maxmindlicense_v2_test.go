@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package dockerhub
+package maxmindlicense_v2
 
 import (
 	"context"
@@ -10,24 +10,22 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestDockerhub_FromChunk(t *testing.T) {
+func TestMaxMindLicense_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
-	email := testSecrets.MustGetField("DOCKERHUB_EMAIL")
-	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
-	inactivePat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
+	secret := testSecrets.MustGetField("MAXMIND_LICENSE")
+	user := testSecrets.MustGetField("MAXMIND_USER")
+	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -46,29 +44,17 @@ func TestDockerhub_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, pat)),
+				data:   []byte(fmt.Sprintf("You can find a geoip secret %s within with maxmind user %s", secret, user)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dockerhub,
+					DetectorType: detectorspb.DetectorType_MaxMindLicense,
+					Redacted:     "662034",
 					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, verified (email)",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", email, pat)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Dockerhub,
-					Verified:     true,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+					},
 				},
 			},
 			wantErr: false,
@@ -78,13 +64,17 @@ func TestDockerhub_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, inactivePat)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a maxmind secret %s within with maxmind user %s", inactiveSecret, user)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dockerhub,
+					DetectorType: detectorspb.DetectorType_MaxMindLicense,
+					Redacted:     "662034",
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+					},
 				},
 			},
 			wantErr: false,
@@ -106,7 +96,7 @@ func TestDockerhub_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Dockerhub.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MaxMindLicense.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -114,11 +104,9 @@ func TestDockerhub_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].RawV2 = nil
-				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Dockerhub.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("MaxMindLicense.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

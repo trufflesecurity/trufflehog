@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -73,7 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else {
 						var user userResponse
 						if err := json.Unmarshal(body, &user); err != nil {
-							fmt.Printf("Unmarshal error: %v\n", err)
 							s1.SetVerificationError(err, token)
 						} else {
 							s1.ExtraData = map[string]string{
