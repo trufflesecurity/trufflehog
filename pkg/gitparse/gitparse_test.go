@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -2050,3 +2052,32 @@ index 2ee133b..12b4843 100644
 +output = json
 +region = us-east-2
 `
+
+func TestBufferWriterStateTransitionOnClose(t *testing.T) {
+	t.Parallel()
+	writer := new(buffer)
+
+	// Initially, the writer should be in write-only mode.
+	assert.Equal(t, writeOnly, writer.state)
+
+	// Perform some write operation.
+	_, err := writer.Write(context.Background(), []byte("test data"))
+	assert.NoError(t, err)
+
+	// Close the writer.
+	err = writer.CloseForWriting()
+	assert.NoError(t, err)
+
+	// After closing, the writer should be in read-only mode.
+	assert.Equal(t, readOnly, writer.state)
+}
+
+func TestBufferWriterWriteInReadOnlyState(t *testing.T) {
+	t.Parallel()
+	writer := new(buffer)
+	_ = writer.CloseForWriting() // Transition to read-only mode
+
+	// Attempt to write in read-only mode.
+	_, err := writer.Write(context.Background(), []byte("should fail"))
+	assert.Error(t, err)
+}
