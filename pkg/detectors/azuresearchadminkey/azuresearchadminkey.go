@@ -53,7 +53,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
-				Raw:          []byte(resMatch + resServiceMatch),
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resServiceMatch),
 			}
 
 			if verify {

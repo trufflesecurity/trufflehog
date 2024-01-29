@@ -52,7 +52,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureDevopsPersonalAccessToken,
-				Raw:          []byte(resMatch + resOrgMatch),
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resOrgMatch),
 			}
 
 			if verify {

@@ -44,7 +44,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resUrl := strings.TrimSpace(urlMatch[0])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureFunctionKey,
-				Raw:          []byte(resMatch + resUrl),
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + resUrl),
 			}
 
 			if verify {
