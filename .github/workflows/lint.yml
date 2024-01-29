@@ -11,13 +11,13 @@ permissions:
   pull-requests: read
 
 jobs:
-  golangci:
-    name: lint
+  golangci-lint:
+    name: golangci-lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: "1.21"
       - uses: actions/checkout@v4
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -35,3 +35,12 @@ jobs:
 
           # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
           # skip-build-cache: true
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep --config=hack/semgrep-rules/detectors.yaml pkg/detectors/

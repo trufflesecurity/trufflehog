@@ -6,10 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -54,8 +55,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureBatch,
 				Raw:          []byte(endpoint),
-				Redacted:     endpoint,
 				RawV2:        []byte(endpoint + accountKey),
+				Redacted:     endpoint,
 			}
 
 			if verify {

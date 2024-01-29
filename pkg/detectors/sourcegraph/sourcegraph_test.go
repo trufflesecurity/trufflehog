@@ -34,15 +34,12 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 	inactiveSecretV2 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V2")
 	inactiveSecretV3 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V3")
 
-	secrets := []string{secretV1, secretV2, secretV3, inactiveSecretV1, inactiveSecretV2, inactiveSecretV3}
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
-	for _, secret := range secrets {
-	tests = append(tests, []struct {
+	tests := []struct {
 		name                string
 		s                   Scanner
 		args                args
@@ -51,11 +48,11 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, verified v1",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secretV1)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -68,11 +65,96 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, unverified",
+			name: "found, verified v1",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secretV1)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, verified v2",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secretV2)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, verified v3",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secretV3)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, unverified v1",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within but not valid", inactiveSecretV1)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, unverified v2",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within but not valid", inactiveSecretV2)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Sourcegraph,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, unverified v3",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within but not valid", inactiveSecretV3)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -101,7 +183,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secretV1)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -118,7 +200,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a sourcegraph secret %s within", secretV1)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -131,7 +213,6 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 	}
-}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)

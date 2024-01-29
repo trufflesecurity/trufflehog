@@ -107,7 +107,7 @@ func StringShannonEntropy(input string) float64 {
 func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
 	var filteredResults []Result
 	for _, result := range results {
-		if !result.Verified && result.VerificationError() == nil {
+		if !result.Verified {
 			if result.RawV2 != nil {
 				if StringShannonEntropy(string(result.RawV2)) >= entropy {
 					filteredResults = append(filteredResults, result)
