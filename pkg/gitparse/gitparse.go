@@ -124,7 +124,7 @@ type Commit struct {
 }
 
 // Equal compares the content of two Commits to determine if they are the same.
-func (c1 *Commit) Equal(c2 *Commit) bool {
+func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
 	switch {
 	case c1.Hash != c2.Hash:
 		return false
@@ -164,6 +164,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 		default:
 			equal, err := isEqualContentString(d1.contentWriter, d2.contentWriter)
 			if err != nil || !equal {
+				ctx.Logger().Error(err, "failed to compare diff content")
 				return false
 			}
 		}

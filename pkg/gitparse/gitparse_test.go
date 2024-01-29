@@ -703,7 +703,7 @@ func TestCommitParsing(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Message.String(), commit, commit.Message.String())
 		}
 		i++
@@ -736,7 +736,7 @@ func TestIndividualCommitParsing(t *testing.T) {
 			}
 
 			// Assert
-			if !commit.Equal(&expected[i]) {
+			if !commit.Equal(context.Background(), &expected[i]) {
 				t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[j].Message.String(), commit, commit.Message.String())
 			}
 			j++
@@ -816,7 +816,7 @@ func TestStagedDiffParsing(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], commit)
 		}
 		i++
@@ -875,7 +875,7 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++
@@ -995,7 +995,7 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++
