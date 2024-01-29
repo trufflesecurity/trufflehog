@@ -38,33 +38,57 @@ type contentWriter interface { // Write appends data to the content storage.
 	Write(ctx context.Context, data []byte) (int, error)
 	// ReadCloser provides a reader for accessing stored content.
 	ReadCloser() (io.ReadCloser, error)
-	// Close finalizes the content storage, performing cleanup if necessary.
-	Close() error
+	// CloseForWriting closes the content storage for writing.
+	CloseForWriting() error
 	// Len returns the current size of the content.
 	Len() int
 	// String returns the content as a string or an error if the content cannot be converted to a string.
 	String() (string, error)
 }
 
+// state represents the current mode of buffer.
+type state uint8
+
+const (
+	// writeOnly indicates the buffer is in write-only mode.
+	writeOnly state = iota
+	// readOnly indicates the buffer has been closed and is in read-only mode.
+	readOnly
+)
+
 // buffer is a wrapper around bytes.Buffer, implementing the contentWriter interface.
 // This allows bytes.Buffer to be used wherever a contentWriter is required, ensuring compatibility
 // with the contentWriter interface while leveraging the existing implementation of bytes.Buffer.
-type buffer struct{ bytes.Buffer }
+type buffer struct {
+	state state // current state of the buffer (writeOnly or readOnly)
+	bytes.Buffer
+}
 
 // Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
 // The context is included to satisfy the contentWriter interface, allowing for future extensions
 // where context handling might be necessary (e.g., for timeouts or cancellation).
-func (b *buffer) Write(_ context.Context, data []byte) (int, error) { return b.Buffer.Write(data) }
+func (b *buffer) Write(_ context.Context, data []byte) (int, error) {
+	if b.state == readOnly {
+		return 0, fmt.Errorf("buffer is in read-only mode")
+	}
+	return b.Buffer.Write(data)
+}
 
 // ReadCloser provides a read-closer for the buffer's content.
 // It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
 // as closing a bytes.Buffer is a no-op.
 func (b *buffer) ReadCloser() (io.ReadCloser, error) {
+	if b.state == writeOnly {
+		return nil, fmt.Errorf("buffer is in write-only mode")
+	}
 	return io.NopCloser(bytes.NewReader(b.Bytes())), nil
 }
 
-// Close is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
-func (b *buffer) Close() error { return nil }
+// CloseForWriting is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
+func (b *buffer) CloseForWriting() error {
+	b.state = readOnly
+	return nil
+}
 
 // String returns the buffer's content as a string.
 func (b *buffer) String() (string, error) { return b.Buffer.String(), nil }
@@ -111,7 +135,7 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // finalize ensures proper closure of resources associated with the Diff.
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
-func (d *Diff) finalize() error { return d.contentWriter.Close() }
+func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -124,7 +148,7 @@ type Commit struct {
 }
 
 // Equal compares the content of two Commits to determine if they are the same.
-func (c1 *Commit) Equal(c2 *Commit) bool {
+func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
 	switch {
 	case c1.Hash != c2.Hash:
 		return false
@@ -164,6 +188,7 @@ func (c1 *Commit) Equal(c2 *Commit) bool {
 		default:
 			equal, err := isEqualContentString(d1.contentWriter, d2.contentWriter)
 			if err != nil || !equal {
+				ctx.Logger().Error(err, "failed to compare diff content")
 				return false
 			}
 		}

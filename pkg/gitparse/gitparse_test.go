@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
@@ -704,7 +706,7 @@ func TestCommitParsing(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Message.String(), commit, commit.Message.String())
 		}
 		i++
@@ -737,7 +739,7 @@ func TestIndividualCommitParsing(t *testing.T) {
 			}
 
 			// Assert
-			if !commit.Equal(&expected[i]) {
+			if !commit.Equal(context.Background(), &expected[i]) {
 				t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[j].Message.String(), commit, commit.Message.String())
 			}
 			j++
@@ -826,7 +828,7 @@ func TestStagedDiffParsing(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], commit)
 		}
 		i++
@@ -958,7 +960,7 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++
@@ -1137,7 +1139,7 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
+		if !commit.Equal(context.Background(), &expected[i]) {
 			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
 		}
 		i++
@@ -2242,3 +2244,32 @@ index 2ee133b..12b4843 100644
 +output = json
 +region = us-east-2
 `
+
+func TestBufferWriterStateTransitionOnClose(t *testing.T) {
+	t.Parallel()
+	writer := new(buffer)
+
+	// Initially, the writer should be in write-only mode.
+	assert.Equal(t, writeOnly, writer.state)
+
+	// Perform some write operation.
+	_, err := writer.Write(context.Background(), []byte("test data"))
+	assert.NoError(t, err)
+
+	// Close the writer.
+	err = writer.CloseForWriting()
+	assert.NoError(t, err)
+
+	// After closing, the writer should be in read-only mode.
+	assert.Equal(t, readOnly, writer.state)
+}
+
+func TestBufferWriterWriteInReadOnlyState(t *testing.T) {
+	t.Parallel()
+	writer := new(buffer)
+	_ = writer.CloseForWriting() // Transition to read-only mode
+
+	// Attempt to write in read-only mode.
+	_, err := writer.Write(context.Background(), []byte("should fail"))
+	assert.Error(t, err)
+}
