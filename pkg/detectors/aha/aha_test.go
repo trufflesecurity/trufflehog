@@ -57,24 +57,6 @@ func TestAha_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found, unverified error due to inactive account",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a aha secret %s within %s but verified", secret, domain)),
-				verify: true,
-			},
-			want: func() []detectors.Result {
-				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Aha,
-					Verified:     false,
-				}
-				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 403"))
-				return []detectors.Result{r}
-			}(),
-			wantErr: false,
-		},
-		{
 			name: "found, real secrets, verification error due to timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{

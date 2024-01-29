@@ -102,11 +102,10 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized, http.StatusNotFound:
+	case http.StatusUnauthorized, http.StatusNotFound, http.StatusForbidden:
+		// 403 is a known case where an account is inactive bc of a trial ending or payment issue
 		return false, nil
 	default:
-		// 403 is a known case where an account is inactive bc of a trial ending or payment issue
-		// this is still indeterminate as the key could be valid when the account is reactivated
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
