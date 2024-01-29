@@ -1607,7 +1607,7 @@ func DefaultDetectors() []detectors.Detector {
 		azurestorage.Scanner{},
 		azurecontainerregistry.Scanner{},
 		azurebatch.Scanner{},
-		// azurefunctionkey.Scanner{}, // AZF is throwing some FPs
+		// azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		azuredevopspersonalaccesstoken.Scanner{},
 		azuresearchadminkey.Scanner{},
 		&azuresearchquerykey.Scanner{},
