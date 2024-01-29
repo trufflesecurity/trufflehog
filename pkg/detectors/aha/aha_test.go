@@ -12,7 +12,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"gopkg.in/h2non/gock.v1"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -29,32 +28,25 @@ func TestAha_FromChunk(t *testing.T) {
 	secret := testSecrets.MustGetField("AHA_SECRET")
 	inactiveSecret := testSecrets.MustGetField("AHA_INACTIVE")
 
-	interceptClient := common.SaneHttpClient()
-
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
 	tests := []struct {
-		name      string
-		s         Scanner
-		args      args
-		mockSetup func()
-		want      []detectors.Result
-		wantErr   bool
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
 	}{
 		{
 			name: "found, verified",
-			s:    Scanner{client: interceptClient},
+			s:    Scanner{client: common.ConstantResponseHttpClient(200, "{}")},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aha secret %s within %s but verified", secret, domain)),
 				verify: true,
-			},
-			mockSetup: func() {
-				gock.InterceptClient(interceptClient)
-				gock.New(domain).Reply(200)
 			},
 			want: []detectors.Result{
 				{
@@ -148,10 +140,6 @@ func TestAha_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.mockSetup != nil {
-				tt.mockSetup()
-				defer gock.Off()
-			}
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Aha.FromData() error = %v, wantErr %v", err, tt.wantErr)
