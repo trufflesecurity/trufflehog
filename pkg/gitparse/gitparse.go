@@ -64,6 +64,8 @@ type buffer struct {
 	bytes.Buffer
 }
 
+func newBuffer() *buffer { return &buffer{state: writeOnly} }
+
 // Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
 // The context is included to satisfy the contentWriter interface, allowing for future extensions
 // where context handling might be necessary (e.g., for timeouts or cancellation).
@@ -112,7 +114,7 @@ func withPathB(pathB string) diffOption { return func(d *Diff) { d.PathB = pathB
 // NewDiff creates a new Diff with a threshold.
 func NewDiff(opts ...diffOption) *Diff {
 	diff := new(Diff)
-	diff.contentWriter = new(buffer)
+	diff.contentWriter = newBuffer()
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -281,7 +283,7 @@ func NewParser(options ...Option) *Parser {
 		dateFormat:    defaultDateFormat,
 		maxDiffSize:   defaultMaxDiffSize,
 		maxCommitSize: defaultMaxCommitSize,
-		contentWriter: new(buffer),
+		contentWriter: newBuffer(),
 	}
 	for _, option := range options {
 		option(parser)
@@ -579,7 +581,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 	}
-	cleanupParse(currentCommit, currentDiff, commitChan, &totalLogSize)
+	cleanupParse(ctx, currentCommit, currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
@@ -849,7 +851,11 @@ func isCommitSeparatorLine(isStaged bool, latestState ParseState, line []byte) b
 	return false
 }
 
-func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
+func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
+	if err := currentDiff.finalize(); err != nil {
+		ctx.Logger().Error(err, "failed to finalize diff")
+		return
+	}
 	// Ignore empty or binary diffs (this condition may be redundant).
 	if currentDiff != nil && (currentDiff.Len() > 0 || currentDiff.IsBinary) {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
