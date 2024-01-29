@@ -17,9 +17,12 @@ import (
 )
 
 var (
-	yellowPrinter = color.New(color.FgYellow)
-	greenPrinter  = color.New(color.FgHiGreen)
-	whitePrinter  = color.New(color.FgWhite)
+	boldYellowPrinter = color.New(color.Bold, color.FgYellow)
+	yellowPrinter     = color.New(color.FgHiYellow)
+	greenPrinter      = color.New(color.FgHiGreen)
+	boldGreenPrinter  = color.New(color.Bold, color.FgHiGreen)
+	whitePrinter      = color.New(color.FgWhite)
+	boldWhitePrinter  = color.New(color.Bold, color.FgWhite)
 )
 
 // PlainPrinter is a printer that prints results in plain text format.
@@ -27,11 +30,12 @@ type PlainPrinter struct{ mu sync.Mutex }
 
 func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
-		DetectorType: r.Result.DetectorType.String(),
-		DecoderType:  r.Result.DecoderType.String(),
-		Verified:     r.Result.Verified,
-		MetaData:     r.SourceMetadata,
-		Raw:          strings.TrimSpace(string(r.Result.Raw)),
+		DetectorType:      r.Result.DetectorType.String(),
+		DecoderType:       r.Result.DecoderType.String(),
+		Verified:          r.Result.Verified,
+		VerificationError: r.Result.VerificationError(),
+		MetaData:          r.SourceMetadata,
+		Raw:               strings.TrimSpace(string(r.Result.Raw)),
 	}
 
 	meta, err := structToMap(out.MetaData.Data)
@@ -44,10 +48,14 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	defer p.mu.Unlock()
 
 	if out.Verified {
-		yellowPrinter.Print("Found verified result 🐷🔑\n")
+		boldGreenPrinter.Print("✅ Found verified result 🐷🔑\n")
+	} else if out.VerificationError != nil {
+		printer = yellowPrinter
+		boldYellowPrinter.Print("⚠️  Found result - unable to verify due to error 🐷🔑❗️\n")
+		printer.Printf("Verification Error: %s\n", out.VerificationError)
 	} else {
 		printer = whitePrinter
-		whitePrinter.Print("Found unverified result 🐷🔑❓\n")
+		boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
 	printer.Printf("Decoder Type: %s\n", out.DecoderType)
@@ -105,7 +113,8 @@ func structToMap(obj any) (m map[string]map[string]any, err error) {
 type outputFormat struct {
 	DetectorType,
 	DecoderType string
-	Verified bool
-	Raw      string
+	Verified          bool
+	VerificationError error
+	Raw               string
 	*source_metadatapb.MetaData
 }
