@@ -67,6 +67,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurefunctionkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
@@ -801,9 +802,6 @@ func DefaultDetectors() []detectors.Detector {
 		&alibaba.Scanner{},
 		aws.New(),
 		awssessionkey.New(),
-		&azure.Scanner{},
-		&azurecontainerregistry.Scanner{},
-		&azurebatch.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlab.Scanner{},
 		&gitlabv2.Scanner{},
@@ -1604,12 +1602,16 @@ func DefaultDetectors() []detectors.Detector {
 		rabbitmq.Scanner{},
 		planetscale.Scanner{},
 		portainertoken.Scanner{},
-		azurestorage.Scanner{},
 		planetscaledb.Scanner{},
+		azure.Scanner{},
+		azurestorage.Scanner{},
+		azurecontainerregistry.Scanner{},
+		azurebatch.Scanner{},
+		azurefunctionkey.Scanner{},
+		azuredevopspersonalaccesstoken.Scanner{},
+		azuresearchadminkey.Scanner{},
 		jiratoken_v2.Scanner{},
-		&azurefunctionkey.Scanner{},
 		&googleoauth2.Scanner{},
-		&azuredevopspersonalaccesstoken.Scanner{},
 	}
 
 }
