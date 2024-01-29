@@ -66,6 +66,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
@@ -1608,6 +1609,7 @@ func DefaultDetectors() []detectors.Detector {
 		jiratoken_v2.Scanner{},
 		&googleoauth2.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
+		&azuresearchquerykey.Scanner{},
 	}
 
 }
