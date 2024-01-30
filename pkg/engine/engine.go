@@ -640,14 +640,13 @@ nextChunk:
 						e.reverificationTracking.increment()
 					}
 					chunk.reverifyWgDoneFn()
-					wgDetect.Add(1)
-					chunk.chunk.Verify = false // DO NOT VERIFY
-					e.detectableChunksChan <- detectableChunk{
+
+					e.processResult(ctx, detectableChunk{
 						chunk:    chunk.chunk,
 						detector: detector,
 						decoder:  chunk.decoder,
 						wgDoneFn: wgDetect.Done,
-					}
+					}, res)
 
 					// Empty the dupes and detectors slice.
 					chunkSecrets = chunkSecrets[:0]
