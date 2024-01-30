@@ -530,6 +530,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	const avgDetectorsPerChunk = 2
 	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
+	nextChunk:
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
@@ -552,7 +553,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					for k := range chunkSpecificDetectors {
 						delete(chunkSpecificDetectors, k)
 					}
-					continue
+					continue nextChunk
 				}
 
 				for k, detector := range chunkSpecificDetectors {
