@@ -394,11 +394,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 
-		ctx = context.WithValues(ctx,
-			"diff", currentDiff.PathB,
-			"size", currentDiff.Len(),
-		)
-
 		switch {
 		case isCommitLine(isStaged, latestState, line):
 			latestState = CommitLine
@@ -411,10 +406,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				if err := currentDiff.finalize(); err != nil {
-					ctx.Logger().Error(err,
+					ctx.Logger().Error(
+						err,
 						"failed to finalize diff",
 						"commit", currentCommit.Hash,
-						"latest_state", latestState,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
 					)
 				}
 				commitChan <- *currentCommit
@@ -464,7 +462,9 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					ctx.Logger().Error(err,
 						"failed to finalize diff",
 						"commit", currentCommit.Hash,
-						"latest_state", latestState,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
 					)
 				}
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
@@ -852,7 +852,7 @@ func isCommitSeparatorLine(isStaged bool, latestState ParseState, line []byte) b
 
 func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
 	if err := currentDiff.finalize(); err != nil {
-		ctx.Logger().Error(err, "failed to finalize diff", "latest_state", "cleanup")
+		ctx.Logger().Error(err, "failed to finalize diff")
 		return
 	}
 	// Ignore empty or binary diffs (this condition may be redundant).
