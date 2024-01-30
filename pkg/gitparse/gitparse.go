@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/go-logr/logr"
 	"io"
 	"os"
 	"os/exec"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-logr/logr"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -22,11 +23,121 @@ const (
 	defaultDateFormat = "Mon Jan 02 15:04:05 2006 -0700"
 
 	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-	defaultMaxDiffSize = 1 * 1024 * 1024 * 1024 // 1GB
+	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 2GB
 
 	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
-	defaultMaxCommitSize = 1 * 1024 * 1024 * 1024 // 1GB
+	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 2GB
 )
+
+// contentWriter defines a common interface for writing, reading, and managing diff content.
+// It abstracts the underlying storage mechanism, allowing flexibility in how content is handled.
+// This interface enables the use of different content storage strategies (e.g., in-memory buffer, file-based storage)
+// based on performance needs or resource constraints, providing a unified way to interact with different content types.
+type contentWriter interface { // Write appends data to the content storage.
+	// Write appends data to the content storage.
+	Write(ctx context.Context, data []byte) (int, error)
+	// ReadCloser provides a reader for accessing stored content.
+	ReadCloser() (io.ReadCloser, error)
+	// CloseForWriting closes the content storage for writing.
+	CloseForWriting() error
+	// Len returns the current size of the content.
+	Len() int
+	// String returns the content as a string or an error if the content cannot be converted to a string.
+	String() (string, error)
+}
+
+// state represents the current mode of buffer.
+type state uint8
+
+const (
+	// writeOnly indicates the buffer is in write-only mode.
+	writeOnly state = iota
+	// readOnly indicates the buffer has been closed and is in read-only mode.
+	readOnly
+)
+
+// buffer is a wrapper around bytes.Buffer, implementing the contentWriter interface.
+// This allows bytes.Buffer to be used wherever a contentWriter is required, ensuring compatibility
+// with the contentWriter interface while leveraging the existing implementation of bytes.Buffer.
+type buffer struct {
+	state state // current state of the buffer (writeOnly or readOnly)
+	bytes.Buffer
+}
+
+func newBuffer() *buffer { return &buffer{state: writeOnly} }
+
+// Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
+// The context is included to satisfy the contentWriter interface, allowing for future extensions
+// where context handling might be necessary (e.g., for timeouts or cancellation).
+func (b *buffer) Write(_ context.Context, data []byte) (int, error) {
+	if b.state == readOnly {
+		return 0, fmt.Errorf("buffer is in read-only mode")
+	}
+	return b.Buffer.Write(data)
+}
+
+// ReadCloser provides a read-closer for the buffer's content.
+// It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
+// as closing a bytes.Buffer is a no-op.
+func (b *buffer) ReadCloser() (io.ReadCloser, error) {
+	if b.state == writeOnly {
+		return nil, fmt.Errorf("buffer is in write-only mode")
+	}
+	return io.NopCloser(bytes.NewReader(b.Bytes())), nil
+}
+
+// CloseForWriting is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
+func (b *buffer) CloseForWriting() error {
+	b.state = readOnly
+	return nil
+}
+
+// String returns the buffer's content as a string.
+func (b *buffer) String() (string, error) { return b.Buffer.String(), nil }
+
+// Diff contains the information about a file diff in a commit.
+// It abstracts the underlying content representation, allowing for flexible handling of diff content.
+// The use of contentWriter enables the management of diff data either in memory or on disk,
+// based on its size, optimizing resource usage and performance.
+type Diff struct {
+	PathB         string
+	LineStart     int
+	contentWriter contentWriter
+	IsBinary      bool
+}
+
+type diffOption func(*Diff)
+
+// withPathB sets the PathB option.
+func withPathB(pathB string) diffOption { return func(d *Diff) { d.PathB = pathB } }
+
+// NewDiff creates a new Diff with a threshold.
+func NewDiff(opts ...diffOption) *Diff {
+	diff := new(Diff)
+	diff.contentWriter = newBuffer()
+	for _, opt := range opts {
+		opt(diff)
+	}
+
+	return diff
+}
+
+// Len returns the length of the storage.
+func (d *Diff) Len() int { return d.contentWriter.Len() }
+
+// ReadCloser returns a ReadCloser for the contentWriter.
+func (d *Diff) ReadCloser() (io.ReadCloser, error) { return d.contentWriter.ReadCloser() }
+
+// write delegates to the contentWriter.
+func (d *Diff) write(ctx context.Context, p []byte) error {
+	_, err := d.contentWriter.Write(ctx, p)
+	return err
+}
+
+// finalize ensures proper closure of resources associated with the Diff.
+// handle the final flush in the finalize method, in case there's data remaining in the buffer.
+// This method should be called to release resources, especially when writing to a file.
+func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -38,12 +149,53 @@ type Commit struct {
 	Size    int // in bytes
 }
 
-// Diff contains the info about a file diff in a commit.
-type Diff struct {
-	PathB     string
-	LineStart int
-	Content   bytes.Buffer
-	IsBinary  bool
+// Equal compares the content of two Commits to determine if they are the same.
+func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
+	switch {
+	case c1.Hash != c2.Hash:
+		return false
+	case c1.Author != c2.Author:
+		return false
+	case !c1.Date.Equal(c2.Date):
+		return false
+	case c1.Message.String() != c2.Message.String():
+		return false
+	case len(c1.Diffs) != len(c2.Diffs):
+		return false
+	}
+
+	// isEqualString handles the error-prone String() method calls and compares the results.
+	isEqualContentString := func(s1, s2 contentWriter) (bool, error) {
+		str1, err := s1.String()
+		if err != nil {
+			return false, err
+		}
+		str2, err := s2.String()
+		if err != nil {
+			return false, err
+		}
+		return str1 == str2, nil
+	}
+
+	for i := range c1.Diffs {
+		d1 := c1.Diffs[i]
+		d2 := c2.Diffs[i]
+		switch {
+		case d1.PathB != d2.PathB:
+			return false
+		case d1.LineStart != d2.LineStart:
+			return false
+		case d1.IsBinary != d2.IsBinary:
+			return false
+		default:
+			equal, err := isEqualContentString(d1.contentWriter, d2.contentWriter)
+			if err != nil || !equal {
+				ctx.Logger().Error(err, "failed to compare diff content")
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Parser sets values used in GitParse.
@@ -51,6 +203,7 @@ type Parser struct {
 	maxDiffSize   int
 	maxCommitSize int
 	dateFormat    string
+	contentWriter contentWriter
 }
 
 type ParseState int
@@ -123,43 +276,12 @@ func NewParser(options ...Option) *Parser {
 		dateFormat:    defaultDateFormat,
 		maxDiffSize:   defaultMaxDiffSize,
 		maxCommitSize: defaultMaxCommitSize,
+		contentWriter: newBuffer(),
 	}
 	for _, option := range options {
 		option(parser)
 	}
 	return parser
-}
-
-// Equal compares the content of two Commits to determine if they are the same.
-func (c1 *Commit) Equal(c2 *Commit) bool {
-	switch {
-	case c1.Hash != c2.Hash:
-		return false
-	case c1.Author != c2.Author:
-		return false
-	case !c1.Date.Equal(c2.Date):
-		return false
-	case c1.Message.String() != c2.Message.String():
-		return false
-	case len(c1.Diffs) != len(c2.Diffs):
-		return false
-	}
-	for i := range c1.Diffs {
-		d1 := c1.Diffs[i]
-		d2 := c2.Diffs[i]
-		switch {
-		case d1.PathB != d2.PathB:
-			return false
-		case d1.LineStart != d2.LineStart:
-			return false
-		case d1.Content.String() != d2.Content.String():
-			return false
-		case d1.IsBinary != d2.IsBinary:
-			return false
-		}
-	}
-	return true
-
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
@@ -254,11 +376,11 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	outReader := bufio.NewReader(stdOut)
 	var (
 		currentCommit *Commit
-		currentDiff   Diff
 
 		totalLogSize int
 	)
 	var latestState = Initial
+	currentDiff := NewDiff()
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -277,9 +399,23 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = CommitLine
 
 			// If there is a currentDiff, add it to currentCommit.
-			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
-				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
-				currentCommit.Size += currentDiff.Content.Len()
+			if currentDiff.Len() > 0 || currentDiff.IsBinary {
+				// TODO: Consider modifying the diffs field in the Commit struct to be a []*Diff.
+				// Otherwise, we end up with this temporal coupling where we have to finalize the diff
+				// before we can add it to the commit. I found this out the hard way when I tried to
+				// test this.
+				if err := currentDiff.finalize(); err != nil {
+					ctx.Logger().Error(
+						err,
+						"failed to finalize diff",
+						"commit", currentCommit.Hash,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
+					)
+				}
+				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+				currentCommit.Size += currentDiff.Len()
 			}
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
@@ -287,10 +423,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = Diff{}
-			currentCommit = &Commit{
-				Message: strings.Builder{},
-			}
+			currentDiff = NewDiff()
+			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
@@ -326,12 +460,21 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if currentCommit == nil {
 				currentCommit = &Commit{}
 			}
-			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
-				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
+			if currentDiff.Len() > 0 || currentDiff.IsBinary {
+				if err := currentDiff.finalize(); err != nil {
+					ctx.Logger().Error(err,
+						"failed to finalize diff",
+						"commit", currentCommit.Hash,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
+					)
+				}
+				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
 				totalSize := 0
 				for _, diff := range currentCommit.Diffs {
-					totalSize += diff.Content.Len()
+					totalSize += diff.Len()
 				}
 				if totalSize > c.maxCommitSize {
 					oldCommit := currentCommit
@@ -348,7 +491,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = Diff{}
+			currentDiff = NewDiff()
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -375,12 +518,20 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isHunkLineNumberLine(isStaged, latestState, line):
 			latestState = HunkLineNumberLine
 
-			if currentDiff.Content.Len() > 0 || currentDiff.IsBinary {
-				currentCommit.Diffs = append(currentCommit.Diffs, currentDiff)
+			if currentDiff.Len() > 0 || currentDiff.IsBinary {
+				if err := currentDiff.finalize(); err != nil {
+					ctx.Logger().Error(
+						err,
+						"failed to finalize diff",
+						"commit", currentCommit.Hash,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
+					)
+				}
+				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
-			currentDiff = Diff{
-				PathB: currentDiff.PathB,
-			}
+			currentDiff = NewDiff(withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -395,24 +546,21 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				latestState = HunkContentLine
 			}
 			// TODO: Why do we care about this? It creates empty lines in the diff. If there are no plusLines, it's just newlines.
-			currentDiff.Content.Write([]byte("\n"))
+			if err := currentDiff.write(ctx, []byte("\n")); err != nil {
+				ctx.Logger().Error(err, "failed to write to diff")
+			}
 		case isHunkPlusLine(isStaged, latestState, line):
 			if latestState != HunkContentLine {
 				latestState = HunkContentLine
 			}
 
-			currentDiff.Content.Write(line[1:])
-		case isHunkMinusLine(isStaged, latestState, line):
-			if latestState != HunkContentLine {
-				latestState = HunkContentLine
+			if err := currentDiff.write(ctx, line[1:]); err != nil {
+				ctx.Logger().Error(err, "failed to write to diff")
 			}
 			// NoOp. We only care about additions.
-		case isHunkNewlineWarningLine(isStaged, latestState, line):
-			if latestState != HunkContentLine {
-				latestState = HunkContentLine
-			}
-			// NoOp
-		case isHunkEmptyLine(isStaged, latestState, line):
+		case isHunkMinusLine(isStaged, latestState, line),
+			isHunkNewlineWarningLine(isStaged, latestState, line),
+			isHunkEmptyLine(isStaged, latestState, line):
 			if latestState != HunkContentLine {
 				latestState = HunkContentLine
 			}
@@ -439,14 +587,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = ParseFailure
 		}
 
-		if currentDiff.Content.Len() > c.maxDiffSize {
+		if currentDiff.Len() > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
 			))
 			break
 		}
 	}
-	cleanupParse(currentCommit, &currentDiff, commitChan, &totalLogSize)
+	cleanupParse(ctx, currentCommit, currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
@@ -716,9 +864,13 @@ func isCommitSeparatorLine(isStaged bool, latestState ParseState, line []byte) b
 	return false
 }
 
-func cleanupParse(currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
+func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
+	if err := currentDiff.finalize(); err != nil {
+		ctx.Logger().Error(err, "failed to finalize diff")
+		return
+	}
 	// Ignore empty or binary diffs (this condition may be redundant).
-	if currentDiff != nil && (currentDiff.Content.Len() > 0 || currentDiff.IsBinary) {
+	if currentDiff != nil && (currentDiff.Len() > 0 || currentDiff.IsBinary) {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 	}
 	if currentCommit != nil {
