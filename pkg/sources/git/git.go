@@ -539,7 +539,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				continue
 			}
 
-			if diff.Len() > sources.ChunkSize+sources.PeekSize {
+			if diff.Len(ctx) > sources.ChunkSize+sources.PeekSize {
 				s.gitChunk(ctx, &diff, fileName, email, hash, when, remoteURL, reporter)
 				continue
 			}
@@ -554,7 +554,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				}
 				defer reader.Close()
 
-				data := make([]byte, diff.Len())
+				data := make([]byte, diff.Len(ctx))
 				if _, err := reader.Read(data); err != nil {
 					ctx.Logger().Error(err, "error reading diff content for commit", "filename", fileName, "commit", hash, "file", diff.PathB)
 					return nil
@@ -738,7 +738,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				}
 				defer reader.Close()
 
-				data := make([]byte, diff.Len())
+				data := make([]byte, diff.Len(ctx))
 				if _, err := reader.Read(data); err != nil {
 					ctx.Logger().Error(err, "error reading diff content for staged", "filename", fileName, "commit", hash, "file", diff.PathB)
 					return nil
