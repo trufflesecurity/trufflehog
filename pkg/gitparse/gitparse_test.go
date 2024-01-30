@@ -749,7 +749,10 @@ func TestIndividualCommitParsing(t *testing.T) {
 
 func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
 	b := bufferedfilewriter.New()
-	_, _ = b.Write(context.Background(), content) // Using Write method to add content
+	_, err := b.Write(context.Background(), content) // Using Write method to add content
+	if err != nil {
+		panic(err)
+	}
 	return b
 }
 
