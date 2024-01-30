@@ -116,7 +116,8 @@ func TestBufferedFileWriterLen(t *testing.T) {
 			_, err := writer.Write(context.Background(), tc.input)
 			assert.NoError(t, err)
 
-			length := writer.Len()
+			length, err := writer.Len()
+			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedLen, length)
 		})
 	}

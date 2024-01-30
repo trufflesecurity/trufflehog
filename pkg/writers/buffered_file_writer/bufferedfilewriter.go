@@ -63,7 +63,12 @@ func New(opts ...Option) *BufferedFileWriter {
 }
 
 // Len returns the number of bytes written to the buffer or file.
-func (w *BufferedFileWriter) Len() int { return int(w.size) }
+func (w *BufferedFileWriter) Len() (int, error) {
+	if w.state == writeOnly {
+		return 0, fmt.Errorf("BufferedFileWriter must be in read-only mode to get length")
+	}
+	return int(w.size), nil
+}
 
 // String returns all the data written to the buffer or file as a string or an empty string if there is an error.
 func (w *BufferedFileWriter) String() (string, error) {
