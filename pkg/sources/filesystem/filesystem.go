@@ -240,6 +240,9 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 				return nil
 			}
 			fullPath := filepath.Join(path, relativePath)
+			if s.filter != nil && !s.filter.Pass(fullPath) {
+				return nil
+			}
 			item := sources.CommonSourceUnit{ID: fullPath}
 			return reporter.UnitOk(ctx, item)
 		})
