@@ -576,22 +576,17 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func likelyDuplicate(ctx context.Context, val string, dupesSlice []string) bool {
-	for _, v := range dupesSlice {
-		if v == val {
-			ctx.Logger().V(2).Info("found exact duplicate", "val", val, "v", v)
-			return true
-		}
-		// Avoid comparing strings of vastly different lengths.
-		if len(v)*10 < len(val)*9 || len(v)*10 > len(val)*11 {
-			continue
-		}
+func likelyDuplicate(ctx context.Context, val string, dupes map[string]struct{}) bool {
+	if _, ok := dupes[val]; ok {
+		return true
+	}
 
-		similarity := strutil.Similarity(val, v, metrics.NewLevenshtein())
+	for k := range dupes {
+		similarity := strutil.Similarity(val, k, metrics.NewLevenshtein())
 
 		// close enough
 		if similarity > 0.9 {
-			ctx.Logger().V(2).Info("found similar duplicate", "val", val, "v", v, "similarity", similarity)
+			ctx.Logger().V(2).Info("found similar duplicate", "val", val, "similarity", similarity)
 			return true
 		}
 	}
@@ -604,7 +599,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
 	detectorsWithResult := make([]detectors.Detector, 0, avgSecretsPerDetector)
-	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
+	chunkSecrets := make(map[string]struct{}, avgSecretsPerDetector)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
@@ -649,11 +644,11 @@ nextChunk:
 					}, res)
 
 					// Empty the dupes and detectors slice.
-					chunkSecrets = chunkSecrets[:0]
+					chunkSecrets = make(map[string]struct{}, avgSecretsPerDetector)
 					detectorsWithResult = detectorsWithResult[:0]
 					continue nextChunk
 				}
-				chunkSecrets = append(chunkSecrets, valStr)
+				chunkSecrets[valStr] = struct{}{}
 			}
 		}
 
@@ -669,7 +664,7 @@ nextChunk:
 		}
 
 		// Empty the dupes and detectors slice
-		chunkSecrets = chunkSecrets[:0]
+		chunkSecrets = make(map[string]struct{}, avgSecretsPerDetector)
 		detectorsWithResult = detectorsWithResult[:0]
 
 		chunk.reverifyWgDoneFn()
