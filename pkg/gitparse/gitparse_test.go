@@ -596,9 +596,9 @@ Author: Zachary Rice <zachary.rice@trufflesec.com>
 Date:   Tue Jun 13 14:49:21 2023 -0500
 
     add a custom detector check for logging duplicate detector (#1394)
-    
+
     * add a custom detector check for logging duplicate detector
-    
+
     * use pb type
 
 diff --git a/pkg/engine/engine.go b/pkg/engine/engine.go
@@ -627,7 +627,7 @@ Author: Michelle Purcell <92924207+michelle-purcell@users.noreply.github.com>
 Date:   Tue Jun 27 13:48:04 2023 +0100
 
     Update docs/src/main/asciidoc/security-vulnerability-detection.adoc
-    
+
     Co-authored-by: Sergey Beryozkin <sberyozkin@gmail.com>
     (cherry picked from commit 10f04b79e0ab3a331ac1bfae78d7ed399e243bf0)
 
@@ -1223,12 +1223,12 @@ index 239b415..2ee133b 100644
 +++ b/aws2
 !!!ERROR!!!
  blah blaj
- 
+
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
- 
+
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
@@ -1308,7 +1308,7 @@ func TestMaxDiffSize(t *testing.T) {
 	select {
 	case commit := <-commitChan:
 		if commit.Diffs[0].Len(ctx) > parser.maxDiffSize+1024 {
-			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Len(), parser.maxDiffSize+1024)
+			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Len(ctx), parser.maxDiffSize+1024)
 		}
 	case <-ctx.Done():
 		t.Fatal("Test timed out")
@@ -1620,7 +1620,7 @@ Author: rjtmahinay <rjt.mahinay@gmail.com>
 Date:   Mon Jul 10 01:22:32 2023 +0800
 
     Add QuarkusApplication javadoc
-    
+
     * Fix #34463
 
 diff --git a/core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java b/core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java
@@ -2081,12 +2081,12 @@ index 239b415..2ee133b 100644
 +++ b/aws2
 @@ -1,5 +1,7 @@
  blah blaj
- 
+
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
- 
+
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
@@ -2212,12 +2212,12 @@ index 239b415..2ee133b 100644
 +++ b/aws
 @@ -1,5 +1,7 @@
  blah blaj
- 
+
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
- 
+
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
