@@ -547,7 +547,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			chunkData := func(d *gitparse.Diff) error {
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, int64(diff.LineStart))
 
-				reader, err := diff.ReadCloser()
+				reader, err := d.ReadCloser()
 				if err != nil {
 					ctx.Logger().Error(err, "error creating reader for commits", "filename", fileName, "commit", hash, "file", diff.PathB)
 					return nil

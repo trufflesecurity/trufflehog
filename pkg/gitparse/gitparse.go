@@ -400,11 +400,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 
 			// If there is a currentDiff, add it to currentCommit.
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
-				currentCommit.Size += currentDiff.Len()
-			}
-			// If there is a currentCommit, send it to the channel.
-			if currentCommit != nil {
+				// TODO: Consider modifying the diffs field in the Commit struct to be a []*Diff.
+				// Otherwise, we end up with this temporal coupling where we have to finalize the diff
+				// before we can add it to the commit. I found this out the hard way when I tried to
+				// test this.
 				if err := currentDiff.finalize(); err != nil {
 					ctx.Logger().Error(
 						err,
@@ -415,6 +414,11 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 						"latest_state", latestState.String(),
 					)
 				}
+				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
+				currentCommit.Size += currentDiff.Len()
+			}
+			// If there is a currentCommit, send it to the channel.
+			if currentCommit != nil {
 				commitChan <- *currentCommit
 				totalLogSize += currentCommit.Size
 			}
@@ -457,7 +461,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				currentCommit = &Commit{}
 			}
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
-				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 				if err := currentDiff.finalize(); err != nil {
 					ctx.Logger().Error(err,
 						"failed to finalize diff",
@@ -467,6 +470,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 						"latest_state", latestState.String(),
 					)
 				}
+				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
 				totalSize := 0
 				for _, diff := range currentCommit.Diffs {
@@ -515,6 +519,16 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = HunkLineNumberLine
 
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
+				if err := currentDiff.finalize(); err != nil {
+					ctx.Logger().Error(
+						err,
+						"failed to finalize diff",
+						"commit", currentCommit.Hash,
+						"diff", currentDiff.PathB,
+						"size", currentDiff.Len(),
+						"latest_state", latestState.String(),
+					)
+				}
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
 			currentDiff = NewDiff(withPathB(currentDiff.PathB))
