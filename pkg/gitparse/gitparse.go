@@ -41,7 +41,7 @@ type contentWriter interface { // Write appends data to the content storage.
 	// CloseForWriting closes the content storage for writing.
 	CloseForWriting() error
 	// Len returns the current size of the content.
-	Len() int
+	Len() (int, error)
 	// String returns the content as a string or an error if the content cannot be converted to a string.
 	String() (string, error)
 }
@@ -93,7 +93,20 @@ func (b *buffer) CloseForWriting() error {
 }
 
 // String returns the buffer's content as a string.
-func (b *buffer) String() (string, error) { return b.Buffer.String(), nil }
+func (b *buffer) String() (string, error) {
+	if b.state == writeOnly {
+		return "", fmt.Errorf("buffer is in write-only mode, content not available to read")
+	}
+	return b.Buffer.String(), nil
+}
+
+// Len returns the length of the buffer's content.
+func (b *buffer) Len() (int, error) {
+	if b.state == writeOnly {
+		return 0, fmt.Errorf("buffer is in write-only mode, content not available to read")
+	}
+	return b.Buffer.Len(), nil
+}
 
 // Diff contains the information about a file diff in a commit.
 // It abstracts the underlying content representation, allowing for flexible handling of diff content.
@@ -123,7 +136,14 @@ func NewDiff(opts ...diffOption) *Diff {
 }
 
 // Len returns the length of the storage.
-func (d *Diff) Len() int { return d.contentWriter.Len() }
+func (d *Diff) Len(ctx context.Context) int {
+	n, err := d.contentWriter.Len()
+	if err != nil {
+		ctx.Logger().Error(err, "failed to get diff length")
+		return 0
+	}
+	return n
+}
 
 // ReadCloser returns a ReadCloser for the contentWriter.
 func (d *Diff) ReadCloser() (io.ReadCloser, error) { return d.contentWriter.ReadCloser() }
@@ -394,25 +414,27 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			break
 		}
 
+		ctx = context.WithValues(ctx,
+			"diff", currentDiff.PathB,
+			"commit", currentCommit.Hash,
+			"size", currentDiff.Len(ctx),
+		)
+
 		switch {
 		case isCommitLine(isStaged, latestState, line):
 			latestState = CommitLine
 
 			// If there is a currentDiff, add it to currentCommit.
-			if currentDiff.Len() > 0 || currentDiff.IsBinary {
+			if currentDiff.Len(ctx) > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
-				currentCommit.Size += currentDiff.Len()
+				currentCommit.Size += currentDiff.Len(ctx)
 			}
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				if err := currentDiff.finalize(); err != nil {
-					ctx.Logger().Error(
-						err,
+					ctx.Logger().Error(err,
 						"failed to finalize diff",
-						"commit", currentCommit.Hash,
-						"diff", currentDiff.PathB,
-						"size", currentDiff.Len(),
-						"latest_state", latestState.String(),
+						"latest_state", latestState,
 					)
 				}
 				commitChan <- *currentCommit
@@ -456,15 +478,18 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			if currentCommit == nil {
 				currentCommit = &Commit{}
 			}
-			if currentDiff.Len() > 0 || currentDiff.IsBinary {
+			if currentDiff.Len(ctx) > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 				if err := currentDiff.finalize(); err != nil {
-					ctx.Logger().Error(err, "failed to finalize diff")
+					ctx.Logger().Error(err,
+						"failed to finalize diff",
+						"latest_state", latestState,
+					)
 				}
 				// If the currentDiff is over 1GB, drop it into the channel so it isn't held in memory waiting for more commits.
 				totalSize := 0
 				for _, diff := range currentCommit.Diffs {
-					totalSize += diff.Len()
+					totalSize += diff.Len(ctx)
 				}
 				if totalSize > c.maxCommitSize {
 					oldCommit := currentCommit
@@ -508,7 +533,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		case isHunkLineNumberLine(isStaged, latestState, line):
 			latestState = HunkLineNumberLine
 
-			if currentDiff.Len() > 0 || currentDiff.IsBinary {
+			if currentDiff.Len(ctx) > 0 || currentDiff.IsBinary {
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
 			currentDiff = NewDiff(withPathB(currentDiff.PathB))
@@ -567,7 +592,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			latestState = ParseFailure
 		}
 
-		if currentDiff.Len() > c.maxDiffSize {
+		if currentDiff.Len(ctx) > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
 			))
@@ -846,11 +871,11 @@ func isCommitSeparatorLine(isStaged bool, latestState ParseState, line []byte) b
 
 func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff, commitChan chan Commit, totalLogSize *int) {
 	if err := currentDiff.finalize(); err != nil {
-		ctx.Logger().Error(err, "failed to finalize diff")
+		ctx.Logger().Error(err, "failed to finalize diff", "latest_state", "cleanup")
 		return
 	}
 	// Ignore empty or binary diffs (this condition may be redundant).
-	if currentDiff != nil && (currentDiff.Len() > 0 || currentDiff.IsBinary) {
+	if currentDiff != nil && (currentDiff.Len(ctx) > 0 || currentDiff.IsBinary) {
 		currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 	}
 	if currentCommit != nil {
