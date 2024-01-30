@@ -34,20 +34,27 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
 
 type Source struct {
 	name     string
-	sourceId sources.SourceID
-	jobId    sources.JobID
+	sourceID sources.SourceID
+	jobID    sources.JobID
 	verify   bool
-	git      *Git
+
+	useCustomContentWriter bool
+	git                    *Git
+	scanOptions            *ScanOptions
+
 	sources.Progress
-	conn        *sourcespb.Git
-	scanOptions *ScanOptions
+	conn *sourcespb.Git
 }
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 type Git struct {
 	sourceType         sourcespb.SourceType
@@ -60,26 +67,54 @@ type Git struct {
 	concurrency        *semaphore.Weighted
 	skipBinaries       bool
 	skipArchives       bool
+
+	parser *gitparse.Parser
 }
 
 type metrics struct {
 	commitsScanned uint64
 }
 
-func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
-	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData, skipBinaries bool,
-	skipArchives bool,
-) *Git {
+// Config for a Git source.
+type Config struct {
+	Concurrency        int
+	SourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
+
+	SourceName   string
+	JobID        sources.JobID
+	SourceID     sources.SourceID
+	SourceType   sourcespb.SourceType
+	Verify       bool
+	SkipBinaries bool
+	SkipArchives bool
+
+	// UseCustomContentWriter indicates whether to use a custom contentWriter.
+	// When set to true, the parser will use a custom contentWriter provided through the WithContentWriter option.
+	// When false, the parser will use the default buffer (in-memory) contentWriter.
+	UseCustomContentWriter bool
+}
+
+// NewGit creates a new Git instance with the provided configuration. The Git instance is used to interact with
+// Git repositories.
+func NewGit(config *Config) *Git {
+	var parser *gitparse.Parser
+	if config.UseCustomContentWriter {
+		parser = gitparse.NewParser(gitparse.WithContentWriter(bufferedfilewriter.New()))
+	} else {
+		parser = gitparse.NewParser()
+	}
+
 	return &Git{
-		sourceType:         sourceType,
-		sourceName:         sourceName,
-		sourceID:           sourceID,
-		jobID:              jobID,
-		sourceMetadataFunc: sourceMetadataFunc,
-		verify:             verify,
-		concurrency:        semaphore.NewWeighted(int64(concurrency)),
-		skipBinaries:       skipBinaries,
-		skipArchives:       skipArchives,
+		sourceType:         config.SourceType,
+		sourceName:         config.SourceName,
+		sourceID:           config.SourceID,
+		jobID:              config.JobID,
+		sourceMetadataFunc: config.SourceMetadataFunc,
+		verify:             config.Verify,
+		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
+		skipBinaries:       config.SkipBinaries,
+		skipArchives:       config.SkipArchives,
+		parser:             parser,
 	}
 }
 
@@ -97,11 +132,11 @@ func (s *Source) Type() sourcespb.SourceType {
 }
 
 func (s *Source) SourceID() sources.SourceID {
-	return s.sourceId
+	return s.sourceID
 }
 
 func (s *Source) JobID() sources.JobID {
-	return s.jobId
+	return s.jobID
 }
 
 // withScanOptions sets the scan options.
@@ -112,8 +147,8 @@ func (s *Source) withScanOptions(scanOptions *ScanOptions) {
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
+	s.sourceID = sourceId
+	s.jobID = jobId
 	s.verify = verify
 	if s.scanOptions == nil {
 		s.scanOptions = &ScanOptions{}
@@ -166,8 +201,16 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return err
 	}
 
-	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+	cfg := &Config{
+		SourceName:   s.name,
+		JobID:        s.jobID,
+		SourceID:     s.sourceID,
+		SourceType:   s.Type(),
+		Verify:       s.verify,
+		SkipBinaries: conn.GetSkipBinaries(),
+		SkipArchives: conn.GetSkipArchives(),
+		Concurrency:  concurrency,
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
@@ -181,9 +224,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 				},
 			}
 		},
-		conn.GetSkipBinaries(),
-		conn.GetSkipArchives(),
-	)
+		UseCustomContentWriter: s.useCustomContentWriter,
+	}
+	s.git = NewGit(cfg)
 	return nil
 }
 

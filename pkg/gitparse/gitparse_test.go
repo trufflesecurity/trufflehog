@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 type testCaseLine struct {
@@ -746,6 +747,15 @@ func TestIndividualCommitParsing(t *testing.T) {
 	}
 }
 
+func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
+	b := bufferedfilewriter.New()
+	_, err := b.Write(context.Background(), content) // Using Write method to add content
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 func newBufferWithContent(content []byte) *buffer {
 	var b buffer
 	_, _ = b.Write(context.Background(), content) // Using Write method to add content
@@ -825,6 +835,79 @@ func TestStagedDiffParsing(t *testing.T) {
 	}
 }
 
+func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
+	expected := []Commit{
+		{
+			Hash:    "",
+			Author:  "",
+			Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+			Message: strings.Builder{},
+			Diffs: []Diff{
+				{
+					PathB:         "aws",
+					LineStart:     1,
+					contentWriter: newBufferedFileWriterWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+					IsBinary:      false,
+				},
+				{
+					PathB:         "aws2",
+					LineStart:     1,
+					contentWriter: newBufferedFileWriterWithContent([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
+					IsBinary:      false,
+				},
+				{
+					PathB:         "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
+					LineStart:     3,
+					contentWriter: newBufferedFileWriterWithContent([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
+					IsBinary:      false,
+				},
+				{
+					PathB:         "trufflehog_3.42.0_linux_arm64.tar.gz",
+					IsBinary:      true,
+					contentWriter: newBufferedFileWriterWithContent(nil),
+				},
+				{
+					PathB:         "tzu",
+					LineStart:     11,
+					contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+					IsBinary:      false,
+				},
+				{
+					PathB:         "lao",
+					LineStart:     1,
+					contentWriter: newBufferedFileWriterWithContent([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
+					IsBinary:      false,
+				},
+				{
+					PathB:         "tzu",
+					LineStart:     1,
+					contentWriter: newBufferedFileWriterWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+					IsBinary:      false,
+				},
+			},
+		},
+	}
+
+	r := bytes.NewReader([]byte(stagedDiffs))
+	commitChan := make(chan Commit)
+	parser := NewParser()
+	go func() {
+		parser.FromReader(context.Background(), r, commitChan, true)
+	}()
+	i := 0
+	for commit := range commitChan {
+		if len(expected) <= i {
+			t.Errorf("Missing expected case for commit: %+v", commit)
+			break
+		}
+
+		if !commit.Equal(context.Background(), &expected[i]) {
+			t.Errorf("Commit does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], commit)
+		}
+		i++
+	}
+}
+
 func TestCommitParseFailureRecovery(t *testing.T) {
 	expected := []Commit{
 		{
@@ -858,6 +941,65 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 					PathB:         "tzu",
 					LineStart:     11,
 					contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+					IsBinary:      false,
+				},
+			},
+		},
+	}
+
+	r := bytes.NewReader([]byte(recoverableCommits))
+	commitChan := make(chan Commit)
+	parser := NewParser()
+	go func() {
+		parser.FromReader(context.Background(), r, commitChan, false)
+	}()
+	i := 0
+	for commit := range commitChan {
+		if len(expected) <= i {
+			t.Errorf("Missing expected case for commit: %+v", commit)
+			break
+		}
+
+		if !commit.Equal(context.Background(), &expected[i]) {
+			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
+		}
+		i++
+	}
+}
+
+func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
+	expected := []Commit{
+		{
+			Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
+			Author:  "Stephen <stephen@egroat.com>",
+			Date:    newTime("Wed Dec 06 14:44:41 2017 -0800"),
+			Message: newStringBuilderValue("Add travis testing\n"),
+			Diffs: []Diff{
+				{
+					PathB:         ".travis.yml",
+					LineStart:     1,
+					contentWriter: newBufferedFileWriterWithContent([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
+					IsBinary:      false,
+				},
+			},
+		},
+		{
+			Hash:    "3d76a97faad96e0f326afb61c232b9c2a18dca35",
+			Author:  "John Smith <john.smith@example.com>",
+			Date:    newTime("Tue Jul 11 18:03:54 2023 -0400"),
+			Message: strings.Builder{},
+			Diffs:   []Diff{},
+		},
+		{
+			Hash:    "7bd16429f1f708746dabf970e54b05d2b4734997",
+			Author:  "John Smith <john.smith@example.com>",
+			Date:    newTime("Tue Jul 11 18:10:49 2023 -0400"),
+			Message: newStringBuilderValue("Change file\n"),
+			Diffs: []Diff{
+				{
+					PathB:         "tzu",
+					LineStart:     11,
+					contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 					IsBinary:      false,
 				},
 			},
@@ -978,6 +1120,56 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 					PathB:         "tzu",
 					LineStart:     1,
 					contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+					IsBinary:      false,
+				},
+			},
+		},
+	}
+
+	r := bytes.NewReader([]byte(recoverableDiffs))
+	commitChan := make(chan Commit)
+	parser := NewParser()
+	go func() {
+		parser.FromReader(context.Background(), r, commitChan, true)
+	}()
+	i := 0
+	for commit := range commitChan {
+		if len(expected) <= i {
+			t.Errorf("Missing expected case for commit: %+v", commit)
+			break
+		}
+
+		if !commit.Equal(context.Background(), &expected[i]) {
+			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
+		}
+		i++
+	}
+}
+
+func TestDiffParseFailureRecoveryBufferedFileWriter(t *testing.T) {
+	expected := []Commit{
+		{
+			Hash:    "",
+			Author:  "",
+			Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+			Message: strings.Builder{},
+			Diffs: []Diff{
+				{
+					PathB:         "aws",
+					LineStart:     1,
+					contentWriter: newBufferedFileWriterWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+					IsBinary:      false,
+				},
+				{
+					PathB:         "tzu",
+					LineStart:     11,
+					contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+					IsBinary:      false,
+				},
+				{
+					PathB:         "tzu",
+					LineStart:     1,
+					contentWriter: newBufferedFileWriterWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
 					IsBinary:      false,
 				},
 			},
