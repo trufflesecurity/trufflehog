@@ -570,17 +570,17 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func likelyDuplicate(val string, dupesSlice []string) bool {
-	for _, v := range dupesSlice {
-		if v == val {
-			fmt.Println("found exact duplicate", val, v)
-			return true
-		}
-		similarity := strutil.Similarity(val, v, metrics.NewLevenshtein())
+func dupeuplicate(val string, dupes map[string]struct{}) bool {
+	if _, ok := dupes[val]; ok {
+		fmt.Println("found exact duplicate", val)
+		return true
+	}
+	for k := range dupes {
+		similarity := strutil.Similarity(val, k, metrics.NewLevenshtein())
 
 		// close enough
 		if similarity > 0.9 {
-			fmt.Println("found similar duplicate", val, v, similarity)
+			fmt.Println("found similar duplicate", val, k, similarity)
 			return true
 		}
 	}
@@ -594,13 +594,13 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	const avgSecretsPerDetector = 8
 
 	detectorsToVerify := make(map[string]detectors.Detector, avgSecretsPerDetector)
-	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
 
 	var wgReverify sync.WaitGroup
 	dMu := sync.Mutex{}
 	detectorResults := make(map[string][]detectors.Result, avgSecretsPerDetector)
 
 	for chunk := range e.reverifiableChunksChan {
+		dupes := make(map[string]struct{}, avgSecretsPerDetector)
 		for _, detector := range chunk.detectors {
 			detectorsToVerify[detector.Type().String()] = detector
 			detector := detector
@@ -638,7 +638,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 					} else {
 						val = res.Raw
 					}
-					chunkSecrets = append(chunkSecrets, string(val))
+					dupes[string(val)] = struct{}{}
 				}
 			}
 
@@ -656,7 +656,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				if likelyDuplicate(string(val), chunkSecrets) {
+				if dupeuplicate(string(val), dupes) {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
@@ -678,8 +678,8 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 
 				delete(detectorsToVerify, detector.Type().String())
 
-				// Empty the dupes and detectors slice
-				chunkSecrets = chunkSecrets[:0]
+				// Empty the dupes and detectors map.
+				dupes = make(map[string]struct{}, avgSecretsPerDetector)
 			}
 		}
 
