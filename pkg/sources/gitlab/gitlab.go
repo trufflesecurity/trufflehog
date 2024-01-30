@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -32,25 +31,33 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
 
 type Source struct {
-	name            string
-	sourceId        sources.SourceID
-	jobId           sources.JobID
-	verify          bool
-	authMethod      string
-	user            string
-	password        string
-	token           string
-	url             string
-	repos           []string
-	ignoreRepos     []string
-	git             *git.Git
-	scanOptions     *git.ScanOptions
+	name     string
+	sourceID sources.SourceID
+	jobID    sources.JobID
+	verify   bool
+
+	authMethod  string
+	user        string
+	password    string
+	token       string
+	url         string
+	repos       []string
+	ignoreRepos []string
+
+	useCustomContentWriter bool
+	git                    *git.Git
+	scanOptions            *git.ScanOptions
+
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
 	sources.Progress
+
 	jobPool *errgroup.Group
 	sources.CommonSourceUnitUnmarshaller
 }
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 // Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -64,18 +71,18 @@ func (s *Source) Type() sourcespb.SourceType {
 }
 
 func (s *Source) SourceID() sources.SourceID {
-	return s.sourceId
+	return s.sourceID
 }
 
 func (s *Source) JobID() sources.JobID {
-	return s.jobId
+	return s.jobID
 }
 
 // Init returns an initialized Gitlab source.
 func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
+	s.sourceID = sourceId
+	s.jobID = jobId
 	s.verify = verify
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
@@ -121,8 +128,16 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		return err
 	}
 
-	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+	cfg := &git.Config{
+		SourceName:   s.name,
+		JobID:        s.jobID,
+		SourceID:     s.sourceID,
+		SourceType:   s.Type(),
+		Verify:       s.verify,
+		SkipBinaries: conn.GetSkipBinaries(),
+		SkipArchives: conn.GetSkipArchives(),
+		Concurrency:  concurrency,
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Gitlab{
 					Gitlab: &source_metadatapb.Gitlab{
@@ -137,9 +152,9 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 				},
 			}
 		},
-		conn.GetSkipBinaries(),
-		conn.GetSkipArchives(),
-	)
+		UseCustomContentWriter: s.useCustomContentWriter,
+	}
+	s.git = git.NewGit(cfg)
 
 	return nil
 }

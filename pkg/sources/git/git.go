@@ -19,12 +19,11 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v42/github"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -35,20 +34,27 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
 
 type Source struct {
 	name     string
-	sourceId sources.SourceID
-	jobId    sources.JobID
+	sourceID sources.SourceID
+	jobID    sources.JobID
 	verify   bool
-	git      *Git
+
+	useCustomContentWriter bool
+	git                    *Git
+	scanOptions            *ScanOptions
+
 	sources.Progress
-	conn        *sourcespb.Git
-	scanOptions *ScanOptions
+	conn *sourcespb.Git
 }
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 type Git struct {
 	sourceType         sourcespb.SourceType
@@ -61,26 +67,54 @@ type Git struct {
 	concurrency        *semaphore.Weighted
 	skipBinaries       bool
 	skipArchives       bool
+
+	parser *gitparse.Parser
 }
 
 type metrics struct {
 	commitsScanned uint64
 }
 
-func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
-	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData, skipBinaries bool,
-	skipArchives bool,
-) *Git {
+// Config for a Git source.
+type Config struct {
+	Concurrency        int
+	SourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
+
+	SourceName   string
+	JobID        sources.JobID
+	SourceID     sources.SourceID
+	SourceType   sourcespb.SourceType
+	Verify       bool
+	SkipBinaries bool
+	SkipArchives bool
+
+	// UseCustomContentWriter indicates whether to use a custom contentWriter.
+	// When set to true, the parser will use a custom contentWriter provided through the WithContentWriter option.
+	// When false, the parser will use the default buffer (in-memory) contentWriter.
+	UseCustomContentWriter bool
+}
+
+// NewGit creates a new Git instance with the provided configuration. The Git instance is used to interact with
+// Git repositories.
+func NewGit(config *Config) *Git {
+	var parser *gitparse.Parser
+	if config.UseCustomContentWriter {
+		parser = gitparse.NewParser(gitparse.WithContentWriter(bufferedfilewriter.New()))
+	} else {
+		parser = gitparse.NewParser()
+	}
+
 	return &Git{
-		sourceType:         sourceType,
-		sourceName:         sourceName,
-		sourceID:           sourceID,
-		jobID:              jobID,
-		sourceMetadataFunc: sourceMetadataFunc,
-		verify:             verify,
-		concurrency:        semaphore.NewWeighted(int64(concurrency)),
-		skipBinaries:       skipBinaries,
-		skipArchives:       skipArchives,
+		sourceType:         config.SourceType,
+		sourceName:         config.SourceName,
+		sourceID:           config.SourceID,
+		jobID:              config.JobID,
+		sourceMetadataFunc: config.SourceMetadataFunc,
+		verify:             config.Verify,
+		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
+		skipBinaries:       config.SkipBinaries,
+		skipArchives:       config.SkipArchives,
+		parser:             parser,
 	}
 }
 
@@ -98,11 +132,11 @@ func (s *Source) Type() sourcespb.SourceType {
 }
 
 func (s *Source) SourceID() sources.SourceID {
-	return s.sourceId
+	return s.sourceID
 }
 
 func (s *Source) JobID() sources.JobID {
-	return s.jobId
+	return s.jobID
 }
 
 // withScanOptions sets the scan options.
@@ -113,8 +147,8 @@ func (s *Source) withScanOptions(scanOptions *ScanOptions) {
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
+	s.sourceID = sourceId
+	s.jobID = jobId
 	s.verify = verify
 	if s.scanOptions == nil {
 		s.scanOptions = &ScanOptions{}
@@ -167,8 +201,16 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return err
 	}
 
-	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+	cfg := &Config{
+		SourceName:   s.name,
+		JobID:        s.jobID,
+		SourceID:     s.sourceID,
+		SourceType:   s.Type(),
+		Verify:       s.verify,
+		SkipBinaries: conn.GetSkipBinaries(),
+		SkipArchives: conn.GetSkipArchives(),
+		Concurrency:  concurrency,
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
@@ -182,9 +224,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 				},
 			}
 		},
-		conn.GetSkipBinaries(),
-		conn.GetSkipArchives(),
-	)
+		UseCustomContentWriter: s.useCustomContentWriter,
+	}
+	s.git = NewGit(cfg)
 	return nil
 }
 
@@ -508,6 +550,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		atomic.AddUint64(&s.metrics.commitsScanned, 1)
 		logger.V(5).Info("scanning commit", "commit", commit.Hash)
 		for _, diff := range commit.Diffs {
+			diff := diff
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
 			}
@@ -539,21 +582,38 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				continue
 			}
 
-			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(ctx, diff, fileName, email, hash, when, remoteURL, reporter)
+			if diff.Len() > sources.ChunkSize+sources.PeekSize {
+				s.gitChunk(ctx, &diff, fileName, email, hash, when, remoteURL, reporter)
 				continue
 			}
-			metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, int64(diff.LineStart))
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           diff.Content.Bytes(),
-				Verify:         s.verify,
+
+			chunkData := func(d *gitparse.Diff) error {
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, int64(diff.LineStart))
+
+				reader, err := d.ReadCloser()
+				if err != nil {
+					ctx.Logger().Error(err, "error creating reader for commits", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				defer reader.Close()
+
+				data := make([]byte, diff.Len())
+				if _, err := reader.Read(data); err != nil {
+					ctx.Logger().Error(err, "error reading diff content for commit", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				chunk := sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					JobID:          s.jobID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           data,
+					Verify:         s.verify,
+				}
+				return reporter.ChunkOk(ctx, chunk)
 			}
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			if err := chunkData(&diff); err != nil {
 				return err
 			}
 		}
@@ -561,8 +621,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	return nil
 }
 
-func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, reporter sources.ChunkReporter) {
-	originalChunk := bufio.NewScanner(&diff.Content)
+func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email, hash, when, urlMetadata string, reporter sources.ChunkReporter) {
+	reader, err := diff.ReadCloser()
+	if err != nil {
+		ctx.Logger().Error(err, "error creating reader for chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
+		return
+	}
+	defer reader.Close()
+
+	originalChunk := bufio.NewScanner(reader)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
@@ -654,6 +721,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
 		for _, diff := range commit.Diffs {
+			diff := diff
 			logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", commit.Hash, "file", diff.PathB)
 			logger.V(2).Info("scanning staged changes from git")
 
@@ -703,17 +771,33 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				continue
 			}
 
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           diff.Content.Bytes(),
-				Verify:         s.verify,
+			chunkData := func(d *gitparse.Diff) error {
+				metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
+
+				reader, err := diff.ReadCloser()
+				if err != nil {
+					ctx.Logger().Error(err, "error creating reader for staged", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				defer reader.Close()
+
+				data := make([]byte, diff.Len())
+				if _, err := reader.Read(data); err != nil {
+					ctx.Logger().Error(err, "error reading diff content for staged", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				chunk := sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					JobID:          s.jobID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           data,
+					Verify:         s.verify,
+				}
+				return reporter.ChunkOk(ctx, chunk)
 			}
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			if err := chunkData(&diff); err != nil {
 				return err
 			}
 		}
@@ -1048,9 +1132,6 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return err
 	}
 	defer func() {
-		if err := fileReader.Close(); err != nil {
-			ctx.Logger().Error(err, "error closing fileReader")
-		}
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().Error(
 				err, "error waiting for command",

@@ -65,6 +65,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
@@ -305,6 +308,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
@@ -416,6 +420,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mattermostpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mavenlink"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense_v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meaningcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
@@ -797,9 +802,6 @@ func DefaultDetectors() []detectors.Detector {
 		&alibaba.Scanner{},
 		aws.New(),
 		awssessionkey.New(),
-		&azure.Scanner{},
-		&azurecontainerregistry.Scanner{},
-		&azurebatch.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlab.Scanner{},
 		&gitlabv2.Scanner{},
@@ -821,6 +823,7 @@ func DefaultDetectors() []detectors.Detector {
 		&jdbc.Scanner{},
 		&privatekey.Scanner{},
 		&maxmindlicense.Scanner{},
+		&maxmindlicense_v2.Scanner{},
 		&airtableapikey.Scanner{},
 		&bitfinex.Scanner{},
 		&telegrambottoken.Scanner{},
@@ -1599,9 +1602,17 @@ func DefaultDetectors() []detectors.Detector {
 		rabbitmq.Scanner{},
 		planetscale.Scanner{},
 		portainertoken.Scanner{},
-		azurestorage.Scanner{},
 		planetscaledb.Scanner{},
+		azure.Scanner{},
+		azurestorage.Scanner{},
+		azurecontainerregistry.Scanner{},
+		azurebatch.Scanner{},
+		// azurefunctionkey.Scanner{}, // detector is throwing some FPs
+		azuredevopspersonalaccesstoken.Scanner{},
+		azuresearchadminkey.Scanner{},
+		&azuresearchquerykey.Scanner{},
 		jiratoken_v2.Scanner{},
+		&googleoauth2.Scanner{},
 	}
 
 }

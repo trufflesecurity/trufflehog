@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,7 +61,9 @@ type Source struct {
 	memberCache       map[string]struct{}
 	repoSizes         repoSize
 	totalRepoSize     int // total size of all repos in kb
-	git               *git.Git
+
+	useCustomContentWriter bool
+	git                    *git.Git
 
 	scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
@@ -84,6 +85,9 @@ type Source struct {
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
@@ -259,8 +263,16 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.publicMap = map[string]source_metadatapb.Visibility{}
 
-	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+	cfg := &git.Config{
+		SourceName:   s.name,
+		JobID:        s.jobID,
+		SourceID:     s.sourceID,
+		SourceType:   s.Type(),
+		Verify:       s.verify,
+		SkipBinaries: conn.GetSkipBinaries(),
+		SkipArchives: conn.GetSkipArchives(),
+		Concurrency:  concurrency,
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -276,9 +288,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 				},
 			}
 		},
-		conn.GetSkipBinaries(),
-		conn.GetSkipArchives(),
-	)
+		UseCustomContentWriter: s.useCustomContentWriter,
+	}
+	s.git = git.NewGit(cfg)
 
 	return nil
 }
@@ -737,7 +749,7 @@ func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Cl
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
-	var scanned uint64
+	var scannedCount uint64
 
 	s.log.V(2).Info("Found repos to scan", "count", len(s.repos))
 
@@ -773,10 +785,12 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			}
 
 			logger := s.log.WithValues("repo", repoURL)
-			logger.V(2).Info(fmt.Sprintf("attempting to clone repo %d/%d", i+1, len(s.repos)))
-			var path string
-			var repo *gogit.Repository
-			var err error
+			logger.V(2).Info("attempting to clone repo")
+			var (
+				path string
+				repo *gogit.Repository
+				err  error
+			)
 
 			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
 			if err != nil {
@@ -793,34 +807,38 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			s.setScanOptions(s.conn.Base, s.conn.Head)
 
 			repoSize := s.repoSizes.getRepo(repoURL)
-			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size_kb", repoSize)
+			logger.V(2).Info("scanning repo", "repo_size_kb", repoSize)
 
 			now := time.Now()
-			defer func(start time.Time) {
-				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
-			}(now)
+			scanFailed := false
+			defer func(start time.Time, failed *bool) {
+				if *failed {
+					return
+				}
+				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", time.Since(start).Seconds())
+			}(now, &scanFailed)
 
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
 				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
+				scanFailed = true
+				return nil
+			}
+
+			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
+				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
+				scanFailed = true
 				return nil
 			}
 
 			githubReposScanned.WithLabelValues(s.name).Inc()
-
-			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
-				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
-				return nil
-			}
-
-			atomic.AddUint64(&scanned, 1)
-
+			atomic.AddUint64(&scannedCount, 1)
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		s.log.V(2).Info("Errors encountered while scanning", "error-count", scanErrs.Count(), "errors", scanErrs)
+		s.log.V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs)
 	}
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
 

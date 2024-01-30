@@ -6,6 +6,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	ahocorasick "github.com/BobuSumisu/aho-corasick"
 )
 
 var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
@@ -21,16 +23,21 @@ var wordList []byte
 //go:embed "programmingbooks.txt"
 var programmingBookWords []byte
 
-type Wordlists struct {
-	wordList             map[string]struct{}
-	badList              map[string]struct{}
-	programmingBookWords map[string]struct{}
-}
+var filter *ahocorasick.Trie
 
-var FalsePositiveWordlists = Wordlists{
-	wordList:             bytesToCleanWordList(wordList),
-	badList:              bytesToCleanWordList(badList),
-	programmingBookWords: bytesToCleanWordList(programmingBookWords),
+func init() {
+	builder := ahocorasick.NewTrieBuilder()
+
+	wordList := bytesToCleanWordList(wordList)
+	builder.AddStrings(wordList)
+
+	badList := bytesToCleanWordList(badList)
+	builder.AddStrings(badList)
+
+	programmingBookWords := bytesToCleanWordList(programmingBookWords)
+	builder.AddStrings(programmingBookWords)
+
+	filter = builder.Build()
 }
 
 // IsKnownFalsePositives will not return a valid secret finding if any of the disqualifying conditions are met
@@ -48,21 +55,11 @@ func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordChec
 	}
 
 	if wordCheck {
-		// check against common substring badlist
-		if _, ok := FalsePositiveWordlists.badList[lower]; ok {
-			return true
-		}
-
-		// check for dictionary word substrings
-		if _, ok := FalsePositiveWordlists.wordList[lower]; ok {
-			return true
-		}
-
-		// check for programming book token substrings
-		if _, ok := FalsePositiveWordlists.programmingBookWords[lower]; ok {
+		if filter.MatchFirstString(lower) != nil {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -76,14 +73,19 @@ func HasDigit(key string) bool {
 	return false
 }
 
-func bytesToCleanWordList(data []byte) map[string]struct{} {
+func bytesToCleanWordList(data []byte) []string {
 	words := make(map[string]struct{})
 	for _, word := range strings.Split(string(data), "\n") {
 		if strings.TrimSpace(word) != "" {
 			words[strings.TrimSpace(strings.ToLower(word))] = struct{}{}
 		}
 	}
-	return words
+
+	wordList := make([]string, 0, len(words))
+	for word := range words {
+		wordList = append(wordList, word)
+	}
+	return wordList
 }
 
 func StringShannonEntropy(input string) float64 {
@@ -107,7 +109,7 @@ func StringShannonEntropy(input string) float64 {
 func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
 	var filteredResults []Result
 	for _, result := range results {
-		if !result.Verified && result.VerificationError() == nil {
+		if !result.Verified {
 			if result.RawV2 != nil {
 				if StringShannonEntropy(string(result.RawV2)) >= entropy {
 					filteredResults = append(filteredResults, result)
