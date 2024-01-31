@@ -530,7 +530,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	const avgDetectorsPerChunk = 2
 	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
-	nextChunk:
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 			for _, decoder := range e.decoders {
@@ -553,7 +552,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					for k := range chunkSpecificDetectors {
 						delete(chunkSpecificDetectors, k)
 					}
-					continue nextChunk
+					continue
 				}
 
 				for k, detector := range chunkSpecificDetectors {
@@ -577,22 +576,21 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func likelyDuplicate(ctx context.Context, val string, dupesSlice []string) bool {
-	for _, v := range dupesSlice {
-		if v == val {
-			ctx.Logger().V(2).Info("found exact duplicate", "val", val, "v", v)
-			return true
-		}
+func likelyDuplicate(ctx context.Context, val string, dupes map[string]struct{}) bool {
+	if _, ok := dupes[val]; ok {
+		return true
+	}
+	for k := range dupes {
 		// Avoid comparing strings of vastly different lengths.
-		if len(v)*10 < len(val)*9 || len(v)*10 > len(val)*11 {
+		if len(k)*10 < len(val)*9 || len(k)*10 > len(val)*11 {
 			continue
 		}
 
-		similarity := strutil.Similarity(val, v, metrics.NewLevenshtein())
+		similarity := strutil.Similarity(val, k, metrics.NewLevenshtein())
 
 		// close enough
 		if similarity > 0.9 {
-			ctx.Logger().V(2).Info("found similar duplicate", "val", val, "v", v, "similarity", similarity)
+			ctx.Logger().V(2).Info("found similar duplicate", "val", val, "k", k, "similarity", similarity)
 			return true
 		}
 	}
@@ -604,8 +602,8 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorsWithResult := make([]detectors.Detector, 0, avgSecretsPerDetector)
-	chunkSecrets := make([]string, 0, avgSecretsPerDetector)
+	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
+	chunkSecrets := make(map[string]struct{}, avgSecretsPerDetector)
 
 nextChunk:
 	for chunk := range e.reverifiableChunksChan {
@@ -619,7 +617,9 @@ nextChunk:
 			if len(results) == 0 {
 				continue
 			}
-			detectorsWithResult = append(detectorsWithResult, detector)
+			if _, ok := detectorsWithResult[detector]; !ok {
+				detectorsWithResult[detector] = struct{}{}
+			}
 
 			for _, res := range results {
 				var val []byte
@@ -650,15 +650,19 @@ nextChunk:
 					}, res)
 
 					// Empty the dupes and detectors slice.
-					chunkSecrets = chunkSecrets[:0]
-					detectorsWithResult = detectorsWithResult[:0]
+					for k := range chunkSecrets {
+						delete(chunkSecrets, k)
+					}
+					for k := range detectorsWithResult {
+						delete(detectorsWithResult, k)
+					}
 					continue nextChunk
 				}
-				chunkSecrets = append(chunkSecrets, valStr)
+				chunkSecrets[valStr] = struct{}{}
 			}
 		}
 
-		for _, detector := range detectorsWithResult {
+		for detector := range detectorsWithResult {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
@@ -670,8 +674,12 @@ nextChunk:
 		}
 
 		// Empty the dupes and detectors slice
-		chunkSecrets = chunkSecrets[:0]
-		detectorsWithResult = detectorsWithResult[:0]
+		for k := range chunkSecrets {
+			delete(chunkSecrets, k)
+		}
+		for k := range detectorsWithResult {
+			delete(detectorsWithResult, k)
+		}
 
 		chunk.reverifyWgDoneFn()
 	}
