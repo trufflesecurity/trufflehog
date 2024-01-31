@@ -215,16 +215,16 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
-func TestReverifcationChunk(t *testing.T) {
+func TestVerificationOverlapChunk(t *testing.T) {
 	ctx := context.Background()
 
-	absPath, err := filepath.Abs("./testdata/reverification_secrets.txt")
+	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets.txt")
 	assert.Nil(t, err)
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	confPath, err := filepath.Abs("./testdata/reverification_detectors.yaml")
+	confPath, err := filepath.Abs("./testdata/verificationoverlap_detectors.yaml")
 	assert.Nil(t, err)
 	conf, err := config.Read(confPath)
 	assert.Nil(t, err)
@@ -235,7 +235,7 @@ func TestReverifcationChunk(t *testing.T) {
 		WithDetectors(conf.Detectors...),
 		WithVerify(false),
 		WithPrinter(new(discardPrinter)),
-		withReverificationTracking(),
+		withVerificationOverlapTracking(),
 	)
 	assert.Nil(t, err)
 
@@ -251,7 +251,7 @@ func TestReverifcationChunk(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 
 	wantDupe := 1
-	assert.Equal(t, wantDupe, e.reverificationTracking.reverificationDuplicateCount)
+	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
 }
 
 func TestFragmentFirstLineAndLink(t *testing.T) {

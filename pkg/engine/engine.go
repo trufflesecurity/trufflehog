@@ -65,21 +65,21 @@ type Engine struct {
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
 	filterEntropy        *float64
 	onlyVerified         bool
-	forceReverification  bool
+	verificationOverlap  bool
 	printAvgDetectorTime bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
 
 	// Engine synchronization primitives.
-	sourceManager          *sources.SourceManager
-	results                chan detectors.ResultWithMetadata
-	detectableChunksChan   chan detectableChunk
-	reverifiableChunksChan chan reVerifiableChunk
-	workersWg              sync.WaitGroup
-	reverifiersWg          sync.WaitGroup
-	wgDetectorWorkers      sync.WaitGroup
-	WgNotifier             sync.WaitGroup
+	sourceManager                 *sources.SourceManager
+	results                       chan detectors.ResultWithMetadata
+	detectableChunksChan          chan detectableChunk
+	verificationOverlapChunksChan chan verificationOverlapChunk
+	workersWg                     sync.WaitGroup
+	verificationOverlapWg         sync.WaitGroup
+	wgDetectorWorkers             sync.WaitGroup
+	WgNotifier                    sync.WaitGroup
 
 	// Runtime information.
 	metrics runtimeMetrics
@@ -99,17 +99,17 @@ type Engine struct {
 	verify bool
 
 	// Note: bad hack only used for testing
-	reverificationTracking *reverificationTracking
+	verificationOverlapTracker *verificationOverlapTracker
 }
 
-type reverificationTracking struct {
-	reverificationDuplicateCount int
-	mu                           sync.Mutex
+type verificationOverlapTracker struct {
+	verificationOverlapDuplicateCount int
+	mu                                sync.Mutex
 }
 
-func (r *reverificationTracking) increment() {
+func (r *verificationOverlapTracker) increment() {
 	r.mu.Lock()
-	r.reverificationDuplicateCount++
+	r.verificationOverlapDuplicateCount++
 	r.mu.Unlock()
 }
 
@@ -201,18 +201,18 @@ func WithVerify(verify bool) Option {
 	}
 }
 
-func withReverificationTracking() Option {
+func withVerificationOverlapTracking() Option {
 	return func(e *Engine) {
-		e.reverificationTracking = &reverificationTracking{
-			reverificationDuplicateCount: 0,
+		e.verificationOverlapTracker = &verificationOverlapTracker{
+			verificationOverlapDuplicateCount: 0,
 		}
 	}
 }
 
-// WithForceReverification TODO comment
-func WithForceReverification(forceReverification bool) Option {
+// WithVerificationOverlap
+func WithVerificationOverlap(verificationOverlap bool) Option {
 	return func(e *Engine) {
-		e.forceReverification = forceReverification
+		e.verificationOverlap = verificationOverlap
 	}
 }
 
@@ -337,14 +337,14 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	const (
 		// detectableChunksChanMultiplier is set to accommodate a high number of concurrent worker goroutines.
 		// This multiplier ensures that the detectableChunksChan channel has sufficient buffer capacity
-		// to hold messages from multiple worker groups (detector workers/ reverifier workers) without blocking.
+		// to hold messages from multiple worker groups (detector workers/ verificationOverlap workers) without blocking.
 		// A large buffer helps accommodate for the fact workers are producing data at a faster rate
 		// than it can be consumed.
 		detectableChunksChanMultiplier = 50
-		// reverifiableChunksChanMultiplier uses a smaller buffer compared to detectableChunksChanMultiplier.
+		// verificationOverlapChunksChanMultiplier uses a smaller buffer compared to detectableChunksChanMultiplier.
 		// This reflects the anticipated lower volume of data that needs re-verification.
 		// The buffer size is a trade-off between memory usage and the need to prevent blocking.
-		reverifiableChunksChanMultiplier = 25
+		verificationOverlapChunksChanMultiplier = 25
 	)
 
 	// Channels are used for communication between different parts of the engine,
@@ -352,7 +352,7 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// The buffer sizes for these channels are set to multiples of defaultChannelBuffer,
 	// considering the expected concurrency and workload in the system.
 	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer*detectableChunksChanMultiplier)
-	e.reverifiableChunksChan = make(chan reVerifiableChunk, defaultChannelBuffer*reverifiableChunksChanMultiplier)
+	e.verificationOverlapChunksChan = make(chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
 	e.dedupeCache = cache
 	e.printer = new(output.PlainPrinter)
@@ -442,17 +442,17 @@ func (e *Engine) startWorkers(ctx context.Context) {
 		}()
 	}
 
-	// Reverifier workers handle verification of chunks that have been detected by multiple detectors.
+	// verificationOverlap workers handle verification of chunks that have been detected by multiple detectors.
 	// They ensure that verification is disabled for any secrets that have been detected by multiple detectors.
-	const reverifierWorkerMultiplier = detectorWorkerMultiplier
-	ctx.Logger().V(2).Info("starting reverifier workers", "count", e.concurrency)
-	for worker := uint64(0); worker < uint64(e.concurrency*reverifierWorkerMultiplier); worker++ {
-		e.reverifiersWg.Add(1)
+	const verificationOverlapWorkerMultiplier = detectorWorkerMultiplier
+	ctx.Logger().V(2).Info("starting verificationOverlap workers", "count", e.concurrency)
+	for worker := uint64(0); worker < uint64(e.concurrency*verificationOverlapWorkerMultiplier); worker++ {
+		e.verificationOverlapWg.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "secret_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
-			defer e.reverifiersWg.Done()
-			e.reverifierWorker(ctx)
+			defer e.verificationOverlapWg.Done()
+			e.verificationOverlapWorker(ctx)
 		}()
 	}
 
@@ -485,8 +485,8 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	e.workersWg.Wait() // Wait for the workers to finish scanning chunks.
 
-	close(e.reverifiableChunksChan)
-	e.reverifiersWg.Wait()
+	close(e.verificationOverlapChunksChan)
+	e.verificationOverlapWg.Wait()
 
 	close(e.detectableChunksChan)
 	e.wgDetectorWorkers.Wait() // Wait for the detector workers to finish detecting chunks.
@@ -526,19 +526,19 @@ type detectableChunk struct {
 	wgDoneFn func()
 }
 
-// reVerifiableChunk is a decoded chunk that has multiple detectors that match it.
+// verificationOverlapChunk is a decoded chunk that has multiple detectors that match it.
 // It will be initially processed with verification disabled, and then reprocessed with verification
 // enabled if the same secret was not found by multiple detectors.
-type reVerifiableChunk struct {
-	chunk            sources.Chunk
-	decoder          detectorspb.DecoderType
-	detectors        []ahocorasick.DetectorInfo
-	reverifyWgDoneFn func()
+type verificationOverlapChunk struct {
+	chunk                       sources.Chunk
+	decoder                     detectorspb.DecoderType
+	detectors                   []ahocorasick.DetectorInfo
+	verificationOverlapWgDoneFn func()
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
-	var wgReverify sync.WaitGroup
+	var wgVerificationOverlap sync.WaitGroup
 
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 8
@@ -554,13 +554,13 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-				if len(chunkSpecificDetectors) > 1 && !e.forceReverification {
-					wgReverify.Add(1)
-					e.reverifiableChunksChan <- reVerifiableChunk{
-						chunk:            *decoded.Chunk,
-						detectors:        matchingDetectors,
-						decoder:          decoded.DecoderType,
-						reverifyWgDoneFn: wgReverify.Done,
+				if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
+					wgVerificationOverlap.Add(1)
+					e.verificationOverlapChunksChan <- verificationOverlapChunk{
+						chunk:                       *decoded.Chunk,
+						detectors:                   matchingDetectors,
+						decoder:                     decoded.DecoderType,
+						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 					}
 					// Empty the map.
 					for k := range chunkSpecificDetectors {
@@ -585,7 +585,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
 
-	wgReverify.Wait()
+	wgVerificationOverlap.Wait()
 	wgDetect.Wait()
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
@@ -626,7 +626,7 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 	return false
 }
 
-func (e *Engine) reverifierWorker(ctx context.Context) {
+func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 
 	// Reuse the same map and slice to avoid allocations.
@@ -634,7 +634,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
-	for chunk := range e.reverifiableChunksChan {
+	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
 			// DO NOT VERIFY at this stage of the pipeline.
 			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
@@ -670,8 +670,8 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 				if likelyDuplicate(ctx, key, chunkSecrets) {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
-					if e.reverificationTracking != nil {
-						e.reverificationTracking.increment()
+					if e.verificationOverlapTracker != nil {
+						e.verificationOverlapTracker.increment()
 					}
 					e.processResult(ctx, detectableChunk{
 						chunk:    chunk.chunk,
@@ -706,11 +706,11 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 			delete(detectorsWithResult, k)
 		}
 
-		chunk.reverifyWgDoneFn()
+		chunk.verificationOverlapWgDoneFn()
 	}
 
 	wgDetect.Wait()
-	ctx.Logger().V(4).Info("finished reverifying chunks")
+	ctx.Logger().V(4).Info("finished verificationOverlap chunks")
 }
 
 func (e *Engine) detectChunks(ctx context.Context) {
