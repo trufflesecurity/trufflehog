@@ -54,6 +54,7 @@ func TestAzureDevopsPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureDevopsPersonalAccessToken,
 					Verified:     true,
+					RawV2:        []byte(secret + org),
 				},
 			},
 			wantErr:             false,
@@ -71,6 +72,7 @@ func TestAzureDevopsPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureDevopsPersonalAccessToken,
 					Verified:     false,
+					RawV2:        []byte(inactiveSecret + org),
 				},
 			},
 			wantErr:             false,
@@ -100,6 +102,7 @@ func TestAzureDevopsPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureDevopsPersonalAccessToken,
 					Verified:     false,
+					RawV2:        []byte(secret + org),
 				},
 			},
 			wantErr:             false,
@@ -117,6 +120,7 @@ func TestAzureDevopsPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureDevopsPersonalAccessToken,
 					Verified:     false,
+					RawV2:        []byte(secret + org),
 				},
 			},
 			wantErr:             false,
@@ -134,11 +138,14 @@ func TestAzureDevopsPersonalAccessToken_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no rawV2 secret present: \n %+v", got[i])
+				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AzureDevopsPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

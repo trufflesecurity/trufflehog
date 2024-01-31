@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
-// ScanGitHub scans Github with the provided options.
+// ScanGitHub scans GitHub with the provided options.
 func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	connection := sourcespb.GitHub{
 		Endpoint:                   c.Endpoint,
@@ -21,9 +21,11 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		ScanUsers:                  c.IncludeMembers,
 		IgnoreRepos:                c.ExcludeRepos,
 		IncludeRepos:               c.IncludeRepos,
+		IncludeForks:               c.IncludeForks,
 		IncludeIssueComments:       c.IncludeIssueComments,
 		IncludePullRequestComments: c.IncludePullRequestComments,
 		IncludeGistComments:        c.IncludeGistComments,
+		IncludeWikis:               c.IncludeWikis,
 		SkipBinaries:               c.SkipBinaries,
 	}
 	if len(c.Token) > 0 {
@@ -33,7 +35,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	} else {
 		connection.Credential = &sourcespb.GitHub_Unauthenticated{}
 	}
-	connection.IncludeForks = c.IncludeForks
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {

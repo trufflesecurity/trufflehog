@@ -236,6 +236,7 @@ message GitHub {
   bool include_gist_comments = 16;
   bool skip_binaries = 17;
   bool skip_archives = 18;
+  bool include_wikis = 19;
 }
 
 message GoogleDrive {
