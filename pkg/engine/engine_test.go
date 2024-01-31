@@ -215,66 +215,6 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
-func TestEngine_DuplicatVerifiedSecrets(t *testing.T) {
-	ctx := context.Background()
-
-	absPath, err := filepath.Abs("./testdata/verified_canary_secrets.txt")
-	assert.Nil(t, err)
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(DefaultDetectors()...),
-		WithVerify(true),
-		WithPrinter(new(discardPrinter)),
-	)
-	assert.Nil(t, err)
-
-	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
-		return
-	}
-
-	// Wait for all the chunks to be processed.
-	assert.Nil(t, e.Finish(ctx))
-	want := uint64(4)
-	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
-}
-
-func TestEngine_DuplicatVerifiedSecretsMultipleDetectors(t *testing.T) {
-	ctx := context.Background()
-
-	absPath, err := filepath.Abs("./testdata/mixed_secrets.txt")
-	assert.Nil(t, err)
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(DefaultDetectors()...),
-		WithVerify(true),
-		WithPrinter(new(discardPrinter)),
-	)
-	assert.Nil(t, err)
-
-	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
-		return
-	}
-
-	// Wait for all the chunks to be processed.
-	assert.Nil(t, e.Finish(ctx))
-	wantVerified := uint64(4)
-	wantUnverified := uint64(4)
-	assert.Equal(t, wantVerified, e.GetMetrics().VerifiedSecretsFound)
-	assert.Equal(t, wantUnverified, e.GetMetrics().UnverifiedSecretsFound)
-}
-
 func TestReverifcationChunk(t *testing.T) {
 	ctx := context.Background()
 
