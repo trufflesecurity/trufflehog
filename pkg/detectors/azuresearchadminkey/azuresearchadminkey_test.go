@@ -18,7 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAzuresearchadminkey_FromChunk(t *testing.T) {
+func TestAzureSearchAdminKey_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
@@ -54,6 +54,7 @@ func TestAzuresearchadminkey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
 					Verified:     true,
+					RawV2:        []byte(secret + service),
 				},
 			},
 			wantErr:             false,
@@ -71,6 +72,7 @@ func TestAzuresearchadminkey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
 					Verified:     false,
+					RawV2:        []byte(inactiveSecret + service),
 				},
 			},
 			wantErr:             false,
@@ -100,6 +102,7 @@ func TestAzuresearchadminkey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
 					Verified:     false,
+					RawV2:        []byte(secret + service),
 				},
 			},
 			wantErr:             false,
@@ -117,6 +120,7 @@ func TestAzuresearchadminkey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
 					Verified:     false,
+					RawV2:        []byte(secret + service),
 				},
 			},
 			wantErr:             false,
@@ -127,20 +131,23 @@ func TestAzuresearchadminkey_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Azuresearchadminkey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("AzureSearchAdminKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no rawV2 secret present: \n %+v", got[i])
+				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Azuresearchadminkey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("AzureSearchAdminKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
