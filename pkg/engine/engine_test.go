@@ -189,7 +189,7 @@ func BenchmarkSupportsLineNumbersLoop(b *testing.B) {
 func TestEngine_DuplicatSecrets(t *testing.T) {
 	ctx := context.Background()
 
-	absPath, err := filepath.Abs("./testdata")
+	absPath, err := filepath.Abs("./testdata/secrets.txt")
 	assert.Nil(t, err)
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
