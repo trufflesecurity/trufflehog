@@ -590,16 +590,17 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func likelyDuplicate(ctx context.Context, val []byte, dupes map[string]struct{}) bool {
-	if _, ok := dupes[string(val)]; ok {
-		return true
-	}
+type chunkSecretKey struct {
+	secret     string
+	detectorID int32
+}
 
-	// The string conversion is purposefully placed after the dupes check to avoid the allocation.
-	// []byte -> string conversion within a map lookup does not allocate. (due to compiler optimizations)
-	valStr := string(val)
+func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSecretKey]struct{}) bool {
 	const similarityThreshold = 0.9
-	for dupe := range dupes {
+
+	valStr := val.secret
+	for dupeKey := range dupes {
+		dupe := dupeKey.secret
 		// Avoid comparing strings of vastly different lengths.
 		if len(dupe)*10 < len(valStr)*9 || len(dupe)*10 > len(valStr)*11 {
 			continue
@@ -627,7 +628,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
 	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
-	chunkSecrets := make(map[string]struct{}, avgSecretsPerDetector)
+	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.reverifiableChunksChan {
 		for _, detector := range chunk.detectors {
@@ -656,7 +657,13 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				if likelyDuplicate(ctx, val, chunkSecrets) {
+				key := chunkSecretKey{secret: string(val), detectorID: int32(res.DetectorType)}
+				if _, ok := chunkSecrets[key]; ok {
+					chunkSecrets[key] = struct{}{}
+					continue
+				}
+
+				if likelyDuplicate(ctx, key, chunkSecrets) {
 					// This indicates that the same secret was found by multiple detectors.
 					// We should NOT VERIFY this chunk's data.
 					if e.reverificationTracking != nil {
@@ -669,10 +676,10 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 						wgDoneFn: wgDetect.Done,
 					}, res)
 
-					// Remove the detector and secret from the maps
+					// Remove the detector from the list of detectors with results.
 					delete(detectorsWithResult, detector)
 				}
-				chunkSecrets[string(val)] = struct{}{}
+				chunkSecrets[key] = struct{}{}
 			}
 		}
 
