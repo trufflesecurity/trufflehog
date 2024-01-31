@@ -532,7 +532,7 @@ type detectableChunk struct {
 type reVerifiableChunk struct {
 	chunk            sources.Chunk
 	decoder          detectorspb.DecoderType
-	detectors        []detectors.Detector
+	detectors        []ahocorasick.DetectorInfo
 	reverifyWgDoneFn func()
 }
 
@@ -595,8 +595,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 // by the same detector in the chunk. Exact matches on lookup indicate a duplicate secret for a detector
 // in that chunk - which is expected and not malicious. Those intra-detector dupes are still verified.
 type chunkSecretKey struct {
-	secret     string
-	detectorID int32
+	secret       string
+	detectorInfo ahocorasick.DetectorInfo
 }
 
 func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSecretKey]struct{}) bool {
@@ -661,7 +661,7 @@ func (e *Engine) reverifierWorker(ctx context.Context) {
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				key := chunkSecretKey{secret: string(val), detectorID: int32(res.DetectorType)}
+				key := chunkSecretKey{secret: string(val), detectorInfo: detector}
 				if _, ok := chunkSecrets[key]; ok {
 					chunkSecrets[key] = struct{}{}
 					continue

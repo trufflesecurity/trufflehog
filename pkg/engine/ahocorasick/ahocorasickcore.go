@@ -63,15 +63,24 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	}
 }
 
+// DetectorInfo represents a detected pattern's metadata in a data chunk.
+// It encapsulates the key identifying a specific detector and the detector instance itself.
+type DetectorInfo struct {
+	Key DetectorKey
+	detectors.Detector
+}
+
 // PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
 // provided input. This method populates an existing map rather than allocating a new one because
 // it will be called once per chunk and that many allocations has a noticeable performance cost.
-func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[DetectorKey]detectors.Detector) []detectors.Detector {
+// It returns a slice of unique 'DetectorInfo' corresponding to the matched detectors. This slice is
+// constructed to prevent duplications by utilizing an internal map to track already processed detectors.
+func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[DetectorKey]detectors.Detector) []DetectorInfo {
 	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
 
 	// Use a map to avoid adding duplicate detectors to the slice.
 	addedDetectors := make(map[DetectorKey]struct{})
-	uniqueDetectors := make([]detectors.Detector, 0, len(matches))
+	uniqueDetectors := make([]DetectorInfo, 0, len(matches))
 
 	for _, m := range matches {
 		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
@@ -84,7 +93,7 @@ func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[D
 			// Add the detector to the map and slice.
 			detector := ac.detectorsByKey[k]
 			dts[k] = detector
-			uniqueDetectors = append(uniqueDetectors, detector)
+			uniqueDetectors = append(uniqueDetectors, DetectorInfo{Key: k, Detector: detector})
 		}
 	}
 
