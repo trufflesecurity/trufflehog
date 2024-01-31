@@ -68,15 +68,27 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 // it will be called once per chunk and that many allocations has a noticeable performance cost.
 func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[DetectorKey]detectors.Detector) []detectors.Detector {
 	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
-	d := make([]detectors.Detector, 0, len(matches))
-	for _, m := range ac.prefilter.MatchString(strings.ToLower(chunkData)) {
+
+	// Use a map to avoid adding duplicate detectors to the slice.
+	addedDetectors := make(map[DetectorKey]struct{})
+	uniqueDetectors := make([]detectors.Detector, 0, len(matches))
+
+	for _, m := range matches {
 		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
-			dts[k] = ac.detectorsByKey[k]
-			d = append(d, ac.detectorsByKey[k])
+			if _, exists := addedDetectors[k]; exists {
+				continue
+			}
+			// Add to the map to track already added detectors.
+			addedDetectors[k] = struct{}{}
+
+			// Add the detector to the map and slice.
+			detector := ac.detectorsByKey[k]
+			dts[k] = detector
+			uniqueDetectors = append(uniqueDetectors, detector)
 		}
 	}
 
-	return d
+	return uniqueDetectors
 }
 
 // createDetectorKey creates a unique key for each detector from its type, version, and, for

@@ -199,7 +199,7 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(DefaultDetectors()...),
-		WithVerify(true),
+		WithVerify(false),
 		WithPrinter(new(discardPrinter)),
 	)
 	assert.Nil(t, err)
@@ -233,7 +233,7 @@ func TestReverifcationChunk(t *testing.T) {
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(conf.Detectors...),
-		WithVerify(true),
+		WithVerify(false),
 		WithPrinter(new(discardPrinter)),
 		withReverificationTracking(),
 	)
@@ -246,7 +246,8 @@ func TestReverifcationChunk(t *testing.T) {
 
 	// Wait for all the chunks to be processed.
 	assert.Nil(t, e.Finish(ctx))
-	want := uint64(1)
+	// We want TWO secrets that match both the custom regexes.
+	want := uint64(2)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 
 	wantDupe := 1
