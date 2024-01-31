@@ -590,6 +590,10 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
+// chunkSecretKey ties secrets to the specific detector that found them. This allows identifying identical
+// credentials extracted by multiple different detectors processing the same chunk. Or duplicates found by the
+// same detector in the chunk. Exact matches on lookup indicate a duplicate secret for a detector in
+// that chunk - which is expected and not malicious. Those intra-detector dupes are still verified.
 type chunkSecretKey struct {
 	secret     string
 	detectorID int32
