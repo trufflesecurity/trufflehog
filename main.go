@@ -49,7 +49,7 @@ var (
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
-	forceReverification = cli.Flag("force-reverification", "Verify credentials when multiple similar credentials are found across detectors.").Bool()
+	forceReverification = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy       = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
 	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
