@@ -534,11 +534,19 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	gitDir := filepath.Join(path, gitDirName)
 
 	logger := repoCtx.Logger()
-	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
+	var logValues []any
+	if scanOptions.BaseHash != "" {
+		logValues = append(logValues, "base", scanOptions.BaseHash)
+	}
+	if scanOptions.HeadHash != "" {
+		logValues = append(logValues, "head", scanOptions.HeadHash)
+	}
+	logger.V(1).Info("scanning repo", logValues...)
+
 	for commit := range commitChan {
 		if len(scanOptions.BaseHash) > 0 {
 			if commit.Hash == scanOptions.BaseHash {
-				logger.V(1).Info("reached base commit", "commit", commit.Hash)
+				logger.V(1).Info("reached base commit", "commit", commit.Hash[:7])
 				break
 			}
 		}
@@ -548,7 +556,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 		depth++
 		atomic.AddUint64(&s.metrics.commitsScanned, 1)
-		logger.V(5).Info("scanning commit", "commit", commit.Hash)
+		logger.V(5).Info("scanning commit", "commit", commit.Hash[:7])
 		for _, diff := range commit.Diffs {
 			diff := diff
 			if !scanOptions.Filter.Pass(diff.PathB) {
@@ -823,18 +831,22 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		}
 	}
 
+	logger := ctx.Logger()
 	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp.
 	// To make this duration logging useful, we need to log the remote as well.
-	remotes, _ := repo.Remotes()
-	repoURL := "Could not get remote for repo"
-	if len(remotes) != 0 {
-		repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
+	// Other sources may have included this info to the context, in which case we don't need to add it again.
+	if ctx.Value("repo") == nil {
+		remotes, _ := repo.Remotes()
+		repoURL := "Could not get remote for repo"
+		if len(remotes) != 0 {
+			repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
+		}
+		logger = logger.WithValues("repo", repoURL)
 	}
 
 	scanTime := time.Now().Unix() - start
-	ctx.Logger().V(1).Info(
+	logger.V(1).Info(
 		"scanning git repo complete",
-		"repo", repoURL,
 		"path", repoPath,
 		"time_seconds", scanTime,
 		"commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned),
@@ -1099,7 +1111,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 }
 
 func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	fileCtx := context.WithValues(ctx, "commit", commitHash.String(), "path", path)
+	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
 
 	if common.SkipFile(path) {
