@@ -663,7 +663,6 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				key := chunkSecretKey{secret: string(val), detectorInfo: detector}
 				if _, ok := chunkSecrets[key]; ok {
-					chunkSecrets[key] = struct{}{}
 					continue
 				}
 
