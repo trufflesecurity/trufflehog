@@ -449,7 +449,7 @@ func (e *Engine) startWorkers(ctx context.Context) {
 	for worker := uint64(0); worker < uint64(e.concurrency*verificationOverlapWorkerMultiplier); worker++ {
 		e.verificationOverlapWg.Add(1)
 		go func() {
-			ctx := context.WithValue(ctx, "secret_worker_id", common.RandomID(5))
+			ctx := context.WithValue(ctx, "verification_overlap_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.verificationOverlapWg.Done()
 			e.verificationOverlapWorker(ctx)
@@ -616,9 +616,6 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 		if similarity > similarityThreshold {
 			ctx.Logger().V(2).Info(
 				"found similar duplicate",
-				"val", val,
-				"dupe", dupe,
-				"similarity", similarity,
 			)
 			return true
 		}
