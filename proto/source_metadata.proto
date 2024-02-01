@@ -288,9 +288,11 @@ message Postman {
   string environment_name = 8;
   string request_id =  9;
   string request_name = 10;
-  string field_type = 11;
-  string field_name = 12;
-  string variable_type = 13;
+  string folder_id = 11;
+  string folder_name = 12;
+  string field_type = 13;
+  string field_name = 14;
+  string variable_type = 15;
 }
 
 message MetaData {

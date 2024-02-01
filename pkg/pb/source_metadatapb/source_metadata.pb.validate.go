@@ -3275,6 +3275,10 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for RequestName
 
+	// no validation rules for FolderId
+
+	// no validation rules for FolderName
+
 	// no validation rules for FieldType
 
 	// no validation rules for FieldName

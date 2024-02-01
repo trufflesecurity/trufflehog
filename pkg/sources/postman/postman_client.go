@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 const (
@@ -24,19 +25,21 @@ const (
 )
 
 type WorkspaceObj struct {
-	Workspace struct {
-		ID           string       `json:"id"`
-		Name         string       `json:"name"`
-		Type         string       `json:"type"`
-		Description  string       `json:"description"`
-		Visibility   string       `json:"visibility"`
-		CreatedBy    string       `json:"createdBy"`
-		UpdatedBy    string       `json:"updatedBy"`
-		CreatedAt    string       `json:"createdAt"`
-		UpdatedAt    string       `json:"updatedAt"`
-		Collections  []IDNameUUID `json:"collections"`
-		Environments []IDNameUUID `json:"environments"`
-	} `json:"workspace"`
+	Workspace WorkspaceStruct `json:"workspace"`
+}
+
+type WorkspaceStruct struct {
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	Type         string       `json:"type"`
+	Description  string       `json:"description"`
+	Visibility   string       `json:"visibility"`
+	CreatedBy    string       `json:"createdBy"`
+	UpdatedBy    string       `json:"updatedBy"`
+	CreatedAt    string       `json:"createdAt"`
+	UpdatedAt    string       `json:"updatedAt"`
+	Collections  []IDNameUUID `json:"collections"`
+	Environments []IDNameUUID `json:"environments"`
 }
 
 type IDNameUUID struct {
@@ -51,10 +54,11 @@ type KeyValue struct {
 	Enabled      bool        `json:"enabled,omitempty"`
 	Type         string      `json:"type,omitempty"`
 	SessionValue string      `json:"sessionValue,omitempty"`
+	Id           string      `json:"id,omitempty"`
 }
 
 type VariableData struct {
-	ID        string     `json:"id"`
+	ID        string     `json:"id"` // For globals and envs, this is just the UUID, not the full ID.
 	Name      string     `json:"name"`
 	KeyValues []KeyValue `json:"values"`
 	Owner     string     `json:"owner"`
@@ -71,22 +75,117 @@ type GlobalVars struct {
 	VariableData `json:"data"`
 }
 
-// type Collection struct {
-// 	Collection struct {
-// 		Info struct {
-// 			Postman_id  string `json:"_postman_id"`
-// 			Name        string `json:"name"`
-// 			Description string `json:"description"`
-// 			Schema      string `json:"schema"`
-// 			UpdatedAt   string `json:"updatedAt"`
-// 			Uid         string `json:"uid"`
-// 		} `json:"info"`
-// 		Item     []interface{} `json:"item"`
-// 		Auth     interface{}   `json:"auth"`
-// 		Variable []interface{} `json:"variable"`
-// 		Event    []interface{} `json:"event"`
-// 	} `json:"collection"`
-// }
+type Metadata struct {
+	WorkspaceUUID  string
+	WorkspaceName  string
+	CreatedBy      string
+	CollectionInfo Info
+	FolderID       string // UUID of the folder (but not full ID)
+	FolderName     string
+	RequestID      string // UUID of the request (but not full ID)
+	RequestName    string
+	FullID         string //full ID of the reference item (created_by + ID) OR just the UUID
+	Link           string //direct link to the folder (could be .json file path)
+	Type           string //folder, request, etc.
+}
+
+type CollectionObj struct {
+	Collection Collection `json:"collection"`
+}
+
+type Collection struct {
+	Info     Info       `json:"info"`
+	Item     []Item     `json:"item,omitempty"`
+	Auth     Auth       `json:"auth,omitempty"`
+	Event    []Event    `json:"event,omitempty"`
+	Variable []KeyValue `json:"variable,omitempty"`
+}
+
+type Info struct {
+	PostmanID   string    `json:"_postman_id"` // This is a UUID. Needs createdBy ID prefix to be used with API.
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Schema      string    `json:"schema"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	UID         string    `json:"uid"` //Need to use this to get the collection via API
+}
+
+type Item struct {
+	Name        string     `json:"name"`
+	Item        []Item     `json:"item,omitempty"`
+	ID          string     `json:"id,omitempty"`
+	Auth        Auth       `json:"auth,omitempty"`
+	Event       []Event    `json:"event,omitempty"`
+	Variable    []KeyValue `json:"variable,omitempty"`
+	Request     Request    `json:"request,omitempty"`
+	Response    []Response `json:"response,omitempty"`
+	Description string     `json:"description,omitempty"`
+	UID         string     `json:"uid,omitempty"` //Need to use this to get the collection via API
+}
+
+type Auth struct {
+	Type   string     `json:"type"`
+	Apikey []KeyValue `json:"apikey,omitempty"`
+	Bearer []KeyValue `json:"bearer,omitempty"`
+	AWSv4  []KeyValue `json:"awsv4,omitempty"`
+	Basic  []KeyValue `json:"basic,omitempty"`
+	OAuth2 []KeyValue `json:"oauth2,omitempty"`
+}
+
+type Event struct {
+	Listen string `json:"listen"`
+	Script Script `json:"script"`
+}
+
+type Script struct {
+	Type string   `json:"type"`
+	Exec []string `json:"exec"`
+	Id   string   `json:"id"`
+}
+
+type Request struct {
+	Auth        Auth       `json:"auth,omitempty"`
+	Method      string     `json:"method"`
+	Header      []KeyValue `json:"header,omitempty"`
+	Body        Body       `json:"body,omitempty"` //Need to update with additional options
+	URL         URL        `json:"url"`
+	Description string     `json:"description,omitempty"`
+}
+
+type Body struct {
+	Mode       string      `json:"mode"`
+	Raw        string      `json:"raw,omitempty"`
+	File       BodyFile    `json:"file,omitempty"`
+	URLEncoded []KeyValue  `json:"urlencoded,omitempty"` //FINISH
+	FormData   []KeyValue  `json:"formdata,omitempty"`   //FINISH
+	GraphQL    BodyGraphQL `json:"graphql,omitempty"`
+}
+
+type BodyGraphQL struct {
+	Query     string `json:"query"`
+	Variables string `json:"variables"`
+}
+
+type BodyFile struct {
+	Src string `json:"src"`
+}
+
+type URL struct {
+	Raw      string     `json:"raw"`
+	Protocol string     `json:"protocol"`
+	Host     []string   `json:"host"`
+	Path     []string   `json:"path"`
+	Query    []KeyValue `json:"query,omitempty"`
+}
+
+type Response struct {
+	ID              string     `json:"id"`
+	Name            string     `json:"name,omitempty"`
+	OriginalRequest Request    `json:"originalRequest,omitempty"`
+	Header          []KeyValue `json:"header,omitempty"`
+	Body            string     `json:"body,omitempty"`
+	UID             string     `json:"uid,omitempty"`
+}
 
 // A Client manages communication with the Postman API.
 type Client struct {
@@ -214,7 +313,6 @@ func (c *Client) GetEnvironment(environment_uuid string) (Environment, error) {
 	var env Environment
 
 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
-	fmt.Println(url)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
 		fmt.Println(err)
@@ -227,7 +325,6 @@ func (c *Client) GetEnvironment(environment_uuid string) (Environment, error) {
 		err = fmt.Errorf("could not read env var response body for environment: %s", environment_uuid)
 		return env, err
 	}
-	fmt.Println(string(body))
 	if err := json.Unmarshal([]byte(body), &env); err != nil {
 		err = fmt.Errorf("could not unmarshal env variables JSON for environment: %s", environment_uuid)
 		return env, err
@@ -236,8 +333,27 @@ func (c *Client) GetEnvironment(environment_uuid string) (Environment, error) {
 
 }
 
-// // GetCollection returns the collection for a given collection
-// func (c *Client) GetCollection(collection_uuid string) (map[string]interface{}, error) {
-// 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
-// 	return c.getURLParseJSON(url, nil)
-// }
+// GetCollection returns the collection for a given collection
+func (c *Client) GetCollection(collection_uuid string) (CollectionObj, error) {
+	var col CollectionObj
+
+	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
+	r, err := c.getPostmanReq(url, nil)
+	if err != nil {
+		fmt.Println(err)
+		err = fmt.Errorf("could not get collection: %s", collection_uuid)
+		return col, err
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		err = fmt.Errorf("could not read response body for collection: %s", collection_uuid)
+		return col, err
+	}
+	if err := json.Unmarshal([]byte(body), &col); err != nil {
+		err = fmt.Errorf("could not unmarshal JSON for collection: %s", collection_uuid)
+		return col, err
+	}
+
+	return col, nil
+}
