@@ -47,7 +47,7 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	detectorsByKey := make(map[DetectorKey]detectors.Detector, len(allDetectors))
 	var keywords []string
 	for _, d := range allDetectors {
-		key := createDetectorKey(d)
+		key := CreateDetectorKey(d)
 		detectorsByKey[key] = d
 		for _, kw := range d.Keywords() {
 			kwLower := strings.ToLower(kw)
@@ -100,9 +100,9 @@ func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[D
 	return uniqueDetectors
 }
 
-// createDetectorKey creates a unique key for each detector from its type, version, and, for
+// CreateDetectorKey creates a unique key for each detector from its type, version, and, for
 // custom regex detectors, its name.
-func createDetectorKey(d detectors.Detector) DetectorKey {
+func CreateDetectorKey(d detectors.Detector) DetectorKey {
 	detectorType := d.Type()
 	var version int
 	if v, ok := d.(detectors.Versioner); ok {

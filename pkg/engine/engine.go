@@ -610,6 +610,18 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 			continue
 		}
 
+		// If the detectors are the same, we don't need to compare the secrets.
+		if val.detectorInfo == dupeKey.detectorInfo {
+			continue
+		}
+
+		if valStr == dupe {
+			ctx.Logger().V(2).Info(
+				"found exact duplicate",
+			)
+			return true
+		}
+
 		similarity := strutil.Similarity(valStr, dupe, metrics.NewLevenshtein())
 
 		// close enough

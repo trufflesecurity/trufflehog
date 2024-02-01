@@ -12,6 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -434,6 +435,78 @@ func TestSetLink(t *testing.T) {
 				assert.Equal(t, tt.wantLink, data.Filesystem.Link, "Filesystem link mismatch")
 			case *source_metadatapb.MetaData_AzureRepos:
 				assert.Equal(t, tt.wantLink, data.AzureRepos.Link, "Azure Repos link mismatch")
+			}
+		})
+	}
+}
+
+func TestLikelyDuplicate(t *testing.T) {
+	// Initialize detectors
+	// (not actually calling detector FromData or anything, just using detector struct for key creation)
+	detectorA := ahocorasick.DetectorInfo{Key: ahocorasick.CreateDetectorKey(DefaultDetectors()[0])}
+	detectorB := ahocorasick.DetectorInfo{Key: ahocorasick.CreateDetectorKey(DefaultDetectors()[1])}
+
+	// Define test cases
+	tests := []struct {
+		name     string
+		val      chunkSecretKey
+		dupes    map[chunkSecretKey]struct{}
+		expected bool
+	}{
+		{
+			name: "exact duplicate different detector",
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB}: {},
+			},
+			expected: true,
+		},
+		{
+			name: "non-duplicate length outside range",
+			val:  chunkSecretKey{"short", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"muchlongerthanthevalstring", detectorB}: {},
+			},
+			expected: false,
+		},
+		{
+			name: "similar within threshold",
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB}: {},
+			},
+			expected: true,
+		},
+		{
+			name: "similar outside threshold",
+			val:  chunkSecretKey{"anotherkey", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"completelydifferent", detectorB}: {},
+			},
+			expected: false,
+		},
+		{
+			name:     "empty strings",
+			val:      chunkSecretKey{"", detectorA},
+			dupes:    map[chunkSecretKey]struct{}{{"", detectorB}: {}},
+			expected: true,
+		},
+		{
+			name: "similar within threshold same detector",
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA}: {},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			result := likelyDuplicate(ctx, tc.val, tc.dupes)
+			if result != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, result)
 			}
 		})
 	}
