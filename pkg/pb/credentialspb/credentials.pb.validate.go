@@ -987,10 +987,10 @@ func (m *AWSSessionTokenSecret) validate(all bool) error {
 
 	var errors []error
 
-	if utf8.RuneCountInString(m.GetKey()) < 20 {
+	if utf8.RuneCountInString(m.GetKey()) < 1 {
 		err := AWSSessionTokenSecretValidationError{
 			field:  "Key",
-			reason: "value length must be at least 20 runes",
+			reason: "value length must be at least 1 runes",
 		}
 		if !all {
 			return err
@@ -998,10 +998,10 @@ func (m *AWSSessionTokenSecret) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if utf8.RuneCountInString(m.GetSecret()) < 40 {
+	if utf8.RuneCountInString(m.GetSecret()) < 1 {
 		err := AWSSessionTokenSecretValidationError{
 			field:  "Secret",
-			reason: "value length must be at least 40 runes",
+			reason: "value length must be at least 1 runes",
 		}
 		if !all {
 			return err
@@ -1121,10 +1121,10 @@ func (m *AWS) validate(all bool) error {
 
 	var errors []error
 
-	if utf8.RuneCountInString(m.GetKey()) < 20 {
+	if utf8.RuneCountInString(m.GetKey()) < 1 {
 		err := AWSValidationError{
 			field:  "Key",
-			reason: "value length must be at least 20 runes",
+			reason: "value length must be at least 1 runes",
 		}
 		if !all {
 			return err
@@ -1132,10 +1132,10 @@ func (m *AWS) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if utf8.RuneCountInString(m.GetSecret()) < 40 {
+	if utf8.RuneCountInString(m.GetSecret()) < 1 {
 		err := AWSValidationError{
 			field:  "Secret",
-			reason: "value length must be at least 40 runes",
+			reason: "value length must be at least 1 runes",
 		}
 		if !all {
 			return err
