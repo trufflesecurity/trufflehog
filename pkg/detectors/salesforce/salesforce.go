@@ -3,8 +3,8 @@ package salesforce
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -79,7 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if err != nil {
 					// End execution, append Detector Result if request fails to prevent panic on response body checks
-					s1.VerificationError = err
+					s1.SetVerificationError(err, tokenMatch)
 					results = append(results, s1)
 					continue
 				}
@@ -94,7 +94,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else if res.StatusCode == 401 {
 					s1.Verified = false
 				} else {
-					s1.VerificationError = fmt.Errorf("request to %v returned status %d with error %+v", res.Request.URL, res.StatusCode, err)
+					err = fmt.Errorf("request to %v returned status %d with error %+v", res.Request.URL, res.StatusCode, err)
+					s1.SetVerificationError(err, tokenMatch)
 				}
 
 			}

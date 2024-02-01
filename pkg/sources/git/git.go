@@ -3,17 +3,18 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/go-errors/errors"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -25,6 +26,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -32,23 +34,27 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
 
 type Source struct {
 	name     string
-	sourceId sources.SourceID
-	jobId    sources.JobID
+	sourceID sources.SourceID
+	jobID    sources.JobID
 	verify   bool
-	git      *Git
+
+	useCustomContentWriter bool
+	git                    *Git
+	scanOptions            *ScanOptions
+
 	sources.Progress
-	conn        *sourcespb.Git
-	scanOptions *ScanOptions
-	// Kludge to preserve engine.ScanGit functionality which doesn't expect
-	// the scanning to clean up the directory.
-	preserveTempDirs bool
+	conn *sourcespb.Git
 }
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 type Git struct {
 	sourceType         sourcespb.SourceType
@@ -59,23 +65,56 @@ type Git struct {
 	verify             bool
 	metrics            metrics
 	concurrency        *semaphore.Weighted
+	skipBinaries       bool
+	skipArchives       bool
+
+	parser *gitparse.Parser
 }
 
 type metrics struct {
 	commitsScanned uint64
 }
 
-func NewGit(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
-	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData,
-) *Git {
+// Config for a Git source.
+type Config struct {
+	Concurrency        int
+	SourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
+
+	SourceName   string
+	JobID        sources.JobID
+	SourceID     sources.SourceID
+	SourceType   sourcespb.SourceType
+	Verify       bool
+	SkipBinaries bool
+	SkipArchives bool
+
+	// UseCustomContentWriter indicates whether to use a custom contentWriter.
+	// When set to true, the parser will use a custom contentWriter provided through the WithContentWriter option.
+	// When false, the parser will use the default buffer (in-memory) contentWriter.
+	UseCustomContentWriter bool
+}
+
+// NewGit creates a new Git instance with the provided configuration. The Git instance is used to interact with
+// Git repositories.
+func NewGit(config *Config) *Git {
+	var parser *gitparse.Parser
+	if config.UseCustomContentWriter {
+		parser = gitparse.NewParser(gitparse.WithContentWriter(bufferedfilewriter.New()))
+	} else {
+		parser = gitparse.NewParser()
+	}
+
 	return &Git{
-		sourceType:         sourceType,
-		sourceName:         sourceName,
-		sourceID:           sourceID,
-		jobID:              jobID,
-		sourceMetadataFunc: sourceMetadataFunc,
-		verify:             verify,
-		concurrency:        semaphore.NewWeighted(int64(concurrency)),
+		sourceType:         config.SourceType,
+		sourceName:         config.SourceName,
+		sourceID:           config.SourceID,
+		jobID:              config.JobID,
+		sourceMetadataFunc: config.SourceMetadataFunc,
+		verify:             config.Verify,
+		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
+		skipBinaries:       config.SkipBinaries,
+		skipArchives:       config.SkipArchives,
+		parser:             parser,
 	}
 }
 
@@ -93,31 +132,23 @@ func (s *Source) Type() sourcespb.SourceType {
 }
 
 func (s *Source) SourceID() sources.SourceID {
-	return s.sourceId
+	return s.sourceID
 }
 
 func (s *Source) JobID() sources.JobID {
-	return s.jobId
+	return s.jobID
 }
 
-// WithScanOptions sets the scan options.
-func (s *Source) WithScanOptions(scanOptions *ScanOptions) {
+// withScanOptions sets the scan options.
+func (s *Source) withScanOptions(scanOptions *ScanOptions) {
 	s.scanOptions = scanOptions
-}
-
-// WithPreserveTempDirs sets whether to preserve temp directories when scanning
-// the provided list of s.conn.Directories. NOTE: This is *only* for
-// s.conn.Directories, not all temp directories created. This is also a kludge
-// and should be refactored away.
-func (s *Source) WithPreserveTempDirs(preserve bool) {
-	s.preserveTempDirs = preserve
 }
 
 // Init returns an initialized GitHub source.
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
+	s.sourceID = sourceId
+	s.jobID = jobId
 	s.verify = verify
 	if s.scanOptions == nil {
 		s.scanOptions = &ScanOptions{}
@@ -125,8 +156,40 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	var conn sourcespb.Git
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
-		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
+
+	if uri := conn.GetUri(); uri != "" {
+		repoPath, _, err := prepareRepoSinceCommit(aCtx, uri, conn.GetBase())
+		if err != nil || repoPath == "" {
+			return fmt.Errorf("error preparing repo: %w", err)
+		}
+		conn.Directories = append(conn.Directories, repoPath)
+	}
+
+	filter, err := common.FilterFromFiles(conn.IncludePathsFile, conn.ExcludePathsFile)
+	if err != nil {
+		return fmt.Errorf("error creating filter: %w", err)
+	}
+	opts := []ScanOption{ScanOptionFilter(filter), ScanOptionLogOptions(new(git.LogOptions))}
+
+	if depth := conn.GetMaxDepth(); depth != 0 {
+		opts = append(opts, ScanOptionMaxDepth(depth))
+	}
+	if base := conn.GetBase(); base != "" {
+		opts = append(opts, ScanOptionBaseHash(base))
+	}
+	if head := conn.GetHead(); head != "" {
+		opts = append(opts, ScanOptionHeadCommit(head))
+	}
+	if globs := conn.GetExcludeGlobs(); globs != "" {
+		excludedGlobs := strings.Split(globs, ",")
+		opts = append(opts, ScanOptionExcludeGlobs(excludedGlobs))
+	}
+	if isBare := conn.GetBare(); isBare {
+		opts = append(opts, ScanOptionBare(isBare))
+	}
+	s.withScanOptions(NewScanOptions(opts...))
 
 	s.conn = &conn
 
@@ -134,13 +197,20 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		concurrency = runtime.NumCPU()
 	}
 
-	err := GitCmdCheck()
-	if err != nil {
+	if err = CmdCheck(); err != nil {
 		return err
 	}
 
-	s.git = NewGit(s.Type(), s.jobId, s.sourceId, s.name, s.verify, concurrency,
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+	cfg := &Config{
+		SourceName:   s.name,
+		JobID:        s.jobID,
+		SourceID:     s.sourceID,
+		SourceType:   s.Type(),
+		Verify:       s.verify,
+		SkipBinaries: conn.GetSkipBinaries(),
+		SkipArchives: conn.GetSkipArchives(),
+		Concurrency:  concurrency,
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Git{
 					Git: &source_metadatapb.Git{
@@ -153,7 +223,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 					},
 				},
 			}
-		})
+		},
+		UseCustomContentWriter: s.useCustomContentWriter,
+	}
+	s.git = NewGit(cfg)
 	return nil
 }
 
@@ -261,7 +334,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 	}
 
 	err = func() error {
-		if !s.preserveTempDirs && strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) {
+		if strings.HasPrefix(gitDir, filepath.Join(os.TempDir(), "trufflehog")) {
 			defer os.RemoveAll(gitDir)
 		}
 
@@ -316,11 +389,6 @@ type cloneParams struct {
 // The core cloning logic is delegated to a nested function, which returns errors to the
 // outer function for centralized error handling and cleanup.
 func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, args ...string) (string, *git.Repository, error) {
-	var err error
-	if err = GitCmdCheck(); err != nil {
-		return "", nil, err
-	}
-
 	clonePath, err := cleantemp.MkdirTemp()
 	if err != nil {
 		return "", nil, err
@@ -366,7 +434,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	// Execute command and wait for the stdout / stderr.
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
-		err = errors.WrapPrefix(err, "error running 'git clone'", 0)
+		err = fmt.Errorf("error executing git clone: %w", err)
 	}
 	logger.V(3).Info("git subcommand finished", "output", string(output))
 
@@ -393,7 +461,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 //
 // Pinging using other authentication methods is only unimplemented because there's been no pressing need for it yet.
 func PingRepoUsingToken(ctx context.Context, token, gitUrl, user string) error {
-	if err := GitCmdCheck(); err != nil {
+	if err := CmdCheck(); err != nil {
 		return err
 	}
 	lsUrl, err := GitURLParse(gitUrl)
@@ -426,21 +494,35 @@ func CloneRepoUsingUnauthenticated(ctx context.Context, url string, args ...stri
 }
 
 // CloneRepoUsingSSH clones a repo using SSH.
-func CloneRepoUsingSSH(ctx context.Context, gitUrl string, args ...string) (string, *git.Repository, error) {
+func CloneRepoUsingSSH(ctx context.Context, gitURL string, args ...string) (string, *git.Repository, error) {
+	if isCodeCommitURL(gitURL) {
+		return CloneRepo(ctx, nil, gitURL, args...)
+	}
 	userInfo := url.User("git")
-	return CloneRepo(ctx, userInfo, gitUrl, args...)
+	return CloneRepo(ctx, userInfo, gitURL, args...)
 }
+
+var codeCommitRE = regexp.MustCompile(`ssh://git-codecommit\.[\w-]+\.amazonaws\.com`)
+
+func isCodeCommitURL(gitURL string) bool { return codeCommitRE.MatchString(gitURL) }
 
 func (s *Git) CommitsScanned() uint64 {
 	return atomic.LoadUint64(&s.metrics.commitsScanned)
 }
 
+const gitDirName = ".git"
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-	if err := GitCmdCheck(); err != nil {
-		return err
+	// Get the remote URL for reporting (may be empty)
+	remoteURL := getSafeRemoteURL(repo, "origin")
+	var repoCtx context.Context
+	if remoteURL != "" {
+		repoCtx = context.WithValue(ctx, "repo", remoteURL)
+	} else {
+		repoCtx = context.WithValue(ctx, "repo", path)
 	}
 
-	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
+	commitChan, err := gitparse.NewParser().RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -448,17 +530,23 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return nil
 	}
 
-	// get the URL metadata for reporting (may be empty)
-	urlMetadata := getSafeRemoteURL(repo, "origin")
-
 	var depth int64
+	gitDir := filepath.Join(path, gitDirName)
 
-	logger := ctx.Logger().WithValues("repo", urlMetadata)
-	logger.V(1).Info("scanning repo", "base", scanOptions.BaseHash, "head", scanOptions.HeadHash)
+	logger := repoCtx.Logger()
+	var logValues []any
+	if scanOptions.BaseHash != "" {
+		logValues = append(logValues, "base", scanOptions.BaseHash)
+	}
+	if scanOptions.HeadHash != "" {
+		logValues = append(logValues, "head", scanOptions.HeadHash)
+	}
+	logger.V(1).Info("scanning repo", logValues...)
+
 	for commit := range commitChan {
 		if len(scanOptions.BaseHash) > 0 {
 			if commit.Hash == scanOptions.BaseHash {
-				logger.V(1).Info("reached base commit", "commit", commit.Hash)
+				logger.V(1).Info("reached base commit", "commit", commit.Hash[:7])
 				break
 			}
 		}
@@ -468,8 +556,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 		depth++
 		atomic.AddUint64(&s.metrics.commitsScanned, 1)
-		logger.V(5).Info("scanning commit", "commit", commit.Hash)
+		logger.V(5).Info("scanning commit", "commit", commit.Hash[:7])
 		for _, diff := range commit.Diffs {
+			diff := diff
 			if !scanOptions.Filter.Pass(diff.PathB) {
 				continue
 			}
@@ -486,7 +575,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// Handle binary files by reading the entire file rather than using the diff.
 			if diff.IsBinary {
 				commitHash := plumbing.NewHash(hash)
-				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, 0)
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, 0)
 				chunkSkel := &sources.Chunk{
 					SourceName:     s.sourceName,
 					SourceID:       s.sourceID,
@@ -495,27 +584,44 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 				continue
 			}
 
-			if diff.Content.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(ctx, diff, fileName, email, hash, when, urlMetadata, reporter)
+			if diff.Len() > sources.ChunkSize+sources.PeekSize {
+				s.gitChunk(ctx, &diff, fileName, email, hash, when, remoteURL, reporter)
 				continue
 			}
-			metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart))
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           diff.Content.Bytes(),
-				Verify:         s.verify,
+
+			chunkData := func(d *gitparse.Diff) error {
+				metadata := s.sourceMetadataFunc(fileName, email, hash, when, remoteURL, int64(diff.LineStart))
+
+				reader, err := d.ReadCloser()
+				if err != nil {
+					ctx.Logger().Error(err, "error creating reader for commits", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				defer reader.Close()
+
+				data := make([]byte, diff.Len())
+				if _, err := reader.Read(data); err != nil {
+					ctx.Logger().Error(err, "error reading diff content for commit", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				chunk := sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					JobID:          s.jobID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           data,
+					Verify:         s.verify,
+				}
+				return reporter.ChunkOk(ctx, chunk)
 			}
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			if err := chunkData(&diff); err != nil {
 				return err
 			}
 		}
@@ -523,8 +629,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	return nil
 }
 
-func (s *Git) gitChunk(ctx context.Context, diff gitparse.Diff, fileName, email, hash, when, urlMetadata string, reporter sources.ChunkReporter) {
-	originalChunk := bufio.NewScanner(&diff.Content)
+func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email, hash, when, urlMetadata string, reporter sources.ChunkReporter) {
+	reader, err := diff.ReadCloser()
+	if err != nil {
+		ctx.Logger().Error(err, "error creating reader for chunk", "filename", fileName, "commit", hash, "file", diff.PathB)
+		return
+	}
+	defer reader.Close()
+
+	originalChunk := bufio.NewScanner(reader)
 	newChunkBuffer := bytes.Buffer{}
 	lastOffset := 0
 	for offset := 0; originalChunk.Scan(); offset++ {
@@ -611,10 +724,12 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	var depth int64
 	reachedBase := false
+	gitDir := filepath.Join(path, gitDirName)
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 	for commit := range commitChan {
 		for _, diff := range commit.Diffs {
+			diff := diff
 			logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", commit.Hash, "file", diff.PathB)
 			logger.V(2).Info("scanning staged changes from git")
 
@@ -658,23 +773,39 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 					SourceMetadata: metadata,
 					Verify:         s.verify,
 				}
-				if err := handleBinary(ctx, repo, reporter, chunkSkel, commitHash, fileName); err != nil {
+				if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 					logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
 				}
 				continue
 			}
 
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           diff.Content.Bytes(),
-				Verify:         s.verify,
+			chunkData := func(d *gitparse.Diff) error {
+				metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
+
+				reader, err := diff.ReadCloser()
+				if err != nil {
+					ctx.Logger().Error(err, "error creating reader for staged", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				defer reader.Close()
+
+				data := make([]byte, diff.Len())
+				if _, err := reader.Read(data); err != nil {
+					ctx.Logger().Error(err, "error reading diff content for staged", "filename", fileName, "commit", hash, "file", diff.PathB)
+					return nil
+				}
+				chunk := sources.Chunk{
+					SourceName:     s.sourceName,
+					SourceID:       s.sourceID,
+					JobID:          s.jobID,
+					SourceType:     s.sourceType,
+					SourceMetadata: metadata,
+					Data:           data,
+					Verify:         s.verify,
+				}
+				return reporter.ChunkOk(ctx, chunk)
 			}
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			if err := chunkData(&diff); err != nil {
 				return err
 			}
 		}
@@ -700,66 +831,102 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		}
 	}
 
-	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp
-	// To make this duration logging useful, we need to log the remote as well
-	remotes, _ := repo.Remotes()
-	repoUrl := "Could not get remote for repo"
-	if len(remotes) != 0 {
-		repoUrl = getSafeRemoteURL(repo, remotes[0].Config().Name)
+	logger := ctx.Logger()
+	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp.
+	// To make this duration logging useful, we need to log the remote as well.
+	// Other sources may have included this info to the context, in which case we don't need to add it again.
+	if ctx.Value("repo") == nil {
+		remotes, _ := repo.Remotes()
+		repoURL := "Could not get remote for repo"
+		if len(remotes) != 0 {
+			repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
+		}
+		logger = logger.WithValues("repo", repoURL)
 	}
 
 	scanTime := time.Now().Unix() - start
-	ctx.Logger().V(1).Info("scanning git repo complete", "repo", repoUrl, "path", repoPath, "time_seconds", scanTime, "commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned))
+	logger.V(1).Info(
+		"scanning git repo complete",
+		"path", repoPath,
+		"time_seconds", scanTime,
+		"commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned),
+	)
 	return nil
 }
 
-func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) (err error) {
-	var baseCommit *object.Commit
-	if len(scanOptions.BaseHash) > 0 {
-		baseHash := plumbing.NewHash(scanOptions.BaseHash)
-		if !plumbing.IsHash(scanOptions.BaseHash) {
-			base, err := TryAdditionalBaseRefs(repo, scanOptions.BaseHash)
-			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
-			}
-			scanOptions.BaseHash = base.String()
-			baseCommit, _ = repo.CommitObject(plumbing.NewHash(scanOptions.BaseHash))
-		} else {
-			baseCommit, err = repo.CommitObject(baseHash)
-			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve base ref", 0)
-			}
-		}
+// normalizeConfig updates scanOptions with the resolved base and head commit hashes.
+// It's designed to handle scenarios where BaseHash and HeadHash in scanOptions might be branch names or
+// other non-hash references. This ensures that both the base and head commits are resolved to actual commit hashes.
+// If either commit cannot be resolved, it returns early.
+// If both are resolved, it finds and sets the merge base in scanOptions.
+func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
+	baseCommit, baseSet, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
+	if err != nil {
+		return err
 	}
 
-	var headCommit *object.Commit
-	if len(scanOptions.HeadHash) > 0 {
-		headHash := plumbing.NewHash(scanOptions.HeadHash)
-		if !plumbing.IsHash(scanOptions.HeadHash) {
-			head, err := TryAdditionalBaseRefs(repo, scanOptions.HeadHash)
-			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
-			}
-			scanOptions.HeadHash = head.String()
-			headCommit, _ = repo.CommitObject(plumbing.NewHash(scanOptions.HeadHash))
-		} else {
-			headCommit, err = repo.CommitObject(headHash)
-			if err != nil {
-				return errors.WrapPrefix(err, "unable to resolve head ref", 0)
-			}
-		}
+	headCommit, headSet, err := resolveAndSetCommit(repo, &scanOptions.HeadHash)
+	if err != nil {
+		return err
+	}
+
+	if !(baseSet && headSet) {
+		return nil
 	}
 
 	// If baseCommit is an ancestor of headCommit, update c.BaseRef to be the common ancestor.
-	if headCommit != nil && baseCommit != nil {
-		mergeBase, err := headCommit.MergeBase(baseCommit)
-		if err != nil || len(mergeBase) < 1 {
-			return errors.WrapPrefix(err, "could not find common base between the given references", 0)
-		}
-		scanOptions.BaseHash = mergeBase[0].Hash.String()
+	mergeBase, err := headCommit.MergeBase(baseCommit)
+	if err != nil {
+		return fmt.Errorf("unable to resolve merge base: %w", err)
+	}
+	if len(mergeBase) == 0 {
+		return fmt.Errorf("unable to resolve merge base: no merge base found")
 	}
 
+	scanOptions.BaseHash = mergeBase[0].Hash.String()
+
 	return nil
+}
+
+// resolveAndSetCommit resolves a Git reference to a commit object and updates the reference if it was not a direct hash.
+// Returns the commit object, a boolean indicating if the commit was successfully set, and any error encountered.
+func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, bool, error) {
+	if repo == nil || ref == nil {
+		return nil, false, fmt.Errorf("repo and ref must be non-nil")
+	}
+	if len(*ref) == 0 {
+		return nil, false, nil
+	}
+
+	originalRef := *ref
+	resolvedRef, err := resolveHash(repo, originalRef)
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to resolve ref: %w", err)
+	}
+
+	commit, err := repo.CommitObject(plumbing.NewHash(resolvedRef))
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to resolve commit: %w", err)
+	}
+
+	wasSet := originalRef != resolvedRef
+	if wasSet {
+		*ref = resolvedRef
+	}
+
+	return commit, wasSet, nil
+}
+
+func resolveHash(repo *git.Repository, ref string) (string, error) {
+	if plumbing.IsHash(ref) {
+		return ref, nil
+	}
+
+	resolved, err := TryAdditionalBaseRefs(repo, ref)
+	if err != nil {
+		return "", err
+	}
+	return resolved.String(), nil
 }
 
 func stripPassword(u string) (string, error) {
@@ -769,7 +936,7 @@ func stripPassword(u string) (string, error) {
 
 	repoURL, err := url.Parse(u)
 	if err != nil {
-		return "", errors.WrapPrefix(err, "repo remote cannot be sanitized as URI", 0)
+		return "", fmt.Errorf("repo remote is not a URI: %w", err)
 	}
 
 	repoURL.User = nil
@@ -786,7 +953,7 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 	}
 	for _, prefix := range revisionPrefixes {
 		outHash, err := repo.ResolveRevision(plumbing.Revision(prefix + base))
-		if err == plumbing.ErrReferenceNotFound {
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
 			continue
 		}
 		if err != nil {
@@ -798,8 +965,8 @@ func TryAdditionalBaseRefs(repo *git.Repository, base string) (*plumbing.Hash, e
 	return nil, fmt.Errorf("no base refs succeeded for base: %q", base)
 }
 
-// PrepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
-func PrepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (string, bool, error) {
+// prepareRepoSinceCommit clones a repo starting at the given commitHash and returns the cloned repo path.
+func prepareRepoSinceCommit(ctx context.Context, uriString, commitHash string) (string, bool, error) {
 	if commitHash == "" {
 		return PrepareRepo(ctx, uriString)
 	}
@@ -943,49 +1110,77 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func handleBinary(ctx context.Context, repo *git.Repository, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	ctx.Logger().V(5).Info("handling binary file", "path", path)
-	commit, err := repo.CommitObject(commitHash)
+func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
+	fileCtx.Logger().V(5).Info("handling binary file")
+
+	if common.SkipFile(path) {
+		fileCtx.Logger().V(5).Info("file contains ignored extension")
+		return nil
+	}
+
+	if s.skipBinaries {
+		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
+		return nil
+	}
+
+	var handlerOpts []handlers.Option
+
+	if s.skipArchives {
+		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
+	}
+
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	fileReader, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
 
-	file, err := commit.File(path)
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		return err
 	}
+	defer func() {
+		if err := cmd.Wait(); err != nil {
+			ctx.Logger().Error(
+				err, "error waiting for command",
+				"command", cmd.String(),
+				"stderr", stderr.String(),
+				"commit", commitHash,
+			)
+		}
+	}()
 
-	fileReader, err := file.Reader()
-	if err != nil {
-		return err
-	}
-	defer fileReader.Close()
+	bufferName := cleantemp.MkFilename()
 
-	reader, err := diskbufferreader.New(fileReader)
+	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(ctx, reader, chunkSkel, reporter) {
+	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
 		return nil
 	}
 
-	ctx.Logger().V(1).Info("binary file not handled, chunking raw", "path", path)
+	fileCtx.Logger().V(1).Info("binary file not handled, chunking raw")
 	if err := reader.Reset(); err != nil {
 		return err
 	}
 	reader.Stop()
 
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reader)
+	chunkResChan := chunkReader(fileCtx, reader)
 	for data := range chunkResChan {
 		chunk := *chunkSkel
 		chunk.Data = data.Bytes()
 		if err := data.Error(); err != nil {
 			return err
 		}
-		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+		if err := reporter.ChunkOk(fileCtx, chunk); err != nil {
 			return err
 		}
 	}

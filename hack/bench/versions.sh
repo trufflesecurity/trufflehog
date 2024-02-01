@@ -21,7 +21,7 @@ git clone --quiet "$test_repo" $repo_tmp
 
 
 # Get list of git tags, sorted from newest to oldest
-tags=$(git tag --sort=-creatordate)
+tags=$(echo $(git describe --tags --always --dirty --match='v*') $(git tag --sort=-creatordate))
 
 # Counter to keep track of number of tags checked out
 count=0
@@ -40,7 +40,7 @@ do
   fi
 
   # Skip alpha tags
-  if [[ $tag == *"alpha"* ]]; then
+  if [[ $tag == *"alpha"* ]];  then
     continue
   fi
 

@@ -3,8 +3,8 @@ package pubnubpublishkey
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				isVerified, verificationErr := verifyPubNub(ctx, client, resMatch, ressubMatch)
 				s1.Verified = isVerified
-				s1.VerificationError = verificationErr
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			// This function will check false positives for common test words, but also it will make sure the key

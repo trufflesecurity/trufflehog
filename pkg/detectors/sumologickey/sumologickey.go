@@ -4,8 +4,8 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -52,6 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SumoLogicKey,
 				Raw:          []byte(resMatch),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/sumologic/",
+				},
 			}
 
 			if verify {

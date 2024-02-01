@@ -144,15 +144,22 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 
 			// If there is an error other than EOF, or if we have read some bytes, send the chunk.
 			// io.ReadFull will only return io.EOF when n == 0.
-			if isErrAndNotEOF(err) {
+			switch {
+			case isErrAndNotEOF(err):
 				ctx.Logger().Error(err, "error reading chunk")
 				chunkRes.err = err
-				chunkResultChan <- chunkRes
-			} else if n > 0 {
-				chunkResultChan <- chunkRes
+			case n > 0:
+				chunkRes.err = nil
+			default:
+				return
 			}
 
-			// Return on any type of error.
+			select {
+			case <-ctx.Done():
+				return
+			case chunkResultChan <- chunkRes:
+			}
+
 			if err != nil {
 				return
 			}
