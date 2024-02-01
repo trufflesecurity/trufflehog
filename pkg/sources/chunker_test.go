@@ -3,9 +3,12 @@ package sources
 import (
 	"bytes"
 	"io"
+	"math/rand"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/iotest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
@@ -216,4 +219,36 @@ func TestFlakyChunkReader(t *testing.T) {
 	chunk := chunks[0]
 	assert.NoError(t, chunk.Error())
 	assert.Equal(t, a+b, string(chunk.Bytes()))
+}
+
+func TestReadInChunksWithCancellation(t *testing.T) {
+	largeData := strings.Repeat("large test data ", 1024*1024) // Large data string.
+
+	for i := 0; i < 10; i++ {
+		initialGoroutines := runtime.NumGoroutine()
+
+		for j := 0; j < 5; j++ { // Call readInChunks multiple times
+			ctx, cancel := context.WithCancel(context.Background())
+
+			reader := strings.NewReader(largeData)
+			chunkReader := NewChunkReader()
+
+			chunkChan := chunkReader(ctx, reader)
+
+			if rand.Intn(2) == 0 { // Randomly decide to cancel the context
+				cancel()
+			} else {
+				for range chunkChan {
+				}
+			}
+		}
+
+		// Allow for goroutine finalization.
+		time.Sleep(time.Millisecond * 100)
+
+		// Check for goroutine leaks.
+		if runtime.NumGoroutine() > initialGoroutines {
+			t.Error("Potential goroutine leak detected")
+		}
+	}
 }

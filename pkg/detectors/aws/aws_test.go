@@ -84,7 +84,10 @@ func TestAWS_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
-					ExtraData:    map[string]string{"resource_type": "Access key"},
+					ExtraData: map[string]string{
+						"resource_type": "Access key",
+						"account":       "171436882533",
+					},
 				},
 			},
 			wantErr: false,
@@ -115,6 +118,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJXYZ",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 				{
@@ -187,6 +191,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
@@ -221,6 +226,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
@@ -242,6 +248,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
@@ -263,6 +270,7 @@ func TestAWS_FromChunk(t *testing.T) {
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
+						"account":       "171436882533",
 					},
 				},
 			},
@@ -306,11 +314,11 @@ func TestAWS_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				if (got[i].VerificationError != nil) != tt.wantVerificationError {
-					t.Fatalf("wantVerificationError %v, verification error = %v", tt.wantVerificationError, got[i].VerificationError)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationError {
+					t.Fatalf("wantVerificationError %v, verification error = %v", tt.wantVerificationError, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "VerificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AWS.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -4,24 +4,28 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
-
-// Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+type Scanner struct {
+	client *http.Client
+}
 
 var (
-	client = common.SaneHttpClient()
+	// Ensure the Scanner satisfies the interface at compile time.
+	_ detectors.Detector = (*Scanner)(nil)
+
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aha"}) + `\b([0-9a-f]{64})\b`)
+	URLPat = regexp.MustCompile(`\b([A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])\.aha\.io)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -30,11 +34,26 @@ func (s Scanner) Keywords() []string {
 	return []string{"aha"}
 }
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
 // FromData will find and optionally verify Aha secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	URLmatches := URLPat.FindAllStringSubmatch(dataStr, -1)
+
+	resURLMatch := "aha.io"
+	for _, URLmatch := range URLmatches {
+		if len(URLmatch) != 2 {
+			continue
+		}
+		resURLMatch = strings.TrimSpace(URLmatch[1])
+	}
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -48,30 +67,47 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://company.aha.io/api/v1/me", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/vnd.aha+json; version=3")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
-			}
+			client := s.getClient()
+			isVerified, verificationErr := verifyAha(ctx, client, resMatch, resURLMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
+		}
+
+		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+			continue
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch string) (bool, error) {
+	url := fmt.Sprintf("https://%s/api/v1/me", resURLMatch)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Accept", "application/vnd.aha+json; version=3")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	// https://www.aha.io/api
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusNotFound, http.StatusForbidden:
+		// 403 is a known case where an account is inactive bc of a trial ending or payment issue
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

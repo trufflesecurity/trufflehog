@@ -1,9 +1,10 @@
-package engine
+package ahocorasick
 
 import (
 	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

@@ -5,7 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"regexp"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -49,8 +50,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureContainerRegistry,
 				Raw:          []byte(endpoint),
-				Redacted:     endpoint,
 				RawV2:        []byte(endpoint + password),
+				Redacted:     endpoint,
 			}
 
 			if verify {
@@ -75,10 +76,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else if res.StatusCode == 401 {
 						// The secret is determinately not verified (nothing to do)
 					} else {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						s1.SetVerificationError(err, password)
 					}
 				} else {
-					s1.VerificationError = err
+					s1.SetVerificationError(err, username, password)
 				}
 			}
 

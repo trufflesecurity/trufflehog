@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -59,17 +60,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			res, err := client.Do(req)
 			if err == nil {
-				fmt.Println(res.Status, resMatch)
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				} else if res.StatusCode == 403 {
 					// The secret is determinately not verified (nothing to do)
 				} else {
-					s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			} else {
-				s1.VerificationError = err
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 

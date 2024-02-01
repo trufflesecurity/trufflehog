@@ -3,10 +3,10 @@ package pastebin
 import (
 	"bytes"
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"

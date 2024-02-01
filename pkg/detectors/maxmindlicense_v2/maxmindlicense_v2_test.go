@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package text2data
+package maxmindlicense_v2
 
 import (
 	"context"
@@ -16,15 +16,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestText2Data_FromChunk(t *testing.T) {
+func TestMaxMindLicense_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TEXT2DATA")
-	inactiveSecret := testSecrets.MustGetField("TEXT2DATA_INACTIVE")
+	secret := testSecrets.MustGetField("MAXMIND_LICENSE")
+	user := testSecrets.MustGetField("MAXMIND_USER")
+	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,13 +44,17 @@ func TestText2Data_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a text2data secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a geoip secret %s within with maxmind user %s", secret, user)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Text2Data,
+					DetectorType: detectorspb.DetectorType_MaxMindLicense,
+					Redacted:     "662034",
 					Verified:     true,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+					},
 				},
 			},
 			wantErr: false,
@@ -59,13 +64,17 @@ func TestText2Data_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a text2data secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a maxmind secret %s within with maxmind user %s", inactiveSecret, user)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Text2Data,
+					DetectorType: detectorspb.DetectorType_MaxMindLicense,
+					Redacted:     "662034",
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+					},
 				},
 			},
 			wantErr: false,
@@ -87,7 +96,7 @@ func TestText2Data_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Text2Data.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MaxMindLicense.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +106,7 @@ func TestText2Data_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Text2Data.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("MaxMindLicense.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
