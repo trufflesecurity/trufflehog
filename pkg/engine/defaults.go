@@ -211,6 +211,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhubv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -1613,6 +1614,7 @@ func DefaultDetectors() []detectors.Detector {
 		&azuresearchquerykey.Scanner{},
 		jiratoken_v2.Scanner{},
 		&googleoauth2.Scanner{},
+		dockerhubv2.Scanner{},
 	}
 
 }
