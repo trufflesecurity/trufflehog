@@ -79,13 +79,16 @@ func TestSource_Scan(t *testing.T) {
 					return
 				}
 			}()
+			var counter int
 			for chunk := range chunksCh {
+				counter++
 				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
 					if diff := pretty.Compare(chunk.SourceMetadata, tt.wantSourceMetadata); diff != "" {
 						t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
 					}
 				}
 			}
+			assert.Equal(t, 2, counter)
 		})
 	}
 }
