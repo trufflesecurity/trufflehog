@@ -7,12 +7,13 @@ import (
 	"os"
 	"path/filepath"
 
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -39,8 +40,7 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
-var _ sources.SourceUnitEnumerator = (*Source)(nil)
-var _ sources.SourceUnitChunker = (*Source)(nil)
+var _ sources.SourceUnitEnumChunker = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -71,11 +71,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	}
 	s.paths = append(conn.Paths, conn.Directories...)
 
-	return nil
-}
-
-func (s *Source) WithFilter(filter *common.Filter) {
+	filter, err := common.FilterFromFiles(conn.IncludePathsFile, conn.ExcludePathsFile)
+	if err != nil {
+		return fmt.Errorf("unable to create filter: %w", err)
+	}
 	s.filter = filter
+
+	return nil
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -117,12 +119,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 		// Skip over non-regular files. We do this check here to suppress noisy
 		// logs for trying to scan directories and other non-regular files in
 		// our traversal.
-		fileStat, err := os.Stat(fullPath)
-		if err != nil {
-			ctx.Logger().Info("unable to stat file", "path", fullPath, "error", err)
-			return nil
-		}
-		if !fileStat.Mode().IsRegular() {
+		if !d.Type().IsRegular() {
 			return nil
 		}
 		if s.filter != nil && !s.filter.Pass(fullPath) {
@@ -150,10 +147,13 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	if err != nil {
 		return fmt.Errorf("unable to open file: %w", err)
 	}
+
+	bufferName := cleantemp.MkFilename()
+
 	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
 
-	reReader, err := diskbufferreader.New(inputFile)
+	reReader, err := diskbufferreader.New(inputFile, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return fmt.Errorf("could not create re-readable reader: %w", err)
 	}
@@ -173,7 +173,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		},
 		Verify: s.verify,
 	}
-	if handlers.HandleFile(ctx, reReader, chunkSkel, chunksChan) {
+	if handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
 		return nil
 	}
 
@@ -218,9 +218,38 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // filepath or a directory.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		item := sources.CommonSourceUnit{ID: path}
-		if err := reporter.UnitOk(ctx, item); err != nil {
-			return err
+		fileInfo, err := os.Stat(filepath.Clean(path))
+		if err != nil {
+			if err := reporter.UnitErr(ctx, err); err != nil {
+				return err
+			}
+			continue
+		}
+		if !fileInfo.IsDir() {
+			item := sources.CommonSourceUnit{ID: path}
+			if err := reporter.UnitOk(ctx, item); err != nil {
+				return err
+			}
+			continue
+		}
+		err = fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return reporter.UnitErr(ctx, err)
+			}
+			if d.IsDir() {
+				return nil
+			}
+			fullPath := filepath.Join(path, relativePath)
+			if s.filter != nil && !s.filter.Pass(fullPath) {
+				return nil
+			}
+			item := sources.CommonSourceUnit{ID: fullPath}
+			return reporter.UnitOk(ctx, item)
+		})
+		if err != nil {
+			if err := reporter.UnitErr(ctx, err); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

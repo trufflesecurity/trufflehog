@@ -2,8 +2,9 @@ package plaidkey
 
 import (
 	"context"
+	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -53,32 +54,36 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_PlaidKey,
 				Raw:          []byte(resMatch),
 			}
-
+			environments := []string{"development", "production"}
 			if verify {
-				payload := strings.NewReader(`{"client_id":"` + idresMatch + `","secret":"` + resMatch + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://development.plaid.com/link/token/create", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
+				for _, env := range environments {
+					payload := strings.NewReader(`{"client_id":"` + idresMatch + `","secret":"` + resMatch + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
+					req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".plaid.com/link/token/create", payload)
+					if err != nil {
+						continue
+					}
+					req.Header.Add("Content-Type", "application/json")
+					res, err := client.Do(req)
+					if err == nil {
+						defer res.Body.Close()
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							s1.Verified = true
+							s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
+						} else {
+							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
+							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+								continue
+							}
 						}
 					}
 				}
+				results = append(results, s1)
+				// if the environment is dev, we don't need to check production
+				if s1.Verified {
+					break
+				}
 			}
-
-			results = append(results, s1)
-
 		}
-
 	}
 
 	return results, nil

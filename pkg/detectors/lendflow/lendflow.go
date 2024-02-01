@@ -3,8 +3,8 @@ package lendflow
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 

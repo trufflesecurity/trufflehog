@@ -8,8 +8,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 

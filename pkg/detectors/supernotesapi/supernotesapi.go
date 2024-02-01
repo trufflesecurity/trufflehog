@@ -2,8 +2,8 @@ package supernotesapi
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.supernotes.app/v1/user/", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.supernotes.app/v1/user", nil)
 			if err != nil {
 				continue
 			}

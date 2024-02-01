@@ -2,9 +2,11 @@ package myfreshworks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -56,25 +58,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Authorization", fmt.Sprintf("Token token=%s", resMatch))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode == http.StatusOK {
-						s1.Verified = true
-					} else if !(res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden) {
-						s1.VerificationError = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					}
-				}
+				client := s.getClient()
+				isVerified, verificationErr := verifyMyfreshworks(ctx, client, resMatch, resIdMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
@@ -87,6 +74,40 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
+func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Token token=%s", resMatch))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusOK {
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+
+		return json.Valid(body), nil
+	} else if !(res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden) {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

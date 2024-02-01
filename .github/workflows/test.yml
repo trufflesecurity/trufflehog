@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    if: ${{ ! github.event.pull_request.head.repo.fork }}
+    if: ${{ github.repository == 'trufflesecurity/trufflehog' && !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     permissions:
       actions: "read"
@@ -22,9 +22,9 @@ jobs:
         with:
           go-version: "1.21"
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - id: "auth"
-        uses: "google-github-actions/auth@v1"
+        uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: "projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "github-ci-external@trufflehog-testing.iam.gserviceaccount.com"
@@ -48,7 +48,7 @@ jobs:
           secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
           tags: integration
       - name: Annotate test results
-        uses: mikepenz/action-junit-report@v3
+        uses: mikepenz/action-junit-report@v4
         if: success() || failure() # always run even if the previous step fails
         with:
           report_paths: "tmp/test-results/*.xml"
@@ -64,6 +64,6 @@ jobs:
         with:
           go-version: "1.21"
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Test
         run: make test-community

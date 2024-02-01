@@ -3,8 +3,8 @@ package npmtokenv2
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -47,6 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_NpmToken,
 			Raw:          []byte(resMatch),
+		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/npm/",
 		}
 
 		if verify {

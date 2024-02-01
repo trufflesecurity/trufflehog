@@ -2,8 +2,8 @@ package salesblink
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,7 +20,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesblink"}) + `\b([a-zA-Z]{16})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesblink"}) + `\b(key-[a-zA-Z0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://run.salesblink.io/api/campaigns", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://run.salesblink.io/api/public/lists", nil)
 			if err != nil {
 				continue
 			}

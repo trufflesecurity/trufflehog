@@ -141,14 +141,11 @@ func TestSource_Validate(t *testing.T) {
 			var cancelOnce sync.Once
 			defer cancelOnce.Do(cancel)
 
-			// These are used by the tests that assume roles
-			t.Setenv("AWS_ACCESS_KEY_ID", s3key)
-			t.Setenv("AWS_SECRET_ACCESS_KEY", s3secret)
-
 			s := &Source{}
 
+			// As of this writing, credentials set in the environment or the on-disk credentials file also work, but I
+			// couldn't figure out how to write automated tests for those cases that weren't ugly as sin.
 			conn, err := anypb.New(&sourcespb.S3{
-				// These are used by the tests that don't assume roles
 				Credential: &sourcespb.S3_AccessKey{
 					AccessKey: &credentialspb.KeySecret{
 						Key:    s3key,

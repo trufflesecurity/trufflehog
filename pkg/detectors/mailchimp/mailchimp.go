@@ -3,8 +3,8 @@ package mailchimp
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -33,7 +33,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	//pretty standard regex match
+	// pretty standard regex match
 	matches := keyPat.FindAllString(dataStr, -1)
 
 	for _, match := range matches {
@@ -41,6 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mailchimp,
 			Raw:          []byte(match),
+		}
+		s.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/mailchimp/",
 		}
 
 		if verify {

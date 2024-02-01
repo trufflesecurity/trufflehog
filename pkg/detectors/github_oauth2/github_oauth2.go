@@ -2,7 +2,7 @@ package github_oauth2
 
 import (
 	"context"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -53,6 +53,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_GitHubOauth2,
 				Raw:          []byte(idMatch[1]),
 				RawV2:        []byte(idMatch[1] + secretMatch[1]),
+			}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 			}
 
 			config := &clientcredentials.Config{

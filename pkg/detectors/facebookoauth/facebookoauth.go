@@ -3,8 +3,8 @@ package facebookoauth
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -59,7 +59,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				// thanks https://stackoverflow.com/questions/15621471/validate-a-facebook-app-id-and-app-secret
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://graph.facebook.com/%s?fields=roles&access_token=%s|%s", apiIdRes, apiIdRes, apiSecretRes), nil)
+				// https://stackoverflow.com/questions/24401241/how-to-get-a-facebook-access-token-using-appid-and-app-secret-without-any-login
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://graph.facebook.com/me?access_token=%s|%s", apiIdRes, apiSecretRes), nil)
 				if err != nil {
 					continue
 				}

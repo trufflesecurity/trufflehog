@@ -1,8 +1,7 @@
-FROM alpine:3.15
+FROM alpine:3.19
 
-RUN apk add --no-cache bash git openssh-client ca-certificates \
-    && rm -rf /var/cache/apk/* && \
-    update-ca-certificates
+RUN apk add --no-cache bash git openssh-client ca-certificates rpm2cpio binutils cpio \
+    && rm -rf /var/cache/apk/* && update-ca-certificates
 WORKDIR /usr/bin/
 COPY trufflehog .
 COPY entrypoint.sh /etc/entrypoint.sh

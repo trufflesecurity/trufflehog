@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/paulbellamy/ratecounter"
 	"golang.org/x/sync/semaphore"
-	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -74,7 +74,7 @@ func main() {
 		selectedScanners := map[string]detectors.Detector{}
 		allScanners := getAllScanners()
 
-		decoders := decoders.DefaultDecoders()
+		allDecoders := decoders.DefaultDecoders()
 
 		input := strings.ToLower(*scanCmdDetector)
 		if input == "all" {
@@ -121,7 +121,7 @@ func main() {
 
 				for chunk := range chunksChan {
 					for name, scanner := range selectedScanners {
-						for _, dec := range decoders {
+						for _, dec := range allDecoders {
 							decoded := dec.FromChunk(&sources.Chunk{Data: chunk.Data})
 							if decoded != nil {
 								foundKeyword := false
@@ -188,8 +188,16 @@ func main() {
 
 				logger.Info("cloned repo", "repo", r)
 
-				s := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "snifftest", false, runtime.NumCPU(),
-					func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+				cfg := &git.Config{
+					SourceName:   "snifftest",
+					JobID:        0,
+					SourceID:     0,
+					SourceType:   sourcespb.SourceType_SOURCE_TYPE_GIT,
+					Verify:       false,
+					SkipBinaries: true,
+					SkipArchives: false,
+					Concurrency:  runtime.NumCPU(),
+					SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 						return &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Git{
 								Git: &source_metadatapb.Git{
@@ -201,10 +209,12 @@ func main() {
 								},
 							},
 						}
-					})
+					},
+				}
+				s := git.NewGit(cfg)
 
 				logger.Info("scanning repo", "repo", r)
-				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
+				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), sources.ChanReporter{Ch: chunksChan})
 				if err != nil {
 					logFatal(err, "error scanning repo")
 				}

@@ -14,13 +14,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sts"
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -98,20 +99,20 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
-	var errors []error
+	var errs []error
 	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) {
 		roleErrs := s.validateBucketAccess(c, defaultRegionClient, roleArn, buckets)
 		if len(roleErrs) > 0 {
-			errors = append(errors, roleErrs...)
+			errs = append(errs, roleErrs...)
 		}
 	}
 
 	err := s.visitRoles(ctx, visitor)
 	if err != nil {
-		errors = append(errors, err)
+		errs = append(errs, err)
 	}
 
-	return errors
+	return errs
 }
 
 // setMaxObjectSize sets the maximum size of objects that will be scanned. If
@@ -130,20 +131,19 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
 	cfg.Region = aws.String(region)
 
-	if roleArn == "" {
-		switch cred := s.conn.GetCredential().(type) {
-		case *sourcespb.S3_SessionToken:
-			cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
-		case *sourcespb.S3_AccessKey:
-			cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
-		case *sourcespb.S3_Unauthenticated:
-			cfg.Credentials = credentials.AnonymousCredentials
-		case *sourcespb.S3_CloudEnvironment:
-			// Nothing needs to be done!
-		default:
-			return nil, errors.Errorf("invalid configuration given for %s source", s.name)
-		}
-	} else {
+	switch cred := s.conn.GetCredential().(type) {
+	case *sourcespb.S3_SessionToken:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
+	case *sourcespb.S3_AccessKey:
+		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
+	case *sourcespb.S3_Unauthenticated:
+		cfg.Credentials = credentials.AnonymousCredentials
+	default:
+		// In all other cases, the AWS SDK will follow its normal waterfall logic to pick up credentials (i.e. they can
+		// come from the environment or the credentials file or whatever else AWS gets up to).
+	}
+
+	if roleArn != "" {
 		sess, err := session.NewSession(cfg)
 		if err != nil {
 			return nil, err
@@ -346,8 +346,10 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				return nil
 			}
 
+			bufferName := cleantemp.MkFilename()
+
 			defer res.Body.Close()
-			reader, err := diskbufferreader.New(res.Body)
+			reader, err := diskbufferreader.New(res.Body, diskbufferreader.WithBufferName(bufferName))
 			if err != nil {
 				s.log.Error(err, "Could not create reader.")
 				return nil
@@ -377,7 +379,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(ctx, reader, chunkSkel, chunksChan) {
+			if handlers.HandleFile(ctx, reader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
 				atomic.AddUint64(objectCount, 1)
 				s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
 				return nil
@@ -422,16 +424,16 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleArn string, buckets []string) []error {
 	shouldHaveAccessToAllBuckets := roleArn == ""
 	wasAbleToListAnyBucket := false
-	var errors []error
+	var errs []error
 
 	for _, bucket := range buckets {
 		if common.IsDone(ctx) {
-			return append(errors, ctx.Err())
+			return append(errs, ctx.Err())
 		}
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, roleArn, bucket)
 		if err != nil {
-			errors = append(errors, fmt.Errorf("could not get regional client for bucket %q: %w", bucket, err))
+			errs = append(errs, fmt.Errorf("could not get regional client for bucket %q: %w", bucket, err))
 			continue
 		}
 
@@ -440,19 +442,19 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 		if err == nil {
 			wasAbleToListAnyBucket = true
 		} else if shouldHaveAccessToAllBuckets {
-			errors = append(errors, fmt.Errorf("could not list objects in bucket %q: %w", bucket, err))
+			errs = append(errs, fmt.Errorf("could not list objects in bucket %q: %w", bucket, err))
 		}
 	}
 
 	if !wasAbleToListAnyBucket {
 		if roleArn == "" {
-			errors = append(errors, fmt.Errorf("could not list objects in any bucket"))
+			errs = append(errs, fmt.Errorf("could not list objects in any bucket"))
 		} else {
-			errors = append(errors, fmt.Errorf("role %q could not list objects in any bucket", roleArn))
+			errs = append(errs, fmt.Errorf("role %q could not list objects in any bucket", roleArn))
 		}
 	}
 
-	return errors
+	return errs
 }
 
 func (s *Source) visitRoles(ctx context.Context, f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string)) error {

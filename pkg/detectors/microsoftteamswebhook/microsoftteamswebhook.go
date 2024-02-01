@@ -3,9 +3,9 @@ package microsoftteamswebhook
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -50,6 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
 			Raw:          []byte(resMatch),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/ms/",
+		}
 
 		if verify {
 			client := s.client
@@ -59,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, verificationErr := verifyWebhook(ctx, client, resMatch)
 			s1.Verified = isVerified
-			s1.VerificationError = verificationErr
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {

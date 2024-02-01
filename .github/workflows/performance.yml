@@ -16,7 +16,7 @@ jobs:
         go-version: '1.21'
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         ref: ${{ github.head_ref }}
@@ -52,7 +52,7 @@ jobs:
         echo PREVIOUS_TAG=$(cat previous_tag.txt) >> $GITHUB_ENV
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         ref: ${{ env.PREVIOUS_TAG }}

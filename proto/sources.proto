@@ -44,14 +44,35 @@ enum SourceType {
   SOURCE_TYPE_SHAREPOINT = 29;
   SOURCE_TYPE_GCS_UNAUTHED = 30;
   SOURCE_TYPE_AZURE_REPOS = 31;
+  SOURCE_TYPE_TRAVISCI = 32;
 }
 
 message LocalSource {
   string type = 1 ;
   string name = 2 ;
-  google.protobuf.Duration scan_interval = 3;
+  // DEPRECATED: scan_interval is deprecated and can be removed when we no longer depend on the name.
+  // Deprecating in favor of scan_period due to the fact that scan_interval is a duration
+  // which is a fixed-length span of time represented as a count of seconds and fractions of seconds
+  // at nanosecond resolution. Most of the time, we want to be able to specify a scan interval in
+  // human-readable format (e.g. 45s, 30m, 12h, etc.) which is not possible with a duration.
+  // https://protobuf.dev/reference/protobuf/google.protobuf/#duration
+  google.protobuf.Duration scan_interval = 3 [deprecated = true];
   bool verify = 4;
   google.protobuf.Any connection = 5;
+  string scan_period = 6;
+}
+
+// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
+message Artifactory {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.BasicAuth basic_auth = 2;
+    string access_token = 3;
+    credentials.Unauthenticated unauthenticated = 7;
+  }
+  repeated string repositories = 4;
+  repeated string include_paths = 5;
+  repeated string ignore_paths = 6;
 }
 
 message AzureStorage {
@@ -74,9 +95,18 @@ message Bitbucket {
   }
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
+  bool skip_binaries = 7;
+  bool skip_archives = 8;
 }
 
 message CircleCI {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+  }
+}
+
+message TravisCI {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
     string token = 2;
@@ -127,6 +157,8 @@ message Filesystem {
   // paths when we no longer depend on the name in enterprise configs.
   repeated string directories = 1;
   repeated string paths = 2;
+  string include_paths_file = 3; // path to file containing newline separated list of paths
+  string exclude_paths_file = 4; // path to file containing newline separated list of paths
 }
 
 message GCS {
@@ -154,6 +186,20 @@ message Git {
   }
   repeated string directories = 3;
   repeated string repositories = 4;
+  string head = 6;
+  string base = 7;
+  bool bare = 8;
+  string include_paths_file = 9; // path to file containing newline separated list of paths
+  string exclude_paths_file = 10; // path to file containing newline separated list of paths
+  string exclude_globs = 11; // comma separated list of globs
+  int64  max_depth = 12;
+  // This field is generally used by the CLI or within CI/CD systems to specify a single repository,
+  // whereas the repositories field is used by the enterprise config to specify multiple repositories.
+  // Passing a single repository via the uri field also allows for additional options to be specified
+  // like head, base, bare, etc.
+  string uri = 13; // repository URL. https://, file://, or ssh://
+  bool skip_binaries = 14;
+  bool skip_archives = 15;
 }
 
 message GitLab {
@@ -165,6 +211,8 @@ message GitLab {
   }
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
+  bool skip_binaries = 7;
+  bool skip_archives = 8;
 }
 
 message GitHub {
@@ -181,11 +229,14 @@ message GitHub {
   bool includeForks = 8;
   string head = 9;
   string base = 10;
-  repeated string ignoreRepos = 11;
-  repeated string includeRepos = 12;
-  bool includePullRequestComments = 14;
-  bool includeIssueComments = 15;
-  bool includeGistComments = 16;
+  repeated string ignore_repos = 11;
+  repeated string include_repos = 12;
+  bool include_pull_request_comments = 14;
+  bool include_issue_comments = 15;
+  bool include_gist_comments = 16;
+  bool skip_binaries = 17;
+  bool skip_archives = 18;
+  bool include_wikis = 19;
 }
 
 message GoogleDrive {
@@ -204,6 +255,7 @@ message JIRA {
   }
   repeated string projects = 5;
   repeated string ignore_projects = 7;
+  bool insecure_skip_verify_tls = 8;
 }
 
 message NPMUnauthenticatedPackage {
@@ -237,7 +289,7 @@ message Slack {
     credentials.SlackTokens tokens = 5;
   }
   repeated string channels = 3;
-  repeated string ignoreList = 4;
+  repeated string ignore_list = 4;
 }
 
 message Test{}
@@ -255,6 +307,8 @@ message Gerrit {
     credentials.Unauthenticated unauthenticated = 3;
   }
   repeated string projects = 4;
+  bool skip_binaries = 5;
+  bool skip_archives = 6;
 }
 
 message Jenkins {
@@ -263,6 +317,7 @@ message Jenkins {
     credentials.BasicAuth basic_auth = 2;
     credentials.Header header = 3;
   }
+  bool insecure_skip_verify_tls = 4;
 }
 
 message Teams {
@@ -273,23 +328,13 @@ message Teams {
     credentials.Oauth2 oauth = 7;
   }
   repeated string channels = 4;
-  repeated string ignoreList = 5;
+  repeated string ignore_list = 5;
   repeated string team_ids = 6;
-}
-
-// https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
-message Artifactory {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
-  oneof credential {
-    credentials.BasicAuth basic_auth = 2;
-    string access_token = 3;
-  }
-  repeated string repositories = 4;
 }
 
 message Syslog {
   string protocol = 1;
-  string listenAddress = 2;
+  string listen_address = 2;
   string tlsCert = 3;
   string tlsKey = 4;
   string format = 5;
@@ -326,9 +371,11 @@ message AzureRepos {
   repeated string repositories = 4;
   repeated string organizations = 5;
   repeated string projects = 6;
-  bool includeForks = 7;
-  repeated string ignoreRepos = 8;
-  repeated string includeRepos = 9;
-  repeated string includeProjects = 10;
-  repeated string ignoreProjects = 11;
+  bool include_forks = 7;
+  repeated string ignore_repos = 8;
+  repeated string include_repos = 9;
+  repeated string include_projects = 10;
+  repeated string ignore_projects = 11;
+  bool skip_binaries = 12;
+  bool skip_archives = 13;
 }

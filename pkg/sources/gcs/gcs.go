@@ -10,9 +10,9 @@ import (
 	"sync"
 
 	"cloud.google.com/go/storage"
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -96,7 +97,7 @@ func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) 
 
 // Set overrides the cache Set method of the cache to enable the persistence
 // of the cache contents the Progress of the source at given increments.
-func (c *persistableCache) Set(key, val string) {
+func (c *persistableCache) Set(key string, val any) {
 	c.Cache.Set(key, val)
 	if ok, contents := c.shouldPersist(); ok {
 		c.Progress.EncodedResumeInfo = contents
@@ -296,7 +297,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	var c cache.Cache
 	if s.Progress.EncodedResumeInfo != "" {
-		c = memory.NewWithData(ctx, strings.Split(s.Progress.EncodedResumeInfo, ","))
+		keys := strings.Split(s.Progress.EncodedResumeInfo, ",")
+		entries := make([]memory.CacheEntry, len(keys))
+		for i, val := range keys {
+			entries[i] = memory.CacheEntry{Key: val, Value: val}
+		}
+
+		c = memory.NewWithData(entries)
+		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
 	} else {
 		c = memory.New()
 	}
@@ -369,13 +377,14 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 }
 
 func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) ([]byte, error) {
-	reader, err := diskbufferreader.New(o)
+	bufferName := cleantemp.MkFilename()
+	reader, err := diskbufferreader.New(o, diskbufferreader.WithBufferName(bufferName))
 	if err != nil {
 		return nil, fmt.Errorf("error creating disk buffer reader: %w", err)
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(ctx, reader, chunk, s.chunksCh) {
+	if handlers.HandleFile(ctx, reader, chunk, sources.ChanReporter{Ch: s.chunksCh}) {
 		ctx.Logger().V(3).Info("File was handled", "name", s.name, "bucket", o.bucket, "object", o.name)
 		return nil, nil
 	}

@@ -5,8 +5,8 @@ import (
 
 	// b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -56,6 +56,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GitHubApp,
 				Raw:          []byte(resMatch),
+			}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 			}
 
 			if verify {

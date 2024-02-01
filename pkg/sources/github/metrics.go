@@ -39,4 +39,12 @@ var (
 		Help:      "Total number of GitHub repositories scanned.",
 	},
 		[]string{"source_name"})
+
+	githubOrgsEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "github_orgs_enumerated",
+		Help:      "Total number of GitHub organizations enumerated.",
+	},
+		[]string{"source_name"})
 )
