@@ -631,7 +631,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorsWithResult := make(map[detectors.Detector]struct{}, avgSecretsPerDetector)
+	detectorsWithResult := make(map[ahocorasick.DetectorInfo]struct{}, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
