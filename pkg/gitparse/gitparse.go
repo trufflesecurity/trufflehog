@@ -161,6 +161,7 @@ type Commit struct {
 type Parser struct {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 3bc448262 (reorder fields)
 	maxDiffSize   int
@@ -175,6 +176,11 @@ type Parser struct {
 >>>>>>> d530798f2 (correctly use the buffered file writer)
 =======
 >>>>>>> 3bc448262 (reorder fields)
+=======
+	maxDiffSize            int
+	maxCommitSize          int
+	dateFormat             string
+>>>>>>> 5e5a57a2f (correctly use the buffered file writer)
 	useCustomContentWriter bool
 }
 
@@ -357,6 +363,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	)
 	var latestState = Initial
 
+<<<<<<< HEAD
 	diff := func(opts ...diffOption) *Diff {
 		opts = append(opts, withCustomContentWriter(newBuffer()))
 		return NewDiff(opts...)
@@ -368,6 +375,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		}
 	}
 	currentDiff := diff()
+=======
+	writer := c.contentWriter()
+	currentDiff := NewDiff(withCustomContentWriter(writer))
+>>>>>>> 5e5a57a2f (correctly use the buffered file writer)
 
 	defer common.RecoverWithExit(ctx)
 	defer close(diffChan)
@@ -406,9 +417,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
+<<<<<<< HEAD
 			currentDiff = diff()
 			currentCommit = &Commit{}
 			currentDiff.CommitMessage = strings.Builder{}
+=======
+			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
+			currentCommit = &Commit{Message: strings.Builder{}}
+>>>>>>> 5e5a57a2f (correctly use the buffered file writer)
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
@@ -458,8 +474,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 			}
+<<<<<<< HEAD
 			currentDiff = diff()
 		case isModeLine(latestState, line):
+=======
+			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
+		case isModeLine(isStaged, latestState, line):
+>>>>>>> 5e5a57a2f (correctly use the buffered file writer)
 			latestState = ModeLine
 			// NoOp
 		case isIndexLine(latestState, line):
@@ -499,7 +520,11 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 			}
+<<<<<<< HEAD
 			currentDiff = diff(withPathB(currentDiff.PathB))
+=======
+			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()), withPathB(currentDiff.PathB))
+>>>>>>> 5e5a57a2f (correctly use the buffered file writer)
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -568,6 +593,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	cleanupParse(ctx, currentCommit, currentDiff, diffChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
+}
+
+func (c *Parser) contentWriter() contentWriter {
+	if c.useCustomContentWriter {
+		return bufferedfilewriter.New()
+	}
+	return newBuffer()
 }
 
 func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
