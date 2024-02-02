@@ -701,11 +701,17 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 		}
 
 		for key := range detectorKeysWithResults {
+			detector := e.ahoCorasickCore.GetDetectorByKey(key)
+			if detector == nil {
+				ctx.Logger().Info("detector not found", "key", key)
+				continue
+			}
+		
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
 				chunk:    chunk.chunk,
-				detector: e.ahoCorasickCore.GetDetectorByKey(key),
+				detector: detector,
 				decoder:  chunk.decoder,
 				wgDoneFn: wgDetect.Done,
 			}
