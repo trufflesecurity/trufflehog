@@ -96,7 +96,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		fileInfo, err := os.Stat(cleanPath)
 		if err != nil {
 			logger.Error(err, "unable to get file info")
-			return nil
+			continue
 		}
 
 		if fileInfo.IsDir() {
