@@ -16,6 +16,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 const (
@@ -100,10 +101,11 @@ func (b *buffer) String() (string, error) { return b.Buffer.String(), nil }
 // The use of contentWriter enables the management of diff data either in memory or on disk,
 // based on its size, optimizing resource usage and performance.
 type Diff struct {
-	PathB         string
-	LineStart     int
+	PathB     string
+	LineStart int
+	IsBinary  bool
+
 	contentWriter contentWriter
-	IsBinary      bool
 }
 
 type diffOption func(*Diff)
@@ -111,10 +113,14 @@ type diffOption func(*Diff)
 // withPathB sets the PathB option.
 func withPathB(pathB string) diffOption { return func(d *Diff) { d.PathB = pathB } }
 
+// withCustomContentWriter sets the useCustomContentWriter option.
+func withCustomContentWriter(cr contentWriter) diffOption {
+	return func(d *Diff) { d.contentWriter = cr }
+}
+
 // NewDiff creates a new Diff with a threshold.
 func NewDiff(opts ...diffOption) *Diff {
 	diff := new(Diff)
-	diff.contentWriter = newBuffer()
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -200,10 +206,10 @@ func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
 
 // Parser sets values used in GitParse.
 type Parser struct {
-	maxDiffSize   int
-	maxCommitSize int
-	dateFormat    string
-	contentWriter contentWriter
+	maxDiffSize            int
+	maxCommitSize          int
+	dateFormat             string
+	useCustomContentWriter bool
 }
 
 type ParseState int
@@ -250,11 +256,9 @@ func (state ParseState) String() string {
 	}[state]
 }
 
-// WithContentWriter sets the ContentWriter for the Parser.
-func WithContentWriter(writer contentWriter) Option {
-	return func(parser *Parser) {
-		parser.contentWriter = writer
-	}
+// UseCustomContentWriter sets useCustomContentWriter option.
+func UseCustomContentWriter() Option {
+	return func(parser *Parser) { parser.useCustomContentWriter = true }
 }
 
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
@@ -283,7 +287,6 @@ func NewParser(options ...Option) *Parser {
 		dateFormat:    defaultDateFormat,
 		maxDiffSize:   defaultMaxDiffSize,
 		maxCommitSize: defaultMaxCommitSize,
-		contentWriter: newBuffer(),
 	}
 	for _, option := range options {
 		option(parser)
@@ -387,7 +390,9 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 		totalLogSize int
 	)
 	var latestState = Initial
-	currentDiff := NewDiff()
+
+	writer := c.contentWriter()
+	currentDiff := NewDiff(withCustomContentWriter(writer))
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -430,7 +435,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = NewDiff()
+			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
 			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
@@ -498,7 +503,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = NewDiff()
+			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -538,7 +543,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				}
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
-			currentDiff = NewDiff(withPathB(currentDiff.PathB))
+			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()), withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -604,6 +609,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	cleanupParse(ctx, currentCommit, currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
+}
+
+func (c *Parser) contentWriter() contentWriter {
+	if c.useCustomContentWriter {
+		return bufferedfilewriter.New()
+	}
+	return newBuffer()
 }
 
 func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
