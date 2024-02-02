@@ -2,12 +2,14 @@ package engine
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
@@ -214,6 +216,42 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(5)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	assert.NoError(t, err)
+	secretV2 := testSecrets.MustGetField("GITLABV2")
+	secretV1 := testSecrets.MustGetField("GITLAB")
+	fmt.Printf("Secrets: %s %s\n", secretV2, secretV1)
+
+	tmpFile, err := os.CreateTemp("", "testfile")
+	assert.Nil(t, err)
+	defer tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(fmt.Sprintf("You can find a gitlab secrets %s and another gitlab secret %s within", secretV2, secretV1))
+	assert.Nil(t, err)
+
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(DefaultDetectors()...),
+		WithVerify(true),
+		WithPrinter(new(discardPrinter)),
+	)
+	assert.Nil(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	assert.Nil(t, e.Finish(ctx))
+	want := uint64(2)
+	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
 }
 
 func TestVerificationOverlapChunk(t *testing.T) {
