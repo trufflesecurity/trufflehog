@@ -351,7 +351,8 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	want := uint64(2)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 
-	wantDupe := 1
+	// We want 0 because these are custom detectors and verification should still occur.
+	wantDupe := 0
 	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
 }
 
@@ -543,8 +544,14 @@ func TestSetLink(t *testing.T) {
 func TestLikelyDuplicate(t *testing.T) {
 	// Initialize detectors
 	// (not actually calling detector FromData or anything, just using detector struct for key creation)
-	detectorA := ahocorasick.DetectorInfo{Key: ahocorasick.CreateDetectorKey(DefaultDetectors()[0])}
-	detectorB := ahocorasick.DetectorInfo{Key: ahocorasick.CreateDetectorKey(DefaultDetectors()[1])}
+	detectorA := ahocorasick.DetectorInfo{
+		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[0]),
+		Detector: DefaultDetectors()[0],
+	}
+	detectorB := ahocorasick.DetectorInfo{
+		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[1]),
+		Detector: DefaultDetectors()[1],
+	}
 
 	// Define test cases
 	tests := []struct {
