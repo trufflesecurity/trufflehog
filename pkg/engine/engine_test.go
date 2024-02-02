@@ -218,6 +218,8 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
+// TestEngine_VersionedDetectorsVerifiedSecrets is a test that detects ALL verified secrets across
+// versioned detectors.
 func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -225,7 +227,6 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	assert.NoError(t, err)
 	secretV2 := testSecrets.MustGetField("GITLABV2")
 	secretV1 := testSecrets.MustGetField("GITLAB")
-	fmt.Printf("Secrets: %s %s\n", secretV2, secretV1)
 
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
