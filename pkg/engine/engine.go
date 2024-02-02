@@ -644,7 +644,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorsWithResult := make(map[ahocorasick.DetectorInfo]struct{}, avgSecretsPerDetector)
+	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]struct{}, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
@@ -658,8 +658,8 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			if len(results) == 0 {
 				continue
 			}
-			if _, ok := detectorsWithResult[detector]; !ok {
-				detectorsWithResult[detector] = struct{}{}
+			if _, ok := detectorKeysWithResults[detector.Key]; !ok {
+				detectorKeysWithResults[detector.Key] = struct{}{}
 			}
 
 			for _, res := range results {
@@ -694,18 +694,18 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					}, res)
 
 					// Remove the detector from the list of detectors with results.
-					delete(detectorsWithResult, detector)
+					delete(detectorKeysWithResults, detector.Key)
 				}
 				chunkSecrets[key] = struct{}{}
 			}
 		}
 
-		for detector := range detectorsWithResult {
+		for key := range detectorKeysWithResults {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
 				chunk:    chunk.chunk,
-				detector: detector,
+				detector: e.ahoCorasickCore.GetDetectorByKey(key),
 				decoder:  chunk.decoder,
 				wgDoneFn: wgDetect.Done,
 			}
@@ -715,8 +715,8 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 		for k := range chunkSecrets {
 			delete(chunkSecrets, k)
 		}
-		for k := range detectorsWithResult {
-			delete(detectorsWithResult, k)
+		for k := range detectorKeysWithResults {
+			delete(detectorKeysWithResults, k)
 		}
 
 		chunk.verificationOverlapWgDoneFn()

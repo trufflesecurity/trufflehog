@@ -63,6 +63,12 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	}
 }
 
+// GetDetectorByKey returns the detector associated with the given key. If no detector is found, it
+// returns nil.
+func (ac *AhoCorasickCore) GetDetectorByKey(key DetectorKey) detectors.Detector {
+	return ac.detectorsByKey[key]
+}
+
 // DetectorInfo represents a detected pattern's metadata in a data chunk.
 // It encapsulates the key identifying a specific detector and the detector instance itself.
 type DetectorInfo struct {
