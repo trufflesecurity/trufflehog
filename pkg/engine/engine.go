@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -27,6 +28,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
+
+var overlapError = errors.New("More than one detector has found this result. For your safety, verification has been disabled. You can override this behavior by using the --allow-verification-overlap flag.")
 
 // Metrics for the scan engine for external consumption.
 type Metrics struct {
@@ -682,6 +685,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					if e.verificationOverlapTracker != nil {
 						e.verificationOverlapTracker.increment()
 					}
+					res.SetVerificationError(overlapError)
 					e.processResult(ctx, detectableChunk{
 						chunk:    chunk.chunk,
 						detector: detector,
