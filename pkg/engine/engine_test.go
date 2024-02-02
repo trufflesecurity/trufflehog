@@ -2,6 +2,8 @@ package engine
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,9 +14,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -252,6 +256,63 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(2)
+	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
+}
+
+// TestEngine_CustomDetectorsDetectorsVerifiedSecrets is a test that covers an edge case where there are
+// multiple detectors with the same type, keywords and regex that match the same secret.
+// This ensures that those secrets get verified.
+func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "testfile")
+	assert.Nil(t, err)
+	defer tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString("test stuff")
+	assert.Nil(t, err)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	customDetector1, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "custom detector 1",
+		Keywords: []string{"test"},
+		Regex:    map[string]string{"test": "\\w+"},
+		Verify:   []*custom_detectorspb.VerifierConfig{{Endpoint: ts.URL, Unsafe: true, SuccessRanges: []string{"200"}}},
+	})
+	assert.Nil(t, err)
+
+	customDetector2, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "custom detector 2",
+		Keywords: []string{"test"},
+		Regex:    map[string]string{"test": "\\w+"},
+		Verify:   []*custom_detectorspb.VerifierConfig{{Endpoint: ts.URL, Unsafe: true, SuccessRanges: []string{"200"}}},
+	})
+	assert.Nil(t, err)
+
+	allDetectors := []detectors.Detector{customDetector1, customDetector2}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(allDetectors...),
+		WithVerify(true),
+		WithPrinter(new(discardPrinter)),
+	)
+	assert.Nil(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	assert.Nil(t, e.Finish(ctx))
+	// We should have 4 verified secrets, 2 for each custom detector.
+	want := uint64(4)
 	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
 }
 

@@ -610,8 +610,9 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 			continue
 		}
 
-		// If the detectors are the same, we don't need to compare the secrets.
-		if val.detectorInfo == dupeKey.detectorInfo {
+		// If the detector type is the same, we don't need to compare the strings.
+		// These are not duplicates, and should be verified.
+		if val.detectorInfo.Type() == dupeKey.detectorInfo.Type() {
 			continue
 		}
 
