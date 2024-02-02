@@ -137,7 +137,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 		workerPool.Go(func() error {
 			if err = s.scanFile(ctx, fullPath, chunksChan); err != nil {
-				ctx.Logger().Info("error scanning file", "path", fullPath, "error", err)
+				ctx.Logger().Error(err, "error scanning file", "path", fullPath, "error", err)
 			}
 			return nil
 		})
