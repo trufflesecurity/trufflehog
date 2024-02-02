@@ -693,7 +693,9 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						wgDoneFn: wgDetect.Done,
 					}, res)
 
-					// Remove the detector from the list of detectors with results.
+					// Remove the detector key from the list of detector keys with results.
+					// This is to ensure that the chunk is not reprocessed with verification enabled
+					// for this detector.
 					delete(detectorKeysWithResults, detector.Key)
 				}
 				chunkSecrets[key] = struct{}{}
@@ -706,7 +708,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				ctx.Logger().Info("detector not found", "key", key)
 				continue
 			}
-		
+
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
