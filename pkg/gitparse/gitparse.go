@@ -105,12 +105,15 @@ type Diff struct {
 	LineStart int
 	IsBinary  bool
 
+<<<<<<< HEAD
 	// Commit metadata.
 	CommitHash    string
 	Author        string
 	CommitDate    time.Time
 	CommitMessage strings.Builder
 
+=======
+>>>>>>> d530798f2 (correctly use the buffered file writer)
 	contentWriter contentWriter
 }
 
@@ -159,10 +162,16 @@ type Commit struct {
 
 // Parser sets values used in GitParse.
 type Parser struct {
+<<<<<<< HEAD
 	maxDiffSize   int
 	maxCommitSize int
 	dateFormat    string
 
+=======
+	maxDiffSize            int
+	maxCommitSize          int
+	dateFormat             string
+>>>>>>> d530798f2 (correctly use the buffered file writer)
 	useCustomContentWriter bool
 }
 
