@@ -53,6 +53,7 @@ func TestSource_Scan(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
@@ -71,16 +72,23 @@ func TestSource_Scan(t *testing.T) {
 			// TODO: this is kind of bad, if it errors right away we don't see it as a test failure.
 			// Debugging this usually requires setting a breakpoint on L78 and running test w/ debug.
 			go func() {
+				defer close(chunksCh)
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 			}()
-			gotChunk := <-chunksCh
-			if diff := pretty.Compare(gotChunk.SourceMetadata, tt.wantSourceMetadata); diff != "" {
-				t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+			var counter int
+			for chunk := range chunksCh {
+				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
+					counter++
+					if diff := pretty.Compare(chunk.SourceMetadata, tt.wantSourceMetadata); diff != "" {
+						t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+					}
+				}
 			}
+			assert.Equal(t, 1, counter)
 		})
 	}
 }
