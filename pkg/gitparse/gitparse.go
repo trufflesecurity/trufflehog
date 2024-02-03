@@ -206,9 +206,10 @@ func (c1 *Commit) Equal(ctx context.Context, c2 *Commit) bool {
 
 // Parser sets values used in GitParse.
 type Parser struct {
-	maxDiffSize            int
-	maxCommitSize          int
-	dateFormat             string
+	maxDiffSize   int
+	maxCommitSize int
+	dateFormat    string
+
 	useCustomContentWriter bool
 }
 
