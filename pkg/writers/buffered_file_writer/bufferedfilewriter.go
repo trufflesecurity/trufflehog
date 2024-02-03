@@ -8,17 +8,38 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// bufferPool is used to store buffers for reuse.
-var bufferPool = sync.Pool{
-	// TODO: Consider growing the buffer before returning it if we can find an optimal size.
-	// Ideally the size would cover the majority of cases without being too large.
-	// This would avoid the need to grow the buffer when writing to it, reducing allocations.
-	New: func() any { return new(bytes.Buffer) },
+type bufPoolOpt func(*sync.Pool)
+
+func withBufPoolSize(size int) bufPoolOpt {
+	return func(pool *sync.Pool) {
+		pool.New = func() any {
+			buf := new(bytes.Buffer)
+			buf.Grow(size)
+			return buf
+		}
+	}
+}
+
+func newBufferPool(opts ...bufPoolOpt) sync.Pool {
+	const defaultBufferSize = 10 * 1024 // 10KB
+
+	pool := sync.Pool{
+		New: func() any {
+			buf := new(bytes.Buffer)
+			buf.Grow(defaultBufferSize)
+			return buf
+		},
+	}
+	for _, opt := range opts {
+		opt(&pool)
+	}
+	return pool
 }
 
 // state represents the current mode of BufferedFileWriter.
@@ -39,6 +60,7 @@ type BufferedFileWriter struct {
 
 	state state // Current state of the writer. (writeOnly or readOnly)
 
+	bufPool  sync.Pool      // Pool for storing buffers for reuse.
 	buf      bytes.Buffer   // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     io.WriteCloser // File for storing data over the threshold.
@@ -46,6 +68,11 @@ type BufferedFileWriter struct {
 
 // Option is a function that modifies a BufferedFileWriter.
 type Option func(*BufferedFileWriter)
+
+// WithBufPoolSize sets the size of the buffer pool.
+func WithBufPoolSize(size int) Option {
+	return func(w *BufferedFileWriter) { w.bufPool = newBufferPool(withBufPoolSize(size)) }
+}
 
 // WithThreshold sets the threshold for switching to file writing.
 func WithThreshold(threshold uint64) Option {
@@ -55,7 +82,11 @@ func WithThreshold(threshold uint64) Option {
 // New creates a new BufferedFileWriter with the given options.
 func New(opts ...Option) *BufferedFileWriter {
 	const defaultThreshold = 10 * 1024 * 1024 // 10MB
-	w := &BufferedFileWriter{threshold: defaultThreshold, state: writeOnly}
+	w := &BufferedFileWriter{
+		threshold: defaultThreshold,
+		state:     writeOnly,
+		bufPool:   newBufferPool(),
+	}
 	for _, opt := range opts {
 		opt(w)
 	}
@@ -88,7 +119,9 @@ func (w *BufferedFileWriter) String() (string, error) {
 	}
 
 	// Append buffer data, if any, to the end of the file contents.
-	buf.Write(w.buf.Bytes())
+	if _, err := buf.WriteTo(&w.buf); err != nil {
+		return "", err
+	}
 
 	return buf.String(), nil
 }
@@ -111,11 +144,12 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 	}()
 
 	if w.buf.Len() == 0 {
-		bufPtr, ok := bufferPool.Get().(*bytes.Buffer)
+		bufPtr, ok := w.bufPool.Get().(*bytes.Buffer)
 		if !ok {
 			ctx.Logger().Error(fmt.Errorf("buffer pool returned unexpected type"), "using new buffer")
 			bufPtr = new(bytes.Buffer)
 		}
+		atomic.AddInt64(&activeBufferCount, 1)
 		bufPtr.Reset() // Reset the buffer to clear any existing data
 		w.buf = *bufPtr
 	}
@@ -145,12 +179,13 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 		// This ensures all the data is in one place - either entirely in the buffer or the file.
 		if w.buf.Len() > 0 {
 			ctx.Logger().V(4).Info("writing buffer to file", "content_size", w.buf.Len())
-			if _, err := w.file.Write(w.buf.Bytes()); err != nil {
+			if _, err := w.buf.WriteTo(w.file); err != nil {
 				return 0, err
 			}
 			// Reset the buffer to clear any existing data and return it to the pool.
-			w.buf.Reset()
-			bufferPool.Put(&w.buf)
+			w.returnBufferToPool(&w.buf)
+			// w.buf.Reset()
+			// bufferPool.Put(&w.buf)
 		}
 	}
 	ctx.Logger().V(4).Info("writing to file", "data_size", size)
@@ -167,7 +202,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 	}
 
 	if w.buf.Len() > 0 {
-		_, err := w.file.Write(w.buf.Bytes())
+		_, err := w.buf.WriteTo(w.file)
 		if err != nil {
 			return err
 		}
@@ -199,8 +234,46 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 	// Data is in memory.
 	return &bufferReadCloser{
 		Reader:  bytes.NewReader(w.buf.Bytes()),
-		onClose: func() { bufferPool.Put(&w.buf) },
+		onClose: func() { w.returnBufferToPool(&w.buf) },
 	}, nil
+}
+
+var (
+	// Track the number of active buffers not yet returned to the pool.
+	activeBufferCount int64
+	totalBufferLength uint64 // Tracks the total length of all buffers
+	totalBufferSize   uint64
+	bufferCount       uint64
+	logFrequency      uint64 = 25000 // Log after every 25000 calls
+)
+
+func (w *BufferedFileWriter) returnBufferToPool(buf *bytes.Buffer) {
+	atomic.AddInt64(&activeBufferCount, -1)
+	currentCapacity := buf.Cap()
+	currentLength := buf.Len()
+
+	// Add to totals
+	atomic.AddUint64(&totalBufferSize, uint64(currentCapacity))
+	atomic.AddUint64(&totalBufferLength, uint64(currentLength))
+	count := atomic.AddUint64(&bufferCount, 1)
+
+	if count%logFrequency == 0 {
+		avgBufferSize := atomic.LoadUint64(&totalBufferSize) / count
+		avgBufferLength := atomic.LoadUint64(&totalBufferLength) / count
+		fmt.Printf("Buffer pool update: count = %d, average size = %d bytes, average length = %d bytes\n", count, avgBufferSize, avgBufferLength)
+
+		count := atomic.LoadInt64(&activeBufferCount)
+		fmt.Printf("Current active buffer count: %d\n", count)
+
+		// Here you might decide to reset the counters to zero to get more recent trends
+		// atomic.StoreUint64(&totalBufferSize, 0)
+		// atomic.StoreUint64(&totalBufferLength, 0)
+		// atomic.StoreUint64(&bufferCount, 0)
+	}
+
+	// Reset the buffer to clear any existing data and return it to the pool.
+	buf.Reset()
+	w.bufPool.Put(buf)
 }
 
 // autoDeletingFileReader wraps an *os.File and deletes the file on Close.
