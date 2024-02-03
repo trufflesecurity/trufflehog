@@ -54,7 +54,7 @@ type runtimeMetrics struct {
 // Printer is used to format found results and output them to the user. Ex JSON, plain text, etc.
 // Please note printer implementations SHOULD BE thread safe.
 type Printer interface {
-	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
+	Print(ctx context.Context, r *detectors.ResultWithMetadata, logErrors *bool) error
 }
 
 type Engine struct {
@@ -68,10 +68,11 @@ type Engine struct {
 	// only the first one will be kept.
 	filterUnverified bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
-	filterEntropy        *float64
-	onlyVerified         bool
-	verificationOverlap  bool
-	printAvgDetectorTime bool
+	filterEntropy         *float64
+	onlyVerified          bool
+	logVerificationErrors bool
+	verificationOverlap   bool
+	printAvgDetectorTime  bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
@@ -169,6 +170,15 @@ func WithFilterEntropy(entropy float64) Option {
 func WithOnlyVerified(onlyVerified bool) Option {
 	return func(e *Engine) {
 		e.onlyVerified = onlyVerified
+	}
+}
+
+// WithLogVerificationErrors sets the |logVerificationErrors| flag on the engine.
+// If set to true, the engine will print results with verification errors,
+// even if the result is unverified and |onlyVerified| is true.
+func WithLogVerificationErrors(logVerificationErrors bool) Option {
+	return func(e *Engine) {
+		e.logVerificationErrors = logVerificationErrors
 	}
 }
 
@@ -849,8 +859,11 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 func (e *Engine) notifyResults(ctx context.Context) {
 	for r := range e.ResultsChan() {
-		if e.onlyVerified && !r.Verified {
-			continue
+		if !r.Verified && e.onlyVerified {
+			// Skip unverified errors, unless they have a verification error and |logVerificationErrors| is true.
+			if !(e.logVerificationErrors && r.VerificationError() != nil) {
+				continue
+			}
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
 
@@ -871,7 +884,7 @@ func (e *Engine) notifyResults(ctx context.Context) {
 			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
 		}
 
-		if err := e.printer.Print(ctx, &r); err != nil {
+		if err := e.printer.Print(ctx, &r, &e.logVerificationErrors); err != nil {
 			ctx.Logger().Error(err, "error printing result")
 		}
 	}

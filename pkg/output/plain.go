@@ -28,7 +28,7 @@ var (
 // PlainPrinter is a printer that prints results in plain text format.
 type PlainPrinter struct{ mu sync.Mutex }
 
-func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
+func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata, logErrors *bool) error {
 	out := outputFormat{
 		DetectorType:      r.Result.DetectorType.String(),
 		DecoderType:       r.Result.DecoderType.String(),
@@ -49,9 +49,9 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 
 	if out.Verified {
 		boldGreenPrinter.Print("✅ Found verified result 🐷🔑\n")
-	} else if out.VerificationError != nil {
+	} else if out.VerificationError != nil && (logErrors != nil && *logErrors) {
 		printer = yellowPrinter
-		boldYellowPrinter.Print("⚠️  Found result - unable to verify due to error 🐷🔑❗️\n")
+		boldYellowPrinter.Print("⚠️ Found result - unable to verify due to error 🐷🔑❗️\n")
 		printer.Printf("Verification Error: %s\n", out.VerificationError)
 	} else {
 		printer = whitePrinter

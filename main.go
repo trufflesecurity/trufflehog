@@ -38,18 +38,21 @@ import (
 )
 
 var (
-	cli                      = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd                      string
-	debug                    = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace                    = cli.Flag("trace", "Run in trace mode.").Bool()
-	profile                  = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
-	localDev                 = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
-	jsonOut                  = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy               = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	gitHubActionsFormat      = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency              = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification           = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified             = cli.Flag("only-verified", "Only output verified results.").Bool()
+	cli                        = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd                        string
+	debug                      = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace                      = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile                    = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	localDev                   = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
+	jsonOut                    = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy                 = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat        = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	concurrency                = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification             = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified               = cli.Flag("only-verified", "Only output verified results.").Bool()
+	logVerificationErrorsIsSet bool
+	logVerificationErrors      = cli.Flag("log-verification-errors", "Output verification errors").IsSetByUser(&logVerificationErrorsIsSet).Bool()
+
 	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy            = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
@@ -405,6 +408,14 @@ func run(state overseer.State) {
 	if *jobReportFile != nil {
 		jobReportWriter = *jobReportFile
 	}
+
+	// If |logVerificationErrors| was not set by the user,
+	// default to false if --only-verified is specified.
+	if !logVerificationErrorsIsSet {
+		value := !*onlyVerified
+		logVerificationErrors = &value
+	}
+
 	e, err := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
@@ -416,6 +427,7 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
 		engine.WithOnlyVerified(*onlyVerified),
+		engine.WithLogVerificationErrors(*logVerificationErrors),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),

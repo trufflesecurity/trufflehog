@@ -16,7 +16,7 @@ var dedupeCache = make(map[string]struct{})
 // GitHubActionsPrinter is a printer that prints results in GitHub Actions format.
 type GitHubActionsPrinter struct{ mu sync.Mutex }
 
-func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
+func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata, _ *bool) error {
 	out := gitHubActionsOutputFormat{
 		DetectorType: r.Result.DetectorType.String(),
 		DecoderType:  r.Result.DecoderType.String(),

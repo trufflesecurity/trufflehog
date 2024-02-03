@@ -24,7 +24,7 @@ import (
 // LegacyJSONPrinter is a printer that prints results in legacy JSON format for backwards compatibility.
 type LegacyJSONPrinter struct{ mu sync.Mutex }
 
-func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
+func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata, _ *bool) error {
 	var repo string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:

@@ -16,9 +16,9 @@ import (
 // JSONPrinter is a printer that prints results in JSON format.
 type JSONPrinter struct{ mu sync.Mutex }
 
-func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
+func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata, logErrors *bool) error {
 	verificationErr := func(err error) string {
-		if err != nil {
+		if err != nil && (logErrors != nil && *logErrors) {
 			return err.Error()
 		}
 		return ""
