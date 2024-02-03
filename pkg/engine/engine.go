@@ -598,8 +598,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 // by the same detector in the chunk. Exact matches on lookup indicate a duplicate secret for a detector
 // in that chunk - which is expected and not malicious. Those intra-detector dupes are still verified.
 type chunkSecretKey struct {
-	secret       string
-	detectorInfo ahocorasick.DetectorInfo
+	secret      string
+	detectorKey ahocorasick.DetectorKey
 }
 
 func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSecretKey]struct{}) bool {
@@ -615,7 +615,7 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 
 		// If the detector type is the same, we don't need to compare the strings.
 		// These are not duplicates, and should be verified.
-		if val.detectorInfo.Type() == dupeKey.detectorInfo.Type() {
+		if val.detectorKey.Type() == dupeKey.detectorKey.Type() {
 			continue
 		}
 
@@ -674,7 +674,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				key := chunkSecretKey{secret: string(val), detectorInfo: detector}
+				key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
 				if _, ok := chunkSecrets[key]; ok {
 					continue
 				}
