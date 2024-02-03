@@ -59,11 +59,9 @@ type Source struct {
 func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 // Ensure the Source satisfies the interfaces at compile time.
-var _ interface {
-	sources.Source
-	sources.SourceUnitUnmarshaller
-	sources.Validator
-} = (*Source)(nil)
+var _ sources.Source = (*Source)(nil)
+var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.Validator = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -116,7 +114,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		// We may need the password as a token if the user is using an access_token with basic auth.
 		s.token = cred.BasicAuth.Password
 	default:
-		return fmt.Errorf("invalid auth method")
+		return fmt.Errorf("invalid configuration given for source %q (%s)", name, s.Type().String())
 	}
 
 	if len(s.url) == 0 {
