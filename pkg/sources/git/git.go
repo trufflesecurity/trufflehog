@@ -223,7 +223,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 				},
 			}
 		},
-		UseCustomContentWriter: true,
+		UseCustomContentWriter: s.useCustomContentWriter,
 	}
 	s.git = NewGit(cfg)
 	return nil
