@@ -3,8 +3,8 @@ package pagerdutyapikey
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			client := s.getClient()
 			isVerified, verificationErr := verifyPagerdutyapikey(ctx, client, resMatch)
 			s1.Verified = isVerified
-			s1.VerificationError = verificationErr
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {

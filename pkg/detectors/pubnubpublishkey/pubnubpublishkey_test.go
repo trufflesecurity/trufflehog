@@ -131,11 +131,11 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				if (got[i].VerificationError != nil) != tt.wantVerificationErr {
-					t.Fatalf(" wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError)
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf(" wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "VerificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("PubNubPublishKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

@@ -2692,22 +2692,21 @@ var _ interface {
 	ErrorName() string
 } = SyslogValidationError{}
 
-// Validate checks the field values on PublicEventMonitoring with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *PublicEventMonitoring) Validate() error {
+// Validate checks the field values on Forager with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Forager) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on PublicEventMonitoring with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// PublicEventMonitoringMultiError, or nil if none found.
-func (m *PublicEventMonitoring) ValidateAll() error {
+// ValidateAll checks the field values on Forager with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in ForagerMultiError, or nil if none found.
+func (m *Forager) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *PublicEventMonitoring) validate(all bool) error {
+func (m *Forager) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -2716,13 +2715,13 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 
 	switch m.Metadata.(type) {
 
-	case *PublicEventMonitoring_Github:
+	case *Forager_Github:
 
 		if all {
 			switch v := interface{}(m.GetGithub()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, PublicEventMonitoringValidationError{
+					errors = append(errors, ForagerValidationError{
 						field:  "Github",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2730,7 +2729,7 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, PublicEventMonitoringValidationError{
+					errors = append(errors, ForagerValidationError{
 						field:  "Github",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2739,8 +2738,70 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetGithub()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return PublicEventMonitoringValidationError{
+				return ForagerValidationError{
 					field:  "Github",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Forager_Npm:
+
+		if all {
+			switch v := interface{}(m.GetNpm()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Npm",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Npm",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetNpm()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ForagerValidationError{
+					field:  "Npm",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Forager_Pypi:
+
+		if all {
+			switch v := interface{}(m.GetPypi()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Pypi",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Pypi",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetPypi()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ForagerValidationError{
+					field:  "Pypi",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -2750,19 +2811,18 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return PublicEventMonitoringMultiError(errors)
+		return ForagerMultiError(errors)
 	}
 
 	return nil
 }
 
-// PublicEventMonitoringMultiError is an error wrapping multiple validation
-// errors returned by PublicEventMonitoring.ValidateAll() if the designated
-// constraints aren't met.
-type PublicEventMonitoringMultiError []error
+// ForagerMultiError is an error wrapping multiple validation errors returned
+// by Forager.ValidateAll() if the designated constraints aren't met.
+type ForagerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m PublicEventMonitoringMultiError) Error() string {
+func (m ForagerMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2771,11 +2831,11 @@ func (m PublicEventMonitoringMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m PublicEventMonitoringMultiError) AllErrors() []error { return m }
+func (m ForagerMultiError) AllErrors() []error { return m }
 
-// PublicEventMonitoringValidationError is the validation error returned by
-// PublicEventMonitoring.Validate if the designated constraints aren't met.
-type PublicEventMonitoringValidationError struct {
+// ForagerValidationError is the validation error returned by Forager.Validate
+// if the designated constraints aren't met.
+type ForagerValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2783,24 +2843,22 @@ type PublicEventMonitoringValidationError struct {
 }
 
 // Field function returns field value.
-func (e PublicEventMonitoringValidationError) Field() string { return e.field }
+func (e ForagerValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e PublicEventMonitoringValidationError) Reason() string { return e.reason }
+func (e ForagerValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e PublicEventMonitoringValidationError) Cause() error { return e.cause }
+func (e ForagerValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e PublicEventMonitoringValidationError) Key() bool { return e.key }
+func (e ForagerValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e PublicEventMonitoringValidationError) ErrorName() string {
-	return "PublicEventMonitoringValidationError"
-}
+func (e ForagerValidationError) ErrorName() string { return "ForagerValidationError" }
 
 // Error satisfies the builtin error interface
-func (e PublicEventMonitoringValidationError) Error() string {
+func (e ForagerValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2812,14 +2870,14 @@ func (e PublicEventMonitoringValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sPublicEventMonitoring.%s: %s%s",
+		"invalid %sForager.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = PublicEventMonitoringValidationError{}
+var _ error = ForagerValidationError{}
 
 var _ interface {
 	Field() string
@@ -2827,7 +2885,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = PublicEventMonitoringValidationError{}
+} = ForagerValidationError{}
 
 // Validate checks the field values on SharePoint with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -3913,14 +3971,14 @@ func (m *MetaData) validate(all bool) error {
 			}
 		}
 
-	case *MetaData_PublicEventMonitoring:
+	case *MetaData_Forager:
 
 		if all {
-			switch v := interface{}(m.GetPublicEventMonitoring()).(type) {
+			switch v := interface{}(m.GetForager()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, MetaDataValidationError{
-						field:  "PublicEventMonitoring",
+						field:  "Forager",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -3928,16 +3986,16 @@ func (m *MetaData) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, MetaDataValidationError{
-						field:  "PublicEventMonitoring",
+						field:  "Forager",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetPublicEventMonitoring()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetForager()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
-					field:  "PublicEventMonitoring",
+					field:  "Forager",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

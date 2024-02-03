@@ -12,6 +12,7 @@ func TestIsFalsePositive(t *testing.T) {
 	type args struct {
 		match          string
 		falsePositives []FalsePositive
+		useWordlist    bool
 	}
 	tests := []struct {
 		name string
@@ -23,21 +24,50 @@ func TestIsFalsePositive(t *testing.T) {
 			args: args{
 				match:          "example",
 				falsePositives: DefaultFalsePositives,
+				useWordlist:    false,
 			},
 			want: true,
+		},
+		{
+			name: "fp - in wordlist",
+			args: args{
+				match:          "sdfdsfprivatesfsdfd",
+				falsePositives: DefaultFalsePositives,
+				useWordlist:    true,
+			},
+			want: true,
+		},
+		{
+			name: "fp - not in wordlist",
+			args: args{
+				match:          "sdfdsfsfsdfd",
+				falsePositives: DefaultFalsePositives,
+				useWordlist:    true,
+			},
+			want: false,
 		},
 		{
 			name: "not fp",
 			args: args{
 				match:          "notafp123",
 				falsePositives: DefaultFalsePositives,
+				useWordlist:    false,
 			},
 			want: false,
+		},
+		{
+			name: "fp - in wordlist exact match",
+			args: args{
+				match:          "private",
+				falsePositives: DefaultFalsePositives,
+				useWordlist:    true,
+			},
+			want: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, false); got != tt.want {
+			if got := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, tt.args.useWordlist); got != tt.want {
 				t.Errorf("IsKnownFalsePositive() = %v, want %v", got, tt.want)
 			}
 		})

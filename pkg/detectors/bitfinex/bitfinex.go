@@ -3,8 +3,8 @@ package bitfinex
 import (
 	"context"
 	"flag"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
