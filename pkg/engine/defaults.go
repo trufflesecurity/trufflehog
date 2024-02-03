@@ -336,6 +336,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/host"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/html2pdf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspotapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspotapikeyv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hunter"
@@ -1632,6 +1633,7 @@ func DefaultDetectors() []detectors.Detector {
 		netsuite.Scanner{},
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
+		hubspotapikeyv2.Scanner{},
 	}
 }
 
