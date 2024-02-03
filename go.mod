@@ -11,6 +11,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.1
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.19.0
+	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/aws/aws-sdk-go v1.50.0
 	github.com/aymanbagabas/go-osc52 v1.2.2

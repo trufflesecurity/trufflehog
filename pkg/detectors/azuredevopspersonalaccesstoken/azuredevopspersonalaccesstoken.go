@@ -69,7 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
+					hasVerifiedRes, _ := common.ResponseContainsSubstring(res.Body, "lastUpdateTime")
+					if res.StatusCode >= 200 && res.StatusCode < 300 && hasVerifiedRes {
 						s1.Verified = true
 					} else if res.StatusCode == 401 {
 						// The secret is determinately not verified (nothing to do)

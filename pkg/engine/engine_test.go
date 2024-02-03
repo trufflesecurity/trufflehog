@@ -2,15 +2,23 @@ package engine
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -188,7 +196,7 @@ func BenchmarkSupportsLineNumbersLoop(b *testing.B) {
 func TestEngine_DuplicatSecrets(t *testing.T) {
 	ctx := context.Background()
 
-	absPath, err := filepath.Abs("./testdata")
+	absPath, err := filepath.Abs("./testdata/secrets.txt")
 	assert.Nil(t, err)
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -198,7 +206,7 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(DefaultDetectors()...),
-		WithVerify(true),
+		WithVerify(false),
 		WithPrinter(new(discardPrinter)),
 	)
 	assert.Nil(t, err)
@@ -212,6 +220,140 @@ func TestEngine_DuplicatSecrets(t *testing.T) {
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(5)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+// TestEngine_VersionedDetectorsVerifiedSecrets is a test that detects ALL verified secrets across
+// versioned detectors.
+func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	assert.NoError(t, err)
+	secretV2 := testSecrets.MustGetField("GITLABV2")
+	secretV1 := testSecrets.MustGetField("GITLAB")
+
+	tmpFile, err := os.CreateTemp("", "testfile")
+	assert.Nil(t, err)
+	defer tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(fmt.Sprintf("You can find a gitlab secrets %s and another gitlab secret %s within", secretV2, secretV1))
+	assert.Nil(t, err)
+
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(DefaultDetectors()...),
+		WithVerify(true),
+		WithPrinter(new(discardPrinter)),
+	)
+	assert.Nil(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	assert.Nil(t, e.Finish(ctx))
+	want := uint64(2)
+	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
+}
+
+// TestEngine_CustomDetectorsDetectorsVerifiedSecrets is a test that covers an edge case where there are
+// multiple detectors with the same type, keywords and regex that match the same secret.
+// This ensures that those secrets get verified.
+func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "testfile")
+	assert.Nil(t, err)
+	defer tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString("test stuff")
+	assert.Nil(t, err)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	customDetector1, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "custom detector 1",
+		Keywords: []string{"test"},
+		Regex:    map[string]string{"test": "\\w+"},
+		Verify:   []*custom_detectorspb.VerifierConfig{{Endpoint: ts.URL, Unsafe: true, SuccessRanges: []string{"200"}}},
+	})
+	assert.Nil(t, err)
+
+	customDetector2, err := custom_detectors.NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:     "custom detector 2",
+		Keywords: []string{"test"},
+		Regex:    map[string]string{"test": "\\w+"},
+		Verify:   []*custom_detectorspb.VerifierConfig{{Endpoint: ts.URL, Unsafe: true, SuccessRanges: []string{"200"}}},
+	})
+	assert.Nil(t, err)
+
+	allDetectors := []detectors.Detector{customDetector1, customDetector2}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(allDetectors...),
+		WithVerify(true),
+		WithPrinter(new(discardPrinter)),
+	)
+	assert.Nil(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	assert.Nil(t, e.Finish(ctx))
+	// We should have 4 verified secrets, 2 for each custom detector.
+	want := uint64(4)
+	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
+}
+
+func TestVerificationOverlapChunk(t *testing.T) {
+	ctx := context.Background()
+
+	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets.txt")
+	assert.Nil(t, err)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	confPath, err := filepath.Abs("./testdata/verificationoverlap_detectors.yaml")
+	assert.Nil(t, err)
+	conf, err := config.Read(confPath)
+	assert.Nil(t, err)
+
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(conf.Detectors...),
+		WithVerify(false),
+		WithPrinter(new(discardPrinter)),
+		withVerificationOverlapTracking(),
+	)
+	assert.Nil(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	// Wait for all the chunks to be processed.
+	assert.Nil(t, e.Finish(ctx))
+	// We want TWO secrets that match both the custom regexes.
+	want := uint64(2)
+	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+
+	// We want 0 because these are custom detectors and verification should still occur.
+	wantDupe := 0
+	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
 }
 
 func TestFragmentFirstLineAndLink(t *testing.T) {
@@ -394,6 +536,84 @@ func TestSetLink(t *testing.T) {
 				assert.Equal(t, tt.wantLink, data.Filesystem.Link, "Filesystem link mismatch")
 			case *source_metadatapb.MetaData_AzureRepos:
 				assert.Equal(t, tt.wantLink, data.AzureRepos.Link, "Azure Repos link mismatch")
+			}
+		})
+	}
+}
+
+func TestLikelyDuplicate(t *testing.T) {
+	// Initialize detectors
+	// (not actually calling detector FromData or anything, just using detector struct for key creation)
+	detectorA := ahocorasick.DetectorInfo{
+		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[0]),
+		Detector: DefaultDetectors()[0],
+	}
+	detectorB := ahocorasick.DetectorInfo{
+		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[1]),
+		Detector: DefaultDetectors()[1],
+	}
+
+	// Define test cases
+	tests := []struct {
+		name     string
+		val      chunkSecretKey
+		dupes    map[chunkSecretKey]struct{}
+		expected bool
+	}{
+		{
+			name: "exact duplicate different detector",
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB}: {},
+			},
+			expected: true,
+		},
+		{
+			name: "non-duplicate length outside range",
+			val:  chunkSecretKey{"short", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"muchlongerthanthevalstring", detectorB}: {},
+			},
+			expected: false,
+		},
+		{
+			name: "similar within threshold",
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB}: {},
+			},
+			expected: true,
+		},
+		{
+			name: "similar outside threshold",
+			val:  chunkSecretKey{"anotherkey", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"completelydifferent", detectorB}: {},
+			},
+			expected: false,
+		},
+		{
+			name:     "empty strings",
+			val:      chunkSecretKey{"", detectorA},
+			dupes:    map[chunkSecretKey]struct{}{{"", detectorB}: {}},
+			expected: true,
+		},
+		{
+			name: "similar within threshold same detector",
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			dupes: map[chunkSecretKey]struct{}{
+				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA}: {},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			result := likelyDuplicate(ctx, tc.val, tc.dupes)
+			if result != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, result)
 			}
 		})
 	}
