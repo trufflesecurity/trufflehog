@@ -162,7 +162,7 @@ func (w *BufferedFileWriter) String() (string, error) {
 	}
 
 	// Append buffer data, if any, to the end of the file contents.
-	if _, err := buf.WriteTo(w.buf); err != nil {
+	if _, err := w.buf.WriteTo(&buf); err != nil {
 		return "", err
 	}
 
