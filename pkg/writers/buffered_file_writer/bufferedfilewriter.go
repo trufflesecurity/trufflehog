@@ -15,10 +15,6 @@ import (
 
 type bufPoolOpt func(pool *bufferPool)
 
-func withBufPoolSize(size uint32) bufPoolOpt {
-	return func(pool *bufferPool) { pool.bufferSize = size }
-}
-
 type bufferPool struct {
 	bufferSize uint32
 	*sync.Pool
@@ -26,21 +22,26 @@ type bufferPool struct {
 
 const defaultBufferSize = 2 << 12 // 8KB
 func newBufferPool(opts ...bufPoolOpt) *bufferPool {
-	bp := &bufferPool{bufferSize: defaultBufferSize}
+	pool := &bufferPool{bufferSize: defaultBufferSize}
 
 	for _, opt := range opts {
-		opt(bp)
+		opt(pool)
 	}
-	bp.Pool = &sync.Pool{
+	pool.Pool = &sync.Pool{
 		New: func() any {
 			buf := new(bytes.Buffer)
-			buf.Grow(int(bp.bufferSize))
+			buf.Grow(int(pool.bufferSize))
 			return buf
 		},
 	}
 
-	return bp
+	return pool
 }
+
+var sharedBufferPool *bufferPool
+
+// init function to initialize the shared buffer pool
+func init() { sharedBufferPool = newBufferPool() }
 
 func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 	buf, ok := bp.Pool.Get().(*bytes.Buffer)
@@ -115,11 +116,6 @@ type BufferedFileWriter struct {
 // Option is a function that modifies a BufferedFileWriter.
 type Option func(*BufferedFileWriter)
 
-// WithBufPoolSize sets the size of the buffer pool.
-func WithBufPoolSize(size uint32) Option {
-	return func(w *BufferedFileWriter) { w.bufPool = newBufferPool(withBufPoolSize(size)) }
-}
-
 // WithThreshold sets the threshold for switching to file writing.
 func WithThreshold(threshold uint64) Option {
 	return func(w *BufferedFileWriter) { w.threshold = threshold }
@@ -131,7 +127,7 @@ func New(opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		bufPool:   newBufferPool(),
+		bufPool:   sharedBufferPool,
 	}
 	for _, opt := range opts {
 		opt(w)
