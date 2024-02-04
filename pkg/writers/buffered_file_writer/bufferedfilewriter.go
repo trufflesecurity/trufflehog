@@ -8,38 +8,84 @@ import (
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-type bufPoolOpt func(*sync.Pool)
+type bufPoolOpt func(pool *bufferPool)
 
-func withBufPoolSize(size int) bufPoolOpt {
-	return func(pool *sync.Pool) {
-		pool.New = func() any {
-			buf := new(bytes.Buffer)
-			buf.Grow(size)
-			return buf
-		}
-	}
+func withBufPoolSize(size uint32) bufPoolOpt {
+	return func(pool *bufferPool) { pool.bufferSize = size }
 }
 
-func newBufferPool(opts ...bufPoolOpt) sync.Pool {
-	const defaultBufferSize = 10 * 1024 // 10KB
+type bufferPool struct {
+	bufferSize uint32
+	*sync.Pool
+}
 
-	pool := sync.Pool{
+const defaultBufferSize = 2 << 12 // 8KB
+func newBufferPool(opts ...bufPoolOpt) *bufferPool {
+	bp := &bufferPool{bufferSize: defaultBufferSize}
+
+	for _, opt := range opts {
+		opt(bp)
+	}
+	bp.Pool = &sync.Pool{
 		New: func() any {
 			buf := new(bytes.Buffer)
-			buf.Grow(defaultBufferSize)
+			buf.Grow(int(bp.bufferSize))
 			return buf
 		},
 	}
-	for _, opt := range opts {
-		opt(&pool)
+
+	return bp
+}
+
+func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
+	buf, ok := bp.Pool.Get().(*bytes.Buffer)
+	if !ok {
+		ctx.Logger().Error(fmt.Errorf("buffer pool returned unexpected type"), "using new buffer")
+		buf = bytes.NewBuffer(make([]byte, 0, bp.bufferSize))
 	}
-	return pool
+
+	return buf
+}
+
+func (bp *bufferPool) getWithSize(ctx context.Context, dataSize uint64) *bytes.Buffer {
+	var buf *bytes.Buffer
+
+	// Attempt to fetch a buffer from the pool.
+	if fetchedBuf := bp.get(ctx); fetchedBuf != nil {
+		// Check if the fetched buffer can accommodate the data size.
+		// If not, create a new buffer with enough capacity.
+		diff := int(dataSize) - fetchedBuf.Cap()
+		if diff > 0 {
+			// Since the fetched buffer is not suitable, put it back into the pool
+			// and allocate a new buffer of the required size.
+			bp.put(buf)
+			buf = bytes.NewBuffer(make([]byte, 0, dataSize))
+		}
+	}
+
+	// Ensure the buffer is reset before use to avoid any old data remaining.
+	buf.Reset()
+	return buf
+}
+
+func (bp *bufferPool) put(buf *bytes.Buffer) {
+	// If the buffer is more than twice the default size, replace it with a new, smaller one.
+	// This prevents us from returning very large buffers to the pool.
+	const maxAllowedCapacity = 2 * defaultBufferSize
+	if buf.Cap() > maxAllowedCapacity {
+		// Replace the buffer with a new, smaller one. No need to copy data since we're resetting it.
+		buf = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+	} else {
+		// Reset the buffer to clear any existing data.
+		buf.Reset()
+	}
+
+	bp.Put(buf)
 }
 
 // state represents the current mode of BufferedFileWriter.
@@ -60,8 +106,8 @@ type BufferedFileWriter struct {
 
 	state state // Current state of the writer. (writeOnly or readOnly)
 
-	bufPool  sync.Pool      // Pool for storing buffers for reuse.
-	buf      bytes.Buffer   // Buffer for storing data under the threshold in memory.
+	bufPool  *bufferPool    // Pool for storing buffers for reuse.
+	buf      *bytes.Buffer  // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     io.WriteCloser // File for storing data over the threshold.
 }
@@ -70,7 +116,7 @@ type BufferedFileWriter struct {
 type Option func(*BufferedFileWriter)
 
 // WithBufPoolSize sets the size of the buffer pool.
-func WithBufPoolSize(size int) Option {
+func WithBufPoolSize(size uint32) Option {
 	return func(w *BufferedFileWriter) { w.bufPool = newBufferPool(withBufPoolSize(size)) }
 }
 
@@ -109,17 +155,14 @@ func (w *BufferedFileWriter) String() (string, error) {
 	}
 	defer file.Close()
 
-	// Create a buffer large enough to hold file data and additional buffer data, if any.
-	fileSize := w.size
-	buf := bytes.NewBuffer(make([]byte, 0, fileSize))
-
+	var buf bytes.Buffer
 	// Read the file contents into the buffer.
-	if _, err := io.Copy(buf, file); err != nil {
+	if _, err := io.CopyBuffer(&buf, file, nil); err != nil {
 		return "", fmt.Errorf("failed to read file contents: %w", err)
 	}
 
 	// Append buffer data, if any, to the end of the file contents.
-	if _, err := buf.WriteTo(&w.buf); err != nil {
+	if _, err := buf.WriteTo(w.buf); err != nil {
 		return "", err
 	}
 
@@ -143,24 +186,36 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 		)
 	}()
 
-	if w.buf.Len() == 0 {
-		bufPtr, ok := w.bufPool.Get().(*bytes.Buffer)
-		if !ok {
-			ctx.Logger().Error(fmt.Errorf("buffer pool returned unexpected type"), "using new buffer")
-			bufPtr = new(bytes.Buffer)
-		}
-		atomic.AddInt64(&activeBufferCount, 1)
-		bufPtr.Reset() // Reset the buffer to clear any existing data
-		w.buf = *bufPtr
+	if w.buf == nil || w.buf.Len() == 0 {
+		w.buf = w.bufPool.get(ctx)
 	}
 
-	if uint64(w.buf.Len())+size <= w.threshold {
+	totalSizeNeeded := uint64(w.buf.Len()) + uint64(len(data))
+	if totalSizeNeeded <= w.threshold {
 		// If the total size is within the threshold, write to the buffer.
 		ctx.Logger().V(4).Info(
 			"writing to buffer",
 			"data_size", size,
 			"content_size", w.buf.Len(),
 		)
+
+		if totalSizeNeeded > uint64(w.buf.Cap()) {
+			ctx.Logger().V(4).Info(
+				"buffer size exceeded, getting new buffer",
+				"current_size", w.buf.Len(),
+				"new_size", totalSizeNeeded,
+			)
+			// The current buffer cannot accommodate the new data; fetch a new, larger buffer.
+			newBuf := w.bufPool.getWithSize(ctx, totalSizeNeeded)
+
+			// Copy the existing data to the new buffer and return the old buffer to the pool.
+			if _, err := w.buf.WriteTo(newBuf); err != nil {
+				return 0, err
+			}
+			w.bufPool.put(w.buf)
+			w.buf = newBuf
+		}
+
 		return w.buf.Write(data)
 	}
 
@@ -183,9 +238,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 				return 0, err
 			}
 			// Reset the buffer to clear any existing data and return it to the pool.
-			w.returnBufferToPool(&w.buf)
-			// w.buf.Reset()
-			// bufferPool.Put(&w.buf)
+			w.bufPool.put(w.buf)
 		}
 	}
 	ctx.Logger().V(4).Info("writing to file", "data_size", size)
@@ -234,46 +287,8 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 	// Data is in memory.
 	return &bufferReadCloser{
 		Reader:  bytes.NewReader(w.buf.Bytes()),
-		onClose: func() { w.returnBufferToPool(&w.buf) },
+		onClose: func() { w.bufPool.put(w.buf) },
 	}, nil
-}
-
-var (
-	// Track the number of active buffers not yet returned to the pool.
-	activeBufferCount int64
-	totalBufferLength uint64 // Tracks the total length of all buffers
-	totalBufferSize   uint64
-	bufferCount       uint64
-	logFrequency      uint64 = 25000 // Log after every 25000 calls
-)
-
-func (w *BufferedFileWriter) returnBufferToPool(buf *bytes.Buffer) {
-	atomic.AddInt64(&activeBufferCount, -1)
-	currentCapacity := buf.Cap()
-	currentLength := buf.Len()
-
-	// Add to totals
-	atomic.AddUint64(&totalBufferSize, uint64(currentCapacity))
-	atomic.AddUint64(&totalBufferLength, uint64(currentLength))
-	count := atomic.AddUint64(&bufferCount, 1)
-
-	if count%logFrequency == 0 {
-		avgBufferSize := atomic.LoadUint64(&totalBufferSize) / count
-		avgBufferLength := atomic.LoadUint64(&totalBufferLength) / count
-		fmt.Printf("Buffer pool update: count = %d, average size = %d bytes, average length = %d bytes\n", count, avgBufferSize, avgBufferLength)
-
-		count := atomic.LoadInt64(&activeBufferCount)
-		fmt.Printf("Current active buffer count: %d\n", count)
-
-		// Here you might decide to reset the counters to zero to get more recent trends
-		// atomic.StoreUint64(&totalBufferSize, 0)
-		// atomic.StoreUint64(&totalBufferLength, 0)
-		// atomic.StoreUint64(&bufferCount, 0)
-	}
-
-	// Reset the buffer to clear any existing data and return it to the pool.
-	buf.Reset()
-	w.bufPool.Put(buf)
 }
 
 // autoDeletingFileReader wraps an *os.File and deletes the file on Close.
