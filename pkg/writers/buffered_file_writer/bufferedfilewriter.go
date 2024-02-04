@@ -63,7 +63,7 @@ func (bp *bufferPool) getWithSize(ctx context.Context, dataSize uint64) *bytes.B
 		if diff > 0 {
 			// Since the fetched buffer is not suitable, put it back into the pool
 			// and allocate a new buffer of the required size.
-			bp.put(buf)
+			bp.put(fetchedBuf)
 			buf = bytes.NewBuffer(make([]byte, 0, dataSize))
 		}
 	}
