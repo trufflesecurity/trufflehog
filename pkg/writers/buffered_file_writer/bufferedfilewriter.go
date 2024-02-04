@@ -54,6 +54,17 @@ func (m *bufferPoolMetrics) recordBufferReturn() {
 
 func (m *bufferPoolMetrics) recordPreAllocatedUse() { m.preAllocatedUse.Add(1) }
 
+// print returns a string representation of the buffer pool metrics.
+func (m *bufferPoolMetrics) print() {
+	fmt.Printf("Buffer Pool Metrics:\n")
+	fmt.Printf("Active Buffers: %d\n", m.activeBufferCount.Load())
+	fmt.Printf("Buffer Count: %d\n", m.bufferCount.Load())
+	fmt.Printf("Total Buffer Length: %d\n", m.totalBufferLength.Load())
+	fmt.Printf("Total Buffer Size: %d\n", m.totalBufferSize.Load())
+	fmt.Printf("Pre-allocated Buffer Use: %d\n", m.preAllocatedUse.Load())
+	fmt.Printf("Average Buffer Growth: %d\n", m.averageGrowth())
+}
+
 type bufPoolOpt func(pool *bufferPool)
 
 type bufferPool struct {
@@ -121,15 +132,6 @@ func (bp *bufferPool) put(buf *bytes.Buffer) {
 	bp.Put(buf)
 }
 
-func logBufferPoolMetrics() {
-	// growCount := atomic.LoadInt64(&metrics.growCount)
-	// growAmount := atomic.LoadInt64(&metrics.growAmount)
-	// if growCount > 0 {
-	// 	avgGrowAmount := growAmount / growCount
-	// 	fmt.Printf("Buffer Growth: Count = %d, Total Amount = %d, Average Growth = %d\n", growCount, growAmount, avgGrowAmount)
-	// }
-}
-
 // state represents the current mode of BufferedFileWriter.
 type state uint8
 
@@ -173,6 +175,7 @@ func New(opts ...Option) *BufferedFileWriter {
 	for _, opt := range opts {
 		opt(w)
 	}
+
 	return w
 }
 
