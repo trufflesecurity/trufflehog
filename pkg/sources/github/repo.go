@@ -2,18 +2,55 @@ package github
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v57/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
+
+type repoInfoCache struct {
+	mu    sync.RWMutex
+	cache map[string]*repoInfo
+}
+
+func newRepoInfoCache() repoInfoCache {
+	return repoInfoCache{
+		cache: make(map[string]*repoInfo),
+	}
+}
+
+func (r *repoInfoCache) put(repoURL string, info *repoInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cache[repoURL] = info
+}
+
+func (r *repoInfoCache) get(repoURL string) (*repoInfo, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	info, ok := r.cache[repoURL]
+	return info, ok
+}
+
+type repoInfo struct {
+	owner      string
+	name       string
+	fullName   string
+	hasWiki    bool // the repo is _likely_ to have a wiki (see the comment on hasWiki func).
+	size       int
+	visibility source_metadatapb.Visibility
+}
 
 func (s *Source) cloneRepo(
 	ctx context.Context,
@@ -209,9 +246,6 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 		if err != nil {
 			return err
 		}
-		if res == nil {
-			break
-		}
 
 		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
@@ -228,12 +262,22 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			}
 
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
-			s.repoSizes.addRepo(repoURL, r.GetSize())
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
-			if s.conn.GetIncludeWikis() && s.hasWiki(ctx, r, repoURL) {
-				s.reposWithWikis[repoURL] = struct{}{}
+
+			info := &repoInfo{
+				owner:    r.GetOwner().GetLogin(),
+				name:     r.GetName(),
+				fullName: r.GetFullName(),
+				hasWiki:  s.conn.GetIncludeWikis() && s.hasWiki(ctx, r, repoURL),
+				size:     r.GetSize(),
 			}
+			if r.GetPrivate() {
+				info.visibility = source_metadatapb.Visibility_private
+			} else {
+				info.visibility = source_metadatapb.Visibility_public
+			}
+			s.repoInfoCache.put(repoURL, info)
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
@@ -266,6 +310,7 @@ func (s *Source) hasWiki(ctx context.Context, repo *github.Repository, repoURL s
 	if err != nil {
 		return false
 	}
+	_, _ = io.Copy(io.Discard, res.Body)
 	_ = res.Body.Close()
 
 	// If the wiki is disabled, or is enabled but has no content, the request should be redirected.
