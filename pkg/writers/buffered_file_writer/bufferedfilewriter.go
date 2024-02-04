@@ -54,24 +54,20 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 }
 
 func (bp *bufferPool) getWithSize(ctx context.Context, dataSize uint64) *bytes.Buffer {
-	var buf *bytes.Buffer
+	fetchedBuf := bp.get(ctx)
 
-	// Attempt to fetch a buffer from the pool.
-	if fetchedBuf := bp.get(ctx); fetchedBuf != nil {
-		// Check if the fetched buffer can accommodate the data size.
-		// If not, create a new buffer with enough capacity.
-		diff := int(dataSize) - fetchedBuf.Cap()
-		if diff > 0 {
-			// Since the fetched buffer is not suitable, put it back into the pool
-			// and allocate a new buffer of the required size.
-			bp.put(fetchedBuf)
-			buf = bytes.NewBuffer(make([]byte, 0, dataSize))
-		}
+	// Calculate if the fetched buffer's capacity is less than the required data size.
+	requiredCapacity := int(dataSize)
+	if fetchedBuf.Cap() >= requiredCapacity {
+		fetchedBuf.Reset()
+		return fetchedBuf
 	}
 
-	// Ensure the buffer is reset before use to avoid any old data remaining.
-	buf.Reset()
-	return buf
+	// If the fetched buffer's capacity is insufficient, return the inadequate buffer to the pool,
+	// and create a new buffer of the required size.
+	bp.put(fetchedBuf) // Return the initially fetched buffer as it's not used.
+
+	return bytes.NewBuffer(make([]byte, 0, requiredCapacity))
 }
 
 func (bp *bufferPool) put(buf *bytes.Buffer) {
@@ -183,7 +179,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 	}()
 
 	if w.buf == nil || w.buf.Len() == 0 {
-		w.buf = w.bufPool.get(ctx)
+		w.buf = w.bufPool.getWithSize(ctx, defaultBufferSize)
 	}
 
 	totalSizeNeeded := uint64(w.buf.Len()) + uint64(len(data))
