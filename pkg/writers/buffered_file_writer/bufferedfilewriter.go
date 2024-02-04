@@ -8,16 +8,59 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+type bufferPoolMetrics struct {
+	growCount  atomic.Int64
+	growAmount atomic.Int64
+
+	activeBufferCount atomic.Int64
+	bufferCount       atomic.Int64
+
+	totalBufferLength atomic.Int64
+	totalBufferSize   atomic.Int64
+
+	preAllocatedUse atomic.Int64 // Tracks successful uses of pre-allocated buffers
+}
+
+func (m *bufferPoolMetrics) recordGrowth(growthAmount int) {
+	m.growCount.Add(1)
+	m.growAmount.Add(int64(growthAmount))
+}
+
+func (m *bufferPoolMetrics) averageGrowth() int64 {
+	if m.growCount.Load() == 0 {
+		return 0
+	}
+	return m.growAmount.Load() / m.growCount.Load()
+}
+
+// recordBufferRetrival groups the metrics updates for when a buffer is fetched.
+func (m *bufferPoolMetrics) recordBufferRetrival(bufCap, bufLen int64) {
+	m.activeBufferCount.Add(1)
+	m.totalBufferSize.Add(bufCap)
+	m.totalBufferLength.Add(bufLen)
+}
+
+// recordBufferReturn groups the metrics updates for when a buffer is returned.
+func (m *bufferPoolMetrics) recordBufferReturn() {
+	m.activeBufferCount.Add(-1)
+	m.bufferCount.Add(1)
+}
+
+func (m *bufferPoolMetrics) recordPreAllocatedUse() { m.preAllocatedUse.Add(1) }
 
 type bufPoolOpt func(pool *bufferPool)
 
 type bufferPool struct {
 	bufferSize uint32
 	*sync.Pool
+
+	metrics *bufferPoolMetrics
 }
 
 const defaultBufferSize = 2 << 12 // 8KB
@@ -51,6 +94,8 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 		buf = bytes.NewBuffer(make([]byte, 0, bp.bufferSize))
 	}
 
+	bp.metrics.recordBufferRetrival(int64(buf.Cap()), int64(buf.Len()))
+
 	return buf
 }
 
@@ -60,6 +105,8 @@ func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, size int) {
 }
 
 func (bp *bufferPool) put(buf *bytes.Buffer) {
+	bp.metrics.recordBufferReturn()
+
 	// If the buffer is more than twice the default size, replace it with a new, smaller one.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
@@ -72,6 +119,15 @@ func (bp *bufferPool) put(buf *bytes.Buffer) {
 	}
 
 	bp.Put(buf)
+}
+
+func logBufferPoolMetrics() {
+	// growCount := atomic.LoadInt64(&metrics.growCount)
+	// growAmount := atomic.LoadInt64(&metrics.growAmount)
+	// if growCount > 0 {
+	// 	avgGrowAmount := growAmount / growCount
+	// 	fmt.Printf("Buffer Growth: Count = %d, Total Amount = %d, Average Growth = %d\n", growCount, growAmount, avgGrowAmount)
+	// }
 }
 
 // state represents the current mode of BufferedFileWriter.
@@ -143,7 +199,7 @@ func (w *BufferedFileWriter) String() (string, error) {
 	}
 
 	// Append buffer data, if any, to the end of the file contents.
-	if _, err := w.buf.WriteTo(&buf); err != nil {
+	if _, err := buf.WriteTo(w.buf); err != nil {
 		return "", err
 	}
 
