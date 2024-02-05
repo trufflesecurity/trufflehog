@@ -404,9 +404,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	}
 	currentDiff := diff()
 
-	// writer := c.contentWriter()
-	// currentDiff := NewDiff(withCustomContentWriter(writer))
-
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
 	for {
