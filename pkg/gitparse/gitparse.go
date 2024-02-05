@@ -392,8 +392,15 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	)
 	var latestState = Initial
 
-	writer := c.contentWriter()
-	currentDiff := NewDiff(withCustomContentWriter(writer))
+	diff := func(opts ...diffOption) *Diff {
+		return NewDiff(withCustomContentWriter(newBuffer()))
+	}
+	if c.useCustomContentWriter {
+		diff = func(opts ...diffOption) *Diff {
+			return NewDiff(withCustomContentWriter(bufferedfilewriter.New()))
+		}
+	}
+	currentDiff := diff()
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -436,7 +443,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
+			currentDiff = diff()
 			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
@@ -504,7 +511,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
+			currentDiff = diff()
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -544,7 +551,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				}
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
-			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()), withPathB(currentDiff.PathB))
+			currentDiff = diff(withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -610,13 +617,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	cleanupParse(ctx, currentCommit, currentDiff, commitChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
-}
-
-func (c *Parser) contentWriter() contentWriter {
-	if c.useCustomContentWriter {
-		return bufferedfilewriter.New()
-	}
-	return newBuffer()
 }
 
 func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
