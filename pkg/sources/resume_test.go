@@ -1,11 +1,8 @@
 package sources
 
 import (
-	"io"
 	"reflect"
 	"testing"
-
-	"github.com/sirupsen/logrus"
 )
 
 func TestRemoveRepoFromResumeInfo(t *testing.T) {
@@ -31,9 +28,6 @@ func TestRemoveRepoFromResumeInfo(t *testing.T) {
 		},
 	}
 
-	// Prevent the error message from showing up.
-	logrus.SetOutput(io.Discard)
-
 	for _, tt := range tests {
 		gotResumeInfoSlice := RemoveRepoFromResumeInfo(tt.startingResumeInfoSlice, tt.repoURL)
 		if !reflect.DeepEqual(gotResumeInfoSlice, tt.wantResumeInfoSlice) {
@@ -56,9 +50,6 @@ func TestEncodeResumeInfo(t *testing.T) {
 			wantEncodedResumeInfo:   "",
 		},
 	}
-
-	logger := logrus.New()
-	logger.Out = io.Discard
 
 	for _, tt := range tests {
 		gotEncodedResumeInfo := EncodeResumeInfo(tt.startingResumeInfoSlice)

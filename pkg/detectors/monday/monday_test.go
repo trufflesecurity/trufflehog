@@ -19,7 +19,7 @@ import (
 func TestMonday_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -108,6 +108,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

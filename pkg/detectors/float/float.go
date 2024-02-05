@@ -3,8 +3,8 @@ package float
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"float"}) + `\b([a-zA-Z0-9-._+=]{59,60})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"float"}) + `\b([a-f0-9]{16}[A-Za-z0-9+/]{42,43}=)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+			req.Header.Add("User-Agent", "TruffleHog3 (example@example.com)")
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -70,5 +71,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Float
 }

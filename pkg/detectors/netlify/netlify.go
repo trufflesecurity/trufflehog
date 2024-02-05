@@ -3,8 +3,8 @@ package netlify
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -45,6 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Netlify,
 			Raw:          []byte(resMatch),
 		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
+		}
 
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.netlify.com/api/v1/sites", nil)
@@ -68,5 +71,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Netlify
 }

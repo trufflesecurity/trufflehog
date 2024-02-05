@@ -6,11 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -98,9 +97,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 						bodyString := string(body)
 						validResponse := strings.Contains(bodyString, `timestamp`)
-						if err != nil {
-							fmt.Print(err.Error())
-						}
 
 						var responseObject Response
 						if err := json.Unmarshal(body, &responseObject); err != nil {
@@ -131,7 +127,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 type Response struct {
@@ -145,4 +141,8 @@ func getCexIOPassphrase(apiSecret string, apiKey string, nonce string, userId st
 	mac.Write([]byte(msg))
 	macsum := mac.Sum(nil)
 	return strings.ToUpper(hex.EncodeToString(macsum))
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_CexIO
 }

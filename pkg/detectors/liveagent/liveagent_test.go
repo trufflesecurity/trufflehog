@@ -6,6 +6,7 @@ package liveagent
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -23,8 +24,14 @@ func TestLiveAgent_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
+	deskUrl := testSecrets.MustGetField("LIVEAGENT_URL")
 	secret := testSecrets.MustGetField("LIVEAGENT_TOKEN")
 	inactiveSecret := testSecrets.MustGetField("LIVEAGENT_INACTIVE")
+	u, err := url.Parse(deskUrl)
+	if err != nil {
+		t.Fatalf("could not parse LIVEAGENT_URL: %s", err)
+	}
+	wantUrl := u.Scheme + "://" + u.Hostname()
 
 	type args struct {
 		ctx    context.Context
@@ -43,13 +50,16 @@ func TestLiveAgent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a liveagent secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a liveagent secret %s within for %s", secret, deskUrl)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_LiveAgent,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"domain": wantUrl,
+					},
 				},
 			},
 			wantErr: false,
@@ -59,13 +69,16 @@ func TestLiveAgent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a liveagent secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a liveagent secret %s within but not valid for %s", inactiveSecret, deskUrl)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_LiveAgent,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"domain": wantUrl,
+					},
 				},
 			},
 			wantErr: false,
@@ -108,6 +121,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

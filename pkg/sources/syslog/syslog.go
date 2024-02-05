@@ -12,7 +12,6 @@ import (
 	"github.com/bill-rich/go-syslog/pkg/syslogparser/rfc3164"
 	"github.com/crewjam/rfc5424"
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -24,15 +23,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const nilString = ""
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_SYSLOG
+
+	nilString = ""
+)
 
 type Source struct {
 	name     string
-	sourceId int64
-	jobId    int64
+	sourceId sources.SourceID
+	jobId    sources.JobID
 	verify   bool
 	syslog   *Syslog
-	aCtx     context.Context
 	sources.Progress
 	conn *sourcespb.Syslog
 }
@@ -40,14 +42,14 @@ type Source struct {
 type Syslog struct {
 	sourceType         sourcespb.SourceType
 	sourceName         string
-	sourceID           int64
-	jobID              int64
+	sourceID           sources.SourceID
+	jobID              sources.JobID
 	sourceMetadataFunc func(hostname, appname, procid, timestamp, facility, client string) *source_metadatapb.MetaData
 	verify             bool
 	concurrency        *semaphore.Weighted
 }
 
-func NewSyslog(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceName string, verify bool, concurrency int,
+func NewSyslog(sourceType sourcespb.SourceType, jobID sources.JobID, sourceID sources.SourceID, sourceName string, verify bool, concurrency int,
 	sourceMetadataFunc func(hostname, appname, procid, timestamp, facility, client string) *source_metadatapb.MetaData,
 ) *Syslog {
 	return &Syslog{
@@ -61,20 +63,58 @@ func NewSyslog(sourceType sourcespb.SourceType, jobID, sourceID int64, sourceNam
 	}
 }
 
+// Validate validates the configuration of the source.
+func (s *Source) Validate(ctx context.Context) []error {
+	var errs []error
+
+	if s.conn.TlsCert != nilString || s.conn.TlsKey != nilString {
+		if s.conn.TlsCert == nilString || s.conn.TlsKey == nilString {
+			errs = append(errs, fmt.Errorf("tls cert and key must both be set"))
+		}
+		if _, err := tls.LoadX509KeyPair(s.conn.TlsCert, s.conn.TlsKey); err != nil {
+			errs = append(errs, fmt.Errorf("error loading tls cert and key: %s", err))
+		}
+	}
+
+	if s.conn.ListenAddress != nilString {
+		switch s.conn.Protocol {
+		case "tcp":
+			srv, err := net.Listen(s.conn.Protocol, s.conn.ListenAddress)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("error listening on tcp socket: %s", err))
+			}
+			srv.Close()
+		case "udp":
+			srv, err := net.ListenPacket(s.conn.Protocol, s.conn.ListenAddress)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("error listening on udp socket: %s", err))
+			}
+			srv.Close()
+		}
+	}
+	if s.conn.Protocol != "tcp" && s.conn.Protocol != "udp" {
+		errs = append(errs, fmt.Errorf("protocol must be 'tcp' or 'udp', got: %s", s.conn.Protocol))
+	}
+	if s.conn.Format != "rfc5424" && s.conn.Format != "rfc3164" {
+		errs = append(errs, fmt.Errorf("format must be 'rfc5424' or 'rfc3164', got: %s", s.conn.Format))
+	}
+	return errs
+}
+
 // Ensure the Source satisfies the interface at compile time.
 var _ sources.Source = (*Source)(nil)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_SYSLOG
+	return SourceType
 }
 
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
@@ -83,9 +123,8 @@ func (s *Source) InjectConnection(conn *sourcespb.Syslog) {
 }
 
 // Init returns an initialized Syslog source.
-func (s *Source) Init(aCtx context.Context, name string, jobId, sourceId int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 
-	s.aCtx = aCtx
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -147,7 +186,7 @@ func (s *Source) verifyConnectionConfig() error {
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	switch {
 	case s.conn.TlsCert != nilString || s.conn.TlsKey != nilString:
 		cert, err := tls.X509KeyPair([]byte(s.conn.TlsCert), []byte(s.conn.TlsKey))
@@ -210,14 +249,14 @@ func (s *Source) parseSyslogMetadata(input []byte, remote string) (*source_metad
 }
 
 func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksChan chan *sources.Chunk) {
-	defer common.Recover(ctx)
+	defer common.RecoverWithExit(ctx)
 	for {
 		if common.IsDone(ctx) {
 			return
 		}
 		err := conn.SetDeadline(time.Now().Add(time.Second))
 		if err != nil {
-			logrus.WithError(err).Debug("could not set connection deadline deadline")
+			ctx.Logger().V(2).Info("could not set connection deadline", "error", err)
 		}
 		input := make([]byte, 8096)
 		remote := conn.RemoteAddr()
@@ -228,15 +267,16 @@ func (s *Source) monitorConnection(ctx context.Context, conn net.Conn, chunksCha
 			}
 			continue
 		}
-		logrus.Trace(string(input))
+		ctx.Logger().V(5).Info(string(input))
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
-			logrus.WithError(err).Debug("failed to generate metadata")
+			ctx.Logger().V(2).Info("failed to generate metadata", "error", err)
 		}
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
 			SourceType:     s.syslog.sourceType,
+			JobID:          s.JobID(),
 			SourceMetadata: metadata,
 			Data:           input,
 			Verify:         s.verify,
@@ -251,7 +291,7 @@ func (s *Source) acceptTCPConnections(ctx context.Context, netListener net.Liste
 		}
 		conn, err := netListener.Accept()
 		if err != nil {
-			logrus.WithError(err).Debug("failed to accept TCP connection")
+			ctx.Logger().V(2).Info("failed to accept TCP connection", "error", err)
 			continue
 		}
 		go s.monitorConnection(ctx, conn, chunksChan)
@@ -263,6 +303,10 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 		if common.IsDone(ctx) {
 			return nil
 		}
+		err := netListener.SetDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			ctx.Logger().V(2).Info("could not update connection deadline", "error", err)
+		}
 		input := make([]byte, 65535)
 		_, remote, err := netListener.ReadFrom(input)
 		if err != nil {
@@ -273,11 +317,12 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 		}
 		metadata, err := s.parseSyslogMetadata(input, remote.String())
 		if err != nil {
-			logrus.WithError(err).Debug("failed to parse metadata")
+			ctx.Logger().V(2).Info("failed to parse metadata", "error", err)
 		}
 		chunksChan <- &sources.Chunk{
 			SourceName:     s.syslog.sourceName,
 			SourceID:       s.syslog.sourceID,
+			JobID:          s.JobID(),
 			SourceType:     s.syslog.sourceType,
 			SourceMetadata: metadata,
 			Data:           input,

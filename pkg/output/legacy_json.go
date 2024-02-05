@@ -2,23 +2,29 @@ package output
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sergi/go-diff/diffmatchpatch"
-	"github.com/sirupsen/logrus"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-func PrintLegacyJSON(r *detectors.ResultWithMetadata) {
+// LegacyJSONPrinter is a printer that prints results in legacy JSON format for backwards compatibility.
+type LegacyJSONPrinter struct{ mu sync.Mutex }
+
+func (p *LegacyJSONPrinter) Print(ctx context.Context, r *detectors.ResultWithMetadata) error {
 	var repo string
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
@@ -28,27 +34,34 @@ func PrintLegacyJSON(r *detectors.ResultWithMetadata) {
 	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
 		repo = r.SourceMetadata.GetGitlab().Repository
 	default:
-		logrus.Errorf("unsupported source type for legacy json output: %s", r.SourceType)
+		return fmt.Errorf("unsupported source type for legacy json output: %s", r.SourceType)
 	}
 
 	// cloning the repo again here is not great and only works with unauthed repos
-	repoPath, remote, err := git.PrepareRepo(repo)
+	repoPath, remote, err := git.PrepareRepo(ctx, repo)
 	if err != nil || repoPath == "" {
-		logrus.WithError(err).Fatal("error preparing git repo for scanning")
+		return fmt.Errorf("error preparing git repo for scanning: %w", err)
 	}
 	if remote {
 		defer os.RemoveAll(repoPath)
 	}
 
-	legacy := ConvertToLegacyJSON(r, repoPath)
+	legacy, err := convertToLegacyJSON(r, repoPath)
+	if err != nil {
+		return fmt.Errorf("could not convert to legacy JSON: %w", err)
+	}
 	out, err := json.Marshal(legacy)
 	if err != nil {
-		logrus.WithError(err).Fatal("could not marshal result")
+		return fmt.Errorf("could not marshal result: %w", err)
 	}
+
+	p.mu.Lock()
 	fmt.Println(string(out))
+	p.mu.Unlock()
+	return nil
 }
 
-func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) *LegacyJSONOutput {
+func convertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) (*LegacyJSONOutput, error) {
 	var source LegacyJSONCompatibleSource
 	switch r.SourceType {
 	case sourcespb.SourceType_SOURCE_TYPE_GIT:
@@ -58,14 +71,19 @@ func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) *Lega
 	case sourcespb.SourceType_SOURCE_TYPE_GITLAB:
 		source = r.SourceMetadata.GetGitlab()
 	default:
-		log.Fatalf("legacy JSON output can not be used with this source: %s", r.SourceName)
+		return nil, fmt.Errorf("legacy JSON output can not be used with this source: %s", r.SourceName)
 	}
 
-	// The repo will be needed to gather info needed for the legacy output that isn't included in the new
-	// output format.
-	repo, err := gogit.PlainOpenWithOptions(repoPath, &gogit.PlainOpenOptions{DetectDotGit: true})
+	options := &gogit.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	}
+
+	// The repo will be needed to gather info needed for the legacy output that
+	// isn't included in the new output format.
+	repo, err := gogit.PlainOpenWithOptions(repoPath, options)
 	if err != nil {
-		logrus.WithError(err).Fatalf("could not open repo: %s", repoPath)
+		return nil, fmt.Errorf("could not open repo %q: %w", repoPath, err)
 	}
 
 	fileName := source.GetFile()
@@ -94,7 +112,7 @@ func ConvertToLegacyJSON(r *detectors.ResultWithMetadata, repoPath string) *Lega
 		Reason:       r.Result.DetectorType.String(),
 		StringsFound: []string{foundString},
 	}
-	return output
+	return output, nil
 }
 
 // BranchHeads creates a map of branch names to their head commit. This can be used to find if a commit is an ancestor
@@ -106,16 +124,17 @@ func BranchHeads(repo *gogit.Repository) (map[string]*object.Commit, error) {
 		return branches, err
 	}
 
+	logger := context.Background().Logger()
 	err = branchIter.ForEach(func(branchRef *plumbing.Reference) error {
 		branchName := branchRef.Name().String()
 		headHash, err := repo.ResolveRevision(plumbing.Revision(branchName))
 		if err != nil {
-			logrus.WithError(err).Errorf("unable to resolve head of branch: %s", branchRef.Name().String())
+			logger.Error(err, "unable to resolve head of branch", "branch", branchRef.Name().String())
 			return nil
 		}
 		headCommit, err := repo.CommitObject(*headHash)
 		if err != nil {
-			logrus.WithError(err).Errorf("unable to get commit: %s", headCommit.String())
+			logger.Error(err, "unable to get commit", "head_hash", headHash.String())
 			return nil
 		}
 		branches[branchName] = headCommit
@@ -126,15 +145,17 @@ func BranchHeads(repo *gogit.Repository) (map[string]*object.Commit, error) {
 
 // FindBranch returns the first branch a commit is a part of. Not the most accurate, but it should work similar to pre v3.0.
 func FindBranch(commit *object.Commit, repo *gogit.Repository) string {
+	logger := context.Background().Logger()
 	branches, err := BranchHeads(repo)
 	if err != nil {
-		logrus.WithError(err).Fatal("could not list branches")
+		logger.Error(err, "could not list branches")
+		os.Exit(1)
 	}
 
 	for name, head := range branches {
 		isAncestor, err := commit.IsAncestor(head)
 		if err != nil {
-			logrus.WithError(err).Errorf("could not determine if %s is an ancestor of %s", commit.Hash.String(), head.Hash.String())
+			logger.Error(err, fmt.Sprintf("could not determine if %s is an ancestor of %s", commit.Hash.String(), head.Hash.String()))
 			continue
 		}
 		if isAncestor {
@@ -147,26 +168,27 @@ func FindBranch(commit *object.Commit, repo *gogit.Repository) string {
 // GenerateDiff will take a commit and create a string diff between the commit and its first parent.
 func GenerateDiff(commit *object.Commit, fileName string) string {
 	var diff string
+	logger := context.Background().Logger().WithValues("file", fileName)
 
 	// First grab the first parent of the commit. If there are none, we are at the first commit and should diff against
 	// an empty file.
 	parent, err := commit.Parent(0)
-	if err != object.ErrParentNotFound && err != nil {
-		logrus.WithError(err).Errorf("could not find parent of %s", commit.Hash.String())
+	if !errors.Is(err, object.ErrParentNotFound) && err != nil {
+		logger.Error(err, "could not find parent", "commit", commit.Hash.String())
 	}
 
 	// Now get the files from the commit and its parent.
 	var parentFile *object.File
 	if parent != nil {
 		parentFile, err = parent.File(fileName)
-		if err != nil && err != object.ErrFileNotFound {
-			logrus.WithError(err).Errorf("could not get previous version of file: %q", fileName)
+		if err != nil && !errors.Is(err, object.ErrFileNotFound) {
+			logger.Error(err, "could not get previous version of file")
 			return diff
 		}
 	}
 	commitFile, err := commit.File(fileName)
 	if err != nil {
-		logrus.WithError(err).Errorf("could not get current version of file: %q", fileName)
+		logger.Error(err, "could not get current version of file")
 		return diff
 	}
 
@@ -177,14 +199,14 @@ func GenerateDiff(commit *object.Commit, fileName string) string {
 	if parentFile != nil {
 		oldContent, err = parentFile.Contents()
 		if err != nil {
-			logrus.WithError(err).Errorf("could not get contents of previous version of file: %q", fileName)
+			logger.Error(err, "could not get contents of previous version of file")
 		}
 	}
 	// commitFile should never be nil at this point, but double-checking so we don't get a nil error.
 	if commitFile != nil {
 		newContent, _ = commitFile.Contents()
 		if err != nil {
-			logrus.WithError(err).Errorf("could not get contents of current version of file: %q", fileName)
+			logger.Error(err, "could not get contents of current version of file")
 		}
 	}
 
@@ -197,7 +219,7 @@ func GenerateDiff(commit *object.Commit, fileName string) string {
 		// The String() method URL escapes the diff, so it needs to be undone.
 		patchDiff, err := url.QueryUnescape(patch.String())
 		if err != nil {
-			logrus.WithError(err).Error("unable to unescape diff")
+			logger.Error(err, "unable to unescape diff")
 		}
 		diff += patchDiff
 	}

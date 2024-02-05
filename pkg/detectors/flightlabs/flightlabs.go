@@ -3,9 +3,9 @@ package flightlabs
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flightlabs"}) + `\b(ey[a-zA-Z0-9]{34}.ey[a-zA-Z0-9._-]{300,350})\b`)
 )
 
@@ -77,5 +77,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_FlightLabs
 }

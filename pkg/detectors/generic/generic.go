@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,20 +20,18 @@ func New() Scanner {
 		`[A-Z]{2,6}\-[0-9]{2,6}`, // issue tracker
 		`#[a-fA-F0-9]{6}\b`,      // hex color code
 		`\b[A-Fa-f0-9]{64}\b`,    // hex encoded hash
-		`\b[A-Fa-f0-9]{32}\b`,    // hex encoded hash
 		`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`, // http
 		`\b([/]{0,1}([\w]+[/])+[\w\.]*)\b`,                 // filepath
 		`([0-9A-F]{2}[:-]){5}([0-9A-F]{2})`,                // MAC addr
 		`\d{4}[-/]{1}([0]\d|1[0-2])[-/]{1}([0-2]\d|3[01])`, // date
-		`[v|\-]\d\.\d`, //version
-		`\d\.\d\.\d-`,  //version
+		`[v|\-]\d\.\d`, // version
+		`\d\.\d\.\d-`,  // version
 		`[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}`,      // IPs and OIDs
-		`\b[A-Fa-f0-9x]{6,99}\b`,                          // hex encoding
 		`[A-Fa-f0-9x]{2}:[A-Fa-f0-9x]{2}:[A-Fa-f0-9x]{2}`, // hex encoding
-		`[\w]+\([\w, ]+\)`,                                // function
+		`[\w]+\([\w, ]+\)`, // function
 	}
 
-	excludeMatchers := []*regexp.Regexp{}
+	var excludeMatchers []*regexp.Regexp
 	for _, pat := range excludePatterns {
 		excludeMatchers = append(excludeMatchers, regexp.MustCompile(pat))
 	}
@@ -44,10 +42,7 @@ func New() Scanner {
 }
 
 type Scanner struct {
-	wordList             []string
-	badList              []string
-	programmingBookWords []string
-	excludeMatchers      []*regexp.Regexp
+	excludeMatchers []*regexp.Regexp
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -137,3 +132,7 @@ func hasReMatch(matchers []*regexp.Regexp, token string) bool {
 // 	}
 // 	return words
 // }
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Generic
+}

@@ -5,9 +5,9 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/hex"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -100,7 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 func getPoloniexSignature(secret string, payload string) string {
@@ -108,4 +108,8 @@ func getPoloniexSignature(secret string, payload string) string {
 	mac.Write([]byte(payload))
 	macsum := mac.Sum(nil)
 	return hex.EncodeToString(macsum)
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Poloniex
 }

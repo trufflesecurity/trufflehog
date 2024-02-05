@@ -2,8 +2,6 @@ package sources
 
 import (
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 // RemoveRepoFromResumeInfo removes the repoURL from the resume info.
@@ -18,8 +16,7 @@ func RemoveRepoFromResumeInfo(resumeRepos []string, repoURL string) []string {
 
 	if index == -1 {
 		// We should never be able to be here. But if we are, it means the resume info never had the repo added.
-		// So log the error and do nothing.
-		logrus.Errorf("repoURL (%q) not found in list of encode resume info: %v", repoURL, resumeRepos)
+		// So do nothing.
 		return resumeRepos
 	}
 

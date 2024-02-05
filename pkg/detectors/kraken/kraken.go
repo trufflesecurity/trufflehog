@@ -6,10 +6,10 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -103,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 // Code from https://docs.kraken.com/rest/#section/Authentication/Headers-and-Signature
@@ -117,4 +117,8 @@ func getKrakenSignature(url_path string, values url.Values, secret []byte) strin
 	mac.Write(append([]byte(url_path), shasum...))
 	macsum := mac.Sum(nil)
 	return base64.StdEncoding.EncodeToString(macsum)
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Kraken
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -21,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([a-fA-Z0-9*]{29})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([A-F0-9-]{37})\b`)
 )
@@ -83,5 +83,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Bulksms
 }

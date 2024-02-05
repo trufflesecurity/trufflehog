@@ -2,8 +2,8 @@ package pivotaltracker
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -72,5 +72,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_PivotalTracker
 }

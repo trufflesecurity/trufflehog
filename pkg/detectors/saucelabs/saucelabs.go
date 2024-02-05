@@ -4,8 +4,8 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
-				//req.SetBasicAuth(idMatch, keyMatch)
+				// req.SetBasicAuth(idMatch, keyMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
@@ -85,5 +85,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_SauceLabs
 }
