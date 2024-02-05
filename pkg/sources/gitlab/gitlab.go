@@ -19,7 +19,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 
-	"github.com/go-errors/errors"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
 	"github.com/xanzy/go-gitlab"
@@ -90,7 +89,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
-		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
+		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
 	s.repos = conn.Repositories
@@ -115,7 +114,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		// We may need the password as a token if the user is using an access_token with basic auth.
 		s.token = cred.BasicAuth.Password
 	default:
-		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", name, s.Type())
+		return fmt.Errorf("invalid configuration given for source %q (%s)", name, s.Type().String())
 	}
 
 	if len(s.url) == 0 {
@@ -164,7 +163,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	// Start client.
 	apiClient, err := s.newClient()
 	if err != nil {
-		return errors.New(err)
+		return err
 	}
 
 	gitlabReposScanned.WithLabelValues(s.name).Set(0)
@@ -176,7 +175,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// End early if we had errors getting specified repos but none were validated.
 	if len(errs) > 0 && len(repos) == 0 {
-		return errors.New("All specified repos had validation issues, ending scan")
+		return fmt.Errorf("all specified repos had validation issues, ending scan")
 	}
 
 	// Get all repos if not specified.
@@ -184,9 +183,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
 			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
 		})
-		gitlabRepos, err2, done := s.getReposFromGitlab(ctx, apiClient, ignoreRepo)
-		if done {
-			return err2
+		gitlabRepos, err := s.getReposFromGitlab(ctx, apiClient, ignoreRepo)
+		if err != nil {
+			return err
 		}
 		repos = gitlabRepos
 	}
@@ -210,8 +209,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 
 	_, _, err = apiClient.Users.CurrentUser()
 	if err != nil {
-		msg := fmt.Sprintf("gitlab authentication failed using method %v", s.authMethod)
-		return []error{errors.WrapPrefix(err, msg, 0)}
+		return []error{fmt.Errorf("gitlab authentication failed using method %v: %w", s.authMethod, err)}
 	}
 
 	explicitlyConfiguredRepos, errs := normalizeRepos(s.repos)
@@ -227,14 +225,16 @@ func (s *Source) Validate(ctx context.Context) []error {
 		// access isn't a local configuration issue.
 		for _, r := range explicitlyConfiguredRepos {
 			if err := git.PingRepoUsingToken(ctx, s.token, r, user); err != nil {
-				msg := fmt.Sprintf("could not reach git repository %q", r)
-				err = errors.WrapPrefix(err, msg, 0)
+				err = fmt.Errorf("could not reach git repository %q: %w", r, err)
 				errs = append(errs, err)
 			}
 		}
 
 		if len(s.ignoreRepos) > 0 {
-			errs = append(errs, fmt.Errorf("both repositories and ignore patterns were explicitly configured; ignore patterns will not be used"))
+			errs = append(
+				errs,
+				fmt.Errorf("both repositories and ignore patterns were explicitly configured; ignore patterns will not be used"),
+			)
 		}
 	}
 
@@ -243,8 +243,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 	}
 
 	ignoreProject := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
-		msg := fmt.Sprintf("could not compile ignore repo pattern %q", pattern)
-		errs = append(errs, errors.WrapPrefix(err, msg, 0))
+		errs = append(errs, fmt.Errorf("could not compile ignore repo pattern %q: %w", pattern, err))
 	})
 
 	projects, err := s.getAllProjects(ctx, apiClient)
@@ -268,14 +267,14 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	case "OAUTH":
 		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
 		if err != nil {
-			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %s. Error: %v", s.url, err)
+			return nil, fmt.Errorf("could not create Gitlab OAUTH client for %q: %w", s.url, err)
 		}
 		return apiClient, nil
 
 	case "BASIC_AUTH":
 		apiClient, err := gitlab.NewBasicAuthClient(s.user, s.password, gitlab.WithBaseURL(s.url))
 		if err != nil {
-			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %s. Error: %v", s.url, err)
+			return nil, fmt.Errorf("could not create Gitlab BASICAUTH client for %q: %w", s.url, err)
 		}
 		// If the user is using an access_token rather than a username/password, then basic auth
 		// will not work. In this case, we test to see if basic auth would work, and if it does not,
@@ -288,12 +287,12 @@ func (s *Source) newClient() (*gitlab.Client, error) {
 	case "TOKEN":
 		apiClient, err := gitlab.NewOAuthClient(s.token, gitlab.WithBaseURL(s.url))
 		if err != nil {
-			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %s. Error: %v", s.url, err)
+			return nil, fmt.Errorf("could not create Gitlab TOKEN client for %q: %w", s.url, err)
 		}
 		return apiClient, nil
 
 	default:
-		return nil, errors.New("Could not determine authMethod specified for GitLab")
+		return nil, fmt.Errorf("invalid auth method %q", s.authMethod)
 	}
 }
 
@@ -315,7 +314,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 	if err != nil {
-		return nil, fmt.Errorf("unable to authenticate using %s, %w", s.authMethod, err)
+		return nil, fmt.Errorf("unable to authenticate using %s: %w", s.authMethod, err)
 	}
 
 	uniqueProjects := make(map[int]*gitlab.Project)
@@ -407,10 +406,10 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client) (
 	return projects, nil
 }
 
-func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Client, ignoreRepo func(repo string) bool) ([]string, error, bool) {
+func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Client, ignoreRepo func(repo string) bool) ([]string, error) {
 	projects, err := s.getAllProjects(ctx, apiClient)
 	if err != nil {
-		return nil, fmt.Errorf("error getting all projects: %v", err), true
+		return nil, fmt.Errorf("error getting all projects: %w", err)
 	}
 
 	// Turn projects into URLs for Git cloner.
@@ -423,15 +422,16 @@ func (s *Source) getReposFromGitlab(ctx context.Context, apiClient *gitlab.Clien
 		// Ensure the urls are valid before adding them to the repo list.
 		_, err := url.Parse(prj.HTTPURLToRepo)
 		if err != nil {
-			fmt.Printf("could not parse url given by project: %s", prj.HTTPURLToRepo)
+			ctx.Logger().Error(err, "could not parse url given by project", "project", prj.HTTPURLToRepo)
+			continue
 		}
 		repos = append(repos, prj.HTTPURLToRepo)
 	}
 	if len(repos) == 0 {
-		return nil, errors.Errorf("unable to discover any repos"), true
+		return nil, fmt.Errorf("unable to discover any repos")
 	}
 
-	return repos, nil, false
+	return repos, nil
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
@@ -478,20 +478,20 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				}
 				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
 			}
-			defer os.RemoveAll(path)
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
+			defer os.RemoveAll(path)
 
-			logger.V(2).Info(fmt.Sprintf("Starting to scan repo %d/%d", i+1, len(s.repos)))
+			logger.V(2).Info("starting scan", "num", i+1, "total", len(s.repos))
 			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
 			gitlabReposScanned.WithLabelValues(s.name).Inc()
 
-			logger.V(2).Info(fmt.Sprintf("Completed scanning repo %d/%d", i+1, len(s.repos)))
+			logger.V(2).Info("completed scan", "num", i+1, "total", len(s.repos))
 			return nil
 		})
 	}
@@ -550,12 +550,13 @@ func buildIgnorer(patterns []string, onCompileErr func(err error, pattern string
 }
 
 func normalizeRepos(repos []string) ([]string, []error) {
-	var validRepos []string
+	// Optimistically allocate space for all valid repositories.
+	validRepos := make([]string, 0, len(repos))
 	var errs []error
 	for _, prj := range repos {
 		repo, err := giturl.NormalizeGitlabRepo(prj)
 		if err != nil {
-			errs = append(errs, errors.WrapPrefix(err, fmt.Sprintf("unable to normalize gitlab repo url %s", prj), 0))
+			errs = append(errs, fmt.Errorf("unable to normalize gitlab repo url %q: %w", prj, err))
 			continue
 		}
 
