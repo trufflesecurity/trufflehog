@@ -126,7 +126,6 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, size int) {
 	// Grow the buffer to accommodate the new data.
 	bp.metrics.recordGrowth(size)
-	bp.metrics.recordGrowth(size)
 	buf.Grow(size)
 }
 
