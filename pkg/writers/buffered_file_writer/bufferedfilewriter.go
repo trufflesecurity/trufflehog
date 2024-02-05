@@ -18,6 +18,7 @@ import (
 type bufferPoolMetrics struct {
 	growCount    atomic.Int64
 	growAmount   atomic.Int64
+	shrinkCount  atomic.Int64
 	shrinkAmount atomic.Int64
 
 	activeBufferCount atomic.Int64
@@ -26,24 +27,28 @@ type bufferPoolMetrics struct {
 	totalBufferLength atomic.Int64
 	totalBufferSize   atomic.Int64
 
-	preAllocatedUse atomic.Int64 // Tracks successful uses of pre-allocated buffers
-	newBufferCount  atomic.Int64
+	checkoutDurationTotal atomic.Int64
+	checkoutCount         atomic.Int64
 }
 
-func ReportBufferPoolMetrics() {
-	ticker := time.NewTicker(10 * time.Second)
+func ReportBufferPoolMetrics(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
+			if sharedBufferPool == nil {
+				continue
+			}
 			sharedBufferPool.metrics.print()
+		case <-ctx.Done():
+			return
 		}
 	}
 }
 
 func (m *bufferPoolMetrics) recordGrowth(growthAmount int) {
 	m.growCount.Add(1)
-	m.newBufferCount.Add(1)
 	m.growAmount.Add(int64(growthAmount))
 }
 
@@ -54,18 +59,44 @@ func (m *bufferPoolMetrics) averageGrowth() int64 {
 	return m.growAmount.Load() / m.growCount.Load()
 }
 
+func (m *bufferPoolMetrics) recordShrink(amount int) {
+	m.shrinkCount.Add(1)
+	m.shrinkAmount.Add(int64(amount))
+}
+
+func (m *bufferPoolMetrics) averageShrink() int64 {
+	if m.shrinkCount.Load() == 0 {
+		return 0
+	}
+	return m.shrinkAmount.Load() / m.shrinkCount.Load()
+}
+
+func (m *bufferPoolMetrics) recordCheckoutDuration(duration time.Duration) {
+	m.checkoutDurationTotal.Add(duration.Nanoseconds())
+	m.checkoutCount.Add(1)
+}
+
+func (m *bufferPoolMetrics) averageCheckoutDuration() time.Duration {
+	totalDurations := m.checkoutDurationTotal.Load()
+	count := m.checkoutCount.Load()
+	if count == 0 {
+		return 0
+	}
+	averageDurationNs := totalDurations / count
+	return time.Duration(averageDurationNs)
+}
+
 // recordBufferRetrival groups the metrics updates for when a buffer is fetched.
-func (m *bufferPoolMetrics) recordBufferRetrival(bufCap, bufLen int64) {
+func (m *bufferPoolMetrics) recordBufferRetrival() {
 	m.activeBufferCount.Add(1)
 	m.bufferCount.Add(1)
+}
+
+func (m *bufferPoolMetrics) recordBufferReturn(bufCap, bufLen int64) {
+	m.activeBufferCount.Add(-1)
 	m.totalBufferSize.Add(bufCap)
 	m.totalBufferLength.Add(bufLen)
 }
-
-// recordBufferReturn groups the metrics updates for when a buffer is returned.
-func (m *bufferPoolMetrics) recordBufferReturn() { m.activeBufferCount.Add(-1) }
-
-func (m *bufferPoolMetrics) recordPreAllocatedUse() { m.preAllocatedUse.Add(1) }
 
 // print returns a string representation of the buffer pool metrics.
 func (m *bufferPoolMetrics) print() {
@@ -74,8 +105,17 @@ func (m *bufferPoolMetrics) print() {
 	fmt.Printf("Buffer Count: %d\n", m.bufferCount.Load())
 	fmt.Printf("Total Buffer Length: %d\n", m.totalBufferLength.Load())
 	fmt.Printf("Total Buffer Size: %d\n", m.totalBufferSize.Load())
-	// fmt.Printf("Pre-allocated Buffer Use: %d\n", m.preAllocatedUse.Load())
+	fmt.Printf("Grow Count: %d\n", m.growCount.Load())
 	fmt.Printf("Average Buffer Growth: %d\n", m.averageGrowth())
+	fmt.Printf("Shrink Count: %d\n", m.shrinkCount.Load())
+	fmt.Printf("Average Buffer Shrink: %d\n", m.averageShrink())
+	if m.bufferCount.Load() != 0 {
+		fmt.Printf("Average Buffer Length: %d\n", m.totalBufferLength.Load()/m.bufferCount.Load())
+		fmt.Printf("Average Buffer Size: %d\n", m.totalBufferSize.Load()/m.bufferCount.Load())
+		fmt.Printf("Percentage of buffers that grew: %f\n", float64(m.growCount.Load())/float64(m.bufferCount.Load()))
+		fmt.Printf("Percentage of buffers that shrank: %f\n", float64(m.shrinkCount.Load())/float64(m.bufferCount.Load()))
+	}
+	fmt.Printf("Average Checkout Duration: %v (ms)\n", m.averageCheckoutDuration().Milliseconds())
 	fmt.Printf("\n\n\n")
 }
 
@@ -97,8 +137,7 @@ func newBufferPool(opts ...bufPoolOpt) *bufferPool {
 	}
 	pool.Pool = &sync.Pool{
 		New: func() any {
-			buf := new(bytes.Buffer)
-			buf.Grow(int(pool.bufferSize))
+			buf := &bufferWrapper{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
 			return buf
 		},
 	}
@@ -112,32 +151,40 @@ var sharedBufferPool *bufferPool
 
 func init() { sharedBufferPool = newBufferPool() }
 
-func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
-	buf, ok := bp.Pool.Get().(*bytes.Buffer)
+type bufferWrapper struct {
+	*bytes.Buffer
+	checkedOut time.Time
+}
+
+func (bp *bufferPool) get(ctx context.Context) *bufferWrapper {
+	buf, ok := bp.Pool.Get().(*bufferWrapper)
 	if !ok {
 		ctx.Logger().Error(fmt.Errorf("buffer pool returned unexpected type"), "using new buffer")
-		buf = bytes.NewBuffer(make([]byte, 0, bp.bufferSize))
+		buf = &bufferWrapper{Buffer: bytes.NewBuffer(make([]byte, 0, bp.bufferSize))}
 	}
-	bp.metrics.recordBufferRetrival(int64(buf.Cap()), defaultBufferSize)
+	buf.checkedOut = time.Now()
+	bp.metrics.recordBufferRetrival()
 
 	return buf
 }
 
-func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, size int) {
+func (bp *bufferPool) growBufferWithSize(buf *bufferWrapper, size int) {
 	// Grow the buffer to accommodate the new data.
 	bp.metrics.recordGrowth(size)
 	buf.Grow(size)
 }
 
-func (bp *bufferPool) put(buf *bytes.Buffer) {
-	bp.metrics.recordBufferReturn()
+func (bp *bufferPool) put(buf *bufferWrapper) {
+	bp.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
+	bp.metrics.recordCheckoutDuration(time.Since(buf.checkedOut))
 
 	// If the buffer is more than twice the default size, replace it with a new, smaller one.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
 		// Replace the buffer with a new, smaller one. No need to copy data since we're resetting it.
-		buf = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+		bp.metrics.recordShrink(buf.Cap() - defaultBufferSize)
+		buf.Buffer = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	} else {
 		// Reset the buffer to clear any existing data.
 		buf.Reset()
@@ -165,7 +212,7 @@ type BufferedFileWriter struct {
 	state state // Current state of the writer. (writeOnly or readOnly)
 
 	bufPool  *bufferPool    // Pool for storing buffers for reuse.
-	buf      *bytes.Buffer  // Buffer for storing data under the threshold in memory.
+	buf      *bufferWrapper // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     io.WriteCloser // File for storing data over the threshold.
 }
@@ -256,12 +303,14 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 			"content_size", bufferLength,
 		)
 
-		growSize := int(totalSizeNeeded - uint64(w.buf.Cap()))
-		if growSize > 0 {
+		availableSpace := w.buf.Cap() - bufferLength
+		growSize := int(totalSizeNeeded) - bufferLength
+		if growSize > availableSpace {
 			ctx.Logger().V(4).Info(
 				"buffer size exceeded, growing buffer",
 				"current_size", bufferLength,
 				"new_size", totalSizeNeeded,
+				"available_space", availableSpace,
 				"grow_size", growSize,
 			)
 			w.bufPool.growBufferWithSize(w.buf, growSize)
