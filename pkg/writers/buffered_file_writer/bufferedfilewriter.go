@@ -313,6 +313,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 				"available_space", availableSpace,
 				"grow_size", growSize,
 			)
+			// We are manually growing the buffer so we can track the growth via metrics.
 			w.bufPool.growBufferWithSize(w.buf, growSize)
 		}
 
