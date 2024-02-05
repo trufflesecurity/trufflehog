@@ -9,14 +9,16 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type bufferPoolMetrics struct {
-	growCount  atomic.Int64
-	growAmount atomic.Int64
+	growCount    atomic.Int64
+	growAmount   atomic.Int64
+	shrinkAmount atomic.Int64
 
 	activeBufferCount atomic.Int64
 	bufferCount       atomic.Int64
@@ -25,10 +27,23 @@ type bufferPoolMetrics struct {
 	totalBufferSize   atomic.Int64
 
 	preAllocatedUse atomic.Int64 // Tracks successful uses of pre-allocated buffers
+	newBufferCount  atomic.Int64
+}
+
+func ReportBufferPoolMetrics() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			sharedBufferPool.metrics.print()
+		}
+	}
 }
 
 func (m *bufferPoolMetrics) recordGrowth(growthAmount int) {
 	m.growCount.Add(1)
+	m.newBufferCount.Add(1)
 	m.growAmount.Add(int64(growthAmount))
 }
 
@@ -42,15 +57,13 @@ func (m *bufferPoolMetrics) averageGrowth() int64 {
 // recordBufferRetrival groups the metrics updates for when a buffer is fetched.
 func (m *bufferPoolMetrics) recordBufferRetrival(bufCap, bufLen int64) {
 	m.activeBufferCount.Add(1)
+	m.bufferCount.Add(1)
 	m.totalBufferSize.Add(bufCap)
 	m.totalBufferLength.Add(bufLen)
 }
 
 // recordBufferReturn groups the metrics updates for when a buffer is returned.
-func (m *bufferPoolMetrics) recordBufferReturn() {
-	m.activeBufferCount.Add(-1)
-	m.bufferCount.Add(1)
-}
+func (m *bufferPoolMetrics) recordBufferReturn() { m.activeBufferCount.Add(-1) }
 
 func (m *bufferPoolMetrics) recordPreAllocatedUse() { m.preAllocatedUse.Add(1) }
 
@@ -61,8 +74,9 @@ func (m *bufferPoolMetrics) print() {
 	fmt.Printf("Buffer Count: %d\n", m.bufferCount.Load())
 	fmt.Printf("Total Buffer Length: %d\n", m.totalBufferLength.Load())
 	fmt.Printf("Total Buffer Size: %d\n", m.totalBufferSize.Load())
-	fmt.Printf("Pre-allocated Buffer Use: %d\n", m.preAllocatedUse.Load())
+	// fmt.Printf("Pre-allocated Buffer Use: %d\n", m.preAllocatedUse.Load())
 	fmt.Printf("Average Buffer Growth: %d\n", m.averageGrowth())
+	fmt.Printf("\n\n\n")
 }
 
 type bufPoolOpt func(pool *bufferPool)
@@ -76,7 +90,7 @@ type bufferPool struct {
 
 const defaultBufferSize = 2 << 12 // 8KB
 func newBufferPool(opts ...bufPoolOpt) *bufferPool {
-	pool := &bufferPool{bufferSize: defaultBufferSize}
+	pool := &bufferPool{bufferSize: defaultBufferSize, metrics: new(bufferPoolMetrics)}
 
 	for _, opt := range opts {
 		opt(pool)
@@ -104,14 +118,15 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 		ctx.Logger().Error(fmt.Errorf("buffer pool returned unexpected type"), "using new buffer")
 		buf = bytes.NewBuffer(make([]byte, 0, bp.bufferSize))
 	}
-
-	bp.metrics.recordBufferRetrival(int64(buf.Cap()), int64(buf.Len()))
+	bp.metrics.recordBufferRetrival(int64(buf.Cap()), defaultBufferSize)
 
 	return buf
 }
 
 func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, size int) {
 	// Grow the buffer to accommodate the new data.
+	bp.metrics.recordGrowth(size)
+	bp.metrics.recordGrowth(size)
 	buf.Grow(size)
 }
 
