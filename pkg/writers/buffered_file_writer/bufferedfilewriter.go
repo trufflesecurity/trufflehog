@@ -38,9 +38,10 @@ func newBufferPool(opts ...bufPoolOpt) *bufferPool {
 	return pool
 }
 
+// sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
+// This allows for efficient reuse of buffers across multiple writers.
 var sharedBufferPool *bufferPool
 
-// init function to initialize the shared buffer pool
 func init() { sharedBufferPool = newBufferPool() }
 
 func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
@@ -53,21 +54,10 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 	return buf
 }
 
-func (bp *bufferPool) getWithSize(ctx context.Context, dataSize uint64) *bytes.Buffer {
-	fetchedBuf := bp.get(ctx)
-
-	// Calculate if the fetched buffer's capacity is less than the required data size.
-	requiredCapacity := int(dataSize)
-	if fetchedBuf.Cap() >= requiredCapacity {
-		fetchedBuf.Reset()
-		return fetchedBuf
-	}
-
-	// If the fetched buffer's capacity is insufficient, return the inadequate buffer to the pool,
-	// and create a new buffer of the required size.
-	bp.put(fetchedBuf) // Return the initially fetched buffer as it's not used.
-
-	return bytes.NewBuffer(make([]byte, 0, requiredCapacity))
+func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, dataSize uint64) {
+	// Grow the buffer to accommodate the new data.
+	requiredGrowth := int(dataSize - uint64(buf.Cap()))
+	buf.Grow(requiredGrowth)
 }
 
 func (bp *bufferPool) put(buf *bytes.Buffer) {
@@ -168,44 +158,40 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 	}
 
 	size := uint64(len(data))
+
+	if w.buf == nil || w.buf.Len() == 0 {
+		w.buf = w.bufPool.get(ctx)
+	}
+
+	bufferLength := w.buf.Len()
+
 	defer func() {
 		w.size += size
 		ctx.Logger().V(4).Info(
 			"write complete",
 			"data_size", size,
-			"content_size", w.buf.Len(),
+			"content_size", bufferLength,
 			"total_size", w.size,
 		)
 	}()
 
-	if w.buf == nil || w.buf.Len() == 0 {
-		w.buf = w.bufPool.getWithSize(ctx, defaultBufferSize)
-	}
-
-	totalSizeNeeded := uint64(w.buf.Len()) + uint64(len(data))
+	totalSizeNeeded := uint64(bufferLength) + uint64(len(data))
 	if totalSizeNeeded <= w.threshold {
 		// If the total size is within the threshold, write to the buffer.
 		ctx.Logger().V(4).Info(
 			"writing to buffer",
 			"data_size", size,
-			"content_size", w.buf.Len(),
+			"content_size", bufferLength,
 		)
 
 		if totalSizeNeeded > uint64(w.buf.Cap()) {
 			ctx.Logger().V(4).Info(
 				"buffer size exceeded, getting new buffer",
-				"current_size", w.buf.Len(),
+				"current_size", bufferLength,
 				"new_size", totalSizeNeeded,
 			)
-			// The current buffer cannot accommodate the new data; fetch a new, larger buffer.
-			newBuf := w.bufPool.getWithSize(ctx, totalSizeNeeded)
-
-			// Copy the existing data to the new buffer and return the old buffer to the pool.
-			if _, err := w.buf.WriteTo(newBuf); err != nil {
-				return 0, err
-			}
-			w.bufPool.put(w.buf)
-			w.buf = newBuf
+			// The current buffer cannot accommodate the new data; grow it.
+			w.bufPool.growBufferWithSize(w.buf, totalSizeNeeded)
 		}
 
 		return w.buf.Write(data)
@@ -224,8 +210,8 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 
 		// Transfer existing data in buffer to the file, then clear the buffer.
 		// This ensures all the data is in one place - either entirely in the buffer or the file.
-		if w.buf.Len() > 0 {
-			ctx.Logger().V(4).Info("writing buffer to file", "content_size", w.buf.Len())
+		if bufferLength > 0 {
+			ctx.Logger().V(4).Info("writing buffer to file", "content_size", bufferLength)
 			if _, err := w.buf.WriteTo(w.file); err != nil {
 				return 0, err
 			}
