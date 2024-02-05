@@ -149,7 +149,7 @@ func (s *Source) appListReposWrapper(ctx context.Context, _ string, opts repoLis
 }
 
 type userListOptions struct {
-	github.RepositoryListOptions
+	github.RepositoryListByUserOptions
 }
 
 func (u *userListOptions) getListOptions() *github.ListOptions {
@@ -158,7 +158,7 @@ func (u *userListOptions) getListOptions() *github.ListOptions {
 
 func (s *Source) getReposByUser(ctx context.Context, user string) error {
 	return s.processRepos(ctx, user, s.userListReposWrapper, &userListOptions{
-		RepositoryListOptions: github.RepositoryListOptions{
+		RepositoryListByUserOptions: github.RepositoryListByUserOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
 			},
@@ -167,7 +167,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 }
 
 func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.apiClient.Repositories.List(ctx, user, &opts.(*userListOptions).RepositoryListOptions)
+	return s.apiClient.Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
 }
 
 type orgListOptions struct {

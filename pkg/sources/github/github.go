@@ -696,7 +696,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	// Does this need to be separate from |s.httpClient|?
 	instHTTPClient := common.RetryableHttpClientTimeout(60)
 	instHTTPClient.Transport = appItr
-	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHTTPClient)
+	installationClient, err = github.NewClient(instHTTPClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -713,7 +713,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	itr.BaseURL = apiEndpoint
 
 	s.httpClient.Transport = itr
-	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
+	s.apiClient, err = github.NewClient(s.httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +753,7 @@ func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Cl
 		return github.NewClient(httpClient), nil
 	}
 
-	return github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
+	return github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
@@ -929,7 +929,7 @@ func (s *Source) handleRateLimit(errIn error) bool {
 
 		rateLimitMu.Unlock()
 	} else {
-		retryAfter = resumeTime.Sub(time.Now())
+		retryAfter = time.Until(resumeTime)
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
