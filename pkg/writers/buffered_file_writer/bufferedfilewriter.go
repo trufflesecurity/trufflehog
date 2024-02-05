@@ -188,7 +188,6 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 				"available_space", availableSpace,
 				"grow_size", growSize,
 			)
-			w.buf.Grow(growSize)
 		}
 
 		return w.buf.Write(data)
