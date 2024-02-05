@@ -2222,8 +2222,6 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	// no validation rules for IncludeWikis
-
 	switch m.Credential.(type) {
 
 	case *GitHub_GithubApp:

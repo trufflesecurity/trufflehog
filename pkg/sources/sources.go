@@ -217,8 +217,6 @@ type GithubConfig struct {
 	IncludeGistComments bool
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
-	// IncludeWikis indicates whether to include repository wikis in the scan.
-	IncludeWikis bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
