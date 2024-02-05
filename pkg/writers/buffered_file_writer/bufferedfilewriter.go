@@ -54,11 +54,6 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 	return buf
 }
 
-func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, size int) {
-	// Grow the buffer to accommodate the new data.
-	buf.Grow(size)
-}
-
 func (bp *bufferPool) put(buf *bytes.Buffer) {
 	// If the buffer is more than twice the default size, replace it with a new, smaller one.
 	// This prevents us from returning very large buffers to the pool.
@@ -193,7 +188,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 				"available_space", availableSpace,
 				"grow_size", growSize,
 			)
-			w.bufPool.growBufferWithSize(w.buf, growSize)
+			w.buf.Grow(growSize)
 		}
 
 		return w.buf.Write(data)
