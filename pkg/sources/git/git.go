@@ -1143,6 +1143,9 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return err
 	}
 	defer func() {
+		if err := fileReader.Close(); err != nil {
+			ctx.Logger().Error(err, "error closing fileReader")
+		}
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().Error(
 				err, "error waiting for command",
