@@ -183,8 +183,8 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 			"content_size", bufferLength,
 		)
 
-		growSize := int(totalSizeNeeded - uint64(w.buf.Cap()))
-		if growSize > 0 {
+		if totalSizeNeeded > uint64(w.buf.Cap()) {
+			growSize := int(totalSizeNeeded - uint64(w.buf.Cap()))
 			ctx.Logger().V(4).Info(
 				"buffer size exceeded, growing buffer",
 				"current_size", bufferLength,
