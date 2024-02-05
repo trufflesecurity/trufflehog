@@ -392,8 +392,17 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	)
 	var latestState = Initial
 
-	writer := c.contentWriter()
-	currentDiff := NewDiff(withCustomContentWriter(writer))
+	diff := func(opts ...diffOption) *Diff {
+		opts = append(opts, withCustomContentWriter(newBuffer()))
+		return NewDiff(opts...)
+	}
+	if c.useCustomContentWriter {
+		diff = func(opts ...diffOption) *Diff {
+			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
+			return NewDiff(opts...)
+		}
+	}
+	currentDiff := diff()
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -436,7 +445,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
+			currentCommit = &Commit{}
+			currentDiff = diff()
 			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
@@ -504,7 +514,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 					currentCommit.Message.WriteString(oldCommit.Message.String())
 				}
 			}
-			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
+			currentDiff = diff()
+			// currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -544,7 +555,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				}
 				currentCommit.Diffs = append(currentCommit.Diffs, *currentDiff)
 			}
-			currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()), withPathB(currentDiff.PathB))
+			currentDiff = diff(withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
