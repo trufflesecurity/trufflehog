@@ -115,7 +115,7 @@ func (m *bufferPoolMetrics) print() {
 		fmt.Printf("Percentage of buffers that grew: %f\n", float64(m.growCount.Load())/float64(m.bufferCount.Load()))
 		fmt.Printf("Percentage of buffers that shrank: %f\n", float64(m.shrinkCount.Load())/float64(m.bufferCount.Load()))
 	}
-	fmt.Printf("Average Checkout Duration: %v (ms)\n", m.averageCheckoutDuration().Milliseconds())
+	fmt.Printf("Average Checkout Duration: %v (ms)\n", m.averageCheckoutDuration().Microseconds())
 	fmt.Printf("\n\n\n")
 }
 
