@@ -42,13 +42,13 @@ func TestRazorPay_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("25:RAZORPAY_KEY='rzp_test_SnDTaP1ncfliDt'\n\"rzp_secret\" : \" %s\", ", secretInactive)),
+				data:   []byte(fmt.Sprintf("25:RAZORPAY_KEY='rzp_live_SnDTaP1ncfliDt'\n\"rzp_secret\" : \" %s\", ", secretInactive)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_RazorPay,
-					Redacted:     "rzp_test_SnDTaP1ncfliDt",
+					Redacted:     "rzp_live_SnDTaP1ncfliDt",
 					Verified:     false,
 				},
 			},
@@ -82,6 +82,7 @@ func TestRazorPay_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("RazorPay.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
@@ -95,6 +96,7 @@ func BenchmarkFromData(benchmark *testing.B) {
 	s := Scanner{}
 	for name, data := range detectors.MustGetBenchmarkData() {
 		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				_, err := s.FromData(ctx, false, data)
 				if err != nil {

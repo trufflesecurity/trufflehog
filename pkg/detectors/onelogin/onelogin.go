@@ -3,8 +3,8 @@ package onelogin
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_OneLogin,
 				Raw:          []byte(clientID[1]),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", clientID[1], clientSecret[1])),
 				Redacted:     clientID[1],
 			}
 
@@ -81,5 +82,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_OneLogin
 }

@@ -2,12 +2,12 @@ package gitlab
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
-	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -15,14 +15,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.SetLevel(log.DebugLevel)
-	log.SetFormatter(&log.TextFormatter{ForceColors: true})
 	secret, err := common.GetTestSecret(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
@@ -37,27 +36,45 @@ func TestSource_Scan(t *testing.T) {
 		connection *sourcespb.GitLab
 	}
 	tests := []struct {
-		name      string
-		init      init
-		wantChunk *sources.Chunk
-		wantErr   bool
+		name             string
+		init             init
+		wantChunk        *sources.Chunk
+		wantReposScanned int
+		wantErr          bool
 	}{
 		{
-			name: "token auth, enumerate repo",
+			name: "token auth, enumerate repo, with explicit ignore",
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitLab{
 					Credential: &sourcespb.GitLab_Token{
 						Token: token,
 					},
+					IgnoreRepos: []string{"tes1188/learn-gitlab"},
 				},
 			},
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 5,
+		},
+		{
+			name: "token auth, enumerate repo, with glob ignore",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitLab{
+					Credential: &sourcespb.GitLab_Token{
+						Token: token,
+					},
+					IgnoreRepos: []string{"tes1188/*-gitlab"},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+				SourceName: "test source",
+			},
+			wantReposScanned: 5,
 		},
 		{
 			name: "token auth, scoped repo",
@@ -73,9 +90,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source scoped",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 1,
 		},
 		{
 			name: "basic auth, scoped repo",
@@ -94,9 +110,8 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source basic auth scoped",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 1,
 		},
 		{
 			name: "basic auth access token, scoped repo",
@@ -115,15 +130,14 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: &sources.Chunk{
 				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
 				SourceName: "test source basic auth access token scoped",
-				Verify:     false,
 			},
-			wantErr: false,
+			wantReposScanned: 1,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
-			log.SetLevel(log.DebugLevel)
 
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
@@ -154,9 +168,155 @@ func TestSource_Scan(t *testing.T) {
 					t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
 				}
 			}
+
+			assert.Equal(t, tt.wantReposScanned, len(s.repos))
 			if chunkCnt < 1 {
 				t.Errorf("0 chunks scanned.")
 			}
+		})
+	}
+}
+
+func TestSource_Validate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+	token := secret.MustGetField("GITLAB_TOKEN")
+	tokenWrongScope := secret.MustGetField("GITLAB_TOKEN_WRONG_SCOPE")
+
+	tests := []struct {
+		name         string
+		connection   *sourcespb.GitLab
+		wantErrCount int
+		wantErrs     []string
+	}{
+		{
+			name: "basic auth did not authenticate",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_BasicAuth{
+					BasicAuth: &credentialspb.BasicAuth{
+						Username: "bad-user",
+						Password: "bad-password",
+					},
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "token did not authenticate",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: "bad-token",
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "bad repo urls",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy",  // valid
+					"https://gitlab.com/testermctestface/testy/", // trailing slash
+					"ssh:git@gitlab.com/testermctestface/testy",  // bad protocol
+					"https://gitlab.com",                         // no path
+					"https://gitlab.com/",                        // no org name
+					"https://gitlab.com//testy",                  // no org name
+					"https://gitlab.com/testermctestface/",       // no repo name
+				},
+			},
+			wantErrCount: 6,
+		},
+		{
+			name: "token does not have permission to list projects",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: tokenWrongScope,
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "repositories and ignore globs both configured",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy", // valid
+				},
+				IgnoreRepos: []string{
+					"tes1188/*-gitlab",
+					"[", // glob doesn't compile, but this won't be checked
+				},
+			},
+			wantErrCount: 1,
+		},
+		{
+			name: "could not compile ignore glob(s)",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IgnoreRepos: []string{
+					"tes1188/*-gitlab",
+					"[",    // glob doesn't compile
+					"[a-]", // glob doesn't compile
+				},
+			},
+			wantErrCount: 2,
+		},
+		{
+			name: "repositories do not exist or are not accessible",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				Repositories: []string{
+					"https://gitlab.com/testermctestface/testy",
+					"https://gitlab.com/testermctestface/doesn't-exist",
+					"https://gitlab.com/testermctestface/also-doesn't-exist",
+				},
+			},
+			wantErrCount: 2,
+		},
+		{
+			name: "ignore globs exclude all repos",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IgnoreRepos: []string{
+					"*",
+				},
+			},
+			wantErrCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.name, 0, 0, false, conn, 1)
+			if err != nil {
+				t.Fatalf("Source.Init() error: %v", err)
+			}
+
+			errs := s.Validate(ctx)
+
+			assert.Equal(t, tt.wantErrCount, len(errs))
 		})
 	}
 }
@@ -179,7 +339,6 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 		},
 	}
 
-	log.SetOutput(io.Discard)
 	s := &Source{repos: []string{}}
 
 	for _, tt := range tests {
@@ -227,8 +386,6 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		},
 	}
 
-	log.SetOutput(io.Discard)
-
 	for _, tt := range tests {
 		s := &Source{
 			repos: tt.repos,
@@ -245,5 +402,44 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 		if gotProgress.SectionsRemaining != tt.wantSectionsRemaining {
 			t.Errorf("s.setProgressCompleteWithRepo() PercentComplete got: %v want: %v", gotProgress.SectionsRemaining, tt.wantSectionsRemaining)
 		}
+	}
+}
+
+func Test_scanRepos_SetProgressComplete(t *testing.T) {
+	testCases := []struct {
+		name         string
+		repos        []string
+		wantComplete bool
+		wantErr      bool
+	}{
+		{
+			name:         "no repos",
+			wantComplete: true,
+		},
+		{
+			name:         "one valid repo",
+			repos:        []string{"repo"},
+			wantComplete: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := &Source{
+				repos: tc.repos,
+			}
+			src.jobPool = &errgroup.Group{}
+			src.scanOptions = &git.ScanOptions{}
+
+			_ = src.scanRepos(context.Background(), nil)
+			if !tc.wantErr {
+				assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
+			}
+
+			gotComplete := src.GetProgress().PercentComplete == 100
+			if gotComplete != tc.wantComplete {
+				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
+			}
+		})
 	}
 }

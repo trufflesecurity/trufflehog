@@ -3,8 +3,8 @@ package scrapfly
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -22,7 +22,11 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scrapfly"}) + `\b([a-z0-9]{32})\b`)
+	// examples of api valid keys:
+	//   - scp-live-03b9e7d0d0024e4b8fccc1ffe923e899 (new format)
+	//   - scp-test-03b9e7d0d0024e4b8fccc1ffe923e899 (new format)
+	//   - 03b9e7d0d0024e4b8fccc1ffe923e899 (old format)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scrapfly"}) + `\b([a-z0-9]{32}|scp-(?:live|test)-[a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -51,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.scrapfly.io/scrape?key=%s&url=https://google.com", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.scrapfly.io/scrape?key=%s&url=https://httpbin.org/status/200", resMatch), nil)
 			if err != nil {
 				continue
 			}
@@ -72,5 +76,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Scrapfly
 }

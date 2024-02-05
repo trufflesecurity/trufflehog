@@ -486,6 +486,117 @@ var _ interface {
 	ErrorName() string
 } = CircleCIValidationError{}
 
+// Validate checks the field values on TravisCI with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *TravisCI) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TravisCI with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in TravisCIMultiError, or nil
+// if none found.
+func (m *TravisCI) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TravisCI) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Username
+
+	// no validation rules for Repository
+
+	// no validation rules for BuildNumber
+
+	// no validation rules for JobNumber
+
+	// no validation rules for Link
+
+	// no validation rules for Public
+
+	if len(errors) > 0 {
+		return TravisCIMultiError(errors)
+	}
+
+	return nil
+}
+
+// TravisCIMultiError is an error wrapping multiple validation errors returned
+// by TravisCI.ValidateAll() if the designated constraints aren't met.
+type TravisCIMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TravisCIMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TravisCIMultiError) AllErrors() []error { return m }
+
+// TravisCIValidationError is the validation error returned by
+// TravisCI.Validate if the designated constraints aren't met.
+type TravisCIValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TravisCIValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TravisCIValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TravisCIValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TravisCIValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TravisCIValidationError) ErrorName() string { return "TravisCIValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TravisCIValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTravisCI.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TravisCIValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TravisCIValidationError{}
+
 // Validate checks the field values on Confluence with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -519,6 +630,10 @@ func (m *Confluence) validate(all bool) error {
 	// no validation rules for Email
 
 	// no validation rules for Timestamp
+
+	// no validation rules for Location
+
+	// no validation rules for File
 
 	if len(errors) > 0 {
 		return ConfluenceMultiError(errors)
@@ -597,22 +712,21 @@ var _ interface {
 	ErrorName() string
 } = ConfluenceValidationError{}
 
-// Validate checks the field values on Dockerhub with the rules defined in the
+// Validate checks the field values on Docker with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
-func (m *Dockerhub) Validate() error {
+func (m *Docker) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Dockerhub with the rules defined in
-// the proto definition for this message. If any rules are violated, the
-// result is a list of violation errors wrapped in DockerhubMultiError, or nil
-// if none found.
-func (m *Dockerhub) ValidateAll() error {
+// ValidateAll checks the field values on Docker with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in DockerMultiError, or nil if none found.
+func (m *Docker) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Dockerhub) validate(all bool) error {
+func (m *Docker) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -627,23 +741,19 @@ func (m *Dockerhub) validate(all bool) error {
 
 	// no validation rules for Tag
 
-	// no validation rules for Link
-
-	// no validation rules for Email
-
 	if len(errors) > 0 {
-		return DockerhubMultiError(errors)
+		return DockerMultiError(errors)
 	}
 
 	return nil
 }
 
-// DockerhubMultiError is an error wrapping multiple validation errors returned
-// by Dockerhub.ValidateAll() if the designated constraints aren't met.
-type DockerhubMultiError []error
+// DockerMultiError is an error wrapping multiple validation errors returned by
+// Docker.ValidateAll() if the designated constraints aren't met.
+type DockerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m DockerhubMultiError) Error() string {
+func (m DockerMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -652,11 +762,11 @@ func (m DockerhubMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m DockerhubMultiError) AllErrors() []error { return m }
+func (m DockerMultiError) AllErrors() []error { return m }
 
-// DockerhubValidationError is the validation error returned by
-// Dockerhub.Validate if the designated constraints aren't met.
-type DockerhubValidationError struct {
+// DockerValidationError is the validation error returned by Docker.Validate if
+// the designated constraints aren't met.
+type DockerValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -664,22 +774,22 @@ type DockerhubValidationError struct {
 }
 
 // Field function returns field value.
-func (e DockerhubValidationError) Field() string { return e.field }
+func (e DockerValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e DockerhubValidationError) Reason() string { return e.reason }
+func (e DockerValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e DockerhubValidationError) Cause() error { return e.cause }
+func (e DockerValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e DockerhubValidationError) Key() bool { return e.key }
+func (e DockerValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e DockerhubValidationError) ErrorName() string { return "DockerhubValidationError" }
+func (e DockerValidationError) ErrorName() string { return "DockerValidationError" }
 
 // Error satisfies the builtin error interface
-func (e DockerhubValidationError) Error() string {
+func (e DockerValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -691,14 +801,14 @@ func (e DockerhubValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sDockerhub.%s: %s%s",
+		"invalid %sDocker.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = DockerhubValidationError{}
+var _ error = DockerValidationError{}
 
 var _ interface {
 	Field() string
@@ -706,7 +816,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = DockerhubValidationError{}
+} = DockerValidationError{}
 
 // Validate checks the field values on ECR with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
@@ -847,6 +957,8 @@ func (m *Filesystem) validate(all bool) error {
 	// no validation rules for Link
 
 	// no validation rules for Email
+
+	// no validation rules for Line
 
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
@@ -1072,6 +1184,8 @@ func (m *Github) validate(all bool) error {
 
 	// no validation rules for Line
 
+	// no validation rules for Visibility
+
 	if len(errors) > 0 {
 		return GithubMultiError(errors)
 	}
@@ -1284,11 +1398,17 @@ func (m *GCS) validate(all bool) error {
 
 	// no validation rules for Bucket
 
-	// no validation rules for File
+	// no validation rules for Filename
 
 	// no validation rules for Link
 
 	// no validation rules for Email
+
+	// no validation rules for CreatedAt
+
+	// no validation rules for UpdatedAt
+
+	// no validation rules for ContentType
 
 	if len(errors) > 0 {
 		return GCSMultiError(errors)
@@ -1836,6 +1956,10 @@ func (m *Slack) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Visibility
+
+	// no validation rules for Location
+
 	if len(errors) > 0 {
 		return SlackMultiError(errors)
 	}
@@ -2264,6 +2388,12 @@ func (m *Teams) validate(all bool) error {
 
 	// no validation rules for Email
 
+	// no validation rules for Location
+
+	// no validation rules for TeamName
+
+	// no validation rules for TeamId
+
 	if len(errors) > 0 {
 		return TeamsMultiError(errors)
 	}
@@ -2562,22 +2692,21 @@ var _ interface {
 	ErrorName() string
 } = SyslogValidationError{}
 
-// Validate checks the field values on PublicEventMonitoring with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *PublicEventMonitoring) Validate() error {
+// Validate checks the field values on Forager with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Forager) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on PublicEventMonitoring with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// PublicEventMonitoringMultiError, or nil if none found.
-func (m *PublicEventMonitoring) ValidateAll() error {
+// ValidateAll checks the field values on Forager with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in ForagerMultiError, or nil if none found.
+func (m *Forager) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *PublicEventMonitoring) validate(all bool) error {
+func (m *Forager) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -2586,13 +2715,13 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 
 	switch m.Metadata.(type) {
 
-	case *PublicEventMonitoring_Github:
+	case *Forager_Github:
 
 		if all {
 			switch v := interface{}(m.GetGithub()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, PublicEventMonitoringValidationError{
+					errors = append(errors, ForagerValidationError{
 						field:  "Github",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2600,7 +2729,7 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, PublicEventMonitoringValidationError{
+					errors = append(errors, ForagerValidationError{
 						field:  "Github",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -2609,8 +2738,70 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetGithub()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return PublicEventMonitoringValidationError{
+				return ForagerValidationError{
 					field:  "Github",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Forager_Npm:
+
+		if all {
+			switch v := interface{}(m.GetNpm()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Npm",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Npm",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetNpm()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ForagerValidationError{
+					field:  "Npm",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Forager_Pypi:
+
+		if all {
+			switch v := interface{}(m.GetPypi()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Pypi",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ForagerValidationError{
+						field:  "Pypi",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetPypi()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ForagerValidationError{
+					field:  "Pypi",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -2620,19 +2811,18 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return PublicEventMonitoringMultiError(errors)
+		return ForagerMultiError(errors)
 	}
 
 	return nil
 }
 
-// PublicEventMonitoringMultiError is an error wrapping multiple validation
-// errors returned by PublicEventMonitoring.ValidateAll() if the designated
-// constraints aren't met.
-type PublicEventMonitoringMultiError []error
+// ForagerMultiError is an error wrapping multiple validation errors returned
+// by Forager.ValidateAll() if the designated constraints aren't met.
+type ForagerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m PublicEventMonitoringMultiError) Error() string {
+func (m ForagerMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -2641,11 +2831,11 @@ func (m PublicEventMonitoringMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m PublicEventMonitoringMultiError) AllErrors() []error { return m }
+func (m ForagerMultiError) AllErrors() []error { return m }
 
-// PublicEventMonitoringValidationError is the validation error returned by
-// PublicEventMonitoring.Validate if the designated constraints aren't met.
-type PublicEventMonitoringValidationError struct {
+// ForagerValidationError is the validation error returned by Forager.Validate
+// if the designated constraints aren't met.
+type ForagerValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -2653,24 +2843,22 @@ type PublicEventMonitoringValidationError struct {
 }
 
 // Field function returns field value.
-func (e PublicEventMonitoringValidationError) Field() string { return e.field }
+func (e ForagerValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e PublicEventMonitoringValidationError) Reason() string { return e.reason }
+func (e ForagerValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e PublicEventMonitoringValidationError) Cause() error { return e.cause }
+func (e ForagerValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e PublicEventMonitoringValidationError) Key() bool { return e.key }
+func (e ForagerValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e PublicEventMonitoringValidationError) ErrorName() string {
-	return "PublicEventMonitoringValidationError"
-}
+func (e ForagerValidationError) ErrorName() string { return "ForagerValidationError" }
 
 // Error satisfies the builtin error interface
-func (e PublicEventMonitoringValidationError) Error() string {
+func (e ForagerValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -2682,14 +2870,14 @@ func (e PublicEventMonitoringValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sPublicEventMonitoring.%s: %s%s",
+		"invalid %sForager.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = PublicEventMonitoringValidationError{}
+var _ error = ForagerValidationError{}
 
 var _ interface {
 	Field() string
@@ -2697,7 +2885,354 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = PublicEventMonitoringValidationError{}
+} = ForagerValidationError{}
+
+// Validate checks the field values on SharePoint with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SharePoint) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SharePoint with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SharePointMultiError, or
+// nil if none found.
+func (m *SharePoint) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SharePoint) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Link
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Author
+
+	// no validation rules for Title
+
+	// no validation rules for Views
+
+	// no validation rules for Docid
+
+	// no validation rules for Email
+
+	if len(errors) > 0 {
+		return SharePointMultiError(errors)
+	}
+
+	return nil
+}
+
+// SharePointMultiError is an error wrapping multiple validation errors
+// returned by SharePoint.ValidateAll() if the designated constraints aren't met.
+type SharePointMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SharePointMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SharePointMultiError) AllErrors() []error { return m }
+
+// SharePointValidationError is the validation error returned by
+// SharePoint.Validate if the designated constraints aren't met.
+type SharePointValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SharePointValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SharePointValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SharePointValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SharePointValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SharePointValidationError) ErrorName() string { return "SharePointValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SharePointValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSharePoint.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SharePointValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SharePointValidationError{}
+
+// Validate checks the field values on GoogleDrive with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *GoogleDrive) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GoogleDrive with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in GoogleDriveMultiError, or
+// nil if none found.
+func (m *GoogleDrive) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GoogleDrive) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for File
+
+	// no validation rules for Link
+
+	// no validation rules for Email
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Shared
+
+	// no validation rules for LastModifiedBy
+
+	// no validation rules for Path
+
+	if len(errors) > 0 {
+		return GoogleDriveMultiError(errors)
+	}
+
+	return nil
+}
+
+// GoogleDriveMultiError is an error wrapping multiple validation errors
+// returned by GoogleDrive.ValidateAll() if the designated constraints aren't met.
+type GoogleDriveMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GoogleDriveMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GoogleDriveMultiError) AllErrors() []error { return m }
+
+// GoogleDriveValidationError is the validation error returned by
+// GoogleDrive.Validate if the designated constraints aren't met.
+type GoogleDriveValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GoogleDriveValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GoogleDriveValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GoogleDriveValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GoogleDriveValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GoogleDriveValidationError) ErrorName() string { return "GoogleDriveValidationError" }
+
+// Error satisfies the builtin error interface
+func (e GoogleDriveValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGoogleDrive.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GoogleDriveValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GoogleDriveValidationError{}
+
+// Validate checks the field values on AzureRepos with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *AzureRepos) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AzureRepos with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in AzureReposMultiError, or
+// nil if none found.
+func (m *AzureRepos) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AzureRepos) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Link
+
+	// no validation rules for Username
+
+	// no validation rules for Repository
+
+	// no validation rules for Commit
+
+	// no validation rules for Email
+
+	// no validation rules for File
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Line
+
+	// no validation rules for Visibility
+
+	// no validation rules for Project
+
+	// no validation rules for Organization
+
+	if len(errors) > 0 {
+		return AzureReposMultiError(errors)
+	}
+
+	return nil
+}
+
+// AzureReposMultiError is an error wrapping multiple validation errors
+// returned by AzureRepos.ValidateAll() if the designated constraints aren't met.
+type AzureReposMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AzureReposMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AzureReposMultiError) AllErrors() []error { return m }
+
+// AzureReposValidationError is the validation error returned by
+// AzureRepos.Validate if the designated constraints aren't met.
+type AzureReposValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AzureReposValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AzureReposValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AzureReposValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AzureReposValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AzureReposValidationError) ErrorName() string { return "AzureReposValidationError" }
+
+// Error satisfies the builtin error interface
+func (e AzureReposValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAzureRepos.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AzureReposValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AzureReposValidationError{}
 
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -2847,14 +3382,14 @@ func (m *MetaData) validate(all bool) error {
 			}
 		}
 
-	case *MetaData_Dockerhub:
+	case *MetaData_Docker:
 
 		if all {
-			switch v := interface{}(m.GetDockerhub()).(type) {
+			switch v := interface{}(m.GetDocker()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, MetaDataValidationError{
-						field:  "Dockerhub",
+						field:  "Docker",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -2862,16 +3397,16 @@ func (m *MetaData) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, MetaDataValidationError{
-						field:  "Dockerhub",
+						field:  "Docker",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetDockerhub()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetDocker()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
-					field:  "Dockerhub",
+					field:  "Docker",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -3436,14 +3971,14 @@ func (m *MetaData) validate(all bool) error {
 			}
 		}
 
-	case *MetaData_PublicEventMonitoring:
+	case *MetaData_Forager:
 
 		if all {
-			switch v := interface{}(m.GetPublicEventMonitoring()).(type) {
+			switch v := interface{}(m.GetForager()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, MetaDataValidationError{
-						field:  "PublicEventMonitoring",
+						field:  "Forager",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -3451,16 +3986,140 @@ func (m *MetaData) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, MetaDataValidationError{
-						field:  "PublicEventMonitoring",
+						field:  "Forager",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetPublicEventMonitoring()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetForager()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
-					field:  "PublicEventMonitoring",
+					field:  "Forager",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Sharepoint:
+
+		if all {
+			switch v := interface{}(m.GetSharepoint()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sharepoint",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sharepoint",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSharepoint()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Sharepoint",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_GoogleDrive:
+
+		if all {
+			switch v := interface{}(m.GetGoogleDrive()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "GoogleDrive",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "GoogleDrive",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetGoogleDrive()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "GoogleDrive",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_AzureRepos:
+
+		if all {
+			switch v := interface{}(m.GetAzureRepos()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "AzureRepos",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "AzureRepos",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAzureRepos()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "AzureRepos",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_TravisCI:
+
+		if all {
+			switch v := interface{}(m.GetTravisCI()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "TravisCI",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "TravisCI",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTravisCI()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "TravisCI",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

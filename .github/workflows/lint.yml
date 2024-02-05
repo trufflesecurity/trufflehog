@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - v*
-    branches:
-      - main
   pull_request:
 
 permissions:
@@ -13,14 +11,14 @@ permissions:
   pull-requests: read
 
 jobs:
-  golangci:
-    name: lint
+  golangci-lint:
+    name: golangci-lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: '1.18'
-      - uses: actions/checkout@v3
+          go-version: "1.21"
+      - uses: actions/checkout@v4
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -30,13 +28,19 @@ jobs:
           # working-directory: somedir
 
           # Optional: golangci-lint command line arguments.
-          args: --enable bodyclose --timeout 10m
-
-          # Optional: show only new issues if it's a pull request. The default value is `false`.
-          only-new-issues: true
+          args: --enable bodyclose --enable exportloopref --timeout 10m
 
           # Optional: if set to true then the action don't cache or restore ~/go/pkg.
           # skip-pkg-cache: true
 
           # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
           # skip-build-cache: true
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep --config=hack/semgrep-rules/detectors.yaml pkg/detectors/

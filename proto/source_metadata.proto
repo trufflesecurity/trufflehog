@@ -44,6 +44,16 @@ message CircleCI {
   string email = 7;
 }
 
+message TravisCI {
+  string username = 2;
+  string repository = 3;
+  string build_number = 4;
+  string job_number  = 5;
+  string link = 6;
+  bool public = 7;
+}
+
+
 message Confluence {
   string page = 1;
   string space = 2;
@@ -51,15 +61,15 @@ message Confluence {
   string link = 4;
   string email = 5;
   string timestamp = 6;
+  string location = 7;
+  string file = 8;
 }
 
-message Dockerhub {
+message Docker {
   string file = 1;
   string image = 2;
   string layer = 3;
   string tag = 4;
-  string link = 5;
-  string email = 6;
 }
 
 message ECR {
@@ -76,6 +86,7 @@ message Filesystem {
   string file = 1;
   string link = 2;
   string email = 3;
+  int64 line = 4;
 }
 
 message Git {
@@ -96,6 +107,7 @@ message Github {
   string file = 6;
   string timestamp = 7;
   int64 line = 8;
+  Visibility visibility = 9;
 }
 
 message Gitlab {
@@ -110,9 +122,13 @@ message Gitlab {
 
 message GCS {
   string bucket = 1;
-  string file = 2;
+  string filename = 2;
   string link = 3;
   string email = 4;
+  string created_at = 5;
+  string updated_at = 6;
+  repeated string acls = 7;
+  string content_type = 8;
 }
 
 message Jira {
@@ -148,6 +164,13 @@ message S3 {
   string timestamp = 6;
 }
 
+enum Visibility {
+  public = 0;
+  private = 1;
+  shared = 2;
+  unknown = 3;
+}
+
 message Slack {
   string channel_id = 1;
   string channel_name = 2;
@@ -156,6 +179,8 @@ message Slack {
   string link = 5;
   string file = 6;
   string email = 7;
+  Visibility visibility = 8;
+  string location = 9;
 }
 
 message Gerrit {
@@ -186,6 +211,9 @@ message Teams {
   string link = 5;
   string file = 6;
   string email = 7;
+  string location = 8;
+  string team_name = 9;
+  string team_id = 10;
 }
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-FileInfo
@@ -207,10 +235,46 @@ message Syslog {
   string facility = 6;
 }
 
-message PublicEventMonitoring {
+message Forager {
   oneof metadata {
     Github github = 1;
+    NPM npm = 2;
+    PyPi pypi = 3;
   }
+}
+
+message SharePoint {
+  string link = 1;
+  string timestamp = 2;
+  string author = 3;
+  string title = 4;
+  int64 views = 5;
+  string docid = 6;
+  string email = 7;
+}
+
+message GoogleDrive {
+  string file = 1;
+  string link = 2;
+  string email = 3;
+  string timestamp = 4;
+  bool shared = 5;
+  string last_modified_by = 6;
+  string path = 7;
+}
+
+message AzureRepos {
+  string link = 1;
+  string username = 2;
+  string repository = 3;
+  string commit = 4;
+  string email = 5;
+  string file = 6;
+  string timestamp = 7;
+  int64 line = 8;
+  Visibility visibility = 9;
+  string project = 10;
+  string organization = 11;
 }
 
 message MetaData {
@@ -219,7 +283,7 @@ message MetaData {
     Bitbucket bitbucket = 2;
     CircleCI circleci = 3;
     Confluence confluence = 4;
-    Dockerhub dockerhub = 5;
+    Docker docker = 5;
     ECR ecr = 6;
     GCS gcs = 7;
     Github github = 8;
@@ -238,6 +302,10 @@ message MetaData {
     Teams teams = 21;
     Artifactory artifactory = 22;
     Syslog syslog = 23;
-    PublicEventMonitoring publicEventMonitoring = 24;
+    Forager forager = 24;
+    SharePoint sharepoint = 25;
+    GoogleDrive googleDrive = 26;
+    AzureRepos azureRepos = 27;
+    TravisCI travisCI = 28;
   }
 }

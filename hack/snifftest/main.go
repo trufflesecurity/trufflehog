@@ -10,15 +10,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/paulbellamy/ratecounter"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
-	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -42,6 +42,20 @@ var (
 )
 
 func main() {
+	// setup logger
+	logger, flush := log.New("trufflehog", log.WithConsoleSink(os.Stderr))
+	// make it the default logger for contexts
+	context.SetDefaultLogger(logger)
+	defer func() { _ = flush() }()
+	logFatal := func(err error, message string, keyAndVals ...any) {
+		logger.Error(err, message, keyAndVals...)
+		if err != nil {
+			os.Exit(1)
+			return
+		}
+		os.Exit(0)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*2)
 	var cancelOnce sync.Once
 	defer cancelOnce.Do(cancel)
@@ -60,7 +74,7 @@ func main() {
 		selectedScanners := map[string]detectors.Detector{}
 		allScanners := getAllScanners()
 
-		decoders := decoders.DefaultDecoders()
+		allDecoders := decoders.DefaultDecoders()
 
 		input := strings.ToLower(*scanCmdDetector)
 		if input == "all" {
@@ -68,19 +82,19 @@ func main() {
 		} else {
 			_, ok := allScanners[input]
 			if !ok {
-				log.Fatal("could not find scanner by that name")
+				logFatal(fmt.Errorf("invalid input"), "could not find scanner by that name")
 			}
 			selectedScanners[input] = allScanners[input]
 		}
 		if len(selectedScanners) == 0 {
-			log.Fatal("no detectors selected")
+			logFatal(fmt.Errorf("invalid input"), "no detectors selected")
 		}
 
 		for _, excluded := range *scanCmdExclude {
 			delete(selectedScanners, excluded)
 		}
 
-		log.Infof("loaded %d secret detectors", len(selectedScanners)+3)
+		logger.Info("loaded secret detectors", "count", len(selectedScanners)+3)
 
 		var wgScanners sync.WaitGroup
 
@@ -92,7 +106,7 @@ func main() {
 				time.Sleep(60 * time.Second)
 				counter.Incr(int64(chunkCounter - prev))
 				prev = chunkCounter
-				log.Infof("chunk scan rate: %d/sec", counter.Rate()/60)
+				logger.Info("chunk scan rate per second", "rate", counter.Rate()/60)
 			}
 		}()
 
@@ -107,7 +121,7 @@ func main() {
 
 				for chunk := range chunksChan {
 					for name, scanner := range selectedScanners {
-						for _, dec := range decoders {
+						for _, dec := range allDecoders {
 							decoded := dec.FromChunk(&sources.Chunk{Data: chunk.Data})
 							if decoded != nil {
 								foundKeyword := false
@@ -122,7 +136,7 @@ func main() {
 
 								res, err := scanner.FromData(ctx, *scanVerify, decoded.Data)
 								if err != nil {
-									log.Fatal(err)
+									logFatal(err, "error scanning chunk")
 								}
 								if len(res) > 0 {
 									if resCounter[name] == nil {
@@ -131,16 +145,19 @@ func main() {
 									}
 									atomic.AddUint64(resCounter[name], uint64(len(res)))
 									if *scanThreshold != 0 && int(*resCounter[name]) > *scanThreshold {
-										log.WithField("scanner", name).Errorf("exceeded result threshold of %d", *scanThreshold)
+										logger.Error(
+											fmt.Errorf("exceeded result threshold"), "snifftest failed",
+											"scanner", name, "threshold", *scanThreshold,
+										)
 										failed = true
 										os.Exit(1)
 									}
 
 									if *scanPrintRes {
 										for _, r := range res {
-											logger := log.WithField("secret", name).WithField("meta", chunk.SourceMetadata).WithField("result", string(r.Raw))
+											logger := logger.WithValues("secret", name, "meta", chunk.SourceMetadata, "result", string(r.Raw))
 											if *scanPrintChunkRes {
-												logger = logger.WithField("chunk", string(decoded.Data))
+												logger = logger.WithValues("chunk", string(decoded.Data))
 											}
 											logger.Info("result")
 										}
@@ -156,21 +173,31 @@ func main() {
 		}
 
 		for _, repo := range strings.Split(*scanCmdRepo, ",") {
-			sem.Acquire(ctx, 1)
+			if err := sem.Acquire(ctx, 1); err != nil {
+				logFatal(err, "timed out waiting for semaphore")
+			}
 			wgChunkers.Add(1)
 			go func(r string) {
 				defer sem.Release(1)
 				defer wgChunkers.Done()
-				log.Infof("cloning %s", r)
-				path, repo, err := git.CloneRepoUsingUnauthenticated(r)
+				logger.Info("cloning repo", "repo", r)
+				path, repo, err := git.CloneRepoUsingUnauthenticated(ctx, r)
 				if err != nil {
-					log.Fatal(err)
+					logFatal(err, "error cloning repo", "repo", r)
 				}
 
-				log.Infof("cloned %s", r)
+				logger.Info("cloned repo", "repo", r)
 
-				s := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "snifftest", false, runtime.NumCPU(),
-					func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+				cfg := &git.Config{
+					SourceName:   "snifftest",
+					JobID:        0,
+					SourceID:     0,
+					SourceType:   sourcespb.SourceType_SOURCE_TYPE_GIT,
+					Verify:       false,
+					SkipBinaries: true,
+					SkipArchives: false,
+					Concurrency:  runtime.NumCPU(),
+					SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 						return &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Git{
 								Git: &source_metadatapb.Git{
@@ -182,14 +209,16 @@ func main() {
 								},
 							},
 						}
-					})
-
-				log.Infof("scanning %s", r)
-				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), chunksChan)
-				if err != nil {
-					log.Fatal(err)
+					},
 				}
-				log.Infof("scanned %s", r)
+				s := git.NewGit(cfg)
+
+				logger.Info("scanning repo", "repo", r)
+				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), sources.ChanReporter{Ch: chunksChan})
+				if err != nil {
+					logFatal(err, "error scanning repo")
+				}
+				logger.Info("scanned repo", "repo", r)
 				defer os.RemoveAll(path)
 			}(repo)
 		}
@@ -201,9 +230,9 @@ func main() {
 
 		wgScanners.Wait()
 
-		log.WithField("chunks", chunkCounter).Info("completed")
+		logger.Info("completed snifftest", "chunks", chunkCounter)
 		for scanner, resultsCount := range resCounter {
-			log.WithField("results", *resultsCount).Info(scanner)
+			logger.Info(scanner, "results", *resultsCount)
 		}
 
 		if failed {

@@ -2,22 +2,24 @@ package twilio
 
 import (
 	"context"
+	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"net/url"
-	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	defaultClient = common.SaneHttpClient()
 	identifierPat = regexp.MustCompile(`(?i)sid.{0,20}AC[0-9a-f]{32}`) // Should we have this? Seems restrictive.
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
@@ -43,24 +45,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	sidMatches := sidPat.FindAllString(dataStr, -1)
 
 	for _, sid := range sidMatches {
+		for _, key := range keyMatches {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Twilio,
+				Raw:          []byte(sid),
+				RawV2:        []byte(sid + key),
+				Redacted:     sid,
+			}
 
-		s := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Twilio,
-			Raw:          []byte(sid),
-			Redacted:     sid,
-		}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
+			}
 
-		if verify {
-			client := common.SaneHttpClient()
-			for _, key := range keyMatches {
+			if verify {
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
 
-				form := url.Values{}
-				form.Add("FriendlyName", "MyServiceName")
 				req, err := http.NewRequestWithContext(
-					ctx, "POST", "https://verify.twilio.com/v2/Services",
-
-					strings.NewReader(form.Encode()),
-				)
+					ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
 				if err != nil {
 					continue
 				}
@@ -72,20 +76,31 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					res.Body.Close() // The request body is unused.
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s.Verified = true
+						s1.Verified = true
+					} else if res.StatusCode == 401 || res.StatusCode == 403 {
+						// The secret is determinately not verified (nothing to do)
+					} else {
+						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+						s1.SetVerificationError(err, key)
 					}
+				} else {
+					s1.SetVerificationError(err, key)
 				}
 			}
-		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-			continue
-		}
+			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
+				continue
+			}
 
-		if len(keyMatches) > 0 {
-			results = append(results, s)
+			if len(keyMatches) > 0 {
+				results = append(results, s1)
+			}
 		}
 	}
 
-	return
+	return detectors.CleanResults(results), nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Twilio
 }

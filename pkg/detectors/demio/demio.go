@@ -2,10 +2,11 @@ package demio
 
 import (
 	"context"
-	"net/http"
-	"regexp"
-	"strings"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
+	"net/http"
+	"strings"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -19,10 +20,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{32})\b`)
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{32})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"demio"}) + `\b([a-z0-9A-Z]{10,20})\b`)
-
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -52,9 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Demio,
 				Raw:          []byte(resMatch),
 			}
-	
+
 			if verify {
-				url := fmt.Sprintf("https://my.demio.com/api/v1/ping/query?api_key=%s&api_secret=%s",resMatch,resIdMatch)
+				url := fmt.Sprintf("https://my.demio.com/api/v1/ping/query?api_key=%s&api_secret=%s", resMatch, resIdMatch)
 				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
@@ -65,18 +65,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
 				}
 			}
-	
+
 			results = append(results, s1)
 		}
-		
+
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Demio
 }
