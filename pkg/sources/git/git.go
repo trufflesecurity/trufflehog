@@ -34,7 +34,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GIT
@@ -99,7 +98,7 @@ type Config struct {
 func NewGit(config *Config) *Git {
 	var parser *gitparse.Parser
 	if config.UseCustomContentWriter {
-		parser = gitparse.NewParser(gitparse.WithContentWriter(bufferedfilewriter.New()))
+		parser = gitparse.NewParser(gitparse.UseCustomContentWriter())
 	} else {
 		parser = gitparse.NewParser()
 	}
@@ -522,7 +521,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = context.WithValue(ctx, "repo", path)
 	}
 
-	commitChan, err := gitparse.NewParser().RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
+	commitChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
