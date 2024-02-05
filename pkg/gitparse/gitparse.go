@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -293,6 +294,11 @@ func NewParser(options ...Option) *Parser {
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan Commit, error) {
+	tmpFile, err := ioutil.TempFile("", "example")
+	if err != nil {
+		return nil, err
+	}
+
 	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
@@ -307,6 +313,9 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	}
 
 	cmd := exec.Command("git", args...)
+
+	cmd.Stdout = tmpFile
+
 	absPath, err := filepath.Abs(source)
 	if err == nil {
 		if !isBare {
@@ -348,29 +357,16 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan Commit, error)
 func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan Commit, error) {
 	commitChan := make(chan Commit, 64)
 
-	stdOut, err := cmd.StdoutPipe()
-	if err != nil {
-		return commitChan, err
-	}
-	stdErr, err := cmd.StderrPipe()
-	if err != nil {
-		return commitChan, err
-	}
-
-	err = cmd.Start()
+	err := cmd.Run()
 	if err != nil {
 		return commitChan, err
 	}
 
 	go func() {
-		scanner := bufio.NewScanner(stdErr)
-		for scanner.Scan() {
-			ctx.Logger().V(2).Info(scanner.Text())
-		}
-	}()
-
-	go func() {
-		c.FromReader(ctx, stdOut, commitChan, isStaged)
+		tmpFile := cmd.Stdout.(*os.File)
+		defer os.Remove(tmpFile.Name())
+		tmpFile.Seek(0, 0)
+		c.FromReader(ctx, tmpFile, commitChan, isStaged)
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
