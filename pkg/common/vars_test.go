@@ -1,6 +1,9 @@
 package common
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSkipFile(t *testing.T) {
 	type testCase struct {
@@ -9,10 +12,15 @@ func TestSkipFile(t *testing.T) {
 	}
 
 	// Add a test case for each ignored extension.
-	testCases := make([]testCase, 0, len(IgnoredExtensions)+1)
-	for _, ext := range IgnoredExtensions {
+	testCases := make([]testCase, 0, (len(ignoredExtensions)+1)*2)
+	for ext := range ignoredExtensions {
 		testCases = append(testCases, testCase{
 			file: "test." + ext,
+			want: true,
+		})
+
+		testCases = append(testCases, testCase{
+			file: "test." + strings.ToUpper(ext),
 			want: true,
 		})
 	}
