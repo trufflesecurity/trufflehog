@@ -4,11 +4,9 @@ import (
 	"os"
 
 	"github.com/go-errors/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -16,7 +14,7 @@ import (
 )
 
 // ScanSyslog is a source that scans syslog files.
-func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
+func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) error {
 	connection := &sourcespb.Syslog{
 		Protocol:      c.Protocol,
 		ListenAddress: c.Address,
@@ -42,22 +40,15 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.Config) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
-	source := syslog.Source{}
-	err = source.Init(ctx, "trufflehog - syslog", 0, 0, false, &conn, c.Concurrency)
-	source.InjectConnection(connection)
-	if err != nil {
-		logrus.WithError(err).Error("failed to initialize syslog source")
+
+	sourceName := "trufflehog - syslog"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, syslog.SourceType)
+	syslogSource := &syslog.Source{}
+	if err := syslogSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return err
 	}
+	syslogSource.InjectConnection(connection)
 
-	e.sourcesWg.Add(1)
-	go func() {
-		defer common.Recover(ctx)
-		defer e.sourcesWg.Done()
-		err := source.Chunks(ctx, e.ChunksChan())
-		if err != nil {
-			logrus.WithError(err).Fatal("could not scan syslog")
-		}
-	}()
-	return nil
+	_, err = e.sourceManager.Run(ctx, sourceName, syslogSource)
+	return err
 }

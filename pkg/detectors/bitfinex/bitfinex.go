@@ -3,8 +3,8 @@ package bitfinex
 import (
 	"context"
 	"flag"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
@@ -86,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				s1.Verified = isValid
 				// If there is a valid one, we need to stop iterating now and return the valid result
-				if isValid == true {
+				if isValid {
 					break
 				}
 			}
@@ -99,5 +99,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Bitfinex
 }

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package custom_detectors;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb";
+
+import "validate/validate.proto";
+
+message CustomDetectors {
+  repeated CustomRegex detectors = 1;
+}
+
+message CustomRegex {
+  string name = 1;
+  repeated string keywords = 2;
+  map<string, string> regex = 3;
+  repeated VerifierConfig verify = 4;
+}
+
+message VerifierConfig {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  bool unsafe = 2;
+  repeated string headers = 3;
+  repeated string successRanges = 4;
+}

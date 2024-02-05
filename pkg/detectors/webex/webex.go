@@ -3,9 +3,9 @@ package webex
 import (
 	"context"
 	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -19,8 +19,8 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([A-Za-z0-9_-]{64})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([A-Za-z0-9_-]{65})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([a-f0-9]{64})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b(C[a-f0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -88,5 +88,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Webex
 }

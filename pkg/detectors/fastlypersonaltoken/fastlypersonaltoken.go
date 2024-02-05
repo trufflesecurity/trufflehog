@@ -2,9 +2,11 @@ package fastlypersonaltoken
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -29,6 +31,14 @@ func (s Scanner) Keywords() []string {
 	return []string{"fastly"}
 }
 
+type fastlyUserRes struct {
+	Login                string `json:"login"`
+	Name                 string `json:"name"`
+	Role                 string `json:"role"`
+	TwoFactorAuthEnabled bool   `json:"two_factor_auth_enabled"`
+	Locked               bool   `json:"locked"`
+}
+
 // FromData will find and optionally verify FastlyPersonalToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -47,16 +57,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.fastly.com/services", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.fastly.com/current_user", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Fastly-Key", fmt.Sprintf("%s", resMatch))
+			req.Header.Add("Fastly-Key", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
+				bodyBytes, err := io.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
+					var userRes fastlyUserRes
+					err = json.Unmarshal(bodyBytes, &userRes)
+					if err != nil {
+						continue
+					}
 					s1.Verified = true
+					s1.ExtraData = map[string]string{
+						"username":                userRes.Login,
+						"name":                    userRes.Name,
+						"role":                    userRes.Role,
+						"locked":                  fmt.Sprintf("%t", userRes.Locked),
+						"two_factor_auth_enabled": fmt.Sprintf("%t", userRes.TwoFactorAuthEnabled),
+					}
 				} else {
 					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 						continue
@@ -68,5 +94,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_FastlyPersonalToken
 }

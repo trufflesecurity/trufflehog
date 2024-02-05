@@ -5,8 +5,8 @@ import (
 
 	// b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -57,13 +57,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_GitHubApp,
 				Raw:          []byte(resMatch),
 			}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+			}
 
 			if verify {
 				signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(resMatch))
 				if err != nil {
 					continue
 				}
-				//issued at time
+				// issued at time
 				iat := time.Now().Add(-60 * time.Second)
 				exp := time.Now().Add(9 * 60 * time.Second)
 
@@ -77,7 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				//end get token
+				// end get token
 
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/app", nil)
 				if err != nil {
@@ -100,5 +103,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_GitHubApp
 }

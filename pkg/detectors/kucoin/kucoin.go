@@ -5,8 +5,8 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -112,7 +112,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 func getKucoinPassphrase(apiSecret string, apiPassphrase string) string {
@@ -130,4 +130,8 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 	mac.Write([]byte(preHashStr))
 	macsum := mac.Sum(nil)
 	return base64.StdEncoding.EncodeToString(macsum)
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_KuCoin
 }

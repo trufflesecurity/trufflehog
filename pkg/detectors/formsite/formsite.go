@@ -3,8 +3,8 @@ package formsite
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,10 +20,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{32})\b`)
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{32})\b`)
 	serverPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b(fs[0-9]{1,4})\b`)
-	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{6})\b`)
+	userPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"formsite"}) + `\b([a-zA-Z0-9]{6})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -59,9 +59,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Formsite,
 					Raw:          []byte(resMatch),
 				}
-		
+
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.formsite.com/api/v2/%s/forms",resServerMatch,resUserMatch), nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.formsite.com/api/v2/%s/forms", resServerMatch, resUserMatch), nil)
 					if err != nil {
 						continue
 					}
@@ -72,19 +72,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 						} else {
-							//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 								continue
 							}
 						}
 					}
 				}
-		
+
 				results = append(results, s1)
-			}		
-		}	
-		
+			}
+		}
+
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Formsite
 }

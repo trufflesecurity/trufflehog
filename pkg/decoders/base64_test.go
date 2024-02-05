@@ -11,9 +11,9 @@ import (
 
 func TestBase64_FromChunk(t *testing.T) {
 	tests := []struct {
-		name  string
 		chunk *sources.Chunk
 		want  *sources.Chunk
+		name  string
 	}{
 		{
 			name: "only b64 chunk",
@@ -69,6 +69,60 @@ func TestBase64_FromChunk(t *testing.T) {
 				but only this encapsulated secret should be decoded.`),
 			},
 		},
+		{
+			name: "b64-url-safe: only b64 chunk",
+			chunk: &sources.Chunk{
+				Data: []byte(`bG9uZ2VyLWVuY29kZWQtc2VjcmV0LXRlc3Q`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`longer-encoded-secret-test`),
+			},
+		},
+		{
+			name: "b64-url-safe: mixed content",
+			chunk: &sources.Chunk{
+				Data: []byte(`token: bG9uZ2VyLWVuY29kZWQtc2VjcmV0LXRlc3Q`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`token: longer-encoded-secret-test`),
+			},
+		},
+		{
+			name: "b64-url-safe: env var (looks like all b64 decodable but has `=` in the middle)",
+			chunk: &sources.Chunk{
+				Data: []byte(`some-encoded-secret=dGVzdHNlY3JldA`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`some-encoded-secret=testsecret`),
+			},
+		},
+		{
+			name: "b64-url-safe: has longer b64 inside",
+			chunk: &sources.Chunk{
+				Data: []byte(`some-encoded-secret="bG9uZ2VyLWVuY29kZWQtc2VjcmV0LXRlc3Q"`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`some-encoded-secret="longer-encoded-secret-test"`),
+			},
+		},
+		{
+			name: "b64-url-safe: hyphen url b64",
+			chunk: &sources.Chunk{
+				Data: []byte(`dHJ1ZmZsZWhvZz4-ZmluZHMtc2VjcmV0cw`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`trufflehog>>finds-secrets`),
+			},
+		},
+		{
+			name: "b64-url-safe: underscore url b64",
+			chunk: &sources.Chunk{
+				Data: []byte(`YjY0dXJsc2FmZS10ZXN0LXNlY3JldC11bmRlcnNjb3Jlcz8_`),
+			},
+			want: &sources.Chunk{
+				Data: []byte(`b64urlsafe-test-secret-underscores??`),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,13 +144,29 @@ func TestBase64_FromChunk(t *testing.T) {
 	}
 }
 
-func BenchmarkFromChunk(benchmark *testing.B) {
+func BenchmarkFromChunkSmall(b *testing.B) {
 	d := Base64{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				d.FromChunk(&sources.Chunk{Data: data})
-			}
-		})
+	data := detectors.MustGetBenchmarkData()["small"]
+
+	for n := 0; n < b.N; n++ {
+		d.FromChunk(&sources.Chunk{Data: data})
+	}
+}
+
+func BenchmarkFromChunkMedium(b *testing.B) {
+	d := Base64{}
+	data := detectors.MustGetBenchmarkData()["medium"]
+
+	for n := 0; n < b.N; n++ {
+		d.FromChunk(&sources.Chunk{Data: data})
+	}
+}
+
+func BenchmarkFromChunkLarge(b *testing.B) {
+	d := Base64{}
+	data := detectors.MustGetBenchmarkData()["big"]
+
+	for n := 0; n < b.N; n++ {
+		d.FromChunk(&sources.Chunk{Data: data})
 	}
 }

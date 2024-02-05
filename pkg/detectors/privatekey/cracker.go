@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-//go:embed "rockyou-15.txt"
+//go:embed "list.txt"
 var rawCrackList []byte
 var passphrases [][]byte
 
@@ -21,17 +21,17 @@ var (
 	ErrUncrackable = errors.New("unable to crack encryption")
 )
 
-func crack(in []byte) (interface{}, error) {
+func crack(in []byte) (any, string, error) {
 	for _, passphrase := range passphrases {
 		parsed, err := ssh.ParseRawPrivateKeyWithPassphrase(in, passphrase)
 		if err != nil {
 			if errors.Is(err, x509.IncorrectPasswordError) {
 				continue
 			} else {
-				return nil, err
+				return nil, "", err
 			}
 		}
-		return parsed, nil
+		return parsed, string(passphrase), nil
 	}
-	return nil, ErrUncrackable
+	return nil, "", ErrUncrackable
 }

@@ -3,8 +3,8 @@ package scalr
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,9 +20,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	//Make sure that your group is surrounded in boundry characters such as below to reduce false positives
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scalr"}) + `\b([0-9a-zA-Z._]{136})`)
-	idPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scalr"}) + `\b([0-9a-z]{4,50})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"scalr"}) + `\b([0-9a-z]{4,50})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -52,34 +52,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Scalr,
 				Raw:          []byte(resMatch),
 			}
-	
+
 			if verify {
-				url := fmt.Sprintf("https://%s.scalr.io/api/iacp/v3/agents",resIdMatch)
+				url := fmt.Sprintf("https://%s.scalr.io/api/iacp/v3/agents", resIdMatch)
 				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s",resMatch))
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 				req.Header.Add("Content-Type", "application/vnd.api+json")
 				req.Header.Add("Prefer", "profile=preview")
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true 
+						s1.Verified = true
 					} else {
-						//This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
+						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
 						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
 				}
 			}
-	
+
 			results = append(results, s1)
-		}	
-		
+		}
+
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Scalr
 }

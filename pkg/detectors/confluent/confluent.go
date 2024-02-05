@@ -4,8 +4,8 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,8 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"confluent"}) + `\b([a-zA-Z-0-9]{16})\b`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"confluent"}) + `\b([a-zA-Z-0-9]{64})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"confluent"}) + `\b([a-zA-Z0-9]{16})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"confluent"}) + `\b([a-zA-Z0-9\+\/]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				data := fmt.Sprintf("%s:%s", resMatch, resSecret)
 				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.telemetry.confluent.cloud/v2/metrics/cloud/descriptors/resources", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.confluent.cloud/iam/v2/api-keys/"+resMatch, nil)
 				if err != nil {
 					continue
 				}
@@ -72,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 					} else {
 						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+						if detectors.IsKnownFalsePositive(resSecret, detectors.DefaultFalsePositives, true) {
 							continue
 						}
 					}
@@ -84,5 +84,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Confluent
 }

@@ -3,6 +3,7 @@ package context
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -158,7 +159,7 @@ func TestWithValues(t *testing.T) {
 	assert.NotContains(t, logs[6], `what does this do?`)
 }
 
-func TestDiscardLogger(t *testing.T) {
+func TestDefaultLogger(t *testing.T) {
 	var panicked bool
 	defer func() {
 		if r := recover(); r != nil {
@@ -168,4 +169,19 @@ func TestDiscardLogger(t *testing.T) {
 	}()
 	ctx := Background()
 	ctx.Logger().Info("this shouldn't panic")
+}
+
+func TestRace(t *testing.T) {
+	ctx, cancel := WithCancel(Background())
+	go cancel()
+	go func() { _ = ctx.Err() }()
+	cancel()
+	_ = ctx.Err()
+}
+
+func TestCause(t *testing.T) {
+	ctx, cancel := WithCancelCause(Background())
+	err := fmt.Errorf("oh no")
+	cancel(err)
+	assert.Equal(t, err, Cause(ctx))
 }

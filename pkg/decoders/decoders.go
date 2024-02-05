@@ -1,18 +1,28 @@
 package decoders
 
 import (
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func DefaultDecoders() []Decoder {
 	return []Decoder{
-		&Plain{},
+		// UTF8 must be first for duplicate detection
+		&UTF8{},
 		&Base64{},
+		&UTF16{},
 	}
 }
 
+// DecodableChunk is a chunk that includes the type of decoder used.
+// This allows us to avoid a type assertion on each decoder.
+type DecodableChunk struct {
+	*sources.Chunk
+	DecoderType detectorspb.DecoderType
+}
+
 type Decoder interface {
-	FromChunk(chunk *sources.Chunk) *sources.Chunk
+	FromChunk(chunk *sources.Chunk) *DecodableChunk
 }
 
 // Fuzz is an entrypoint for go-fuzz, which is an AFL-style fuzzing tool.
