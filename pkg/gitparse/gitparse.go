@@ -623,13 +623,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
 }
 
-func (c *Parser) contentWriter() contentWriter {
-	if c.useCustomContentWriter {
-		return bufferedfilewriter.New()
-	}
-	return newBuffer()
-}
-
 func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
 	if isStaged || latestState != CommitLine {
 		return false
