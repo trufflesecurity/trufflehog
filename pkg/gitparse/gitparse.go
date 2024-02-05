@@ -393,14 +393,19 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 	var latestState = Initial
 
 	diff := func(opts ...diffOption) *Diff {
-		return NewDiff(withCustomContentWriter(newBuffer()))
+		opts = append(opts, withCustomContentWriter(newBuffer()))
+		return NewDiff(opts...)
 	}
 	if c.useCustomContentWriter {
 		diff = func(opts ...diffOption) *Diff {
-			return NewDiff(withCustomContentWriter(bufferedfilewriter.New()))
+			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
+			return NewDiff(opts...)
 		}
 	}
 	currentDiff := diff()
+
+	// writer := c.contentWriter()
+	// currentDiff := NewDiff(withCustomContentWriter(writer))
 
 	defer common.RecoverWithExit(ctx)
 	defer close(commitChan)
@@ -444,6 +449,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			}
 			// Create a new currentDiff and currentCommit
 			currentDiff = diff()
+			// currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
 			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
@@ -512,6 +518,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 				}
 			}
 			currentDiff = diff()
+			// currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
 		case isModeLine(isStaged, latestState, line):
 			latestState = ModeLine
 			// NoOp
