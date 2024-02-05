@@ -54,10 +54,9 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 	return buf
 }
 
-func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, dataSize uint64) {
+func (bp *bufferPool) growBufferWithSize(buf *bytes.Buffer, size int) {
 	// Grow the buffer to accommodate the new data.
-	requiredGrowth := int(dataSize - uint64(buf.Cap()))
-	buf.Grow(requiredGrowth)
+	buf.Grow(size)
 }
 
 func (bp *bufferPool) put(buf *bytes.Buffer) {
@@ -184,14 +183,15 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 			"content_size", bufferLength,
 		)
 
-		if totalSizeNeeded > uint64(w.buf.Cap()) {
+		growSize := int(totalSizeNeeded - uint64(w.buf.Cap()))
+		if growSize > 0 {
 			ctx.Logger().V(4).Info(
-				"buffer size exceeded, getting new buffer",
+				"buffer size exceeded, growing buffer",
 				"current_size", bufferLength,
 				"new_size", totalSizeNeeded,
+				"grow_size", growSize,
 			)
-			// The current buffer cannot accommodate the new data; grow it.
-			w.bufPool.growBufferWithSize(w.buf, totalSizeNeeded)
+			w.bufPool.growBufferWithSize(w.buf, growSize)
 		}
 
 		return w.buf.Write(data)
