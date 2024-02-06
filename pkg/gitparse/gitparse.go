@@ -151,8 +151,8 @@ func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 type Commit struct {
 	Hash    string
 	Author  string
-	Message strings.Builder
 	Date    time.Time
+	Message strings.Builder
 	Size    int // in bytes
 }
 
