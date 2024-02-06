@@ -121,7 +121,7 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 }
 
 // newDiff creates a new Diff with a threshold and an associated commit.
-// All Diff's must have an associated commit.
+// All Diffs must have an associated commit.
 // The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
 // By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
 func newDiff(commit *Commit, opts ...diffOption) *Diff {
@@ -251,7 +251,7 @@ func NewParser(options ...Option) *Parser {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-// The Diff chan will returns diffs in the order they are parsed from the log.
+// The Diff chan will return diffs in the order they are parsed from the log.
 func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan *Diff, error) {
 	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
