@@ -211,7 +211,6 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 			if _, err := w.buf.WriteTo(w.file); err != nil {
 				return 0, err
 			}
-			// Reset the buffer to clear any existing data and return it to the pool.
 			w.bufPool.put(w.buf)
 		}
 	}
