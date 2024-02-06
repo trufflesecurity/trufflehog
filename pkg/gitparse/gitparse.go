@@ -449,7 +449,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, commitChan ch
 			}
 			// Create a new currentDiff and currentCommit
 			currentDiff = diff()
-			// currentDiff = NewDiff(withCustomContentWriter(c.contentWriter()))
 			currentCommit = &Commit{Message: strings.Builder{}}
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {

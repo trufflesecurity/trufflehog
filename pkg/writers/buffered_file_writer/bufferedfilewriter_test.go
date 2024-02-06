@@ -1,6 +1,7 @@
 package bufferedfilewriter
 
 import (
+	"bytes"
 	"os"
 	"testing"
 	"time"
@@ -89,10 +90,149 @@ func TestBufferedFileWriterString(t *testing.T) {
 
 			got, err := writer.String()
 			assert.NoError(t, err)
+			err = writer.CloseForWriting()
+			assert.NoError(t, err)
 
 			assert.Equal(t, tc.expectedStr, got, "String content mismatch")
 		})
 	}
+}
+
+const (
+	smallBuffer  = 2 << 5  // 64B
+	mediumBuffer = 2 << 10 // 2KB
+	smallFile    = 2 << 25 // 32MB
+	mediumFile   = 2 << 28 // 256MB
+)
+
+func BenchmarkBufferedFileWriterString_BufferOnly_Small(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), smallBuffer)
+
+	ctx := context.Background()
+	writer := New()
+
+	_, err := writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_BufferOnly_Medium(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), mediumBuffer)
+	ctx := context.Background()
+	writer := New()
+
+	_, err := writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_OnlyFile_Small(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), smallFile)
+
+	ctx := context.Background()
+	writer := New()
+
+	_, err := writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_OnlyFile_Medium(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), mediumFile)
+
+	ctx := context.Background()
+	writer := New()
+
+	_, err := writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_BufferWithFile_Small(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), smallFile)
+
+	ctx := context.Background()
+	writer := New()
+
+	_, err := writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	// Write again so we also fill up the buffer.
+	_, err = writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_BufferWithFile_Medium(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), mediumFile)
+
+	ctx := context.Background()
+	writer := New()
+
+	_, err := writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	// Write again so we also fill up the buffer.
+	_, err = writer.Write(ctx, data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func benchmarkBufferedFileWriterString(b *testing.B, w *BufferedFileWriter) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := w.String()
+		assert.NoError(b, err)
+	}
+	b.StopTimer()
 }
 
 func TestBufferedFileWriterLen(t *testing.T) {
@@ -305,4 +445,64 @@ func TestBufferedFileWriterWriteInReadOnlyState(t *testing.T) {
 	// Attempt to write in read-only mode.
 	_, err := writer.Write(context.Background(), []byte("should fail"))
 	assert.Error(t, err)
+}
+
+func BenchmarkBufferedFileWriterWriteLarge(b *testing.B) {
+	ctx := context.Background()
+	data := make([]byte, 1024*1024*10) // 10MB
+	for i := range data {
+		data[i] = byte(i % 256) // Simple pattern to avoid uniform zero data
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Threshold is smaller than the data size, data should get flushed to the file.
+		writer := New(WithThreshold(1024))
+
+		b.StartTimer()
+		{
+			_, err := writer.Write(ctx, data)
+			assert.NoError(b, err)
+		}
+		b.StopTimer()
+
+		// Ensure proper cleanup after each write operation, including closing the file
+		err := writer.CloseForWriting()
+		assert.NoError(b, err)
+
+		rc, err := writer.ReadCloser()
+		assert.NoError(b, err)
+		rc.Close()
+	}
+}
+
+func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
+	ctx := context.Background()
+	data := make([]byte, 1024*1024) // 1MB
+	for i := range data {
+		data[i] = byte(i % 256) // Simple pattern to avoid uniform zero data
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Threshold is the same as the buffer size, data should always be written to the buffer.
+		writer := New(WithThreshold(1024 * 1024))
+
+		b.StartTimer()
+		{
+			_, err := writer.Write(ctx, data)
+			assert.NoError(b, err)
+		}
+		b.StopTimer()
+
+		// Ensure proper cleanup after each write operation, including closing the file.
+		err := writer.CloseForWriting()
+		assert.NoError(b, err)
+
+		rc, err := writer.ReadCloser()
+		assert.NoError(b, err)
+		rc.Close()
+	}
 }
