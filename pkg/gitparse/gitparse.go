@@ -120,9 +120,12 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 	return func(d *Diff) { d.contentWriter = cr }
 }
 
-// NewDiff creates a new Diff with a threshold.
-func NewDiff(opts ...diffOption) *Diff {
-	diff := new(Diff)
+// newDiff creates a new Diff with a threshold and an associated commit.
+// All Diff's must have an associated commit.
+// The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
+// By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
+func newDiff(commit *Commit, opts ...diffOption) *Diff {
+	diff := &Diff{Commit: commit, contentWriter: newBuffer()}
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -348,18 +351,17 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	)
 	var latestState = Initial
 
-	diff := func(opts ...diffOption) *Diff {
+	diff := func(c *Commit, opts ...diffOption) *Diff {
 		opts = append(opts, withCustomContentWriter(newBuffer()))
-		return NewDiff(opts...)
+		return newDiff(c, opts...)
 	}
 	if c.useCustomContentWriter {
-		diff = func(opts ...diffOption) *Diff {
+		diff = func(c *Commit, opts ...diffOption) *Diff {
 			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
-			return NewDiff(opts...)
+			return newDiff(c, opts...)
 		}
 	}
-	currentDiff := diff()
-	currentDiff.Commit = currentCommit
+	currentDiff := diff(currentCommit)
 
 	defer common.RecoverWithExit(ctx)
 	defer close(diffChan)
@@ -397,9 +399,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = diff()
 			currentCommit = &Commit{Message: strings.Builder{}}
-			currentDiff.Commit = currentCommit
+			currentDiff = diff(currentCommit)
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
@@ -434,7 +435,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			// This should never be nil, but check in case the stdin stream is messed up.
 			if currentCommit == nil {
 				currentCommit = &Commit{}
-				currentDiff.Commit = currentCommit
 			}
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				if err := currentDiff.finalize(); err != nil {
@@ -448,7 +448,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				}
 				diffChan <- currentDiff
 			}
-			currentDiff = diff()
+			currentDiff = diff(currentCommit)
 		case isModeLine(latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -488,8 +488,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				}
 				diffChan <- currentDiff
 			}
-			currentDiff = diff(withPathB(currentDiff.PathB))
-			currentDiff.Commit = currentCommit
+			currentDiff = diff(currentCommit, withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -543,9 +542,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			logger.Error(err, "failed to parse Git input. Recovering at the latest commit or diff...")
 
 			latestState = ParseFailure
-		}
-		if currentCommit != nil && currentDiff != nil && currentDiff.Commit == nil {
-			currentDiff.Commit = currentCommit
 		}
 
 		if currentDiff.Len() > c.maxDiffSize {
