@@ -562,47 +562,47 @@ func TestLikelyDuplicate(t *testing.T) {
 	}{
 		{
 			name: "exact duplicate different detector",
-			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA.Key},
 			dupes: map[chunkSecretKey]struct{}{
-				{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB}: {},
+				{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB.Key}: {},
 			},
 			expected: true,
 		},
 		{
 			name: "non-duplicate length outside range",
-			val:  chunkSecretKey{"short", detectorA},
+			val:  chunkSecretKey{"short", detectorA.Key},
 			dupes: map[chunkSecretKey]struct{}{
-				{"muchlongerthanthevalstring", detectorB}: {},
+				{"muchlongerthanthevalstring", detectorB.Key}: {},
 			},
 			expected: false,
 		},
 		{
 			name: "similar within threshold",
-			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA.Key},
 			dupes: map[chunkSecretKey]struct{}{
-				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB}: {},
+				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorB.Key}: {},
 			},
 			expected: true,
 		},
 		{
 			name: "similar outside threshold",
-			val:  chunkSecretKey{"anotherkey", detectorA},
+			val:  chunkSecretKey{"anotherkey", detectorA.Key},
 			dupes: map[chunkSecretKey]struct{}{
-				{"completelydifferent", detectorB}: {},
+				{"completelydifferent", detectorB.Key}: {},
 			},
 			expected: false,
 		},
 		{
 			name:     "empty strings",
-			val:      chunkSecretKey{"", detectorA},
-			dupes:    map[chunkSecretKey]struct{}{{"", detectorB}: {}},
+			val:      chunkSecretKey{"", detectorA.Key},
+			dupes:    map[chunkSecretKey]struct{}{{"", detectorB.Key}: {}},
 			expected: true,
 		},
 		{
 			name: "similar within threshold same detector",
-			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA},
+			val:  chunkSecretKey{"PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA.Key},
 			dupes: map[chunkSecretKey]struct{}{
-				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA}: {},
+				{"qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r", detectorA.Key}: {},
 			},
 			expected: false,
 		},
