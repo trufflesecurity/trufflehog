@@ -20,7 +20,7 @@ type bufferPool struct {
 	*sync.Pool
 }
 
-const defaultBufferSize = 2 << 12 // 8KB
+const defaultBufferSize = 2 << 10 // 2KB
 func newBufferPool(opts ...bufPoolOpt) *bufferPool {
 	pool := &bufferPool{bufferSize: defaultBufferSize}
 
