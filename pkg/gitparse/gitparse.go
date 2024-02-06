@@ -375,6 +375,9 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 
 	go func() {
 		c.FromReader(ctx, stdOut, commitChan, isStaged)
+		if err := stdOut.Close(); err != nil {
+			ctx.Logger().V(2).Info("Error closing git stdout pipe.", "error", err)
+		}
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
