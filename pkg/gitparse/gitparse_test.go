@@ -591,12 +591,17 @@ func TestLineChecksNoStaged(t *testing.T) {
 
 func TestBinaryPathParse(t *testing.T) {
 	cases := map[string]string{
-		"Binary files /dev/null and b/plugin.sig differ\n":                    "plugin.sig",
-		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n": " Lunch and Learn - HCDiag.pdf",
+		"Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ\n":                                 "",
+		"Binary files /dev/null and b/plugin.sig differ\n":                                                           "plugin.sig",
+		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n":                                        " Lunch and Learn - HCDiag.pdf",
+		"Binary files /dev/null and \"b/assets/retailers/ON-ikony-Platforma-ecom \\342\\200\\224 kopia.png\" differ": "assets/retailers/ON-ikony-Platforma-ecom \\342\\200\\224 kopia.png",
 	}
 
 	for name, expected := range cases {
-		filename := pathFromBinaryLine([]byte(name))
+		filename, err := pathFromBinaryLine([]byte(name))
+		if err != nil {
+			t.Errorf("Got unexpected error: %s", err)
+		}
 		if filename != expected {
 			t.Errorf("Expected: %s, Got: %s", expected, filename)
 		}

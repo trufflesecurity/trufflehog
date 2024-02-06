@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/go-logr/logr"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -458,10 +460,16 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isBinaryLine(latestState, line):
 			latestState = BinaryFileLine
 
-			currentDiff.PathB = pathFromBinaryLine(line)
+			path, err := pathFromBinaryLine(line)
+			if err != nil {
+				ctx.Logger().Error(err, "Failed to parse binary file line")
+				latestState = ParseFailure
+				continue
+			}
 
 			// Don't do anything if the file is deleted. (pathA has file path, pathB is /dev/null)
-			if currentDiff.PathB != "" {
+			if path != "" {
+				currentDiff.PathB = path
 				currentDiff.IsBinary = true
 			}
 		case isFromFileLine(latestState, line):
@@ -707,16 +715,24 @@ func isBinaryLine(latestState ParseState, line []byte) bool {
 	return false
 }
 
+var binaryPathPat = regexp.MustCompile(`Binary files .+ and (?:/dev/null|b/(.+)|"b/(.+)") differ`)
+
 // Get the b/ file path. Ignoring the edge case of files having `and /b` in the name for simplicity.
-func pathFromBinaryLine(line []byte) string {
-	logger := context.Background().Logger()
-	sbytes := bytes.Split(line, []byte(" and b/"))
-	if len(sbytes) != 2 {
-		logger.V(2).Info("Expected binary line to be in 'Binary files a/fileA and b/fileB differ' format.", "got", line)
-		return ""
+func pathFromBinaryLine(line []byte) (string, error) {
+	matches := binaryPathPat.FindSubmatch(line)
+	if len(matches) == 0 {
+		err := fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
+		return "", err
 	}
-	bRaw := sbytes[1]
-	return string(bRaw[:len(bRaw)-8]) // drop the "b/" and " differ\n"
+
+	var path string
+	for _, match := range matches[1:] { // the first match is the entire input
+		if len(match) > 0 {
+			path = string(match)
+			break
+		}
+	}
+	return path, nil
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
