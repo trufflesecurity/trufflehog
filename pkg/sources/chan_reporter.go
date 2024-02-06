@@ -21,18 +21,21 @@ func (ChanReporter) ChunkErr(ctx context.Context, err error) error {
 	return ctx.Err()
 }
 
-var _ UnitReporter = (*SliceReporter)(nil)
+var _ UnitReporter = (*VisitorReporter)(nil)
 
-type SliceReporter struct {
-	Units []string
+type VisitorReporter struct {
+	VisitUnit func(context.Context, SourceUnit) error
+	VisitErr  func(context.Context, error) error
 }
 
-func (s *SliceReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
-	s.Units = append(s.Units, unit.SourceUnitID())
-	return ctx.Err()
+func (v VisitorReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
+	return v.VisitUnit(ctx, unit)
 }
 
-func (s *SliceReporter) UnitErr(ctx context.Context, err error) error {
-	ctx.Logger().Error(err, "error enumerating")
-	return ctx.Err()
+func (v VisitorReporter) UnitErr(ctx context.Context, err error) error {
+	if v.VisitErr == nil {
+		ctx.Logger().Error(err, "error enumerating")
+		return ctx.Err()
+	}
+	return v.VisitErr(ctx, err)
 }

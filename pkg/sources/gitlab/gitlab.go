@@ -184,11 +184,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
 			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
 		})
-		reporter := new(sources.SliceReporter)
+		reporter := sources.VisitorReporter{
+			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
+				repos = append(repos, unit.SourceUnitID())
+				return ctx.Err()
+			},
+		}
 		if err := s.getReposFromGitlab(ctx, apiClient, ignoreRepo, reporter); err != nil {
 			return err
 		}
-		repos = reporter.Units
 	}
 
 	s.repos = repos
@@ -247,7 +251,9 @@ func (s *Source) Validate(ctx context.Context) []error {
 		errs = append(errs, fmt.Errorf("could not compile ignore repo pattern %q: %w", pattern, err))
 	})
 
-	projects, err := s.getAllProjects(ctx, apiClient, nil)
+	// getAllProjects only uses the reporter for reporting errors, so the
+	// empty VisitorReporter is okay to use.
+	projects, err := s.getAllProjects(ctx, apiClient, sources.VisitorReporter{})
 	if err != nil {
 		errs = append(errs, err)
 		return errs
@@ -315,13 +321,6 @@ func (s *Source) basicAuthSuccessful(apiClient *gitlab.Client) bool {
 // The reporter, if provided, is only used for reporting errors that would only
 // otherwise be logged.
 func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client, reporter sources.UnitReporter) ([]*gitlab.Project, error) {
-	reportErr := func(ctx context.Context, err error) error {
-		ctx.Logger().Error(err, "getAllProjects error")
-		if reporter != nil {
-			return reporter.UnitErr(ctx, err)
-		}
-		return nil
-	}
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 	if err != nil {
@@ -356,7 +355,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client, r
 		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions)
 		if err != nil {
 			err = fmt.Errorf("received error on listing user projects: %w", err)
-			if err := reportErr(ctx, err); err != nil {
+			if err := reporter.UnitErr(ctx, err); err != nil {
 				return nil, err
 			}
 			break
@@ -384,7 +383,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client, r
 		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
 		if err != nil {
 			err = fmt.Errorf("received error on listing groups, you probably don't have permissions to do that: %w", err)
-			if err := reportErr(ctx, err); err != nil {
+			if err := reporter.UnitErr(ctx, err); err != nil {
 				return nil, err
 			}
 			break
@@ -409,7 +408,7 @@ func (s *Source) getAllProjects(ctx context.Context, apiClient *gitlab.Client, r
 					"received error on listing group projects for %q, you probably don't have permissions to do that: %w",
 					group.FullPath, err,
 				)
-				if err := reportErr(ctx, err); err != nil {
+				if err := reporter.UnitErr(ctx, err); err != nil {
 					return nil, err
 				}
 				break
