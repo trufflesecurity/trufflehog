@@ -554,8 +554,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
+			logger.V(5).Info("scanning commit", "commit", fullHash)
 		}
-		logger.V(5).Info("scanning commit", "commit", fullHash)
 		if len(scanOptions.BaseHash) > 0 {
 			if fullHash == scanOptions.BaseHash {
 				logger.V(1).Info("reached base commit", "commit", fullHash)
