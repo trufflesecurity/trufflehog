@@ -398,7 +398,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			}
 			// Create a new currentDiff and currentCommit
 			currentDiff = diff()
-			currentCommit = &Commit{}
+			currentCommit = &Commit{Message: strings.Builder{}}
 			currentDiff.Commit = currentCommit
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
@@ -408,7 +408,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			latestState = MergeLine
 		case isAuthorLine(isStaged, latestState, line):
 			latestState = AuthorLine
-			currentCommit.Author = strings.TrimSpace(string(line[8:]))
+			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
 
 		case isDateLine(isStaged, latestState, line):
 			latestState = DateLine
