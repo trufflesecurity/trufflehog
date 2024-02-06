@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/go-logr/logr"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -460,8 +458,9 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isBinaryLine(latestState, line):
 			latestState = BinaryFileLine
 
-			path, err := pathFromBinaryLine(line)
-			if err != nil {
+			path, ok := pathFromBinaryLine(line)
+			if !ok {
+				err = fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
 				ctx.Logger().Error(err, "Failed to parse binary file line")
 				latestState = ParseFailure
 				continue
@@ -715,24 +714,28 @@ func isBinaryLine(latestState ParseState, line []byte) bool {
 	return false
 }
 
-var binaryPathPat = regexp.MustCompile(`Binary files .+ and (?:/dev/null|b/(.+)|"b/(.+)") differ`)
-
 // Get the b/ file path. Ignoring the edge case of files having `and /b` in the name for simplicity.
-func pathFromBinaryLine(line []byte) (string, error) {
-	matches := binaryPathPat.FindSubmatch(line)
-	if len(matches) == 0 {
-		err := fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
-		return "", err
+func pathFromBinaryLine(line []byte) (string, bool) {
+	if bytes.Index(line, []byte("and /dev/null")) != -1 {
+		return "", true
 	}
 
-	var path string
-	for _, match := range matches[1:] { // the first match is the entire input
-		if len(match) > 0 {
-			path = string(match)
-			break
-		}
+	_, after, ok := bytes.Cut(line, []byte(" and b/"))
+	if ok {
+		// drop the " differ\n"
+		return string(after[:len(after)-8]), true
 	}
-	return path, nil
+
+	// Edge case where the path is quoted.
+	// https://github.com/trufflesecurity/trufflehog/issues/2384
+	_, after, ok = bytes.Cut(line, []byte(` and "b/`))
+	if ok {
+		// drop the `" differ\n`
+		return string(after[:len(after)-9]), true
+	}
+
+	// Unknown format.
+	return "", false
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
