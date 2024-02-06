@@ -55,12 +55,11 @@ func (bp *bufferPool) get(ctx context.Context) *bytes.Buffer {
 }
 
 func (bp *bufferPool) put(buf *bytes.Buffer) {
-	// If the buffer is more than twice the default size, replace it with a new, smaller one.
+	// If the buffer is more than twice the default size, release it for garbage collection.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
-		// Replace the buffer with a new, smaller one. No need to copy data since we're resetting it.
-		buf = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+		buf = nil // Release the large buffer for garbage collection.
 	} else {
 		// Reset the buffer to clear any existing data.
 		buf.Reset()
