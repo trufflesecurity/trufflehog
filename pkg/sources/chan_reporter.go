@@ -18,5 +18,21 @@ func (c ChanReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
 
 func (ChanReporter) ChunkErr(ctx context.Context, err error) error {
 	ctx.Logger().Error(err, "error chunking")
-	return nil
+	return ctx.Err()
+}
+
+var _ UnitReporter = (*SliceReporter)(nil)
+
+type SliceReporter struct {
+	Units []string
+}
+
+func (s *SliceReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
+	s.Units = append(s.Units, unit.SourceUnitID())
+	return ctx.Err()
+}
+
+func (s *SliceReporter) UnitErr(ctx context.Context, err error) error {
+	ctx.Logger().Error(err, "error enumerating")
+	return ctx.Err()
 }

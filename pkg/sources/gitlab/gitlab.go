@@ -184,11 +184,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
 			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
 		})
-		gitlabRepos, err := s.getReposFromGitlab(ctx, apiClient, ignoreRepo, nil)
-		if err != nil {
+		reporter := new(sources.SliceReporter)
+		if err := s.getReposFromGitlab(ctx, apiClient, ignoreRepo, reporter); err != nil {
 			return err
 		}
-		repos = gitlabRepos
+		repos = reporter.Units
 	}
 
 	s.repos = repos
@@ -437,14 +437,14 @@ func (s *Source) getReposFromGitlab(
 	apiClient *gitlab.Client,
 	ignoreRepo func(string) bool,
 	reporter sources.UnitReporter,
-) ([]string, error) {
+) error {
 	projects, err := s.getAllProjects(ctx, apiClient, reporter)
 	if err != nil {
-		return nil, fmt.Errorf("error getting all projects: %w", err)
+		return fmt.Errorf("error getting all projects: %w", err)
 	}
 
 	// Turn projects into URLs for Git cloner.
-	var repos []string
+	var foundOne bool
 	for _, prj := range projects {
 		if ignoreRepo(prj.PathWithNamespace) {
 			continue
@@ -454,26 +454,22 @@ func (s *Source) getReposFromGitlab(
 		_, err := url.Parse(prj.HTTPURLToRepo)
 		if err != nil {
 			ctx.Logger().Error(err, "could not parse url given by project", "project", prj.HTTPURLToRepo)
-			if reporter != nil {
-				if err := reporter.UnitErr(ctx, err); err != nil {
-					return nil, err
-				}
+			if err := reporter.UnitErr(ctx, err); err != nil {
+				return err
 			}
 			continue
 		}
-		repos = append(repos, prj.HTTPURLToRepo)
-		if reporter != nil {
-			unit := sources.CommonSourceUnit{ID: prj.HTTPURLToRepo}
-			if err := reporter.UnitOk(ctx, unit); err != nil {
-				return nil, err
-			}
+		unit := sources.CommonSourceUnit{ID: prj.HTTPURLToRepo}
+		if err := reporter.UnitOk(ctx, unit); err != nil {
+			return err
 		}
+		foundOne = true
 	}
-	if len(repos) == 0 {
-		return nil, fmt.Errorf("unable to discover any repos")
+	if !foundOne {
+		return fmt.Errorf("unable to discover any repos")
 	}
 
-	return repos, nil
+	return nil
 }
 
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
@@ -649,10 +645,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		// TODO: Handle error returned from UnitErr.
 		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile ignore repo glob: %w", err))
 	})
-	// getReposFromGitlab will report the repos as it finds them, so we can
-	// ignore the returned slice.
-	_, err = s.getReposFromGitlab(ctx, apiClient, ignoreRepo, reporter)
-	return err
+	return s.getReposFromGitlab(ctx, apiClient, ignoreRepo, reporter)
 }
 
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
