@@ -105,11 +105,7 @@ type Diff struct {
 	LineStart int
 	IsBinary  bool
 
-	// Commit metadata.
-	CommitHash    string
-	Author        string
-	CommitDate    time.Time
-	CommitMessage strings.Builder
+	Commit *Commit
 
 	contentWriter contentWriter
 }
@@ -153,8 +149,11 @@ func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 
 // Commit contains commit header info and diffs.
 type Commit struct {
-	Hash string
-	Size int // in bytes
+	Hash    string
+	Author  string
+	Message strings.Builder
+	Date    time.Time
+	Size    int // in bytes
 }
 
 // Parser sets values used in GitParse.
@@ -360,6 +359,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		}
 	}
 	currentDiff := diff()
+	currentDiff.Commit = currentCommit
 
 	defer common.RecoverWithExit(ctx)
 	defer close(diffChan)
@@ -389,7 +389,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 						"latest_state", latestState.String(),
 					)
 				}
-				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 				currentCommit.Size += currentDiff.Len()
 			}
@@ -400,18 +399,17 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			// Create a new currentDiff and currentCommit
 			currentDiff = diff()
 			currentCommit = &Commit{}
-			currentDiff.CommitMessage = strings.Builder{}
+			currentDiff.Commit = currentCommit
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
-				currentDiff.CommitHash = currentCommit.Hash
 			}
 		case isMergeLine(isStaged, latestState, line):
 			latestState = MergeLine
 		case isAuthorLine(isStaged, latestState, line):
 			latestState = AuthorLine
+			currentCommit.Author = strings.TrimSpace(string(line[8:]))
 
-			currentDiff.Author = strings.TrimRight(string(line[8:]), "\n")
 		case isDateLine(isStaged, latestState, line):
 			latestState = DateLine
 
@@ -419,14 +417,14 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			if err != nil {
 				ctx.Logger().V(2).Info("Could not parse date from git stream.", "error", err)
 			}
-			currentDiff.CommitDate = date
+			currentCommit.Date = date
 		case isMessageStartLine(isStaged, latestState, line):
 			latestState = MessageStartLine
 			// NoOp
 		case isMessageLine(isStaged, latestState, line):
 			latestState = MessageLine
+			currentCommit.Message.Write(line[4:]) // Messages are indented by 4 spaces.
 
-			currentDiff.CommitMessage.Write(line[4:])
 		case isMessageEndLine(isStaged, latestState, line):
 			latestState = MessageEndLine
 			// NoOp
@@ -436,6 +434,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			// This should never be nil, but check in case the stdin stream is messed up.
 			if currentCommit == nil {
 				currentCommit = &Commit{}
+				currentDiff.Commit = currentCommit
 			}
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				if err := currentDiff.finalize(); err != nil {
@@ -447,7 +446,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 						"latest_state", latestState.String(),
 					)
 				}
-				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 			}
 			currentDiff = diff()
@@ -488,10 +486,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 						"latest_state", latestState.String(),
 					)
 				}
-				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 			}
 			currentDiff = diff(withPathB(currentDiff.PathB))
+			currentDiff.Commit = currentCommit
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -546,8 +544,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 
 			latestState = ParseFailure
 		}
-		if currentCommit != nil && currentDiff != nil {
-			currentDiff.CommitHash = currentCommit.Hash
+		if currentCommit != nil && currentDiff != nil && currentDiff.Commit == nil {
+			currentDiff.Commit = currentCommit
 		}
 
 		if currentDiff.Len() > c.maxDiffSize {
@@ -835,7 +833,7 @@ func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff,
 
 	// Ignore empty or binary diffs (this condition may be redundant).
 	if currentDiff != nil && (currentDiff.Len() > 0 || currentDiff.IsBinary) {
-		currentDiff.CommitHash = currentCommit.Hash
+		currentDiff.Commit = currentCommit
 		diffChan <- currentDiff
 	}
 	if currentCommit != nil {

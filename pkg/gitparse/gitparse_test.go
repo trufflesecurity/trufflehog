@@ -652,7 +652,7 @@ func TestCommitParsing(t *testing.T) {
 		}
 
 		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].CommitMessage.String(), diff, diff.CommitMessage.String())
+			t.Errorf("Diff does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Commit.Message.String(), diff, diff.Commit.Message.String())
 		}
 		i++
 	}
@@ -685,7 +685,7 @@ func TestIndividualCommitParsing(t *testing.T) {
 
 			// Assert
 			if !diff.Equal(context.Background(), expected[i]) {
-				t.Errorf("Diff does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[j].CommitMessage.String(), diff, diff.CommitMessage.String())
+				t.Errorf("Diff does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[j].Commit.Message.String(), diff, diff.Commit.Message.String())
 			}
 			j++
 		}
