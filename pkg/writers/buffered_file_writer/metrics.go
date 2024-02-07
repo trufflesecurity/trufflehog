@@ -96,8 +96,8 @@ var (
 	totalWriteDuration = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
-		Name:      "total_write_duration_seconds",
-		Help:      "Total duration of write operations by the BufferedFileWriter in seconds.",
+		Name:      "total_write_duration_microseconds",
+		Help:      "Total duration of write operations by the BufferedFileWriter in microseconds.",
 	})
 
 	diskWriteCount = promauto.NewCounter(prometheus.CounterOpts{
