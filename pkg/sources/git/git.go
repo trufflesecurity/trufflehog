@@ -522,7 +522,26 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = context.WithValue(ctx, "repo", path)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
+	logger := repoCtx.Logger()
+	var (
+		logValues []any
+
+		baseHashSet bool
+		maxDepthSet bool
+	)
+	if scanOptions.BaseHash != "" {
+		logValues = append(logValues, "base", scanOptions.BaseHash)
+		baseHashSet = true
+	}
+	if scanOptions.HeadHash != "" {
+		logValues = append(logValues, "head", scanOptions.HeadHash)
+	}
+	if scanOptions.MaxDepth > 0 {
+		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
+		maxDepthSet = true
+	}
+
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, !baseHashSet, scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -532,36 +551,27 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	gitDir := filepath.Join(path, gitDirName)
 
-	logger := repoCtx.Logger()
-	var logValues []any
-	if scanOptions.BaseHash != "" {
-		logValues = append(logValues, "base", scanOptions.BaseHash)
-	}
-	if scanOptions.HeadHash != "" {
-		logValues = append(logValues, "head", scanOptions.HeadHash)
-	}
 	logger.V(1).Info("scanning repo", logValues...)
 
 	var depth int64
 	var lastCommitHash string
 	for diff := range diffChan {
-		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+		if maxDepthSet && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth", "depth", depth)
 			break
 		}
 
 		fullHash := diff.Commit.Hash
-		if !strings.EqualFold(fullHash, lastCommitHash) {
+		if baseHashSet && scanOptions.BaseHash == fullHash {
+			logger.V(1).Info("reached base commit", "commit", fullHash)
+			break
+		}
+
+		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 			logger.V(5).Info("scanning commit", "commit", fullHash)
-		}
-		if len(scanOptions.BaseHash) > 0 {
-			if fullHash == scanOptions.BaseHash {
-				logger.V(1).Info("reached base commit", "commit", fullHash)
-				break
-			}
 		}
 
 		if !scanOptions.Filter.Pass(diff.PathB) {
@@ -733,7 +743,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	// Get the URL metadata for reporting (may be empty).
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
-	diffChan, err := gitparse.NewParser().Staged(ctx, path)
+	diffChan, err := s.parser.Staged(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -744,6 +754,26 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	reachedBase := false
 	gitDir := filepath.Join(path, gitDirName)
 
+	logger := ctx.Logger()
+	var (
+		logValues []any
+
+		baseHashSet bool
+		maxDepthSet bool
+	)
+	if scanOptions.BaseHash != "" {
+		logValues = append(logValues, "base", scanOptions.BaseHash)
+		baseHashSet = true
+	}
+	if scanOptions.HeadHash != "" {
+		logValues = append(logValues, "head", scanOptions.HeadHash)
+	}
+	if scanOptions.MaxDepth > 0 {
+		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
+		maxDepthSet = true
+	}
+	logger.V(1).Info("scanning repo", logValues...)
+
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 
 	var depth int64
@@ -753,26 +783,24 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
 		logger.V(2).Info("scanning staged changes from git")
 
-		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+		if maxDepthSet && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth")
 			break
 		}
 
-		if !strings.EqualFold(fullHash, lastCommitHash) {
+		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 		}
 
-		if reachedBase && !strings.EqualFold(fullHash, scanOptions.BaseHash) {
+		if reachedBase && fullHash != scanOptions.BaseHash {
 			break
 		}
 
-		if len(scanOptions.BaseHash) > 0 {
-			if strings.EqualFold(fullHash, scanOptions.BaseHash) {
-				logger.V(1).Info("reached base hash, finishing scanning files")
-				reachedBase = true
-			}
+		if baseHashSet && fullHash == scanOptions.BaseHash {
+			logger.V(1).Info("reached base hash, finishing scanning files")
+			reachedBase = true
 		}
 
 		if !scanOptions.Filter.Pass(diff.PathB) {

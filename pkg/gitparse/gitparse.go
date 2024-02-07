@@ -147,8 +147,13 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 
 // finalize ensures proper closure of resources associated with the Diff.
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
+// Also set the hasDiffs flag on the commit to indicate that the commit has diffs.
+// This is needed to handle the case where a commit has no diffs, which would otherwise be missed.
 // This method should be called to release resources, especially when writing to a file.
-func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
+func (d *Diff) finalize() error {
+	d.Commit.hasDiffs = true
+	return d.contentWriter.CloseForWriting()
+}
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -157,6 +162,8 @@ type Commit struct {
 	Date    time.Time
 	Message strings.Builder
 	Size    int // in bytes
+
+	hasDiffs bool
 }
 
 // Parser sets values used in GitParse.
@@ -363,6 +370,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	}
 	currentDiff := diff(currentCommit)
 
+	createEmptyDiffForCommit := func(commit *Commit) *Diff {
+		// Initialize an empty Diff instance associated with the given commit.
+		// Since this diff represents "no changes", we only need to set the commit.
+		return &Diff{Commit: commit}
+	}
+
 	defer common.RecoverWithExit(ctx)
 	defer close(diffChan)
 	for {
@@ -397,7 +410,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				totalLogSize += currentCommit.Size
+				if !currentCommit.hasDiffs {
+					emptyDiff := createEmptyDiffForCommit(currentCommit)
+					diffChan <- emptyDiff
+				}
 			}
+
 			// Create a new currentDiff and currentCommit
 			currentCommit = &Commit{Message: strings.Builder{}}
 			currentDiff = diff(currentCommit)
@@ -433,9 +451,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			latestState = DiffLine
 
 			// This should never be nil, but check in case the stdin stream is messed up.
-			if currentCommit == nil {
-				currentCommit = &Commit{}
-			}
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				if err := currentDiff.finalize(); err != nil {
 					ctx.Logger().Error(err,
@@ -447,6 +462,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 					)
 				}
 				diffChan <- currentDiff
+			}
+
+			if currentCommit == nil {
+				currentCommit = &Commit{}
 			}
 			currentDiff = diff(currentCommit)
 		case isModeLine(latestState, line):
