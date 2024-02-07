@@ -228,6 +228,10 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	if err != nil {
+		t.Log("Failed to get secrets, likely running community-tests")
+		return
+	}
 	assert.NoError(t, err)
 	secretV2 := testSecrets.MustGetField("GITLABV2")
 	secretV1 := testSecrets.MustGetField("GITLAB")
