@@ -17,7 +17,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v42/github"
+	"github.com/google/go-github/v57/github"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -330,13 +330,13 @@ func TestNormalizeRepos(t *testing.T) {
 
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(nil)
-	assert.False(t, s.handleRateLimit(nil, nil))
+	assert.False(t, s.handleRateLimit(nil))
 
 	err := &github.RateLimitError{}
 	res := &github.Response{Response: &http.Response{Header: make(http.Header)}}
 	res.Header.Set("x-ratelimit-remaining", "0")
 	res.Header.Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Unix()+1, 10))
-	assert.True(t, s.handleRateLimit(err, res))
+	assert.True(t, s.handleRateLimit(err))
 }
 
 func TestEnumerateUnauthenticated(t *testing.T) {
