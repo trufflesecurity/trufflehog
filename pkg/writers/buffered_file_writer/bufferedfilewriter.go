@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -120,12 +118,7 @@ func (bp *bufferPool) put(buf *buffer) {
 	bp.Put(buf)
 }
 
-type bufferedFileWriterMetrics struct {
-	totalWriteSize     prometheus.Counter
-	totalWriteDuration prometheus.Counter
-	diskWriteCount     prometheus.Counter
-	fileSizeHistogram  prometheus.Histogram
-}
+type bufferedFileWriterMetrics struct{}
 
 func (*bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Duration) {
 	totalWriteSize.Add(float64(size))
@@ -183,6 +176,7 @@ func New(opts ...Option) *BufferedFileWriter {
 		threshold: defaultThreshold,
 		state:     writeOnly,
 		bufPool:   sharedBufferPool,
+		metrics:   new(bufferedFileWriterMetrics),
 	}
 	for _, opt := range opts {
 		opt(w)
