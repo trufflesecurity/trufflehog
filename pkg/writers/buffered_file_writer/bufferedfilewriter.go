@@ -104,16 +104,16 @@ func (bp *bufferPool) put(buf *buffer) {
 	bp.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
 	bp.metrics.recordCheckoutDuration(time.Since(buf.checkedOut))
 
-	// If the buffer is more than twice the default size, release it for garbage collection.
+	// If the buffer is more than twice the default size, replace it with a new buffer.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
 		bp.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		// Release the large buffer for garbage collection by not returning it to the pool.
-		return
+		buf = &buffer{Buffer: bytes.NewBuffer(make([]byte, 0, bp.bufferSize))}
+	} else {
+		// Reset the buffer to clear any existing data.
+		buf.Reset()
 	}
-	// Reset the buffer to clear any existing data.
-	buf.Reset()
 
 	bp.Put(buf)
 }
