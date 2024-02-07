@@ -32,7 +32,6 @@ func (b *bufferPoolMetrics) recordCheckoutDuration(duration time.Duration) {
 	checkoutDurationTotal.Add(float64(duration.Microseconds()))
 }
 
-// recordBufferRetrival groups the metrics updates for when a buffer is fetched.
 func (b *bufferPoolMetrics) recordBufferRetrival() {
 	activeBufferCount.Inc()
 	bufferCount.Inc()
