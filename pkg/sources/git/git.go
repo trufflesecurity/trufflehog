@@ -549,13 +549,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 
-		fullHash := diff.CommitHash
+		fullHash := diff.Commit.Hash
 		if !strings.EqualFold(fullHash, lastCommitHash) {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
+			logger.V(5).Info("scanning commit", "commit", fullHash)
 		}
-		logger.V(5).Info("scanning commit", "commit", fullHash)
 		if len(scanOptions.BaseHash) > 0 {
 			if fullHash == scanOptions.BaseHash {
 				logger.V(1).Info("reached base commit", "commit", fullHash)
@@ -571,8 +571,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		if fileName == "" {
 			continue
 		}
-		email := diff.Author
-		when := diff.CommitDate.UTC().Format("2006-01-02 15:04:05 -0700")
+		email := diff.Commit.Author
+		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
@@ -748,7 +748,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	var depth int64
 	var lastCommitHash string
 	for diff := range diffChan {
-		fullHash := diff.CommitHash
+		fullHash := diff.Commit.Hash
 		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
 		logger.V(2).Info("scanning staged changes from git")
 
@@ -783,8 +783,8 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			continue
 		}
 
-		email := diff.Author
-		when := diff.CommitDate.UTC().Format("2006-01-02 15:04:05 -0700")
+		email := diff.Commit.Author
+		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
@@ -1178,6 +1178,9 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return err
 	}
 	defer func() {
+		if err := fileReader.Close(); err != nil {
+			ctx.Logger().Error(err, "error closing fileReader")
+		}
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().Error(
 				err, "error waiting for command",

@@ -53,7 +53,7 @@ type bufferPool struct {
 	metrics *bufferPoolMetrics
 }
 
-const defaultBufferSize = 2 << 12 // 8KB
+const defaultBufferSize = 2 << 10 // 2KB
 func newBufferPool(opts ...bufPoolOpt) *bufferPool {
 	pool := &bufferPool{bufferSize: defaultBufferSize, metrics: new(bufferPoolMetrics)}
 
@@ -103,13 +103,11 @@ func (bp *bufferPool) put(buf *buffer) {
 	bp.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
 	bp.metrics.recordCheckoutDuration(time.Since(buf.checkedOut))
 
-	// If the buffer is more than twice the default size, replace it with a new, smaller one.
+	// If the buffer is more than twice the default size, release it for garbage collection.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
-		// Replace the buffer with a new, smaller one. No need to copy data since we're resetting it.
-		bp.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf.Buffer = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+		buf = nil // Release the large buffer for garbage collection.
 	} else {
 		// Reset the buffer to clear any existing data.
 		buf.Reset()
@@ -188,7 +186,7 @@ func (w *BufferedFileWriter) String() (string, error) {
 	}
 
 	// Append buffer data, if any, to the end of the file contents.
-	if _, err := buf.WriteTo(w.buf); err != nil {
+	if _, err := w.buf.WriteTo(&buf); err != nil {
 		return "", err
 	}
 
@@ -263,7 +261,6 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 			if _, err := w.buf.WriteTo(w.file); err != nil {
 				return 0, err
 			}
-			// Reset the buffer to clear any existing data and return it to the pool.
 			w.bufPool.put(w.buf)
 		}
 	}

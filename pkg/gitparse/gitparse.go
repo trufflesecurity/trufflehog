@@ -105,11 +105,7 @@ type Diff struct {
 	LineStart int
 	IsBinary  bool
 
-	// Commit metadata.
-	CommitHash    string
-	Author        string
-	CommitDate    time.Time
-	CommitMessage strings.Builder
+	Commit *Commit
 
 	contentWriter contentWriter
 }
@@ -124,9 +120,12 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 	return func(d *Diff) { d.contentWriter = cr }
 }
 
-// NewDiff creates a new Diff with a threshold.
-func NewDiff(opts ...diffOption) *Diff {
-	diff := new(Diff)
+// newDiff creates a new Diff with a threshold and an associated commit.
+// All Diffs must have an associated commit.
+// The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
+// By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
+func newDiff(commit *Commit, opts ...diffOption) *Diff {
+	diff := &Diff{Commit: commit, contentWriter: newBuffer()}
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -153,8 +152,11 @@ func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 
 // Commit contains commit header info and diffs.
 type Commit struct {
-	Hash string
-	Size int // in bytes
+	Hash    string
+	Author  string
+	Date    time.Time
+	Message strings.Builder
+	Size    int // in bytes
 }
 
 // Parser sets values used in GitParse.
@@ -249,6 +251,7 @@ func NewParser(options ...Option) *Parser {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
+// The Diff chan will return diffs in the order they are parsed from the log.
 func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan *Diff, error) {
 	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 	if abbreviatedLog {
@@ -328,6 +331,9 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 
 	go func() {
 		c.FromReader(ctx, stdOut, diffChan, isStaged)
+		if err := stdOut.Close(); err != nil {
+			ctx.Logger().V(2).Info("Error closing git stdout pipe.", "error", err)
+		}
 		if err := cmd.Wait(); err != nil {
 			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
@@ -345,17 +351,17 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	)
 	var latestState = Initial
 
-	diff := func(opts ...diffOption) *Diff {
+	diff := func(c *Commit, opts ...diffOption) *Diff {
 		opts = append(opts, withCustomContentWriter(newBuffer()))
-		return NewDiff(opts...)
+		return newDiff(c, opts...)
 	}
 	if c.useCustomContentWriter {
-		diff = func(opts ...diffOption) *Diff {
+		diff = func(c *Commit, opts ...diffOption) *Diff {
 			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
-			return NewDiff(opts...)
+			return newDiff(c, opts...)
 		}
 	}
-	currentDiff := diff()
+	currentDiff := diff(currentCommit)
 
 	defer common.RecoverWithExit(ctx)
 	defer close(diffChan)
@@ -385,7 +391,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 						"latest_state", latestState.String(),
 					)
 				}
-				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 				currentCommit.Size += currentDiff.Len()
 			}
@@ -394,9 +399,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				totalLogSize += currentCommit.Size
 			}
 			// Create a new currentDiff and currentCommit
-			currentDiff = diff()
-			currentCommit = &Commit{}
-			currentDiff.CommitMessage = strings.Builder{}
+			currentCommit = &Commit{Message: strings.Builder{}}
+			currentDiff = diff(currentCommit)
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
@@ -406,8 +410,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			latestState = MergeLine
 		case isAuthorLine(isStaged, latestState, line):
 			latestState = AuthorLine
+			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
 
-			currentDiff.Author = strings.TrimRight(string(line[8:]), "\n")
 		case isDateLine(isStaged, latestState, line):
 			latestState = DateLine
 
@@ -421,8 +425,8 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			// NoOp
 		case isMessageLine(isStaged, latestState, line):
 			latestState = MessageLine
+			currentCommit.Message.Write(line[4:]) // Messages are indented by 4 spaces.
 
-			currentDiff.CommitMessage.Write(line[4:])
 		case isMessageEndLine(isStaged, latestState, line):
 			latestState = MessageEndLine
 			// NoOp
@@ -443,10 +447,9 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 						"latest_state", latestState.String(),
 					)
 				}
-				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 			}
-			currentDiff = diff()
+			currentDiff = diff(currentCommit)
 		case isModeLine(latestState, line):
 			latestState = ModeLine
 			// NoOp
@@ -484,10 +487,9 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 						"latest_state", latestState.String(),
 					)
 				}
-				currentDiff.CommitHash = currentCommit.Hash
 				diffChan <- currentDiff
 			}
-			currentDiff = diff(withPathB(currentDiff.PathB))
+			currentDiff = diff(currentCommit, withPathB(currentDiff.PathB))
 
 			words := bytes.Split(line, []byte(" "))
 			if len(words) >= 3 {
@@ -838,7 +840,7 @@ func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff,
 
 	// Ignore empty or binary diffs (this condition may be redundant).
 	if currentDiff != nil && (currentDiff.Len() > 0 || currentDiff.IsBinary) {
-		currentDiff.CommitHash = currentCommit.Hash
+		currentDiff.Commit = currentCommit
 		diffChan <- currentDiff
 	}
 	if currentCommit != nil {
