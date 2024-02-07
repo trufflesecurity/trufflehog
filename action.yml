@@ -80,7 +80,7 @@ runs:
       ##########################################
       ##          Run TruffleHog              ##
       ##########################################       
-      docker run --rm -v "$REPO_PATH":/tmp \
+      docker run --rm -v "$REPO_PATH":/tmp -w /tmp \
       ghcr.io/trufflesecurity/trufflehog:latest \
       git file:///tmp/ \
       --since-commit \
