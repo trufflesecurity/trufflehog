@@ -109,11 +109,11 @@ func (bp *bufferPool) put(buf *buffer) {
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
 		bp.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = nil // Release the large buffer for garbage collection.
-	} else {
-		// Reset the buffer to clear any existing data.
-		buf.Reset()
+		// Release the large buffer for garbage collection by not returning it to the pool.
+		return
 	}
+	// Reset the buffer to clear any existing data.
+	buf.Reset()
 
 	bp.Put(buf)
 }
