@@ -10,35 +10,37 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type bufferPoolMetrics struct{}
 
-func (m *bufferPoolMetrics) recordGrowth(growthAmount int) {
+func (b *bufferPoolMetrics) recordGrowth(growthAmount int) {
 	growCount.Inc()
 	growAmount.Add(float64(growthAmount))
 }
 
-func (m *bufferPoolMetrics) recordShrink(amount int) {
+func (b *bufferPoolMetrics) recordShrink(amount int) {
 	shrinkCount.Inc()
 	shrinkAmount.Add(float64(amount))
 }
 
-func (m *bufferPoolMetrics) recordCheckoutDuration(duration time.Duration) {
+func (b *bufferPoolMetrics) recordCheckoutDuration(duration time.Duration) {
 	checkoutDuration.Observe(float64(duration.Microseconds()))
 	checkoutCount.Inc()
 	checkoutDurationTotal.Add(float64(duration.Microseconds()))
 }
 
 // recordBufferRetrival groups the metrics updates for when a buffer is fetched.
-func (m *bufferPoolMetrics) recordBufferRetrival() {
-	activeBufferCount.Add(1)
-	bufferCount.Add(1)
+func (b *bufferPoolMetrics) recordBufferRetrival() {
+	activeBufferCount.Inc()
+	bufferCount.Inc()
 }
 
-func (m *bufferPoolMetrics) recordBufferReturn(bufCap, bufLen int64) {
+func (b *bufferPoolMetrics) recordBufferReturn(bufCap, bufLen int64) {
 	activeBufferCount.Dec()
 	totalBufferSize.Add(float64(bufCap))
 	totalBufferLength.Add(float64(bufLen))
@@ -53,7 +55,7 @@ type bufferPool struct {
 	metrics *bufferPoolMetrics
 }
 
-const defaultBufferSize = 2 << 10 // 2KB
+const defaultBufferSize = 2 << 12 // 4KB
 func newBufferPool(opts ...bufPoolOpt) *bufferPool {
 	pool := &bufferPool{bufferSize: defaultBufferSize, metrics: new(bufferPoolMetrics)}
 
@@ -76,6 +78,7 @@ var sharedBufferPool *bufferPool
 
 func init() { sharedBufferPool = newBufferPool() }
 
+// buffer is a wrapper around bytes.Buffer that includes a timestamp for tracking buffer checkout duration.
 type buffer struct {
 	*bytes.Buffer
 	checkedOut time.Time
@@ -107,6 +110,7 @@ func (bp *bufferPool) put(buf *buffer) {
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
+		bp.metrics.recordShrink(buf.Cap() - defaultBufferSize)
 		buf = nil // Release the large buffer for garbage collection.
 	} else {
 		// Reset the buffer to clear any existing data.
@@ -114,6 +118,28 @@ func (bp *bufferPool) put(buf *buffer) {
 	}
 
 	bp.Put(buf)
+}
+
+type bufferedFileWriterMetrics struct {
+	totalWriteSize     prometheus.Counter
+	totalWriteDuration prometheus.Counter
+	diskWriteCount     prometheus.Counter
+	fileSizeHistogram  prometheus.Histogram
+}
+
+func (*bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Duration) {
+	totalWriteSize.Add(float64(size))
+	totalWriteDuration.Add(float64(dur.Microseconds()))
+}
+
+func (*bufferedFileWriterMetrics) recordDiskWrite(ctx context.Context, f *os.File) {
+	diskWriteCount.Inc()
+	size, err := f.Stat()
+	if err != nil {
+		ctx.Logger().Error(err, "failed to get file size for metric")
+		return
+	}
+	fileSizeHistogram.Observe(float64(size.Size()))
 }
 
 // state represents the current mode of BufferedFileWriter.
@@ -138,6 +164,8 @@ type BufferedFileWriter struct {
 	buf      *buffer        // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     io.WriteCloser // File for storing data over the threshold.
+
+	metrics *bufferedFileWriterMetrics
 }
 
 // Option is a function that modifies a BufferedFileWriter.
@@ -148,9 +176,9 @@ func WithThreshold(threshold uint64) Option {
 	return func(w *BufferedFileWriter) { w.threshold = threshold }
 }
 
+const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(opts ...Option) *BufferedFileWriter {
-	const defaultThreshold = 10 * 1024 * 1024 // 10MB
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
@@ -207,7 +235,10 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 
 	bufferLength := w.buf.Len()
 
-	defer func() {
+	start := time.Now()
+	defer func(start time.Time) {
+		w.metrics.recordDataProcessed(size, time.Since(start))
+
 		w.size += size
 		ctx.Logger().V(4).Info(
 			"write complete",
@@ -215,9 +246,9 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 			"content_size", bufferLength,
 			"total_size", w.size,
 		)
-	}()
+	}(start)
 
-	totalSizeNeeded := uint64(bufferLength) + uint64(len(data))
+	totalSizeNeeded := uint64(bufferLength) + size
 	if totalSizeNeeded <= w.threshold {
 		// If the total size is within the threshold, write to the buffer.
 		ctx.Logger().V(4).Info(
@@ -253,6 +284,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 
 		w.filename = file.Name()
 		w.file = file
+		w.metrics.recordDiskWrite(ctx, file)
 
 		// Transfer existing data in buffer to the file, then clear the buffer.
 		// This ensures all the data is in one place - either entirely in the buffer or the file.

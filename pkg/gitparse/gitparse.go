@@ -404,7 +404,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			// Check that the commit line contains a hash and set it.
 			if len(line) >= 47 {
 				currentCommit.Hash = string(line[7:47])
-				currentDiff.CommitHash = currentCommit.Hash
 			}
 		case isMergeLine(isStaged, latestState, line):
 			latestState = MergeLine
@@ -419,7 +418,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			if err != nil {
 				ctx.Logger().V(2).Info("Could not parse date from git stream.", "error", err)
 			}
-			currentDiff.CommitDate = date
+			currentCommit.Date = date
 		case isMessageStartLine(isStaged, latestState, line):
 			latestState = MessageStartLine
 			// NoOp
@@ -544,9 +543,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 
 			latestState = ParseFailure
 		}
-		if currentCommit != nil && currentDiff != nil {
-			currentDiff.CommitHash = currentCommit.Hash
-		}
 
 		if currentDiff.Len() > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
@@ -558,13 +554,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	cleanupParse(ctx, currentCommit, currentDiff, diffChan, &totalLogSize)
 
 	ctx.Logger().V(2).Info("finished parsing git log.", "total_log_size", totalLogSize)
-}
-
-func (c *Parser) contentWriter() contentWriter {
-	if c.useCustomContentWriter {
-		return bufferedfilewriter.New()
-	}
-	return newBuffer()
 }
 
 func isMergeLine(isStaged bool, latestState ParseState, line []byte) bool {
