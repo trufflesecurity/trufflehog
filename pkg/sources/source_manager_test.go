@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -316,7 +316,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 }
 
 func TestSourceManagerUnitHook(t *testing.T) {
-	hook := NewUnitHook(context.TODO())
+	hook, ch := NewUnitHook(context.TODO())
 
 	input := []unitChunk{
 		{unit: "1 one", output: "bar"},
@@ -333,9 +333,13 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
+	assert.NoError(t, mgr.Wait())
 
-	metrics := hook.UnitMetrics()
-	assert.Equal(t, 3, len(metrics))
+	assert.Equal(t, 0, len(hook.InProgressSnapshot()))
+	var metrics []UnitMetrics
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
 	sort.Slice(metrics, func(i, j int) bool {
 		return metrics[i].Unit.SourceUnitID() < metrics[j].Unit.SourceUnitID()
 	})
@@ -366,14 +370,10 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.Equal(t, 1, len(m2.Errors))
 }
 
-// TestSourceManagerUnitHookNoBlock tests that the UnitHook drops metrics if
-// they aren't handled fast enough.
-func TestSourceManagerUnitHookNoBlock(t *testing.T) {
-	var evictedKeys []string
-	cache, _ := lru.NewWithEvict(1, func(key string, _ *UnitMetrics) {
-		evictedKeys = append(evictedKeys, key)
-	})
-	hook := NewUnitHook(context.TODO(), WithUnitHookCache(cache))
+// TestSourceManagerUnitHookBackPressure tests that the UnitHook blocks if the
+// finished metrics aren't handled fast enough.
+func TestSourceManagerUnitHookBackPressure(t *testing.T) {
+	hook, ch := NewUnitHook(context.TODO(), WithUnitHookFinishBufferSize(0))
 
 	input := []unitChunk{
 		{unit: "one", output: "bar"},
@@ -389,18 +389,25 @@ func TestSourceManagerUnitHookNoBlock(t *testing.T) {
 	assert.NoError(t, err)
 	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
-	<-ref.Done()
 
-	assert.Equal(t, 2, len(evictedKeys))
-	metrics := hook.UnitMetrics()
-	assert.Equal(t, 1, len(metrics))
-	assert.Equal(t, "three", metrics[0].Unit.SourceUnitID())
+	var metrics []UnitMetrics
+	for i := 0; i < len(input); i++ {
+		select {
+		case <-ref.Done():
+			t.Fatal("job should not finish until metrics have been collected")
+		case <-time.After(1 * time.Millisecond):
+		}
+		metrics = append(metrics, <-ch)
+	}
+
+	assert.NoError(t, mgr.Wait())
+	assert.Equal(t, 3, len(metrics), metrics)
 }
 
 // TestSourceManagerUnitHookNoUnits tests whether the UnitHook works for
 // sources that don't support units.
 func TestSourceManagerUnitHookNoUnits(t *testing.T) {
-	hook := NewUnitHook(context.TODO())
+	hook, ch := NewUnitHook(context.TODO())
 
 	mgr := NewManager(
 		WithBufferedOutput(8),
@@ -412,8 +419,12 @@ func TestSourceManagerUnitHookNoUnits(t *testing.T) {
 	ref, err := mgr.Run(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
+	assert.NoError(t, mgr.Wait())
 
-	metrics := hook.UnitMetrics()
+	var metrics []UnitMetrics
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
 	assert.Equal(t, 1, len(metrics))
 
 	m := metrics[0]
