@@ -2,6 +2,7 @@ package sources
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -182,6 +183,11 @@ func (s *SourceManager) Wait() error {
 	}
 	close(s.outputChunks)
 	close(s.firstErr)
+	for _, hook := range s.hooks {
+		if hookCloser, ok := hook.(io.Closer); ok {
+			_ = hookCloser.Close()
+		}
+	}
 	return s.waitErr
 }
 
