@@ -260,6 +260,10 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 				"grow_size", growSize,
 			)
 			// We are manually growing the buffer so we can track the growth via metrics.
+			// Knowing the exact data size, we directly resize to fit it, rather than exponential growth
+			// which may require multiple allocations and copies if the size required is much larger
+			// than double the capacity. Our approach aligns with default behavior when growth sizes
+			// happen to match current capacity, retaining asymptotic efficiency benefits.
 			w.bufPool.growBufferWithSize(w.buf, growSize)
 		}
 
