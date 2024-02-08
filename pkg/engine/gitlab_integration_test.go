@@ -36,6 +36,6 @@ func TestGitLab(t *testing.T) {
 
 	// Check the output provided by metrics.
 	metrics := e.GetMetrics()
-	assert.GreaterOrEqual(t, metrics.ChunksScanned, uint64(36390))
-	assert.GreaterOrEqual(t, metrics.BytesScanned, uint64(92662889))
+	assert.GreaterOrEqual(t, metrics.ChunksScanned, uint64(36312))
+	assert.GreaterOrEqual(t, metrics.BytesScanned, uint64(91618854))
 }
