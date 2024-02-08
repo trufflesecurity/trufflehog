@@ -716,7 +716,7 @@ func isBinaryLine(latestState ParseState, line []byte) bool {
 
 // Get the b/ file path. Ignoring the edge case of files having `and /b` in the name for simplicity.
 func pathFromBinaryLine(line []byte) (string, bool) {
-	if bytes.Index(line, []byte("and /dev/null")) != -1 {
+	if bytes.Contains(line, []byte("and /dev/null")) {
 		return "", true
 	}
 
