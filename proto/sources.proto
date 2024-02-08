@@ -340,11 +340,11 @@ message Syslog {
   string format = 5;
 }
 
-message PublicEventMonitoring {
+message Forager {
   oneof credential {
     credentials.Unauthenticated unauthenticated = 1;
   }
-  string domain = 2;
+  repeated string domains = 2;
   int64 max_depth = 3;
   google.protobuf.Timestamp since = 4;
 }
