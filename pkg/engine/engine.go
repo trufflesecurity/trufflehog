@@ -54,7 +54,7 @@ type runtimeMetrics struct {
 // Printer is used to format found results and output them to the user. Ex JSON, plain text, etc.
 // Please note printer implementations SHOULD BE thread safe.
 type Printer interface {
-	Print(ctx context.Context, r *detectors.ResultWithMetadata, logErrors *bool) error
+	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
 type Engine struct {
@@ -68,11 +68,12 @@ type Engine struct {
 	// only the first one will be kept.
 	filterUnverified bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
-	filterEntropy         *float64
-	onlyVerified          bool
-	logVerificationErrors bool
-	verificationOverlap   bool
-	printAvgDetectorTime  bool
+	filterEntropy           *float64
+	notifyVerifiedResults   bool
+	notifyUnverifiedResults bool
+	notifyUnknownResults    bool
+	verificationOverlap     bool
+	printAvgDetectorTime    bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
@@ -165,20 +166,24 @@ func WithFilterEntropy(entropy float64) Option {
 	}
 }
 
-// WithOnlyVerified sets the onlyVerified flag on the engine. If set to true,
-// the engine will only print verified results.
-func WithOnlyVerified(onlyVerified bool) Option {
+// WithResults defines which results will be printed by the engine.
+func WithResults(results map[string]struct{}) Option {
 	return func(e *Engine) {
-		e.onlyVerified = onlyVerified
-	}
-}
-
-// WithLogVerificationErrors sets the |logVerificationErrors| flag on the engine.
-// If set to true, the engine will print results with verification errors,
-// even if the result is unverified and |onlyVerified| is true.
-func WithLogVerificationErrors(logVerificationErrors bool) Option {
-	return func(e *Engine) {
-		e.logVerificationErrors = logVerificationErrors
+		if len(results) > 0 {
+			if _, ok := results["verified"]; ok {
+				e.notifyVerifiedResults = true
+			}
+			if _, ok := results["unknown"]; ok {
+				e.notifyUnknownResults = true
+			}
+			if _, ok := results["unverified"]; ok {
+				e.notifyUnverifiedResults = true
+			}
+		} else {
+			e.notifyVerifiedResults = true
+			e.notifyUnknownResults = true
+			e.notifyUnverifiedResults = true
+		}
 	}
 }
 
@@ -859,11 +864,21 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 func (e *Engine) notifyResults(ctx context.Context) {
 	for r := range e.ResultsChan() {
-		if !r.Verified && e.onlyVerified {
-			// Skip unverified errors, unless they have a verification error and |logVerificationErrors| is true.
-			if !(e.logVerificationErrors && r.VerificationError() != nil) {
+		// Filter unwanted results, based on `--results`.
+		if !r.Verified {
+			if r.VerificationError() != nil {
+				if !e.notifyUnknownResults {
+					// Skip results with verification errors.
+					continue
+				}
+			} else if !e.notifyUnverifiedResults {
+				// Skip unverified results.
 				continue
 			}
+		} else if !e.notifyVerifiedResults {
+			// Skip verified results.
+			// TODO: Is this a legitimate use case?
+			continue
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
 
@@ -884,7 +899,7 @@ func (e *Engine) notifyResults(ctx context.Context) {
 			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
 		}
 
-		if err := e.printer.Print(ctx, &r, &e.logVerificationErrors); err != nil {
+		if err := e.printer.Print(ctx, &r); err != nil {
 			ctx.Logger().Error(err, "error printing result")
 		}
 	}

@@ -38,20 +38,19 @@ import (
 )
 
 var (
-	cli                        = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd                        string
-	debug                      = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace                      = cli.Flag("trace", "Run in trace mode.").Bool()
-	profile                    = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
-	localDev                   = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
-	jsonOut                    = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy                 = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	gitHubActionsFormat        = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency                = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification             = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified               = cli.Flag("only-verified", "Only output verified results.").Bool()
-	logVerificationErrorsIsSet bool
-	logVerificationErrors      = cli.Flag("log-verification-errors", "Output verification errors").IsSetByUser(&logVerificationErrorsIsSet).Bool()
+	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd                 string
+	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
+	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. This flag can be repeated. Defaults to all types.").Default("verified,unknown").String()
 
 	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -409,11 +408,14 @@ func run(state overseer.State) {
 		jobReportWriter = *jobReportFile
 	}
 
-	// If |logVerificationErrors| was not set by the user,
-	// default to false if --only-verified is specified.
-	if !logVerificationErrorsIsSet {
-		value := !*onlyVerified
-		logVerificationErrors = &value
+	// Parse --results flag.
+	if *onlyVerified {
+		r := "verified"
+		results = &r
+	}
+	parsedResults, err := parseResults(results)
+	if err != nil {
+		logFatal(err, "failed to configure results flag")
 	}
 
 	e, err := engine.Start(ctx,
@@ -426,8 +428,7 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
-		engine.WithOnlyVerified(*onlyVerified),
-		engine.WithLogVerificationErrors(*logVerificationErrors),
+		engine.WithResults(parsedResults),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),
@@ -604,6 +605,28 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
+}
+
+// parseResults ensures that users provide valid CSV input to `--results`.
+//
+// This is a work-around to kingpin not supporting CSVs.
+// See: https://github.com/trufflesecurity/trufflehog/pull/2372#issuecomment-1983868917
+func parseResults(input *string) (map[string]struct{}, error) {
+	var (
+		values  = strings.Split(strings.ToLower(*input), ",")
+		results = make(map[string]struct{}, 3)
+	)
+	for _, value := range values {
+		switch value {
+		case "verified":
+		case "unknown":
+		case "unverified":
+			results[value] = struct{}{}
+		default:
+			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified'", value)
+		}
+	}
+	return results, nil
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
