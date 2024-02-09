@@ -396,7 +396,15 @@ func (e *Engine) initSourceManager(ctx context.Context) {
 		e.wgDetectorWorkers.Add(1)
 		go func() {
 			defer e.wgDetectorWorkers.Done()
-			defer e.jobReportWriter.Close()
+			defer func() {
+				e.jobReportWriter.Close()
+				// Add a bit of extra information if it's a *os.File.
+				if namer, ok := e.jobReportWriter.(interface{ Name() string }); ok {
+					ctx.Logger().Info("report written", "path", namer.Name())
+				} else {
+					ctx.Logger().Info("report written")
+				}
+			}()
 			for metrics := range finishedMetrics {
 				metrics.Errors = common.ExportErrors(metrics.Errors...)
 				details, err := json.Marshal(map[string]any{
