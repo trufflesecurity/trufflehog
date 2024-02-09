@@ -720,13 +720,13 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			}
 
 			// Scan the wiki, if enabled, and the repo has one.
-			if s.conn.IncludeWikis && repoInfo.hasWiki {
+			if s.conn.IncludeWikis && repoInfo.hasWiki && s.hasWiki(ctx, repoURL) {
 				wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
 				wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
 				_, err := s.cloneAndScanRepo(wikiCtx, installationClient, wikiURL, repoInfo, chunksChan)
 				if err != nil {
-					scanErrs.Add(err)
+					scanErrs.Add(fmt.Errorf("error scanning wiki: %s", wikiURL))
 					// Don't return, it still might be possible to scan comments.
 				}
 			}

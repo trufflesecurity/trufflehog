@@ -269,7 +269,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 				owner:    r.GetOwner().GetLogin(),
 				name:     r.GetName(),
 				fullName: r.GetFullName(),
-				hasWiki:  s.conn.GetIncludeWikis() && s.hasWiki(ctx, r, repoURL),
+				hasWiki:  r.GetHasWiki(),
 				size:     r.GetSize(),
 			}
 			if r.GetPrivate() {
@@ -295,11 +295,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 // hasWiki returns true if the "has_wiki" property is true AND https://github.com/$org/$repo/wiki is not redirected.
 // Unfortunately, this isn't 100% accurate. Some repositories meet both criteria yet don't have a cloneable wiki.
-func (s *Source) hasWiki(ctx context.Context, repo *github.Repository, repoURL string) bool {
-	if !repo.GetHasWiki() {
-		return false
-	}
-
+func (s *Source) hasWiki(ctx context.Context, repoURL string) bool {
 	wikiURL := strings.TrimSuffix(repoURL, ".git") + "/wiki"
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
 	if err != nil {
