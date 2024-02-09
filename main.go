@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -399,6 +400,10 @@ func run(state overseer.State) {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
+	var jobReportWriter io.WriteCloser
+	if *jobReportFile != nil {
+		jobReportWriter = *jobReportFile
+	}
 	e, err := engine.Start(ctx,
 		engine.WithConcurrency(uint8(*concurrency)),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
@@ -414,7 +419,7 @@ func run(state overseer.State) {
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),
 		engine.WithVerificationOverlap(*allowVerificationOverlap),
-		engine.WithJobReportWriter(*jobReportFile),
+		engine.WithJobReportWriter(jobReportWriter),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")
