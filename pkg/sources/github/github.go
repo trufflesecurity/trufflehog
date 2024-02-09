@@ -410,6 +410,19 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 			ctx.Logger().Error(fmt.Errorf("type assertion failed"), "unexpected value in cache", "repo", repo)
 			continue
 		}
+
+		_, urlParts, err := getRepoURLParts(r)
+		if err != nil {
+			ctx.Logger().Error(err, "failed to parse repository URL")
+			continue
+		}
+
+		ghRepo, _, err := s.apiClient.Repositories.Get(ctx, urlParts[1], urlParts[2])
+		if err != nil {
+			ctx.Logger().Error(err, "failed to fetch repository")
+			continue
+		}
+		s.cacheRepoInfo(ghRepo)
 		s.repos = append(s.repos, r)
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
@@ -720,7 +733,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			}
 
 			// Scan the wiki, if enabled, and the repo has one.
-			if s.conn.IncludeWikis && repoInfo.hasWiki && s.hasWiki(ctx, repoURL) {
+			if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
 				wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
 				wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
@@ -739,7 +752,7 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				}
 			}
 
-			repoCtx.Logger().V(1).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", duration)
+			repoCtx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", duration)
 			githubReposScanned.WithLabelValues(s.name).Inc()
 			atomic.AddUint64(&scannedCount, 1)
 			return nil
@@ -748,14 +761,14 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		s.log.V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs)
+		s.log.V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
 	}
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed GitHub scan", "")
 
 	return nil
 }
 
-func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, repoURL string, repoInfo *repoInfo, chunksChan chan *sources.Chunk) (time.Duration, error) {
+func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, repoURL string, repoInfo repoInfo, chunksChan chan *sources.Chunk) (time.Duration, error) {
 	var duration time.Duration
 
 	ctx.Logger().V(2).Info("attempting to clone repo")
@@ -775,7 +788,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 	} else {
 		logger = ctx.Logger()
 	}
-	logger.V(1).Info("scanning repo")
+	logger.V(2).Info("scanning repo")
 
 	start := time.Now()
 	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
@@ -883,7 +896,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 		for _, gist := range gists {
 			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
 
-			info := &repoInfo{
+			info := repoInfo{
 				owner: gist.GetOwner().GetLogin(),
 			}
 			if gist.GetPublic() {
@@ -1052,17 +1065,10 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
 
-func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo *repoInfo, chunksChan chan *sources.Chunk) error {
-	// Support ssh and https URLs.
-	repoURL, err := git.GitURLParse(repoPath)
+func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+	urlString, urlParts, err := getRepoURLParts(repoPath)
 	if err != nil {
 		return err
-	}
-	urlString := repoURL.String()
-
-	urlParts := trimURLAndSplit(urlString)
-	if len(urlParts) < 2 || len(urlParts) > 3 {
-		return fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be 2 or 3", urlString)
 	}
 
 	if s.includeGistComments && urlParts[0] == "gist.github.com" {
@@ -1080,17 +1086,34 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo *re
 // - "https://github.com/trufflesecurity/trufflehog" => ["github.com", "trufflesecurity", "trufflehog"]
 // - "https://gist.github.com/nat/5fdbb7f945d121f197fb074578e53948" => ["gist.github.com", "nat", "5fdbb7f945d121f197fb074578e53948"]
 // - "https://gist.github.com/ff0e5e8dc8ec22f7a25ddfc3492d3451.git" => ["gist.github.com", "ff0e5e8dc8ec22f7a25ddfc3492d3451"]
-func trimURLAndSplit(url string) []string {
-	trimmedURL := strings.TrimPrefix(url, "https://")
+func getRepoURLParts(repoURL string) (string, []string, error) {
+	// Support ssh and https URLs.
+	url, err := git.GitURLParse(repoURL)
+	if err != nil {
+		return "", []string{}, err
+	}
+
+	// Remove the user information.
+	// e.g., `git@github.com` -> `github.com`
+	if url.User != nil {
+		url.User = nil
+	}
+
+	urlString := url.String()
+	trimmedURL := strings.TrimPrefix(urlString, url.Scheme+"://")
 	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
 	splitURL := strings.Split(trimmedURL, "/")
 
-	return splitURL
+	if len(splitURL) < 2 || len(splitURL) > 3 {
+		return "", []string{}, fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be 2 or 3", urlString)
+	}
+
+	return urlString, splitURL, nil
 }
 
 const initialPage = 1 // page to start listing from
 
-func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo *repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	ctx.Logger().V(2).Info("Scanning GitHub Gist comments")
 
 	// GitHub Gist URL.
@@ -1125,7 +1148,7 @@ func extractGistID(url []string) string {
 	return url[len(url)-1]
 }
 
-func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo *repoInfo, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1173,7 +1196,7 @@ var (
 	state = "all"
 )
 
-func (s *Source) processRepoComments(ctx context.Context, repoInfo *repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
@@ -1198,7 +1221,7 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo *repoInfo, ch
 
 }
 
-func (s *Source) processIssues(ctx context.Context, repoInfo *repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	bodyTextsOpts := &github.IssueListByRepoOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1232,7 +1255,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo *repoInfo, chunksCh
 	return nil
 }
 
-func (s *Source) chunkIssues(ctx context.Context, repoInfo *repoInfo, issues []*github.Issue, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, chunksChan chan *sources.Chunk) error {
 	for _, issue := range issues {
 
 		// Skip pull requests since covered by processPRs.
@@ -1271,7 +1294,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo *repoInfo, issues []*
 	return nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, repoInfo *repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
@@ -1302,7 +1325,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo *repoInfo, c
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo *repoInfo, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1335,7 +1358,7 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo *repoInfo, com
 	return nil
 }
 
-func (s *Source) processPRs(ctx context.Context, repoInfo *repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	prOpts := &github.PullRequestListOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1368,7 +1391,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo *repoInfo, chunksChan 
 	return nil
 }
 
-func (s *Source) processPRComments(ctx context.Context, repoInfo *repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	prOpts := &github.PullRequestListCommentsOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1400,7 +1423,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo *repoInfo, chun
 	return nil
 }
 
-func (s *Source) chunkPullRequests(ctx context.Context, repoInfo *repoInfo, prs []*github.PullRequest, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []*github.PullRequest, chunksChan chan *sources.Chunk) error {
 	for _, pr := range prs {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{
@@ -1433,7 +1456,7 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo *repoInfo, prs 
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo *repoInfo, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
 		chunk := &sources.Chunk{

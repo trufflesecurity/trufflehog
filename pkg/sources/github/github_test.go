@@ -710,6 +710,26 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 	}
 }
 
+func TestGetRepoURLParts(t *testing.T) {
+	tests := []string{
+		"https://github.com/trufflesecurity/trufflehog.git",
+		"git+https://github.com/trufflesecurity/trufflehog.git",
+		//"git@github.com:trufflesecurity/trufflehog.git",
+		"ssh://github.com/trufflesecurity/trufflehog.git",
+		"ssh://git@github.com/trufflesecurity/trufflehog.git",
+		"git+ssh://git@github.com/trufflesecurity/trufflehog.git",
+		"git://github.com/trufflesecurity/trufflehog.git",
+	}
+	expected := []string{"github.com", "trufflesecurity", "trufflehog"}
+	for _, tt := range tests {
+		_, parts, err := getRepoURLParts(tt)
+		if err != nil {
+			t.Fatalf("failed: %v", err)
+		}
+		assert.Equal(t, expected, parts)
+	}
+}
+
 func TestGetGistID(t *testing.T) {
 	tests := []struct {
 		trimmedURL []string

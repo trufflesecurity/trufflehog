@@ -20,22 +20,22 @@ import (
 
 type repoInfoCache struct {
 	mu    sync.RWMutex
-	cache map[string]*repoInfo
+	cache map[string]repoInfo
 }
 
 func newRepoInfoCache() repoInfoCache {
 	return repoInfoCache{
-		cache: make(map[string]*repoInfo),
+		cache: make(map[string]repoInfo),
 	}
 }
 
-func (r *repoInfoCache) put(repoURL string, info *repoInfo) {
+func (r *repoInfoCache) put(repoURL string, info repoInfo) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.cache[repoURL] = info
 }
 
-func (r *repoInfoCache) get(repoURL string) (*repoInfo, bool) {
+func (r *repoInfoCache) get(repoURL string) (repoInfo, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -47,7 +47,7 @@ type repoInfo struct {
 	owner      string
 	name       string
 	fullName   string
-	hasWiki    bool // the repo is _likely_ to have a wiki (see the comment on hasWiki func).
+	hasWiki    bool // the repo is _likely_ to have a wiki (see the comment on wikiIsReachable func).
 	size       int
 	visibility source_metadatapb.Visibility
 }
@@ -265,19 +265,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
 
-			info := &repoInfo{
-				owner:    r.GetOwner().GetLogin(),
-				name:     r.GetName(),
-				fullName: r.GetFullName(),
-				hasWiki:  r.GetHasWiki(),
-				size:     r.GetSize(),
-			}
-			if r.GetPrivate() {
-				info.visibility = source_metadatapb.Visibility_private
-			} else {
-				info.visibility = source_metadatapb.Visibility_public
-			}
-			s.repoInfoCache.put(repoURL, info)
+			s.cacheRepoInfo(r)
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
@@ -293,9 +281,26 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 	return nil
 }
 
-// hasWiki returns true if the "has_wiki" property is true AND https://github.com/$org/$repo/wiki is not redirected.
-// Unfortunately, this isn't 100% accurate. Some repositories meet both criteria yet don't have a cloneable wiki.
-func (s *Source) hasWiki(ctx context.Context, repoURL string) bool {
+func (s *Source) cacheRepoInfo(r *github.Repository) {
+	info := repoInfo{
+		owner:    r.GetOwner().GetLogin(),
+		name:     r.GetName(),
+		fullName: r.GetFullName(),
+		hasWiki:  r.GetHasWiki(),
+		size:     r.GetSize(),
+	}
+	if r.GetPrivate() {
+		info.visibility = source_metadatapb.Visibility_private
+	} else {
+		info.visibility = source_metadatapb.Visibility_public
+	}
+	s.repoInfoCache.put(r.GetCloneURL(), info)
+}
+
+// wikiIsReachable returns true if https://github.com/$org/$repo/wiki is not redirected.
+// Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
+// but still don't have a cloneable wiki.
+func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 	wikiURL := strings.TrimSuffix(repoURL, ".git") + "/wiki"
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
 	if err != nil {
