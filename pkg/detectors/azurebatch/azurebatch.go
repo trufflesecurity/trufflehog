@@ -30,7 +30,7 @@ var (
 	urlPat = regexp.MustCompile(`https://(.{1,50})\.(.{1,50})\.batch\.azure\.com`)
 
 	// examples we have end with == so /b won't work for the end boundary, gotta specifically match double "="
-	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/\=]{86}={0,2})`)
+	secretPat = regexp.MustCompile(`\b([A-Za-z0-9+/\=]{86}==)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

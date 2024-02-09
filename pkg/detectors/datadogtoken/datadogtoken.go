@@ -21,8 +21,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog"}) + `\b([a-zA-Z-0-9]{40})\b`)
-	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog"}) + `\b([a-zA-Z-0-9]{32})\b`)
+	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd_", "dd-"}) + `\b([a-zA-Z-0-9]{40})\b`)
+	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd_", "dd-"}) + `\b([a-zA-Z-0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
