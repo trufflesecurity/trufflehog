@@ -7,12 +7,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -29,8 +30,8 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Removed bounds since there are some cases where the start and end of the token is a special character
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"gengo"}) + `([ ]{0,1}[0-9a-zA-Z\[\]\-\(\)\{\}|_^@$=~]{64}[ \r\n]{1})`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gengo"}) + `([ ]{0,1}[0-9a-zA-Z\[\]\-\(\)\{\}|_^@$=~]{64}[ \r\n]{1})`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"gengo"}) + `([0-9a-zA-Z\[\]\-\(\)\{\}|_^@$=~]{64})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gengo"}) + `([0-9a-zA-Z\[\]\-\(\)\{\}|_^@$=~]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

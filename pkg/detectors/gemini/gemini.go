@@ -8,10 +8,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -33,14 +34,14 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(`\b((?:master-|account-)[0-9A-Za-z]{20})\b`)
-	secretPat = regexp.MustCompile(`[A-Za-z0-9]{27,28}`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"gemini"}) + `\b((?:master-|account-)[0-9A-Za-z]{20})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gemini"}) + `\b([A-Za-z0-9]{27,28})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"master-", "account-"}
+	return []string{"master-", "account-", "gemini"}
 }
 
 // FromData will find and optionally verify Gemini secrets in a given set of bytes.

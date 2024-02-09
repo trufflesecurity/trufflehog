@@ -5,12 +5,13 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,8 +27,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + `([ \r\n]{1}[0-9a-zA-Z\-\_]{24}[ \r\n]{1})`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + `([ \r\n]{1}[0-9a-zA-Z\-\_]{48}[ \r\n]{1})`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + `\b([0-9a-zA-Z\-\_]{24})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bitmex"}) + `\b([0-9a-zA-Z\-\_]{48})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
