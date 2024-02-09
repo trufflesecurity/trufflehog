@@ -48,7 +48,7 @@ Several options available for you:
 
 ```bash
 # MacOS users
-brew install trufflesecurity/trufflehog/trufflehog
+brew install trufflehog
 
 # Docker
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
