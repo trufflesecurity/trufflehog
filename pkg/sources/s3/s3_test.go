@@ -32,7 +32,6 @@ func TestSource_Chunks(t *testing.T) {
 	s3secret := secret.MustGetField("AWS_S3_SECRET")
 
 	type init struct {
-		name       string
 		verify     bool
 		connection *sourcespb.S3
 		setEnv     map[string]string
