@@ -393,7 +393,10 @@ func (e *Engine) initSourceManager(ctx context.Context) {
 	if e.jobReportWriter != nil {
 		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
 		opts = append(opts, sources.WithReportHook(unitHook))
+		e.wgDetectorWorkers.Add(1)
 		go func() {
+			defer e.wgDetectorWorkers.Done()
+			defer e.jobReportWriter.Close()
 			for metrics := range finishedMetrics {
 				metrics.Errors = common.ExportErrors(metrics.Errors...)
 				details, err := json.Marshal(map[string]any{
@@ -529,10 +532,6 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
-
-	if e.jobReportWriter != nil {
-		_ = e.jobReportWriter.Close()
-	}
 
 	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 		ctx.Logger().Error(err, "error cleaning temp artifacts")
