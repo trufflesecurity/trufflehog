@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"runtime"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -103,11 +104,15 @@ type Config struct {
 }
 
 // NewConfig creates a new Config with the given connection and options.
+// The connection is the only required parameter because a source cannot be initialized without it.
 func NewConfig(connection *anypb.Any, opts ...SourceConfigOption) *Config {
 	cfg := &Config{Connection: connection}
 
 	for _, opt := range opts {
 		opt(cfg)
+	}
+	if cfg.Concurrency == 0 {
+		cfg.Concurrency = runtime.NumCPU()
 	}
 
 	return cfg
