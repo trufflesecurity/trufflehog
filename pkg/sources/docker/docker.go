@@ -56,18 +56,18 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init initializes the source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
-	s.verify = verify
-	s.concurrency = concurrency
+func (s *Source) Init(_ context.Context, cfg *sources.Config) error {
+	s.name = cfg.Name
+	s.sourceId = cfg.SourceID
+	s.jobId = cfg.JobID
+	s.verify = cfg.Verify
+	s.concurrency = cfg.Concurrency
 
 	// Reset metrics for this source at initialization time.
 	dockerImagesScanned.WithLabelValues(s.name).Set(0)
 	dockerLayersScanned.WithLabelValues(s.name).Set(0)
 
-	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
+	if err := anypb.UnmarshalTo(cfg.Connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 

@@ -26,7 +26,14 @@ func TestDockerImageScan(t *testing.T) {
 	assert.NoError(t, err)
 
 	s := &Source{}
-	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	err = s.Init(
+		context.Background(),
+		sources.NewConfig(
+			conn,
+			sources.WithName("test source"),
+			sources.WithConcurrency(1),
+		),
+	)
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -63,7 +70,14 @@ func TestDockerImageScanWithDigest(t *testing.T) {
 	assert.NoError(t, err)
 
 	s := &Source{}
-	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	err = s.Init(
+		context.Background(),
+		sources.NewConfig(
+			conn,
+			sources.WithName("test source"),
+			sources.WithConcurrency(1),
+		),
+	)
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
