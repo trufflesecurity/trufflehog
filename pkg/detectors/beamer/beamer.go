@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"beamer"}) + `\b([a-zA-Z0-9_+/]{45}=)\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"beamer"}) + `\b([a-zA-Z0-9_+/]{45}=)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
