@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
@@ -69,7 +70,15 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 5)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithVerify(tt.init.verify),
+					sources.WithConcurrency(5),
+				),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}

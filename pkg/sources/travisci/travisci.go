@@ -61,11 +61,11 @@ func (s *Source) Init(ctx context.Context, cfg *sources.Config) error {
 	s.sourceId = cfg.SourceID
 	s.jobId = cfg.JobID
 	s.verify = cfg.Verify
-	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
+	s.jobPool = new(errgroup.Group)
+	s.jobPool.SetLimit(cfg.Concurrency)
 
 	var conn sourcespb.TravisCI
-	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+	if err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 

@@ -46,10 +46,4 @@ func (e *Engine) ScanTravisCI(ctx context.Context, token string) error {
 
 	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
-
-	// if err := travisSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-	// 	return err
-	// }
-	// _, err = e.sourceManager.Run(ctx, sourceName, travisSource)
-	// return err
 }
