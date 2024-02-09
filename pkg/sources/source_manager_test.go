@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -25,9 +24,9 @@ type DummySource struct {
 func (d *DummySource) Type() sourcespb.SourceType { return 1337 }
 func (d *DummySource) SourceID() SourceID         { return d.sourceID }
 func (d *DummySource) JobID() JobID               { return d.jobID }
-func (d *DummySource) Init(_ context.Context, _ string, jobID JobID, sourceID SourceID, _ bool, _ *anypb.Any, _ int) error {
-	d.sourceID = sourceID
-	d.jobID = jobID
+func (d *DummySource) Init(_ context.Context, cfg *Config) error {
+	d.sourceID = cfg.SourceID
+	d.jobID = cfg.JobID
 	return nil
 }
 func (d *DummySource) GetProgress() *Progress { return nil }
@@ -85,7 +84,18 @@ func (c errorChunker) ChunkUnit(context.Context, SourceUnit, ChunkReporter) erro
 // buildDummy is a helper function to enroll a DummySource with a SourceManager.
 func buildDummy(chunkMethod chunker) (Source, error) {
 	source := &DummySource{chunker: chunkMethod}
-	if err := source.Init(context.Background(), "dummy", 123, 456, true, nil, 42); err != nil {
+	err := source.Init(
+		context.Background(),
+		NewConfig(
+			nil,
+			WithName("dummy"),
+			WithSourceID(123),
+			WithJobID(456),
+			WithVerify(true),
+			WithConcurrency(42),
+		),
+	)
+	if err != nil {
 		return nil, err
 	}
 	return source, nil
