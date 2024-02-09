@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"circle_", "circle-", "circleci"}) + `\b([a-fA-F0-9]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"circle"}) + `\b([a-fA-F0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
