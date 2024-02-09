@@ -1,13 +1,12 @@
 package engine
 
 import (
-	"runtime"
-
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
 )
 
@@ -29,10 +28,22 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 	sourceName := "trufflehog - Circle CI"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, circleci.SourceType)
 
-	circleSource := &circleci.Source{}
-	if err := circleSource.Init(ctx, "trufflehog - Circle CI", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	src := &circleci.Source{}
+	err = src.Init(
+		ctx,
+		sources.NewConfig(
+			&conn,
+			sources.WithName(sourceName),
+			sources.WithSourceID(sourceID),
+			sources.WithJobID(jobID),
+			sources.WithVerify(e.verify),
+			sources.WithConcurrency(int(e.concurrency)),
+		),
+	)
+	if err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, circleSource)
+
+	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
 }

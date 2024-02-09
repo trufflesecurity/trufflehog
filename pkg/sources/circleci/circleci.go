@@ -56,17 +56,17 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized CircleCI source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
-	s.verify = verify
-	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
+func (s *Source) Init(_ context.Context, cfg *sources.Config) error {
+	s.name = cfg.Name
+	s.sourceId = cfg.SourceID
+	s.jobId = cfg.JobID
+	s.verify = cfg.Verify
+	s.jobPool = new(errgroup.Group)
+	s.jobPool.SetLimit(cfg.Concurrency)
 	s.client = common.RetryableHttpClientTimeout(3)
 
 	var conn sourcespb.CircleCI
-	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+	if err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
