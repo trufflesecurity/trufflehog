@@ -131,7 +131,15 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, tt.init.concurrency)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(tt.init.concurrency),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -226,7 +234,15 @@ func TestSource_Chunks_Integration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(4),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -369,7 +385,15 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(4),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			if err != nil {
 				t.Errorf("Source.Init() error = %v", err)
 				return
@@ -523,7 +547,15 @@ func TestEnumerate(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test enumerate", 0, 0, true, conn, 1)
+	err = s.Init(
+		ctx,
+		sources.NewConfig(
+			conn,
+			sources.WithName("test enumerate"),
+			sources.WithConcurrency(1),
+			sources.WithVerify(true),
+		),
+	)
 	assert.NoError(t, err)
 
 	reporter := sourcestest.TestReporter{}
@@ -552,7 +584,15 @@ func TestChunkUnit(t *testing.T) {
 		Credential: &sourcespb.Git_Unauthenticated{},
 	})
 	assert.NoError(t, err)
-	err = s.Init(ctx, "test chunk", 0, 0, true, conn, 1)
+	err = s.Init(
+		ctx,
+		sources.NewConfig(
+			conn,
+			sources.WithName("test chunk"),
+			sources.WithConcurrency(1),
+			sources.WithVerify(true),
+		),
+	)
 	assert.NoError(t, err)
 
 	reporter := sourcestest.TestReporter{}

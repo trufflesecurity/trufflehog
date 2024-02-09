@@ -41,9 +41,19 @@ func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
 
 func initTestSource(src *sourcespb.GitHub) *Source {
 	s, conn := createTestSource(src)
-	if err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1); err != nil {
+
+	err := s.Init(
+		context.Background(),
+		sources.NewConfig(
+			conn,
+			sources.WithName("test - github"),
+			sources.WithConcurrency(1),
+		),
+	)
+	if err != nil {
 		panic(err)
 	}
+
 	s.apiClient = github.NewClient(s.httpClient)
 	gock.InterceptClient(s.httpClient)
 	return s
@@ -57,7 +67,14 @@ func TestInit(t *testing.T) {
 		},
 	})
 
-	err := source.Init(context.Background(), "test - github", 0, 1337, false, conn, 1)
+	err := source.Init(
+		context.Background(),
+		sources.NewConfig(
+			conn,
+			sources.WithName("test - github"),
+			sources.WithConcurrency(1),
+		),
+	)
 	assert.Nil(t, err)
 
 	// TODO: test error case

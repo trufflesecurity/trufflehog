@@ -43,21 +43,33 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		return err
 	}
 
+	sourceName := "trufflehog - github"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
+
+	src := &github.Source{}
+	err = src.Init(
+		ctx,
+		sources.NewConfig(
+			&conn,
+			sources.WithName(sourceName),
+			sources.WithSourceID(sourceID),
+			sources.WithJobID(jobID),
+			sources.WithVerify(e.verify),
+			sources.WithConcurrency(int(e.concurrency)),
+		),
+	)
+	if err != nil {
+		return err
+	}
+
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
 		git.ScanOptionLogOptions(logOptions),
 	}
 	scanOptions := git.NewScanOptions(opts...)
+	src.WithScanOptions(scanOptions)
 
-	sourceName := "trufflehog - github"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
-
-	githubSource := &github.Source{}
-	if err := githubSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
-		return err
-	}
-	githubSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, githubSource)
+	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
 }

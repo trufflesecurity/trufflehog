@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"runtime"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -61,10 +60,22 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	sourceName := "trufflehog - s3"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, s3.SourceType)
 
-	s3Source := &s3.Source{}
-	if err := s3Source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	src := &s3.Source{}
+	err = src.Init(
+		ctx,
+		sources.NewConfig(
+			&conn,
+			sources.WithName(sourceName),
+			sources.WithSourceID(sourceID),
+			sources.WithJobID(jobID),
+			sources.WithVerify(e.verify),
+			sources.WithConcurrency(int(e.concurrency)),
+		),
+	)
+	if err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, s3Source)
+
+	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
 }

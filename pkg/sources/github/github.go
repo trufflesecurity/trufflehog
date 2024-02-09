@@ -208,21 +208,22 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, cfg *sources.Config) error {
 	s.log = aCtx.Logger()
 
-	s.name = name
-	s.sourceID = sourceID
-	s.jobID = jobID
-	s.verify = verify
-	s.jobPool = &errgroup.Group{}
+	s.name = cfg.Name
+	s.sourceID = cfg.SourceID
+	s.jobID = cfg.JobID
+	s.verify = cfg.Verify
+	s.jobPool = new(errgroup.Group)
+	concurrency := int(cfg.Concurrency)
 	s.jobPool.SetLimit(concurrency)
 
 	s.httpClient = common.RetryableHttpClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
+	err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
@@ -267,7 +268,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.publicMap = map[string]source_metadatapb.Visibility{}
 
-	cfg := &git.Config{
+	gitCfg := &git.Config{
 		SourceName:   s.name,
 		JobID:        s.jobID,
 		SourceID:     s.sourceID,
@@ -294,7 +295,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
 	}
-	s.git = git.NewGit(cfg)
+	s.git = git.NewGit(gitCfg)
 
 	return nil
 }

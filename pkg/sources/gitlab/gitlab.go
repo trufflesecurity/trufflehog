@@ -78,16 +78,17 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized Gitlab source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	s.name = name
-	s.sourceID = sourceId
-	s.jobID = jobId
-	s.verify = verify
-	s.jobPool = &errgroup.Group{}
+func (s *Source) Init(_ context.Context, cfg *sources.Config) error {
+	s.name = cfg.Name
+	s.sourceID = cfg.SourceID
+	s.jobID = cfg.JobID
+	s.verify = cfg.Verify
+	s.jobPool = new(errgroup.Group)
+	concurrency := cfg.Concurrency
 	s.jobPool.SetLimit(concurrency)
 
 	var conn sourcespb.GitLab
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
+	err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
@@ -114,7 +115,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		// We may need the password as a token if the user is using an access_token with basic auth.
 		s.token = cred.BasicAuth.Password
 	default:
-		return fmt.Errorf("invalid configuration given for source %q (%s)", name, s.Type().String())
+		return fmt.Errorf("invalid configuration given for source %q (%s)", s.name, s.Type().String())
 	}
 
 	if len(s.url) == 0 {
@@ -127,7 +128,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		return err
 	}
 
-	cfg := &git.Config{
+	gitCfg := &git.Config{
 		SourceName:   s.name,
 		JobID:        s.jobID,
 		SourceID:     s.sourceID,
@@ -153,7 +154,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
 	}
-	s.git = git.NewGit(cfg)
+	s.git = git.NewGit(gitCfg)
 
 	return nil
 }

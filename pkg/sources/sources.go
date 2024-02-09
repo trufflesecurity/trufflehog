@@ -57,6 +57,62 @@ type ChunkingTarget struct {
 	SecretID int64
 }
 
+// SourceConfigOption is responsible for configuring a Config.
+// This allows for a more flexible way to configure a Source.
+type SourceConfigOption func(*Config)
+
+// WithName sets the name for the source.
+func WithName(name string) SourceConfigOption {
+	return func(c *Config) { c.Name = name }
+}
+
+// WithJobID sets the job ID for the source.
+func WithJobID(jobID JobID) SourceConfigOption {
+	return func(c *Config) { c.JobID = jobID }
+}
+
+// WithSourceID sets the source ID for the source.
+func WithSourceID(sourceID SourceID) SourceConfigOption {
+	return func(c *Config) { c.SourceID = sourceID }
+}
+
+// WithConcurrency sets the concurrency for the source.
+func WithConcurrency(concurrency int) SourceConfigOption {
+	return func(c *Config) { c.Concurrency = concurrency }
+}
+
+// WithVerify sets the verify flag for the source.
+func WithVerify(verify bool) SourceConfigOption {
+	return func(c *Config) { c.Verify = verify }
+}
+
+// Config provides a way to configure a Source.
+type Config struct {
+	// Name is the name of the source.
+	Name string
+	// JobID is the ID of the job that the source is associated with.
+	JobID JobID
+	// SourceID is the ID of the source.
+	SourceID SourceID
+	// Verify specifies whether any secrets in the Chunk should be verified.
+	Verify bool
+	// Connection is the connection information for the source.
+	Connection *anypb.Any
+	// Concurrency is the number of concurrent workers to use for the source.
+	Concurrency int
+}
+
+// NewConfig creates a new Config with the given connection and options.
+func NewConfig(connection *anypb.Any, opts ...SourceConfigOption) *Config {
+	cfg := &Config{Connection: connection}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	return cfg
+}
+
 // Source defines the interface required to implement a source chunker.
 type Source interface {
 	// Type returns the source type, used for matching against configuration and jobs.
@@ -66,7 +122,7 @@ type Source interface {
 	// JobID returns the initialized job ID used for tracking relationships in the DB.
 	JobID() JobID
 	// Init initializes the source.
-	Init(aCtx context.Context, name string, jobId JobID, sourceId SourceID, verify bool, connection *anypb.Any, concurrency int) error
+	Init(aCtx context.Context, cfg *Config) error
 	// Chunks emits data over a channel which is then decoded and scanned for secrets.
 	// By default, data is obtained indiscriminately. However, by providing one or more
 	// ChunkingTarget parameters, the caller can direct the function to retrieve

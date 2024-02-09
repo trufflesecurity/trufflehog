@@ -112,22 +112,22 @@ func (c *persistableCache) shouldPersist() (bool, string) {
 }
 
 // Init returns an initialized GCS source.
-func (s *Source) Init(aCtx context.Context, name string, id sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, cfg *sources.Config) error {
 	s.log = aCtx.Logger()
 
-	s.name = name
-	s.verify = verify
-	s.sourceId = sourceID
-	s.jobId = id
-	s.concurrency = concurrency
+	s.name = cfg.Name
+	s.verify = cfg.Verify
+	s.sourceId = cfg.SourceID
+	s.jobId = cfg.JobID
+	s.concurrency = cfg.Concurrency
 
 	var conn sourcespb.GCS
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
+	err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
 
-	gcsManager, err := configureGCSManager(aCtx, &conn, concurrency)
+	gcsManager, err := configureGCSManager(aCtx, &conn, s.concurrency)
 	if err != nil {
 		return err
 	}

@@ -47,11 +47,23 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 	sourceName := "trufflehog - gcs"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gcs.SourceType)
 
-	gcsSource := &gcs.Source{}
-	if err := gcsSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
+	src := &gcs.Source{}
+	err = src.Init(
+		ctx,
+		sources.NewConfig(
+			&conn,
+			sources.WithName(sourceName),
+			sources.WithSourceID(sourceID),
+			sources.WithJobID(jobID),
+			sources.WithVerify(e.verify),
+			sources.WithConcurrency(int(e.concurrency)),
+		),
+	)
+	if err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, gcsSource)
+
+	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
 }
 

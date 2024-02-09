@@ -73,21 +73,21 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized AWS source
-func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	s.log = context.WithValues(aCtx, "source", s.Type(), "name", name).Logger()
-
-	s.name = name
-	s.sourceId = sourceId
-	s.jobId = jobId
-	s.verify = verify
-	s.concurrency = concurrency
+func (s *Source) Init(aCtx context.Context, cfg *sources.Config) error {
+	s.name = cfg.Name
+	s.sourceId = cfg.SourceID
+	s.jobId = cfg.JobID
+	s.verify = cfg.Verify
+	s.concurrency = cfg.Concurrency
 	s.errorCount = &sync.Map{}
 	s.log = aCtx.Logger()
-	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
+	s.jobPool = new(errgroup.Group)
+	s.jobPool.SetLimit(s.concurrency)
+
+	s.log = context.WithValues(aCtx, "source", s.Type(), "name", s.name).Logger()
 
 	var conn sourcespb.S3
-	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
+	err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}

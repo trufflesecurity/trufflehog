@@ -26,7 +26,15 @@ func TestChunks(t *testing.T) {
 		ExcludeBuckets: []string{perfTestBucketGlob, publicBucket},
 	})
 
-	err := source.Init(ctx, "test", 1, 1, true, conn, 8)
+	err := source.Init(
+		context.Background(),
+		sources.NewConfig(
+			conn,
+			sources.WithName("test"),
+			sources.WithVerify(true),
+			sources.WithConcurrency(9),
+		),
+	)
 	assert.Nil(t, err)
 
 	chunksCh := make(chan *sources.Chunk, 1)
@@ -66,7 +74,15 @@ func TestChunks_PublicBucket(t *testing.T) {
 		IncludeBuckets: []string{publicBucket},
 	})
 
-	err := source.Init(ctx, "test", 1, 1, true, conn, 8)
+	err := source.Init(
+		context.Background(),
+		sources.NewConfig(
+			conn,
+			sources.WithName("test"),
+			sources.WithVerify(true),
+			sources.WithConcurrency(9),
+		),
+	)
 	assert.Nil(t, err)
 
 	chunksCh := make(chan *sources.Chunk, 1)

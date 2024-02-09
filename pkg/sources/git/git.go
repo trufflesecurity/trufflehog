@@ -145,17 +145,17 @@ func (s *Source) withScanOptions(scanOptions *ScanOptions) {
 }
 
 // Init returns an initialized GitHub source.
-func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
-	s.name = name
-	s.sourceID = sourceId
-	s.jobID = jobId
-	s.verify = verify
+func (s *Source) Init(aCtx context.Context, cfg *sources.Config) error {
+	s.name = cfg.Name
+	s.sourceID = cfg.SourceID
+	s.jobID = cfg.JobID
+	s.verify = cfg.Verify
 	if s.scanOptions == nil {
 		s.scanOptions = &ScanOptions{}
 	}
 
 	var conn sourcespb.Git
-	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
+	if err := anypb.UnmarshalTo(cfg.Connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
@@ -193,7 +193,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	s.conn = &conn
 
-	if concurrency == 0 {
+	concurrency := cfg.Concurrency
+	if cfg.Concurrency == 0 {
 		concurrency = runtime.NumCPU()
 	}
 
@@ -201,7 +202,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		return err
 	}
 
-	cfg := &Config{
+	gitCfg := &Config{
 		SourceName:   s.name,
 		JobID:        s.jobID,
 		SourceID:     s.sourceID,
@@ -226,7 +227,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
 	}
-	s.git = NewGit(cfg)
+	s.git = NewGit(gitCfg)
 	return nil
 }
 

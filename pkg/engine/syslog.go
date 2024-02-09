@@ -43,12 +43,23 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) error {
 
 	sourceName := "trufflehog - syslog"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, syslog.SourceType)
-	syslogSource := &syslog.Source{}
-	if err := syslogSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
+
+	src := &syslog.Source{}
+	err = src.Init(
+		ctx,
+		sources.NewConfig(
+			&conn,
+			sources.WithName(sourceName),
+			sources.WithSourceID(sourceID),
+			sources.WithJobID(jobID),
+			sources.WithVerify(e.verify),
+			sources.WithConcurrency(int(e.concurrency)),
+		),
+	)
+	if err != nil {
 		return err
 	}
-	syslogSource.InjectConnection(connection)
 
-	_, err = e.sourceManager.Run(ctx, sourceName, syslogSource)
+	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
 }

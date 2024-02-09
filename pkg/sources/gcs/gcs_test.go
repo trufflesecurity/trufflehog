@@ -46,7 +46,15 @@ func TestSourceInit(t *testing.T) {
 		Credential: &sourcespb.GCS_Unauthenticated{},
 	})
 
-	err := source.Init(context.Background(), "test", 1, 1, true, conn, 8)
+	err := source.Init(
+		context.Background(),
+		sources.NewConfig(
+			conn,
+			sources.WithName("test"),
+			sources.WithVerify(true),
+			sources.WithConcurrency(9),
+		),
+	)
 	assert.Nil(t, err)
 	assert.NotNil(t, source.gcsManager)
 }

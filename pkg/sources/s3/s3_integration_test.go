@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -33,7 +34,14 @@ func TestSource_ChunksCount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = s.Init(ctx, "test name", 0, 0, false, conn, 1)
+	err = s.Init(
+		ctx,
+		sources.NewConfig(
+			conn,
+			sources.WithName("test name"),
+			sources.WithConcurrency(1),
+		),
+	)
 	chunksCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunksCh)
@@ -159,7 +167,14 @@ func TestSource_Validate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.name, 0, 0, false, conn, 0)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.name),
+					sources.WithConcurrency(1),
+				),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}

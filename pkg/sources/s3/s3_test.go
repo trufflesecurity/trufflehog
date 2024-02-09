@@ -10,12 +10,13 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Chunks(t *testing.T) {
@@ -92,7 +93,15 @@ func TestSource_Chunks(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.name),
+					sources.WithConcurrency(8),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return

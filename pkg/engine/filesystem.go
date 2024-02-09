@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"runtime"
-
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -29,10 +27,22 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	sourceName := "trufflehog - filesystem"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, filesystem.SourceType)
 
-	fileSystemSource := &filesystem.Source{}
-	if err := fileSystemSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	src := &filesystem.Source{}
+	err = src.Init(
+		ctx,
+		sources.NewConfig(
+			&conn,
+			sources.WithName(sourceName),
+			sources.WithSourceID(sourceID),
+			sources.WithJobID(jobID),
+			sources.WithVerify(e.verify),
+			sources.WithConcurrency(int(e.concurrency)),
+		),
+	)
+	if err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, fileSystemSource)
+
+	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
 }

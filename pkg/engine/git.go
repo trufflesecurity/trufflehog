@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"runtime"
-
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -34,11 +32,22 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	sourceName := "trufflehog - git"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, git.SourceType)
 
-	gitSource := &git.Source{}
-	if err := gitSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	src := &git.Source{}
+	err := src.Init(
+		ctx,
+		sources.NewConfig(
+			&conn,
+			sources.WithName(sourceName),
+			sources.WithSourceID(sourceID),
+			sources.WithJobID(jobID),
+			sources.WithVerify(e.verify),
+			sources.WithConcurrency(int(e.concurrency)),
+		),
+	)
+	if err != nil {
 		return err
 	}
 
-	_, err := e.sourceManager.Run(ctx, sourceName, gitSource)
+	_, err = e.sourceManager.Run(ctx, sourceName, src)
 	return err
 }

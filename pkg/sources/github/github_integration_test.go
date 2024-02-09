@@ -180,7 +180,15 @@ func TestSource_ScanComments(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(4),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -275,7 +283,15 @@ func TestSource_ScanChunks(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(8),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			assert.Nil(t, err)
 
 			chunksCh := make(chan *sources.Chunk, 1)
@@ -596,7 +612,15 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(4),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -737,7 +761,15 @@ func TestSource_paginateGists(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 4)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(4),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -942,7 +974,15 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			conn, err := anypb.New(tt.init.connection)
 			assert.Nil(t, err)
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithConcurrency(8),
+					sources.WithVerify(tt.init.verify),
+				),
+			)
 			assert.Nil(t, err)
 
 			chunksCh := make(chan *sources.Chunk, 1)

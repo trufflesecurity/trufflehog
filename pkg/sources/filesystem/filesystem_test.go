@@ -63,7 +63,15 @@ func TestSource_Scan(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 5)
+			err = s.Init(
+				ctx,
+				sources.NewConfig(
+					conn,
+					sources.WithName(tt.init.name),
+					sources.WithVerify(tt.init.verify),
+					sources.WithConcurrency(5),
+				),
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -162,7 +170,15 @@ func TestEnumerate(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test enumerate", 0, 0, true, conn, 1)
+	err = s.Init(
+		ctx,
+		sources.NewConfig(
+			conn,
+			sources.WithName("test enumerate"),
+			sources.WithVerify(true),
+			sources.WithConcurrency(1),
+		),
+	)
 	assert.NoError(t, err)
 
 	reporter := sourcestest.TestReporter{}
@@ -198,7 +214,15 @@ func TestChunkUnit(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test chunk unit", 0, 0, true, conn, 1)
+	err = s.Init(
+		ctx,
+		sources.NewConfig(
+			conn,
+			sources.WithName("test chunk unit"),
+			sources.WithVerify(true),
+			sources.WithConcurrency(1),
+		),
+	)
 	assert.NoError(t, err)
 
 	// Happy path single file.
@@ -249,7 +273,15 @@ func TestEnumerateReporterErr(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test enumerate", 0, 0, true, conn, 1)
+	err = s.Init(
+		ctx,
+		sources.NewConfig(
+			conn,
+			sources.WithName("test enumerate"),
+			sources.WithVerify(true),
+			sources.WithConcurrency(1),
+		),
+	)
 	assert.NoError(t, err)
 
 	// Enumerate should always return an error if the reporter returns an
@@ -280,7 +312,15 @@ func TestChunkUnitReporterErr(t *testing.T) {
 
 	// Initialize the source.
 	s := Source{}
-	err = s.Init(ctx, "test chunk unit", 0, 0, true, conn, 1)
+	err = s.Init(
+		ctx,
+		sources.NewConfig(
+			conn,
+			sources.WithName("test chunk unit"),
+			sources.WithVerify(true),
+			sources.WithConcurrency(1),
+		),
+	)
 	assert.NoError(t, err)
 
 	// Happy path. ChunkUnit should always return an error if the reporter
