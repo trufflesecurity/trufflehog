@@ -23,6 +23,9 @@ func (ChanReporter) ChunkErr(ctx context.Context, err error) error {
 
 var _ UnitReporter = (*VisitorReporter)(nil)
 
+// VisitorReporter is a UnitReporter that will call the provided callbacks for
+// finding units and reporting errors. VisitErr is optional; if unset it will
+// log the error.
 type VisitorReporter struct {
 	VisitUnit func(context.Context, SourceUnit) error
 	VisitErr  func(context.Context, error) error
