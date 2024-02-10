@@ -151,7 +151,9 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // This is needed to handle the case where a commit has no diffs, which would otherwise be missed.
 // This method should be called to release resources, especially when writing to a file.
 func (d *Diff) finalize() error {
-	d.Commit.hasDiffs = true
+	if d.Commit != nil {
+		d.Commit.hasDiffs = true
+	}
 	return d.contentWriter.CloseForWriting()
 }
 
