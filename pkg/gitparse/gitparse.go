@@ -411,8 +411,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			if currentCommit != nil {
 				totalLogSize += currentCommit.Size
 				if !currentCommit.hasDiffs {
-					emptyDiff := createEmptyDiffForCommit(currentCommit)
-					diffChan <- emptyDiff
+					diffChan <- createEmptyDiffForCommit(currentCommit)
 				}
 			}
 

@@ -621,6 +621,14 @@ func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
 	switch {
 	case d1.PathB != d2.PathB:
 		return false
+	case d1.Commit.Hash != d2.Commit.Hash:
+		return false
+	case d1.Commit.Author != d2.Commit.Author:
+		return false
+	case d1.Commit.Date != d2.Commit.Date:
+		return false
+	case d1.Commit.Message.String() != d2.Commit.Message.String():
+		return false
 	case d1.LineStart != d2.LineStart:
 		return false
 	case d1.IsBinary != d2.IsBinary:
@@ -1069,20 +1077,38 @@ index 5af88a8..c729cdb 100644
 func TestDiffParseFailureRecovery(t *testing.T) {
 	expected := []*Diff{
 		{
-			PathB:         "aws",
-			LineStart:     1,
+			PathB:     "aws",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
 			contentWriter: newBufferWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
 			IsBinary:      false,
 		},
 		{
-			PathB:         "tzu",
-			LineStart:     11,
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
 			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 		{
-			PathB:         "tzu",
-			LineStart:     1,
+			PathB:     "tzu",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
 			contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
 			IsBinary:      false,
 		},
@@ -1111,21 +1137,39 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 func TestDiffParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 	expected := []*Diff{
 		{
-			PathB:         "aws",
-			LineStart:     1,
-			contentWriter: newBufferedFileWriterWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+			PathB:     "aws",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
 			IsBinary:      false,
 		},
 		{
-			PathB:         "tzu",
-			LineStart:     11,
-			contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 		{
-			PathB:         "tzu",
-			LineStart:     1,
-			contentWriter: newBufferedFileWriterWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+			PathB:     "tzu",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
 			IsBinary:      false,
 		},
 	}
