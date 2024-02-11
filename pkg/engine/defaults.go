@@ -1582,7 +1582,6 @@ func DefaultDetectors() []detectors.Detector {
 		web3storage.Scanner{},
 		&ramp.Scanner{},
 		&anthropic.Scanner{},
-<<<<<<< HEAD
 		&sourcegraphcody.Scanner{},
 		voiceflow.Scanner{},
 		ip2location.Scanner{},
@@ -1627,7 +1626,6 @@ func DefaultDetectors() []detectors.Detector {
 		&googleoauth2.Scanner{},
 		&jupiterone.Scanner{},
 	}
-
 }
 
 func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {

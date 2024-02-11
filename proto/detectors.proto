@@ -944,7 +944,6 @@ enum DetectorType {
   Anthropic = 933;
   Ramp = 934;
   Klaviyo = 935;
-<<<<<<< HEAD
   SourcegraphCody = 936;
   Voiceflow = 937;
   Privacy = 938;
