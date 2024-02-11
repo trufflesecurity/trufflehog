@@ -21,7 +21,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v57/github"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -65,7 +64,7 @@ type Git struct {
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
-	concurrency        *semaphore.Weighted
+	concurrency        int
 	skipBinaries       bool
 	skipArchives       bool
 
@@ -112,7 +111,7 @@ func NewGit(config *Config) *Git {
 		jobID:              config.JobID,
 		sourceMetadataFunc: config.SourceMetadataFunc,
 		verify:             config.Verify,
-		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
+		concurrency:        config.Concurrency,
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
 		parser:             parser,
@@ -533,6 +532,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	if scanOptions.BaseHash != "" {
 		logValues = append(logValues, "base", scanOptions.BaseHash)
 		baseHashSet = true
+		// Update the concurrency to 1 if a base hash is set. This is to ensure serial processing of commits
+		// where we need to stop at the base commit.
+		s.concurrency = 1
 	}
 	if scanOptions.HeadHash != "" {
 		logValues = append(logValues, "head", scanOptions.HeadHash)
@@ -541,6 +543,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 		maxDepthSet = true
 	}
+	logValues = append(logValues, "concurrency", s.concurrency)
 
 	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, !baseHashSet, scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
@@ -554,14 +557,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	logger.V(1).Info("scanning repo", logValues...)
 
-	var wg sync.WaitGroup
-
 	// Create workers to read the diffChan and process the diffs.
-	var depth atomic.Int64
+	var (
+		wg sync.WaitGroup
 
-	var mu sync.Mutex
-	var lastCommitHash string
-	for i := 0; i < runtime.NumCPU(); i++ {
+		depth          atomic.Int64
+		mu             sync.Mutex
+		lastCommitHash string
+	)
+	for i := 0; i < s.concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
