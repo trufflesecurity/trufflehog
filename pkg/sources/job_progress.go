@@ -188,7 +188,8 @@ func (jp *JobProgress) executeHooks(todo func(hook JobProgressHook)) {
 		hooksExecTime.WithLabelValues().Observe(float64(elapsed))
 	}(time.Now())
 	for _, hook := range jp.hooks {
-		// TODO: Non-blocking?
+		// Execute hooks synchronously so they can provide
+		// back-pressure to the source.
 		todo(hook)
 	}
 }

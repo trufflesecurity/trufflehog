@@ -478,10 +478,17 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isBinaryLine(latestState, line):
 			latestState = BinaryFileLine
 
-			currentDiff.PathB = pathFromBinaryLine(line)
+			path, ok := pathFromBinaryLine(line)
+			if !ok {
+				err = fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
+				ctx.Logger().Error(err, "Failed to parse binary file line")
+				latestState = ParseFailure
+				continue
+			}
 
 			// Don't do anything if the file is deleted. (pathA has file path, pathB is /dev/null)
-			if currentDiff.PathB != "" {
+			if path != "" {
+				currentDiff.PathB = path
 				currentDiff.IsBinary = true
 			}
 		case isFromFileLine(latestState, line):
@@ -728,15 +735,27 @@ func isBinaryLine(latestState ParseState, line []byte) bool {
 }
 
 // Get the b/ file path. Ignoring the edge case of files having `and /b` in the name for simplicity.
-func pathFromBinaryLine(line []byte) string {
-	logger := context.Background().Logger()
-	sbytes := bytes.Split(line, []byte(" and b/"))
-	if len(sbytes) != 2 {
-		logger.V(2).Info("Expected binary line to be in 'Binary files a/fileA and b/fileB differ' format.", "got", line)
-		return ""
+func pathFromBinaryLine(line []byte) (string, bool) {
+	if bytes.Contains(line, []byte("and /dev/null")) {
+		return "", true
 	}
-	bRaw := sbytes[1]
-	return string(bRaw[:len(bRaw)-8]) // drop the "b/" and " differ\n"
+
+	_, after, ok := bytes.Cut(line, []byte(" and b/"))
+	if ok {
+		// drop the " differ\n"
+		return string(after[:len(after)-8]), true
+	}
+
+	// Edge case where the path is quoted.
+	// https://github.com/trufflesecurity/trufflehog/issues/2384
+	_, after, ok = bytes.Cut(line, []byte(` and "b/`))
+	if ok {
+		// drop the `" differ\n`
+		return string(after[:len(after)-9]), true
+	}
+
+	// Unknown format.
+	return "", false
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
