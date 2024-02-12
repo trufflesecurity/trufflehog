@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"errors"
+	"io"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -33,6 +34,48 @@ func (r *Ring) Write(_ context.Context, p []byte) (n int, err error) {
 	}
 
 	return r.write(p)
+}
+
+func (r *Ring) WriteTo(w io.Writer) (n int64, err error) {
+	if r.isEmpty() {
+		return 0, nil // Nothing to write
+	}
+
+	var totalWritten int64
+
+	// If the data wraps in the buffer, write in two parts: from read pointer to end, and from start to write pointer.
+	if r.w > r.r {
+		// Data does not wrap, can directly write from r to w
+		n, err := w.Write(r.buf[r.r:r.w])
+		totalWritten += int64(n)
+		if err != nil {
+			return totalWritten, err
+		}
+	} else {
+		// Data wraps, write from r to end of buffer
+		n, err := w.Write(r.buf[r.r:])
+		totalWritten += int64(n)
+		if err != nil {
+			return totalWritten, err
+		}
+		// Then, write from start of buffer to w
+		if r.w > 0 {
+			n, err := w.Write(r.buf[:r.w])
+			totalWritten += int64(n)
+			if err != nil {
+				return totalWritten, err
+			}
+		}
+	}
+
+	// Update the ring buffer's read pointer and full flag after successful write
+	// Since all data has been read, we can reset the ring buffer
+	r.r = 0
+	r.w = 0
+	r.isFull = false
+	r.availableCap = r.size
+
+	return totalWritten, nil
 }
 
 func (r *Ring) write(p []byte) (n int, err error) {
@@ -72,7 +115,7 @@ func (r *Ring) resize(newSize int) {
 }
 
 func (r *Ring) Read(p []byte) (n int, err error) {
-	if r.IsEmpty() {
+	if r.isEmpty() {
 		return 0, errors.New("ring buffer is empty")
 	}
 
@@ -107,11 +150,9 @@ func (r *Ring) read(p []byte) int {
 	return n
 }
 
-// Cap returns the current capacity of the buffer.
-
 // Bytes returns a copy of the buffer's data.
 func (r *Ring) Bytes() []byte {
-	if r.IsEmpty() {
+	if r.isEmpty() {
 		return nil
 	}
 
@@ -120,8 +161,7 @@ func (r *Ring) Bytes() []byte {
 	return data
 }
 
-// IsEmpty returns true if the buffer is empty.
-func (r *Ring) IsEmpty() bool { return r.Len() == 0 }
+func (r *Ring) isEmpty() bool { return r.Len() == 0 }
 
 // Len return the length of available read bytes.
 func (r *Ring) Len() int {
