@@ -570,8 +570,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		go func() {
 			defer wg.Done()
 			for diff := range diffChan {
-				if maxDepthSet && depth.Load() >= scanOptions.MaxDepth {
-					logger.V(1).Info("reached max depth", "depth", depth)
+				localDepth := depth.Load()
+				if maxDepthSet && localDepth >= scanOptions.MaxDepth {
+					logger.V(1).Info("reached max depth", "depth", localDepth)
 					break
 				}
 
