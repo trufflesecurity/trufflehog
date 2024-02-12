@@ -13,11 +13,12 @@ var (
 )
 
 type Ring struct {
-	buf    []byte
-	size   int
-	r      int // Read pointer
-	w      int // Write pointer
-	isFull bool
+	buf          []byte
+	size         int
+	r            int // Read pointer
+	w            int // Write pointer
+	isFull       bool
+	availableCap int
 }
 
 func NewRingBuffer(size int) *Ring {
@@ -32,7 +33,7 @@ func (r *Ring) Write(_ context.Context, p []byte) (n int, err error) {
 		return 0, nil
 	}
 
-	if len(p) > r.availableSpace() {
+	if len(p) > r.availableCap {
 		r.resize(len(p) + r.Len()) // Ensure there's enough space for new data
 	}
 
@@ -54,6 +55,11 @@ func (r *Ring) write(p []byte) (n int, err error) {
 	r.w = endPos
 	r.isFull = r.w == r.r && len(p) != 0
 
+	r.availableCap -= n
+	if r.availableCap < 0 {
+		r.availableCap = 0
+	}
+
 	return len(p), nil
 }
 
@@ -66,37 +72,8 @@ func (r *Ring) resize(newSize int) {
 	r.r = 0
 	r.w = oldLen
 	r.isFull = false
-}
 
-func (r *Ring) read(p []byte) int {
-	n := copy(p, r.buf[r.r:])
-	if r.w < r.r {
-		n += copy(p[n:], r.buf[:r.w])
-	}
-	return n
-}
-
-func (r *Ring) availableSpace() int {
-	if r.isFull {
-		return 0
-	}
-	if r.w >= r.r {
-		return r.size - r.w + r.r - 1
-	}
-	return r.r - r.w - 1
-}
-
-// Cap returns the current capacity of the buffer.
-
-// Bytes returns a copy of the buffer's data.
-func (r *Ring) Bytes() []byte {
-	if r.IsEmpty() {
-		return nil
-	}
-
-	data := make([]byte, r.Len())
-	r.Read(data)
-	return data
+	r.availableCap = newSize - r.Len()
 }
 
 func (r *Ring) Read(p []byte) (n int, err error) {
@@ -119,7 +96,33 @@ func (r *Ring) Read(p []byte) (n int, err error) {
 	r.r = (r.r + n) % r.size
 	r.isFull = false // After a read, the buffer can't be full
 
+	r.availableCap += n
+	if r.availableCap > r.size {
+		r.availableCap = r.size
+	}
+
 	return n, nil
+}
+
+func (r *Ring) read(p []byte) int {
+	n := copy(p, r.buf[r.r:])
+	if r.w < r.r {
+		n += copy(p[n:], r.buf[:r.w])
+	}
+	return n
+}
+
+// Cap returns the current capacity of the buffer.
+
+// Bytes returns a copy of the buffer's data.
+func (r *Ring) Bytes() []byte {
+	if r.IsEmpty() {
+		return nil
+	}
+
+	data := make([]byte, r.Len())
+	r.Read(data)
+	return data
 }
 
 // IsEmpty returns true if the buffer is empty.

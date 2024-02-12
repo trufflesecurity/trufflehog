@@ -91,7 +91,6 @@ func BenchmarkBufferWriterWrite(b *testing.B) {
 }
 
 func generateData(size int) []byte {
-	// Use a fixed seed for reproducibility
 	rand.Seed(42)
 	data := make([]byte, size)
 	for i := range data {
