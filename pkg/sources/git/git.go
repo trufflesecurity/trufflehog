@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v57/github"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -64,7 +64,7 @@ type Git struct {
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
-	concurrency        *semaphore.Weighted
+	concurrency        int
 	skipBinaries       bool
 	skipArchives       bool
 
@@ -111,7 +111,7 @@ func NewGit(config *Config) *Git {
 		jobID:              config.JobID,
 		sourceMetadataFunc: config.SourceMetadataFunc,
 		verify:             config.Verify,
-		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
+		concurrency:        config.Concurrency,
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
 		parser:             parser,
@@ -532,6 +532,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	if scanOptions.BaseHash != "" {
 		logValues = append(logValues, "base", scanOptions.BaseHash)
 		baseHashSet = true
+		// Update the concurrency to 1 if a base hash is set. This is to ensure serial processing of commits
+		// where we need to stop at the base commit.
+		s.concurrency = 1
 	}
 	if scanOptions.HeadHash != "" {
 		logValues = append(logValues, "head", scanOptions.HeadHash)
@@ -540,6 +543,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 		maxDepthSet = true
 	}
+	logValues = append(logValues, "concurrency", s.concurrency)
 
 	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, !baseHashSet, scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
@@ -553,108 +557,125 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	logger.V(1).Info("scanning repo", logValues...)
 
-	var depth int64
-	var lastCommitHash string
-	for diff := range diffChan {
-		if maxDepthSet && depth >= scanOptions.MaxDepth {
-			logger.V(1).Info("reached max depth", "depth", depth)
-			break
-		}
+	// Create workers to read the diffChan and process the diffs.
+	var (
+		wg sync.WaitGroup
 
-		fullHash := diff.Commit.Hash
-		if baseHashSet && scanOptions.BaseHash == fullHash {
-			logger.V(1).Info("reached base commit", "commit", fullHash)
-			break
-		}
+		depth          atomic.Int64
+		mu             sync.Mutex
+		lastCommitHash string
+	)
+	for i := 0; i < s.concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for diff := range diffChan {
+				localDepth := depth.Load()
+				if maxDepthSet && localDepth >= scanOptions.MaxDepth {
+					logger.V(1).Info("reached max depth", "depth", localDepth)
+					break
+				}
 
-		if fullHash != lastCommitHash {
-			depth++
-			lastCommitHash = fullHash
-			atomic.AddUint64(&s.metrics.commitsScanned, 1)
-			logger.V(5).Info("scanning commit", "commit", fullHash)
-		}
+				fullHash := diff.Commit.Hash
+				if baseHashSet && scanOptions.BaseHash == fullHash {
+					logger.V(1).Info("reached base commit", "commit", fullHash)
+					break
+				}
 
-		if !scanOptions.Filter.Pass(diff.PathB) {
-			continue
-		}
+				mu.Lock()
+				if fullHash != lastCommitHash {
+					depth.Add(1)
+					lastCommitHash = fullHash
+					atomic.AddUint64(&s.metrics.commitsScanned, 1)
+					logger.V(5).Info("scanning commit", "commit", fullHash)
+				}
+				mu.Unlock()
 
-		fileName := diff.PathB
-		if fileName == "" {
-			continue
-		}
-		email := diff.Commit.Author
-		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+				if !scanOptions.Filter.Pass(diff.PathB) {
+					continue
+				}
 
-		// Handle binary files by reading the entire file rather than using the diff.
-		if diff.IsBinary {
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
-			chunkSkel := &sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Verify:         s.verify,
+				fileName := diff.PathB
+				if fileName == "" {
+					continue
+				}
+				email := diff.Commit.Author
+				when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+
+				// Handle binary files by reading the entire file rather than using the diff.
+				if diff.IsBinary {
+					metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
+					chunkSkel := &sources.Chunk{
+						SourceName:     s.sourceName,
+						SourceID:       s.sourceID,
+						JobID:          s.jobID,
+						SourceType:     s.sourceType,
+						SourceMetadata: metadata,
+						Verify:         s.verify,
+					}
+
+					commitHash := plumbing.NewHash(fullHash)
+					if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+						logger.V(1).Info(
+							"error handling binary file",
+							"error", err,
+							"filename", fileName,
+							"commit", commitHash,
+							"file", diff.PathB,
+						)
+					}
+					continue
+				}
+
+				if diff.Len() > sources.ChunkSize+sources.PeekSize {
+					s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
+					continue
+				}
+
+				chunkData := func(d *gitparse.Diff) error {
+					metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, int64(diff.LineStart))
+
+					reader, err := d.ReadCloser()
+					if err != nil {
+						ctx.Logger().Error(
+							err, "error creating reader for commits",
+							"filename", fileName,
+							"commit", fullHash,
+							"file", diff.PathB,
+						)
+						return nil
+					}
+					defer reader.Close()
+
+					data := make([]byte, d.Len())
+					if _, err := reader.Read(data); err != nil {
+						ctx.Logger().Error(
+							err, "error reading diff content for commit",
+							"filename", fileName,
+							"commit", fullHash,
+							"file", diff.PathB,
+						)
+						return nil
+					}
+					chunk := sources.Chunk{
+						SourceName:     s.sourceName,
+						SourceID:       s.sourceID,
+						JobID:          s.jobID,
+						SourceType:     s.sourceType,
+						SourceMetadata: metadata,
+						Data:           data,
+						Verify:         s.verify,
+					}
+					return reporter.ChunkOk(ctx, chunk)
+				}
+				if err := chunkData(diff); err != nil {
+					return
+				}
 			}
-
-			commitHash := plumbing.NewHash(fullHash)
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info(
-					"error handling binary file",
-					"error", err,
-					"filename", fileName,
-					"commit", commitHash,
-					"file", diff.PathB,
-				)
-			}
-			continue
-		}
-
-		if diff.Len() > sources.ChunkSize+sources.PeekSize {
-			s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
-			continue
-		}
-
-		chunkData := func(d *gitparse.Diff) error {
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, int64(diff.LineStart))
-
-			reader, err := d.ReadCloser()
-			if err != nil {
-				ctx.Logger().Error(
-					err, "error creating reader for commits",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
-				return nil
-			}
-			defer reader.Close()
-
-			data := make([]byte, d.Len())
-			if _, err := reader.Read(data); err != nil {
-				ctx.Logger().Error(
-					err, "error reading diff content for commit",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
-				return nil
-			}
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           data,
-				Verify:         s.verify,
-			}
-			return reporter.ChunkOk(ctx, chunk)
-		}
-		if err := chunkData(diff); err != nil {
-			return err
-		}
+		}()
 	}
+	wg.Wait()
+
 	return nil
 }
 
