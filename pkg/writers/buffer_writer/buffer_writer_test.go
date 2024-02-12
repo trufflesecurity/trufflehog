@@ -85,6 +85,7 @@ func BenchmarkBufferWriterWrite(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, err := writer.Write(ctx, data)
 				assert.NoError(b, err)
+				writer.buf.Reset()
 			}
 		})
 	}

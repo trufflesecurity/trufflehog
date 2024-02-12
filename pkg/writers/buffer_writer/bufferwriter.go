@@ -60,20 +60,20 @@ func (b *BufferWriter) Write(ctx context.Context, data []byte) (int, error) {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
 	}
 
-	// size := len(data)
-	// b.size += size
-	// start := time.Now()
-	// defer func(start time.Time) {
-	// 	bufferLength := uint64(b.buf.Len())
-	// 	b.metrics.recordDataProcessed(bufferLength, time.Since(start))
-	//
-	// 	ctx.Logger().V(4).Info(
-	// 		"write complete",
-	// 		"data_size", size,
-	// 		"buffer_len", bufferLength,
-	// 		"buffer_size", b.buf.Cap(),
-	// 	)
-	// }(start)
+	size := len(data)
+	b.size += size
+	start := time.Now()
+	defer func(start time.Time) {
+		bufferLength := uint64(b.buf.Len())
+		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
+
+		ctx.Logger().V(4).Info(
+			"write complete",
+			"data_size", size,
+			"buffer_len", bufferLength,
+			"buffer_size", b.buf.Cap(),
+		)
+	}(start)
 	return b.buf.Write(ctx, data)
 }
 

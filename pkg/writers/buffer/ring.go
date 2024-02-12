@@ -6,12 +6,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-var (
-	ErrBufferFull         = errors.New("ring buffer is full")
-	ErrTooManyDataToWrite = errors.New("too much data to write to ring buffer")
-	ErrAcquireLock        = errors.New("unable to acquire lock for writing")
-)
-
+// Ring is a ring buffer implementation that implements the io.Writer and io.Reader interfaces.
 type Ring struct {
 	buf          []byte
 	size         int
@@ -147,4 +142,12 @@ func (r *Ring) Len() int {
 // Cap returns the size of the underlying buffer.
 func (r *Ring) Cap() int {
 	return r.size
+}
+
+// Reset resets the buffer.
+func (r *Ring) Reset() {
+	r.r = 0
+	r.w = 0
+	r.isFull = false
+	r.availableCap = r.size
 }

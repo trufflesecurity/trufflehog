@@ -49,7 +49,6 @@ func NewBufferPool(opts ...PoolOpts) *Pool {
 	}
 	pool.Pool = &sync.Pool{
 		New: func() any {
-			// return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
 			return NewRingBuffer(int(pool.bufferSize))
 		},
 	}
@@ -62,7 +61,6 @@ func (p *Pool) Get(ctx context.Context) *Ring {
 	buf, ok := p.Pool.Get().(*Ring)
 	if !ok {
 		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
-		// buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
 		buf = NewRingBuffer(int(p.bufferSize))
 	}
 	p.metrics.recordBufferRetrival()
@@ -73,18 +71,14 @@ func (p *Pool) Get(ctx context.Context) *Ring {
 
 // Put returns a Buffer to the pool.
 func (p *Pool) Put(buf *Ring) {
-	// p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
+	p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
 
 	// If the Buffer is more than twice the default size, replace it with a new Buffer.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
 		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		// buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
 		buf = NewRingBuffer(int(p.bufferSize))
-	} else {
-		// Reset the Buffer to clear any existing data.
-		// buf.Reset()
 	}
 	// buf.recordMetric()
 
@@ -100,35 +94,35 @@ type Buffer struct {
 // NewBuffer creates a new instance of Buffer.
 func NewBuffer() *Buffer { return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, defaultBufferSize))} }
 
-func (b *Buffer) Grow(size int) {
-	b.Buffer.Grow(size)
-	b.recordGrowth(size)
+func (r *Buffer) Grow(size int) {
+	r.Buffer.Grow(size)
+	r.recordGrowth(size)
 }
 
-func (b *Buffer) resetMetric() { b.checkedOutAt = time.Now() }
+func (r *Buffer) resetMetric() { r.checkedOutAt = time.Now() }
 
-func (b *Buffer) recordMetric() {
-	dur := time.Since(b.checkedOutAt)
+func (r *Buffer) recordMetric() {
+	dur := time.Since(r.checkedOutAt)
 	checkoutDuration.Observe(float64(dur.Microseconds()))
 	checkoutDurationTotal.Add(float64(dur.Microseconds()))
 }
 
-func (b *Buffer) recordGrowth(size int) {
+func (r *Buffer) recordGrowth(size int) {
 	growCount.Inc()
 	growAmount.Add(float64(size))
 }
 
 // Write date to the buffer.
-func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
-	if b.Buffer == nil {
+func (r *Buffer) Write(ctx context.Context, data []byte) (int, error) {
+	if r.Buffer == nil {
 		// This case should ideally never occur if buffers are properly managed.
 		ctx.Logger().Error(fmt.Errorf("buffer is nil, initializing a new buffer"), "action", "initializing_new_buffer")
-		b.Buffer = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-		b.resetMetric()
+		r.Buffer = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+		r.resetMetric()
 	}
 
 	size := len(data)
-	bufferLength := b.Buffer.Len()
+	bufferLength := r.Buffer.Len()
 	totalSizeNeeded := bufferLength + size
 	// If the total size is within the threshold, write to the buffer.
 	ctx.Logger().V(4).Info(
@@ -137,7 +131,7 @@ func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
 		"content_size", bufferLength,
 	)
 
-	availableSpace := b.Buffer.Cap() - bufferLength
+	availableSpace := r.Buffer.Cap() - bufferLength
 	growSize := totalSizeNeeded - bufferLength
 	if growSize > availableSpace {
 		ctx.Logger().V(4).Info(
@@ -152,10 +146,10 @@ func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
 		// which may require multiple allocations and copies if the size required is much larger
 		// than double the capacity. Our approach aligns with default behavior when growth sizes
 		// happen to match current capacity, retaining asymptotic efficiency benefits.
-		b.Buffer.Grow(growSize)
+		r.Buffer.Grow(growSize)
 	}
 
-	return b.Buffer.Write(data)
+	return r.Buffer.Write(data)
 }
 
 // readCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader
