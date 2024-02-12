@@ -147,13 +147,8 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 
 // finalize ensures proper closure of resources associated with the Diff.
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
-// Also set the hasDiffs flag on the commit to indicate that the commit has diffs.
-// This is needed to handle the case where a commit has no diffs, which would otherwise be missed.
 // This method should be called to release resources, especially when writing to a file.
 func (d *Diff) finalize() error {
-	if d.Commit != nil {
-		d.Commit.hasDiffs = true
-	}
 	return d.contentWriter.CloseForWriting()
 }
 
@@ -372,12 +367,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	}
 	currentDiff := diff(currentCommit)
 
-	createEmptyDiffForCommit := func(commit *Commit) *Diff {
-		// Initialize an empty Diff instance associated with the given commit.
-		// Since this diff represents "no changes", we only need to set the commit.
-		return &Diff{Commit: commit}
-	}
-
 	defer common.RecoverWithExit(ctx)
 	defer close(diffChan)
 	for {
@@ -408,12 +397,15 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				}
 				diffChan <- currentDiff
 				currentCommit.Size += currentDiff.Len()
+				currentCommit.hasDiffs = true
 			}
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				totalLogSize += currentCommit.Size
 				if !currentCommit.hasDiffs {
-					diffChan <- createEmptyDiffForCommit(currentCommit)
+					// Initialize an empty Diff instance associated with the given commit.
+					// Since this diff represents "no changes", we only need to set the commit.
+					diffChan <- &Diff{Commit: currentCommit}
 				}
 			}
 
@@ -463,6 +455,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 					)
 				}
 				diffChan <- currentDiff
+				currentCommit.hasDiffs = true
 			}
 
 			if currentCommit == nil {
