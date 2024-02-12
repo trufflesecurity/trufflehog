@@ -49,7 +49,8 @@ func NewBufferPool(opts ...PoolOpts) *Pool {
 	}
 	pool.Pool = &sync.Pool{
 		New: func() any {
-			return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
+			// return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
+			return NewRingBuffer(int(pool.bufferSize))
 		},
 	}
 
@@ -57,33 +58,35 @@ func NewBufferPool(opts ...PoolOpts) *Pool {
 }
 
 // Get returns a Buffer from the pool.
-func (p *Pool) Get(ctx context.Context) *Buffer {
-	buf, ok := p.Pool.Get().(*Buffer)
+func (p *Pool) Get(ctx context.Context) *Ring {
+	buf, ok := p.Pool.Get().(*Ring)
 	if !ok {
 		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
+		// buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
+		buf = NewRingBuffer(int(p.bufferSize))
 	}
 	p.metrics.recordBufferRetrival()
-	buf.resetMetric()
+	// buf.resetMetric()
 
 	return buf
 }
 
 // Put returns a Buffer to the pool.
-func (p *Pool) Put(buf *Buffer) {
-	p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
+func (p *Pool) Put(buf *Ring) {
+	// p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
 
 	// If the Buffer is more than twice the default size, replace it with a new Buffer.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
 		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
+		// buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
+		buf = NewRingBuffer(int(p.bufferSize))
 	} else {
 		// Reset the Buffer to clear any existing data.
-		buf.Reset()
+		// buf.Reset()
 	}
-	buf.recordMetric()
+	// buf.recordMetric()
 
 	p.Pool.Put(buf)
 }

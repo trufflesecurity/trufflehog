@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/rand"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -53,6 +54,50 @@ func TestBufferWriterWrite(t *testing.T) {
 			}
 		})
 	}
+}
+
+func BenchmarkBufferWriterWrite(b *testing.B) {
+	type benchCase struct {
+		name     string
+		dataSize int // Size of the data to write in bytes
+	}
+
+	benchmarks := []benchCase{
+		{"1KB", 1 << 10},     // 1KB
+		{"4KB", 4 << 10},     // 4KB
+		{"16KB", 16 << 10},   // 16KB
+		{"64KB", 64 << 10},   // 64KB
+		{"256KB", 256 << 10}, // 256KB
+		{"1MB", 1 << 20},     // 1MB
+		{"4MB", 4 << 20},     // 4MB
+		{"16MB", 16 << 20},   // 16MB
+		{"64MB", 64 << 20},   // 64MB
+	}
+
+	for _, bc := range benchmarks {
+		bc := bc
+		data := generateData(bc.dataSize) // Generate pseudo-random data for this benchmark case
+		b.Run(bc.name, func(b *testing.B) {
+			ctx := context.Background()
+			writer := New(ctx)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := writer.Write(ctx, data)
+				assert.NoError(b, err)
+			}
+		})
+	}
+}
+
+func generateData(size int) []byte {
+	// Use a fixed seed for reproducibility
+	rand.Seed(42)
+	data := make([]byte, size)
+	for i := range data {
+		data[i] = byte(rand.Intn(256))
+	}
+	return data
 }
 
 func TestBufferWriterReadCloser(t *testing.T) {

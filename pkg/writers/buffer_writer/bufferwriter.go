@@ -34,10 +34,10 @@ const (
 
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
-	buf     *buffer.Buffer // The current buffer in use.
-	bufPool *buffer.Pool   // The buffer pool used to manage the buffer.
-	size    int            // The total size of the content written to the buffer.
-	state   state          // The current state of the buffer.
+	buf     *buffer.Ring // The current buffer in use.
+	bufPool *buffer.Pool // The buffer pool used to manage the buffer.
+	size    int          // The total size of the content written to the buffer.
+	state   state        // The current state of the buffer.
 
 	metrics metrics
 }
@@ -46,7 +46,8 @@ type BufferWriter struct {
 func New(ctx context.Context) *BufferWriter {
 	buf := bufferPool.Get(ctx)
 	if buf == nil {
-		buf = buffer.NewBuffer()
+		// buf = buffer.NewBuffer()
+		buf = buffer.NewRingBuffer(1 << 12)
 	}
 	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
 }
@@ -59,20 +60,20 @@ func (b *BufferWriter) Write(ctx context.Context, data []byte) (int, error) {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
 	}
 
-	size := len(data)
-	b.size += size
-	start := time.Now()
-	defer func(start time.Time) {
-		bufferLength := uint64(b.buf.Len())
-		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
-
-		ctx.Logger().V(4).Info(
-			"write complete",
-			"data_size", size,
-			"buffer_len", bufferLength,
-			"buffer_size", b.buf.Cap(),
-		)
-	}(start)
+	// size := len(data)
+	// b.size += size
+	// start := time.Now()
+	// defer func(start time.Time) {
+	// 	bufferLength := uint64(b.buf.Len())
+	// 	b.metrics.recordDataProcessed(bufferLength, time.Since(start))
+	//
+	// 	ctx.Logger().V(4).Info(
+	// 		"write complete",
+	// 		"data_size", size,
+	// 		"buffer_len", bufferLength,
+	// 		"buffer_size", b.buf.Cap(),
+	// 	)
+	// }(start)
 	return b.buf.Write(ctx, data)
 }
 
@@ -98,7 +99,7 @@ func (b *BufferWriter) String() (string, error) {
 	if b.buf == nil {
 		return "", fmt.Errorf("buffer is nil")
 	}
-	return b.buf.String(), nil
+	return string(b.buf.Bytes()), nil
 }
 
 // Len returns the length of the buffer's content.
