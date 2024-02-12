@@ -523,25 +523,18 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	}
 
 	logger := repoCtx.Logger()
-	var (
-		logValues []any
-
-		baseHashSet bool
-		maxDepthSet bool
-	)
+	var logValues []any
 	if scanOptions.BaseHash != "" {
 		logValues = append(logValues, "base", scanOptions.BaseHash)
-		baseHashSet = true
 	}
 	if scanOptions.HeadHash != "" {
 		logValues = append(logValues, "head", scanOptions.HeadHash)
 	}
 	if scanOptions.MaxDepth > 0 {
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
-		maxDepthSet = true
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, !baseHashSet, scanOptions.ExcludeGlobs, scanOptions.Bare)
+	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
 	}
@@ -556,13 +549,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	var depth int64
 	var lastCommitHash string
 	for diff := range diffChan {
-		if maxDepthSet && depth >= scanOptions.MaxDepth {
+		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth", "depth", depth)
 			break
 		}
 
 		fullHash := diff.Commit.Hash
-		if baseHashSet && scanOptions.BaseHash == fullHash {
+		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
 			logger.V(1).Info("reached base commit", "commit", fullHash)
 			break
 		}
@@ -755,22 +748,15 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	gitDir := filepath.Join(path, gitDirName)
 
 	logger := ctx.Logger()
-	var (
-		logValues []any
-
-		baseHashSet bool
-		maxDepthSet bool
-	)
+	var logValues []any
 	if scanOptions.BaseHash != "" {
 		logValues = append(logValues, "base", scanOptions.BaseHash)
-		baseHashSet = true
 	}
 	if scanOptions.HeadHash != "" {
 		logValues = append(logValues, "head", scanOptions.HeadHash)
 	}
 	if scanOptions.MaxDepth > 0 {
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
-		maxDepthSet = true
 	}
 	logger.V(1).Info("scanning repo", logValues...)
 
@@ -783,7 +769,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
 		logger.V(2).Info("scanning staged changes from git")
 
-		if maxDepthSet && depth >= scanOptions.MaxDepth {
+		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth")
 			break
 		}
@@ -798,7 +784,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			break
 		}
 
-		if baseHashSet && fullHash == scanOptions.BaseHash {
+		if scanOptions.BaseHash != "" && fullHash == scanOptions.BaseHash {
 			logger.V(1).Info("reached base hash, finishing scanning files")
 			reachedBase = true
 		}
