@@ -443,7 +443,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isDiffLine(isStaged, latestState, line):
 			latestState = DiffLine
 
-			// This should never be nil, but check in case the stdin stream is messed up.
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				if err := currentDiff.finalize(); err != nil {
 					ctx.Logger().Error(err,
@@ -458,6 +457,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				currentCommit.hasDiffs = true
 			}
 
+			// This should never be nil, but check in case the stdin stream is messed up.
 			if currentCommit == nil {
 				currentCommit = &Commit{}
 			}
