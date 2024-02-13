@@ -405,6 +405,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				if !currentCommit.hasDiffs {
 					// Initialize an empty Diff instance associated with the given commit.
 					// Since this diff represents "no changes", we only need to set the commit.
+					// This is required to ensure commits that have no diffs are still processed.
 					diffChan <- &Diff{Commit: currentCommit}
 				}
 			}
