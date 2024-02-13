@@ -48,7 +48,7 @@ Several options available for you:
 
 ```bash
 # MacOS users
-brew install trufflesecurity/trufflehog/trufflehog
+brew install trufflehog
 
 # Docker
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
@@ -469,11 +469,12 @@ status code, the secret is considered verified.
 ```yaml
 # config.yaml
 detectors:
-  - name: hog detector
+  - name: HogTokenDetector
     keywords:
       - hog
     regex:
-      adjective: hogs are (\S+)
+      hogID: \b(HOG[0-9A-Z]{16})\b
+      hogToken: [^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}
     verify:
       - endpoint: http://localhost:8000/
         # unsafe must be set if the endpoint is HTTP
@@ -482,6 +483,7 @@ detectors:
           - "Authorization: super secret authorization header"
 ```
 
+
 ```
 $ trufflehog filesystem /tmp --config config.yaml --only-verified
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
@@ -489,8 +491,18 @@ $ trufflehog filesystem /tmp --config config.yaml --only-verified
 Found verified result 🐷🔑
 Detector Type: CustomRegex
 Decoder Type: PLAIN
-Raw result: hogs are cool
+Raw result: HOGAAIUNNWHAHJJWUQYR
 File: /tmp/hog-facts.txt
+```
+Data structure sent to the custom verificaiton server:
+
+```
+{
+    "HogTokenDetector": {
+        "HogID": ["HOGAAIUNNWHAHJJWUQYR"],
+        "HogSecret": ["sD9vzqdSsAOxntjAJ/qZ9sw+8PvEYg0r7D1Hhh0C"],
+    }
+}
 ```
 
 ## Verification Server Example (Python)
@@ -523,8 +535,8 @@ class Verifier(BaseHTTPRequestHandler):
             request = json.loads(self.rfile.read(length))
             self.log_message("%s", request)
 
-            # check the match
-            if request['hog detector']['adjective'][-1] == 'cool':
+            # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
+            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']): 
                 self.send_response(200)
                 self.end_headers()
             else:

@@ -2,6 +2,7 @@ package sources
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -182,6 +183,11 @@ func (s *SourceManager) Wait() error {
 	}
 	close(s.outputChunks)
 	close(s.firstErr)
+	for _, hook := range s.hooks {
+		if hookCloser, ok := hook.(io.Closer); ok {
+			_ = hookCloser.Close()
+		}
+	}
 	return s.waitErr
 }
 
@@ -349,7 +355,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 			ctx := context.WithValue(ctx, "unit", unit.SourceUnitID())
 			ctx.Logger().V(3).Info("chunking unit")
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
-				report.ReportError(Fatal{err})
+				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 				catchFirstFatal(Fatal{err})
 			}
 			return nil

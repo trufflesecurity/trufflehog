@@ -7,46 +7,65 @@ import (
 
 var (
 	KB, MB, GB, TB, PB = 1e3, 1e6, 1e9, 1e12, 1e15
-	IgnoredExtensions  = []string{
-		// multimedia/containers
-		"mp4",
-		"avi",
-		"mpeg",
-		"mpg",
-		"mov",
-		"wmv",
-		"m4p",
-		"swf",
-		"mp2",
-		"flv",
-		"vob",
-		"webm",
-		"hdv",
-		"3gp",
-		"ogg",
-		"mp3",
-		"wav",
-		"flac",
-		"webp",
-		"pdf",
-
+	ignoredExtensions  = map[string]struct{}{
 		// images
-		"png",
-		"jpg",
-		"jpeg",
-		"gif",
-		"tiff",
+		"apng": {},
+		"avif": {},
+		"bmp":  {},
+		"gif":  {},
+		"icns": {}, // Apple icon image file
+		"ico":  {}, // Icon file
+		"jpg":  {},
+		"jpeg": {},
+		"png":  {},
+		"svg":  {},
+		"svgz": {}, // Compressed Scalable Vector Graphics file
+		"tga":  {},
+		"tif":  {},
+		"tiff": {},
 
-		"fnt",   // Windows font file
-		"fon",   // Generic font file
-		"ttf",   // TrueType font
-		"otf",   // OpenType font
-		"woff",  // Web Open Font Format
-		"woff2", // Web Open Font Format 2
-		"eot",   // Embedded OpenType font
-		"svgz",  // Compressed Scalable Vector Graphics file
-		"icns",  // Apple icon image file
-		"ico",   // Icon file
+		// audio
+		"fev":  {}, // video game audio
+		"fsb":  {},
+		"m2a":  {},
+		"m4a":  {},
+		"mp2":  {},
+		"mp3":  {},
+		"snag": {},
+
+		// video
+		"264":  {},
+		"3gp":  {},
+		"avi":  {},
+		"flac": {},
+		"flv":  {},
+		"hdv":  {},
+		"m4p":  {},
+		"mov":  {},
+		"mp4":  {},
+		"mpg":  {},
+		"mpeg": {},
+		"ogg":  {},
+		"qt":   {},
+		"swf":  {},
+		"vob":  {},
+		"wav":  {},
+		"webm": {},
+		"webp": {},
+		"wmv":  {},
+
+		// documents
+		"pdf": {},
+		"psd": {},
+
+		// fonts
+		"eot":   {}, // Embedded OpenType font
+		"fnt":   {}, // Windows font file
+		"fon":   {}, // Generic font file
+		"otf":   {}, // OpenType font
+		"ttf":   {}, // TrueType font
+		"woff":  {}, // Web Open Font Format
+		"woff2": {}, // Web Open Font Format 2
 	}
 
 	binaryExtensions = map[string]struct{}{
@@ -86,13 +105,11 @@ var (
 	}
 )
 
+// SkipFile returns true if the file extension is in the ignoredExtensions list.
 func SkipFile(filename string) bool {
-	for _, ext := range IgnoredExtensions {
-		if strings.TrimPrefix(filepath.Ext(filename), ".") == ext {
-			return true
-		}
-	}
-	return false
+	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(filename), "."))
+	_, ok := ignoredExtensions[ext]
+	return ok
 }
 
 // IsBinary returns true if the file extension is in the binaryExtensions list.

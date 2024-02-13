@@ -2,8 +2,10 @@ package engine
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -58,9 +60,10 @@ type Printer interface {
 
 type Engine struct {
 	// CLI flags.
-	concurrency uint8
-	decoders    []decoders.Decoder
-	detectors   []detectors.Detector
+	concurrency     uint8
+	decoders        []decoders.Decoder
+	detectors       []detectors.Detector
+	jobReportWriter io.WriteCloser
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
@@ -118,6 +121,12 @@ func (r *verificationOverlapTracker) increment() {
 
 // Option is used to configure the engine during initialization using functional options.
 type Option func(*Engine)
+
+func WithJobReportWriter(w io.WriteCloser) Option {
+	return func(e *Engine) {
+		e.jobReportWriter = w
+	}
+}
 
 func WithConcurrency(concurrency uint8) Option {
 	return func(e *Engine) {
@@ -317,6 +326,7 @@ func Start(ctx context.Context, options ...Option) (*Engine, error) {
 	if err := e.initialize(ctx, options...); err != nil {
 		return nil, err
 	}
+	e.initSourceManager(ctx)
 	e.setDefaults(ctx)
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
@@ -373,6 +383,47 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	return nil
 }
 
+func (e *Engine) initSourceManager(ctx context.Context) {
+	opts := []func(*sources.SourceManager){
+		sources.WithConcurrentSources(int(e.concurrency)),
+		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultChannelBuffer),
+	}
+	if e.jobReportWriter != nil {
+		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
+		opts = append(opts, sources.WithReportHook(unitHook))
+		e.wgDetectorWorkers.Add(1)
+		go func() {
+			defer e.wgDetectorWorkers.Done()
+			defer func() {
+				e.jobReportWriter.Close()
+				// Add a bit of extra information if it's a *os.File.
+				if namer, ok := e.jobReportWriter.(interface{ Name() string }); ok {
+					ctx.Logger().Info("report written", "path", namer.Name())
+				} else {
+					ctx.Logger().Info("report written")
+				}
+			}()
+			for metrics := range finishedMetrics {
+				metrics.Errors = common.ExportErrors(metrics.Errors...)
+				details, err := json.Marshal(map[string]any{
+					"version": 1,
+					"data":    metrics,
+				})
+				if err != nil {
+					ctx.Logger().Error(err, "error marshalling job details")
+					continue
+				}
+				if _, err := e.jobReportWriter.Write(append(details, '\n')); err != nil {
+					ctx.Logger().Error(err, "error writing to file")
+				}
+			}
+		}()
+	}
+	e.sourceManager = sources.NewManager(opts...)
+}
+
 // setDefaults ensures that if specific engine properties aren't provided,
 // they're set to reasonable default values. It makes the engine robust to
 // incomplete configuration.
@@ -383,13 +434,6 @@ func (e *Engine) setDefaults(ctx context.Context) {
 		e.concurrency = uint8(numCPU)
 	}
 	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
-
-	e.sourceManager = sources.NewManager(
-		sources.WithConcurrentSources(int(e.concurrency)),
-		sources.WithConcurrentUnits(int(e.concurrency)),
-		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultChannelBuffer),
-	)
 
 	// Default decoders handle common encoding formats.
 	if len(e.decoders) == 0 {
@@ -598,8 +642,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 // by the same detector in the chunk. Exact matches on lookup indicate a duplicate secret for a detector
 // in that chunk - which is expected and not malicious. Those intra-detector dupes are still verified.
 type chunkSecretKey struct {
-	secret       string
-	detectorInfo ahocorasick.DetectorInfo
+	secret      string
+	detectorKey ahocorasick.DetectorKey
 }
 
 func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSecretKey]struct{}) bool {
@@ -615,7 +659,7 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 
 		// If the detector type is the same, we don't need to compare the strings.
 		// These are not duplicates, and should be verified.
-		if val.detectorInfo.Type() == dupeKey.detectorInfo.Type() {
+		if val.detectorKey.Type() == dupeKey.detectorKey.Type() {
 			continue
 		}
 
@@ -674,7 +718,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				// Ex:
 				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
 				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				key := chunkSecretKey{secret: string(val), detectorInfo: detector}
+				key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
 				if _, ok := chunkSecrets[key]; ok {
 					continue
 				}

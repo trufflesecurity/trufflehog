@@ -18,6 +18,10 @@ inputs:
     default: ''
     description: Extra args to be passed to the trufflehog cli.
     required: false
+  version:
+    default: 'latest'
+    description: Scan with this trufflehog cli version.
+    required: false
 branding:
   icon: "shield"
   color: "green"
@@ -32,6 +36,7 @@ runs:
       HEAD: ${{ inputs.head }}
       ARGS: ${{ inputs.extra_args }}
       COMMITS: ${{ toJson(github.event.commits) }}
+      VERSION: ${{ inputs.version }}
     run: |
       ##########################################
       ## ADVANCED USAGE                       ##
@@ -79,9 +84,9 @@ runs:
       fi
       ##########################################
       ##          Run TruffleHog              ##
-      ##########################################       
-      docker run --rm -v "$REPO_PATH":/tmp \
-      ghcr.io/trufflesecurity/trufflehog:latest \
+      ##########################################
+      docker run --rm -v "$REPO_PATH":/tmp -w /tmp \
+      ghcr.io/trufflesecurity/trufflehog:${VERSION} \
       git file:///tmp/ \
       --since-commit \
       ${BASE:-''} \
