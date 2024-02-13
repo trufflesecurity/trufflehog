@@ -22,8 +22,9 @@ type Ring struct {
 
 func NewRingBuffer(size int) *Ring {
 	return &Ring{
-		buf:  make([]byte, size),
-		size: size,
+		buf:          make([]byte, size),
+		size:         size,
+		availableCap: size,
 	}
 }
 
