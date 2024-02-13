@@ -1,17 +1,6 @@
 package engine
 
 import (
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jupiterone"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/snowflake"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sourcegraph"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -375,6 +364,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken_v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jupiterone"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/juro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanban"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanbantool"
