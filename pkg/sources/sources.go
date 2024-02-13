@@ -133,8 +133,13 @@ type ChunkReporter interface {
 // SourceUnit is an object that represents a Source's unit of work. This is
 // used as the output of enumeration, progress reporting, and job distribution.
 type SourceUnit interface {
-	// SourceUnitID uniquely identifies a source unit.
+	// SourceUnitID uniquely identifies a source unit. It does not need to
+	// be human readable or two-way, however, it should be canonical and
+	// stable across runs.
 	SourceUnitID() string
+
+	// Display is the human readable representation of the SourceUnit.
+	Display() string
 }
 
 // GCSConfig defines the optional configuration for a GCS source.

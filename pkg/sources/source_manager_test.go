@@ -62,6 +62,8 @@ type countChunk byte
 
 func (c countChunk) SourceUnitID() string { return fmt.Sprintf("countChunk(%d)", c) }
 
+func (c countChunk) Display() string { return c.SourceUnitID() }
+
 func (c *counterChunker) Enumerate(ctx context.Context, reporter UnitReporter) error {
 	for i := 0; i < c.count; i++ {
 		if err := reporter.UnitOk(ctx, countChunk(byte(i))); err != nil {
@@ -187,7 +189,7 @@ func (c *unitChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...ChunkingT
 }
 func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 	for _, step := range c.steps {
-		if err := rep.UnitOk(ctx, CommonSourceUnit{step.unit}); err != nil {
+		if err := rep.UnitOk(ctx, CommonSourceUnit{ID: step.unit}); err != nil {
 			return err
 		}
 	}
@@ -195,7 +197,11 @@ func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 }
 func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkReporter) error {
 	for _, step := range c.steps {
-		if unit.SourceUnitID() != step.unit {
+		commonUnit, err := IntoCommonUnit(unit)
+		if err != nil {
+			return err
+		}
+		if commonUnit.ID != step.unit {
 			continue
 		}
 		if step.err != "" {
@@ -345,7 +351,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	})
 	m0, m1, m2 := metrics[0], metrics[1], metrics[2]
 
-	assert.Equal(t, "1 one", m0.Unit.SourceUnitID())
+	assert.Equal(t, "unit:1 one", m0.Unit.SourceUnitID())
 	assert.Equal(t, uint64(1), m0.TotalChunks)
 	assert.Equal(t, uint64(3), m0.TotalBytes)
 	assert.NotZero(t, m0.StartTime)
@@ -353,7 +359,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m0.ElapsedTime())
 	assert.Equal(t, 0, len(m0.Errors))
 
-	assert.Equal(t, "2 two", m1.Unit.SourceUnitID())
+	assert.Equal(t, "unit:2 two", m1.Unit.SourceUnitID())
 	assert.Equal(t, uint64(0), m1.TotalChunks)
 	assert.Equal(t, uint64(0), m1.TotalBytes)
 	assert.NotZero(t, m1.StartTime)
@@ -361,7 +367,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m1.ElapsedTime())
 	assert.Equal(t, 1, len(m1.Errors))
 
-	assert.Equal(t, "3 three", m2.Unit.SourceUnitID())
+	assert.Equal(t, "unit:3 three", m2.Unit.SourceUnitID())
 	assert.Equal(t, uint64(0), m2.TotalChunks)
 	assert.Equal(t, uint64(0), m2.TotalBytes)
 	assert.NotZero(t, m2.StartTime)

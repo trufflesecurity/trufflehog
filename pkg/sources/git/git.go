@@ -1249,9 +1249,9 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	gitUnit, ok := unit.(SourceUnit)
-	if !ok {
-		return fmt.Errorf("unsupported unit type: %T", unit)
+	gitUnit, err := sources.IntoUnit[SourceUnit](unit)
+	if err != nil {
+		return err
 	}
 
 	switch gitUnit.Kind {
