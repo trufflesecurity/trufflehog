@@ -3,11 +3,12 @@ package browserstack
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -25,7 +26,7 @@ const browserStackAPIURL = "https://www.browserstack.com/automate/plan.json"
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "accessKey", "\"access_Key\":", "ACCESS_KEY", "key", "browserstackKey", "BS_AUTHKEY", "BROWSERSTACK_ACCESS_KEY"}) + `\b([0-9a-zA-Z]{20})\b`)
+	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "accessKey", "\"access_Key\":", "ACCESS_KEY", "key", "browserstackKey", "BS_AUTHKEY", "BROWSERSTACK_ACCESS_KEY"}) + `?\b([0-9a-zA-Z]{20})\b`)
 	userPat = regexp.MustCompile(detectors.PrefixRegex([]string{"hub-cloud.browserstack.com", "userName", "\"username\":", "USER_NAME", "user", "browserstackUser", "BS_USERNAME", "BROWSERSTACK_USERNAME"}) + `\b([a-zA-Z\d]{3,18}[._-]*[a-zA-Z\d]{6,11})\b`)
 )
 

@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,7 +27,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sentry"}) + `\b([a-f0-9]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sentry"}) + `?\b([a-f0-9]{64})\b`)
 
 	errUnauthorized = fmt.Errorf("token unauthorized")
 )

@@ -27,7 +27,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aeroworkflow"}) + `([a-zA-Z0-9^!?#:*;]{20})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"aeroworkflow"}) + `\b([0-9]{1,})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"aeroworkflow"}) + `?\b([0-9]{1,})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

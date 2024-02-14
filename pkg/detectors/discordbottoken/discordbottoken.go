@@ -3,9 +3,10 @@ package discordbottoken
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -19,7 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"discord"}) + `\b([0-9]{17})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"discord"}) + `?\b([0-9]{17})\b`)
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"discord"}) + `\b([A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27})\b`)
 )
 

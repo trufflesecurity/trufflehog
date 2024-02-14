@@ -26,8 +26,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `\b([a-z0-9]{32})\b`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `\b([a-z0-9]{32})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `?\b([a-z0-9]{32})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `?\b([a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

@@ -2,9 +2,10 @@ package maxmindlicense
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -19,8 +20,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9]{2,7})\b`)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9A-Za-z]{16})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `?\b([0-9]{2,7})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `?\b([0-9A-Za-z]{16})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

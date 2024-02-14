@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-zA-Z]{52})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `?\b([0-9a-zA-Z]{52})\b`)
 	urlPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `https:\/\/([0-9a-z]{5,40})\.search\.windows\.net\/indexes\/([0-9a-z]{5,40})\b`)
 )
 

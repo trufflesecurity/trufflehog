@@ -3,10 +3,11 @@ package scrapfly
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -26,7 +27,7 @@ var (
 	//   - scp-live-03b9e7d0d0024e4b8fccc1ffe923e899 (new format)
 	//   - scp-test-03b9e7d0d0024e4b8fccc1ffe923e899 (new format)
 	//   - 03b9e7d0d0024e4b8fccc1ffe923e899 (old format)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scrapfly"}) + `\b([a-z0-9]{32}|scp-(?:live|test)-[a-z0-9]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"scrapfly"}) + `?\b([a-z0-9]{32}|scp-(?:live|test)-[a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

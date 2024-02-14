@@ -19,7 +19,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9]{2,7})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `?\b([0-9]{2,7})\b`)
 	keyPat = regexp.MustCompile(`\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
 )
 

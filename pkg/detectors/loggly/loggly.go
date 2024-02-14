@@ -3,9 +3,10 @@ package loggly
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -23,7 +24,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9-]+\.loggly\.com)\b`)
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"loggly"}) + `\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"loggly"}) + `?\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"craftmypdf"}) + `\b([0-9a-zA-Z]{35})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"craftmypdf"}) + `?\b([0-9a-zA-Z]{35})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

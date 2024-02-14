@@ -3,9 +3,10 @@ package planviewleankit
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat       = regexp.MustCompile(detectors.PrefixRegex([]string{"planviewleankit", "planview"}) + `\b([0-9a-f]{128})\b`)
+	keyPat       = regexp.MustCompile(detectors.PrefixRegex([]string{"planviewleankit", "planview"}) + `?\b([0-9a-f]{128})\b`)
 	subDomainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"planviewleankit", "planview"}) + `(?:subdomain).\b([a-zA-Z][a-zA-Z0-9.-]{1,23}[a-zA-Z0-9])\b`)
 )
 

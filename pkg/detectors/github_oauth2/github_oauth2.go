@@ -2,8 +2,9 @@ package github_oauth2
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -18,8 +19,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Oauth2 client ID and secret
-	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{20})\b`)
-	oauth2ClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{40})\b`)
+	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `?\b([a-f0-9]{20})\b`)
+	oauth2ClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `?\b([a-f0-9]{40})\b`)
 )
 
 const (

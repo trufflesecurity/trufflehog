@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"time"
 	"unicode"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	_ "github.com/snowflakedb/gosnowflake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,7 +23,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z]{7})\b`)
+	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `?\b([a-zA-Z]{7}-[0-9a-zA-Z]{7})\b`)
 	usernameExclusionPat = `!@#$%^&*{}:<>,.;?()/\+=\s\n`
 )
 

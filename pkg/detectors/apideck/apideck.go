@@ -3,9 +3,10 @@ package apideck
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +23,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(sk_live_[a-z0-9A-Z-]{93})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"apideck"}) + `\b([a-z0-9A-Z]{40})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"apideck"}) + `?\b([a-z0-9A-Z]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

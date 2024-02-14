@@ -3,9 +3,10 @@ package replyio
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"replyio"}) + `\b([0-9A-Za-z]{24})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"replyio"}) + `?\b([0-9A-Za-z]{24})\b`)
 )
 
 func (s Scanner) Keywords() []string {

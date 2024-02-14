@@ -3,9 +3,10 @@ package cloudelements
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +23,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudelements"}) + `\b([a-zA-Z0-9]{43})\b`)
-	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudelements"}) + `\b([a-z0-9]{32})\b`)
+	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudelements"}) + `?\b([a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

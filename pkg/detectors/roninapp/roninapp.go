@@ -3,8 +3,9 @@ package roninapp
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	b64 "encoding/base64"
 	"net/http"
@@ -23,7 +24,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ronin"}) + `\b([0-9a-zA-Z]{26})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ronin"}) + `?\b([0-9a-zA-Z]{26})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"ronin"}) + `\b([0-9Aa-zA-Z]{3,32})\b`)
 )
 

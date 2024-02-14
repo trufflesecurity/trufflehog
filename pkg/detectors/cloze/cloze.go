@@ -2,10 +2,11 @@ package cloze
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"cloze"}) + `\b([0-9a-f]{32})\b`)
+	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"cloze"}) + `?\b([0-9a-f]{32})\b`)
 	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloze"}) + `\b([\w\.-]+@[\w-]+\.[\w\.-]{2,5})\b`)
 )
 

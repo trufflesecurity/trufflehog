@@ -5,10 +5,11 @@ import (
 
 	// b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -25,7 +26,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([0-9]{6})\b`)
+	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `?\b([0-9]{6})\b`)
 
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `(-----BEGIN RSA PRIVATE KEY-----\s[A-Za-z0-9+\/\s]*\s-----END RSA PRIVATE KEY-----)`)
 )

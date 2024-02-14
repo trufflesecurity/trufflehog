@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 
 	//	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -24,7 +25,7 @@ var (
 
 	// https://core.telegram.org/bots#6-botfather
 	// thanks https://stackoverflow.com/questions/61868770/tegram-bot-api-token-format
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"telegram", "tgram://"}) + `\b([0-9]{8,10}:[a-zA-Z0-9_-]{35})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"telegram", "tgram://"}) + `?\b([0-9]{8,10}:[a-zA-Z0-9_-]{35})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

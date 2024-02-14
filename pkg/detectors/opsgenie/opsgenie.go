@@ -2,11 +2,12 @@ package opsgenie
 
 import (
 	"context"
-	"fmt"
-	regexp "github.com/wasilibs/go-re2"
-	"net/http"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +23,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"opsgenie"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"opsgenie"}) + `?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
 
 func (s Scanner) Type() detectorspb.DetectorType {
@@ -54,41 +55,40 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			// Check for false positives
-		    if detectors.IsKnownFalsePositive(match[0], append(detectors.DefaultFalsePositives, "opsgenie.com/alert/detail/"), true) {
-		        continue
-		    }
-		    req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/alerts", nil)
-		    if err != nil {
-			continue
-		    }
-		    req.Header.Add("Authorization", fmt.Sprintf("GenieKey %s", resMatch))
-		    res, err := client.Do(req)
-		    if err != nil {
-			continue
-		    }
-		    defer res.Body.Close()
-
-		    // Check for 200 status code
-		    if res.StatusCode == 200 {
-			var data map[string]interface{}
-			err := json.NewDecoder(res.Body).Decode(&data)
+			if detectors.IsKnownFalsePositive(match[0], append(detectors.DefaultFalsePositives, "opsgenie.com/alert/detail/"), true) {
+				continue
+			}
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/alerts", nil)
 			if err != nil {
-			    s1.Verified = false
-			    continue
+				continue
 			}
+			req.Header.Add("Authorization", fmt.Sprintf("GenieKey %s", resMatch))
+			res, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+			defer res.Body.Close()
 
-			// Check if "data" is one of the top-level attributes
-			if _, ok := data["data"]; ok {
-			    s1.Verified = true
+			// Check for 200 status code
+			if res.StatusCode == 200 {
+				var data map[string]interface{}
+				err := json.NewDecoder(res.Body).Decode(&data)
+				if err != nil {
+					s1.Verified = false
+					continue
+				}
+
+				// Check if "data" is one of the top-level attributes
+				if _, ok := data["data"]; ok {
+					s1.Verified = true
+				} else {
+					s1.Verified = false
+				}
 			} else {
-			    s1.Verified = false
+				s1.Verified = false
+
 			}
-		    } else {
-			s1.Verified = false
-
-		    }
 		}
-
 
 		results = append(results, s1)
 	}

@@ -3,9 +3,10 @@ package tokeet
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,8 +22,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tokeet"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"tokeet"}) + `\b([0-9]{10}.[0-9]{4})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tokeet"}) + `?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"tokeet"}) + `?\b([0-9]{10}.[0-9]{4})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

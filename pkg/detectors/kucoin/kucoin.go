@@ -5,11 +5,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -25,8 +26,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"kucoin"}) + `\b([0-9a-f]{24})\b`)
-	secretPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"kucoin"}) + `\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"kucoin"}) + `?\b([0-9a-f]{24})\b`)
+	secretPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"kucoin"}) + `?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 	passphrasePat = regexp.MustCompile(detectors.PrefixRegex([]string{"kucoin"}) + `([ \r\n]{1}[!-~]{7,32}[ \r\n]{1})`)
 )
 

@@ -22,8 +22,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-z]{52})\b`)
-	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-z]{7,40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `?\b([0-9a-z]{52})\b`)
+	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `?\b([0-9a-z]{7,40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

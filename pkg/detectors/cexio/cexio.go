@@ -6,13 +6,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,9 +29,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `\b([0-9A-Za-z]{24,27})\b`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `\b([0-9A-Za-z]{24,27})\b`)
-	userIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `\b([a-z]{2}[0-9]{9})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `?\b([0-9A-Za-z]{24,27})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `?\b([0-9A-Za-z]{24,27})\b`)
+	userIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cexio", "cex.io"}) + `?\b([a-z]{2}[0-9]{9})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

@@ -4,9 +4,10 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -23,7 +24,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	urlPat = regexp.MustCompile(`\b([0-9a-z-]{1,}\.freshdesk\.com)\b`)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshdesk"}) + `\b([0-9A-Za-z]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshdesk"}) + `?\b([0-9A-Za-z]{20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

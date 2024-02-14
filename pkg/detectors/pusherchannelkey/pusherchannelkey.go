@@ -6,12 +6,13 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -27,10 +28,10 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	appIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pusher"}) + `\b([0-9]{7})\b`)
-	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"key"}) + `\b([a-z0-9]{20})\b`)
+	appIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pusher"}) + `?\b([0-9]{7})\b`)
+	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"key"}) + `?\b([a-z0-9]{20})\b`)
 	// this is currently incorrect, should be a callback from the API
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pusher"}) + `\b([a-z0-9]{20})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pusher"}) + `?\b([a-z0-9]{20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

@@ -24,7 +24,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aha"}) + `\b([0-9a-f]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aha"}) + `?\b([0-9a-f]{64})\b`)
 	URLPat = regexp.MustCompile(`\b([A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])\.aha\.io)`)
 )
 

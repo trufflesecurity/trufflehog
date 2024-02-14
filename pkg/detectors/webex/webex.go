@@ -3,10 +3,11 @@ package webex
 import (
 	"context"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -19,7 +20,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b([a-f0-9]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `?\b([a-f0-9]{64})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"webex"}) + `\b(C[a-f0-9]{64})\b`)
 )
 
