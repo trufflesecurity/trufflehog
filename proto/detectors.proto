@@ -77,7 +77,7 @@ enum DetectorType {
   DigitalOceanToken = 64;
   DiscordBotToken = 65;
   DiscordWebhook = 66;
-  EtsyApiKey = 67;
+  EtsyApiKey = 67 [deprecated = true];
   FastlyPersonalToken = 68;
   GoogleOauth2 = 69;
   ReCAPTCHA = 70; // Didn't do
@@ -250,7 +250,7 @@ enum DetectorType {
   Feedier = 238;
   Abbysale = 239;
   Magnetic = 240;
-  Nytimes = 241;
+  Nytimes = 241 [deprecated = true];
   Polygon = 242;
   Powrbot = 243;
   ProspectIO = 244 [deprecated = true];
@@ -417,7 +417,7 @@ enum DetectorType {
   FinancialModelingPrep = 406;
   Geocodio = 407;
   HereAPI = 408;
-  Macaddress = 409;
+  Macaddress = 409 [deprecated = true];
   OOPSpam = 410;
   ProtocolsIO = 411;
   ScraperAPI = 412;
@@ -919,7 +919,7 @@ enum DetectorType {
   BlockNative = 908;
   Moralis = 909;
   BscScan = 910;
-  CoinMarketCap = 911;
+  CoinMarketCap = 911 [deprecated = true];
   Percy = 912;
   TinesWebhook = 913;
   Pulumi = 914;
