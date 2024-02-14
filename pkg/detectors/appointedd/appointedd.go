@@ -2,6 +2,7 @@ package appointedd
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -22,7 +23,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appointedd"}) + `\b([a-zA-Z0-9=+]{87}=)`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appointedd"}) + `\b([a-zA-Z0-9=+]{88)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,6 +35,8 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify appointedd secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
+	fmt.Println(keyPat.String())
+	fmt.Println("data", dataStr)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -42,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
+		fmt.Println(resMatch)
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Appointedd,
