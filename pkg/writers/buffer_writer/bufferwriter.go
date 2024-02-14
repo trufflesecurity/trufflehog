@@ -1,3 +1,4 @@
+// Package bufferwritter provides a contentWriter implementation using a shared buffer pool for memory management.
 package bufferwriter
 
 import (
