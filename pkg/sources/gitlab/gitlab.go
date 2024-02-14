@@ -47,6 +47,8 @@ type Source struct {
 	git                    *git.Git
 	scanOptions            *git.ScanOptions
 
+	apiClient *gitlab.Client
+
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
 	sources.Progress
@@ -160,11 +162,19 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	// Start client.
-	apiClient, err := s.newClient()
+	var err error
+	s.apiClient, err = s.newClient()
 	if err != nil {
 		return err
+	}
+
+	// If targets are provided, we're only scanning the data in those targets.
+	// Otherwise, we're scanning all data.
+	// This allows us to only scan the commit where a vulnerability was found.
+	if len(targets) > 0 {
+		return s.scanTargets(ctx, targets, chunksChan)
 	}
 
 	gitlabReposScanned.WithLabelValues(s.name).Set(0)
@@ -190,7 +200,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 				return ctx.Err()
 			},
 		}
-		if err := s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter); err != nil {
+		if err := s.getAllProjectRepos(ctx, s.apiClient, ignoreRepo, reporter); err != nil {
 			return err
 		}
 	}
@@ -201,6 +211,109 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	slices.Sort(s.repos)
 
 	return s.scanRepos(ctx, chunksChan)
+}
+
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	for _, tgt := range targets {
+		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
+			ctx.Logger().Error(err, "error scanning target")
+		}
+	}
+
+	return nil
+}
+
+// commitQuery represents the details required to fetch a commit.
+type commitQuery struct {
+	repo     string
+	owner    string
+	sha      string
+	filename string
+}
+
+func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
+	if !ok {
+		return fmt.Errorf("unable to cast metadata type for targeted scan")
+	}
+	meta := metaType.Github
+
+	u, err := url.Parse(meta.GetLink())
+	if err != nil {
+		return fmt.Errorf("unable to parse GitHub URL: %w", err)
+	}
+
+	// The owner is the second segment and the repo is the third segment of the path.
+	// Ex: https://github.com/owner/repo/.....
+	segments := strings.Split(u.Path, "/")
+	if len(segments) < 3 {
+		return fmt.Errorf("invalid GitHub URL")
+	}
+
+	qry := commitQuery{
+		repo:     segments[2],
+		owner:    segments[1],
+		sha:      meta.GetCommit(),
+		filename: meta.GetFile(),
+	}
+	res, err := s.getDiffForFileInCommit(ctx, qry)
+	if err != nil {
+		return err
+	}
+	chunk := &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
+		SecretID:   target.SecretID,
+		Data:       []byte(res),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{Github: meta},
+		},
+		Verify: s.verify,
+	}
+
+	return common.CancellableWrite(ctx, chunksChan, chunk)
+}
+
+// getDiffForFileInCommit retrieves the diff for a specified file in a commit.
+// If the file or its diff is not found, it returns an error.
+func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
+	// commit, _, err := s.apiClient.Commits.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+	// if s.handleRateLimit(err) {
+	// 	return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
+	// }
+	// if err != nil {
+	// 	return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+	// }
+	//
+	// if len(commit.Files) == 0 {
+	// 	return "", fmt.Errorf("commit %s does not contain any files", query.sha)
+	// }
+	//
+	// res := new(strings.Builder)
+	// // Only return the diff if the file is in the commit.
+	// for _, file := range commit.Files {
+	// 	if *file.Filename != query.filename {
+	// 		continue
+	// 	}
+	//
+	// 	if file.Patch == nil {
+	// 		return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
+	// 	}
+	//
+	// 	if _, err := res.WriteString(*file.Patch); err != nil {
+	// 		return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
+	// 	}
+	// 	res.WriteString("\n")
+	// }
+	//
+	// if res.Len() == 0 {
+	// 	return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
+	// }
+	//
+	// return res.String(), nil
+	return "", nil
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
