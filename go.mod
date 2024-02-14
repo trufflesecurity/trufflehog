@@ -47,7 +47,7 @@ require (
 	github.com/google/go-containerregistry v0.19.0
 	github.com/google/go-github/v57 v57.0.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/gax-go/v2 v2.12.0
+	github.com/googleapis/gax-go/v2 v2.12.1
 	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-retryablehttp v0.7.5
 	github.com/hashicorp/golang-lru v0.6.0
