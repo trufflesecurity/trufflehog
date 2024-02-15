@@ -7,115 +7,18 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
-
-type bufferPoolMetrics struct{}
-
-func (bufferPoolMetrics) recordGrowth(growthAmount int) {
-	growCount.Inc()
-	growAmount.Add(float64(growthAmount))
-}
-
-func (bufferPoolMetrics) recordShrink(amount int) {
-	shrinkCount.Inc()
-	shrinkAmount.Add(float64(amount))
-}
-
-func (bufferPoolMetrics) recordCheckoutDuration(duration time.Duration) {
-	checkoutDuration.Observe(float64(duration.Microseconds()))
-	checkoutCount.Inc()
-	checkoutDurationTotal.Add(float64(duration.Microseconds()))
-}
-
-func (bufferPoolMetrics) recordBufferRetrival() {
-	activeBufferCount.Inc()
-	bufferCount.Inc()
-}
-
-func (bufferPoolMetrics) recordBufferReturn(bufCap, bufLen int64) {
-	activeBufferCount.Dec()
-	totalBufferSize.Add(float64(bufCap))
-	totalBufferLength.Add(float64(bufLen))
-}
-
-type bufPoolOpt func(pool *bufferPool)
-
-type bufferPool struct {
-	bufferSize uint32
-	*sync.Pool
-
-	metrics bufferPoolMetrics
-}
-
-const defaultBufferSize = 1 << 12 // 4KB
-func newBufferPool(opts ...bufPoolOpt) *bufferPool {
-	pool := &bufferPool{bufferSize: defaultBufferSize}
-
-	for _, opt := range opts {
-		opt(pool)
-	}
-	pool.Pool = &sync.Pool{
-		New: func() any {
-			buf := &buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
-			return buf
-		},
-	}
-
-	return pool
-}
 
 // sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
-var sharedBufferPool *bufferPool
+var sharedBufferPool *buffer.Pool
 
-func init() { sharedBufferPool = newBufferPool() }
-
-// buffer is a wrapper around bytes.Buffer that includes a timestamp for tracking buffer checkout duration.
-type buffer struct {
-	*bytes.Buffer
-	checkedOut time.Time
-}
-
-func (bp *bufferPool) get(ctx context.Context) *buffer {
-	buf, ok := bp.Pool.Get().(*buffer)
-	if !ok {
-		ctx.Logger().Error(fmt.Errorf("buffer pool returned unexpected type"), "using new buffer")
-		buf = &buffer{Buffer: bytes.NewBuffer(make([]byte, 0, bp.bufferSize))}
-	}
-	buf.checkedOut = time.Now()
-	bp.metrics.recordBufferRetrival()
-
-	return buf
-}
-
-func (bp *bufferPool) growBufferWithSize(buf *buffer, size int) {
-	// Grow the buffer to accommodate the new data.
-	bp.metrics.recordGrowth(size)
-	buf.Grow(size)
-}
-
-func (bp *bufferPool) put(buf *buffer) {
-	bp.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
-	bp.metrics.recordCheckoutDuration(time.Since(buf.checkedOut))
-
-	// If the buffer is more than twice the default size, replace it with a new buffer.
-	// This prevents us from returning very large buffers to the pool.
-	const maxAllowedCapacity = 2 * defaultBufferSize
-	if buf.Cap() > maxAllowedCapacity {
-		bp.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = &buffer{Buffer: bytes.NewBuffer(make([]byte, 0, bp.bufferSize))}
-	} else {
-		// Reset the buffer to clear any existing data.
-		buf.Reset()
-	}
-
-	bp.Put(buf)
-}
+func init() { sharedBufferPool = buffer.NewBufferPool() }
 
 type bufferedFileWriterMetrics struct{}
 
@@ -150,8 +53,8 @@ type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
 
-	bufPool  *bufferPool    // Pool for storing buffers for reuse.
-	buf      *buffer        // Buffer for storing data under the threshold in memory.
+	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
+	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     io.WriteCloser // File for storing data over the threshold.
 
@@ -170,10 +73,15 @@ func WithThreshold(threshold uint64) Option {
 
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
-func New(opts ...Option) *BufferedFileWriter {
+func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
+	buf := sharedBufferPool.Get(ctx)
+	if buf == nil {
+		buf = buffer.NewBuffer()
+	}
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
+		buf:       buf,
 		bufPool:   sharedBufferPool,
 	}
 	for _, opt := range opts {
@@ -220,13 +128,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 	}
 
 	size := uint64(len(data))
-
-	if w.buf == nil || w.buf.Len() == 0 {
-		w.buf = w.bufPool.get(ctx)
-	}
-
 	bufferLength := w.buf.Len()
-
 	start := time.Now()
 	defer func(start time.Time) {
 		w.metrics.recordDataProcessed(size, time.Since(start))
@@ -242,32 +144,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 
 	totalSizeNeeded := uint64(bufferLength) + size
 	if totalSizeNeeded <= w.threshold {
-		// If the total size is within the threshold, write to the buffer.
-		ctx.Logger().V(4).Info(
-			"writing to buffer",
-			"data_size", size,
-			"content_size", bufferLength,
-		)
-
-		availableSpace := w.buf.Cap() - bufferLength
-		growSize := int(totalSizeNeeded) - bufferLength
-		if growSize > availableSpace {
-			ctx.Logger().V(4).Info(
-				"buffer size exceeded, growing buffer",
-				"current_size", bufferLength,
-				"new_size", totalSizeNeeded,
-				"available_space", availableSpace,
-				"grow_size", growSize,
-			)
-			// We are manually growing the buffer so we can track the growth via metrics.
-			// Knowing the exact data size, we directly resize to fit it, rather than exponential growth
-			// which may require multiple allocations and copies if the size required is much larger
-			// than double the capacity. Our approach aligns with default behavior when growth sizes
-			// happen to match current capacity, retaining asymptotic efficiency benefits.
-			w.bufPool.growBufferWithSize(w.buf, growSize)
-		}
-
-		return w.buf.Write(data)
+		return w.buf.Write(ctx, data)
 	}
 
 	// Switch to file writing if threshold is exceeded.
@@ -289,7 +166,7 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 			if _, err := w.buf.WriteTo(w.file); err != nil {
 				return 0, err
 			}
-			w.bufPool.put(w.buf)
+			w.bufPool.Put(w.buf)
 		}
 	}
 	ctx.Logger().V(4).Info("writing to file", "data_size", size)
@@ -336,10 +213,7 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 	}
 
 	// Data is in memory.
-	return &bufferReadCloser{
-		Reader:  bytes.NewReader(w.buf.Bytes()),
-		onClose: func() { w.bufPool.put(w.buf) },
-	}, nil
+	return buffer.ReadCloser(w.buf.Bytes(), func() { w.bufPool.Put(w.buf) }), nil
 }
 
 // autoDeletingFileReader wraps an *os.File and deletes the file on Close.
@@ -354,24 +228,4 @@ func newAutoDeletingFileReader(file *os.File) *autoDeletingFileReader {
 func (r *autoDeletingFileReader) Close() error {
 	defer os.Remove(r.Name()) // Delete the file after closing
 	return r.File.Close()
-}
-
-// bufferReadCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader
-// for reading data from an in-memory buffer and includes an onClose callback.
-// The onClose callback is used to return the buffer to the pool, ensuring buffer re-usability.
-type bufferReadCloser struct {
-	*bytes.Reader
-	onClose func()
-}
-
-// Close implements the io.Closer interface. It calls the onClose callback to return the buffer
-// to the pool, enabling buffer reuse. This method should be called by the consumers of ReadCloser
-// once they have finished reading the data to ensure proper resource management.
-func (brc *bufferReadCloser) Close() error {
-	if brc.onClose == nil {
-		return nil
-	}
-
-	brc.onClose() // Return the buffer to the pool
-	return nil
 }

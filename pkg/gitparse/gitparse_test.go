@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
@@ -674,18 +673,20 @@ func TestCommitParsing(t *testing.T) {
 }
 
 func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
-	b := bufferedfilewriter.New()
-	_, err := b.Write(context.Background(), content) // Using Write method to add content
+	ctx := context.Background()
+	b := bufferedfilewriter.New(ctx)
+	_, err := b.Write(ctx, content) // Using Write method to add content
 	if err != nil {
 		panic(err)
 	}
 	return b
 }
 
-func newBufferWithContent(content []byte) *buffer {
-	var b buffer
-	_, _ = b.Write(context.Background(), content) // Using Write method to add content
-	return &b
+func newBufferWithContent(content []byte) *bufferwriter.BufferWriter {
+	ctx := context.Background()
+	b := bufferwriter.New(ctx)
+	_, _ = b.Write(ctx, content) // Using Write method to add content
+	return b
 }
 
 func TestStagedDiffParsing(t *testing.T) {
@@ -2292,32 +2293,3 @@ index 2ee133b..12b4843 100644
 +output = json
 +region = us-east-2
 `
-
-func TestBufferWriterStateTransitionOnClose(t *testing.T) {
-	t.Parallel()
-	writer := new(buffer)
-
-	// Initially, the writer should be in write-only mode.
-	assert.Equal(t, writeOnly, writer.state)
-
-	// Perform some write operation.
-	_, err := writer.Write(context.Background(), []byte("test data"))
-	assert.NoError(t, err)
-
-	// Close the writer.
-	err = writer.CloseForWriting()
-	assert.NoError(t, err)
-
-	// After closing, the writer should be in read-only mode.
-	assert.Equal(t, readOnly, writer.state)
-}
-
-func TestBufferWriterWriteInReadOnlyState(t *testing.T) {
-	t.Parallel()
-	writer := new(buffer)
-	_ = writer.CloseForWriting() // Transition to read-only mode
-
-	// Attempt to write in read-only mode.
-	_, err := writer.Write(context.Background(), []byte("should fail"))
-	assert.Error(t, err)
-}

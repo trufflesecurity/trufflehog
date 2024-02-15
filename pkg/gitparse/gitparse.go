@@ -16,6 +16,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
@@ -47,55 +48,6 @@ type contentWriter interface { // Write appends data to the content storage.
 	String() (string, error)
 }
 
-// state represents the current mode of buffer.
-type state uint8
-
-const (
-	// writeOnly indicates the buffer is in write-only mode.
-	writeOnly state = iota
-	// readOnly indicates the buffer has been closed and is in read-only mode.
-	readOnly
-)
-
-// buffer is a wrapper around bytes.Buffer, implementing the contentWriter interface.
-// This allows bytes.Buffer to be used wherever a contentWriter is required, ensuring compatibility
-// with the contentWriter interface while leveraging the existing implementation of bytes.Buffer.
-type buffer struct {
-	state state // current state of the buffer (writeOnly or readOnly)
-	bytes.Buffer
-}
-
-func newBuffer() *buffer { return &buffer{state: writeOnly} }
-
-// Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
-// The context is included to satisfy the contentWriter interface, allowing for future extensions
-// where context handling might be necessary (e.g., for timeouts or cancellation).
-func (b *buffer) Write(_ context.Context, data []byte) (int, error) {
-	if b.state == readOnly {
-		return 0, fmt.Errorf("buffer is in read-only mode")
-	}
-	return b.Buffer.Write(data)
-}
-
-// ReadCloser provides a read-closer for the buffer's content.
-// It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
-// as closing a bytes.Buffer is a no-op.
-func (b *buffer) ReadCloser() (io.ReadCloser, error) {
-	if b.state == writeOnly {
-		return nil, fmt.Errorf("buffer is in write-only mode")
-	}
-	return io.NopCloser(bytes.NewReader(b.Bytes())), nil
-}
-
-// CloseForWriting is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
-func (b *buffer) CloseForWriting() error {
-	b.state = readOnly
-	return nil
-}
-
-// String returns the buffer's content as a string.
-func (b *buffer) String() (string, error) { return b.Buffer.String(), nil }
-
 // Diff contains the information about a file diff in a commit.
 // It abstracts the underlying content representation, allowing for flexible handling of diff content.
 // The use of contentWriter enables the management of diff data either in memory or on disk,
@@ -124,8 +76,8 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 // All Diffs must have an associated commit.
 // The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
 // By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
-func newDiff(commit *Commit, opts ...diffOption) *Diff {
-	diff := &Diff{Commit: commit, contentWriter: newBuffer()}
+func newDiff(ctx context.Context, commit *Commit, opts ...diffOption) *Diff {
+	diff := &Diff{Commit: commit, contentWriter: bufferwriter.New(ctx)}
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -356,13 +308,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	var latestState = Initial
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
-		opts = append(opts, withCustomContentWriter(newBuffer()))
-		return newDiff(c, opts...)
+		opts = append(opts, withCustomContentWriter(bufferwriter.New(ctx)))
+		return newDiff(ctx, c, opts...)
 	}
 	if c.useCustomContentWriter {
 		diff = func(c *Commit, opts ...diffOption) *Diff {
-			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
-			return newDiff(c, opts...)
+			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New(ctx)))
+			return newDiff(ctx, c, opts...)
 		}
 	}
 	currentDiff := diff(currentCommit)
