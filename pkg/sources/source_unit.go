@@ -11,17 +11,17 @@ var _ SourceUnit = CommonSourceUnit{}
 // CommonSourceUnit is a common implementation of SourceUnit that Sources can
 // use instead of implementing their own types.
 type CommonSourceUnit struct {
-	Kind string `json:"kind,omitempty"`
-	ID   string `json:"id"`
+	Kind SourceUnitKind `json:"kind,omitempty"`
+	ID   string         `json:"id"`
 }
 
 // SourceUnitID implements the SourceUnit interface.
-func (c CommonSourceUnit) SourceUnitID() string {
-	kind := "unit"
+func (c CommonSourceUnit) SourceUnitID() (string, SourceUnitKind) {
+	kind := SourceUnitKind("unit")
 	if c.Kind != "" {
 		kind = c.Kind
 	}
-	return fmt.Sprintf("%s:%s", kind, c.ID)
+	return c.ID, kind
 }
 
 func (c CommonSourceUnit) Display() string {
@@ -43,17 +43,4 @@ func (c CommonSourceUnitUnmarshaller) UnmarshalSourceUnit(data []byte) (SourceUn
 		return nil, fmt.Errorf("not a CommonSourceUnit")
 	}
 	return unit, nil
-}
-
-func IntoUnit[T any](unit SourceUnit) (T, error) {
-	tUnit, ok := unit.(T)
-	if !ok {
-		var t T
-		return t, fmt.Errorf("unsupported unit type: %T", unit)
-	}
-	return tUnit, nil
-}
-
-func IntoCommonUnit(unit SourceUnit) (CommonSourceUnit, error) {
-	return IntoUnit[CommonSourceUnit](unit)
 }

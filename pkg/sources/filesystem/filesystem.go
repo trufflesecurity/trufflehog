@@ -270,11 +270,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 // ChunkUnit implements SourceUnitChunker interface.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	commonUnit, err := sources.IntoCommonUnit(unit)
-	if err != nil {
-		return err
-	}
-	path := commonUnit.ID
+	path, _ := unit.SourceUnitID()
 	logger := ctx.Logger().WithValues("path", path)
 
 	cleanPath := filepath.Clean(path)

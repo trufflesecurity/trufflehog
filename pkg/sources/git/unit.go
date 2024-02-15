@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	UnitRepo string = "repo"
-	UnitDir  string = "dir"
+	UnitRepo sources.SourceUnitKind = "repo"
+	UnitDir  sources.SourceUnitKind = "dir"
 )
 
 // Ensure SourceUnit implements the interface at compile time.
@@ -21,13 +21,13 @@ var _ sources.SourceUnit = SourceUnit{}
 // A git source unit can be two kinds of units: either a local directory path
 // or a remote repository.
 type SourceUnit struct {
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
+	Kind sources.SourceUnitKind `json:"kind"`
+	ID   string                 `json:"id"`
 }
 
 // Implement sources.SourceUnit interface.
-func (u SourceUnit) SourceUnitID() string {
-	return fmt.Sprintf("%s:%s", u.Kind, u.ID)
+func (u SourceUnit) SourceUnitID() (string, sources.SourceUnitKind) {
+	return u.ID, u.Kind
 }
 
 // Provide a custom Display method.
@@ -50,10 +50,6 @@ func (u SourceUnit) Display() string {
 	default:
 		return "mysterious git unit"
 	}
-}
-
-func (u SourceUnit) Type() string {
-	return u.Kind
 }
 
 // Helper function to unmarshal raw bytes into our SourceUnit struct.
