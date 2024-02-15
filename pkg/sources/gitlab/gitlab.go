@@ -223,97 +223,56 @@ func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarg
 	return nil
 }
 
-// commitQuery represents the details required to fetch a commit.
-type commitQuery struct {
-	repo     string
-	owner    string
-	sha      string
-	filename string
-}
-
 func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
-	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
+	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Gitlab)
 	if !ok {
 		return fmt.Errorf("unable to cast metadata type for targeted scan")
 	}
-	meta := metaType.Github
+	meta := metaType.Gitlab
+	projID, sha := int(meta.GetProjectId()), meta.GetCommit()
+	if projID == 0 || sha == "" {
+		return fmt.Errorf("project ID and commit SHA must be provided for targeted scan")
+	}
 
-	u, err := url.Parse(meta.GetLink())
+	logger := ctx.Logger().WithValues("project_id", projID, "commit", sha)
+
+	diffs, err := s.getCommitDiffs(ctx, projID, sha)
 	if err != nil {
-		return fmt.Errorf("unable to parse GitHub URL: %w", err)
+		return fmt.Errorf("error fetching diffs for commit %s: %w", sha, err)
 	}
 
-	// The owner is the second segment and the repo is the third segment of the path.
-	// Ex: https://github.com/owner/repo/.....
-	segments := strings.Split(u.Path, "/")
-	if len(segments) < 3 {
-		return fmt.Errorf("invalid GitHub URL")
+	for _, diff := range diffs {
+		if diff.Diff == "" {
+			logger.V(4).Info("skipping empty diff", "file", diff.NewPath)
+			continue
+		}
+
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			SecretID:   target.SecretID,
+			Data:       []byte(diff.Diff),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Gitlab{Gitlab: meta},
+			},
+			Verify: s.verify,
+		}
+
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
+		}
 	}
 
-	qry := commitQuery{
-		repo:     segments[2],
-		owner:    segments[1],
-		sha:      meta.GetCommit(),
-		filename: meta.GetFile(),
-	}
-	res, err := s.getDiffForFileInCommit(ctx, qry)
-	if err != nil {
-		return err
-	}
-	chunk := &sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		JobID:      s.JobID(),
-		SecretID:   target.SecretID,
-		Data:       []byte(res),
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Github{Github: meta},
-		},
-		Verify: s.verify,
-	}
-
-	return common.CancellableWrite(ctx, chunksChan, chunk)
+	return nil
 }
 
-// getDiffForFileInCommit retrieves the diff for a specified file in a commit.
-// If the file or its diff is not found, it returns an error.
-func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	// commit, _, err := s.apiClient.Commits.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-	// if s.handleRateLimit(err) {
-	// 	return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
-	// }
-	// if err != nil {
-	// 	return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
-	// }
-	//
-	// if len(commit.Files) == 0 {
-	// 	return "", fmt.Errorf("commit %s does not contain any files", query.sha)
-	// }
-	//
-	// res := new(strings.Builder)
-	// // Only return the diff if the file is in the commit.
-	// for _, file := range commit.Files {
-	// 	if *file.Filename != query.filename {
-	// 		continue
-	// 	}
-	//
-	// 	if file.Patch == nil {
-	// 		return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
-	// 	}
-	//
-	// 	if _, err := res.WriteString(*file.Patch); err != nil {
-	// 		return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
-	// 	}
-	// 	res.WriteString("\n")
-	// }
-	//
-	// if res.Len() == 0 {
-	// 	return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
-	// }
-	//
-	// return res.String(), nil
-	return "", nil
+func (s *Source) getCommitDiffs(ctx context.Context, projID int, sha string) ([]*gitlab.Diff, error) {
+	const paginationLimit = 100 // Default is 20, max is 100.
+	diffOpts := &gitlab.GetCommitDiffOptions{ListOptions: gitlab.ListOptions{PerPage: paginationLimit}}
+	diffs, _, err := s.apiClient.Commits.GetCommitDiff(projID, sha, diffOpts, gitlab.WithContext(ctx))
+	return diffs, err
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
