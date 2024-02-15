@@ -157,7 +157,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase_waas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinmarketcap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/collect2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/column"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
@@ -236,7 +235,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etsyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eventbrite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/everhour"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangerateapi"
@@ -401,7 +399,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lunchmoney"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/luno"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/macaddress"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/madkudu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magicbell"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magnetic"
@@ -469,7 +466,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nytimes"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oanda"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/okta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/omnisend"
@@ -883,7 +879,6 @@ func DefaultDetectors() []detectors.Detector {
 		&coinbase.Scanner{},
 		&confluent.Scanner{},
 		&zendeskapi.Scanner{},
-		&etsyapikey.Scanner{},
 		&facebookoauth.Scanner{},
 		&amplitudeapikey.Scanner{},
 		&pubnubpublishkey.Scanner{},
@@ -963,7 +958,6 @@ func DefaultDetectors() []detectors.Detector {
 		&delighted.Scanner{},
 		&abbysale.Scanner{},
 		&feedier.Scanner{},
-		&nytimes.Scanner{},
 		&powrbot.Scanner{},
 		&magnetic.Scanner{},
 		&polygon.Scanner{},
@@ -1171,7 +1165,6 @@ func DefaultDetectors() []detectors.Detector {
 		pixabay.Scanner{},
 		ipify.Scanner{},
 		youneedabudget.Scanner{},
-		macaddress.Scanner{},
 		languagelayer.Scanner{},
 		gengo.Scanner{},
 		aylien.Scanner{},
@@ -1546,7 +1539,6 @@ func DefaultDetectors() []detectors.Detector {
 		blocknative.Scanner{},
 		moralis.Scanner{},
 		bscscan.Scanner{},
-		coinmarketcap.Scanner{},
 		percy.Scanner{},
 		tineswebhook.Scanner{},
 		pulumi.Scanner{},

@@ -1298,6 +1298,8 @@ func (m *Gitlab) validate(all bool) error {
 
 	// no validation rules for Line
 
+	// no validation rules for ProjectId
+
 	if len(errors) > 0 {
 		return GitlabMultiError(errors)
 	}

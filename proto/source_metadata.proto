@@ -118,6 +118,7 @@ message Gitlab {
   string repository = 5;
   string timestamp = 6;
   int64 line = 7;
+  int64 project_id = 8;
 }
 
 message GCS {
