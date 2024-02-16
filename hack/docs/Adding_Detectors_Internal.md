@@ -55,9 +55,11 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
 
 2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github/v1/github_old.go#L22)
 
-3. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults.go`
+3. Add a 'version' field in ExtraData for both existing and new detector versions.
 
-4. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
+4. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults.go`
+
+5. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
 
 ### Creating a new Secret Scanner
 
