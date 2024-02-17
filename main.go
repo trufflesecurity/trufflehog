@@ -569,6 +569,10 @@ func run(state overseer.State) {
 		logFatal(err, "engine failed to finish execution")
 	}
 
+	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+		ctx.Logger().Error(err, "error cleaning temp artifacts")
+	}
+
 	metrics := e.GetMetrics()
 	// Print results.
 	logger.Info("finished scanning",
