@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -624,7 +625,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			defer reader.Close()
 
 			data := make([]byte, d.Len())
-			if _, err := reader.Read(data); err != nil {
+			if _, err := io.ReadFull(reader, data); err != nil {
 				ctx.Logger().Error(
 					err, "error reading diff content for commit",
 					"filename", fileName,
