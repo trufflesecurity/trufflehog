@@ -13,7 +13,7 @@ import (
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -98,7 +98,7 @@ type Engine struct {
 
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
-	dedupeCache *lru.Cache
+	dedupeCache *lru.Cache[string, detectorspb.DecoderType]
 
 	// verify determines whether the scanner will attempt to verify candidate secrets
 	verify bool
@@ -342,7 +342,7 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// TODO (ahrav): Determine the optimal cache size.
 	const cacheSize = 512 // number of entries in the LRU cache
 
-	cache, err := lru.New(cacheSize)
+	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
 	if err != nil {
 		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
@@ -861,7 +861,7 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		// results list, this would happen if the same secret is found multiple times.
 		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
 		if val, ok := e.dedupeCache.Get(key); ok {
-			if res, ok := val.(detectorspb.DecoderType); ok && res != r.DecoderType {
+			if val == r.DecoderType {
 				continue
 			}
 		}
