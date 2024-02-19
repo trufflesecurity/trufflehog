@@ -47,8 +47,6 @@ type Source struct {
 	git                    *git.Git
 	scanOptions            *git.ScanOptions
 
-	apiClient *gitlab.Client
-
 	resumeInfoSlice []string
 	resumeInfoMutex sync.Mutex
 	sources.Progress
@@ -164,8 +162,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	// Start client.
-	var err error
-	s.apiClient, err = s.newClient()
+	apiClient, err := s.newClient()
 	if err != nil {
 		return err
 	}
@@ -174,7 +171,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// Otherwise, we're scanning all data.
 	// This allows us to only scan the commit where a vulnerability was found.
 	if len(targets) > 0 {
-		return s.scanTargets(ctx, targets, chunksChan)
+		return s.scanTargets(ctx, apiClient, targets, chunksChan)
 	}
 
 	gitlabReposScanned.WithLabelValues(s.name).Set(0)
@@ -200,7 +197,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 				return ctx.Err()
 			},
 		}
-		if err := s.getAllProjectRepos(ctx, s.apiClient, ignoreRepo, reporter); err != nil {
+		if err := s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter); err != nil {
 			return err
 		}
 	}
@@ -213,9 +210,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	return s.scanRepos(ctx, chunksChan)
 }
 
-func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanTargets(ctx context.Context, client *gitlab.Client, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
 	for _, tgt := range targets {
-		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
+		if err := s.scanTarget(ctx, client, tgt, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning target")
 		}
 	}
@@ -223,7 +220,7 @@ func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarg
 	return nil
 }
 
-func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
 	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Gitlab)
 	if !ok {
 		return fmt.Errorf("unable to cast metadata type for targeted scan")
@@ -234,16 +231,16 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("project ID and commit SHA must be provided for targeted scan")
 	}
 
-	logger := ctx.Logger().WithValues("project_id", projID, "commit", sha)
+	aCtx := context.WithValues(ctx, "project_id", projID, "commit", sha)
 
-	diffs, err := s.getCommitDiffs(ctx, projID, sha)
+	diffs, err := s.getCommitDiffs(aCtx, client, projID, sha)
 	if err != nil {
 		return fmt.Errorf("error fetching diffs for commit %s: %w", sha, err)
 	}
 
 	for _, diff := range diffs {
 		if diff.Diff == "" {
-			logger.V(4).Info("skipping empty diff", "file", diff.NewPath)
+			aCtx.Logger().V(4).Info("skipping empty diff", "file", diff.NewPath)
 			continue
 		}
 
@@ -268,10 +265,10 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	return nil
 }
 
-func (s *Source) getCommitDiffs(ctx context.Context, projID int, sha string) ([]*gitlab.Diff, error) {
+func (s *Source) getCommitDiffs(ctx context.Context, client *gitlab.Client, projID int, sha string) ([]*gitlab.Diff, error) {
 	const paginationLimit = 100 // Default is 20, max is 100.
 	diffOpts := &gitlab.GetCommitDiffOptions{ListOptions: gitlab.ListOptions{PerPage: paginationLimit}}
-	diffs, _, err := s.apiClient.Commits.GetCommitDiff(projID, sha, diffOpts, gitlab.WithContext(ctx))
+	diffs, _, err := client.Commits.GetCommitDiff(projID, sha, diffOpts, gitlab.WithContext(ctx))
 	return diffs, err
 }
 
