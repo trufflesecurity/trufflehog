@@ -405,7 +405,7 @@ func run(state overseer.State) {
 		jobReportWriter = *jobReportFile
 	}
 	e, err := engine.Start(ctx,
-		engine.WithConcurrency(uint16(*concurrency)),
+		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(engine.DefaultDetectors()...),
 		engine.WithDetectors(conf.Detectors...),
