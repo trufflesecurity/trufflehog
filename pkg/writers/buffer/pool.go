@@ -59,7 +59,7 @@ func NewBufferPool(opts ...PoolOpts) *Pool {
 func (p *Pool) Get(ctx context.Context) *ring.Ring {
 	buf, ok := p.Pool.Get().(*ring.Ring)
 	if !ok {
-		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
+		ctx.Logger().Error(fmt.Errorf("buffer pool returned unexpected type"), "using new Buffer")
 		buf = ring.NewRingBuffer(int(p.bufferSize))
 	}
 	p.metrics.recordBufferRetrival()
