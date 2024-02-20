@@ -88,6 +88,10 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
+	if err := git.CmdCheck(); err != nil {
+		return err
+	}
+
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
@@ -115,7 +119,6 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		return fmt.Errorf("invalid configuration given for source %q (%s)", name, s.Type().String())
 	}
 
-	err = git.CmdCheck()
 	s.url, err = normalizeGitlabEndpoint(conn.Endpoint)
 	if err != nil {
 		return err
