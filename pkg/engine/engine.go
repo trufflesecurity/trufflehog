@@ -59,7 +59,7 @@ type Printer interface {
 
 type Engine struct {
 	// CLI flags.
-	concurrency     uint8
+	concurrency     uint16
 	decoders        []decoders.Decoder
 	detectors       []detectors.Detector
 	jobReportWriter io.WriteCloser
@@ -127,7 +127,7 @@ func WithJobReportWriter(w io.WriteCloser) Option {
 	}
 }
 
-func WithConcurrency(concurrency uint8) Option {
+func WithConcurrency(concurrency uint16) Option {
 	return func(e *Engine) {
 		e.concurrency = concurrency
 	}
@@ -430,7 +430,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
-		e.concurrency = uint8(numCPU)
+		e.concurrency = uint16(numCPU)
 	}
 	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
