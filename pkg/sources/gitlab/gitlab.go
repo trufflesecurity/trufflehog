@@ -186,7 +186,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		})
 		reporter := sources.VisitorReporter{
 			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
-				repos = append(repos, unit.SourceUnitID())
+				id, _ := unit.SourceUnitID()
+				repos = append(repos, id)
 				return ctx.Err()
 			},
 		}
@@ -255,7 +256,8 @@ func (s *Source) Validate(ctx context.Context) []error {
 	var repos []string
 	visitor := sources.VisitorReporter{
 		VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
-			repos = append(repos, unit.SourceUnitID())
+			id, _ := unit.SourceUnitID()
+			repos = append(repos, id)
 			return nil
 		},
 	}
@@ -362,7 +364,7 @@ func (s *Source) getAllProjectRepos(
 				continue
 			}
 			// Report the unit.
-			unit := sources.CommonSourceUnit{ID: proj.HTTPURLToRepo}
+			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
@@ -616,7 +618,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// Report all repos if specified.
 	if len(repos) > 0 {
 		for _, repo := range repos {
-			unit := sources.CommonSourceUnit{ID: repo}
+			unit := git.SourceUnit{Kind: git.UnitRepo, ID: repo}
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
@@ -635,7 +637,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	repoURL := unit.SourceUnitID()
+	repoURL, _ := unit.SourceUnitID()
 
 	var path string
 	var repo *gogit.Repository
