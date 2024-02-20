@@ -63,7 +63,6 @@ func (p *Pool) Get(ctx context.Context) *ring.Ring {
 		buf = ring.NewRingBuffer(int(p.bufferSize))
 	}
 	p.metrics.recordBufferRetrival()
-	// buf.resetMetric()
 
 	return buf
 }
@@ -81,7 +80,6 @@ func (p *Pool) Put(buf *ring.Ring) {
 	} else {
 		buf.Reset()
 	}
-	// buf.recordMetric()
 
 	p.Pool.Put(buf)
 }
