@@ -7,11 +7,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -324,6 +327,58 @@ func TestAWS_FromChunk(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAWSFromDataCacheDuplicateCreds tests that duplicate credentials are not verified against the AWS API
+// multiple times.
+func TestAWSFromDataCacheDuplicateCreds(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("AWS")
+	id := testSecrets.MustGetField("AWS_ID")
+
+	// Mock HTTP client to intercept AWS API requests and count them.
+	apiCallCount := 0
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			apiCallCount++
+			return &http.Response{StatusCode: http.StatusOK}, nil
+		}),
+	}
+
+	detector := scanner{verificationClient: mockClient, credsCache: memory.New()}
+
+	testData := []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id))
+
+	// First call - expect cache to be empty and an API call to be made.
+	_, err = detector.FromData(context.Background(), true, testData)
+	if err != nil {
+		t.Fatalf("Error processing data: %s", err)
+	}
+	if apiCallCount != 1 {
+		t.Fatalf("Expected 1 API call, got %d", apiCallCount)
+	}
+
+	// Second call with the same data - expect cache to be used and no additional API calls.
+	_, err = detector.FromData(context.Background(), true, testData)
+	if err != nil {
+		t.Fatalf("Error processing data: %s", err)
+	}
+	if apiCallCount != 1 {
+		t.Fatalf("Cache did not work as expected, API call count: %d", apiCallCount)
+	}
+}
+
+// roundTripperFunc type is an adapter to allow the use of ordinary functions as HTTP round trippers.
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
 }
 
 func BenchmarkFromData(benchmark *testing.B) {
