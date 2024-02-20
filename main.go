@@ -405,7 +405,7 @@ func run(state overseer.State) {
 		jobReportWriter = *jobReportFile
 	}
 	e, err := engine.Start(ctx,
-		engine.WithConcurrency(uint8(*concurrency)),
+		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(engine.DefaultDetectors()...),
 		engine.WithDetectors(conf.Detectors...),
@@ -568,7 +568,6 @@ func run(state overseer.State) {
 	if err = e.Finish(ctx); err != nil {
 		logFatal(err, "engine failed to finish execution")
 	}
-
 	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
 		ctx.Logger().Error(err, "error cleaning temp artifacts")
 	}
