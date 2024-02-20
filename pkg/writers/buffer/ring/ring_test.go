@@ -1,10 +1,10 @@
-package buffer
+package ring
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/rand"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -102,7 +102,7 @@ func TestRingWrite(t *testing.T) {
 	}
 }
 
-func BenchmarkRingWrite(b *testing.B) {
+func BenchmarkBufferWrite(b *testing.B) {
 	type benchCase struct {
 		name     string
 		dataSize int // Size of the data to write in bytes
@@ -120,22 +120,22 @@ func BenchmarkRingWrite(b *testing.B) {
 		{"64MB", 64 << 20},   // 64MB
 	}
 
-	// for _, bc := range benchmarks {
-	// 	bc := bc
-	data := generateData(benchmarks[3].dataSize) // Generate pseudo-random data for this benchmark case
-	// b.Run(bc.name, func(b *testing.B) {
-	ctx := context.Background()
+	for _, bc := range benchmarks {
+		bc := bc
+		b.Run(bc.name, func(b *testing.B) {
+			ctx := context.Background()
 
-	r := NewRingBuffer(defaultBufferSize)
+			data := generateData(bc.dataSize) // Generate pseudo-random data for this benchmark case
+			r := NewRingBuffer(defaultBufferSize)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := r.Write(ctx, data)
-		assert.NoError(b, err)
-		r.Reset()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := r.Write(ctx, data)
+				assert.NoError(b, err)
+				r.Reset()
+			}
+		})
 	}
-	// })
-	// }
 }
 
 func generateData(size int) []byte {

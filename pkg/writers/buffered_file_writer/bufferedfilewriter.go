@@ -12,6 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer/ring"
 )
 
 // sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
@@ -56,7 +57,7 @@ type BufferedFileWriter struct {
 	size      uint64 // Total size of the data written.
 
 	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
-	buf      *buffer.Ring   // Buffer for storing data under the threshold in memory.
+	buf      *ring.Ring     // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     io.WriteCloser // File for storing data over the threshold.
 
@@ -78,7 +79,7 @@ const defaultThreshold = 10 * 1024 * 1024 // 10MB
 func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
 	buf := sharedBufferPool.Get(ctx)
 	if buf == nil {
-		buf = buffer.NewRingBuffer(1 << 12)
+		buf = ring.NewRingBuffer(1 << 12)
 	}
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,

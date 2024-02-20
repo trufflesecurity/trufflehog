@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer/ring"
 )
 
 type poolMetrics struct{}
@@ -47,7 +48,7 @@ func NewBufferPool(opts ...PoolOpts) *Pool {
 	}
 	pool.Pool = &sync.Pool{
 		New: func() any {
-			return NewRingBuffer(int(pool.bufferSize))
+			return ring.NewRingBuffer(int(pool.bufferSize))
 		},
 	}
 
@@ -55,11 +56,11 @@ func NewBufferPool(opts ...PoolOpts) *Pool {
 }
 
 // Get returns a Buffer from the pool.
-func (p *Pool) Get(ctx context.Context) *Ring {
-	buf, ok := p.Pool.Get().(*Ring)
+func (p *Pool) Get(ctx context.Context) *ring.Ring {
+	buf, ok := p.Pool.Get().(*ring.Ring)
 	if !ok {
 		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
-		buf = NewRingBuffer(int(p.bufferSize))
+		buf = ring.NewRingBuffer(int(p.bufferSize))
 	}
 	p.metrics.recordBufferRetrival()
 	// buf.resetMetric()
@@ -68,7 +69,7 @@ func (p *Pool) Get(ctx context.Context) *Ring {
 }
 
 // Put returns a Buffer to the pool.
-func (p *Pool) Put(buf *Ring) {
+func (p *Pool) Put(buf *ring.Ring) {
 	p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
 
 	// If the Buffer is more than twice the default size, replace it with a new Buffer.
@@ -76,7 +77,7 @@ func (p *Pool) Put(buf *Ring) {
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
 		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = NewRingBuffer(int(p.bufferSize))
+		buf = ring.NewRingBuffer(int(p.bufferSize))
 	} else {
 		buf.Reset()
 	}

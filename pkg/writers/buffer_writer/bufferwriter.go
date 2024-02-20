@@ -7,6 +7,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer/ring"
 )
 
 type metrics struct{}
@@ -36,7 +37,7 @@ const (
 
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
-	buf     *buffer.Ring // The current buffer in use.
+	buf     *ring.Ring   // The current buffer in use.
 	bufPool *buffer.Pool // The buffer pool used to manage the buffer.
 	size    int          // The total size of the content written to the buffer.
 	state   state        // The current state of the buffer.
@@ -49,7 +50,7 @@ func New(ctx context.Context) *BufferWriter {
 	buf := bufferPool.Get(ctx)
 	if buf == nil {
 		// buf = buffer.NewBuffer()
-		buf = buffer.NewRingBuffer(1 << 12)
+		buf = ring.NewRingBuffer(1 << 12)
 	}
 	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
 }

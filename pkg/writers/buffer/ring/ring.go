@@ -1,4 +1,4 @@
-package buffer
+package ring
 
 import (
 	"io"
@@ -18,6 +18,8 @@ type Ring struct {
 	// which is needed in case the buffer needs to be resized.
 	availableCap int
 }
+
+const defaultBufferSize = 1 << 12 // 4KB
 
 // NewRingBuffer creates a new ring buffer with the given size.
 func NewRingBuffer(size int) *Ring {
