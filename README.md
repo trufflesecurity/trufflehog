@@ -400,8 +400,7 @@ Depending on the event type (push or PR), we calculate the number of commits pre
 ### Canary detection
 TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/) and lets you know when they're present without setting them off. You can learn more here: [https://trufflesecurity.com/canaries](https://trufflesecurity.com/canaries)
 
-![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/5198ceec-bbf2-4ead-ad85-5fb61aadb4fc)
-
+![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
 
 ### Advanced Usage
 
