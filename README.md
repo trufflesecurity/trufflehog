@@ -397,6 +397,12 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
 
 Depending on the event type (push or PR), we calculate the number of commits present. Then we add 2, so that we can reference a base commit before our code changes. We pass that integer value to the `fetch-depth` flag in the checkout action in addition to the relevant branch. Now our checkout process should be much shorter.
 
+### Canary detection
+TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/) and lets you know when they're present without setting them off. You can learn more here: [https://trufflesecurity.com/canaries](https://trufflesecurity.com/canaries)
+
+![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/5198ceec-bbf2-4ead-ad85-5fb61aadb4fc)
+
+
 ### Advanced Usage
 
 ```yaml
