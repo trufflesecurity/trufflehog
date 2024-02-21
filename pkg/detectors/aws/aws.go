@@ -39,6 +39,39 @@ var resourceTypes = map[string]string{
 	"ASIA": "Temporary (AWS STS) access key IDs",
 }
 
+var thinkstCanaryList = map[string]struct{}{
+	"052310077262": {},
+	"171436882533": {},
+	"534261010715": {},
+	"595918472158": {},
+	"717712589309": {},
+	"819147034852": {},
+	"992382622183": {},
+}
+
+const thinkstMessage = "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries"
+
+var thinkstKnockoffsCanaryList = map[string]struct{}{
+	"044858866125": {},
+	"251535659677": {},
+	"344043088457": {},
+	"351906852752": {},
+	"390477818340": {},
+	"426127672474": {},
+	"427150556519": {},
+	"439872796651": {},
+	"445142720921": {},
+	"465867158099": {},
+	"637958123769": {},
+	"693412236332": {},
+	"732624840810": {},
+	"735421457923": {},
+	"959235150393": {},
+	"982842642351": {},
+}
+
+const thinkstKnockoffsMessage = "This is an off brand AWS Canary inspired by canarytokens.org. It wasn't set off; learn more here: https://trufflesecurity.com/canaries"
+
 func New(opts ...func(*scanner)) *scanner {
 	scanner := &scanner{
 		skipIDs: map[string]struct{}{},
@@ -85,7 +118,6 @@ func (s scanner) Keywords() []string {
 		"AKIA",
 		"ABIA",
 		"ACCA",
-		"ASIA",
 	}
 }
 
@@ -137,7 +169,22 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				},
 			}
 
-			if verify {
+			account, err := common.GetAccountNumFromAWSID(resIDMatch)
+			if err == nil {
+				s1.ExtraData["account"] = account
+			}
+			if _, ok := thinkstCanaryList[account]; ok {
+				s1.ExtraData["is_canary"] = "true"
+				s1.ExtraData["message"] = thinkstMessage
+				s1.Verified = true
+			}
+			if _, ok := thinkstKnockoffsCanaryList[account]; ok {
+				s1.ExtraData["is_canary"] = "true"
+				s1.ExtraData["message"] = thinkstKnockoffsMessage
+				s1.Verified = true
+			}
+
+			if verify && !s1.Verified {
 				isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = isVerified
 				// It'd be good to log when calculated account value does not match
@@ -162,14 +209,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// Unverified results that look like hashes are probably not secrets
 				if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 					continue
-				}
-			}
-
-			// If we haven't already found an account number for this ID (via API), calculate one.
-			if _, ok := s1.ExtraData["account"]; !ok {
-				account, err := common.GetAccountNumFromAWSID(resIDMatch)
-				if err == nil {
-					s1.ExtraData["account"] = account
 				}
 			}
 
