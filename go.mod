@@ -81,7 +81,7 @@ require (
 	github.com/xanzy/go-gitlab v0.97.0
 	go.mongodb.org/mongo-driver v1.14.0
 	go.uber.org/mock v0.4.0
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.19.0
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
 	golang.org/x/net v0.21.0
