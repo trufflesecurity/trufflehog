@@ -1623,6 +1623,8 @@ func removeURLAndSplit(url string) []string {
 	return splitURL
 }
 
+// scanDanglingCommits scans the repository for dangling commits.
+// Note that this only covers as far back as the GH API allows us to get /events...
 func (s *Source) scanDanglingCommits(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
 	scannedCommits := s.git.GetScannedCommits()
 
@@ -1670,15 +1672,13 @@ func (s *Source) scanDanglingCommits(ctx context.Context, repoPath string, chunk
 	for sha := range eventCommits {
 		fmt.Println(sha)
 		if _, ok := scannedCommits[sha]; !ok {
-			if s.processEventCommit(ctx, owner, repo, sha); err != nil {
+			if s.processEventCommit(ctx, owner, repo, sha, repoPath, chunksChan); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
-
-	// if any are not in the repo's commit list, scan them
 }
 
 func (s *Source) getCommitBySha(ctx context.Context, owner string, repo string, sha string) (*github.RepositoryCommit, error) {
@@ -1689,12 +1689,47 @@ func (s *Source) getCommitBySha(ctx context.Context, owner string, repo string, 
 	return commit, nil
 }
 
-func (s *Source) processEventCommit(ctx context.Context, owner string, repo string, sha string) error {
+func (s *Source) processEventCommit(ctx context.Context, owner string, repo string, sha string, repoPath string, chunksChan chan *sources.Chunk) error {
 	commit, err := s.getCommitBySha(ctx, owner, repo, sha)
 	if err != nil {
 		return err
 	}
-	//commit.GetSHA(), nil
-	fmt.Println(commit)
+	commitFiles := commit.Files
+	for _, file := range commitFiles {
+		if err := s.chunkEventCommitPatch(ctx, commit, file, repoPath, chunksChan); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Source) chunkEventCommitPatch(ctx context.Context, commit *github.RepositoryCommit, file *github.CommitFile, repoPath string, chunksChan chan *sources.Chunk) error {
+	// Create chunk and send it to the channel.
+	chunk := &sources.Chunk{
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		SourceType: s.Type(),
+		JobID:      s.JobID(),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{
+				Github: &source_metadatapb.Github{
+					Link:           sanitizer.UTF8(*file.BlobURL),
+					Username:       sanitizer.UTF8(commit.GetAuthor().GetLogin()),
+					Email:          sanitizer.UTF8(commit.GetAuthor().GetEmail()),
+					Repository:     sanitizer.UTF8(repoPath),
+					Timestamp:      sanitizer.UTF8(commit.GetCommit().GetAuthor().GetDate().String()),
+					DanglingCommit: true,
+				},
+			},
+		},
+		Data:   []byte(sanitizer.UTF8(file.GetPatch())),
+		Verify: s.verify,
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case chunksChan <- chunk:
+	}
 	return nil
 }

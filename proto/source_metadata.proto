@@ -108,6 +108,7 @@ message Github {
   string timestamp = 7;
   int64 line = 8;
   Visibility visibility = 9;
+  bool dangling_commit = 10;
 }
 
 message Gitlab {

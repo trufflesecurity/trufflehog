@@ -1186,6 +1186,8 @@ func (m *Github) validate(all bool) error {
 
 	// no validation rules for Visibility
 
+	// no validation rules for DanglingCommit
+
 	if len(errors) > 0 {
 		return GithubMultiError(errors)
 	}
