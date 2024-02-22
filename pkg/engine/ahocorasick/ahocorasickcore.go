@@ -1,9 +1,10 @@
-package engine
+package ahocorasick
 
 import (
 	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -22,6 +23,9 @@ type DetectorKey struct {
 	customDetectorName string
 }
 
+// Type returns the detector type of the key.
+func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
+
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
@@ -34,7 +38,7 @@ type AhoCorasickCore struct {
 	// type and then again from detector type to detector. We could
 	// go straight from keywords to detectors but doing it this way makes
 	// some consuming code a little cleaner.)
-	keywordsToDetectors map[string][]DetectorKey
+	KeywordsToDetectors map[string][]DetectorKey
 	detectorsByKey      map[DetectorKey]detectors.Detector
 }
 
@@ -46,7 +50,7 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	detectorsByKey := make(map[DetectorKey]detectors.Detector, len(allDetectors))
 	var keywords []string
 	for _, d := range allDetectors {
-		key := createDetectorKey(d)
+		key := CreateDetectorKey(d)
 		detectorsByKey[key] = d
 		for _, kw := range d.Keywords() {
 			kwLower := strings.ToLower(kw)
@@ -56,26 +60,58 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	}
 
 	return &AhoCorasickCore{
-		keywordsToDetectors: keywordsToDetectors,
+		KeywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
 		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
 	}
 }
 
+// GetDetectorByKey returns the detector associated with the given key. If no detector is found, it
+// returns nil.
+func (ac *AhoCorasickCore) GetDetectorByKey(key DetectorKey) detectors.Detector {
+	return ac.detectorsByKey[key]
+}
+
+// DetectorInfo represents a detected pattern's metadata in a data chunk.
+// It encapsulates the key identifying a specific detector and the detector instance itself.
+type DetectorInfo struct {
+	Key DetectorKey
+	detectors.Detector
+}
+
 // PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
 // provided input. This method populates an existing map rather than allocating a new one because
 // it will be called once per chunk and that many allocations has a noticeable performance cost.
-func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, detectors map[DetectorKey]detectors.Detector) {
-	for _, m := range ac.prefilter.MatchString(strings.ToLower(chunkData)) {
-		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
-			detectors[k] = ac.detectorsByKey[k]
+// It returns a slice of unique 'DetectorInfo' corresponding to the matched detectors. This slice is
+// constructed to prevent duplications by utilizing an internal map to track already processed detectors.
+func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[DetectorKey]detectors.Detector) []DetectorInfo {
+	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
+
+	// Use a map to avoid adding duplicate detectors to the slice.
+	addedDetectors := make(map[DetectorKey]struct{})
+	uniqueDetectors := make([]DetectorInfo, 0, len(matches))
+
+	for _, m := range matches {
+		for _, k := range ac.KeywordsToDetectors[m.MatchString()] {
+			if _, exists := addedDetectors[k]; exists {
+				continue
+			}
+			// Add to the map to track already added detectors.
+			addedDetectors[k] = struct{}{}
+
+			// Add the detector to the map and slice.
+			detector := ac.detectorsByKey[k]
+			dts[k] = detector
+			uniqueDetectors = append(uniqueDetectors, DetectorInfo{Key: k, Detector: detector})
 		}
 	}
+
+	return uniqueDetectors
 }
 
-// createDetectorKey creates a unique key for each detector from its type, version, and, for
+// CreateDetectorKey creates a unique key for each detector from its type, version, and, for
 // custom regex detectors, its name.
-func createDetectorKey(d detectors.Detector) DetectorKey {
+func CreateDetectorKey(d detectors.Detector) DetectorKey {
 	detectorType := d.Type()
 	var version int
 	if v, ok := d.(detectors.Versioner); ok {

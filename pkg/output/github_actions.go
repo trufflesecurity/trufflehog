@@ -52,13 +52,13 @@ func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithM
 	h := sha256.New()
 	h.Write([]byte(key))
 	key = hex.EncodeToString(h.Sum(nil))
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if _, ok := dedupeCache[key]; ok {
 		return nil
 	}
 	dedupeCache[key] = struct{}{}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	message := fmt.Sprintf("Found %s %s result 🐷🔑\n", verifiedStatus, out.DetectorType)
 	if r.Result.DecoderType != detectorspb.DecoderType_PLAIN {
 		message = fmt.Sprintf("Found %s %s result with %s encoding 🐷🔑\n", verifiedStatus, out.DetectorType, out.DecoderType)

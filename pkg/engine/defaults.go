@@ -65,6 +65,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
@@ -154,7 +157,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase_waas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinmarketcap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/collect2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/column"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/commercejs"
@@ -233,7 +235,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etsyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eventbrite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/everhour"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/exchangerateapi"
@@ -305,6 +306,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
@@ -397,7 +399,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/loyverse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lunchmoney"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/luno"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/macaddress"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/madkudu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magicbell"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magnetic"
@@ -416,6 +417,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mattermostpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mavenlink"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense_v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meaningcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
@@ -464,7 +466,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nytimes"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oanda"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/okta"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/omnisend"
@@ -797,9 +798,6 @@ func DefaultDetectors() []detectors.Detector {
 		&alibaba.Scanner{},
 		aws.New(),
 		awssessionkey.New(),
-		&azure.Scanner{},
-		&azurecontainerregistry.Scanner{},
-		&azurebatch.Scanner{},
 		&slack.Scanner{}, // has 4 secret types
 		&gitlab.Scanner{},
 		&gitlabv2.Scanner{},
@@ -821,6 +819,7 @@ func DefaultDetectors() []detectors.Detector {
 		&jdbc.Scanner{},
 		&privatekey.Scanner{},
 		&maxmindlicense.Scanner{},
+		&maxmindlicense_v2.Scanner{},
 		&airtableapikey.Scanner{},
 		&bitfinex.Scanner{},
 		&telegrambottoken.Scanner{},
@@ -880,7 +879,6 @@ func DefaultDetectors() []detectors.Detector {
 		&coinbase.Scanner{},
 		&confluent.Scanner{},
 		&zendeskapi.Scanner{},
-		&etsyapikey.Scanner{},
 		&facebookoauth.Scanner{},
 		&amplitudeapikey.Scanner{},
 		&pubnubpublishkey.Scanner{},
@@ -960,7 +958,6 @@ func DefaultDetectors() []detectors.Detector {
 		&delighted.Scanner{},
 		&abbysale.Scanner{},
 		&feedier.Scanner{},
-		&nytimes.Scanner{},
 		&powrbot.Scanner{},
 		&magnetic.Scanner{},
 		&polygon.Scanner{},
@@ -1168,7 +1165,6 @@ func DefaultDetectors() []detectors.Detector {
 		pixabay.Scanner{},
 		ipify.Scanner{},
 		youneedabudget.Scanner{},
-		macaddress.Scanner{},
 		languagelayer.Scanner{},
 		gengo.Scanner{},
 		aylien.Scanner{},
@@ -1543,7 +1539,6 @@ func DefaultDetectors() []detectors.Detector {
 		blocknative.Scanner{},
 		moralis.Scanner{},
 		bscscan.Scanner{},
-		coinmarketcap.Scanner{},
 		percy.Scanner{},
 		tineswebhook.Scanner{},
 		pulumi.Scanner{},
@@ -1599,9 +1594,17 @@ func DefaultDetectors() []detectors.Detector {
 		rabbitmq.Scanner{},
 		planetscale.Scanner{},
 		portainertoken.Scanner{},
-		azurestorage.Scanner{},
 		planetscaledb.Scanner{},
+		azure.Scanner{},
+		azurestorage.Scanner{},
+		azurecontainerregistry.Scanner{},
+		azurebatch.Scanner{},
+		// azurefunctionkey.Scanner{}, // detector is throwing some FPs
+		azuredevopspersonalaccesstoken.Scanner{},
+		azuresearchadminkey.Scanner{},
+		&azuresearchquerykey.Scanner{},
 		jiratoken_v2.Scanner{},
+		&googleoauth2.Scanner{},
 	}
 
 }

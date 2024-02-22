@@ -38,7 +38,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 
 	// Turn AhoCorasick keywordsToDetectors into a map of keywords
 	keywords := []string{}
-	for key := range e.ahoCorasickCore.keywordsToDetectors {
+	for key := range e.ahoCorasickCore.KeywordsToDetectors {
 		keywords = append(keywords, key)
 	}
 	connection.DetectorKeywords = keywords

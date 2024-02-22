@@ -111,7 +111,8 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 		for _, repo := range repositories {
 			err = reporter.UnitOk(ctx, sources.CommonSourceUnit{
-				ID: strconv.Itoa(int(*repo.Id)),
+				ID:   strconv.Itoa(int(*repo.Id)),
+				Kind: "repo",
 			})
 			if err != nil {
 				return fmt.Errorf("error reporting unit: %w", err)
@@ -125,7 +126,8 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 // ChunkUnit implements SourceUnitChunker interface.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	repo, _, err := s.client.Repositories.Find(ctx, unit.SourceUnitID(), nil)
+	repoURL, _ := unit.SourceUnitID()
+	repo, _, err := s.client.Repositories.Find(ctx, repoURL, nil)
 	if err != nil {
 		return fmt.Errorf("error finding repository: %w", err)
 	}

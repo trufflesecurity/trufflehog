@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -37,21 +38,22 @@ import (
 )
 
 var (
-	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd                 string
-	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
-	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
-	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
-	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
-	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	filterEntropy       = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
-	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	cli                      = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd                      string
+	debug                    = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace                    = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile                  = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	localDev                 = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
+	jsonOut                  = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy               = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat      = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	concurrency              = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification           = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified             = cli.Flag("only-verified", "Only output verified results.").Bool()
+	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
+	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy            = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	configFilename           = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
@@ -63,6 +65,7 @@ var (
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
 	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.").String()
+	jobReportFile        = cli.Flag("output-report", "Write a scan report to the provided path.").Hidden().OpenFile(os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -77,14 +80,16 @@ var (
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
-	githubScan              = cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint      = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos         = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs          = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken         = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
-	githubIncludeForks      = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers    = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-	githubIncludeRepos      = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubScan           = cli.Command("github", "Find credentials in GitHub repositories.")
+	githubScanEndpoint   = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos      = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs       = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken      = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubIncludeForks   = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
+	githubIncludeRepos   = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubIncludeWikis   = githubScan.Flag("include-wikis", "Include repository wikisin scan.").Bool()
+
 	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
@@ -405,8 +410,12 @@ func run(state overseer.State) {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
+	var jobReportWriter io.WriteCloser
+	if *jobReportFile != nil {
+		jobReportWriter = *jobReportFile
+	}
 	e, err := engine.Start(ctx,
-		engine.WithConcurrency(uint8(*concurrency)),
+		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(engine.DefaultDetectors()...),
 		engine.WithDetectors(conf.Detectors...),
@@ -419,6 +428,8 @@ func run(state overseer.State) {
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),
+		engine.WithVerificationOverlap(*allowVerificationOverlap),
+		engine.WithJobReportWriter(jobReportWriter),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")
@@ -453,6 +464,7 @@ func run(state overseer.State) {
 			Token:                      *githubScanToken,
 			IncludeForks:               *githubIncludeForks,
 			IncludeMembers:             *githubIncludeMembers,
+			IncludeWikis:               *githubIncludeWikis,
 			Concurrency:                *concurrency,
 			ExcludeRepos:               *githubExcludeRepos,
 			IncludeRepos:               *githubIncludeRepos,
@@ -579,6 +591,9 @@ func run(state overseer.State) {
 	// Wait for all workers to finish.
 	if err = e.Finish(ctx); err != nil {
 		logFatal(err, "engine failed to finish execution")
+	}
+	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+		ctx.Logger().Error(err, "error cleaning temp artifacts")
 	}
 
 	metrics := e.GetMetrics()

@@ -1,6 +1,6 @@
 # trufflesecurity/protos:1.18-0
 
-FROM golang:1.21-bullseye
+FROM golang:1.22-bullseye
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -20,4 +20,5 @@ RUN GO111MODULE=off go get -d "github.com/envoyproxy/protoc-gen-validate" && \
     git checkout v0.6.7 && \
     ln -s /usr/local/protoc/include/google google && \
     make build
+RUN go install github.com/chrusty/protoc-gen-jsonschema/cmd/protoc-gen-jsonschema@latest
 CMD ["bash"]

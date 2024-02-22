@@ -17,6 +17,13 @@ import (
 type JSONPrinter struct{ mu sync.Mutex }
 
 func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
+	verificationErr := func(err error) string {
+		if err != nil {
+			return err.Error()
+		}
+		return ""
+	}(r.VerificationError())
+
 	v := &struct {
 		// SourceMetadata contains source-specific contextual information.
 		SourceMetadata *source_metadatapb.MetaData
@@ -31,8 +38,9 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		// DetectorName is the string name of the DetectorType.
 		DetectorName string
 		// DecoderName is the string name of the DecoderType.
-		DecoderName string
-		Verified    bool
+		DecoderName       string
+		Verified          bool
+		VerificationError string `json:",omitempty"`
 		// Raw contains the raw secret data.
 		Raw string
 		// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -44,19 +52,20 @@ func (p *JSONPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) 
 		ExtraData      map[string]string
 		StructuredData *detectorspb.StructuredData
 	}{
-		SourceMetadata: r.SourceMetadata,
-		SourceID:       r.SourceID,
-		SourceType:     r.SourceType,
-		SourceName:     r.SourceName,
-		DetectorType:   r.DetectorType,
-		DetectorName:   r.DetectorType.String(),
-		DecoderName:    r.DecoderType.String(),
-		Verified:       r.Verified,
-		Raw:            string(r.Raw),
-		RawV2:          string(r.RawV2),
-		Redacted:       r.Redacted,
-		ExtraData:      r.ExtraData,
-		StructuredData: r.StructuredData,
+		SourceMetadata:    r.SourceMetadata,
+		SourceID:          r.SourceID,
+		SourceType:        r.SourceType,
+		SourceName:        r.SourceName,
+		DetectorType:      r.DetectorType,
+		DetectorName:      r.DetectorType.String(),
+		DecoderName:       r.DecoderType.String(),
+		Verified:          r.Verified,
+		VerificationError: verificationErr,
+		Raw:               string(r.Raw),
+		RawV2:             string(r.RawV2),
+		Redacted:          r.Redacted,
+		ExtraData:         r.ExtraData,
+		StructuredData:    r.StructuredData,
 	}
 	out, err := json.Marshal(v)
 	if err != nil {

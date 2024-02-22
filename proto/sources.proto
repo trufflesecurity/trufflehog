@@ -237,6 +237,7 @@ message GitHub {
   bool include_gist_comments = 16;
   bool skip_binaries = 17;
   bool skip_archives = 18;
+  bool include_wikis = 19;
 }
 
 message GoogleDrive {
@@ -340,11 +341,11 @@ message Syslog {
   string format = 5;
 }
 
-message PublicEventMonitoring {
+message Forager {
   oneof credential {
     credentials.Unauthenticated unauthenticated = 1;
   }
-  string domain = 2;
+  repeated string domains = 2;
   int64 max_depth = 3;
   google.protobuf.Timestamp since = 4;
 }

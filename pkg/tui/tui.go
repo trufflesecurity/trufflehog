@@ -114,10 +114,6 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ui.activePage -= 1
 				return ui, nil
 			}
-		case tea.MouseMsg:
-			switch msg.Type {
-			case tea.MouseLeft:
-			}
 		}
 	case common.ErrorMsg:
 		return ui, nil

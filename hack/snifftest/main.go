@@ -188,8 +188,16 @@ func main() {
 
 				logger.Info("cloned repo", "repo", r)
 
-				s := git.NewGit(sourcespb.SourceType_SOURCE_TYPE_GIT, 0, 0, "snifftest", false, runtime.NumCPU(),
-					func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+				cfg := &git.Config{
+					SourceName:   "snifftest",
+					JobID:        0,
+					SourceID:     0,
+					SourceType:   sourcespb.SourceType_SOURCE_TYPE_GIT,
+					Verify:       false,
+					SkipBinaries: true,
+					SkipArchives: false,
+					Concurrency:  runtime.NumCPU(),
+					SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 						return &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Git{
 								Git: &source_metadatapb.Git{
@@ -202,9 +210,8 @@ func main() {
 							},
 						}
 					},
-					true,
-					false,
-				)
+				}
+				s := git.NewGit(cfg)
 
 				logger.Info("scanning repo", "repo", r)
 				err = s.ScanRepo(ctx, repo, path, git.NewScanOptions(), sources.ChanReporter{Ch: chunksChan})

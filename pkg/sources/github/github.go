@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,11 +14,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/exp/rand"
+
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v42/github"
+	"github.com/google/go-github/v57/github"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -59,10 +59,14 @@ type Source struct {
 	repos             []string
 	orgsCache         cache.Cache
 	filteredRepoCache *filteredRepoCache
-	memberCache       map[string]struct{}
-	repoSizes         repoSize
-	totalRepoSize     int // total size of all repos in kb
-	git               *git.Git
+	// repos that _probably_ have wikis (see the comment on hasWiki).
+	reposWithWikis map[string]struct{}
+	memberCache    map[string]struct{}
+	repoSizes      repoSize
+	totalRepoSize  int // total size of all repos in kb
+
+	useCustomContentWriter bool
+	git                    *git.Git
 
 	scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
@@ -84,6 +88,9 @@ type Source struct {
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
@@ -225,6 +232,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
+	s.reposWithWikis = make(map[string]struct{})
 	s.memberCache = make(map[string]struct{})
 
 	s.repoSizes = newRepoSize()
@@ -259,8 +267,16 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.publicMap = map[string]source_metadatapb.Visibility{}
 
-	s.git = git.NewGit(s.Type(), s.JobID(), s.SourceID(), s.name, s.verify, runtime.NumCPU(),
-		func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
+	cfg := &git.Config{
+		SourceName:   s.name,
+		JobID:        s.jobID,
+		SourceID:     s.sourceID,
+		SourceType:   s.Type(),
+		Verify:       s.verify,
+		SkipBinaries: conn.GetSkipBinaries(),
+		SkipArchives: conn.GetSkipArchives(),
+		Concurrency:  concurrency,
+		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -276,9 +292,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 				},
 			}
 		},
-		conn.GetSkipBinaries(),
-		conn.GetSkipArchives(),
-	)
+		UseCustomContentWriter: s.useCustomContentWriter,
+	}
+	s.git = git.NewGit(cfg)
 
 	return nil
 }
@@ -343,6 +359,12 @@ func checkGitHubConnection(ctx context.Context, client *github.Client) error {
 }
 
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility source_metadatapb.Visibility) {
+	// It isn't possible to get the visibility of a wiki.
+	// We must use the visibility of the corresponding repository.
+	if strings.HasSuffix(repoURL, ".wiki.git") {
+		repoURL = strings.TrimSuffix(repoURL, ".wiki.git") + ".git"
+	}
+
 	s.mu.Lock()
 	visibility, ok := s.publicMap[repoURL]
 	s.mu.Unlock()
@@ -368,7 +390,6 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 		return
 	}
 
-	var resp *github.Response
 	urlPathParts := strings.Split(u.Path, "/")
 	switch len(urlPathParts) {
 	case 2:
@@ -377,8 +398,8 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 		repoName := urlPathParts[1]
 		repoName = strings.TrimSuffix(repoName, ".git")
 		for {
-			gist, resp, err = s.apiClient.Gists.Get(ctx, repoName)
-			if !s.handleRateLimit(err, resp) {
+			gist, _, err = s.apiClient.Gists.Get(ctx, repoName)
+			if !s.handleRateLimit(err) {
 				break
 			}
 		}
@@ -395,8 +416,8 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) (visibility s
 		repoName := urlPathParts[2]
 		repoName = strings.TrimSuffix(repoName, ".git")
 		for {
-			repo, resp, err = s.apiClient.Repositories.Get(ctx, owner, repoName)
-			if !s.handleRateLimit(err, resp) {
+			repo, _, err = s.apiClient.Repositories.Get(ctx, owner, repoName)
+			if !s.handleRateLimit(err) {
 				break
 			}
 		}
@@ -564,13 +585,12 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 
 	var (
 		ghUser *github.User
-		resp   *github.Response
 	)
 
 	ctx.Logger().V(1).Info("Enumerating with token", "endpoint", apiEndpoint)
 	for {
-		ghUser, resp, err = s.apiClient.Users.Get(ctx, "")
-		if handled := s.handleRateLimit(err, resp); handled {
+		ghUser, _, err = s.apiClient.Users.Get(ctx, "")
+		if s.handleRateLimit(err) {
 			continue
 		}
 		if err != nil {
@@ -676,7 +696,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	// Does this need to be separate from |s.httpClient|?
 	instHTTPClient := common.RetryableHttpClientTimeout(60)
 	instHTTPClient.Transport = appItr
-	installationClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, instHTTPClient)
+	installationClient, err = github.NewClient(instHTTPClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +713,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	itr.BaseURL = apiEndpoint
 
 	s.httpClient.Transport = itr
-	s.apiClient, err = github.NewEnterpriseClient(apiEndpoint, apiEndpoint, s.httpClient)
+	s.apiClient, err = github.NewClient(s.httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -733,11 +753,11 @@ func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Cl
 		return github.NewClient(httpClient), nil
 	}
 
-	return github.NewEnterpriseClient(apiEndpoint, apiEndpoint, httpClient)
+	return github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
-	var scanned uint64
+	var scannedCount uint64
 
 	s.log.V(2).Info("Found repos to scan", "count", len(s.repos))
 
@@ -772,108 +792,147 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 
-			logger := s.log.WithValues("repo", repoURL)
-			logger.V(2).Info(fmt.Sprintf("attempting to clone repo %d/%d", i+1, len(s.repos)))
-			var path string
-			var repo *gogit.Repository
-			var err error
-
-			path, repo, err = s.cloneRepo(ctx, repoURL, installationClient)
+			// Scan the repository
+			repoCtx := context.WithValues(ctx, "repo", repoURL)
+			duration, err := s.cloneAndScanRepo(repoCtx, installationClient, repoURL, chunksChan)
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
 
-			defer os.RemoveAll(path)
-			if err != nil {
-				scanErrs.Add(fmt.Errorf("error cloning repo %s: %w", repoURL, err))
-				return nil
+			// Scan the wiki, if enabled, and the repo has one.
+			if s.conn.IncludeWikis {
+				if _, ok := s.reposWithWikis[repoURL]; ok {
+					wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
+					wikiCtx := context.WithValue(ctx, "repo", wikiURL)
+
+					_, err := s.cloneAndScanRepo(wikiCtx, installationClient, wikiURL, chunksChan)
+					if err != nil {
+						scanErrs.Add(err)
+						// Don't return, it still might be possible to scan comments.
+					}
+				}
 			}
 
-			s.setScanOptions(s.conn.Base, s.conn.Head)
-
-			repoSize := s.repoSizes.getRepo(repoURL)
-			logger.V(2).Info(fmt.Sprintf("scanning repo %d/%d", i, len(s.repos)), "repo_size_kb", repoSize)
-
-			now := time.Now()
-			defer func(start time.Time) {
-				logger.V(2).Info(fmt.Sprintf("scanned %d/%d repos", scanned, len(s.repos)), "repo_size", repoSize, "duration_seconds", time.Since(start).Seconds())
-			}(now)
-
-			if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
-				scanErrs.Add(fmt.Errorf("error scanning repo %s: %w", repoURL, err))
-				return nil
+			// Scan comments, if enabled.
+			if s.includeGistComments || s.includeIssueComments || s.includePRComments {
+				if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
+					scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
+					return nil
+				}
 			}
 
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", duration)
 			githubReposScanned.WithLabelValues(s.name).Inc()
-
-			if err = s.scanComments(ctx, repoURL, chunksChan); err != nil {
-				scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
-				return nil
-			}
-
-			atomic.AddUint64(&scanned, 1)
-
+			atomic.AddUint64(&scannedCount, 1)
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		s.log.V(2).Info("Errors encountered while scanning", "error-count", scanErrs.Count(), "errors", scanErrs)
+		s.log.V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs)
 	}
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed Github scan", "")
 
 	return nil
 }
 
-// handleRateLimit returns true if a rate limit was handled
-// Unauthenticated access to most github endpoints has a rate limit of 60 requests per hour.
-// This will likely only be exhausted if many users/orgs are scanned without auth
-func (s *Source) handleRateLimit(errIn error, res *github.Response) bool {
-	var (
-		knownWait  = true
-		remaining  = 0
-		retryAfter time.Duration
-	)
+func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, repoURL string, chunksChan chan *sources.Chunk) (time.Duration, error) {
+	var duration time.Duration
 
-	// GitHub has both primary (RateLimit) and secondary (AbuseRateLimit) errors.
-	var rateLimit *github.RateLimitError
-	var abuseLimit *github.AbuseRateLimitError
-	if errors.As(errIn, &rateLimit) {
-		// Do nothing
-	} else if errors.As(errIn, &abuseLimit) {
-		retryAfter = abuseLimit.GetRetryAfter()
+	ctx.Logger().V(2).Info("attempting to clone repo")
+	path, repo, err := s.cloneRepo(ctx, repoURL, client)
+	if err != nil {
+		return duration, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+	}
+	defer os.RemoveAll(path)
+
+	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
+	s.setScanOptions(s.conn.Base, s.conn.Head)
+
+	// Repo size is not collected for wikis.
+	var logger logr.Logger
+	if !strings.HasSuffix(repoURL, ".wiki.git") {
+		repoSize := s.repoSizes.getRepo(repoURL)
+		logger = ctx.Logger().WithValues("repo_size_kb", repoSize)
 	} else {
+		logger = ctx.Logger()
+	}
+	logger.V(2).Info("scanning repo")
+
+	start := time.Now()
+	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
+		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
+	}
+	duration = time.Since(start)
+	return duration, nil
+}
+
+var (
+	rateLimitMu         sync.RWMutex
+	rateLimitResumeTime time.Time
+)
+
+// handleRateLimit returns true if a rate limit was handled
+//
+// Unauthenticated users have a rate limit of 60 requests per hour.
+// Authenticated users have a rate limit of 5,000 requests per hour,
+// however, certain actions are subject to a stricter "secondary" limit.
+// https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
+func (s *Source) handleRateLimit(errIn error) bool {
+	if errIn == nil {
 		return false
 	}
 
-	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-	// Parse retry information from response headers, unless a Retry-After value was already provided.
-	// https://docs.github.com/en/rest/overview/resources-in-the-rest-api#exceeding-the-rate-limit
-	if retryAfter <= 0 && res != nil {
-		var err error
-		remaining, err = strconv.Atoi(res.Header.Get("x-ratelimit-remaining"))
-		if err != nil {
-			knownWait = false
+	rateLimitMu.RLock()
+	resumeTime := rateLimitResumeTime
+	rateLimitMu.RUnlock()
+
+	var retryAfter time.Duration
+	if resumeTime.IsZero() || time.Now().After(resumeTime) {
+		rateLimitMu.Lock()
+
+		var (
+			now = time.Now()
+
+			// GitHub has both primary (RateLimit) and secondary (AbuseRateLimit) errors.
+			limitType  string
+			rateLimit  *github.RateLimitError
+			abuseLimit *github.AbuseRateLimitError
+		)
+		if errors.As(errIn, &rateLimit) {
+			limitType = "primary"
+			rate := rateLimit.Rate
+			if rate.Remaining == 0 { // TODO: Will we ever receive a |RateLimitError| when remaining > 0?
+				retryAfter = rate.Reset.Sub(now)
+			}
+		} else if errors.As(errIn, &abuseLimit) {
+			limitType = "secondary"
+			retryAfter = abuseLimit.GetRetryAfter()
+		} else {
+			rateLimitMu.Unlock()
+			return false
 		}
 
-		resetTime, err := strconv.Atoi(res.Header.Get("x-ratelimit-reset"))
-		if err != nil || resetTime == 0 {
-			knownWait = false
-		} else if resetTime > 0 {
-			retryAfter = time.Duration(int64(resetTime)-time.Now().Unix()) * time.Second
+		jitter := time.Duration(rand.Intn(10)+1) * time.Second
+		if retryAfter > 0 {
+			retryAfter = retryAfter + jitter
+			rateLimitResumeTime = now.Add(retryAfter)
+			s.log.V(0).Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+		} else {
+			retryAfter = (5 * time.Minute) + jitter
+			rateLimitResumeTime = now.Add(retryAfter)
+			// TODO: Use exponential backoff instead of static retry time.
+			s.log.V(0).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		}
-	}
 
-	resumeTime := time.Now().Add(retryAfter).String()
-	if knownWait && remaining == 0 && retryAfter > 0 {
-		s.log.V(2).Info("rate limited", "retry_after", retryAfter.String(), "resume_time", resumeTime)
+		rateLimitMu.Unlock()
 	} else {
-		// TODO: Use exponential backoff instead of static retry time.
-		retryAfter = time.Minute * 5
-		s.log.V(2).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", resumeTime)
+		retryAfter = time.Until(resumeTime)
 	}
+
+	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
 	time.Sleep(retryAfter)
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
 	return true
@@ -898,10 +957,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 	logger := s.log.WithValues("user", user)
 	for {
 		gists, res, err := s.apiClient.Gists.List(ctx, user, gistOpts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
+		if s.handleRateLimit(err) {
 			continue
 		}
 		if err != nil {
@@ -954,11 +1010,8 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 		},
 	}
 	for {
-		orgs, resp, err := s.apiClient.Organizations.ListAll(ctx, orgOpts)
-		if err == nil {
-			resp.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, resp); handled {
+		orgs, _, err := s.apiClient.Organizations.ListAll(ctx, orgOpts)
+		if s.handleRateLimit(err) {
 			continue
 		}
 		if err != nil {
@@ -995,10 +1048,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	logger := s.log.WithValues("user", user)
 	for {
 		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
-		if err == nil {
-			resp.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, resp); handled {
+		if handled := s.handleRateLimit(err); handled {
 			continue
 		}
 		if err != nil {
@@ -1033,10 +1083,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 	logger := s.log.WithValues("org", org)
 	for {
 		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
-		if err == nil {
-			defer res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
+		if s.handleRateLimit(err) {
 			continue
 		}
 		if err != nil || len(members) == 0 {
@@ -1108,8 +1155,8 @@ func (s *Source) processGistComments(ctx context.Context, repoPath string, trimm
 		Page:    initialPage,
 	}
 	for {
-		comments, resp, err := s.apiClient.Gists.ListComments(ctx, gistID, options)
-		if s.handleRateLimit(err, resp) {
+		comments, _, err := s.apiClient.Gists.ListComments(ctx, gistID, options)
+		if s.handleRateLimit(err) {
 			break
 		}
 		if err != nil {
@@ -1212,8 +1259,8 @@ func (s *Source) processIssues(ctx context.Context, info repoInfo, chunksChan ch
 	}
 
 	for {
-		issues, resp, err := s.apiClient.Issues.ListByRepo(ctx, info.owner, info.repo, bodyTextsOpts)
-		if s.handleRateLimit(err, resp) {
+		issues, _, err := s.apiClient.Issues.ListByRepo(ctx, info.owner, info.repo, bodyTextsOpts)
+		if s.handleRateLimit(err) {
 			break
 		}
 
@@ -1245,8 +1292,8 @@ func (s *Source) processIssueComments(ctx context.Context, info repoInfo, chunks
 	}
 
 	for {
-		issueComments, resp, err := s.apiClient.Issues.ListComments(ctx, info.owner, info.repo, allComments, issueOpts)
-		if s.handleRateLimit(err, resp) {
+		issueComments, _, err := s.apiClient.Issues.ListComments(ctx, info.owner, info.repo, allComments, issueOpts)
+		if s.handleRateLimit(err) {
 			break
 		}
 
@@ -1279,8 +1326,8 @@ func (s *Source) processPRs(ctx context.Context, info repoInfo, chunksChan chan 
 	}
 
 	for {
-		prs, resp, err := s.apiClient.PullRequests.List(ctx, info.owner, info.repo, prOpts)
-		if s.handleRateLimit(err, resp) {
+		prs, _, err := s.apiClient.PullRequests.List(ctx, info.owner, info.repo, prOpts)
+		if s.handleRateLimit(err) {
 			break
 		}
 
@@ -1312,8 +1359,8 @@ func (s *Source) processPRComments(ctx context.Context, info repoInfo, chunksCha
 	}
 
 	for {
-		prComments, resp, err := s.apiClient.PullRequests.ListComments(ctx, info.owner, info.repo, allComments, prOpts)
-		if s.handleRateLimit(err, resp) {
+		prComments, _, err := s.apiClient.PullRequests.ListComments(ctx, info.owner, info.repo, allComments, prOpts)
+		if s.handleRateLimit(err) {
 			break
 		}
 
