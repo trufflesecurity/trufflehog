@@ -28,7 +28,9 @@ import (
 )
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
-const cloudBaseURL = "https://gitlab.com/"
+
+// This is the URL for gitlab hosted at gitlab.com
+const gitlabBaseURL = "https://gitlab.com/"
 
 type Source struct {
 	name     string
@@ -400,7 +402,7 @@ func (s *Source) getAllProjectRepos(
 		Owned:        gitlab.Ptr(false),
 	}
 
-	if s.url != cloudBaseURL {
+	if s.url != gitlabBaseURL {
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
@@ -591,7 +593,7 @@ func normalizeRepos(repos []string) ([]string, []error) {
 // Otherwise, it ensures we are using https as our protocol, if none was provided.
 func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
 	if gitlabEndpoint == "" {
-		return cloudBaseURL, nil
+		return gitlabBaseURL, nil
 	}
 
 	gitlabURL, err := url.Parse(gitlabEndpoint)
@@ -607,20 +609,15 @@ func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
 		}
 	}
 
-	return normalizeGitlabEndpointURL(gitlabURL)
-}
-
-// Do not use this, only use normalizeGitlabEndpoint.
-func normalizeGitlabEndpointURL(gitlabURL *url.URL) (string, error) {
-	// If the host is gitlab.com, this is the cloud version, which only hase one valid endpoint.
+	// If the host is gitlab.com, this is the cloud version, which has only one valid endpoint.
 	if gitlabURL.Host == "gitlab.com" {
-		return cloudBaseURL, nil
+		return gitlabBaseURL, nil
 	}
 
-	// Beyond this, they are using on-prem gitlab, so we have to mostly leave what they added as-is.
+	// Beyond here, on-prem gitlab is being used, so we have to mostly leave things as-is.
 
-	if gitlabURL.Scheme == "http" {
-		return "", fmt.Errorf("http was used as URL scheme, which is insecure. Please use https instead")
+	if gitlabURL.Scheme != "https" {
+		return "", fmt.Errorf("https was not used as URL scheme, but is required. Please use https")
 	}
 
 	// The gitlab library wants trailing slashes.
