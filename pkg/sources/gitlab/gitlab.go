@@ -233,7 +233,7 @@ func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target s
 
 	aCtx := context.WithValues(ctx, "project_id", projID, "commit", sha)
 
-	diffs, err := s.getCommitDiffs(aCtx, client, projID, sha)
+	diffs, _, err := client.Commits.GetCommitDiff(projID, sha, new(gitlab.GetCommitDiffOptions), gitlab.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("error fetching diffs for commit %s: %w", sha, err)
 	}
@@ -263,13 +263,6 @@ func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target s
 	}
 
 	return nil
-}
-
-func (s *Source) getCommitDiffs(ctx context.Context, client *gitlab.Client, projID int, sha string) ([]*gitlab.Diff, error) {
-	const paginationLimit = 100 // Default is 20, max is 100.
-	diffOpts := &gitlab.GetCommitDiffOptions{ListOptions: gitlab.ListOptions{PerPage: paginationLimit}}
-	diffs, _, err := client.Commits.GetCommitDiff(projID, sha, diffOpts, gitlab.WithContext(ctx))
-	return diffs, err
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
