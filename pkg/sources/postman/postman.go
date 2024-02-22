@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/go-errors/errors"
@@ -32,21 +31,23 @@ const (
 )
 
 type Source struct {
-	name        string
-	sourceId    sources.SourceID
-	jobId       sources.JobID
-	verify      bool
-	concurrency int
-	log         logr.Logger
-	sources.Progress
-	jobPool *errgroup.Group
-	client  *Client
-	conn    *sourcespb.Postman
-	sources.CommonSourceUnitUnmarshaller
+	name             string
+	sourceId         sources.SourceID
+	jobId            sources.JobID
+	verify           bool
+	log              logr.Logger
+	jobPool          *errgroup.Group
+	client           *Client
+	conn             *sourcespb.Postman
 	detectorKeywords map[string]struct{}
+
+	sources.Progress
+	sources.CommonSourceUnitUnmarshaller
 }
 
-type PMScanObject struct {
+// Target is a struct that holds the data for a single scan target.
+// Not all fields are used for every scan target.
+type Target struct {
 	Link            string
 	WorkspaceUUID   string
 	WorkspaceName   string
@@ -65,62 +66,10 @@ type PMScanObject struct {
 	Data            string
 }
 
-type ArchiveJSON struct {
-	Collection  map[string]bool `json:"collection"`
-	Environment map[string]bool `json:"environment"`
-}
-
-func IsValidUUID(u string) bool {
-	_, err := uuid.Parse(u)
-	return err == nil
-}
-
 // ToDo:
 // 2. Read in local JSON files
 // 3. Add tests
 // 4. Try to filter out duplicate objects
-
-// func verifyPostmanExportZip(filepath string) ArchiveJSON {
-// 	var archiveData ArchiveJSON
-
-// 	// Open the ZIP archive.
-// 	r, err := zip.OpenReader(filepath)
-// 	if err != nil {
-// 		fmt.Println("Error opening ZIP file:", err)
-// 		return archiveData
-// 	}
-// 	defer r.Close()
-
-// 	// Iterate through the files in the ZIP archive.
-// 	for _, file := range r.File {
-// 		if strings.HasSuffix(file.Name, "archive.json") {
-// 			// Open the file within the ZIP archive.
-// 			rc, err := file.Open()
-// 			if err != nil {
-// 				fmt.Println("Error opening archive.json:", err)
-// 				return archiveData
-// 			}
-// 			defer rc.Close()
-
-// 			// Read the contents of archive.json.
-// 			contents, err := io.ReadAll(rc)
-// 			if err != nil {
-// 				fmt.Println("Error reading archive.json:", err)
-// 				return archiveData
-// 			}
-
-// 			// Unmarshal the JSON contents into the ArchiveJSON struct.
-// 			if err := json.Unmarshal(contents, &archiveData); err != nil {
-// 				fmt.Println("Error decoding JSON:", err)
-// 				return archiveData
-// 			}
-
-// 			// Check if the structure matches your requirements.
-// 			return archiveData
-// 		}
-// 	}
-// 	return archiveData
-// }
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -144,6 +93,8 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
+
+	s.log = ctx.Logger()
 
 	var conn sourcespb.Postman
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
@@ -176,11 +127,14 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 }
 
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	// Scan workspaces
 	if s.conn.Workspaces != nil {
 		for _, workspace := range s.conn.Workspaces {
 			s.scanWorkspace(ctx, chunksChan, workspace)
 		}
 	}
+
+	// Scan environments
 	if s.conn.Environments != nil {
 		// Need to validate these: technically these are not UUIDs but
 		// <USER_ID>-<ENVIRONMENT_ID> where ENVIRONMENT_ID is a UUID.
@@ -189,36 +143,38 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		for _, environment := range s.conn.Environments {
 			envs = append(envs, IDNameUUID{UUID: environment})
 		}
-		w := WorkspaceObj{
-			Workspace: WorkspaceStruct{
-				Environments: envs,
-			},
+		w := Workspace{
+			Environments: envs,
 		}
 		s.scanEnvironments(ctx, chunksChan, w, nil, nil)
 		// Note that when we read in environment json files, there is no outer
 		// environment field. Same for collections and outer collection field.
 	}
+
+	// Scan collections
 	if s.conn.Collections != nil {
-		var colls []IDNameUUID
+		var collections []IDNameUUID
 		for _, collection := range s.conn.Collections {
-			colls = append(colls, IDNameUUID{UUID: collection})
+			collections = append(collections, IDNameUUID{UUID: collection})
 		}
-		w := WorkspaceObj{
-			Workspace: WorkspaceStruct{
-				Collections: colls,
-			},
+		w := Workspace{
+			Collections: collections,
 		}
+
+		// ZR: this is apparently high touch
 		var varSubMap []map[string]string
 		varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
 		s.scanCollections(ctx, chunksChan, w, nil, &varSubMap)
 	}
+
+	// Scan personal workspaces (from API token)
 	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil {
 		workspaces, err := s.client.EnumerateWorkspaces()
 		if err != nil {
 			ctx.Logger().Error(errors.New("Could not enumerate any workspaces for the API token provided"), "failed to scan postman")
 			return nil
 		}
-		for _, workspace := range workspaces.Workspaces {
+		for _, workspace := range workspaces {
 			s.scanWorkspace(ctx, chunksChan, workspace.ID)
 		}
 	}
@@ -231,20 +187,22 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
 	w, err := s.client.GetWorkspace(workspaceID)
 	if err != nil {
+		// ZR:NOTE this log does not work
 		s.log.Error(err, "could not get workspace object", "workspace_uuid", workspaceID)
 	}
+	// fmt.Println("workspace", w)
 	var extraKeywords []string
-	extraKeywords = append(extraKeywords, w.Workspace.Name)
+	extraKeywords = append(extraKeywords, w.Name)
 	s.scanGlobals(ctx, chunksChan, w, extraKeywords, &varSubMap)
 	s.scanEnvironments(ctx, chunksChan, w, extraKeywords, &varSubMap)
 	s.scanCollections(ctx, chunksChan, w, extraKeywords, &varSubMap)
 }
 
-func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.Chunk, w WorkspaceObj, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, extraKeywords []string, varSubMap *[]map[string]string) {
 	ctx.Logger().V(2).Info("starting scanning collections")
 
 	// Filter Collections
-	collections := filterItemsByUUID(w.Workspace.Collections, s.conn.ExcludeCollections, s.conn.IncludeCollections)
+	collections := filterItemsByUUID(w.Collections, s.conn.ExcludeCollections, s.conn.IncludeCollections)
 
 	// Scan Collections
 	for _, col := range collections {
@@ -253,9 +211,9 @@ func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.C
 			s.log.Error(err, "could not get collection object", "collection_uuid", col.UUID)
 		}
 		m := Metadata{
-			WorkspaceUUID:  w.Workspace.ID,
-			WorkspaceName:  w.Workspace.Name,
-			CreatedBy:      w.Workspace.CreatedBy,
+			WorkspaceUUID:  w.ID,
+			WorkspaceName:  w.Name,
+			CreatedBy:      w.CreatedBy,
 			CollectionInfo: c.Collection.Info,
 			Type:           COLLECTION_TYPE,
 		}
@@ -313,7 +271,7 @@ func (s *Source) scanEvents(ctx context.Context, chunksChan chan *sources.Chunk,
 				link += "?tab=tests"
 			}
 
-			s.scanObject(ctx, chunksChan, PMScanObject{
+			s.scanObject(ctx, chunksChan, Target{
 				Link:           link,
 				FieldType:      EVENT_TYPE,
 				FieldName:      event.Listen,
@@ -518,7 +476,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		authData = ""
 	}
 
-	s.scanObject(ctx, chunksChan, PMScanObject{
+	s.scanObject(ctx, chunksChan, Target{
 		Link:           m.Link + "?tab=authorization",
 		FieldType:      "Authorization",
 		WorkspaceUUID:  m.WorkspaceUUID,
@@ -603,7 +561,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		for _, subMap := range *varSubMap {
 			data += s.substitute(data, subMap)
 		}
-		s.scanObject(ctx, chunksChan, PMScanObject{
+		s.scanObject(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
 			WorkspaceUUID:  m.WorkspaceUUID,
@@ -668,7 +626,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		for _, subMap := range *varSubMap {
 			data += s.substitute(data, subMap)
 		}
-		s.scanObject(ctx, chunksChan, PMScanObject{
+		s.scanObject(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
 			WorkspaceUUID:  m.WorkspaceUUID,
@@ -688,7 +646,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		for _, subMap := range *varSubMap {
 			data += s.substitute(data, subMap)
 		}
-		s.scanObject(ctx, chunksChan, PMScanObject{
+		s.scanObject(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
 			WorkspaceUUID:  m.WorkspaceUUID,
@@ -726,7 +684,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 		// Body in a response is just a string
 		if response.Body != "" {
 			m.Type = m.Type + " > response body"
-			s.scanObject(ctx, chunksChan, PMScanObject{
+			s.scanObject(ctx, chunksChan, Target{
 				Link:           m.Link,
 				FieldType:      m.Type,
 				WorkspaceUUID:  m.WorkspaceUUID,
@@ -749,32 +707,32 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	}
 }
 
-func (s *Source) scanGlobals(ctx context.Context, chunksChan chan *sources.Chunk, w WorkspaceObj, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanGlobals(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, extraKeywords []string, varSubMap *[]map[string]string) {
 	ctx.Logger().V(2).Info("starting scanning global variables")
-	globalVars, err := s.client.GetGlobals(w.Workspace.ID)
+	globalVars, err := s.client.GetGlobals(w.ID)
 	if err != nil {
 		s.log.Error(err, "could not get global variables object")
 	}
 
 	// Will need to adjust FullID and Link for local JSON read in
 	m := Metadata{
-		WorkspaceUUID: w.Workspace.ID,
-		WorkspaceName: w.Workspace.Name,
-		CreatedBy:     w.Workspace.CreatedBy,
+		WorkspaceUUID: w.ID,
+		WorkspaceName: w.Name,
+		CreatedBy:     w.CreatedBy,
 		Type:          GLOBAL_TYPE,
-		FullID:        w.Workspace.CreatedBy + "-" + globalVars.ID,
-		Link:          LINK_BASE_URL + "workspace/" + w.Workspace.ID + "/" + GLOBAL_TYPE,
+		FullID:        w.CreatedBy + "-" + globalVars.ID,
+		Link:          LINK_BASE_URL + "workspace/" + w.ID + "/" + GLOBAL_TYPE,
 	}
 
 	s.scanVars(ctx, chunksChan, m, globalVars.VariableData, extraKeywords, varSubMap)
 	ctx.Logger().V(2).Info("finished scanning global variables")
 }
 
-func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.Chunk, w WorkspaceObj, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, extraKeywords []string, varSubMap *[]map[string]string) {
 	ctx.Logger().V(2).Info("starting scanning environments")
 
 	// Filter Enviroments
-	environments := filterItemsByUUID(w.Workspace.Environments, s.conn.ExcludeEnvironments, s.conn.IncludeEnvironments)
+	environments := filterItemsByUUID(w.Environments, s.conn.ExcludeEnvironments, s.conn.IncludeEnvironments)
 
 	// Scan Environments
 	for _, env := range environments {
@@ -784,9 +742,9 @@ func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.
 		}
 		// Will need to adjust FullID and Link for local JSON read in
 		m := Metadata{
-			WorkspaceUUID: w.Workspace.ID,
-			WorkspaceName: w.Workspace.Name,
-			CreatedBy:     w.Workspace.CreatedBy,
+			WorkspaceUUID: w.ID,
+			WorkspaceName: w.Name,
+			CreatedBy:     w.CreatedBy,
 			Type:          ENVIRONMENT_TYPE,
 			FullID:        env.UUID,
 			Link:          LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + env.UUID,
@@ -859,7 +817,7 @@ func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m
 	filteredKeywords := filterKeywords(extraKeywords, s.detectorKeywords)
 
 	// Create slice of objects to scan (both context & data)
-	pmObjToScan := []PMScanObject{}
+	pmObjToScan := []Target{}
 	for _, v := range varData.KeyValues {
 		data := fmt.Sprintf("%s:%s ", v.Key, fmt.Sprintf("%v", v.Value))
 		for _, keyword := range filteredKeywords {
@@ -870,7 +828,7 @@ func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m
 			data += strings.Repeat(" ", KEYWORD_PADDING)
 		}
 		data += allValues
-		preScanObj := PMScanObject{
+		preScanObj := Target{
 			Link:           m.Link,
 			WorkspaceUUID:  m.WorkspaceUUID,
 			WorkspaceName:  m.WorkspaceName,
@@ -923,10 +881,10 @@ func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m
 	s.scanObjects(ctx, chunksChan, pmObjToScan)
 }
 
-func (s *Source) scanObjects(ctx context.Context, chunksChan chan *sources.Chunk, objects []PMScanObject) {
+func (s *Source) scanObjects(ctx context.Context, chunksChan chan *sources.Chunk, objects []Target) {
 	//Remove duplicate objects to scan
-	uniqueMap := make(map[PMScanObject]struct{})
-	uniqueObjects := []PMScanObject{}
+	uniqueMap := make(map[Target]struct{})
+	uniqueObjects := []Target{}
 
 	// Iterate through the input slice and add unique objects to the map
 	for _, obj := range objects {
@@ -941,7 +899,7 @@ func (s *Source) scanObjects(ctx context.Context, chunksChan chan *sources.Chunk
 
 	// Process each object concurrently.
 	for _, obj := range uniqueObjects {
-		go func(obj PMScanObject) {
+		go func(obj Target) {
 			defer func() {
 				done <- struct{}{} // Signal that the goroutine has completed.
 			}()
@@ -955,7 +913,7 @@ func (s *Source) scanObjects(ctx context.Context, chunksChan chan *sources.Chunk
 	}
 }
 
-func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o PMScanObject) {
+func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o Target) {
 	fmt.Println("#########START OBJECT#########")
 	fmt.Println(o.Data + "\n")
 	fmt.Println("#########END OBJECT#########")

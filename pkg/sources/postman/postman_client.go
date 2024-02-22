@@ -24,15 +24,7 @@ const (
 	defaultContentType = "*"
 )
 
-type WorkspacesObj struct {
-	Workspaces []WorkspaceStruct `json:"workspaces"`
-}
-
-type WorkspaceObj struct {
-	Workspace WorkspaceStruct `json:"workspace"`
-}
-
-type WorkspaceStruct struct {
+type Workspace struct {
 	ID           string       `json:"id"`
 	Name         string       `json:"name"`
 	Type         string       `json:"type"`
@@ -266,8 +258,12 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
 // Consider adding additional flags to support filtering.
-func (c *Client) EnumerateWorkspaces() (WorkspacesObj, error) {
-	var workspaces WorkspacesObj
+// ZR:NOTE: this could just be GetWorkspaces and return a list of workspaces instead of an object
+func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
+	var workspaces []Workspace
+	workspacesObj := struct {
+		Workspaces []Workspace `json:"workspaces"`
+	}{}
 
 	r, err := c.getPostmanReq("https://api.getpostman.com/workspaces", nil)
 	if err != nil {
@@ -281,35 +277,45 @@ func (c *Client) EnumerateWorkspaces() (WorkspacesObj, error) {
 		return workspaces, err
 	}
 
-	if err := json.Unmarshal([]byte(body), &workspaces); err != nil {
+	if err := json.Unmarshal([]byte(body), &workspacesObj); err != nil {
 		err = fmt.Errorf("could not unmarshal workspaces JSON")
 		return workspaces, err
 	}
+
+	// Append all workspaces to the workspaces slice so we don't
+	// have to deal with nested objects
+	for _, ws := range workspacesObj.Workspaces {
+		workspaces = append(workspaces, ws)
+	}
+
 	return workspaces, nil
 }
 
 // GetWorkspace returns the workspace for a given workspace
-func (c *Client) GetWorkspace(workspace_uuid string) (WorkspaceObj, error) {
-	var workspace WorkspaceObj
+func (c *Client) GetWorkspace(workspaceUUID string) (Workspace, error) {
+	var workspace Workspace
+	obj := struct {
+		Workspace Workspace `json:"workspace"`
+	}{}
 
-	url := fmt.Sprintf(WORKSPACE_URL, workspace_uuid)
+	url := fmt.Sprintf(WORKSPACE_URL, workspaceUUID)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
-		err = fmt.Errorf("could not get workspace: %s", workspace_uuid)
+		err = fmt.Errorf("could not get workspace: %s", workspaceUUID)
 		return workspace, err
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		err = fmt.Errorf("could not read response body for workspace: %s", workspace_uuid)
+		err = fmt.Errorf("could not read response body for workspace: %s", workspaceUUID)
 		return workspace, err
 	}
 
-	if err := json.Unmarshal([]byte(body), &workspace); err != nil {
-		err = fmt.Errorf("could not unmarshal workspace JSON for workspace: %s", workspace_uuid)
+	if err := json.Unmarshal([]byte(body), &obj); err != nil {
+		err = fmt.Errorf("could not unmarshal workspace JSON for workspace: %s", workspaceUUID)
 		return workspace, err
 	}
-	return workspace, nil
+	return obj.Workspace, nil
 }
 
 // GetGlobals returns the global variables for a given workspace
