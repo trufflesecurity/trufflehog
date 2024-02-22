@@ -178,17 +178,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	if s.conn.Workspaces != nil {
 		for _, workspace := range s.conn.Workspaces {
-			var varSubMap []map[string]string
-			varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
-			w, err := s.client.GetWorkspace(workspace)
-			if err != nil {
-				s.log.Error(err, "could not get workspace object", "workspace_uuid", workspace)
-			}
-			var extraKeywords []string
-			extraKeywords = append(extraKeywords, w.Workspace.Name)
-			s.scanGlobals(ctx, chunksChan, w, extraKeywords, &varSubMap)
-			s.scanEnvironments(ctx, chunksChan, w, extraKeywords, &varSubMap)
-			s.scanCollections(ctx, chunksChan, w, extraKeywords, &varSubMap)
+			s.scanWorkspace(ctx, chunksChan, workspace)
 		}
 	}
 	if s.conn.Environments != nil {
@@ -222,7 +212,32 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
 		s.scanCollections(ctx, chunksChan, w, nil, &varSubMap)
 	}
+	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil {
+		workspaces, err := s.client.EnumerateWorkspaces()
+		if err != nil {
+			ctx.Logger().Error(errors.New("Could not enumerate any workspaces for the API token provided"), "failed to scan postman")
+			return nil
+		}
+		for _, workspace := range workspaces.Workspaces {
+			s.scanWorkspace(ctx, chunksChan, workspace.ID)
+		}
+	}
+
 	return nil
+}
+
+func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspaceID string) {
+	var varSubMap []map[string]string
+	varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
+	w, err := s.client.GetWorkspace(workspaceID)
+	if err != nil {
+		s.log.Error(err, "could not get workspace object", "workspace_uuid", workspaceID)
+	}
+	var extraKeywords []string
+	extraKeywords = append(extraKeywords, w.Workspace.Name)
+	s.scanGlobals(ctx, chunksChan, w, extraKeywords, &varSubMap)
+	s.scanEnvironments(ctx, chunksChan, w, extraKeywords, &varSubMap)
+	s.scanCollections(ctx, chunksChan, w, extraKeywords, &varSubMap)
 }
 
 func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.Chunk, w WorkspaceObj, extraKeywords []string, varSubMap *[]map[string]string) {
@@ -941,9 +956,9 @@ func (s *Source) scanObjects(ctx context.Context, chunksChan chan *sources.Chunk
 }
 
 func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o PMScanObject) {
-	// fmt.Println("#########START OBJECT#########")
-	// fmt.Println(o.Data + "\n")
-	// fmt.Println("#########END OBJECT#########")
+	fmt.Println("#########START OBJECT#########")
+	fmt.Println(o.Data + "\n")
+	fmt.Println("#########END OBJECT#########")
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,

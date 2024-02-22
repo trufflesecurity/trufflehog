@@ -31,8 +31,8 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 		connection.Credential = &sourcespb.Postman_Unauthenticated{}
 	}
 
-	if len(c.Workspaces) == 0 && len(c.Collections) == 0 && len(c.Environments) == 0 {
-		ctx.Logger().Error(errors.New("no postman workspaces, collections, or environments provided"), "failed to scan postman")
+	if len(c.Workspaces) == 0 && len(c.Collections) == 0 && len(c.Environments) == 0 && len(c.Token) == 0 {
+		ctx.Logger().Error(errors.New("no postman workspaces, collections, environments or API token provided"), "failed to scan postman")
 		return nil
 	}
 

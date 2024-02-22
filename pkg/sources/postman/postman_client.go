@@ -24,6 +24,10 @@ const (
 	defaultContentType = "*"
 )
 
+type WorkspacesObj struct {
+	Workspaces []WorkspaceStruct `json:"workspaces"`
+}
+
 type WorkspaceObj struct {
 	Workspace WorkspaceStruct `json:"workspace"`
 }
@@ -258,6 +262,30 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 		return nil, err
 	}
 	return resp, nil
+}
+
+// EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
+// Consider adding additional flags to support filtering.
+func (c *Client) EnumerateWorkspaces() (WorkspacesObj, error) {
+	var workspaces WorkspacesObj
+
+	r, err := c.getPostmanReq("https://api.getpostman.com/workspaces", nil)
+	if err != nil {
+		err = fmt.Errorf("could not get workspaces")
+		return workspaces, err
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		err = fmt.Errorf("could not read response body for workspaces")
+		return workspaces, err
+	}
+
+	if err := json.Unmarshal([]byte(body), &workspaces); err != nil {
+		err = fmt.Errorf("could not unmarshal workspaces JSON")
+		return workspaces, err
+	}
+	return workspaces, nil
 }
 
 // GetWorkspace returns the workspace for a given workspace
