@@ -82,9 +82,10 @@ type Source struct {
 	mu        sync.Mutex // protects the visibility maps
 	publicMap map[string]source_metadatapb.Visibility
 
-	includePRComments    bool
-	includeIssueComments bool
-	includeGistComments  bool
+	includePRComments      bool
+	includeIssueComments   bool
+	includeGistComments    bool
+	includeDanglingCommits bool
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -249,6 +250,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
+	s.includeDanglingCommits = s.conn.IncludeDanglingCommits
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -822,11 +824,16 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				}
 			}
 
+			if s.includeDanglingCommits {
+				s.scanDanglingCommits(ctx, repoURL, chunksChan)
+			}
+
 			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", duration)
 			githubReposScanned.WithLabelValues(s.name).Inc()
 			atomic.AddUint64(&scannedCount, 1)
 			return nil
 		})
+
 	}
 
 	_ = s.jobPool.Wait()
@@ -1614,4 +1621,80 @@ func removeURLAndSplit(url string) []string {
 	splitURL := strings.Split(trimmedURL, "/")
 
 	return splitURL
+}
+
+func (s *Source) scanDanglingCommits(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
+	scannedCommits := s.git.GetScannedCommits()
+
+	// Support ssh and https URLs
+	repoURL, err := git.GitURLParse(repoPath)
+	if err != nil {
+		return err
+	}
+	trimmedURL := removeURLAndSplit(repoURL.String())
+	owner := trimmedURL[1]
+	repo := trimmedURL[2]
+
+	// get all commit hashes from the repo's events API endpoint
+	var eventCommits = make(map[string]bool)
+
+	options := &github.ListOptions{
+		PerPage: defaultPagination,
+		Page:    initialPage,
+	}
+	for {
+		evt, resp, err := s.apiClient.Activity.ListRepositoryEvents(ctx, owner, repo, options)
+		if s.handleRateLimit(err) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		for _, e := range evt {
+			if *e.Type == "PushEvent" {
+				payloads, err := e.ParsePayload()
+				if err != nil {
+					return err
+				}
+				for _, c := range payloads.(*github.PushEvent).Commits {
+					eventCommits[*c.SHA] = true
+				}
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		options.Page = resp.NextPage
+	}
+
+	for sha := range eventCommits {
+		fmt.Println(sha)
+		if _, ok := scannedCommits[sha]; !ok {
+			if s.processEventCommit(ctx, owner, repo, sha); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+
+	// if any are not in the repo's commit list, scan them
+}
+
+func (s *Source) getCommitBySha(ctx context.Context, owner string, repo string, sha string) (*github.RepositoryCommit, error) {
+	commit, _, err := s.apiClient.Repositories.GetCommit(ctx, owner, repo, sha, nil)
+	if err != nil {
+		return nil, err
+	}
+	return commit, nil
+}
+
+func (s *Source) processEventCommit(ctx context.Context, owner string, repo string, sha string) error {
+	commit, err := s.getCommitBySha(ctx, owner, repo, sha)
+	if err != nil {
+		return err
+	}
+	//commit.GetSHA(), nil
+	fmt.Println(commit)
+	return nil
 }

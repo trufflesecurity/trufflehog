@@ -226,6 +226,8 @@ type GithubConfig struct {
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
+	// IncludeDanglingCommits indicates whether to include dangling commits in the scan.
+	IncludeDanglingCommits bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.

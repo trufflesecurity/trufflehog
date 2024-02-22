@@ -68,6 +68,7 @@ type Git struct {
 	concurrency        *semaphore.Weighted
 	skipBinaries       bool
 	skipArchives       bool
+	scannedCommits     map[string]bool
 
 	parser *gitparse.Parser
 }
@@ -115,6 +116,7 @@ func NewGit(config *Config) *Git {
 		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
+		scannedCommits:     make(map[string]bool),
 		parser:             parser,
 	}
 }
@@ -511,6 +513,10 @@ func (s *Git) CommitsScanned() uint64 {
 	return atomic.LoadUint64(&s.metrics.commitsScanned)
 }
 
+func (s *Git) GetScannedCommits() map[string]bool {
+	return s.scannedCommits
+}
+
 const gitDirName = ".git"
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
@@ -565,6 +571,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
+			s.scannedCommits[fullHash] = true
 			logger.V(5).Info("scanning commit", "commit", fullHash)
 		}
 
@@ -779,6 +786,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
+			s.scannedCommits[fullHash] = true
 		}
 
 		if reachedBase && fullHash != scanOptions.BaseHash {
