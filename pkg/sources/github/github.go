@@ -1624,7 +1624,9 @@ func removeURLAndSplit(url string) []string {
 }
 
 // scanDanglingCommits scans the repository for dangling commits.
-// Note that this only covers as far back as the GH API allows us to get /events...
+// Note: this only covers as far back as the GH API allows us to get /events... which appears to be 90 days?
+// Also, this setting doesn't factor in if the user is scanning a particular branch, etc. This will just
+// grab all commits not scanned, but located in event PushEvent payload data.
 func (s *Source) scanDanglingCommits(ctx context.Context, repoPath string, chunksChan chan *sources.Chunk) error {
 	scannedCommits := s.git.GetScannedCommits()
 
@@ -1682,6 +1684,8 @@ func (s *Source) scanDanglingCommits(ctx context.Context, repoPath string, chunk
 }
 
 func (s *Source) getCommitBySha(ctx context.Context, owner string, repo string, sha string) (*github.RepositoryCommit, error) {
+	// Limitation: API only returns 300 files, unless you use pagination. Need to add that in.
+	// https://docs.github.com/en/rest/commits/commits?apiVersion=2022-11-28#get-a-commit
 	commit, _, err := s.apiClient.Repositories.GetCommit(ctx, owner, repo, sha, nil)
 	if err != nil {
 		return nil, err
