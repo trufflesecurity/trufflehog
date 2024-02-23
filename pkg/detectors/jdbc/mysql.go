@@ -3,8 +3,9 @@ package jdbc
 import (
 	"context"
 	"errors"
-	"github.com/go-sql-driver/mysql"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type mysqlJDBC struct {
@@ -49,12 +50,32 @@ func isMySQLErrorDeterminate(err error) bool {
 	return false
 }
 
-func parseMySQL(subname string) (jdbc, error) {
+func parseConnStr(connStr string) (hostAndDB, params string, err error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
-	hostAndDB, params, _ := strings.Cut(subname, "?")
-	if !strings.HasPrefix(hostAndDB, "//") {
-		return nil, errors.New("expected host to start with //")
+	hostAndDB, params, found := strings.Cut(connStr, "?")
+	if !found {
+		return hostAndDB, "", nil
 	}
+	if !strings.HasPrefix(hostAndDB, "//") {
+		return "", "", errors.New("expected host to start with //")
+	}
+	splitParams := strings.Split(params, "&")
+	for i, param := range splitParams {
+		if strings.Contains(strings.ToLower(param), "allowallfiles") {
+			splitParams[i] = "allowAllFiles=false"
+		}
+	}
+	params = strings.Join(splitParams, "&")
+
+	return hostAndDB, params, nil
+}
+
+func parseMySQL(subname string) (jdbc, error) {
+	hostAndDB, params, err := parseConnStr(subname)
+	if err != nil {
+		return nil, err
+	}
+
 	userPassAndHostAndDB := strings.TrimPrefix(hostAndDB, "//")
 	userPass, hostAndDB, found := strings.Cut(userPassAndHostAndDB, "@")
 	if !found {

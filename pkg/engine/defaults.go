@@ -174,7 +174,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/courier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coveralls"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/craftmypdf"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/crossbrowsertesting"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/crowdin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cryptocompare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/currencycloud"
@@ -263,7 +262,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightlabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightstats"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/float"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowdash"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowflu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flutterwave"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fmfw"
@@ -280,7 +278,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fulcrum"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory_v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fusebill"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
@@ -353,7 +350,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ip2location"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipgeolocation"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipinfodb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
@@ -376,7 +372,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lastfm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/launchdarkly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ldap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/leadfeeder"
@@ -477,7 +472,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opengraphr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openuv"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openvpn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openweather"
@@ -1022,7 +1016,6 @@ func DefaultDetectors() []detectors.Detector {
 		&gocardless.Scanner{},
 		&alconost.Scanner{},
 		&rawg.Scanner{},
-		&opengraphr.Scanner{},
 		&accuweather.Scanner{},
 		&tomtom.Scanner{},
 		&teamgate.Scanner{},
@@ -1070,7 +1063,6 @@ func DefaultDetectors() []detectors.Detector {
 		bannerbear.Scanner{},
 		hypertrack.Scanner{},
 		holidayapi.Scanner{},
-		lastfm.Scanner{},
 		currencylayer.Scanner{},
 		coinlib.Scanner{},
 		agora.Scanner{},
@@ -1163,7 +1155,6 @@ func DefaultDetectors() []detectors.Detector {
 		amadeus.Scanner{},
 		ringcentral.Scanner{},
 		pixabay.Scanner{},
-		ipify.Scanner{},
 		youneedabudget.Scanner{},
 		languagelayer.Scanner{},
 		gengo.Scanner{},
@@ -1315,7 +1306,6 @@ func DefaultDetectors() []detectors.Detector {
 		whoxy.Scanner{},
 		smooch.Scanner{},
 		apifonica.Scanner{},
-		fusebill.Scanner{},
 		goodday.Scanner{},
 		getsandbox.Scanner{},
 		freshdesk.Scanner{},
@@ -1444,8 +1434,6 @@ func DefaultDetectors() []detectors.Detector {
 		exportsdk.Scanner{},
 		rechargepayments.Scanner{},
 		browserstack.Scanner{},
-		crossbrowsertesting.Scanner{},
-		flowdash.Scanner{},
 		lunchmoney.Scanner{},
 		atera.Scanner{},
 		parsehub.Scanner{},
