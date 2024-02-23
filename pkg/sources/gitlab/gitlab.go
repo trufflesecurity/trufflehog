@@ -211,6 +211,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 }
 
 func (s *Source) scanTargets(ctx context.Context, client *gitlab.Client, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	ctx = context.WithValues(ctx, "scan_type", "targeted")
 	for _, tgt := range targets {
 		if err := s.scanTarget(ctx, client, tgt, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning target")
