@@ -1672,7 +1672,6 @@ func (s *Source) scanDanglingCommits(ctx context.Context, repoPath string, chunk
 	}
 
 	for sha := range eventCommits {
-		fmt.Println(sha)
 		if _, ok := scannedCommits[sha]; !ok {
 			if s.processEventCommit(ctx, owner, repo, sha, repoPath, chunksChan); err != nil {
 				return err
