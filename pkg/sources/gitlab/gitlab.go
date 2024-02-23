@@ -160,11 +160,18 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	// Start client.
 	apiClient, err := s.newClient()
 	if err != nil {
 		return err
+	}
+
+	// If targets are provided, we're only scanning the data in those targets.
+	// Otherwise, we're scanning all data.
+	// This allows us to only scan the commit where a vulnerability was found.
+	if len(targets) > 0 {
+		return s.scanTargets(ctx, apiClient, targets, chunksChan)
 	}
 
 	gitlabReposScanned.WithLabelValues(s.name).Set(0)
@@ -202,6 +209,62 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	slices.Sort(s.repos)
 
 	return s.scanRepos(ctx, chunksChan)
+}
+
+func (s *Source) scanTargets(ctx context.Context, client *gitlab.Client, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	ctx = context.WithValues(ctx, "scan_type", "targeted")
+	for _, tgt := range targets {
+		if err := s.scanTarget(ctx, client, tgt, chunksChan); err != nil {
+			ctx.Logger().Error(err, "error scanning target")
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Gitlab)
+	if !ok {
+		return fmt.Errorf("unable to cast metadata type for targeted scan")
+	}
+	meta := metaType.Gitlab
+	projID, sha := int(meta.GetProjectId()), meta.GetCommit()
+	if projID == 0 || sha == "" {
+		return fmt.Errorf("project ID and commit SHA must be provided for targeted scan")
+	}
+
+	aCtx := context.WithValues(ctx, "project_id", projID, "commit", sha)
+
+	diffs, _, err := client.Commits.GetCommitDiff(projID, sha, new(gitlab.GetCommitDiffOptions), gitlab.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("error fetching diffs for commit %s: %w", sha, err)
+	}
+
+	for _, diff := range diffs {
+		if diff.Diff == "" {
+			aCtx.Logger().V(4).Info("skipping empty diff", "file", diff.NewPath)
+			continue
+		}
+
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			SecretID:   target.SecretID,
+			Data:       []byte(diff.Diff),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Gitlab{Gitlab: meta},
+			},
+			Verify: s.verify,
+		}
+
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
