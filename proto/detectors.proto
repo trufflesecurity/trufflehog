@@ -313,7 +313,7 @@ enum DetectorType {
   Alconost = 301;
   Blogger = 302;
   Accuweather = 303;
-  Opengraphr = 304;
+  Opengraphr = 304 [deprecated = true];
   Rawg = 305;
   Riotgames = 306;
   RoninApp = 307;
@@ -455,7 +455,7 @@ enum DetectorType {
   Mixcloud = 444;
   TatumIO = 445;
   Tmetric = 446;
-  Lastfm = 447;
+  Lastfm = 447 [deprecated = true];
   Browshot = 448;
   JSONbin = 449;
   LocationIQ = 450;
@@ -496,7 +496,7 @@ enum DetectorType {
   Aylien = 485;
   Geocode = 486;
   IconFinder = 487;
-  Ipify = 488;
+  Ipify = 488 [deprecated = true];
   LanguageLayer = 489;
   Lob = 490;
   OnWaterIO = 491;
@@ -703,7 +703,7 @@ enum DetectorType {
   Chatfule = 692;
   Aeroworkflow = 693;
   Emailoctopus = 694;
-  Fusebill = 695;
+  Fusebill = 695 [deprecated = true];
   Geckoboard = 696;
   Gosquared = 697;
   Moonclerk = 698;
@@ -765,7 +765,7 @@ enum DetectorType {
   Image4 = 754;
   Pinata = 755;
   BrowserStack = 756;
-  CrossBrowserTesting = 757;
+  CrossBrowserTesting = 757 [deprecated = true];
   Loadmill = 758;
   TestingBot = 759;
   KnapsackPro = 760;
@@ -814,7 +814,7 @@ enum DetectorType {
   Parsehub = 803;
   PackageCloud = 804;
   Cloudsmith = 805;
-  Flowdash = 806;
+  Flowdash = 806 [deprecated = true];
   Flowdock = 807 [deprecated = true];
   Fibery = 808;
   Typetalk = 809;
