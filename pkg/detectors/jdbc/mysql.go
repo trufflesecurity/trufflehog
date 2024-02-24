@@ -53,11 +53,11 @@ func isMySQLErrorDeterminate(err error) bool {
 func parseConnStr(connStr string) (hostAndDB, params string, err error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 	hostAndDB, params, found := strings.Cut(connStr, "?")
-	if !found {
-		return hostAndDB, "", nil
-	}
 	if !strings.HasPrefix(hostAndDB, "//") {
 		return "", "", errors.New("expected host to start with //")
+	}
+	if !found {
+		return hostAndDB, "", nil
 	}
 	splitParams := strings.Split(params, "&")
 	for i, param := range splitParams {
