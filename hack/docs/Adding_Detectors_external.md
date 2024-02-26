@@ -49,7 +49,7 @@ Ex: `<packagename>/<old_files>` -> `<packagename>/v1/<old_files>`, `<packagename
 
 Note: Be sure to update the tests to reference the new secret values in GSM, or the tests will fail.
 
-2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github_old/github_old.go#L22)
+2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github_old/github_old.go#L23)
 
 3. Add a 'version' field in ExtraData for both existing and new detector versions.
 
@@ -82,8 +82,8 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
    1. Update the pattern regex and keywords. Try iterating with [regex101.com](http://regex101.com/).
    2. Update the verifier code to use a non-destructive API call that can determine whether the secret is valid or not.
       * Make sure you understand [verification indeterminacy](#verification-indeterminacy).
-   3. Create a [test for the detector](#testing-the-detector)
-   4. Add your new detector to DefaultDetectors in `/pkg/engine/defaults.go`
+   3. Create a [test for the detector](#testing-the-detector).
+   4. Add your new detector to DefaultDetectors in `/pkg/engine/defaults.go`.
    5. Create a pull request for review.
 
 ### Testing the Detector

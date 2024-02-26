@@ -53,7 +53,7 @@ Ex: `<packagename>/<old_files>` -> `<packagename>/v1/<old_files>`, `<packagename
 
 Note: Be sure to update the tests to reference the new secret values in GSM, or the tests will fail.
 
-2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github/v1/github_old.go#L22)
+2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github/v1/github_old.go#L23)
 
 3. Add a 'version' field in ExtraData for both existing and new detector versions.
 
