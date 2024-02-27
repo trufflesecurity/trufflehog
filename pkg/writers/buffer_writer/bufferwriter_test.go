@@ -1,6 +1,7 @@
 package bufferwriter
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,6 +51,39 @@ func TestBufferWriterWrite(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedSize, writer.Len())
+			}
+		})
+	}
+}
+
+func BenchmarkBufferWriterWrite(b *testing.B) {
+	ctx := context.Background()
+
+	const (
+		xlSmallBuffer = 1 << 6  // 64B
+		smallBuffer   = 1 << 9  // 512B
+		mediumBuffer  = 1 << 12 // 4KB
+		largeBuffer   = 1 << 15 // 32KB
+		xlBuffer      = 1 << 18 // 256KB
+		xl2Buffer     = 1 << 24 // 16MB
+	)
+	inputSizes := []int{xlSmallBuffer, smallBuffer, mediumBuffer, largeBuffer, xlBuffer, xl2Buffer}
+
+	for _, size := range inputSizes {
+		b.Run(fmt.Sprintf("Write %d bytes", size), func(b *testing.B) {
+			data := make([]byte, size)
+			for i := range data {
+				data[i] = byte(i % 256)
+			}
+
+			writer := New(ctx)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := writer.Write(ctx, data)
+				if err != nil {
+					b.Fatalf("Failed to write data: %v", err)
+				}
+				writer.buf.Reset()
 			}
 		})
 	}

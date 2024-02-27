@@ -5,7 +5,6 @@ package buffer
 import (
 	"bytes"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -30,64 +29,105 @@ func (poolMetrics) recordBufferReturn(bufCap, bufLen int64) {
 	totalBufferLength.Add(float64(bufLen))
 }
 
-// PoolOpts is a function that configures a BufferPool.
-type PoolOpts func(pool *Pool)
+// SizedBufferPool manages a pool of Buffer objects using a bounded channel. Each Buffer is pre-allocated
+// with a specified size to optimize memory usage and reduce runtime allocations. This pool aims to
+// balance memory efficiency with the flexibility of handling varying buffer sizes as needed.
+//
+// This implementation of SizedBufferPool is inspired by the bpool package.
+// Original source: https://pkg.go.dev/github.com/oxtoacart/bpool#section-readme
+// We adapted the original implementation to fit our custom Buffer type and specific requirements.
+type SizedBufferPool struct {
+	c          chan *Buffer // Channel of pooled Buffer objects.
+	poolSize   int          // The maximum number of Buffer objects allowed in the pool.
+	bufferSize int          // The initial capacity for each new Buffer in the pool.
 
-// Pool of buffers.
-type Pool struct {
-	*sync.Pool
-	bufferSize uint32
-
-	metrics poolMetrics
+	metrics poolMetrics // Metrics tracking the performance and usage of the buffer pool.
 }
 
-const defaultBufferSize = 1 << 12 // 4KB
-// NewBufferPool creates a new instance of BufferPool.
-func NewBufferPool(opts ...PoolOpts) *Pool {
-	pool := &Pool{bufferSize: defaultBufferSize}
+// PoolOpts is a configuration function used to set options on a SizedBufferPool instance.
+type PoolOpts func(pool *SizedBufferPool)
+
+// WithPoolBufferSize configures the initial capacity for all new buffers created by the pool.
+// This size should be chosen based on typical usage patterns to minimize the need for dynamic buffer resizing.
+func WithPoolBufferSize(size int) PoolOpts {
+	return func(pool *SizedBufferPool) { pool.bufferSize = size }
+}
+
+// WithPoolSize specifies the maximum number of buffers that the pool can hold.
+// This limit helps in controlling the memory footprint of the application.
+func WithPoolSize(size int) PoolOpts { return func(pool *SizedBufferPool) { pool.poolSize = size } }
+
+const (
+	defaultBufferSize = 1 << 12 // 4KB
+	defaultPoolSize   = 1 << 10 // 1024
+)
+
+// NewSizedBufferPool initializes a new instance of SizedBufferPool with optional configurations.
+// It pre-allocates a pool of buffers to a specified size (poolSize) and sets each buffer's
+// initial capacity (bufferSize) to reduce the frequency of runtime allocations.
+// The options allow for customization of the pool according to application-specific requirements,
+// optimizing for the common case of buffer usage.
+//
+// The value of bufferSize should seek to provide a buffer that is representative of
+// most data written to the the buffer (i.e. 95th percentile) without being
+// overly large (which will increase static memory consumption).
+func NewSizedBufferPool(opts ...PoolOpts) (bp *SizedBufferPool) {
+	pool := &SizedBufferPool{
+		c:          make(chan *Buffer, defaultPoolSize),
+		poolSize:   defaultPoolSize,
+		bufferSize: defaultBufferSize,
+	}
 
 	for _, opt := range opts {
 		opt(pool)
-	}
-	pool.Pool = &sync.Pool{
-		New: func() any {
-			return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
-		},
 	}
 
 	return pool
 }
 
-// Get returns a Buffer from the pool.
-func (p *Pool) Get(ctx context.Context) *Buffer {
-	buf, ok := p.Pool.Get().(*Buffer)
-	if !ok {
-		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
+// Get retrieves a Buffer from the pool or creates a new one if the pool is empty.
+// This method ensures that a Buffer is always available for use, with a pre-allocated
+// capacity set according to the pool's configuration.
+func (bp *SizedBufferPool) Get() (b *Buffer) {
+	select {
+	case b = <-bp.c:
+	// Reuse existing buffer.
+	default:
+		// Create new buffer.
+		b = NewBuffer(WithBufferSize(bp.poolSize))
 	}
-	p.metrics.recordBufferRetrival()
-	buf.resetMetric()
 
-	return buf
+	bp.metrics.recordBufferRetrival()
+	b.resetMetric()
+	return
 }
 
-// Put returns a Buffer to the pool.
-func (p *Pool) Put(buf *Buffer) {
-	p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
+// Put returns a Buffer to the pool for reuse. If the pool is full, or if the Buffer's
+// capacity significantly exceeds the pool's default buffer size, the Buffer is discarded
+// to avoid holding onto large amounts of memory. This method also resets the Buffer before
+// returning it to the pool, ensuring that it is ready for immediate reuse without leaking
+// any previous content.
+func (bp *SizedBufferPool) Put(b *Buffer) {
+	b.Reset()
 
-	// If the Buffer is more than twice the default size, replace it with a new Buffer.
-	// This prevents us from returning very large buffers to the pool.
+	// Calculate the capacity of the buffer. If it's more than twice the pool's default size,
+	// create a new buffer to prevent excessive memory retention.
+	// Note that the cap(b.Bytes()) provides the capacity from the read off-set
+	// only, but as we've called b.Reset() the full capacity of the underlying
+	// byte slice is returned.
+	capacity := cap(b.Bytes())
+	bp.metrics.recordBufferReturn(int64(capacity), int64(b.Len()))
 	const maxAllowedCapacity = 2 * defaultBufferSize
-	if buf.Cap() > maxAllowedCapacity {
-		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
-	} else {
-		// Reset the Buffer to clear any existing data.
-		buf.Reset()
+	if capacity > maxAllowedCapacity {
+		bp.metrics.recordShrink(capacity - defaultBufferSize)
+		b = NewBuffer(WithBufferSize(bp.bufferSize))
 	}
-	buf.recordMetric()
 
-	p.Pool.Put(buf)
+	// Attempt to return the buffer to the pool. If the pool is full, discard the buffer.
+	select {
+	case bp.c <- b:
+	default:
+	}
 }
 
 // Buffer is a wrapper around bytes.Buffer that includes a timestamp for tracking Buffer checkout duration.
@@ -96,8 +136,23 @@ type Buffer struct {
 	checkedOutAt time.Time
 }
 
+// Option is a function that configures a Buffer.
+type Option func(*Buffer)
+
+// WithBufferSize sets the initial capacity of the buffer.
+func WithBufferSize(size int) Option {
+	return func(b *Buffer) { b.Buffer = bytes.NewBuffer(make([]byte, 0, size)) }
+}
+
 // NewBuffer creates a new instance of Buffer.
-func NewBuffer() *Buffer { return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, defaultBufferSize))} }
+func NewBuffer(opts ...Option) *Buffer {
+	b := &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, defaultBufferSize))}
+	for _, opt := range opts {
+		opt(b)
+	}
+
+	return b
+}
 
 func (b *Buffer) Grow(size int) {
 	b.Buffer.Grow(size)

@@ -16,9 +16,9 @@ import (
 
 // sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
-var sharedBufferPool *buffer.Pool
+var sharedBufferPool *buffer.SizedBufferPool
 
-func init() { sharedBufferPool = buffer.NewBufferPool() }
+func init() { sharedBufferPool = buffer.NewSizedBufferPool() }
 
 type bufferedFileWriterMetrics struct{}
 
@@ -53,10 +53,10 @@ type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
 
-	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
-	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
-	filename string         // Name of the temporary file.
-	file     io.WriteCloser // File for storing data over the threshold.
+	bufPool  *buffer.SizedBufferPool // Pool for storing buffers for reuse.
+	buf      *buffer.Buffer          // Buffer for storing data under the threshold in memory.
+	filename string                  // Name of the temporary file.
+	file     io.WriteCloser          // File for storing data over the threshold.
 
 	state state // Current state of the writer. (writeOnly or readOnly)
 
@@ -74,7 +74,7 @@ func WithThreshold(threshold uint64) Option {
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
-	buf := sharedBufferPool.Get(ctx)
+	buf := sharedBufferPool.Get()
 	if buf == nil {
 		buf = buffer.NewBuffer()
 	}

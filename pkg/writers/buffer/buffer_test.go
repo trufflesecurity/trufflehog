@@ -19,7 +19,7 @@ func TestNewBufferPool(t *testing.T) {
 		{name: "Default pool size", expectedBuffSize: defaultBufferSize},
 		{
 			name:             "Custom pool size",
-			opts:             []PoolOpts{func(p *Pool) { p.bufferSize = 8 * 1024 }}, // 8KB
+			opts:             []PoolOpts{func(p *SizedBufferPool) { p.bufferSize = 8 * 1024 }}, // 8KB
 			expectedBuffSize: 8 * 1024,
 		},
 	}
@@ -28,7 +28,7 @@ func TestNewBufferPool(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			pool := NewBufferPool(tc.opts...)
+			pool := NewSizedBufferPool(tc.opts...)
 			assert.Equal(t, tc.expectedBuffSize, pool.bufferSize)
 		})
 	}
@@ -38,13 +38,13 @@ func TestBufferPoolGetPut(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
-		preparePool       func(p *Pool) *Buffer // Prepare the pool and return an initial buffer to put if needed
-		expectedCapBefore int                   // Expected capacity before putting it back
-		expectedCapAfter  int                   // Expected capacity after retrieving it again
+		preparePool       func(p *SizedBufferPool) *Buffer // Prepare the pool and return an initial buffer to put if needed
+		expectedCapBefore int                              // Expected capacity before putting it back
+		expectedCapAfter  int                              // Expected capacity after retrieving it again
 	}{
 		{
 			name: "Get new buffer and put back without modification",
-			preparePool: func(_ *Pool) *Buffer {
+			preparePool: func(_ *SizedBufferPool) *Buffer {
 				return nil // No initial buffer to put
 			},
 			expectedCapBefore: int(defaultBufferSize),
@@ -52,7 +52,7 @@ func TestBufferPoolGetPut(t *testing.T) {
 		},
 		{
 			name: "Put oversized buffer, expect shrink",
-			preparePool: func(p *Pool) *Buffer {
+			preparePool: func(p *SizedBufferPool) *Buffer {
 				buf := &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, 3*defaultBufferSize))}
 				return buf
 			},
@@ -65,18 +65,18 @@ func TestBufferPoolGetPut(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			pool := NewBufferPool()
+			pool := NewSizedBufferPool()
 			initialBuf := tc.preparePool(pool)
 			if initialBuf != nil {
 				pool.Put(initialBuf)
 			}
 
-			buf := pool.Get(context.Background())
+			buf := pool.Get()
 			assert.Equal(t, tc.expectedCapBefore, buf.Cap())
 
 			pool.Put(buf)
 
-			bufAfter := pool.Get(context.Background())
+			bufAfter := pool.Get()
 			assert.Equal(t, tc.expectedCapAfter, bufAfter.Cap())
 		})
 	}
