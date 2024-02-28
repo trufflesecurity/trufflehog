@@ -7,61 +7,99 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/mssql"
+	"github.com/testcontainers/testcontainers-go/modules/mysql"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestMain(m *testing.M) {
-	code, err := runMain(m)
-	if err != nil {
-		panic(err)
-	}
-	os.Exit(code)
-}
-
-func runMain(m *testing.M) (int, error) {
-	for _, ctrl := range []struct {
-		start func() error
-		stop  func()
-	}{
-		{startPostgres, stopPostgres},
-		{startMySQL, stopMySQL},
-		{startSqlServer, stopSqlServer},
-	} {
-		if err := ctrl.start(); err != nil {
-			return 0, err
-		}
-		defer ctrl.stop()
-	}
-	return m.Run(), nil
-}
-
-func dockerLogLine(hash string, needle string) chan struct{} {
-	ch := make(chan struct{}, 1)
-	go func() {
-		for {
-			out, err := exec.Command("docker", "logs", hash).CombinedOutput()
-			if err != nil {
-				panic(err)
-			}
-			if strings.Contains(string(out), needle) {
-				ch <- struct{}{}
-				return
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}()
-	return ch
-}
-
 func TestJdbcVerified(t *testing.T) {
+	ctx := context.Background()
+
+	postgresUser := gofakeit.Username()
+	postgresPass := gofakeit.Password(true, true, true, false, false, 10)
+	postgresDB := gofakeit.Word()
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:13-alpine"),
+		postgres.WithDatabase(postgresDB),
+		postgres.WithUsername(postgresUser),
+		postgres.WithPassword(postgresPass),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer postgresContainer.Terminate(ctx)
+
+	postgresHost, err := postgresContainer.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	postgresPort, err := postgresContainer.MappedPort(ctx, "5432")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mysqlUser := gofakeit.Username()
+	mysqlPass := gofakeit.Password(true, true, true, false, false, 10)
+	mysqlDatabase := gofakeit.Word()
+	mysqlC, err := mysql.RunContainer(ctx,
+		mysql.WithDatabase(mysqlDatabase),
+		mysql.WithUsername(mysqlUser),
+		mysql.WithPassword(mysqlPass),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer mysqlC.Terminate(ctx)
+
+	mysqlHost, err := mysqlC.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mysqlPort, err := mysqlC.MappedPort(ctx, "3306")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sqlServerPass := gofakeit.Password(true, true, true, false, false, 10)
+	sqlServerDatabase := "master"
+
+	mssqlContainer, err := mssql.RunContainer(ctx,
+		testcontainers.WithImage("mcr.microsoft.com/mssql/server:2022-RTM-GDR1-ubuntu-20.04"),
+		mssql.WithAcceptEULA(),
+		mssql.WithPassword(sqlServerPass),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer mssqlContainer.Terminate(ctx)
+
+	sqlServerHost, err := mssqlContainer.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sqlServerPort, err := mssqlContainer.MappedPort(ctx, "1433")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -76,15 +114,17 @@ func TestJdbcVerified(t *testing.T) {
 		{
 			name: "postgres verified",
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(`jdbc connection string: jdbc:postgresql://localhost:5432/foo?sslmode=disable&password=` + postgresPass),
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf("jdbc connection string: jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
+					postgresHost, postgresPort.Port(), postgresDB, postgresPass, postgresUser)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_JDBC,
 					Verified:     true,
-					Redacted:     "jdbc:postgresql://localhost:5432/foo?sslmode=disable&password=" + strings.Repeat("*", len(postgresPass)),
+					Redacted: fmt.Sprintf("jdbc:postgresql://%s:%s/%s?sslmode=disable&password=%s&user=%s",
+						postgresHost, postgresPort.Port(), postgresDB, strings.Repeat("*", len(postgresPass)), postgresUser),
 				},
 			},
 			wantErr: false,
@@ -92,15 +132,17 @@ func TestJdbcVerified(t *testing.T) {
 		{
 			name: "mysql verified",
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf(`CONN="jdbc:mysql://%s:%s@tcp(127.0.0.1:3306)/%s"`, mysqlUser, mysqlPass, mysqlDatabase)),
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`CONN="jdbc:mysql://%s:%s@tcp(%s:%s)/%s"`,
+					mysqlUser, mysqlPass, mysqlHost, mysqlPort.Port(), mysqlDatabase)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_JDBC,
 					Verified:     true,
-					Redacted:     fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(127.0.0.1:3306)/%s`, mysqlUser, strings.Repeat("*", len(mysqlPass)), mysqlDatabase),
+					Redacted: fmt.Sprintf(`jdbc:mysql://%s:%s@tcp(%s:%s)/%s`,
+						mysqlUser, strings.Repeat("*", len(mysqlPass)), mysqlHost, mysqlPort.Port(), mysqlDatabase),
 				},
 			},
 			wantErr: false,
@@ -108,15 +150,17 @@ func TestJdbcVerified(t *testing.T) {
 		{
 			name: "sql server verified",
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("jdbc:sqlserver://odbc:server=localhost;database=%s;password=%s", sqlServerDatabase, sqlServerPass)),
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
+					sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, sqlServerPass)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_JDBC,
 					Verified:     true,
-					Redacted:     "jdbc:sqlserver://odbc:server=localhost;database=master;password=**************",
+					Redacted: fmt.Sprintf("jdbc:sqlserver://odbc:server=%s;port=%s;database=%s;password=%s",
+						sqlServerHost, sqlServerPort.Port(), sqlServerDatabase, strings.Repeat("*", len(sqlServerPass))),
 				},
 			},
 			wantErr: false,
