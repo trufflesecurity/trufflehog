@@ -2,9 +2,11 @@ package mongodb
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"net/url"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -85,9 +87,31 @@ func isErrDeterminate(err error) bool {
 }
 
 func verifyUri(uri string, timeout time.Duration) error {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return err
+	}
+
+	params := url.Values{}
+	for k, v := range parsed.Query() {
+		if len(v) > 0 {
+			switch k {
+			case "tls":
+				if v[0] == "false" {
+					params.Set("tls", "false")
+				} else {
+					params.Set("tls", "true")
+				}
+			}
+		}
+	}
+	parsed.RawQuery = params.Encode()
+	parsed.Path = "/"
+	uri = parsed.String()
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(ctx, options.Client().SetTimeout(timeout).ApplyURI(uri))
 	if err != nil {
 		return err
 	}
