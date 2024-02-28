@@ -105,15 +105,13 @@ func verifyUri(uri string, timeout time.Duration) error {
 			}
 		}
 	}
-	params.Set("connectTimeoutMS", "3000")
-	params.Set("timeoutMS", "3000")
 	parsed.RawQuery = params.Encode()
 	parsed.Path = "/"
 	uri = parsed.String()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(ctx, options.Client().SetTimeout(timeout).ApplyURI(uri))
 	if err != nil {
 		return err
 	}
