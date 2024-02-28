@@ -588,7 +588,7 @@ func normalizeRepos(repos []string) ([]string, []error) {
 	return validRepos, errs
 }
 
-// normalizeGitlabEndpoint ensures that if and endpoint is going to gitlab.com, we use https://gitlab.com/ as the endpoint.
+// normalizeGitlabEndpoint ensures that if an endpoint is going to gitlab.com, we use https://gitlab.com/ as the endpoint.
 // If we see the protocol is http, we error, because this shouldn't be used.
 // Otherwise, it ensures we are using https as our protocol, if none was provided.
 func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
