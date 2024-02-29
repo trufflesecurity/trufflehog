@@ -173,7 +173,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				s1.ExtraData["account"] = account
 			}
-			if !strings.Contains(dataStr, "Redacted: " + account) {
+			if !strings.Contains(dataStr, "Redacted: " + resIDMatch) {
 				if _, ok := thinkstCanaryList[account]; ok {
 					s1.ExtraData["is_canary"] = "true"
 					s1.ExtraData["message"] = thinkstMessage
