@@ -19,7 +19,7 @@ import (
 )
 
 func TestSource_Init_BucketListCollisionsError(t *testing.T) {
-	config := &sourcespb.S3{
+	conn, err := anypb.New(&sourcespb.S3{
 		Credential: &sourcespb.S3_AccessKey{
 			AccessKey: &credentialspb.KeySecret{
 				Key:    "ignored for test",
@@ -28,12 +28,8 @@ func TestSource_Init_BucketListCollisionsError(t *testing.T) {
 		},
 		Buckets:       []string{"a", "b", "c"},
 		IgnoreBuckets: []string{"a"},
-	}
-
-	conn, err := anypb.New(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	})
+	assert.NoError(t, err)
 
 	s := Source{}
 	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
