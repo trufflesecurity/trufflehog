@@ -63,10 +63,11 @@ func TestSource_Validate(t *testing.T) {
 	s3secret := secret.MustGetField("AWS_S3_SECRET")
 
 	tests := []struct {
-		name         string
-		roles        []string
-		buckets      []string
-		wantErrCount int
+		name          string
+		roles         []string
+		buckets       []string
+		ignoreBuckets []string
+		wantErrCount  int
 	}{
 		{
 			name: "buckets without roles, can access all buckets",
@@ -81,6 +82,18 @@ func TestSource_Validate(t *testing.T) {
 				"truffletestbucket-s3-tests",
 				"truffletestbucket-s3-role-assumption",
 				"truffletestbucket-no-access",
+			},
+			wantErrCount: 2,
+		},
+		{
+			// If more buckets are added to the account this will break. This is written to find a balance between
+			// speed of implementation and robustness.
+			name: "ignored buckets, one error per inaccessible bucket",
+			ignoreBuckets: []string{
+				"trufflebucketforall",
+				"truffletestbucket-no-access",
+				"truffletestbucket-roleassumption",
+				"truffletestbucket-s3-role-assumption",
 			},
 			wantErrCount: 2,
 		},
@@ -152,8 +165,9 @@ func TestSource_Validate(t *testing.T) {
 						Secret: s3secret,
 					},
 				},
-				Buckets: tt.buckets,
-				Roles:   tt.roles,
+				Buckets:       tt.buckets,
+				IgnoreBuckets: tt.ignoreBuckets,
+				Roles:         tt.roles,
 			})
 			if err != nil {
 				t.Fatal(err)
