@@ -21,6 +21,7 @@ import (
 type scanner struct {
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
+	verifyCanaries     bool
 }
 
 // resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -92,6 +93,12 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 		}
 
 		s.skipIDs = ids
+	}
+}
+
+func WithVerifyCanaries() func(*scanner) {
+	return func(s *scanner) {
+		s.verifyCanaries = true
 	}
 }
 
@@ -173,15 +180,17 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				s1.ExtraData["account"] = account
 			}
-			if _, ok := thinkstCanaryList[account]; ok {
-				s1.ExtraData["is_canary"] = "true"
-				s1.ExtraData["message"] = thinkstMessage
-				s1.Verified = true
-			}
-			if _, ok := thinkstKnockoffsCanaryList[account]; ok {
-				s1.ExtraData["is_canary"] = "true"
-				s1.ExtraData["message"] = thinkstKnockoffsMessage
-				s1.Verified = true
+			if !s.verifyCanaries && !strings.Contains(dataStr, "Redacted: "+resIDMatch) {
+				if _, ok := thinkstCanaryList[account]; ok {
+					s1.ExtraData["is_canary"] = "true"
+					s1.ExtraData["message"] = thinkstMessage
+					s1.Verified = true
+				}
+				if _, ok := thinkstKnockoffsCanaryList[account]; ok {
+					s1.ExtraData["is_canary"] = "true"
+					s1.ExtraData["message"] = thinkstKnockoffsMessage
+					s1.Verified = true
+				}
 			}
 
 			if verify && !s1.Verified {
