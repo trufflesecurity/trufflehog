@@ -18,6 +18,29 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+func TestSource_Init_BucketListCollisionsError(t *testing.T) {
+	config := &sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    "ignored for test",
+				Secret: "ignore for test",
+			},
+		},
+		Buckets:       []string{"a", "b", "c"},
+		IgnoreBuckets: []string{"a"},
+	}
+
+	conn, err := anypb.New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := Source{}
+	err = s.Init(context.Background(), "s3 test source", 0, 0, false, conn, 1)
+
+	assert.Error(t, err)
+}
+
 func TestSource_Chunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
