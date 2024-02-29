@@ -76,7 +76,8 @@ func TestRetryableHTTPClientCheckRetry(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
 			assert.NoError(t, err)
 
-			_, err = client.Do(req)
+			// Bad linter, there is no body to close.
+			_, err = client.Do(req) //nolint:bodyclose
 			if err != nil && slices.Contains([]int{http.StatusInternalServerError, http.StatusTooManyRequests}, tc.responseStatus) {
 				// The underlying transport will retry on 500 and 429 status.
 				assert.Error(t, err)
@@ -152,7 +153,8 @@ func TestRetryableHTTPClientMaxRetry(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
 			assert.NoError(t, err)
 
-			_, err = client.Do(req)
+			// Bad linter, there is no body to close.
+			_, err = client.Do(req) //nolint:bodyclose
 			if err != nil && tc.responseStatus == http.StatusOK {
 				assert.Error(t, err)
 			}
