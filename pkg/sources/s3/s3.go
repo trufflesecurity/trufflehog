@@ -95,6 +95,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
+	if len(conn.Buckets) > 0 && len(conn.IgnoreBuckets) > 0 {
+		return fmt.Errorf("either a bucket include list or a bucket ignore list can be specified, but not both")
+	}
+
 	return nil
 }
 

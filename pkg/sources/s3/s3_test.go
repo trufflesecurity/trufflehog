@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func TestSource_Init_BucketListCollisionsError(t *testing.T) {
+func TestSource_Init_IncludeAndIgnoreBucketsError(t *testing.T) {
 	conn, err := anypb.New(&sourcespb.S3{
 		Credential: &sourcespb.S3_AccessKey{
 			AccessKey: &credentialspb.KeySecret{
@@ -26,8 +26,8 @@ func TestSource_Init_BucketListCollisionsError(t *testing.T) {
 				Secret: "ignore for test",
 			},
 		},
-		Buckets:       []string{"a", "b", "c"},
-		IgnoreBuckets: []string{"a"},
+		Buckets:       []string{"a"},
+		IgnoreBuckets: []string{"b"},
 	})
 	assert.NoError(t, err)
 
