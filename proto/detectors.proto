@@ -990,6 +990,7 @@ enum DetectorType {
   AzureSQL = 979;
   FlyIO = 980;
   BuiltWith = 981;
+  GCPApplicationDefaultCredentials = 982;
 }
 
 message Result {

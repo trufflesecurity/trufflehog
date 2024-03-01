@@ -280,6 +280,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory_v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcpapplicationdefaultcredentials"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gengo"
@@ -1593,6 +1594,7 @@ func DefaultDetectors() []detectors.Detector {
 		&azuresearchquerykey.Scanner{},
 		jiratoken_v2.Scanner{},
 		&googleoauth2.Scanner{},
+		gcpapplicationdefaultcredentials.Scanner{},
 	}
 
 }

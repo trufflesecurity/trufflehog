@@ -1077,6 +1077,7 @@ const (
 	DetectorType_AzureSQL                                DetectorType = 979
 	DetectorType_FlyIO                                   DetectorType = 980
 	DetectorType_BuiltWith                               DetectorType = 981
+	DetectorType_GCPApplicationDefaultCredentials        DetectorType = 982
 )
 
 // Enum value maps for DetectorType.
@@ -2060,6 +2061,7 @@ var (
 		979: "AzureSQL",
 		980: "FlyIO",
 		981: "BuiltWith",
+		982: "GCPApplicationDefaultCredentials",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3040,6 +3042,7 @@ var (
 		"AzureSQL":                   979,
 		"FlyIO":                      980,
 		"BuiltWith":                  981,
+		"GCPApplicationDefaultCredentials": 982,
 	}
 )
 
