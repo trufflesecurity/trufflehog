@@ -123,6 +123,11 @@ func WithCheckRetry(cr retryablehttp.CheckRetry) ClientOption {
 	return func(c *retryablehttp.Client) { c.CheckRetry = cr }
 }
 
+// WithBackoff allows setting a custom backoff policy.
+func WithBackoff(b retryablehttp.Backoff) ClientOption {
+	return func(c *retryablehttp.Client) { c.Backoff = b }
+}
+
 // WithTimeout allows setting a custom timeout.
 func WithTimeout(timeout time.Duration) ClientOption {
 	return func(c *retryablehttp.Client) { c.HTTPClient.Timeout = timeout }
@@ -136,6 +141,11 @@ func WithMaxRetries(retries int) ClientOption {
 // WithRetryWaitMin allows setting a custom minimum retry wait.
 func WithRetryWaitMin(wait time.Duration) ClientOption {
 	return func(c *retryablehttp.Client) { c.RetryWaitMin = wait }
+}
+
+// WithRetryWaitMax allows setting a custom maximum retry wait.
+func WithRetryWaitMax(wait time.Duration) ClientOption {
+	return func(c *retryablehttp.Client) { c.RetryWaitMax = wait }
 }
 
 func PinnedRetryableHttpClient() *http.Client {
