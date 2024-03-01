@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
+		// Trim prefix (".apps.googleusercontent.com") because it will be labeled as false positive
 		detectedClientID, _, _ := strings.Cut(creds.ClientID, ".")
 
 		s1 := detectors.Result{
