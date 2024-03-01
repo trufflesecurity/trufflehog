@@ -258,7 +258,6 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
 // Consider adding additional flags to support filtering.
-// ZR:NOTE: this could just be GetWorkspaces and return a list of workspaces instead of an object
 func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
 	var workspaces []Workspace
 	workspacesObj := struct {
@@ -318,28 +317,30 @@ func (c *Client) GetWorkspace(workspaceUUID string) (Workspace, error) {
 	return obj.Workspace, nil
 }
 
-// GetGlobals returns the global variables for a given workspace
-func (c *Client) GetGlobals(workspace_uuid string) (GlobalVars, error) {
-	var globalVars GlobalVars
+// GetGlobalVariables returns the global variables for a given workspace
+func (c *Client) GetGlobalVariables(workspace_uuid string) (VariableData, error) {
+	obj := struct {
+		VariableData `json:"data"`
+	}{}
 
 	url := fmt.Sprintf(GLOBAL_VARS_URL, workspace_uuid)
 	r, err := c.getPostmanReq(url, map[string]string{"User-Agent": alt_userAgent})
 	if err != nil {
 		err = fmt.Errorf("could not get global variables for workspace: %s", workspace_uuid)
-		return globalVars, err
+		return VariableData{}, err
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("could not read response body for workspace: %s", workspace_uuid)
-		return globalVars, err
+		return VariableData{}, err
 	}
 
-	if err := json.Unmarshal([]byte(body), &globalVars); err != nil {
+	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		err = fmt.Errorf("could not unmarshal global variables JSON for workspace: %s", workspace_uuid)
-		return globalVars, err
+		return VariableData{}, err
 	}
-	return globalVars, nil
+	return obj.VariableData, nil
 }
 
 // GetEnvironment returns the environment variables for a given environment

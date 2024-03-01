@@ -41,6 +41,18 @@ type Source struct {
 	conn             *sourcespb.Postman
 	detectorKeywords map[string]struct{}
 
+	// keywords are potential keywords
+	keywords []string
+
+	variableKeywords    []string
+	environmentKeywords []string
+	collectionKeywords  []string
+	workspaceKeywords   []string
+	httpKeywords        []string
+	folderKeywords      []string
+
+	subMap map[string]string
+
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -146,7 +158,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		w := Workspace{
 			Environments: envs,
 		}
-		s.scanEnvironments(ctx, chunksChan, w, nil, nil)
+		s.scanEnvironments(ctx, chunksChan, w, nil)
 		// Note that when we read in environment json files, there is no outer
 		// environment field. Same for collections and outer collection field.
 	}
@@ -161,10 +173,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			Collections: collections,
 		}
 
-		// ZR: this is apparently high touch
 		var varSubMap []map[string]string
 		varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
-		s.scanCollections(ctx, chunksChan, w, nil, &varSubMap)
+		s.scanCollections(ctx, chunksChan, w, &varSubMap)
 	}
 
 	// Scan personal workspaces (from API token)
@@ -187,18 +198,16 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
 	w, err := s.client.GetWorkspace(workspaceID)
 	if err != nil {
-		// ZR:NOTE this log does not work
 		s.log.Error(err, "could not get workspace object", "workspace_uuid", workspaceID)
 	}
-	// fmt.Println("workspace", w)
-	var extraKeywords []string
-	extraKeywords = append(extraKeywords, w.Name)
-	s.scanGlobals(ctx, chunksChan, w, extraKeywords, &varSubMap)
-	s.scanEnvironments(ctx, chunksChan, w, extraKeywords, &varSubMap)
-	s.scanCollections(ctx, chunksChan, w, extraKeywords, &varSubMap)
+	s.keywords = append(s.keywords, w.Name)
+	// s.workspaceKeywords = append(s.workspaceKeywords, w.Name)
+	s.scanGlobals(ctx, chunksChan, w, &varSubMap)
+	s.scanEnvironments(ctx, chunksChan, w, &varSubMap)
+	s.scanCollections(ctx, chunksChan, w, &varSubMap)
 }
 
-func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, varSubMap *[]map[string]string) {
 	ctx.Logger().V(2).Info("starting scanning collections")
 
 	// Filter Collections
@@ -226,12 +235,12 @@ func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.C
 			m.FullID = m.CollectionInfo.PostmanID
 			m.Link = "../" + m.FullID + ".json"
 		}
-		s.scanCollection(ctx, chunksChan, m, c.Collection, extraKeywords, varSubMap)
+		s.scanCollection(ctx, chunksChan, m, c.Collection, varSubMap)
 	}
 	ctx.Logger().V(2).Info("finished scanning collections")
 }
 
-func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, c Collection, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, c Collection, varSubMap *[]map[string]string) {
 	// Deep copy varSubMap
 	varSubMapCopy := make([]map[string]string, len(*varSubMap))
 	for i, originalMap := range *varSubMap {
@@ -241,18 +250,18 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 		}
 		varSubMapCopy[i] = newMap
 	}
-	s.scanFolderMetadata(ctx, chunksChan, m, c.Variable, c.Event, c.Auth, extraKeywords, &varSubMapCopy)
-	s.scanFolder(ctx, chunksChan, m, c.Item, extraKeywords, &varSubMapCopy)
+	s.scanFolderMetadata(ctx, chunksChan, m, c.Variable, c.Event, c.Auth, &varSubMapCopy)
+	s.scanFolder(ctx, chunksChan, m, c.Item, &varSubMapCopy)
 }
 
 // Scan non-item fields in folder. Outer most folder is a collection.
-func (s *Source) scanFolderMetadata(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, vars []KeyValue, e []Event, a Auth, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanFolderMetadata(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, vars []KeyValue, e []Event, a Auth, varSubMap *[]map[string]string) {
 	varData := VariableData{
 		KeyValues: vars,
 	}
-	s.scanVars(ctx, chunksChan, m, varData, extraKeywords, varSubMap)
+	s.scanVars(ctx, chunksChan, m, varData, varSubMap)
 	s.scanEvents(ctx, chunksChan, m, e, varSubMap)
-	s.scanAuth(ctx, chunksChan, m, a, URL{}, extraKeywords, varSubMap)
+	s.scanAuth(ctx, chunksChan, m, a, URL{}, varSubMap)
 }
 
 func (s *Source) scanEvents(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, events []Event, varSubMap *[]map[string]string) {
@@ -306,7 +315,7 @@ func (s *Source) substitute(data string, subMap map[string]string) string {
 // Process Auth
 // Create scanHTTPItem function
 
-func (s *Source) parseAPIKey(ctx context.Context, a Auth, extraKeywords []string, varSubMap *[]map[string]string) string {
+func (s *Source) parseAPIKey(a Auth, varSubMap *[]map[string]string) string {
 	if len(a.Apikey) == 0 {
 		return ""
 	}
@@ -322,9 +331,11 @@ func (s *Source) parseAPIKey(ctx context.Context, a Auth, extraKeywords []string
 		}
 	}
 	data += fmt.Sprintf("%s=%s\n", apiKeyName, apiKeyValue)
-	for _, keyword := range extraKeywords {
+	for _, keyword := range s.keywords {
 		data += fmt.Sprintf("%s:%s ", keyword, apiKeyValue)
 	}
+
+	// ZRNOTE: kinda confused by this one
 	for _, subMap := range *varSubMap {
 		// Substitute for both key and value, for both regular and keyword subbed in
 		data += s.substitute(data, subMap)
@@ -332,7 +343,7 @@ func (s *Source) parseAPIKey(ctx context.Context, a Auth, extraKeywords []string
 	return data
 }
 
-func (s *Source) parseAWSAuth(ctx context.Context, a Auth, varSubMap *[]map[string]string) string {
+func (s *Source) parseAWSAuth(a Auth, varSubMap *[]map[string]string) string {
 	if len(a.AWSv4) == 0 {
 		return ""
 	}
@@ -360,19 +371,17 @@ func (s *Source) parseAWSAuth(ctx context.Context, a Auth, varSubMap *[]map[stri
 	return data
 }
 
-func (s *Source) parseBearer(ctx context.Context, a Auth, extraKeywords []string, varSubMap *[]map[string]string) string {
+func (s *Source) parseBearer(a Auth, varSubMap *[]map[string]string) string {
 	if len(a.Bearer) == 0 {
 		return ""
 	}
-	var data string
-	var bearerKey string
-	var bearerValue string
+	var data, bearerKey, bearerValue string
 	for _, kv := range a.Bearer {
 		bearerValue = fmt.Sprintf("%v", kv.Value)
 		bearerKey = fmt.Sprintf("%v", kv.Key)
 	}
 	data += fmt.Sprintf("%s:%s\n", bearerKey, bearerValue)
-	for _, keyword := range extraKeywords {
+	for _, keyword := range s.keywords {
 		data += fmt.Sprintf("%s:%s ", keyword, bearerValue)
 	}
 	for _, subMap := range *varSubMap {
@@ -382,13 +391,11 @@ func (s *Source) parseBearer(ctx context.Context, a Auth, extraKeywords []string
 	return data
 }
 
-func (s *Source) parseBasicAuth(ctx context.Context, a Auth, u URL, extraKeywords []string, varSubMap *[]map[string]string) string {
+func (s *Source) parseBasicAuth(ctx context.Context, a Auth, u URL, varSubMap *[]map[string]string) string {
 	if len(a.Basic) == 0 {
 		return ""
 	}
-	var data string
-	var basicUsername string
-	var basicPassword string
+	var data, basicUsername, basicPassword string
 	for _, kv := range a.Basic {
 		switch kv.Key {
 		case "username":
@@ -397,8 +404,9 @@ func (s *Source) parseBasicAuth(ctx context.Context, a Auth, u URL, extraKeyword
 			basicPassword = fmt.Sprintf("%v", kv.Value)
 		}
 	}
+	// ZRNOTE: if either username or pw are empty, we should return an empty string?
 	data += fmt.Sprintf("username:%s password:%s ", basicUsername, basicPassword)
-	for _, keyword := range extraKeywords {
+	for _, keyword := range s.keywords {
 		data += fmt.Sprintf("%s:%s ", keyword, basicPassword)
 	}
 
@@ -426,7 +434,7 @@ func (s *Source) parseBasicAuth(ctx context.Context, a Auth, u URL, extraKeyword
 	return data
 }
 
-func (s *Source) parseOAuth2(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, a Auth, extraKeywords []string, varSubMap *[]map[string]string) string {
+func (s *Source) parseOAuth2(a Auth, varSubMap *[]map[string]string) string {
 	if len(a.OAuth2) == 0 {
 		return ""
 	}
@@ -435,7 +443,7 @@ func (s *Source) parseOAuth2(ctx context.Context, chunksChan chan *sources.Chunk
 		switch oauth.Key {
 		case "accessToken", "refreshToken", "clientId", "clientSecret", "accessTokenUrl", "authUrl":
 			data += fmt.Sprintf("%s:%v ", oauth.Key, oauth.Value)
-			for _, keyword := range extraKeywords {
+			for _, keyword := range s.keywords {
 				data += fmt.Sprintf("%s:%v ", keyword, oauth.Value)
 			}
 		}
@@ -446,30 +454,30 @@ func (s *Source) parseOAuth2(ctx context.Context, chunksChan chan *sources.Chunk
 	return data
 }
 
-func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, a Auth, u URL, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, a Auth, u URL, varSubMap *[]map[string]string) {
 	if a.Type == "" {
 		return
 	}
 	var authData string
 	switch a.Type {
 	case "apikey":
-		authData = s.parseAPIKey(ctx, a, extraKeywords, varSubMap)
+		authData = s.parseAPIKey(a, varSubMap)
 	case "awsSigV4":
-		authData = s.parseAWSAuth(ctx, a, varSubMap)
+		authData = s.parseAWSAuth(a, varSubMap)
 	case "bearer":
-		authData = s.parseBearer(ctx, a, extraKeywords, varSubMap)
+		authData = s.parseBearer(a, varSubMap)
 	case "basic":
-		authData = s.parseBasicAuth(ctx, a, u, extraKeywords, varSubMap)
+		authData = s.parseBasicAuth(ctx, a, u, varSubMap)
+	case "noauth":
+		authData = ""
+	case "oauth2":
+		authData = s.parseOAuth2(a, varSubMap)
+	// case "oauth1":
+	// 	s.scanAuthOAuth1(ctx, chunksChan, m, a, extraKeywords, varSubMap)
 	// case "digest":
 	// 	s.scanAuthDigest(ctx, chunksChan, m, a, extraKeywords, varSubMap)
 	// case "hawk":
 	// 	s.scanAuthHawk(ctx, chunksChan, m, a, extraKeywords, varSubMap)
-	case "noauth":
-		authData = ""
-	// case "oauth1":
-	// 	s.scanAuthOAuth1(ctx, chunksChan, m, a, extraKeywords, varSubMap)
-	case "oauth2":
-		authData = s.parseOAuth2(ctx, chunksChan, m, a, extraKeywords, varSubMap)
 	// case "ntlm":
 	// 	s.scanAuthNTLM(ctx, chunksChan, m, a, extraKeywords, varSubMap)
 	default:
@@ -490,9 +498,10 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	})
 }
 
-func (s *Source) scanFolder(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, FolderData []Item, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanFolder(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, FolderData []Item, varSubMap *[]map[string]string) {
 	for _, folder := range FolderData {
-		extraKeywords = append(extraKeywords, folder.Name)
+		s.keywords = append(s.keywords, folder.Name)
+		// s.folderKeywords = append(s.folderKeywords, folder.Name)
 
 		// Adjust metadata here
 		m.FolderID = folder.ID
@@ -507,16 +516,18 @@ func (s *Source) scanFolder(ctx context.Context, chunksChan chan *sources.Chunk,
 		}
 
 		if folder.Item != nil {
-			s.scanFolderMetadata(ctx, chunksChan, m, nil, folder.Event, folder.Auth, extraKeywords, varSubMap)
-			s.scanFolder(ctx, chunksChan, m, folder.Item, extraKeywords, varSubMap)
+			s.scanFolderMetadata(ctx, chunksChan, m, nil, folder.Event, folder.Auth, varSubMap)
+			// recursive?
+			s.scanFolder(ctx, chunksChan, m, folder.Item, varSubMap)
 		} else {
-			s.scanHTTPItem(ctx, chunksChan, m, folder, extraKeywords, varSubMap)
+			s.scanHTTPItem(ctx, chunksChan, m, folder, varSubMap)
 		}
 	}
 }
 
-func (s *Source) scanHTTPItem(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, item Item, extraKeywords []string, varSubMap *[]map[string]string) {
-	extraKeywords = append(extraKeywords, item.Name)
+func (s *Source) scanHTTPItem(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, item Item, varSubMap *[]map[string]string) {
+	s.keywords = append(s.keywords, item.Name)
+	// s.httpKeywords = append(s.httpKeywords, item.Name)
 	// Adjust metadata here
 	m.RequestID = item.ID
 	m.RequestName = item.Name
@@ -538,21 +549,21 @@ func (s *Source) scanHTTPItem(ctx context.Context, chunksChan chan *sources.Chun
 		s.scanEvents(ctx, chunksChan, m, item.Event, varSubMap)
 	}
 	if item.Request.Method != "" {
-		s.scanHTTPRequest(ctx, chunksChan, m, item.Request, extraKeywords, varSubMap)
+		s.scanHTTPRequest(ctx, chunksChan, m, item.Request, varSubMap)
 	}
 	if len(item.Response) > 0 {
-		s.scanHTTPResponse(ctx, chunksChan, m, item.Response, extraKeywords, varSubMap)
+		s.scanHTTPResponse(ctx, chunksChan, m, item.Response, varSubMap)
 	}
 }
 
-func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, r Request, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, r Request, varSubMap *[]map[string]string) {
 	// Add in var procesisng for headers
 	if r.Header != nil {
 		vars := VariableData{
 			KeyValues: r.Header,
 		}
 		m.Type = m.Type + " > header"
-		s.scanVars(ctx, chunksChan, m, vars, extraKeywords, varSubMap)
+		s.scanVars(ctx, chunksChan, m, vars, varSubMap)
 	}
 
 	if r.URL.Raw != "" {
@@ -579,9 +590,12 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 
 	if len(r.URL.Host) > 0 {
 		for _, host := range r.URL.Host {
-			extraKeywords = append(extraKeywords, host)
+			s.keywords = append(s.keywords, host)
+			// s.httpKeywords = append(s.httpKeywords, host)
+
 			for _, subMap := range *varSubMap {
-				extraKeywords = append(extraKeywords, s.substitute(host, subMap))
+				s.keywords = append(s.keywords, s.substitute(host, subMap))
+				// s.httpKeywords = append(s.httpKeywords, s.substitute(host, subMap))
 			}
 		}
 	}
@@ -591,21 +605,21 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			KeyValues: r.URL.Query,
 		}
 		m.Type = m.Type + " > GET parameters (query)"
-		s.scanVars(ctx, chunksChan, m, vars, extraKeywords, varSubMap)
+		s.scanVars(ctx, chunksChan, m, vars, varSubMap)
 	}
 
 	if r.Auth.Type != "" {
 		m.Type = m.Type + " > request auth"
-		s.scanAuth(ctx, chunksChan, m, r.Auth, URL{}, extraKeywords, varSubMap)
+		s.scanAuth(ctx, chunksChan, m, r.Auth, URL{}, varSubMap)
 	}
 
 	if r.Body.Mode != "" {
 		m.Type = m.Type + " > body"
-		s.scanBody(ctx, chunksChan, m, r.Body, extraKeywords, varSubMap)
+		s.scanBody(ctx, chunksChan, m, r.Body, varSubMap)
 	}
 }
 
-func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body, varSubMap *[]map[string]string) {
 	m.Link = m.Link + "?tab=body"
 	switch b.Mode {
 	case "formdata":
@@ -613,13 +627,13 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		vars := VariableData{
 			KeyValues: b.FormData,
 		}
-		s.scanVars(ctx, chunksChan, m, vars, extraKeywords, varSubMap)
+		s.scanVars(ctx, chunksChan, m, vars, varSubMap)
 	case "urlencoded":
 		m.Type = m.Type + " > url encoded"
 		vars := VariableData{
 			KeyValues: b.URLEncoded,
 		}
-		s.scanVars(ctx, chunksChan, m, vars, extraKeywords, varSubMap)
+		s.scanVars(ctx, chunksChan, m, vars, varSubMap)
 	case "raw":
 		m.Type = m.Type + " > raw"
 		data := b.Raw
@@ -665,7 +679,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 	}
 }
 
-func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, r []Response, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, r []Response, varSubMap *[]map[string]string) {
 	for _, response := range r {
 
 		if response.UID != "" {
@@ -678,7 +692,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 				KeyValues: response.Header,
 			}
 			m.Type = m.Type + " > response header"
-			s.scanVars(ctx, chunksChan, m, vars, extraKeywords, varSubMap)
+			s.scanVars(ctx, chunksChan, m, vars, varSubMap)
 		}
 
 		// Body in a response is just a string
@@ -702,14 +716,14 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 
 		if response.OriginalRequest.Method != "" {
 			m.Type = m.Type + " > original request"
-			s.scanHTTPRequest(ctx, chunksChan, m, response.OriginalRequest, extraKeywords, varSubMap)
+			s.scanHTTPRequest(ctx, chunksChan, m, response.OriginalRequest, varSubMap)
 		}
 	}
 }
 
-func (s *Source) scanGlobals(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanGlobals(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, varSubMap *[]map[string]string) {
 	ctx.Logger().V(2).Info("starting scanning global variables")
-	globalVars, err := s.client.GetGlobals(w.ID)
+	globalVars, err := s.client.GetGlobalVariables(w.ID)
 	if err != nil {
 		s.log.Error(err, "could not get global variables object")
 	}
@@ -724,11 +738,11 @@ func (s *Source) scanGlobals(ctx context.Context, chunksChan chan *sources.Chunk
 		Link:          LINK_BASE_URL + "workspace/" + w.ID + "/" + GLOBAL_TYPE,
 	}
 
-	s.scanVars(ctx, chunksChan, m, globalVars.VariableData, extraKeywords, varSubMap)
+	s.scanVars(ctx, chunksChan, m, globalVars, varSubMap)
 	ctx.Logger().V(2).Info("finished scanning global variables")
 }
 
-func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace, varSubMap *[]map[string]string) {
 	ctx.Logger().V(2).Info("starting scanning environments")
 
 	// Filter Enviroments
@@ -749,21 +763,23 @@ func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.
 			FullID:        env.UUID,
 			Link:          LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + env.UUID,
 		}
-		s.scanEnvironment(ctx, chunksChan, m, envVars.VariableData, extraKeywords, varSubMap)
+		// scan environment
+		vars := envVars.VariableData
+		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", m.FullID)
+		for _, word := range strings.Split(vars.Name, " ") {
+			s.keywords = append(s.keywords, string(word))
+			// s.environmentKeywords = append(s.environmentKeywords, string(word))
+		}
+
+		s.scanVars(ctx, chunksChan, m, vars, varSubMap)
+		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", m.FullID)
 	}
 	ctx.Logger().V(2).Info("finished scanning environments")
 }
 
-func (s *Source) scanEnvironment(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, vars VariableData, extraKeywords []string, varSubMap *[]map[string]string) {
-	ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", m.FullID)
-	for _, word := range strings.Split(vars.Name, " ") {
-		extraKeywords = append(extraKeywords, string(word))
-	}
-	s.scanVars(ctx, chunksChan, m, vars, extraKeywords, varSubMap)
-	ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", m.FullID)
-}
-
-func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, varData VariableData, extraKeywords []string, varSubMap *[]map[string]string) {
+func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, varData VariableData, varSubMap *[]map[string]string) {
+	fmt.Println("[scan vars] varData", varData)
+	fmt.Println("[scan vars] varSubMap", varSubMap)
 	if varData.KeyValues == nil {
 		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "uuid", m.FullID)
 		return
@@ -796,13 +812,14 @@ func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m
 	for _, v := range varData.KeyValues {
 		key := v.Key
 		value := fmt.Sprintf("%v", v.Value)
-		extraKeywords = append(extraKeywords, key)
-		extraKeywords = append(extraKeywords, value)
+		s.keywords = append(s.keywords, []string{key, value}...)
+		// s.variableKeywords = append(s.variableKeywords, []string{key, value}...)
 		allValuesMap[value] = struct{}{}
 		varSubstitutions[key] = value
 		if v.SessionValue != "" {
 			sessionValue := fmt.Sprintf("%v", v.SessionValue)
-			extraKeywords = append(extraKeywords, sessionValue)
+			s.keywords = append(s.keywords, sessionValue)
+			// s.variableKeywords = append(s.variableKeywords, sessionValue)
 			allValuesMap[sessionValue] = struct{}{}
 			varSubstitutions[key] = sessionValue
 		}
@@ -814,7 +831,7 @@ func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m
 	}
 
 	// Filter out keywords that don't exist in pkg/detectors/*
-	filteredKeywords := filterKeywords(extraKeywords, s.detectorKeywords)
+	filteredKeywords := filterKeywords(s.keywords, s.detectorKeywords)
 
 	// Create slice of objects to scan (both context & data)
 	pmObjToScan := []Target{}
@@ -877,6 +894,7 @@ func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m
 	if varSubMap == nil {
 		varSubMap = &[]map[string]string{}
 	}
+	fmt.Println("[scan vars] varSubMap", varSubMap)
 	*varSubMap = append(*varSubMap, varSubstitutions)
 	s.scanObjects(ctx, chunksChan, pmObjToScan)
 }
