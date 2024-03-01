@@ -125,6 +125,9 @@ require (
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/apache/arrow/go/v14 v14.0.2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.25.2 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.4 // indirect
+	github.com/aws/smithy-go v1.20.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
