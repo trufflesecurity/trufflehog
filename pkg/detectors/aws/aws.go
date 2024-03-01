@@ -189,7 +189,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if _, ok := thinkstCanaryList[account]; ok {
 					s1.ExtraData["is_canary"] = "true"
 					s1.ExtraData["message"] = thinkstMessage
-					verified, arn, err := s.verifyCanary(ctx, resIDMatch, resSecretMatch)
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
 					if verified {
 						s1.Verified = true
 					}
@@ -203,7 +203,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if _, ok := thinkstKnockoffsCanaryList[account]; ok {
 					s1.ExtraData["is_canary"] = "true"
 					s1.ExtraData["message"] = thinkstKnockoffsMessage
-					verified, arn, err := s.verifyCanary(ctx, resIDMatch, resSecretMatch)
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
 					if verified {
 						s1.Verified = true
 					}
@@ -373,8 +373,8 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	}
 }
 
-func (s scanner) verifyCanary(ctx context.Context, resIDMatch, resSecretMatch string) (bool, string, error) {
-	// Prep AWS access_key_id and secret_access_key for SNS
+func (s scanner) verifyCanary(resIDMatch, resSecretMatch string) (bool, string, error) {
+	// Prep AWS Creds for SNS
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("us-east-1"), // any region seems to work
 		Credentials: credentials.NewStaticCredentials(
@@ -385,15 +385,13 @@ func (s scanner) verifyCanary(ctx context.Context, resIDMatch, resSecretMatch st
 	}))
 	svc := sns.New(sess)
 
-	// Prep junk vars and publish to Sns
+	// Prep vars and Publish to SNS
 	_, err := svc.Publish(&sns.PublishInput{
 		Message:     aws.String("foo"),
 		PhoneNumber: aws.String("1"),
 	})
 
-	// parse the error, get the arn if it says "not authorized to perform". Otherwise if it says "does not match the signature".
 	if strings.Contains(err.Error(), "not authorized to perform") {
-		// Extract ARN
 		arn := strings.Split(err.Error(), "User: ")[1]
 		arn = strings.Split(arn, " is not authorized to perform: ")[0]
 		return true, arn, nil
