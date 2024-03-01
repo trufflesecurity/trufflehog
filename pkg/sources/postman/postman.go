@@ -42,16 +42,8 @@ type Source struct {
 	detectorKeywords map[string]struct{}
 
 	// keywords are potential keywords
-	keywords []string
-
-	variableKeywords    []string
-	environmentKeywords []string
-	collectionKeywords  []string
-	workspaceKeywords   []string
-	httpKeywords        []string
-	folderKeywords      []string
-
-	subMap map[string]string
+	keywords      []string
+	substitutions map[string]string
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -155,12 +147,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		for _, environment := range s.conn.Environments {
 			envs = append(envs, IDNameUUID{UUID: environment})
 		}
-		w := Workspace{
-			Environments: envs,
-		}
-		s.scanEnvironments(ctx, chunksChan, w, nil)
 		// Note that when we read in environment json files, there is no outer
 		// environment field. Same for collections and outer collection field.
+		s.scanEnvironments(ctx, chunksChan, Workspace{Environments: envs}, nil)
 	}
 
 	// Scan collections
@@ -169,13 +158,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		for _, collection := range s.conn.Collections {
 			collections = append(collections, IDNameUUID{UUID: collection})
 		}
-		w := Workspace{
-			Collections: collections,
-		}
 
 		var varSubMap []map[string]string
 		varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
-		s.scanCollections(ctx, chunksChan, w, &varSubMap)
+		s.scanCollections(ctx, chunksChan, Workspace{Collections: collections}, &varSubMap)
 	}
 
 	// Scan personal workspaces (from API token)
@@ -194,6 +180,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspaceID string) {
+	// reset keywords for each workspace
+	s.keywords = []string{}
+
 	var varSubMap []map[string]string
 	varSubMap = append(varSubMap, make(map[string]string)) //include an empty varsubmap for the substitution function
 	w, err := s.client.GetWorkspace(workspaceID)
@@ -201,7 +190,6 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		s.log.Error(err, "could not get workspace object", "workspace_uuid", workspaceID)
 	}
 	s.keywords = append(s.keywords, w.Name)
-	// s.workspaceKeywords = append(s.workspaceKeywords, w.Name)
 	s.scanGlobals(ctx, chunksChan, w, &varSubMap)
 	s.scanEnvironments(ctx, chunksChan, w, &varSubMap)
 	s.scanCollections(ctx, chunksChan, w, &varSubMap)
@@ -223,7 +211,7 @@ func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.C
 			WorkspaceUUID:  w.ID,
 			WorkspaceName:  w.Name,
 			CreatedBy:      w.CreatedBy,
-			CollectionInfo: c.Collection.Info,
+			CollectionInfo: c.Info,
 			Type:           COLLECTION_TYPE,
 		}
 		if m.CollectionInfo.UID != "" {
@@ -235,7 +223,7 @@ func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.C
 			m.FullID = m.CollectionInfo.PostmanID
 			m.Link = "../" + m.FullID + ".json"
 		}
-		s.scanCollection(ctx, chunksChan, m, c.Collection, varSubMap)
+		s.scanCollection(ctx, chunksChan, m, c, varSubMap)
 	}
 	ctx.Logger().V(2).Info("finished scanning collections")
 }
@@ -313,8 +301,6 @@ func (s *Source) substitute(data string, subMap map[string]string) string {
 }
 
 // Process Auth
-// Create scanHTTPItem function
-
 func (s *Source) parseAPIKey(a Auth, varSubMap *[]map[string]string) string {
 	if len(a.Apikey) == 0 {
 		return ""
@@ -778,8 +764,6 @@ func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.
 }
 
 func (s *Source) scanVars(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, varData VariableData, varSubMap *[]map[string]string) {
-	fmt.Println("[scan vars] varData", varData)
-	fmt.Println("[scan vars] varSubMap", varSubMap)
 	if varData.KeyValues == nil {
 		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "uuid", m.FullID)
 		return

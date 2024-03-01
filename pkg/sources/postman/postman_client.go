@@ -85,10 +85,6 @@ type Metadata struct {
 	Type           string //folder, request, etc.
 }
 
-type CollectionObj struct {
-	Collection Collection `json:"collection"`
-}
-
 type Collection struct {
 	Info     Info       `json:"info"`
 	Item     []Item     `json:"item,omitempty"`
@@ -369,26 +365,29 @@ func (c *Client) GetEnvironment(environment_uuid string) (Environment, error) {
 }
 
 // GetCollection returns the collection for a given collection
-func (c *Client) GetCollection(collection_uuid string) (CollectionObj, error) {
-	var col CollectionObj
+func (c *Client) GetCollection(collection_uuid string) (Collection, error) {
+
+	obj := struct {
+		Collection Collection `json:"collection"`
+	}{}
 
 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
 		fmt.Println(err)
 		err = fmt.Errorf("could not get collection: %s", collection_uuid)
-		return col, err
+		return Collection{}, err
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("could not read response body for collection: %s", collection_uuid)
-		return col, err
+		return Collection{}, err
 	}
-	if err := json.Unmarshal([]byte(body), &col); err != nil {
+	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		err = fmt.Errorf("could not unmarshal JSON for collection: %s", collection_uuid)
-		return col, err
+		return Collection{}, err
 	}
 
-	return col, nil
+	return obj.Collection, nil
 }
