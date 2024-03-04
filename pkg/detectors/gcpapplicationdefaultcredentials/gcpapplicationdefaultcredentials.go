@@ -41,7 +41,7 @@ type gcpApplicationDefaultCredentials struct {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"client_secret"}
+	return []string{".apps.googleusercontent.com"}
 }
 
 // FromData will find and optionally verify Gcpapplicationdefaultcredentials secrets in a given set of bytes.
