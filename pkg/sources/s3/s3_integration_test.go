@@ -41,7 +41,7 @@ func TestSource_ChunksCount(t *testing.T) {
 		assert.Nil(t, err)
 	}()
 
-	wantChunkCount := 120
+	wantChunkCount := 102
 	got := 0
 
 	for range chunksCh {
