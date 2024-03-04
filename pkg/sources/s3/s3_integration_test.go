@@ -86,8 +86,8 @@ func TestSource_Validate(t *testing.T) {
 			wantErrCount: 2,
 		},
 		{
-			// If more buckets are added to the account this will break. This is written to find a balance between
-			// speed of implementation and robustness.
+			// As of the time of this writing the account has six inaccessible buckets. If that is changed, this test
+			// will break. This test was written to balance between speed of implementation and robustness.
 			name: "ignored buckets, one error per inaccessible bucket",
 			ignoreBuckets: []string{
 				"trufflebucketforall",
