@@ -355,8 +355,10 @@ func (a *Archive) extractDebContent(ctx logContext.Context, file io.Reader) (io.
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpEnv.tempFileName)
-	defer os.RemoveAll(tmpEnv.extractPath)
+	defer func() {
+		os.Remove(tmpEnv.tempFileName)
+		os.RemoveAll(tmpEnv.extractPath)
+	}()
 
 	cmd := exec.Command("ar", "x", tmpEnv.tempFile.Name())
 	cmd.Dir = tmpEnv.extractPath
@@ -393,8 +395,10 @@ func (a *Archive) extractRpmContent(ctx logContext.Context, file io.Reader) (io.
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpEnv.tempFileName)
-	defer os.RemoveAll(tmpEnv.extractPath)
+	defer func() {
+		os.Remove(tmpEnv.tempFileName)
+		os.RemoveAll(tmpEnv.extractPath)
+	}()
 
 	// Use rpm2cpio to convert the RPM file to a cpio archive and then extract it using cpio command.
 	cmd := exec.Command("sh", "-c", "rpm2cpio "+tmpEnv.tempFile.Name()+" | cpio -id")
