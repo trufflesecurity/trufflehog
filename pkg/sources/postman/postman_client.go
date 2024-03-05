@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -87,10 +88,11 @@ type Metadata struct {
 
 type Collection struct {
 	Info     Info       `json:"info"`
-	Item     []Item     `json:"item,omitempty"`
+	Items    []Item     `json:"item,omitempty"`
 	Auth     Auth       `json:"auth,omitempty"`
 	Event    []Event    `json:"event,omitempty"`
 	Variable []KeyValue `json:"variable,omitempty"`
+	metadata Metadata
 }
 
 type Info struct {
@@ -104,10 +106,10 @@ type Info struct {
 
 type Item struct {
 	Name        string     `json:"name"`
-	Item        []Item     `json:"item,omitempty"`
+	Items       []Item     `json:"item,omitempty"`
 	ID          string     `json:"id,omitempty"`
 	Auth        Auth       `json:"auth,omitempty"`
-	Event       []Event    `json:"event,omitempty"`
+	Events      []Event    `json:"event,omitempty"`
 	Variable    []KeyValue `json:"variable,omitempty"`
 	Request     Request    `json:"request,omitempty"`
 	Response    []Response `json:"response,omitempty"`
@@ -310,6 +312,15 @@ func (c *Client) GetWorkspace(workspaceUUID string) (Workspace, error) {
 		err = fmt.Errorf("could not unmarshal workspace JSON for workspace: %s", workspaceUUID)
 		return workspace, err
 	}
+
+	// Create a file to save the JSON response
+	file, err := os.Create("workspace.json")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	file.Write(body)
+
 	return obj.Workspace, nil
 }
 
@@ -388,6 +399,14 @@ func (c *Client) GetCollection(collection_uuid string) (Collection, error) {
 		err = fmt.Errorf("could not unmarshal JSON for collection: %s", collection_uuid)
 		return Collection{}, err
 	}
+
+	// Create a file to save the JSON response
+	file, err := os.Create(fmt.Sprintf("response_%s.json", collection_uuid))
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	file.Write(body)
 
 	return obj.Collection, nil
 }
