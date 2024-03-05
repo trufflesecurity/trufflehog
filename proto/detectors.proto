@@ -9,6 +9,7 @@ enum DecoderType {
   PLAIN = 1;
   BASE64 = 2;
   UTF16 = 3;
+  ESCAPED_UNICODE = 4;
 }
 
 enum DetectorType {
