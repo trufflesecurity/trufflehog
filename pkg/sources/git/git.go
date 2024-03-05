@@ -1161,7 +1161,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 		remote = remotes[0]
 	}
 	// URLs is guaranteed to be non-empty
-	safeURL, err := stripPassword(remote.Config().URLs[0])
+	safeURL, _, err := stripPassword(remote.Config().URLs[0])
 	if err != nil {
 		return ""
 	}
