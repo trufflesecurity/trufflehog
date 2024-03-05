@@ -5,13 +5,12 @@ import (
 	"database/sql"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/microsoft/go-mssqldb/msdsn"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct{}
