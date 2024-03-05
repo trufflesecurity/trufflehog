@@ -421,7 +421,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
-	safeURL, err := stripPassword(params.gitURL)
+	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
 		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
 	}
@@ -433,17 +433,24 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	)
 
 	// Execute command and wait for the stdout / stderr.
-	output, err := cloneCmd.CombinedOutput()
+	outputBytes, err := cloneCmd.CombinedOutput()
+	var output string
+	if secretForRedaction != "" {
+		output = strings.ReplaceAll(string(outputBytes), secretForRedaction, "<secret>")
+	} else {
+		output = string(outputBytes)
+	}
+
 	if err != nil {
 		err = fmt.Errorf("error executing git clone: %w", err)
 	}
-	logger.V(3).Info("git subcommand finished", "output", string(output))
+	logger.V(3).Info("git subcommand finished", "output", output)
 
 	if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
+		logger.V(1).Info("git clone failed", "output", output, "error", err)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
@@ -979,19 +986,20 @@ func resolveHash(repo *git.Repository, ref string) (string, error) {
 	return resolved.String(), nil
 }
 
-func stripPassword(u string) (string, error) {
+func stripPassword(u string) (string, string, error) {
 	if strings.HasPrefix(u, "git@") {
-		return u, nil
+		return u, "", nil
 	}
 
 	repoURL, err := url.Parse(u)
 	if err != nil {
-		return "", fmt.Errorf("repo remote is not a URI: %w", err)
+		return "", "", fmt.Errorf("repo remote is not a URI: %w", err)
 	}
 
+	password, _ := repoURL.User.Password()
 	repoURL.User = nil
 
-	return repoURL.String(), nil
+	return repoURL.String(), password, nil
 }
 
 // TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
