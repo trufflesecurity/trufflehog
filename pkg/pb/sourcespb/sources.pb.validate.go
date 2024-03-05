@@ -407,14 +407,14 @@ func (m *AzureStorage) validate(all bool) error {
 	case *AzureStorage_ConnectionString:
 		// no validation rules for ConnectionString
 
-	case *AzureStorage_BasicAuth:
+	case *AzureStorage_AccessToken:
 
 		if all {
-			switch v := interface{}(m.GetBasicAuth()).(type) {
+			switch v := interface{}(m.GetAccessToken()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, AzureStorageValidationError{
-						field:  "BasicAuth",
+						field:  "AccessToken",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -422,24 +422,52 @@ func (m *AzureStorage) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, AzureStorageValidationError{
-						field:  "BasicAuth",
+						field:  "AccessToken",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetBasicAuth()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetAccessToken()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return AzureStorageValidationError{
-					field:  "BasicAuth",
+					field:  "AccessToken",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *AzureStorage_ClientCertificate:
-		// no validation rules for ClientCertificate
+	case *AzureStorage_SharedKey:
+
+		if all {
+			switch v := interface{}(m.GetSharedKey()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, AzureStorageValidationError{
+						field:  "SharedKey",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, AzureStorageValidationError{
+						field:  "SharedKey",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSharedKey()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return AzureStorageValidationError{
+					field:  "SharedKey",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
 
 	case *AzureStorage_Unauthenticated:
 

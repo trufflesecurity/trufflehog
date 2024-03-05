@@ -74,15 +74,17 @@ message Artifactory {
   repeated string include_paths = 5;
   repeated string ignore_paths = 6;
 }
-
 message AzureStorage {
   oneof credential {
     string connection_string = 1;
-    credentials.BasicAuth basic_auth = 2;
-    string client_certificate = 3;
+    credentials.AzureAccessToken access_token = 2;
+    credentials.KeySecret shared_key = 3;
     credentials.Unauthenticated unauthenticated = 4;
   }
   repeated string storage_containers = 5;
+  repeated string storage_tables = 6;
+  repeated string storage_queues = 7;
+  repeated string storage_file_shares = 8;
 }
 
 message Bitbucket {
