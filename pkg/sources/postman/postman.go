@@ -27,6 +27,9 @@ const (
 	FOLDER_TYPE      = "folder"
 	COLLECTION_TYPE  = "collection"
 	EVENT_TYPE       = "script"
+
+	SESSION_VALUE = "Session Value (hidden from UI)"
+	INITIAL_VALUE = "Initial Value"
 )
 
 type Source struct {
@@ -43,16 +46,20 @@ type Source struct {
 	// keywords are potential keywords
 	keywords []string
 
-	// each collection has a set of variables (key-value pairs)
-	// collectionVariables map[string]VariableData
-
 	// each environment has a set of variables (key-value pairs)
-	envVariables map[string]VariableData
+	// variableSubstituions map[string]VariableData
+	variableSubstituions map[string]VariableInfo
 
 	// ZRNOTE: Talk about this first but what about if we just gathered all the keywords and all the values
 	// _then_ sent it on the chunks channel rather than trying to do on the fly bookkeeping?
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+}
+
+type VariableInfo struct {
+	value     string
+	source    string
+	valueType string
 }
 
 // Target is a struct that holds the data for a single scan target.
@@ -106,7 +113,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 	s.detectorKeywords = make(map[string]struct{})
 	// s.collectionVariables = make(map[string]VariableData)
-	s.envVariables = make(map[string]VariableData)
+	s.variableSubstituions = make(map[string]VariableInfo)
 
 	s.log = ctx.Logger()
 
@@ -140,34 +147,21 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	// Scan workspaces
-	if s.conn.Workspaces != nil {
-		for _, workspace := range s.conn.Workspaces {
-			s.scanWorkspace(ctx, chunksChan, workspace)
+	for _, workspaceID := range s.conn.Workspaces {
+		w, err := s.client.GetWorkspace(workspaceID)
+		if err != nil {
+			s.log.Error(err, "could not get workspace object", "workspace_uuid", workspaceID)
 		}
-	}
-
-	// Scan environments
-	if s.conn.Environments != nil {
-		// Need to validate these: technically these are not UUIDs but
-		// <USER_ID>-<ENVIRONMENT_ID> where ENVIRONMENT_ID is a UUID.
-		// Need to show in README how to generate these.
-		var envs []IDNameUUID
-		for _, environment := range s.conn.Environments {
-			envs = append(envs, IDNameUUID{UUID: environment})
-		}
-		// Note that when we read in environment json files, there is no outer
-		// environment field. Same for collections and outer collection field.
-		s.scanEnvironments(ctx, chunksChan, Workspace{Environments: envs})
+		s.scanWorkspace(ctx, chunksChan, w)
 	}
 
 	// Scan collections
-	if s.conn.Collections != nil {
-		var collections []IDNameUUID
-		for _, collection := range s.conn.Collections {
-			collections = append(collections, IDNameUUID{UUID: collection})
+	for _, collectionID := range s.conn.Collections {
+		collection, err := s.client.GetCollection(collectionID)
+		if err != nil {
+			s.log.Error(err, "could not get collection object", "collection_uuid", collectionID)
 		}
-
-		s.scanCollections(ctx, chunksChan, Workspace{Collections: collections})
+		s.scanCollection(ctx, chunksChan, Metadata{}, collection)
 	}
 
 	// Scan personal workspaces (from API token)
@@ -178,84 +172,122 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			return nil
 		}
 		for _, workspace := range workspaces {
-			s.scanWorkspace(ctx, chunksChan, workspace.ID)
+			s.scanWorkspace(ctx, chunksChan, workspace)
 		}
 	}
 
 	return nil
 }
 
-func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspaceID string) {
+func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) {
 	// reset keywords for each workspace
-	s.keywords = []string{}
+	s.keywords = []string{workspace.Name}
 
-	w, err := s.client.GetWorkspace(workspaceID)
-	if err != nil {
-		s.log.Error(err, "could not get workspace object", "workspace_uuid", workspaceID)
+	// initiate metadata to track the tree structure of postman data
+	metadata := Metadata{
+		WorkspaceUUID: workspace.ID,
+		WorkspaceName: workspace.Name,
+		CreatedBy:     workspace.CreatedBy,
+		Type:          "workspace",
 	}
-	s.keywords = append(s.keywords, w.Name)
 
-	// scan global variables
-	s.scanGlobals(ctx, chunksChan, w)
+	ctx.Logger().V(2).Info("starting scanning global variables")
+	globalVars, err := s.client.GetGlobalVariables(workspace.ID)
+	if err != nil {
+		s.log.Error(err, "could not get global variables object")
+	}
+
+	metadata.Type = GLOBAL_TYPE
+	metadata.Link = LINK_BASE_URL + "workspace/" + workspace.ID + "/" + GLOBAL_TYPE
+	metadata.FullID = workspace.CreatedBy + "-" + globalVars.ID
+
+	s.scanVariableData(ctx, chunksChan, metadata, globalVars)
+	ctx.Logger().V(2).Info("finished scanning global variables")
 
 	// scan per environment variables
-	s.scanEnvironments(ctx, chunksChan, w)
+	for _, envID := range workspace.Environments {
+		env, err := s.client.GetEnvironment(envID.UUID)
+		if err != nil {
+			s.log.Error(err, "could not get environment object", "environment_uuid", envID.UUID)
+		}
+		// s.scanEnvironment(ctx, chunksChan, env, workspace)
+		metadata.Type = ENVIRONMENT_TYPE
+		metadata.Link = LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + env.ID
+		metadata.FullID = env.ID
+
+		// scan environment
+		vars := env.VariableData
+
+		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
+		for _, word := range strings.Split(vars.Name, " ") {
+			s.keywords = append(s.keywords, string(word))
+		}
+
+		s.scanVariableData(ctx, chunksChan, metadata, vars)
+		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
+	}
+	ctx.Logger().V(2).Info("finished scanning environments")
 
 	// scan all the collections in the workspace.
 	// at this point we have all the possible
 	// substitutions from Global and Environment variables
-	s.scanCollections(ctx, chunksChan, w)
-}
-
-func (s *Source) scanCollections(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) {
-	ctx.Logger().V(2).Info("starting scanning collections")
-
-	// Filter Collections
-	collections := filterItemsByUUID(workspace.Collections, s.conn.ExcludeCollections, s.conn.IncludeCollections)
-
-	// Scan Collections
-	for _, col := range collections {
-		collection, err := s.client.GetCollection(col.UUID)
+	for _, collectionID := range workspace.Collections {
+		collection, err := s.client.GetCollection(collectionID.UUID)
 		if err != nil {
-			s.log.Error(err, "could not get collection object", "collection_uuid", col.UUID)
+			s.log.Error(err, "could not get collection object", "collection_uuid", collectionID.UUID)
 		}
+		s.scanCollection(ctx, chunksChan, metadata, collection)
 
-		// metadata for the collection
-		// we will populate this with item metadata as we scan through the collection's items
-		metadata := Metadata{
-			WorkspaceUUID:  workspace.ID,
-			WorkspaceName:  workspace.Name,
-			CreatedBy:      workspace.CreatedBy,
-			CollectionInfo: collection.Info,
-			Type:           COLLECTION_TYPE,
-		}
-		if metadata.CollectionInfo.UID != "" {
-			// means we're reading in from an API call vs. local JSON file read
-			metadata.FullID = metadata.CollectionInfo.UID
-			metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
-		} else {
-			// means we're reading in from a local JSON file
-			metadata.FullID = metadata.CollectionInfo.PostmanID
-			metadata.Link = "../" + metadata.FullID + ".json"
-		}
-
-		for _, item := range collection.Items {
-			s.scanItem(ctx, chunksChan, collection, metadata, item)
-		}
-
-		// s.scanCollection(ctx, chunksChan, collection)
-		// ZRNOTE: can we not just drill down into items, events, etc
 	}
-	ctx.Logger().V(2).Info("finished scanning collections")
 }
 
+func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
+	ctx.Logger().V(2).Info("starting scanning collection", collection.Info.Name, "uuid", collection.Info.UID)
+	metadata.CollectionInfo = collection.Info
+	metadata.Type = COLLECTION_TYPE
+
+	if metadata.CollectionInfo.UID != "" {
+		// means we're reading in from an API call vs. local JSON file read
+		metadata.FullID = metadata.CollectionInfo.UID
+		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
+	} else {
+		// means we're reading in from a local JSON file
+		metadata.FullID = metadata.CollectionInfo.PostmanID
+		metadata.Link = "../" + metadata.FullID + ".json"
+	}
+
+	// variables must be scanned first before drilling down into the folders and events
+	// because we need to pick up the substitutions from the top level collection variables
+	if collection.Variables != nil {
+		s.scanVariableData(ctx, chunksChan, metadata, VariableData{
+			KeyValues: collection.Variables,
+		})
+	}
+
+	for _, event := range collection.Events {
+		s.scanEvent(ctx, chunksChan, metadata, event)
+	}
+
+	for _, item := range collection.Items {
+		s.scanItem(ctx, chunksChan, collection, metadata, item)
+	}
+
+}
+
+// ZRNOTE: rename back to folder and change struct name from Item to Folder
 func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item) {
 	s.keywords = append(s.keywords, item.Name)
 
 	// override the base collection metadata with item-specific metadata
 	metadata.FolderID = item.ID
 	metadata.Type = FOLDER_TYPE
-	metadata.FolderName = item.Name
+	if metadata.FolderName != "" {
+		// keep track of the folder hierarchy
+		metadata.FolderName = metadata.FolderName + " > " + item.Name
+	} else {
+		metadata.FolderName = item.Name
+	}
+
 	if item.UID != "" {
 		metadata.FullID = item.UID
 		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.FullID
@@ -269,62 +301,66 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		s.scanItem(ctx, chunksChan, collection, metadata, subItem)
 	}
 
-	s.scanHTTPItem(ctx, chunksChan, metadata, item)
+	// check if there are any requests in the folder
+	if item.Request.Method != "" {
+		metadata.RequestID = item.ID
+		metadata.RequestName = item.Name
+		metadata.Type = REQUEST_TYPE
+		if item.UID != "" {
+			// Route to API endpoint
+			metadata.FullID = item.UID
+			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.UID
+		} else {
+			// Route to collection.json
+			metadata.FullID = item.ID
+			metadata.Link = "../" + metadata.CollectionInfo.PostmanID + ".json"
+		}
+		s.scanHTTPRequest(ctx, chunksChan, metadata, item.Request)
+	}
+
+	// check if there are any responses in the folder
+	for _, response := range item.Response {
+		s.scanHTTPResponse(ctx, chunksChan, metadata, response)
+	}
+
+	for _, event := range item.Events {
+		s.scanEvent(ctx, chunksChan, metadata, event)
+	}
+
+	s.scanAuth(ctx, chunksChan, metadata, item.Auth, URL{})
 	s.scanVariableData(ctx, chunksChan, metadata, VariableData{
 		KeyValues: item.Variable,
 	})
-	s.scanEvents(ctx, chunksChan, metadata, item.Events)
-	s.scanAuth(ctx, chunksChan, metadata, item.Auth, URL{})
+
 }
 
-func (s *Source) scanEvents(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, events []Event) {
-	if events == nil {
-		return
-	}
-	for _, event := range events {
-		fmt.Println(event)
-		// for _, subMap := range *varSubMap {
-		// 	data := strings.Join(event.Script.Exec, " ")
+func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
+	metadata.Type = metadata.Type + " > event"
+	// for _, subMap := range *varSubMap {
+	// 	data := strings.Join(event.Script.Exec, " ")
 
-		// 	// Prep direct links
-		// 	link := LINK_BASE_URL + m.Type + "/" + m.FullID
-		// 	if event.Listen == "prerequest" {
-		// 		link += "?tab=pre-request-scripts"
-		// 	} else {
-		// 		link += "?tab=tests"
-		// 	}
-
-		// 	s.scanObject(ctx, chunksChan, Target{
-		// 		Link:           link,
-		// 		FieldType:      EVENT_TYPE,
-		// 		FieldName:      event.Listen,
-		// 		WorkspaceUUID:  m.WorkspaceUUID,
-		// 		WorkspaceName:  m.WorkspaceName,
-		// 		CollectionID:   m.CollectionInfo.PostmanID,
-		// 		CollectionName: m.CollectionInfo.Name,
-		// 		FolderName:     m.FolderName,
-		// 		FolderId:       m.FolderID,
-		// 		GlobalID:       m.FullID,
-		// 		Data:           s.substitute(data, subMap),
-		// 	})
-		// }
+	// Prep direct links
+	link := LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
+	if event.Listen == "prerequest" {
+		link += "?tab=pre-request-scripts"
+	} else {
+		link += "?tab=tests"
 	}
-}
 
-func (s *Source) substitute(data string, subMap map[string]string) string {
-	// Question: with substitution, we're potentially alerting on every x item (ex: request auth field),
-	// that the variable held in a folder "variable" field, when substituted in the request will reveal a secret.
-	// Do users want to be alerted to every request that uses that secret or just the locatino of taht secret in the
-	// folder "variable" field? The challenge is then keeping track of where taht substitution originated from. And we
-	// have to use substitutions otherwise secrets won't have sufficient context to be tracked.
-	// It's possible to keep track of the source of where the substitution originated from, but then we'd have to send many more individual scan objects.
-	// Possible, but seems complex, but maybe a better user experience?
-	for k, v := range subMap {
-		k = "{{" + k + "}}"
-		fmt.Println("SUBSTITUTING", k, "WITH", v)
-		data = strings.ReplaceAll(data, k, v)
-	}
-	return data
+	s.scanObject(ctx, chunksChan, Target{
+		Link:           link,
+		FieldType:      EVENT_TYPE,
+		FieldName:      event.Listen,
+		WorkspaceUUID:  metadata.WorkspaceUUID,
+		WorkspaceName:  metadata.WorkspaceName,
+		CollectionID:   metadata.CollectionInfo.PostmanID,
+		CollectionName: metadata.CollectionInfo.Name,
+		FolderName:     metadata.FolderName,
+		FolderId:       metadata.FolderID,
+		GlobalID:       metadata.FullID,
+		// ZRNOTE: Todo
+		// Data:           s.substitute(data, subMap),
+	})
 }
 
 // Process Auth
@@ -343,14 +379,6 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		authData = ""
 	case "oauth2":
 		authData = s.parseOAuth2(auth)
-	// case "oauth1":
-	// 	s.scanAuthOAuth1(ctx, chunksChan, m, a, extraKeywords, varSubMap)
-	// case "digest":
-	// 	s.scanAuthDigest(ctx, chunksChan, m, a, extraKeywords, varSubMap)
-	// case "hawk":
-	// 	s.scanAuthHawk(ctx, chunksChan, m, a, extraKeywords, varSubMap)
-	// case "ntlm":
-	// 	s.scanAuthNTLM(ctx, chunksChan, m, a, extraKeywords, varSubMap)
 	default:
 		return
 	}
@@ -367,37 +395,6 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		GlobalID:       m.FullID,
 		Data:           authData,
 	})
-}
-
-func (s *Source) scanHTTPItem(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, item Item) {
-	s.keywords = append(s.keywords, item.Name)
-	// s.httpKeywords = append(s.httpKeywords, item.Name)
-	// Adjust metadata here
-	m.RequestID = item.ID
-	m.RequestName = item.Name
-	m.Type = REQUEST_TYPE
-	// Adjust m.Type later on based on where in the request Ex: REQUEST (OriginalRequest Body)
-
-	if item.UID != "" {
-		// Route to API endpoint
-		m.FullID = item.UID
-		m.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.UID
-	} else {
-		// Route to collection.json
-		m.FullID = item.ID
-		m.Link = "../" + m.CollectionInfo.PostmanID + ".json"
-	}
-
-	if item.Events != nil {
-		m.Type = m.Type + " > event"
-		s.scanEvents(ctx, chunksChan, m, item.Events)
-	}
-	if item.Request.Method != "" {
-		s.scanHTTPRequest(ctx, chunksChan, m, item.Request)
-	}
-	if len(item.Response) > 0 {
-		s.scanHTTPResponse(ctx, chunksChan, m, item.Response)
-	}
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
@@ -478,29 +475,15 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 			KeyValues: b.URLEncoded,
 		}
 		s.scanVariableData(ctx, chunksChan, m, vars)
-	case "raw":
-		m.Type = m.Type + " > raw"
+	case "raw", "graphql":
 		data := b.Raw
-		// for _, subMap := range *varSubMap {
-		// 	data += s.substitute(data, subMap)
-		// }
-		s.scanObject(ctx, chunksChan, Target{
-			Link:           m.Link,
-			FieldType:      m.Type,
-			WorkspaceUUID:  m.WorkspaceUUID,
-			WorkspaceName:  m.WorkspaceName,
-			CollectionID:   m.CollectionInfo.PostmanID,
-			CollectionName: m.CollectionInfo.Name,
-			FolderName:     m.FolderName,
-			FolderId:       m.FolderID,
-			RequestID:      m.RequestID,
-			RequestName:    m.RequestName,
-			GlobalID:       m.FullID,
-			Data:           data,
-		})
-	case "graphql":
-		m.Type = m.Type + " > graphql"
-		data := b.GraphQL.Query + " " + b.GraphQL.Variables
+		if b.Mode == "graphql" {
+			m.Type = m.Type + " > graphql"
+			data = b.GraphQL.Query + " " + b.GraphQL.Variables
+		}
+		if b.Mode == "raw" {
+			m.Type = m.Type + " > raw"
+		}
 		// for _, subMap := range *varSubMap {
 		// 	data += s.substitute(data, subMap)
 		// }
@@ -523,106 +506,47 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 	}
 }
 
-func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, r []Response) {
-	for _, response := range r {
-
-		if response.UID != "" {
-			m.Link = LINK_BASE_URL + "example/" + response.UID
-			m.FullID = response.UID
-		}
-
-		if response.Header != nil {
-			vars := VariableData{
-				KeyValues: response.Header,
-			}
-			m.Type = m.Type + " > response header"
-			s.scanVariableData(ctx, chunksChan, m, vars)
-		}
-
-		// Body in a response is just a string
-		if response.Body != "" {
-			m.Type = m.Type + " > response body"
-			s.scanObject(ctx, chunksChan, Target{
-				Link:           m.Link,
-				FieldType:      m.Type,
-				WorkspaceUUID:  m.WorkspaceUUID,
-				WorkspaceName:  m.WorkspaceName,
-				CollectionID:   m.CollectionInfo.PostmanID,
-				CollectionName: m.CollectionInfo.Name,
-				FolderName:     m.FolderName,
-				FolderId:       m.FolderID,
-				RequestID:      m.RequestID,
-				RequestName:    m.RequestName,
-				GlobalID:       m.FullID,
-				Data:           response.Body,
-			})
-		}
-
-		if response.OriginalRequest.Method != "" {
-			m.Type = m.Type + " > original request"
-			s.scanHTTPRequest(ctx, chunksChan, m, response.OriginalRequest)
-		}
-	}
-}
-
-func (s *Source) scanGlobals(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace) {
-	ctx.Logger().V(2).Info("starting scanning global variables")
-	globalVars, err := s.client.GetGlobalVariables(w.ID)
-	if err != nil {
-		s.log.Error(err, "could not get global variables object")
+func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {
+	if response.UID != "" {
+		m.Link = LINK_BASE_URL + "example/" + response.UID
+		m.FullID = response.UID
 	}
 
-	// Will need to adjust FullID and Link for local JSON read in
-	m := Metadata{
-		WorkspaceUUID: w.ID,
-		WorkspaceName: w.Name,
-		CreatedBy:     w.CreatedBy,
-		Type:          GLOBAL_TYPE,
-		FullID:        w.CreatedBy + "-" + globalVars.ID,
-		Link:          LINK_BASE_URL + "workspace/" + w.ID + "/" + GLOBAL_TYPE,
-	}
-
-	s.scanVariableData(ctx, chunksChan, m, globalVars)
-	ctx.Logger().V(2).Info("finished scanning global variables")
-}
-
-func (s *Source) scanEnvironments(ctx context.Context, chunksChan chan *sources.Chunk, w Workspace) {
-	ctx.Logger().V(2).Info("starting scanning environments")
-
-	// Filter Enviroments
-	environments := filterItemsByUUID(w.Environments, s.conn.ExcludeEnvironments, s.conn.IncludeEnvironments)
-
-	// Scan Environments
-	for _, env := range environments {
-		envVars, err := s.client.GetEnvironment(env.UUID)
-		if err != nil {
-			s.log.Error(err, "could not get environment object", "environment_uuid", env.UUID)
+	if response.Header != nil {
+		vars := VariableData{
+			KeyValues: response.Header,
 		}
-		// Will need to adjust FullID and Link for local JSON read in
-		m := Metadata{
-			WorkspaceUUID: w.ID,
-			WorkspaceName: w.Name,
-			CreatedBy:     w.CreatedBy,
-			Type:          ENVIRONMENT_TYPE,
-			FullID:        env.UUID,
-			Link:          LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + env.UUID,
-		}
-		// scan environment
-		vars := envVars.VariableData
-		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", m.FullID)
-		for _, word := range strings.Split(vars.Name, " ") {
-			s.keywords = append(s.keywords, string(word))
-			// s.environmentKeywords = append(s.environmentKeywords, string(word))
-		}
-
+		m.Type = m.Type + " > response header"
 		s.scanVariableData(ctx, chunksChan, m, vars)
-		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", m.FullID)
 	}
-	ctx.Logger().V(2).Info("finished scanning environments")
+
+	// Body in a response is just a string
+	if response.Body != "" {
+		m.Type = m.Type + " > response body"
+		s.scanObject(ctx, chunksChan, Target{
+			Link:           m.Link,
+			FieldType:      m.Type,
+			WorkspaceUUID:  m.WorkspaceUUID,
+			WorkspaceName:  m.WorkspaceName,
+			CollectionID:   m.CollectionInfo.PostmanID,
+			CollectionName: m.CollectionInfo.Name,
+			FolderName:     m.FolderName,
+			FolderId:       m.FolderID,
+			RequestID:      m.RequestID,
+			RequestName:    m.RequestName,
+			GlobalID:       m.FullID,
+			Data:           response.Body,
+		})
+	}
+
+	if response.OriginalRequest.Method != "" {
+		m.Type = m.Type + " > original request"
+		s.scanHTTPRequest(ctx, chunksChan, m, response.OriginalRequest)
+	}
 }
 
 func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, variableData VariableData) {
-	if variableData.KeyValues == nil {
+	if len(variableData.KeyValues) == 0 {
 		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "uuid", m.FullID)
 		return
 	}
@@ -634,74 +558,74 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		}
 	}
 
-	// Question: Despite lots of efforts to avoid duplicates, they'll still exist.
-	// Is there a way to adjust the scanning mechanism so that for only Postman
-	// we avoid duplicates? It's kind of just the nature of dealing with
-	// user-generated key-value pairs.
+	values := []KeyValue{}
+	for _, kv := range variableData.KeyValues {
+		s.keywords = append(s.keywords, kv.Key)
+		valStr := fmt.Sprintf("%v", kv.Value)
+		if valStr != "" {
+			if strings.HasPrefix(valStr, "{{") && strings.HasSuffix(valStr, "}}") {
+				// This is a variable substitution. So we should see if there is any substitutions we can do
+				// for this variable.
+				// fmt.Println("valStr", valStr)
+				valStr = strings.Trim(strings.Trim(valStr, "{"), "}")
+				if val, ok := s.variableSubstituions[valStr]; ok {
+					// If the value is a session value, we should not substitute it.
+					// ZRNOTE: probably some collision here
+					if val.valueType == INITIAL_VALUE {
+						kv.Value = strings.TrimSpace(val.value)
+						values = append(values, kv)
+					}
+				}
+			} else {
+				s.variableSubstituions[kv.Key] = VariableInfo{
+					value:     valStr,
+					source:    m.Type,
+					valueType: INITIAL_VALUE,
+				}
+				kv.Value = strings.TrimSpace(valStr)
+				values = append(values, kv)
+			}
+		}
 
-	//Pre-process each key=var pair
-	// 1. Map key=value pairs for substitution later in workspace processing
-	// 2. Create slice of strings (keys and values) for use in processing variables
-	// ex: API_KEY=<AN_OPENWEATHERMAP_API_KEY>, then there is a URI=https://openweathermap.com
-	//     or another key is OPENWEATHER_ID={{no_data}}; either way we need both keys and values
-	//     within 40 chars of the API Key.
-	// 3. Create a value string of all values.
-	//    We need to append all of these values for secrets that need a second cred. Like AWS or Shopify URLs.
-	//    But we don't want one value to trigger another value in the wrong var, so pad with 50 spaces.
-
-	//
-	// ZRNOTE: i don't know if 3. works as intended. For most multipart cred we also need an identifier
-	// associated with the secret
-	//
-
-	// varSubstitutions := map[string]string{}
-
-	// This loop gathers all the postman variables in a workspace or collection
-	// The keys are added to the on going list of keywords
-	// The values will be injected with keywords to be scanned as objects later
-	values := []string{}
-	for _, v := range variableData.KeyValues {
-		s.keywords = append(s.keywords, v.Key)
-		values = append(values, fmt.Sprintf("%v", v.Value))
-
-		if v.SessionValue != "" {
-			sessionValue := fmt.Sprintf("%v", v.SessionValue)
+		if kv.SessionValue != "" {
+			sessionValue := fmt.Sprintf("%v", kv.SessionValue)
 			s.keywords = append(s.keywords, sessionValue)
-			values = append(values, sessionValue)
+			if sessionValue == "" {
+				continue
+			}
+			if strings.HasPrefix(sessionValue, "{{") && strings.HasSuffix(sessionValue, "}}") {
+				// This is a variable substitution. So we should see if there is any substitutions we can do
+				// for this variable.
+				if val, ok := s.variableSubstituions[sessionValue]; ok {
+					// If the value is a session value, we should not substitute it.
+					// ZRNOTE: probably some collision here
+					if val.valueType == SESSION_VALUE {
+						sessionValue = val.value
+						values = append(values, KeyValue{Value: strings.TrimSpace(sessionValue)})
+					}
+				}
+			} else {
+				s.variableSubstituions[kv.Key] = VariableInfo{
+					value:     sessionValue,
+					source:    m.Type,
+					valueType: SESSION_VALUE,
+				}
+				values = append(values, KeyValue{Value: strings.TrimSpace(sessionValue)})
+			}
 		}
 	}
 
 	// Filter out keywords that don't exist in pkg/detectors/*
 	filteredKeywords := filterKeywords(s.keywords, s.detectorKeywords)
-	if len(filteredKeywords) == 0 {
+	if len(filteredKeywords) == 0 || len(values) == 0 {
 		return
 	}
 
+	data := ""
 	for _, keyword := range filteredKeywords {
-		data := ""
 		for _, value := range values {
-			data += fmt.Sprintf("%s:%s\n ", keyword, value)
+			data += fmt.Sprintf("%s:%s\n", keyword, value.Value)
 		}
-	}
-
-	allValues := strings.Join(values, strings.Repeat(" ", KEYWORD_PADDING)+"\n")
-	// allValues := " "
-	// for _, value := range values {
-	// 	allValues += (+value)
-	// }
-
-	// Create slice of objects to scan (both context & data)
-	pmObjToScan := []Target{}
-	for _, v := range variableData.KeyValues {
-		data := fmt.Sprintf("%s:%s ", v.Key, fmt.Sprintf("%v", v.Value))
-		for _, keyword := range filteredKeywords {
-			if keyword == fmt.Sprintf("%v", v.Value) {
-				continue
-			}
-			data += fmt.Sprintf("%s:%s ", keyword, fmt.Sprintf("%v", v.Value))
-			data += strings.Repeat(" ", KEYWORD_PADDING)
-		}
-		data += allValues
 		preScanObj := Target{
 			Link:           m.Link,
 			WorkspaceUUID:  m.WorkspaceUUID,
@@ -710,43 +634,79 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 			CollectionName: m.CollectionInfo.Name,
 			GlobalID:       m.FullID,
 			FieldType:      m.Type + " variable",
-			FieldName:      v.Key,
-			VarType:        v.Type,
-			Data:           data,
+			// FieldName:      v.Key,
+			// VarType:        v.Type,
+			Data: data,
 		}
-		pmObjToScan = append(pmObjToScan, preScanObj)
-		// This is a legacy field from Postman. But they can still exist (although invisible in UI).
-		if v.SessionValue != "" {
-			var data string
-			for _, keyword := range filteredKeywords {
-				if keyword == fmt.Sprintf("%v", v.SessionValue) {
-					continue
-				}
-				data += fmt.Sprintf("%s:%v\n", keyword, v.SessionValue)
-				data += strings.Repeat(" ", KEYWORD_PADDING)
-			}
-			data += allValues
-			preScanObj.Data = data
-			preScanObj.VarType = "Session Value (hidden from UI)"
-			pmObjToScan = append(pmObjToScan, preScanObj)
-		}
+		fmt.Println("preScanObj", preScanObj)
+
+		data += "\n\n"
 	}
+
+	// allValues := strings.Join(values, strings.Repeat(" ", KEYWORD_PADDING)+"\n")
+	// allValues := " "
+	// for _, value := range values {
+	// 	allValues += (+value)
+	// }
+
+	// Create slice of objects to scan (both context & data)
+	// pmObjToScan := []Target{}
+	// for _, v := range variableData.KeyValues {
+	// 	data := fmt.Sprintf("%s:%s ", v.Key, fmt.Sprintf("%v", v.Value))
+	// 	for _, keyword := range filteredKeywords {
+	// 		if keyword == fmt.Sprintf("%v", v.Value) {
+	// 			continue
+	// 		}
+	// 		data += fmt.Sprintf("%s:%s ", keyword, fmt.Sprintf("%v", v.Value))
+	// 		data += strings.Repeat(" ", KEYWORD_PADDING)
+	// 	}
+	// 	data += allValues
+	// 	preScanObj := Target{
+	// 		Link:           m.Link,
+	// 		WorkspaceUUID:  m.WorkspaceUUID,
+	// 		WorkspaceName:  m.WorkspaceName,
+	// 		CollectionID:   m.CollectionInfo.PostmanID,
+	// 		CollectionName: m.CollectionInfo.Name,
+	// 		GlobalID:       m.FullID,
+	// 		FieldType:      m.Type + " variable",
+	// 		FieldName:      v.Key,
+	// 		VarType:        v.Type,
+	// 		Data:           data,
+	// 	}
+	// 	pmObjToScan = append(pmObjToScan, preScanObj)
+
+	// 	// This is a legacy field from Postman. But they can still exist (although invisible in UI).
+	// 	if v.SessionValue != "" {
+	// 		var data string
+	// 		for _, keyword := range filteredKeywords {
+	// 			if keyword == fmt.Sprintf("%v", v.SessionValue) {
+	// 				continue
+	// 			}
+	// 			data += fmt.Sprintf("%s:%v\n", keyword, v.SessionValue)
+	// 			data += strings.Repeat(" ", KEYWORD_PADDING)
+	// 		}
+	// 		data += allValues
+	// 		preScanObj.Data = data
+	// 		preScanObj.VarType = "Session Value (hidden from UI)"
+	// 		pmObjToScan = append(pmObjToScan, preScanObj)
+	// 	}
+	// }
 
 	// If no keys match keywords, it's possible we'll end up with  multiple objects all containing the same
 	// string, which would just be the values of all variables. We only need to process one, but we can't be sure
 	// which variable is at fault, so for those objects, we'll "" the FieldName. Then we'll remove duplicates.
 	// This is a bit of a hack, but it's the best we can do without a better way to identify the variable.
 
-	var dataCount = make(map[string]int)
+	// var dataCount = make(map[string]int)
 
-	for _, obj := range pmObjToScan {
-		dataCount[obj.Data]++
-	}
-	for i, obj := range pmObjToScan {
-		if dataCount[obj.Data] > 1 {
-			pmObjToScan[i].FieldName = ""
-		}
-	}
+	// for _, obj := range pmObjToScan {
+	// 	dataCount[obj.Data]++
+	// }
+	// for i, obj := range pmObjToScan {
+	// 	if dataCount[obj.Data] > 1 {
+	// 		pmObjToScan[i].FieldName = ""
+	// 	}
+	// }
 
 	// Add to slice of maps for substitution later
 	// if varSubMap == nil {
@@ -754,45 +714,13 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 	// }
 	// fmt.Println("[scan vars] varSubMap", varSubMap)
 	// *varSubMap = append(*varSubMap, varSubstitutions)
-	s.scanObjects(ctx, chunksChan, pmObjToScan)
-}
-
-func (s *Source) scanObjects(ctx context.Context, chunksChan chan *sources.Chunk, objects []Target) {
-	//Remove duplicate objects to scan
-	uniqueMap := make(map[Target]struct{})
-	uniqueObjects := []Target{}
-
-	// Iterate through the input slice and add unique objects to the map
-	for _, obj := range objects {
-		if _, exists := uniqueMap[obj]; !exists {
-			uniqueMap[obj] = struct{}{}
-			uniqueObjects = append(uniqueObjects, obj)
-		}
-	}
-
-	// Process each object.
-	done := make(chan struct{})
-
-	// Process each object concurrently.
-	for _, obj := range uniqueObjects {
-		go func(obj Target) {
-			defer func() {
-				done <- struct{}{} // Signal that the goroutine has completed.
-			}()
-			s.scanObject(ctx, chunksChan, obj)
-		}(obj)
-	}
-
-	// Wait for all goroutines to finish.
-	for range uniqueObjects {
-		<-done
-	}
+	// s.scanObjects(ctx, chunksChan, pmObjToScan)
 }
 
 func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o Target) {
-	fmt.Println("#########START OBJECT#########")
-	fmt.Println(o.Data + "\n")
-	fmt.Println("#########END OBJECT#########")
+	// fmt.Println("#########START OBJECT#########")
+	// fmt.Println(o.Data + "\n")
+	// fmt.Println("#########END OBJECT#########")
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -913,4 +841,13 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 	}
 
 	return slice
+}
+
+func (s *Source) substitute(data string, subMap map[string]string) string {
+	for k, v := range subMap {
+		k = "{{" + k + "}}"
+		fmt.Println("SUBSTITUTING", k, "WITH", v)
+		data = strings.ReplaceAll(data, k, v)
+	}
+	return data
 }

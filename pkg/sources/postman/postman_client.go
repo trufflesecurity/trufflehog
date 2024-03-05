@@ -81,12 +81,12 @@ type Metadata struct {
 }
 
 type Collection struct {
-	Info     Info       `json:"info"`
-	Items    []Item     `json:"item,omitempty"`
-	Auth     Auth       `json:"auth,omitempty"`
-	Event    []Event    `json:"event,omitempty"`
-	Variable []KeyValue `json:"variable,omitempty"`
-	metadata Metadata
+	Info      Info       `json:"info"`
+	Items     []Item     `json:"item,omitempty"`
+	Auth      Auth       `json:"auth,omitempty"`
+	Events    []Event    `json:"event,omitempty"`
+	Variables []KeyValue `json:"variable,omitempty"`
+	metadata  Metadata
 }
 
 type Info struct {
@@ -371,7 +371,6 @@ func (c *Client) GetEnvironment(environment_uuid string) (Environment, error) {
 
 // GetCollection returns the collection for a given collection
 func (c *Client) GetCollection(collection_uuid string) (Collection, error) {
-
 	obj := struct {
 		Collection Collection `json:"collection"`
 	}{}
