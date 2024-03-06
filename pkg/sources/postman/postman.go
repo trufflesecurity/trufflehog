@@ -44,15 +44,14 @@ type Source struct {
 	conn             *sourcespb.Postman
 	detectorKeywords map[string]struct{}
 
-	// keywords are potential keywords
+	// Keywords are words that are discovered when we walk through postman data.
+	// These keywords are then injected into data that is sent to the detectors.
 	keywords []string
 
 	// each environment has a set of variables (key-value pairs)
 	// variableSubstituions map[string]VariableData
 	variableSubstituions map[string]VariableInfo
 
-	// ZRNOTE: Talk about this first but what about if we just gathered all the keywords and all the values
-	// _then_ sent it on the chunks channel rather than trying to do on the fly bookkeeping?
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -85,11 +84,6 @@ type Target struct {
 }
 
 var subRe = regexp.MustCompile(`\{\{[^{}]+\}\}`)
-
-// ToDo:
-// 2. Read in local JSON files
-// 3. Add tests
-// 4. Try to filter out duplicate objects
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -194,6 +188,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		Type:          "workspace",
 	}
 
+	// scan global variables
 	ctx.Logger().V(2).Info("starting scanning global variables")
 	globalVars, err := s.client.GetGlobalVariables(workspace.ID)
 	if err != nil {
@@ -207,7 +202,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	s.scanVariableData(ctx, chunksChan, metadata, globalVars)
 	ctx.Logger().V(2).Info("finished scanning global variables")
 
-	// scan per environment variables
+	// scan environment variables
 	for _, envID := range workspace.Environments {
 		env, err := s.client.GetEnvironment(envID.UUID)
 		if err != nil {
@@ -633,9 +628,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		CollectionName: m.CollectionInfo.Name,
 		GlobalID:       m.FullID,
 		FieldType:      m.Type + " variable",
-		// FieldName:      v.Key,
-		// VarType:        v.Type,
-		Data: data,
+		Data:           data,
 	}
 	s.scanTarget(ctx, chunksChan, target)
 }
@@ -644,9 +637,6 @@ func (s *Source) scanTarget(ctx context.Context, chunksChan chan *sources.Chunk,
 	if o.Data == "" {
 		return
 	}
-	fmt.Println("#########START OBJECT#########")
-	fmt.Println(o.Data)
-	fmt.Println("#########END OBJECT#########")
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
