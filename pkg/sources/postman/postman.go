@@ -2,6 +2,7 @@ package postman
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -82,6 +83,8 @@ type Target struct {
 	VarType         string
 	Data            string
 }
+
+var subRe = regexp.MustCompile(`\{\{[^{}]+\}\}`)
 
 // ToDo:
 // 2. Read in local JSON files
@@ -347,7 +350,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		link += "?tab=tests"
 	}
 
-	s.scanObject(ctx, chunksChan, Target{
+	s.scanTarget(ctx, chunksChan, Target{
 		Link:           link,
 		FieldType:      EVENT_TYPE,
 		FieldName:      event.Listen,
@@ -383,7 +386,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		return
 	}
 
-	s.scanObject(ctx, chunksChan, Target{
+	s.scanTarget(ctx, chunksChan, Target{
 		Link:           m.Link + "?tab=authorization",
 		FieldType:      "Authorization",
 		WorkspaceUUID:  m.WorkspaceUUID,
@@ -410,10 +413,15 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 	if r.URL.Raw != "" {
 		metadata.Type = metadata.Type + " > request URL"
 		data := r.URL.Raw
-		// for _, subMap := range *varSubMap {
-		// 	data += s.substitute(data, subMap)
-		// }
-		s.scanObject(ctx, chunksChan, Target{
+
+		data = subRe.ReplaceAllStringFunc(data, func(str string) string {
+			if val, ok := s.variableSubstituions[strings.Trim(str, "{}")]; ok {
+				return val.value
+			}
+			return str
+		})
+
+		s.scanTarget(ctx, chunksChan, Target{
 			Link:           metadata.Link,
 			FieldType:      metadata.Type,
 			WorkspaceUUID:  metadata.WorkspaceUUID,
@@ -429,17 +437,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		})
 	}
 
-	if len(r.URL.Host) > 0 {
-		for _, host := range r.URL.Host {
-			s.keywords = append(s.keywords, host)
-			// s.httpKeywords = append(s.httpKeywords, host)
-
-			// for _, subMap := range *varSubMap {
-			// 	s.keywords = append(s.keywords, s.substitute(host, subMap))
-			// 	// s.httpKeywords = append(s.httpKeywords, s.substitute(host, subMap))
-			// }
-		}
-	}
+	s.keywords = append(s.keywords, r.URL.Host...)
 
 	if len(r.URL.Query) > 0 {
 		vars := VariableData{
@@ -487,7 +485,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		// for _, subMap := range *varSubMap {
 		// 	data += s.substitute(data, subMap)
 		// }
-		s.scanObject(ctx, chunksChan, Target{
+		s.scanTarget(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
 			WorkspaceUUID:  m.WorkspaceUUID,
@@ -523,7 +521,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	// Body in a response is just a string
 	if response.Body != "" {
 		m.Type = m.Type + " > response body"
-		s.scanObject(ctx, chunksChan, Target{
+		s.scanTarget(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
 			WorkspaceUUID:  m.WorkspaceUUID,
@@ -558,7 +556,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		}
 	}
 
-	values := []KeyValue{}
+	values := []string{}
 	for _, kv := range variableData.KeyValues {
 		s.keywords = append(s.keywords, kv.Key)
 		valStr := fmt.Sprintf("%v", kv.Value)
@@ -572,8 +570,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 					// If the value is a session value, we should not substitute it.
 					// ZRNOTE: probably some collision here
 					if val.valueType == INITIAL_VALUE {
-						kv.Value = strings.TrimSpace(val.value)
-						values = append(values, kv)
+						values = append(values, strings.TrimSpace(val.value))
 					}
 				}
 			} else {
@@ -582,8 +579,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 					source:    m.Type,
 					valueType: INITIAL_VALUE,
 				}
-				kv.Value = strings.TrimSpace(valStr)
-				values = append(values, kv)
+				values = append(values, strings.TrimSpace(valStr))
 			}
 		}
 
@@ -601,7 +597,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 					// ZRNOTE: probably some collision here
 					if val.valueType == SESSION_VALUE {
 						sessionValue = val.value
-						values = append(values, KeyValue{Value: strings.TrimSpace(sessionValue)})
+						values = append(values, strings.TrimSpace(sessionValue))
 					}
 				}
 			} else {
@@ -610,7 +606,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 					source:    m.Type,
 					valueType: SESSION_VALUE,
 				}
-				values = append(values, KeyValue{Value: strings.TrimSpace(sessionValue)})
+				values = append(values, strings.TrimSpace(sessionValue))
 			}
 		}
 	}
@@ -624,103 +620,33 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 	data := ""
 	for _, keyword := range filteredKeywords {
 		for _, value := range values {
-			data += fmt.Sprintf("%s:%s\n", keyword, value.Value)
+			data += fmt.Sprintf("%s:%s\n", keyword, value)
 		}
-		preScanObj := Target{
-			Link:           m.Link,
-			WorkspaceUUID:  m.WorkspaceUUID,
-			WorkspaceName:  m.WorkspaceName,
-			CollectionID:   m.CollectionInfo.PostmanID,
-			CollectionName: m.CollectionInfo.Name,
-			GlobalID:       m.FullID,
-			FieldType:      m.Type + " variable",
-			// FieldName:      v.Key,
-			// VarType:        v.Type,
-			Data: data,
-		}
-		fmt.Println("preScanObj", preScanObj)
-
 		data += "\n\n"
 	}
 
-	// allValues := strings.Join(values, strings.Repeat(" ", KEYWORD_PADDING)+"\n")
-	// allValues := " "
-	// for _, value := range values {
-	// 	allValues += (+value)
-	// }
-
-	// Create slice of objects to scan (both context & data)
-	// pmObjToScan := []Target{}
-	// for _, v := range variableData.KeyValues {
-	// 	data := fmt.Sprintf("%s:%s ", v.Key, fmt.Sprintf("%v", v.Value))
-	// 	for _, keyword := range filteredKeywords {
-	// 		if keyword == fmt.Sprintf("%v", v.Value) {
-	// 			continue
-	// 		}
-	// 		data += fmt.Sprintf("%s:%s ", keyword, fmt.Sprintf("%v", v.Value))
-	// 		data += strings.Repeat(" ", KEYWORD_PADDING)
-	// 	}
-	// 	data += allValues
-	// 	preScanObj := Target{
-	// 		Link:           m.Link,
-	// 		WorkspaceUUID:  m.WorkspaceUUID,
-	// 		WorkspaceName:  m.WorkspaceName,
-	// 		CollectionID:   m.CollectionInfo.PostmanID,
-	// 		CollectionName: m.CollectionInfo.Name,
-	// 		GlobalID:       m.FullID,
-	// 		FieldType:      m.Type + " variable",
-	// 		FieldName:      v.Key,
-	// 		VarType:        v.Type,
-	// 		Data:           data,
-	// 	}
-	// 	pmObjToScan = append(pmObjToScan, preScanObj)
-
-	// 	// This is a legacy field from Postman. But they can still exist (although invisible in UI).
-	// 	if v.SessionValue != "" {
-	// 		var data string
-	// 		for _, keyword := range filteredKeywords {
-	// 			if keyword == fmt.Sprintf("%v", v.SessionValue) {
-	// 				continue
-	// 			}
-	// 			data += fmt.Sprintf("%s:%v\n", keyword, v.SessionValue)
-	// 			data += strings.Repeat(" ", KEYWORD_PADDING)
-	// 		}
-	// 		data += allValues
-	// 		preScanObj.Data = data
-	// 		preScanObj.VarType = "Session Value (hidden from UI)"
-	// 		pmObjToScan = append(pmObjToScan, preScanObj)
-	// 	}
-	// }
-
-	// If no keys match keywords, it's possible we'll end up with  multiple objects all containing the same
-	// string, which would just be the values of all variables. We only need to process one, but we can't be sure
-	// which variable is at fault, so for those objects, we'll "" the FieldName. Then we'll remove duplicates.
-	// This is a bit of a hack, but it's the best we can do without a better way to identify the variable.
-
-	// var dataCount = make(map[string]int)
-
-	// for _, obj := range pmObjToScan {
-	// 	dataCount[obj.Data]++
-	// }
-	// for i, obj := range pmObjToScan {
-	// 	if dataCount[obj.Data] > 1 {
-	// 		pmObjToScan[i].FieldName = ""
-	// 	}
-	// }
-
-	// Add to slice of maps for substitution later
-	// if varSubMap == nil {
-	// 	varSubMap = &[]map[string]string{}
-	// }
-	// fmt.Println("[scan vars] varSubMap", varSubMap)
-	// *varSubMap = append(*varSubMap, varSubstitutions)
-	// s.scanObjects(ctx, chunksChan, pmObjToScan)
+	target := Target{
+		Link:           m.Link,
+		WorkspaceUUID:  m.WorkspaceUUID,
+		WorkspaceName:  m.WorkspaceName,
+		CollectionID:   m.CollectionInfo.PostmanID,
+		CollectionName: m.CollectionInfo.Name,
+		GlobalID:       m.FullID,
+		FieldType:      m.Type + " variable",
+		// FieldName:      v.Key,
+		// VarType:        v.Type,
+		Data: data,
+	}
+	s.scanTarget(ctx, chunksChan, target)
 }
 
-func (s *Source) scanObject(ctx context.Context, chunksChan chan *sources.Chunk, o Target) {
-	// fmt.Println("#########START OBJECT#########")
-	// fmt.Println(o.Data + "\n")
-	// fmt.Println("#########END OBJECT#########")
+func (s *Source) scanTarget(ctx context.Context, chunksChan chan *sources.Chunk, o Target) {
+	if o.Data == "" {
+		return
+	}
+	fmt.Println("#########START OBJECT#########")
+	fmt.Println(o.Data)
+	fmt.Println("#########END OBJECT#########")
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -759,48 +685,21 @@ func filterKeywords(keys []string, detectorKeywords map[string]struct{}) []strin
 	// Iterate through the input keys
 	for _, key := range keys {
 		// Check if the key contains any detectorKeyword
-		containsDetector := false
 		lowerKey := strings.ToLower(key)
 		for detectorKey := range detectorKeywords {
 			if strings.Contains(lowerKey, detectorKey) {
-				containsDetector = true
+				filteredKeywords[detectorKey] = struct{}{}
 				break
 			}
 		}
-		if containsDetector {
-			filteredKeywords[key] = struct{}{}
-		}
 	}
 
-	// Remove duplicates, but these are defined as situations like this:
-	// openweathermap.com, openweather and api.openweathermap.com
-	// In this scenario only openweather needs to remain
-
-	// Update this to return []string.
-
-	var uniqueKeywords []string
-
-	// Iterate through the filtered keywords
-	for name := range filteredKeywords {
-		foundSimilar := false
-		lowerName := strings.ToLower(name)
-		// Check if the name is similar to any of the unique canonical names
-		for _, key := range uniqueKeywords {
-			lowerKey := strings.ToLower(key)
-			if strings.Contains(lowerKey, lowerName) || strings.Contains(lowerName, lowerKey) {
-				// A similar name is found, skip adding it to the map
-				foundSimilar = true
-				break
-			}
-		}
-
-		if !foundSimilar {
-			// No similar name found, add it to the map
-			uniqueKeywords = append(uniqueKeywords, name)
-		}
+	filteredKeywordsSlice := make([]string, 0, len(filteredKeywords))
+	for key := range filteredKeywords {
+		filteredKeywordsSlice = append(filteredKeywordsSlice, key)
 	}
+	return filteredKeywordsSlice
 
-	return uniqueKeywords
 }
 
 // Used to filter out collections and environments that are not wanted for scanning.
@@ -841,13 +740,4 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 	}
 
 	return slice
-}
-
-func (s *Source) substitute(data string, subMap map[string]string) string {
-	for k, v := range subMap {
-		k = "{{" + k + "}}"
-		fmt.Println("SUBSTITUTING", k, "WITH", v)
-		data = strings.ReplaceAll(data, k, v)
-	}
-	return data
 }
