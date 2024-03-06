@@ -986,6 +986,10 @@ func resolveHash(repo *git.Repository, ref string) (string, error) {
 	return resolved.String(), nil
 }
 
+// stripPassword removes username:password contents from URLs. The first return value is the cleaned URL and the second
+// is the password that was returned, if any. Callers can therefore use this function to identify secret material to
+// redact elsewhere. If the argument begins with git@, it is returned unchanged, and the returned password is the empty
+// string. If the argument is otherwise not parseable by url.Parse, an error is returned.
 func stripPassword(u string) (string, string, error) {
 	if strings.HasPrefix(u, "git@") {
 		return u, "", nil
