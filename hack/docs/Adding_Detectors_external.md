@@ -44,13 +44,18 @@ If you think that something should be included outside of these guidelines, plea
 
 In some instances, services will update their token format, requiring a new regex to properly detect secrets in addition to supporting the previous token format. Accomodating this can be done without adding a net-new detector. [We provide a `Versioner` interface](https://github.com/trufflesecurity/trufflehog/blob/e18cfd5e0af1469a9f05b8d5732bcc94c39da49c/pkg/detectors/detectors.go#L30) that can be implemented.
 
-1. Create a copy of the package and append `_v2` to the package and file names. Ex: `<packagename>/` -> `<packagename>_v2`, `<packagename>.go` -> `<packagename>_v2.go`
+1. Create two new directories `v1` and `v2`. Move the existing detector and tests into `v1`, and add new files to `v2`.
+Ex: `<packagename>/<old_files>` -> `<packagename>/v1/<old_files>`, `<packagename>/v2/<new_files>`
 
 Note: Be sure to update the tests to reference the new secret values in GSM, or the tests will fail.
 
-2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github_old/github_old.go#L22)
+2. Implement the `Versioner` interface. [GitHub example implementation.](/pkg/detectors/github_old/github_old.go#L23)
 
-3. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
+3. Add a 'version' field in ExtraData for both existing and new detector versions.
+
+4. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults.go`
+
+5. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
 
 ### Creating a new Secret Detector
 
@@ -77,8 +82,9 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
    1. Update the pattern regex and keywords. Try iterating with [regex101.com](http://regex101.com/).
    2. Update the verifier code to use a non-destructive API call that can determine whether the secret is valid or not.
       * Make sure you understand [verification indeterminacy](#verification-indeterminacy).
-   3. Create a [test for the detector](#testing-the-detector)
-   4. Create a pull request for review.
+   3. Create a [test for the detector](#testing-the-detector).
+   4. Add your new detector to DefaultDetectors in `/pkg/engine/defaults.go`.
+   5. Create a pull request for review.
 
 ### Testing the Detector
 To ensure the quality of your PR, make sure your tests are passing with verified credentials.

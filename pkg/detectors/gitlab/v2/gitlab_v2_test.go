@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package gitlabv2
+package gitlab
 
 import (
 	"context"
@@ -51,6 +51,10 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Gitlab,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        "2",
+					},
 				},
 			},
 			wantErr: false,
@@ -67,6 +71,10 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Gitlab,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        "2",
+					},
 				},
 			},
 			wantErr: false,
@@ -83,6 +91,10 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Gitlab,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        "2",
+					},
 				},
 			},
 			wantErr:             false,
@@ -100,6 +112,10 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Gitlab,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        "2",
+					},
 				},
 			},
 			wantErr:             false,
@@ -117,6 +133,10 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Gitlab,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/gitlab/",
+						"version":        "2",
+					},
 				},
 			},
 			wantErr: false,

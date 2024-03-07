@@ -54,6 +54,10 @@ func TestJiraToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+						"version":        "1",
+					},
 				},
 			},
 			wantErr:             false,
@@ -71,6 +75,10 @@ func TestJiraToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+						"version":        "1",
+					},
 				},
 			},
 			wantErr:             false,
@@ -100,6 +108,10 @@ func TestJiraToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+						"version":        "1",
+					},
 				},
 			},
 			wantErr:             false,
@@ -117,6 +129,10 @@ func TestJiraToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+						"version":        "1",
+					},
 				},
 			},
 			wantErr:             false,
