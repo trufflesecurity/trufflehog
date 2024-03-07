@@ -17,6 +17,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+const canaryAccessKeyID = "AKIASP2TPHJSQH3FJRUX"
+
 var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
 
 func TestAWS_FromChunk(t *testing.T) {
@@ -277,33 +279,30 @@ func TestAWS_FromChunk(t *testing.T) {
 			wantErr:               false,
 			wantVerificationError: true,
 		},
-		//// Needs a non-canary token to test this
-		// {
-		// 	name: "found, unverified due to unexpected 403 response reason",
-		// 	s: scanner{
-		// 		verificationClient: common.ConstantResponseHttpClient(403, `{"Error": {"Code": "SignatureDoesNotMatch"} }`),
-		// 	},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_AWS,
-		// 			Verified:     false,
-		// 			Redacted:     "AKIASP2TPHJSQH3FJRUX",
-		// 			ExtraData: map[string]string{
-		// 				"resource_type": "Access key",
-		// 				"account":       "171436882533",
-		// 				"is_canary":     "true",
-		// 				"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
-		// 			},
-		// 		},
-		// 	},
-		// 	wantErr:               false,
-		// 	wantVerificationError: true,
-		// },
+		{
+			name: "found, unverified due to invalid aws_secret with valid canary access_key_id",
+			s:    scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", inactiveSecret, canaryAccessKeyID)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     canaryAccessKeyID,
+					ExtraData: map[string]string{
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+					},
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: false,
+		},
 		{
 			name: "verified secret checked directly after unverified secret with same key id",
 			s:    scanner{},
