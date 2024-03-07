@@ -344,28 +344,30 @@ func (c *Client) GetGlobalVariables(workspace_uuid string) (VariableData, error)
 	return obj.VariableData, nil
 }
 
-// GetEnvironment returns the environment variables for a given environment
-func (c *Client) GetEnvironment(environment_uuid string) (Environment, error) {
-	var env Environment
+// GetEnvironmentVariables returns the environment variables for a given environment
+func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData, error) {
+	obj := struct {
+		VariableData `json:"data"`
+	}{}
 
 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
 		fmt.Println(err)
 		err = fmt.Errorf("could not get env variables for environment: %s", environment_uuid)
-		return env, err
+		return VariableData{}, err
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("could not read env var response body for environment: %s", environment_uuid)
-		return env, err
+		return VariableData{}, err
 	}
-	if err := json.Unmarshal([]byte(body), &env); err != nil {
+	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		err = fmt.Errorf("could not unmarshal env variables JSON for environment: %s", environment_uuid)
-		return env, err
+		return VariableData{}, err
 	}
-	return env, nil
+	return obj.VariableData, nil
 
 }
 

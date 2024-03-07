@@ -107,9 +107,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
-
 	s.detectorKeywords = make(map[string]struct{})
-	// s.collectionVariables = make(map[string]VariableData)
 	s.variableSubstituions = make(map[string]VariableInfo)
 
 	s.log = ctx.Logger()
@@ -202,26 +200,23 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	s.scanVariableData(ctx, chunksChan, metadata, globalVars)
 	ctx.Logger().V(2).Info("finished scanning global variables")
 
-	// scan environment variables
+	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
-		env, err := s.client.GetEnvironment(envID.UUID)
+		envVars, err := s.client.GetEnvironmentVariables(envID.UUID)
 		if err != nil {
 			s.log.Error(err, "could not get environment object", "environment_uuid", envID.UUID)
 		}
 		// s.scanEnvironment(ctx, chunksChan, env, workspace)
 		metadata.Type = ENVIRONMENT_TYPE
-		metadata.Link = LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + env.ID
-		metadata.FullID = env.ID
-
-		// scan environment
-		vars := env.VariableData
+		metadata.Link = LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + envVars.ID
+		metadata.FullID = envVars.ID
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
-		for _, word := range strings.Split(vars.Name, " ") {
+		for _, word := range strings.Split(envVars.Name, " ") {
 			s.keywords = append(s.keywords, string(word))
 		}
 
-		s.scanVariableData(ctx, chunksChan, metadata, vars)
+		s.scanVariableData(ctx, chunksChan, metadata, envVars)
 		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
 	}
 	ctx.Logger().V(2).Info("finished scanning environments")
@@ -239,6 +234,8 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	}
 }
 
+// scanCollection scans a collection and all its items, folders, and requests.
+// locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
 	ctx.Logger().V(2).Info("starting scanning collection", collection.Info.Name, "uuid", collection.Info.UID)
 	metadata.CollectionInfo = collection.Info
@@ -256,11 +253,9 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 
 	// variables must be scanned first before drilling down into the folders and events
 	// because we need to pick up the substitutions from the top level collection variables
-	if collection.Variables != nil {
-		s.scanVariableData(ctx, chunksChan, metadata, VariableData{
-			KeyValues: collection.Variables,
-		})
-	}
+	s.scanVariableData(ctx, chunksChan, metadata, VariableData{
+		KeyValues: collection.Variables,
+	})
 
 	for _, event := range collection.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
@@ -334,8 +329,11 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
 	metadata.Type = metadata.Type + " > event"
-	// for _, subMap := range *varSubMap {
-	// 	data := strings.Join(event.Script.Exec, " ")
+
+	// inject all the filtered keywords into the event data
+	filteredKeywords := filterKeywords(s.keywords, s.detectorKeywords)
+	data := strings.Join(filteredKeywords, " ")
+	data += strings.Join(event.Script.Exec, " ")
 
 	// Prep direct links
 	link := LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
@@ -356,8 +354,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		FolderName:     metadata.FolderName,
 		FolderId:       metadata.FolderID,
 		GlobalID:       metadata.FullID,
-		// ZRNOTE: Todo
-		// Data:           s.substitute(data, subMap),
+		Data:           s.substitute(data),
 	})
 }
 
@@ -407,14 +404,6 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 
 	if r.URL.Raw != "" {
 		metadata.Type = metadata.Type + " > request URL"
-		data := r.URL.Raw
-
-		data = subRe.ReplaceAllStringFunc(data, func(str string) string {
-			if val, ok := s.variableSubstituions[strings.Trim(str, "{}")]; ok {
-				return val.value
-			}
-			return str
-		})
 
 		s.scanTarget(ctx, chunksChan, Target{
 			Link:           metadata.Link,
@@ -428,7 +417,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			RequestID:      metadata.RequestID,
 			RequestName:    metadata.RequestName,
 			GlobalID:       metadata.FullID,
-			Data:           data,
+			Data:           s.substitute(r.URL.Raw),
 		})
 	}
 
@@ -477,9 +466,6 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		if b.Mode == "raw" {
 			m.Type = m.Type + " > raw"
 		}
-		// for _, subMap := range *varSubMap {
-		// 	data += s.substitute(data, subMap)
-		// }
 		s.scanTarget(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
@@ -492,7 +478,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 			RequestID:      m.RequestID,
 			RequestName:    m.RequestName,
 			GlobalID:       m.FullID,
-			Data:           data,
+			Data:           s.substitute(data),
 		})
 	default:
 		break
@@ -528,7 +514,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 			RequestID:      m.RequestID,
 			RequestName:    m.RequestName,
 			GlobalID:       m.FullID,
-			Data:           response.Body,
+			Data:           s.substitute(response.Body),
 		})
 	}
 
@@ -637,6 +623,8 @@ func (s *Source) scanTarget(ctx context.Context, chunksChan chan *sources.Chunk,
 	if o.Data == "" {
 		return
 	}
+	fmt.Println("----postman target-----")
+	fmt.Println(o.Data)
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -675,9 +663,8 @@ func filterKeywords(keys []string, detectorKeywords map[string]struct{}) []strin
 	// Iterate through the input keys
 	for _, key := range keys {
 		// Check if the key contains any detectorKeyword
-		lowerKey := strings.ToLower(key)
 		for detectorKey := range detectorKeywords {
-			if strings.Contains(lowerKey, detectorKey) {
+			if strings.Contains(strings.ToLower(key), detectorKey) {
 				filteredKeywords[detectorKey] = struct{}{}
 				break
 			}
@@ -730,4 +717,13 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 	}
 
 	return slice
+}
+
+func (s *Source) substitute(data string) string {
+	return subRe.ReplaceAllStringFunc(data, func(str string) string {
+		if val, ok := s.variableSubstituions[strings.Trim(str, "{}")]; ok {
+			return val.value
+		}
+		return str
+	})
 }
