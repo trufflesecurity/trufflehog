@@ -304,6 +304,30 @@ func TestAWS_FromChunk(t *testing.T) {
 			wantVerificationError: false,
 		},
 		{
+			name: "found, valid canary token with no verification",
+			s:    scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, canaryAccessKeyID)),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     canaryAccessKeyID,
+					ExtraData: map[string]string{
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+					},
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: false,
+		},
+		{
 			name: "verified secret checked directly after unverified secret with same key id",
 			s:    scanner{},
 			args: args{

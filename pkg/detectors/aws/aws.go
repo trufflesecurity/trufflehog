@@ -181,29 +181,33 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if _, ok := thinkstCanaryList[account]; ok {
 				s1.ExtraData["is_canary"] = "true"
 				s1.ExtraData["message"] = thinkstMessage
-				verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
-				if verified {
-					s1.Verified = true
-				}
-				if arn != "" {
-					s1.ExtraData["arn"] = arn
-				}
-				if err != nil {
-					s1.SetVerificationError(err, resSecretMatch)
+				if verify {
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
+					if verified {
+						s1.Verified = true
+					}
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					if err != nil {
+						s1.SetVerificationError(err, resSecretMatch)
+					}
 				}
 			}
 			if _, ok := thinkstKnockoffsCanaryList[account]; ok {
 				s1.ExtraData["is_canary"] = "true"
 				s1.ExtraData["message"] = thinkstKnockoffsMessage
-				verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
-				if verified {
-					s1.Verified = true
-				}
-				if arn != "" {
-					s1.ExtraData["arn"] = arn
-				}
-				if err != nil {
-					s1.SetVerificationError(err, resSecretMatch)
+				if verify {
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
+					if verified {
+						s1.Verified = true
+					}
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					if err != nil {
+						s1.SetVerificationError(err, resSecretMatch)
+					}
 				}
 			}
 
