@@ -499,7 +499,7 @@ Decoder Type: PLAIN
 Raw result: HOGAAIUNNWHAHJJWUQYR
 File: /tmp/hog-facts.txt
 ```
-Data structure sent to the custom verificaiton server:
+Data structure sent to the custom verification server:
 
 ```
 {

@@ -29,6 +29,9 @@ import (
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
 
+// This is the URL for gitlab hosted at gitlab.com
+const gitlabBaseURL = "https://gitlab.com/"
+
 type Source struct {
 	name     string
 	sourceID sources.SourceID
@@ -87,6 +90,10 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
+	if err := git.CmdCheck(); err != nil {
+		return err
+	}
+
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
@@ -95,11 +102,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	s.repos = conn.Repositories
 	s.ignoreRepos = conn.IgnoreRepos
-	s.url = conn.Endpoint
 
-	if conn.Endpoint != "" && !strings.HasSuffix(s.url, "/") {
-		s.url = s.url + "/"
-	}
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.GitLab_Token:
 		s.authMethod = "TOKEN"
@@ -118,12 +121,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		return fmt.Errorf("invalid configuration given for source %q (%s)", name, s.Type().String())
 	}
 
-	if len(s.url) == 0 {
-		// Assuming not custom gitlab url.
-		s.url = "https://gitlab.com/"
-	}
-
-	err = git.CmdCheck()
+	s.url, err = normalizeGitlabEndpoint(conn.Endpoint)
 	if err != nil {
 		return err
 	}
@@ -466,8 +464,8 @@ func (s *Source) getAllProjectRepos(
 		TopLevelOnly: gitlab.Ptr(false),
 		Owned:        gitlab.Ptr(false),
 	}
-	const cloudBaseURL = "https://gitlab.com/"
-	if s.url != cloudBaseURL {
+
+	if s.url != gitlabBaseURL {
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
@@ -651,6 +649,46 @@ func normalizeRepos(repos []string) ([]string, []error) {
 		validRepos = append(validRepos, repo)
 	}
 	return validRepos, errs
+}
+
+// normalizeGitlabEndpoint ensures that if an endpoint is going to gitlab.com, we use https://gitlab.com/ as the endpoint.
+// If we see the protocol is http, we error, because this shouldn't be used.
+// Otherwise, it ensures we are using https as our protocol, if none was provided.
+func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
+	if gitlabEndpoint == "" {
+		return gitlabBaseURL, nil
+	}
+
+	gitlabURL, err := url.Parse(gitlabEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	// We probably didn't receive a URL with a scheme, which messed up the parsing.
+	if gitlabURL.Host == "" {
+		gitlabURL, err = url.Parse("https://" + gitlabEndpoint)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// If the host is gitlab.com, this is the cloud version, which has only one valid endpoint.
+	if gitlabURL.Host == "gitlab.com" {
+		return gitlabBaseURL, nil
+	}
+
+	// Beyond here, on-prem gitlab is being used, so we have to mostly leave things as-is.
+
+	if gitlabURL.Scheme != "https" {
+		return "", fmt.Errorf("https was not used as URL scheme, but is required. Please use https")
+	}
+
+	// The gitlab library wants trailing slashes.
+	if !strings.HasSuffix(gitlabURL.Path, "/") {
+		gitlabURL.Path = gitlabURL.Path + "/"
+	}
+
+	return gitlabURL.String(), nil
 }
 
 // Enumerate reports all GitLab repositories to be scanned to the reporter. If

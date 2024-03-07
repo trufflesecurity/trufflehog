@@ -4,55 +4,87 @@
 package jdbc
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"os/exec"
+	"fmt"
 	"testing"
-	"time"
 
+	"github.com/brianvoe/gofakeit/v6"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-)
-
-const (
-	mysqlUser     = "coolGuy"
-	mysqlPass     = "23201dabb56ca236f3dc6736c0f9afad"
-	mysqlDatabase = "stuff"
+	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
 
 func TestMySQL(t *testing.T) {
+	mysqlUser := gofakeit.Username()
+	mysqlPass := gofakeit.Password(true, true, true, false, false, 10)
+	mysqlDatabase := gofakeit.Word()
+
+	ctx := context.Background()
+
+	mysqlC, err := mysql.RunContainer(ctx,
+		mysql.WithDatabase(mysqlDatabase),
+		mysql.WithUsername(mysqlUser),
+		mysql.WithPassword(mysqlPass),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer mysqlC.Terminate(ctx)
+
+	host, err := mysqlC.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := mysqlC.MappedPort(ctx, "3306")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type result struct {
-		parseErr        bool
-		pingOk          bool
-		pingDeterminate bool
+		ParseErr        bool
+		PingOk          bool
+		PingDeterminate bool
 	}
 	tests := []struct {
+		name  string
 		input string
 		want  result
 	}{
 		{
+			name:  "empty",
 			input: "",
-			want:  result{parseErr: true},
+			want:  result{ParseErr: true},
 		},
 		{
-			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			want:  result{pingOk: true, pingDeterminate: true},
+			name:  "all good",
+			input: fmt.Sprintf("//%s:%s@tcp(%s:%s)/%s", mysqlUser, mysqlPass, host, port.Port(), mysqlDatabase),
+			want:  result{PingOk: true, PingDeterminate: true},
 		},
 		{
-			input: "//wrongUser:wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			want:  result{pingOk: false, pingDeterminate: true},
+			name:  "wrong creds",
+			input: fmt.Sprintf("//wrongUser:wrongPassword@tcp(%s:%s)/%s", host, port.Port(), mysqlDatabase),
+			want:  result{PingOk: false, PingDeterminate: true},
 		},
 		{
-			input: "//" + mysqlUser + ":wrongPass@tcp(127.0.0.1:3306)/" + mysqlDatabase,
-			want:  result{pingOk: false, pingDeterminate: true},
+			name:  "wrong pass",
+			input: fmt.Sprintf("//%s:wrongPass@tcp(%s:%s)/%s", mysqlUser, host, port.Port(), mysqlDatabase),
+			want:  result{PingOk: false, PingDeterminate: true},
 		},
 		{
-			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/",
-			want:  result{pingOk: true, pingDeterminate: true},
+			name:  "no db",
+			input: fmt.Sprintf("//%s:%s@tcp(%s:%s)/", mysqlUser, mysqlPass, host, port.Port()),
+			want:  result{PingOk: true, PingDeterminate: true},
 		},
 		{
-			input: "//" + mysqlUser + ":" + mysqlPass + "@tcp(127.0.0.1:3306)/wrongDB",
-			want:  result{pingOk: true, pingDeterminate: true},
+			name:  "wrong db",
+			input: fmt.Sprintf("//%s:%s@tcp(%s:%s)/wrongDB", mysqlUser, mysqlPass, host, port.Port()),
+			want:  result{PingOk: true, PingDeterminate: true},
+		},
+		{
+			name:  "jdbc format",
+			input: fmt.Sprintf("//%s:%s@%s:%s/%s", mysqlUser, mysqlPass, host, port.Port(), mysqlDatabase),
+			want:  result{PingOk: true, PingDeterminate: true},
 		},
 	}
 	for _, tt := range tests {
@@ -60,45 +92,19 @@ func TestMySQL(t *testing.T) {
 			j, err := parseMySQL(tt.input)
 
 			if err != nil {
-				got := result{parseErr: true}
+				got := result{ParseErr: true}
 				assert.Equal(t, tt.want, got)
 				return
 			}
 
 			pr := j.ping(context.Background())
 
-			got := result{pingOk: pr.err == nil, pingDeterminate: pr.determinate}
-			assert.Equal(t, tt.want, got)
+			got := result{PingOk: pr.err == nil, PingDeterminate: pr.determinate}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("%s: (-want +got)\n%s", tt.name, diff)
+				t.Errorf("error is: %v", pr.err)
+			}
 		})
 	}
-}
-
-var mysqlDockerHash string
-
-func startMySQL() error {
-	cmd := exec.Command(
-		"docker", "run", "--rm", "-p", "3306:3306",
-		"-e", "MYSQL_ROOT_PASSWORD=403a96cff2a323f74bfb1c16992895be",
-		"-e", "MYSQL_USER="+mysqlUser,
-		"-e", "MYSQL_PASSWORD="+mysqlPass,
-		"-e", "MYSQL_DATABASE="+mysqlDatabase,
-		"-e", "MYSQL_ROOT_HOST=%",
-		"-d", "mysql",
-	)
-	out, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	mysqlDockerHash = string(bytes.TrimSpace(out))
-	select {
-	case <-dockerLogLine(mysqlDockerHash, "socket: '/var/run/mysqld/mysqld.sock'  port: 3306"):
-		return nil
-	case <-time.After(30 * time.Second):
-		stopMySQL()
-		return errors.New("timeout waiting for mysql database to be ready")
-	}
-}
-
-func stopMySQL() {
-	exec.Command("docker", "kill", mysqlDockerHash).Run()
 }

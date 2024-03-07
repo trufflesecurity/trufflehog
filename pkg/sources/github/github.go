@@ -218,7 +218,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	s.httpClient = common.RetryableHttpClientTimeout(60)
+	s.httpClient = common.RetryableHTTPClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
@@ -694,7 +694,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	appItr.BaseURL = apiEndpoint
 
 	// Does this need to be separate from |s.httpClient|?
-	instHTTPClient := common.RetryableHttpClientTimeout(60)
+	instHTTPClient := common.RetryableHTTPClientTimeout(60)
 	instHTTPClient.Transport = appItr
 	installationClient, err = github.NewClient(instHTTPClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {

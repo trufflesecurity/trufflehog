@@ -133,3 +133,57 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 		})
 	}
 }
+
+func Test_normalizeGitlabEndpoint(t *testing.T) {
+	testCases := map[string]struct {
+		inputEndpoint  string
+		outputEndpoint string
+		wantErr        bool
+	}{
+		"the cloud url should return the cloud url": {
+			inputEndpoint:  gitlabBaseURL,
+			outputEndpoint: gitlabBaseURL,
+		},
+		"empty string should return the cloud url": {
+			inputEndpoint:  "",
+			outputEndpoint: gitlabBaseURL,
+		},
+		"no scheme cloud url should return the cloud url": {
+			inputEndpoint:  "gitlab.com",
+			outputEndpoint: gitlabBaseURL,
+		},
+		"no scheme cloud url with trailing slash should return the cloud url": {
+			inputEndpoint:  "gitlab.com/",
+			outputEndpoint: gitlabBaseURL,
+		},
+		"http scheme cloud url with organization should return the cloud url": {
+			inputEndpoint:  "http://gitlab.com/trufflesec",
+			outputEndpoint: gitlabBaseURL,
+		},
+		// On-prem endpoint testing.
+		"on-prem url should be unchanged": {
+			inputEndpoint:  "https://gitlab.trufflesec.com/",
+			outputEndpoint: "https://gitlab.trufflesec.com/",
+		},
+		"on-prem url without trailing slash should have trailing slash added": {
+			inputEndpoint:  "https://gitlab.trufflesec.com",
+			outputEndpoint: "https://gitlab.trufflesec.com/",
+		},
+		"on-prem url with http scheme should return an error": {
+			inputEndpoint: "http://gitlab.trufflesec.com/",
+			wantErr:       true,
+		},
+		"on-prem with gitlab.com should not rewrite to the cloud url": {
+			inputEndpoint:  "https://gitlab.com.trufflesec.com/",
+			outputEndpoint: "https://gitlab.com.trufflesec.com/",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			output, err := normalizeGitlabEndpoint(tc.inputEndpoint)
+			assert.Equal(t, tc.outputEndpoint, output)
+			assert.Equal(t, tc.wantErr, err != nil)
+		})
+	}
+}
