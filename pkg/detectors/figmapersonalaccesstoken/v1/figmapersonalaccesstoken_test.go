@@ -51,6 +51,9 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr: false,
@@ -67,6 +70,9 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr: false,
@@ -83,6 +89,9 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr:             false,
@@ -100,6 +109,9 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr:             false,

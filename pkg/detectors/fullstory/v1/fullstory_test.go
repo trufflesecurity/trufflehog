@@ -50,6 +50,9 @@ func TestFullstory_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Fullstory,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr: false,
@@ -66,6 +69,9 @@ func TestFullstory_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Fullstory,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr: false,

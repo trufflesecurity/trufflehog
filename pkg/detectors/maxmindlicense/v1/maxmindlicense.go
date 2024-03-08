@@ -1,10 +1,12 @@
-package maxmindlicense_v2
+package maxmindlicense
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9]{2,7})\b`)
-	keyPat = regexp.MustCompile(`\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9A-Za-z]{16})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -29,7 +31,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"maxmind", "geoip"}
 }
 
-func (Scanner) Version() int { return 2 }
+func (Scanner) Version() int { return 1 }
 
 // FromData will find and optionally verify MaxMindLicense secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -47,14 +49,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			idRes := strings.TrimSpace(idMatch[1])
 
-			s := detectors.Result{
+			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MaxMindLicense,
 				Redacted:     idRes,
 				Raw:          []byte(keyRes),
-				RawV2:        []byte(keyRes + idRes),
-			}
-			s.ExtraData = map[string]string{
-				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
 			}
 
 			if verify {
@@ -67,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s.Verified = true
+						s1.Verified = true
 					} else {
 						if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
 							continue
@@ -76,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			results = append(results, s)
+			results = append(results, s1)
 		}
 	}
 

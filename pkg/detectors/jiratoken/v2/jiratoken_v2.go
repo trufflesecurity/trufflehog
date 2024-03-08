@@ -4,9 +4,10 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,13 +22,14 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int { return 1 }
+func (Scanner) Version() int { return 2 }
 
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
+	// https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/
+	// Tokens created after Jan 18 2023 use a variable length
+	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{5,24}\.[a-zA-Z-0-9]{3,16}\.[a-zA-Z-0-9]{3,16})\b`)
 	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`)
 )
@@ -72,9 +74,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Raw:          []byte(resToken),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resEmail, resToken, resDomain)),
-				}
-				s1.ExtraData = map[string]string{
-					"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
+						"version":        fmt.Sprintf("%d", s.Version()),
+					},
 				}
 
 				if verify {
@@ -89,7 +92,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				results = append(results, s1)
+
 			}
+
 		}
 	}
 
