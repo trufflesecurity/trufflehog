@@ -50,18 +50,8 @@ type Source struct {
 	keywords []string
 	sub      *Substitution
 
-	variableSubstituions map[string]VariableInfo
-
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
-}
-
-type VariableInfo struct {
-	value     string
-	source    string
-	valueType string
-	// collectionID  string
-	// environmentID string
 }
 
 // Target is a struct that holds the data for a single scan target.
@@ -85,10 +75,39 @@ type Target struct {
 	Data            string
 }
 
+func (s *Source) subsSet(data string) string {
+	replacements := []string{}
+	s.subsSetHelper(data, &replacements)
+	// fmt.Println("hmmm replacements", replacements)
+	return strings.Join(replacements, " ")
+}
+
+func (s *Source) subsSetHelper(data string, replacements *[]string) string {
+	matches := subRe.FindAllString(data, -1)
+	if len(matches) == 0 {
+		*replacements = append(*replacements, data)
+		return data
+	}
+
+	for _, match := range matches {
+		trimmed := strings.Trim(match, "{}")
+		toSub := s.sub.globalAndEnvSlice[trimmed]
+		for _, sub := range toSub {
+			data = s.subsSetHelper(strings.Replace(data, match, sub, -1), replacements)
+			// fmt.Println("replaced", strings.Replace(data, match, sub, -1))
+		}
+	}
+
+	return data
+}
+
 type Substitution struct {
 	global     map[string]string
 	env        map[string](map[string]string)
 	collection map[string](map[string]string)
+
+	globalAndEnvSlice map[string][]string
+	collectionSlice   map[string](map[string][]string)
 }
 
 func NewSubstitution() *Substitution {
@@ -96,6 +115,9 @@ func NewSubstitution() *Substitution {
 		global:     make(map[string]string),
 		env:        make(map[string](map[string]string)),
 		collection: make(map[string](map[string]string)),
+
+		globalAndEnvSlice: make(map[string][]string),
+		collectionSlice:   make(map[string](map[string][]string)),
 	}
 }
 
@@ -105,8 +127,9 @@ func NewSubstitution() *Substitution {
 // in subsequent requests, responses, and events.
 // Variables defined in requests, headers, etc can not be substituted in other requests, headers, etc.
 func (sub *Substitution) add(metadata Metadata, key string, value string) {
-	if metadata.Type == GLOBAL_TYPE {
+	if metadata.Type == GLOBAL_TYPE || metadata.Type == ENVIRONMENT_TYPE {
 		sub.global[key] = value
+		sub.globalAndEnvSlice[key] = append(sub.globalAndEnvSlice[key], value)
 	} else if metadata.Type == ENVIRONMENT_TYPE {
 		if _, ok := sub.env[metadata.EnvironmentID]; !ok {
 			sub.env[metadata.EnvironmentID] = make(map[string]string)
@@ -115,8 +138,10 @@ func (sub *Substitution) add(metadata Metadata, key string, value string) {
 	} else if metadata.Type == COLLECTION_TYPE {
 		if _, ok := sub.collection[metadata.CollectionInfo.PostmanID]; !ok {
 			sub.collection[metadata.CollectionInfo.Description] = make(map[string]string)
+			sub.collectionSlice[metadata.CollectionInfo.Description] = make(map[string][]string)
 		}
 		sub.collection[metadata.CollectionInfo.Description][key] = value
+		sub.collectionSlice[metadata.CollectionInfo.Description][key] = append(sub.collectionSlice[metadata.CollectionInfo.Description][key], value)
 	}
 }
 
@@ -145,7 +170,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 	s.detectorKeywords = make(map[string]struct{})
-	s.variableSubstituions = make(map[string]VariableInfo)
 	s.sub = NewSubstitution()
 
 	s.log = ctx.Logger()
@@ -650,18 +674,15 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 	values := []string{}
 	for _, kv := range variableData.KeyValues {
 		s.keywords = append(s.keywords, kv.Key)
-
 		valStr := fmt.Sprintf("%v", kv.Value)
 		if valStr != "" {
 			s.sub.add(m, kv.Key, valStr)
 		} else if kv.SessionValue != "" {
 			valStr = fmt.Sprintf("%v", kv.SessionValue)
 		}
-
 		if valStr == "" {
 			continue
 		}
-
 		// precendence goes env -> collection -> global
 		values = append(values, s.substitute(m, valStr))
 	}
@@ -793,17 +814,8 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 	return slice
 }
 
-// TODO update to use direct variable lookups
-// func (s *Source) substitute(data string) string {
-// 	return subRe.ReplaceAllStringFunc(data, func(str string) string {
-// 		if val, ok := s.variableSubstituions[strings.Trim(str, "{}")]; ok {
-// 			return val.value
-// 		}
-// 		return str
-// 	})
-// }
-
 func (s *Source) substitute(metadata Metadata, data string) string {
+	fmt.Println("returned subsset", s.subsSet(data))
 	// precendence goes env -> collection -> global
 	return subRe.ReplaceAllStringFunc(data, func(str string) string {
 		if val, ok := s.sub.env[metadata.EnvironmentID][strings.Trim(str, "{}")]; ok {
