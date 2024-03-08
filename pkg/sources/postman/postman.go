@@ -76,10 +76,19 @@ type Target struct {
 }
 
 func (s *Source) subsSet(data string) string {
+	matches := subRe.FindAllString(data, -1)
 	replacements := []string{}
-	s.subsSetHelper(data, &replacements)
-	// fmt.Println("hmmm replacements", replacements)
-	return strings.Join(replacements, " ")
+	for _, match := range matches {
+		toReplace := s.sub.globalAndEnvSlice[match]
+		for _, sub := range toReplace {
+			if len(replacements) == 0 {
+				replacements = append(replacements, strings.Replace(data, match, sub, -1))
+			}
+
+		}
+	}
+
+	return data
 }
 
 func (s *Source) subsSetHelper(data string, replacements *[]string) string {
@@ -815,18 +824,62 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 }
 
 func (s *Source) substitute(metadata Metadata, data string) string {
-	fmt.Println("returned subsset", s.subsSet(data))
+	return s.substituteM(metadata, data)
+	// fmt.Println("returned subsset", s.subsSet(data))
+	// // precendence goes env -> collection -> global
+	// return subRe.ReplaceAllStringFunc(data, func(str string) string {
+	// 	if val, ok := s.sub.env[metadata.EnvironmentID][strings.Trim(str, "{}")]; ok {
+	// 		return val
+	// 	}
+	// 	if val, ok := s.sub.collection[metadata.CollectionInfo.PostmanID][strings.Trim(str, "{}")]; ok {
+	// 		return val
+	// 	}
+	// 	if val, ok := s.sub.global[strings.Trim(str, "{}")]; ok {
+	// 		return val
+	// 	}
+	// 	return str
+	// })
+}
+
+func (s *Source) substituteM(metadata Metadata, data string) string {
 	// precendence goes env -> collection -> global
-	return subRe.ReplaceAllStringFunc(data, func(str string) string {
-		if val, ok := s.sub.env[metadata.EnvironmentID][strings.Trim(str, "{}")]; ok {
-			return val
+	l := []string{}
+	longest := 0
+	matches := subRe.FindAllString(data, -1)
+	for _, m := range matches {
+		trimmed := strings.Trim(m, "{}")
+		if len(s.sub.globalAndEnvSlice[trimmed]) > longest {
+			longest = len(s.sub.globalAndEnvSlice[trimmed])
 		}
-		if val, ok := s.sub.collection[metadata.CollectionInfo.PostmanID][strings.Trim(str, "{}")]; ok {
-			return val
-		}
-		if val, ok := s.sub.global[strings.Trim(str, "{}")]; ok {
-			return val
-		}
-		return str
-	})
+	}
+
+	// PICKUP HERE
+	for i := 0; i < longest; i++ {
+		d := subRe.ReplaceAllStringFunc(data, func(str string) string {
+			if slice, ok := s.sub.globalAndEnvSlice[strings.Trim(str, "{}")]; ok {
+				if i < len(slice) {
+					return slice[i]
+				} else {
+					return slice[len(slice)-1]
+				}
+			}
+			return str
+		})
+		l = append(l, d)
+		// fmt.Println("bro what", d)
+	}
+
+	// return subRe.ReplaceAllStringFunc(data, func(str string) string {
+	// 	if val, ok := s.sub.env[metadata.EnvironmentID][strings.Trim(str, "{}")]; ok {
+	// 		return val
+	// 	}
+	// 	if val, ok := s.sub.collection[metadata.CollectionInfo.PostmanID][strings.Trim(str, "{}")]; ok {
+	// 		return val
+	// 	}
+	// 	if val, ok := s.sub.global[strings.Trim(str, "{}")]; ok {
+	// 		return val
+	// 	}
+	// 	return str
+	// })
+	return strings.Join(l, "\n")
 }
