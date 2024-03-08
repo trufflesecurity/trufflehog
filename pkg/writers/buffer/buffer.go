@@ -151,7 +151,7 @@ func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
 		// which may require multiple allocations and copies if the size required is much larger
 		// than double the capacity. Our approach aligns with default behavior when growth sizes
 		// happen to match current capacity, retaining asymptotic efficiency benefits.
-		b.Buffer.Grow(growSize)
+		b.Grow(growSize)
 	}
 
 	return b.Buffer.Write(data)
