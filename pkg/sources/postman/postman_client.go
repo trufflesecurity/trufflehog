@@ -10,12 +10,19 @@ import (
 )
 
 const (
-	GLOBAL_VARS_URL  = "https://api.getpostman.com/workspaces/%s/global-variables"
+	GLOBAL_VARS_URL = "https://www.postman.com/_api/workspace/%s/globals"
+	//Note: This is an undocumented API endpoint. The office API endpoint keeps returning 502.
+	//We'll shift this once that behavior is resolved and stable.
+	//Official API Endpoint: "https://api.getpostman.com/workspaces/%s/global-variables"
+	//GLOBAL_VARS_URL  = "https://api.getpostman.com/workspaces/%s/global-variables"
 	WORKSPACE_URL    = "https://api.getpostman.com/workspaces/%s"
 	ENVIRONMENTS_URL = "https://api.getpostman.com/environments/%s"
 	COLLECTIONS_URL  = "https://api.getpostman.com/collections/%s"
 
-	userAgent          = "PostmanRuntime/7.26.8"
+	userAgent     = "PostmanRuntime/7.26.8"
+	alt_userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	//Since we're using the undocumented API endpoint for global vars, we need a different user agent.
+	//We'll shift this once that behavior is resolved and stable.
 	defaultContentType = "*"
 )
 
@@ -325,7 +332,7 @@ func (c *Client) GetGlobalVariables(workspace_uuid string) (VariableData, error)
 	}{}
 
 	url := fmt.Sprintf(GLOBAL_VARS_URL, workspace_uuid)
-	r, err := c.getPostmanReq(url, nil)
+	r, err := c.getPostmanReq(url, map[string]string{"User-Agent": alt_userAgent})
 	if err != nil {
 		err = fmt.Errorf("could not get global variables for workspace: %s", workspace_uuid)
 		return VariableData{}, err
