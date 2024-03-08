@@ -320,7 +320,9 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
-	s.scanAuth(ctx, chunksChan, metadata, item.Auth, URL{})
+	// an auth all by its lonesome could be inherited to subfolders and requests
+	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
+
 	s.scanVariableData(ctx, chunksChan, metadata, VariableData{
 		KeyValues: item.Variable,
 	})
@@ -358,20 +360,56 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 	})
 }
 
+func (s *Source) keywordCombinations(str string) string {
+	data := ""
+	for _, keyword := range filterKeywords(s.keywords, s.detectorKeywords) {
+		data += fmt.Sprintf("%s:%s\n ", keyword, str)
+	}
+
+	return data
+}
+
 // Process Auth
 func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, url URL) {
 	var authData string
 	switch auth.Type {
 	case "apikey":
-		authData = s.parseAPIKey(auth)
+		var apiKeyValue, apiKeyName string
+		for _, kv := range auth.Apikey {
+			switch kv.Key {
+			case "key":
+				apiKeyValue = fmt.Sprintf("%v", kv.Value)
+			case "value":
+				apiKeyName = fmt.Sprintf("%v", kv.Value)
+			}
+		}
+		authData += fmt.Sprintf("%s=%s\n", apiKeyName, apiKeyValue)
+		authData += s.keywordCombinations(apiKeyValue)
 	case "awsSigV4":
-		authData = s.parseAWSAuth(auth)
+		for _, kv := range auth.AWSv4 {
+			switch kv.Key {
+			case "accessKey":
+				authData += fmt.Sprintf("accessKey:%s ", kv.Value)
+			case "secretKey":
+				authData += fmt.Sprintf("secretKey:%s ", kv.Value)
+			case "region":
+				authData += fmt.Sprintf("region:%s ", kv.Value)
+			case "service":
+				authData += fmt.Sprintf("service:%s ", kv.Value)
+			}
+		}
 	case "bearer":
-		authData = s.parseBearer(auth)
+		var bearerKey, bearerValue string
+		for _, kv := range auth.Bearer {
+			bearerValue = fmt.Sprintf("%v", kv.Value)
+			bearerKey = fmt.Sprintf("%v", kv.Key)
+		}
+		authData += fmt.Sprintf("%s:%s\n", bearerKey, bearerValue)
+		authData += s.keywordCombinations(bearerValue)
 	case "basic":
 		authData = s.parseBasicAuth(ctx, auth, url)
 	case "noauth":
-		authData = ""
+		return
 	case "oauth2":
 		authData = s.parseOAuth2(auth)
 	default:
@@ -388,7 +426,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		FolderName:     m.FolderName,
 		FolderId:       m.FolderID,
 		GlobalID:       m.FullID,
-		Data:           authData,
+		Data:           s.substitute(authData),
 	})
 }
 
@@ -433,7 +471,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 
 	if r.Auth.Type != "" {
 		metadata.Type = metadata.Type + " > request auth"
-		s.scanAuth(ctx, chunksChan, metadata, r.Auth, URL{})
+		s.scanAuth(ctx, chunksChan, metadata, r.Auth, r.URL)
 	}
 
 	if r.Body.Mode != "" {
@@ -545,7 +583,6 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 			if strings.HasPrefix(valStr, "{{") && strings.HasSuffix(valStr, "}}") {
 				// This is a variable substitution. So we should see if there is any substitutions we can do
 				// for this variable.
-				// fmt.Println("valStr", valStr)
 				valStr = strings.Trim(strings.Trim(valStr, "{"), "}")
 				if val, ok := s.variableSubstituions[valStr]; ok {
 					// If the value is a session value, we should not substitute it.

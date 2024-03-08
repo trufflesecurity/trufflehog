@@ -321,7 +321,7 @@ func (c *Client) GetWorkspace(workspaceUUID string) (Workspace, error) {
 // GetGlobalVariables returns the global variables for a given workspace
 func (c *Client) GetGlobalVariables(workspace_uuid string) (VariableData, error) {
 	obj := struct {
-		VariableData `json:"data"`
+		VariableData VariableData `json:"data"`
 	}{}
 
 	url := fmt.Sprintf(GLOBAL_VARS_URL, workspace_uuid)
@@ -347,7 +347,7 @@ func (c *Client) GetGlobalVariables(workspace_uuid string) (VariableData, error)
 // GetEnvironmentVariables returns the environment variables for a given environment
 func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData, error) {
 	obj := struct {
-		VariableData `json:"data"`
+		VariableData VariableData `json:"environment"`
 	}{}
 
 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
@@ -368,7 +368,6 @@ func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData,
 		return VariableData{}, err
 	}
 	return obj.VariableData, nil
-
 }
 
 // GetCollection returns the collection for a given collection
