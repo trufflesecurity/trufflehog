@@ -2,6 +2,7 @@ package postman
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -52,6 +53,11 @@ type Source struct {
 	// variableSubstituions map[string]VariableData
 	variableSubstituions map[string]VariableInfo
 
+	// env id -> variable name -> variable info
+	variableGlobal                 map[string]VariableInfo
+	variableSubstituionsEnv        map[string](map[string]VariableInfo)
+	variableSubstituionsCollection map[string](map[string]VariableInfo)
+
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -60,6 +66,8 @@ type VariableInfo struct {
 	value     string
 	source    string
 	valueType string
+	// collectionID  string
+	// environmentID string
 }
 
 // Target is a struct that holds the data for a single scan target.
@@ -230,7 +238,6 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 			s.log.Error(err, "could not get collection object", "collection_uuid", collectionID.UUID)
 		}
 		s.scanCollection(ctx, chunksChan, metadata, collection)
-
 	}
 }
 
@@ -369,8 +376,7 @@ func (s *Source) keywordCombinations(str string) string {
 	return data
 }
 
-// Process Auth
-func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, url URL) {
+func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, u URL) string {
 	var authData string
 	switch auth.Type {
 	case "apikey":
@@ -385,7 +391,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		}
 		authData += fmt.Sprintf("%s=%s\n", apiKeyName, apiKeyValue)
 		authData += s.keywordCombinations(apiKeyValue)
-	case "awsSigV4":
+	case "awsSigV4", "awsv4":
 		for _, kv := range auth.AWSv4 {
 			switch kv.Key {
 			case "accessKey":
@@ -407,13 +413,46 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		authData += fmt.Sprintf("%s:%s\n", bearerKey, bearerValue)
 		authData += s.keywordCombinations(bearerValue)
 	case "basic":
-		authData = s.parseBasicAuth(ctx, auth, url)
-	case "noauth":
-		return
+		keywords := filterKeywords(s.keywords, s.detectorKeywords)
+		authData += strings.Join(keywords, " ") + "\n"
+		username := ""
+		password := ""
+
+		for _, kv := range auth.Basic {
+			switch kv.Key {
+			case "username":
+				username = fmt.Sprintf("%v", kv.Value)
+			case "password":
+				password = fmt.Sprintf("%v", kv.Value)
+			}
+		}
+		if u.Raw != "" {
+			parsedURL, err := url.Parse(u.Raw)
+			if err != nil {
+				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
+				return ""
+			}
+
+			parsedURL.User = url.User(username + ":" + password)
+			decodedURL, err := url.PathUnescape(parsedURL.String())
+			if err != nil {
+				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
+				return ""
+			}
+			authData += (s.substitute(decodedURL) + " ")
+		}
 	case "oauth2":
-		authData = s.parseOAuth2(auth)
+		for _, oauth := range auth.OAuth2 {
+			switch oauth.Key {
+			case "accessToken", "refreshToken", "clientId", "clientSecret", "accessTokenUrl", "authUrl":
+				authData += fmt.Sprintf("%s:%v ", oauth.Key, oauth.Value)
+				authData += s.keywordCombinations(fmt.Sprintf("%v", oauth.Value))
+			}
+		}
+	case "noauth":
+		return ""
 	default:
-		return
+		return ""
 	}
 
 	s.scanTarget(ctx, chunksChan, Target{
@@ -428,6 +467,8 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		GlobalID:       m.FullID,
 		Data:           s.substitute(authData),
 	})
+
+	return s.substitute(authData)
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
@@ -579,6 +620,17 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 	for _, kv := range variableData.KeyValues {
 		s.keywords = append(s.keywords, kv.Key)
 		valStr := fmt.Sprintf("%v", kv.Value)
+
+		// if strings.HasPrefix(valStr, "{{") && strings.HasSuffix(valStr, "}}") {
+		// 	// This is a variable substitution. So we should see if there is any substitutions we can do.
+		// 	// We should also _not_ add this to the variable lookups.
+		// }
+
+		// // precendence goes env -> global -> collection
+		// if m.Type == ENVIRONMENT_TYPE {
+
+		// }
+
 		if valStr != "" {
 			if strings.HasPrefix(valStr, "{{") && strings.HasSuffix(valStr, "}}") {
 				// This is a variable substitution. So we should see if there is any substitutions we can do
@@ -756,6 +808,7 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 	return slice
 }
 
+// TODO update to use direct variable lookups
 func (s *Source) substitute(data string) string {
 	return subRe.ReplaceAllStringFunc(data, func(str string) string {
 		if val, ok := s.variableSubstituions[strings.Trim(str, "{}")]; ok {
@@ -763,4 +816,24 @@ func (s *Source) substitute(data string) string {
 		}
 		return str
 	})
+}
+
+func (s *Source) parseOAuth2(a Auth) string {
+	if len(a.OAuth2) == 0 {
+		return ""
+	}
+	var data string
+	for _, oauth := range a.OAuth2 {
+		switch oauth.Key {
+		case "accessToken", "refreshToken", "clientId", "clientSecret", "accessTokenUrl", "authUrl":
+			data += fmt.Sprintf("%s:%v ", oauth.Key, oauth.Value)
+			for _, keyword := range s.keywords {
+				data += fmt.Sprintf("%s:%v ", keyword, oauth.Value)
+			}
+		}
+	}
+	// for _, subMap := range *varSubMap {
+	// 	data += s.substitute(data, subMap)
+	// }
+	return data
 }
