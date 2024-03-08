@@ -74,6 +74,7 @@ func (p *Pool) Get(ctx context.Context) *Buffer {
 // Put returns a Buffer to the pool.
 func (p *Pool) Put(buf *Buffer) {
 	p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
+	buf.recordMetric()
 
 	// If the Buffer is more than twice the default size, replace it with a new Buffer.
 	// This prevents us from returning very large buffers to the pool.
@@ -85,7 +86,6 @@ func (p *Pool) Put(buf *Buffer) {
 		// Reset the Buffer to clear any existing data.
 		buf.Reset()
 	}
-	buf.recordMetric()
 
 	p.Pool.Put(buf)
 }
