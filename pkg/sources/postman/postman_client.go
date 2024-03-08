@@ -77,6 +77,7 @@ type Metadata struct {
 	WorkspaceUUID  string
 	WorkspaceName  string
 	CreatedBy      string
+	EnvironmentID  string
 	CollectionInfo Info
 	FolderID       string // UUID of the folder (but not full ID)
 	FolderName     string
@@ -374,6 +375,15 @@ func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData,
 		err = fmt.Errorf("could not unmarshal env variables JSON for environment: %s", environment_uuid)
 		return VariableData{}, err
 	}
+
+	// save to env file
+	file, err := os.Create(fmt.Sprintf("env_%s.json", environment_uuid))
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	file.Write(body)
+
 	return obj.VariableData, nil
 }
 

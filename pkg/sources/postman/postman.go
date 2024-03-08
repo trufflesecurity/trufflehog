@@ -48,15 +48,9 @@ type Source struct {
 	// Keywords are words that are discovered when we walk through postman data.
 	// These keywords are then injected into data that is sent to the detectors.
 	keywords []string
+	sub      *Substitution
 
-	// each environment has a set of variables (key-value pairs)
-	// variableSubstituions map[string]VariableData
 	variableSubstituions map[string]VariableInfo
-
-	// env id -> variable name -> variable info
-	variableGlobal                 map[string]VariableInfo
-	variableSubstituionsEnv        map[string](map[string]VariableInfo)
-	variableSubstituionsCollection map[string](map[string]VariableInfo)
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -91,6 +85,41 @@ type Target struct {
 	Data            string
 }
 
+type Substitution struct {
+	global     map[string]string
+	env        map[string](map[string]string)
+	collection map[string](map[string]string)
+}
+
+func NewSubstitution() *Substitution {
+	return &Substitution{
+		global:     make(map[string]string),
+		env:        make(map[string](map[string]string)),
+		collection: make(map[string](map[string]string)),
+	}
+}
+
+// add adds a key-value pair to the substitution map.
+// Note that there are only 3 types of substitutions: global, environment, and collection.
+// This means users can define variables in any of these 3 scopes which can be used to subsitute
+// in subsequent requests, responses, and events.
+// Variables defined in requests, headers, etc can not be substituted in other requests, headers, etc.
+func (sub *Substitution) add(metadata Metadata, key string, value string) {
+	if metadata.Type == GLOBAL_TYPE {
+		sub.global[key] = value
+	} else if metadata.Type == ENVIRONMENT_TYPE {
+		if _, ok := sub.env[metadata.EnvironmentID]; !ok {
+			sub.env[metadata.EnvironmentID] = make(map[string]string)
+		}
+		sub.env[metadata.EnvironmentID][key] = value
+	} else if metadata.Type == COLLECTION_TYPE {
+		if _, ok := sub.collection[metadata.CollectionInfo.PostmanID]; !ok {
+			sub.collection[metadata.CollectionInfo.Description] = make(map[string]string)
+		}
+		sub.collection[metadata.CollectionInfo.Description][key] = value
+	}
+}
+
 var subRe = regexp.MustCompile(`\{\{[^{}]+\}\}`)
 
 // Type returns the type of source.
@@ -117,6 +146,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.jobPool.SetLimit(concurrency)
 	s.detectorKeywords = make(map[string]struct{})
 	s.variableSubstituions = make(map[string]VariableInfo)
+	s.sub = NewSubstitution()
 
 	s.log = ctx.Logger()
 
@@ -218,6 +248,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.Type = ENVIRONMENT_TYPE
 		metadata.Link = LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + envVars.ID
 		metadata.FullID = envVars.ID
+		metadata.EnvironmentID = envID.UUID
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
 		for _, word := range strings.Split(envVars.Name, " ") {
@@ -330,9 +361,9 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
 
-	s.scanVariableData(ctx, chunksChan, metadata, VariableData{
-		KeyValues: item.Variable,
-	})
+	// s.scanVariableData(ctx, chunksChan, metadata, VariableData{
+	// 	KeyValues: item.Variable,
+	// })
 
 }
 
@@ -363,7 +394,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		FolderName:     metadata.FolderName,
 		FolderId:       metadata.FolderID,
 		GlobalID:       metadata.FullID,
-		Data:           s.substitute(data),
+		Data:           s.substitute(metadata, data),
 	})
 }
 
@@ -439,7 +470,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
 				return ""
 			}
-			authData += (s.substitute(decodedURL) + " ")
+			authData += (s.substitute(m, decodedURL) + " ")
 		}
 	case "oauth2":
 		for _, oauth := range auth.OAuth2 {
@@ -465,10 +496,10 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		FolderName:     m.FolderName,
 		FolderId:       m.FolderID,
 		GlobalID:       m.FullID,
-		Data:           s.substitute(authData),
+		Data:           s.substitute(m, authData),
 	})
 
-	return s.substitute(authData)
+	return s.substitute(m, authData)
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
@@ -496,7 +527,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			RequestID:      metadata.RequestID,
 			RequestName:    metadata.RequestName,
 			GlobalID:       metadata.FullID,
-			Data:           s.substitute(r.URL.Raw),
+			Data:           s.substitute(metadata, r.URL.Raw),
 		})
 	}
 
@@ -557,7 +588,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 			RequestID:      m.RequestID,
 			RequestName:    m.RequestName,
 			GlobalID:       m.FullID,
-			Data:           s.substitute(data),
+			Data:           s.substitute(m, data),
 		})
 	default:
 		break
@@ -593,7 +624,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 			RequestID:      m.RequestID,
 			RequestName:    m.RequestName,
 			GlobalID:       m.FullID,
-			Data:           s.substitute(response.Body),
+			Data:           s.substitute(m, response.Body),
 		})
 	}
 
@@ -619,66 +650,20 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 	values := []string{}
 	for _, kv := range variableData.KeyValues {
 		s.keywords = append(s.keywords, kv.Key)
+
 		valStr := fmt.Sprintf("%v", kv.Value)
-
-		// if strings.HasPrefix(valStr, "{{") && strings.HasSuffix(valStr, "}}") {
-		// 	// This is a variable substitution. So we should see if there is any substitutions we can do.
-		// 	// We should also _not_ add this to the variable lookups.
-		// }
-
-		// // precendence goes env -> global -> collection
-		// if m.Type == ENVIRONMENT_TYPE {
-
-		// }
-
 		if valStr != "" {
-			if strings.HasPrefix(valStr, "{{") && strings.HasSuffix(valStr, "}}") {
-				// This is a variable substitution. So we should see if there is any substitutions we can do
-				// for this variable.
-				valStr = strings.Trim(strings.Trim(valStr, "{"), "}")
-				if val, ok := s.variableSubstituions[valStr]; ok {
-					// If the value is a session value, we should not substitute it.
-					// ZRNOTE: probably some collision here
-					if val.valueType == INITIAL_VALUE {
-						values = append(values, strings.TrimSpace(val.value))
-					}
-				}
-			} else {
-				s.variableSubstituions[kv.Key] = VariableInfo{
-					value:     valStr,
-					source:    m.Type,
-					valueType: INITIAL_VALUE,
-				}
-				values = append(values, strings.TrimSpace(valStr))
-			}
+			s.sub.add(m, kv.Key, valStr)
+		} else if kv.SessionValue != "" {
+			valStr = fmt.Sprintf("%v", kv.SessionValue)
 		}
 
-		if kv.SessionValue != "" {
-			sessionValue := fmt.Sprintf("%v", kv.SessionValue)
-			s.keywords = append(s.keywords, sessionValue)
-			if sessionValue == "" {
-				continue
-			}
-			if strings.HasPrefix(sessionValue, "{{") && strings.HasSuffix(sessionValue, "}}") {
-				// This is a variable substitution. So we should see if there is any substitutions we can do
-				// for this variable.
-				if val, ok := s.variableSubstituions[sessionValue]; ok {
-					// If the value is a session value, we should not substitute it.
-					// ZRNOTE: probably some collision here
-					if val.valueType == SESSION_VALUE {
-						sessionValue = val.value
-						values = append(values, strings.TrimSpace(sessionValue))
-					}
-				}
-			} else {
-				s.variableSubstituions[kv.Key] = VariableInfo{
-					value:     sessionValue,
-					source:    m.Type,
-					valueType: SESSION_VALUE,
-				}
-				values = append(values, strings.TrimSpace(sessionValue))
-			}
+		if valStr == "" {
+			continue
 		}
+
+		// precendence goes env -> collection -> global
+		values = append(values, s.substitute(m, valStr))
 	}
 
 	// Filter out keywords that don't exist in pkg/detectors/*
@@ -809,31 +794,27 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 }
 
 // TODO update to use direct variable lookups
-func (s *Source) substitute(data string) string {
+// func (s *Source) substitute(data string) string {
+// 	return subRe.ReplaceAllStringFunc(data, func(str string) string {
+// 		if val, ok := s.variableSubstituions[strings.Trim(str, "{}")]; ok {
+// 			return val.value
+// 		}
+// 		return str
+// 	})
+// }
+
+func (s *Source) substitute(metadata Metadata, data string) string {
+	// precendence goes env -> collection -> global
 	return subRe.ReplaceAllStringFunc(data, func(str string) string {
-		if val, ok := s.variableSubstituions[strings.Trim(str, "{}")]; ok {
-			return val.value
+		if val, ok := s.sub.env[metadata.EnvironmentID][strings.Trim(str, "{}")]; ok {
+			return val
+		}
+		if val, ok := s.sub.collection[metadata.CollectionInfo.PostmanID][strings.Trim(str, "{}")]; ok {
+			return val
+		}
+		if val, ok := s.sub.global[strings.Trim(str, "{}")]; ok {
+			return val
 		}
 		return str
 	})
-}
-
-func (s *Source) parseOAuth2(a Auth) string {
-	if len(a.OAuth2) == 0 {
-		return ""
-	}
-	var data string
-	for _, oauth := range a.OAuth2 {
-		switch oauth.Key {
-		case "accessToken", "refreshToken", "clientId", "clientSecret", "accessTokenUrl", "authUrl":
-			data += fmt.Sprintf("%s:%v ", oauth.Key, oauth.Value)
-			for _, keyword := range s.keywords {
-				data += fmt.Sprintf("%s:%v ", keyword, oauth.Value)
-			}
-		}
-	}
-	// for _, subMap := range *varSubMap {
-	// 	data += s.substitute(data, subMap)
-	// }
-	return data
 }
