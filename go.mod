@@ -46,7 +46,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.19.0
-	github.com/google/go-github/v57 v57.0.0
+	github.com/google/go-github/v60 v60.0.0
 	github.com/google/go-github/v60 v60.0.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.12.2
