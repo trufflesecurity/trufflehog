@@ -33,7 +33,7 @@ var (
 )
 
 // TODO: Add secret context?? Information about access, ownership etc
-type userRes struct {
+type UserRes struct {
 	Login     string `json:"login"`
 	Type      string `json:"type"`
 	SiteAdmin bool   `json:"site_admin"`
@@ -44,7 +44,7 @@ type userRes struct {
 	LdapDN string `json:"ldap_dn"`
 }
 
-type headerInfo struct {
+type HeaderInfo struct {
 	Scopes string `json:"X-OAuth-Scopes"`
 	Expiry string `json:"github-authentication-token-expiration"`
 }
@@ -86,11 +86,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := common.SaneHttpClient()
 
-			isVerified, userResponse, headers, err := s.verifyGithub(ctx, client, token)
+			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
-			setUserResponse(userResponse, &s1)
-			setHeaderInfo(headers, &s1)
+			SetUserResponse(userResponse, &s1)
+			SetHeaderInfo(headers, &s1)
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
@@ -103,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) verifyGithub(ctx context.Context, client *http.Client, token string) (bool, userRes, headerInfo, error) {
+func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token string) (bool, UserRes, HeaderInfo, error) {
 	// https://developer.github.com/v3/users/#get-the-authenticated-user
 	var requestErr error
 	for _, url := range s.Endpoints(s.DefaultEndpoint()) {
@@ -122,22 +122,22 @@ func (s Scanner) verifyGithub(ctx context.Context, client *http.Client, token st
 		}
 
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
-			var userResponse userRes
+			var userResponse UserRes
 			err = json.NewDecoder(res.Body).Decode(&userResponse)
 			res.Body.Close()
 			if err == nil {
 				// GitHub does not seem to consistently return this header.
 				scopes := res.Header.Get("X-OAuth-Scopes")
 				expiry := res.Header.Get("github-authentication-token-expiration")
-				return true, userResponse, headerInfo{Scopes: scopes, Expiry: expiry}, nil
+				return true, userResponse, HeaderInfo{Scopes: scopes, Expiry: expiry}, nil
 			}
 		}
 	}
-	return false, userRes{}, headerInfo{}, requestErr
+	return false, UserRes{}, HeaderInfo{}, requestErr
 }
 
-func setUserResponse(userResponse userRes, s1 *detectors.Result) {
-	if userResponse != (userRes{}) {
+func SetUserResponse(userResponse UserRes, s1 *detectors.Result) {
+	if userResponse != (UserRes{}) {
 		s1.ExtraData["username"] = userResponse.Login
 		s1.ExtraData["url"] = userResponse.UserURL
 		s1.ExtraData["account_type"] = userResponse.Type
@@ -157,8 +157,8 @@ func setUserResponse(userResponse userRes, s1 *detectors.Result) {
 	}
 }
 
-func setHeaderInfo(headers headerInfo, s1 *detectors.Result) {
-	if headers != (headerInfo{}) {
+func SetHeaderInfo(headers HeaderInfo, s1 *detectors.Result) {
+	if headers != (HeaderInfo{}) {
 		if headers.Scopes != "" {
 			s1.ExtraData["scopes"] = headers.Scopes
 		}
