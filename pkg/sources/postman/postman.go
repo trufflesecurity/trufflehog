@@ -29,9 +29,6 @@ const (
 	FOLDER_TYPE      = "folder"
 	COLLECTION_TYPE  = "collection"
 	EVENT_TYPE       = "script"
-
-	SESSION_VALUE = "Session Value (hidden from UI)"
-	INITIAL_VALUE = "Initial Value"
 )
 
 type Source struct {
@@ -75,83 +72,26 @@ type Target struct {
 	Data            string
 }
 
-func (s *Source) subsSet(data string) string {
-	matches := subRe.FindAllString(data, -1)
-	replacements := []string{}
-	for _, match := range matches {
-		toReplace := s.sub.globalAndEnvSlice[match]
-		for _, sub := range toReplace {
-			if len(replacements) == 0 {
-				replacements = append(replacements, strings.Replace(data, match, sub, -1))
-			}
-
-		}
-	}
-
-	return data
-}
-
-func (s *Source) subsSetHelper(data string, replacements *[]string) string {
-	matches := subRe.FindAllString(data, -1)
-	if len(matches) == 0 {
-		*replacements = append(*replacements, data)
-		return data
-	}
-
-	for _, match := range matches {
-		trimmed := strings.Trim(match, "{}")
-		toSub := s.sub.globalAndEnvSlice[trimmed]
-		for _, sub := range toSub {
-			data = s.subsSetHelper(strings.Replace(data, match, sub, -1), replacements)
-			// fmt.Println("replaced", strings.Replace(data, match, sub, -1))
-		}
-	}
-
-	return data
+type VariableInfo struct {
+	value    string
+	Metadata Metadata
 }
 
 type Substitution struct {
-	global     map[string]string
-	env        map[string](map[string]string)
-	collection map[string](map[string]string)
-
-	globalAndEnvSlice map[string][]string
-	collectionSlice   map[string](map[string][]string)
+	variables map[string][]VariableInfo
 }
 
 func NewSubstitution() *Substitution {
 	return &Substitution{
-		global:     make(map[string]string),
-		env:        make(map[string](map[string]string)),
-		collection: make(map[string](map[string]string)),
-
-		globalAndEnvSlice: make(map[string][]string),
-		collectionSlice:   make(map[string](map[string][]string)),
+		variables: make(map[string][]VariableInfo),
 	}
 }
 
-// add adds a key-value pair to the substitution map.
-// Note that there are only 3 types of substitutions: global, environment, and collection.
-// This means users can define variables in any of these 3 scopes which can be used to subsitute
-// in subsequent requests, responses, and events.
-// Variables defined in requests, headers, etc can not be substituted in other requests, headers, etc.
 func (sub *Substitution) add(metadata Metadata, key string, value string) {
-	if metadata.Type == GLOBAL_TYPE || metadata.Type == ENVIRONMENT_TYPE {
-		sub.global[key] = value
-		sub.globalAndEnvSlice[key] = append(sub.globalAndEnvSlice[key], value)
-	} else if metadata.Type == ENVIRONMENT_TYPE {
-		if _, ok := sub.env[metadata.EnvironmentID]; !ok {
-			sub.env[metadata.EnvironmentID] = make(map[string]string)
-		}
-		sub.env[metadata.EnvironmentID][key] = value
-	} else if metadata.Type == COLLECTION_TYPE {
-		if _, ok := sub.collection[metadata.CollectionInfo.PostmanID]; !ok {
-			sub.collection[metadata.CollectionInfo.Description] = make(map[string]string)
-			sub.collectionSlice[metadata.CollectionInfo.Description] = make(map[string][]string)
-		}
-		sub.collection[metadata.CollectionInfo.Description][key] = value
-		sub.collectionSlice[metadata.CollectionInfo.Description][key] = append(sub.collectionSlice[metadata.CollectionInfo.Description][key], value)
-	}
+	sub.variables[key] = append(sub.variables[key], VariableInfo{
+		value:    value,
+		Metadata: metadata,
+	})
 }
 
 var subRe = regexp.MustCompile(`\{\{[^{}]+\}\}`)
@@ -427,7 +367,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		FolderName:     metadata.FolderName,
 		FolderId:       metadata.FolderID,
 		GlobalID:       metadata.FullID,
-		Data:           s.substitute(metadata, data),
+		Data:           strings.Join(s.buildSubstitueSet(metadata, data, true), "\n"),
 	})
 }
 
@@ -503,7 +443,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
 				return ""
 			}
-			authData += (s.substitute(m, decodedURL) + " ")
+			authData += decodedURL
 		}
 	case "oauth2":
 		for _, oauth := range auth.OAuth2 {
@@ -529,10 +469,10 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		FolderName:     m.FolderName,
 		FolderId:       m.FolderID,
 		GlobalID:       m.FullID,
-		Data:           s.substitute(m, authData),
+		Data:           strings.Join(s.buildSubstitueSet(m, authData, true), "\n"),
 	})
 
-	return s.substitute(m, authData)
+	return ""
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
@@ -560,7 +500,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			RequestID:      metadata.RequestID,
 			RequestName:    metadata.RequestName,
 			GlobalID:       metadata.FullID,
-			Data:           s.substitute(metadata, r.URL.Raw),
+			Data:           strings.Join(s.buildSubstitueSet(metadata, r.URL.Raw, true), "\n"),
 		})
 	}
 
@@ -609,6 +549,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		if b.Mode == "raw" {
 			m.Type = m.Type + " > raw"
 		}
+
 		s.scanTarget(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
@@ -621,7 +562,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 			RequestID:      m.RequestID,
 			RequestName:    m.RequestName,
 			GlobalID:       m.FullID,
-			Data:           s.substitute(m, data),
+			Data:           strings.Join(s.buildSubstitueSet(m, data, true), "\n"),
 		})
 	default:
 		break
@@ -645,6 +586,10 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	// Body in a response is just a string
 	if response.Body != "" {
 		m.Type = m.Type + " > response body"
+		data := ""
+		for _, sub := range s.buildSubstitueSet(m, response.Body, true) {
+			data += sub + "\n"
+		}
 		s.scanTarget(ctx, chunksChan, Target{
 			Link:           m.Link,
 			FieldType:      m.Type,
@@ -657,7 +602,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 			RequestID:      m.RequestID,
 			RequestName:    m.RequestName,
 			GlobalID:       m.FullID,
-			Data:           s.substitute(m, response.Body),
+			Data:           data,
 		})
 	}
 
@@ -692,8 +637,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		if valStr == "" {
 			continue
 		}
-		// precendence goes env -> collection -> global
-		values = append(values, s.substitute(m, valStr))
+		values = append(values, s.buildSubstitueSet(m, valStr, false)...)
 	}
 
 	// Filter out keywords that don't exist in pkg/detectors/*
@@ -704,7 +648,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 
 	data := ""
 	for _, keyword := range filteredKeywords {
-		for _, value := range values {
+		for _, value := range removeDuplicateStr(values) {
 			data += fmt.Sprintf("%s:%s\n", keyword, value)
 		}
 		data += "\n\n"
@@ -758,6 +702,58 @@ func (s *Source) scanTarget(ctx context.Context, chunksChan chan *sources.Chunk,
 		},
 		Verify: s.verify,
 	}
+}
+
+func (s *Source) buildSubstitueSet(metadata Metadata, data string, withKeywords bool) []string {
+	var ret []string
+	combos := make(map[string]struct{})
+
+	s.buildSubstitution(data, metadata, &combos)
+
+	for combo := range combos {
+		if withKeywords {
+			ret = append(ret, s.keywordCombinations(combo))
+		} else {
+			ret = append(ret, combo)
+		}
+	}
+
+	if len(ret) == 0 {
+		ret = append(ret, data)
+	}
+	return ret
+}
+
+func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[string]struct{}) {
+	matches := removeDuplicateStr(subRe.FindAllString(data, -1))
+	for _, match := range matches {
+		if slices, ok := s.sub.variables[strings.Trim(match, "{}")]; ok {
+			for _, slice := range slices {
+				if slice.Metadata.CollectionInfo.PostmanID != "" && slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
+					continue
+				}
+				d := strings.ReplaceAll(data, match, slice.value)
+				s.buildSubstitution(d, metadata, combos)
+			}
+		}
+	}
+
+	if len(matches) == 0 {
+		// add to combos
+		(*combos)[data] = struct{}{}
+	}
+}
+
+func removeDuplicateStr(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
 }
 
 func filterKeywords(keys []string, detectorKeywords map[string]struct{}) []string {
@@ -821,65 +817,4 @@ func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclud
 	}
 
 	return slice
-}
-
-func (s *Source) substitute(metadata Metadata, data string) string {
-	return s.substituteM(metadata, data)
-	// fmt.Println("returned subsset", s.subsSet(data))
-	// // precendence goes env -> collection -> global
-	// return subRe.ReplaceAllStringFunc(data, func(str string) string {
-	// 	if val, ok := s.sub.env[metadata.EnvironmentID][strings.Trim(str, "{}")]; ok {
-	// 		return val
-	// 	}
-	// 	if val, ok := s.sub.collection[metadata.CollectionInfo.PostmanID][strings.Trim(str, "{}")]; ok {
-	// 		return val
-	// 	}
-	// 	if val, ok := s.sub.global[strings.Trim(str, "{}")]; ok {
-	// 		return val
-	// 	}
-	// 	return str
-	// })
-}
-
-func (s *Source) substituteM(metadata Metadata, data string) string {
-	// precendence goes env -> collection -> global
-	l := []string{}
-	longest := 0
-	matches := subRe.FindAllString(data, -1)
-	for _, m := range matches {
-		trimmed := strings.Trim(m, "{}")
-		if len(s.sub.globalAndEnvSlice[trimmed]) > longest {
-			longest = len(s.sub.globalAndEnvSlice[trimmed])
-		}
-	}
-
-	// PICKUP HERE
-	for i := 0; i < longest; i++ {
-		d := subRe.ReplaceAllStringFunc(data, func(str string) string {
-			if slice, ok := s.sub.globalAndEnvSlice[strings.Trim(str, "{}")]; ok {
-				if i < len(slice) {
-					return slice[i]
-				} else {
-					return slice[len(slice)-1]
-				}
-			}
-			return str
-		})
-		l = append(l, d)
-		// fmt.Println("bro what", d)
-	}
-
-	// return subRe.ReplaceAllStringFunc(data, func(str string) string {
-	// 	if val, ok := s.sub.env[metadata.EnvironmentID][strings.Trim(str, "{}")]; ok {
-	// 		return val
-	// 	}
-	// 	if val, ok := s.sub.collection[metadata.CollectionInfo.PostmanID][strings.Trim(str, "{}")]; ok {
-	// 		return val
-	// 	}
-	// 	if val, ok := s.sub.global[strings.Trim(str, "{}")]; ok {
-	// 		return val
-	// 	}
-	// 	return str
-	// })
-	return strings.Join(l, "\n")
 }
