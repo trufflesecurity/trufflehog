@@ -49,8 +49,8 @@ var (
 	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
-	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. This flag can be repeated. Defaults to all types.").Default("verified,unknown").String()
+	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. Defaults to all types.").Hidden().String()
 
 	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -612,6 +612,11 @@ func run(state overseer.State) {
 // This is a work-around to kingpin not supporting CSVs.
 // See: https://github.com/trufflesecurity/trufflehog/pull/2372#issuecomment-1983868917
 func parseResults(input *string) (map[string]struct{}, error) {
+	if *input == "" {
+		return nil, nil
+	}
+
+
 	var (
 		values  = strings.Split(strings.ToLower(*input), ",")
 		results = make(map[string]struct{}, 3)
