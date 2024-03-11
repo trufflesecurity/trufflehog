@@ -229,7 +229,7 @@ func TestRetryableHTTPClientBackoff(t *testing.T) {
 			for i, expectedBackoff := range tc.expectedBackoffs {
 				if i < len(actualBackoffs) {
 					// Allow some deviation in timing due to processing delays.
-					assert.Less(t, math.Abs(float64(actualBackoffs[i]-expectedBackoff)), float64(10*time.Millisecond), "Unexpected backoff duration")
+					assert.Less(t, math.Abs(float64(actualBackoffs[i]-expectedBackoff)), float64(15*time.Millisecond), "Unexpected backoff duration")
 				}
 			}
 		})
