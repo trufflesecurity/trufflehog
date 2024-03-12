@@ -3,7 +3,6 @@ package postman
 import (
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -22,9 +21,9 @@ import (
 const (
 	SourceType       = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
 	LINK_BASE_URL    = "https://go.postman.co/"
-	KEYWORD_PADDING  = 50
 	GLOBAL_TYPE      = "globals"
 	ENVIRONMENT_TYPE = "environment"
+	AUTH_TYPE        = "authorization"
 	REQUEST_TYPE     = "request"
 	FOLDER_TYPE      = "folder"
 	COLLECTION_TYPE  = "collection"
@@ -50,51 +49,6 @@ type Source struct {
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
-
-// Target is a struct that holds the data for a single scan target.
-// Not all fields are used for every scan target.
-type Target struct {
-	Link            string
-	WorkspaceUUID   string
-	WorkspaceName   string
-	GlobalID        string
-	CollectionID    string
-	CollectionName  string
-	EnvironmentID   string
-	EnvironmentName string
-	RequestID       string
-	RequestName     string
-	FolderId        string
-	FolderName      string
-	FieldType       string
-	FieldName       string
-	VarType         string
-	Data            string
-}
-
-type VariableInfo struct {
-	value    string
-	Metadata Metadata
-}
-
-type Substitution struct {
-	variables map[string][]VariableInfo
-}
-
-func NewSubstitution() *Substitution {
-	return &Substitution{
-		variables: make(map[string][]VariableInfo),
-	}
-}
-
-func (sub *Substitution) add(metadata Metadata, key string, value string) {
-	sub.variables[key] = append(sub.variables[key], VariableInfo{
-		value:    value,
-		Metadata: metadata,
-	})
-}
-
-var subRe = regexp.MustCompile(`\{\{[^{}]+\}\}`)
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -333,51 +287,21 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
-
-	// s.scanVariableData(ctx, chunksChan, metadata, VariableData{
-	// 	KeyValues: item.Variable,
-	// })
-
 }
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
 	metadata.Type = metadata.Type + " > event"
-
-	// inject all the filtered keywords into the event data
-	filteredKeywords := filterKeywords(s.keywords, s.detectorKeywords)
-	data := strings.Join(filteredKeywords, " ")
-	data += strings.Join(event.Script.Exec, " ")
+	data := strings.Join(event.Script.Exec, " ")
 
 	// Prep direct links
-	link := LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
+	metadata.Link = LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
 	if event.Listen == "prerequest" {
-		link += "?tab=pre-request-scripts"
+		metadata.Link += "?tab=pre-request-scripts"
 	} else {
-		link += "?tab=tests"
+		metadata.Link += "?tab=tests"
 	}
 
-	s.scanTarget(ctx, chunksChan, Target{
-		Link:           link,
-		FieldType:      EVENT_TYPE,
-		FieldName:      event.Listen,
-		WorkspaceUUID:  metadata.WorkspaceUUID,
-		WorkspaceName:  metadata.WorkspaceName,
-		CollectionID:   metadata.CollectionInfo.PostmanID,
-		CollectionName: metadata.CollectionInfo.Name,
-		FolderName:     metadata.FolderName,
-		FolderId:       metadata.FolderID,
-		GlobalID:       metadata.FullID,
-		Data:           strings.Join(s.buildSubstitueSet(metadata, data, true), "\n"),
-	})
-}
-
-func (s *Source) keywordCombinations(str string) string {
-	data := ""
-	for _, keyword := range filterKeywords(s.keywords, s.detectorKeywords) {
-		data += fmt.Sprintf("%s:%s\n ", keyword, str)
-	}
-
-	return data
+	s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(metadata, data), ""), metadata)
 }
 
 func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, u URL) string {
@@ -394,7 +318,6 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 			}
 		}
 		authData += fmt.Sprintf("%s=%s\n", apiKeyName, apiKeyValue)
-		authData += s.keywordCombinations(apiKeyValue)
 	case "awsSigV4", "awsv4":
 		for _, kv := range auth.AWSv4 {
 			switch kv.Key {
@@ -415,10 +338,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 			bearerKey = fmt.Sprintf("%v", kv.Key)
 		}
 		authData += fmt.Sprintf("%s:%s\n", bearerKey, bearerValue)
-		authData += s.keywordCombinations(bearerValue)
 	case "basic":
-		keywords := filterKeywords(s.keywords, s.detectorKeywords)
-		authData += strings.Join(keywords, " ") + "\n"
 		username := ""
 		password := ""
 
@@ -450,7 +370,6 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 			switch oauth.Key {
 			case "accessToken", "refreshToken", "clientId", "clientSecret", "accessTokenUrl", "authUrl":
 				authData += fmt.Sprintf("%s:%v ", oauth.Key, oauth.Value)
-				authData += s.keywordCombinations(fmt.Sprintf("%v", oauth.Value))
 			}
 		}
 	case "noauth":
@@ -459,23 +378,17 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		return ""
 	}
 
-	s.scanTarget(ctx, chunksChan, Target{
-		Link:           m.Link + "?tab=authorization",
-		FieldType:      "Authorization",
-		WorkspaceUUID:  m.WorkspaceUUID,
-		WorkspaceName:  m.WorkspaceName,
-		CollectionID:   m.CollectionInfo.PostmanID,
-		CollectionName: m.CollectionInfo.Name,
-		FolderName:     m.FolderName,
-		FolderId:       m.FolderID,
-		GlobalID:       m.FullID,
-		Data:           strings.Join(s.buildSubstitueSet(m, authData, true), "\n"),
-	})
+	m.Link = m.Link + "?tab=authorization"
+	m.Type = m.Type + " > authorization"
+	m.FieldType = AUTH_TYPE
+	s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(m, authData), ""), m)
 
 	return ""
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
+	s.keywords = append(s.keywords, r.URL.Host...)
+
 	// Add in var procesisng for headers
 	if r.Header != nil {
 		vars := VariableData{
@@ -487,24 +400,8 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 
 	if r.URL.Raw != "" {
 		metadata.Type = metadata.Type + " > request URL"
-
-		s.scanTarget(ctx, chunksChan, Target{
-			Link:           metadata.Link,
-			FieldType:      metadata.Type,
-			WorkspaceUUID:  metadata.WorkspaceUUID,
-			WorkspaceName:  metadata.WorkspaceName,
-			CollectionID:   metadata.CollectionInfo.PostmanID,
-			CollectionName: metadata.CollectionInfo.Name,
-			FolderName:     metadata.FolderName,
-			FolderId:       metadata.FolderID,
-			RequestID:      metadata.RequestID,
-			RequestName:    metadata.RequestName,
-			GlobalID:       metadata.FullID,
-			Data:           strings.Join(s.buildSubstitueSet(metadata, r.URL.Raw, true), "\n"),
-		})
+		s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(metadata, r.URL.Raw), ""), metadata)
 	}
-
-	s.keywords = append(s.keywords, r.URL.Host...)
 
 	if len(r.URL.Query) > 0 {
 		vars := VariableData{
@@ -549,21 +446,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		if b.Mode == "raw" {
 			m.Type = m.Type + " > raw"
 		}
-
-		s.scanTarget(ctx, chunksChan, Target{
-			Link:           m.Link,
-			FieldType:      m.Type,
-			WorkspaceUUID:  m.WorkspaceUUID,
-			WorkspaceName:  m.WorkspaceName,
-			CollectionID:   m.CollectionInfo.PostmanID,
-			CollectionName: m.CollectionInfo.Name,
-			FolderName:     m.FolderName,
-			FolderId:       m.FolderID,
-			RequestID:      m.RequestID,
-			RequestName:    m.RequestName,
-			GlobalID:       m.FullID,
-			Data:           strings.Join(s.buildSubstitueSet(m, data, true), "\n"),
-		})
+		s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(m, data), ""), m)
 	default:
 		break
 	}
@@ -586,24 +469,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	// Body in a response is just a string
 	if response.Body != "" {
 		m.Type = m.Type + " > response body"
-		data := ""
-		for _, sub := range s.buildSubstitueSet(m, response.Body, true) {
-			data += sub + "\n"
-		}
-		s.scanTarget(ctx, chunksChan, Target{
-			Link:           m.Link,
-			FieldType:      m.Type,
-			WorkspaceUUID:  m.WorkspaceUUID,
-			WorkspaceName:  m.WorkspaceName,
-			CollectionID:   m.CollectionInfo.PostmanID,
-			CollectionName: m.CollectionInfo.Name,
-			FolderName:     m.FolderName,
-			FolderId:       m.FolderID,
-			RequestID:      m.RequestID,
-			RequestName:    m.RequestName,
-			GlobalID:       m.FullID,
-			Data:           data,
-		})
+		s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(m, response.Body), ""), m)
 	}
 
 	if response.OriginalRequest.Method != "" {
@@ -637,123 +503,48 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		if valStr == "" {
 			continue
 		}
-		values = append(values, s.buildSubstitueSet(m, valStr, false)...)
+		values = append(values, s.buildSubstitueSet(m, valStr)...)
 	}
 
-	// Filter out keywords that don't exist in pkg/detectors/*
-	filteredKeywords := filterKeywords(s.keywords, s.detectorKeywords)
-	if len(filteredKeywords) == 0 || len(values) == 0 {
-		return
-	}
-
-	data := ""
-	for _, keyword := range filteredKeywords {
-		for _, value := range removeDuplicateStr(values) {
-			data += fmt.Sprintf("%s:%s\n", keyword, value)
-		}
-		data += "\n\n"
-	}
-
-	target := Target{
-		Link:           m.Link,
-		WorkspaceUUID:  m.WorkspaceUUID,
-		WorkspaceName:  m.WorkspaceName,
-		CollectionID:   m.CollectionInfo.PostmanID,
-		CollectionName: m.CollectionInfo.Name,
-		GlobalID:       m.FullID,
-		FieldType:      m.Type + " variable",
-		Data:           data,
-	}
-	s.scanTarget(ctx, chunksChan, target)
+	m.FieldType = m.Type + " variables"
+	s.scanData(ctx, chunksChan, strings.Join(values, ""), m)
 }
 
-func (s *Source) scanTarget(ctx context.Context, chunksChan chan *sources.Chunk, o Target) {
-	if o.Data == "" {
+func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
+	if data == "" {
 		return
 	}
-	fmt.Println("----postman target-----")
-	fmt.Println(o.Data)
+	fmt.Println("Scanning data: ")
+	fmt.Println(data)
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
-		Data:       []byte(o.Data),
+		Data:       []byte(data),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Postman{
 				Postman: &source_metadatapb.Postman{
-					Link:            o.Link,
-					WorkspaceUuid:   o.WorkspaceUUID,
-					WorkspaceName:   o.WorkspaceName,
-					CollectionId:    o.CollectionID,
-					CollectionName:  o.CollectionName,
-					EnvironmentId:   o.EnvironmentID,
-					EnvironmentName: o.EnvironmentName,
-					RequestId:       o.RequestID,
-					RequestName:     o.RequestName,
-					FolderId:        o.FolderId,
-					FolderName:      o.FolderName,
-					FieldType:       o.FieldType,
-					FieldName:       o.FieldName,
-					VariableType:    o.VarType,
+					Link:            metadata.Link,
+					WorkspaceUuid:   metadata.WorkspaceUUID,
+					WorkspaceName:   metadata.WorkspaceName,
+					CollectionId:    metadata.CollectionInfo.PostmanID,
+					CollectionName:  metadata.CollectionInfo.Name,
+					EnvironmentId:   metadata.EnvironmentID,
+					EnvironmentName: metadata.EnvironmentName,
+					RequestId:       metadata.RequestID,
+					RequestName:     metadata.RequestName,
+					FolderId:        metadata.FolderID,
+					FolderName:      metadata.FolderName,
+					FieldType:       metadata.FieldType,
+					FieldName:       metadata.FieldName,
+					VariableType:    metadata.VarType,
 				},
 			},
 		},
 		Verify: s.verify,
 	}
-}
-
-func (s *Source) buildSubstitueSet(metadata Metadata, data string, withKeywords bool) []string {
-	var ret []string
-	combos := make(map[string]struct{})
-
-	s.buildSubstitution(data, metadata, &combos)
-
-	for combo := range combos {
-		if withKeywords {
-			ret = append(ret, s.keywordCombinations(combo))
-		} else {
-			ret = append(ret, combo)
-		}
-	}
-
-	if len(ret) == 0 {
-		ret = append(ret, data)
-	}
-	return ret
-}
-
-func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[string]struct{}) {
-	matches := removeDuplicateStr(subRe.FindAllString(data, -1))
-	for _, match := range matches {
-		if slices, ok := s.sub.variables[strings.Trim(match, "{}")]; ok {
-			for _, slice := range slices {
-				if slice.Metadata.CollectionInfo.PostmanID != "" && slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
-					continue
-				}
-				d := strings.ReplaceAll(data, match, slice.value)
-				s.buildSubstitution(d, metadata, combos)
-			}
-		}
-	}
-
-	if len(matches) == 0 {
-		// add to combos
-		(*combos)[data] = struct{}{}
-	}
-}
-
-func removeDuplicateStr(strSlice []string) []string {
-	allKeys := make(map[string]bool)
-	list := []string{}
-	for _, item := range strSlice {
-		if _, value := allKeys[item]; !value {
-			allKeys[item] = true
-			list = append(list, item)
-		}
-	}
-	return list
 }
 
 func filterKeywords(keys []string, detectorKeywords map[string]struct{}) []string {

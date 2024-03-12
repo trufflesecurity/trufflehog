@@ -74,18 +74,23 @@ type GlobalVars struct {
 }
 
 type Metadata struct {
-	WorkspaceUUID  string
-	WorkspaceName  string
-	CreatedBy      string
-	EnvironmentID  string
-	CollectionInfo Info
-	FolderID       string // UUID of the folder (but not full ID)
-	FolderName     string
-	RequestID      string // UUID of the request (but not full ID)
-	RequestName    string
-	FullID         string //full ID of the reference item (created_by + ID) OR just the UUID
-	Link           string //direct link to the folder (could be .json file path)
-	Type           string //folder, request, etc.
+	WorkspaceUUID   string
+	WorkspaceName   string
+	CreatedBy       string
+	EnvironmentID   string
+	CollectionInfo  Info
+	FolderID        string // UUID of the folder (but not full ID)
+	FolderName      string
+	RequestID       string // UUID of the request (but not full ID)
+	RequestName     string
+	FullID          string //full ID of the reference item (created_by + ID) OR just the UUID
+	Link            string //direct link to the folder (could be .json file path)
+	Type            string //folder, request, etc.
+	EnvironmentName string
+	GlobalID        string // might just be FullID, not sure
+	VarType         string
+	FieldName       string
+	FieldType       string
 }
 
 type Collection struct {
