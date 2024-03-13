@@ -514,8 +514,6 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 	if data == "" {
 		return
 	}
-	fmt.Println("Scanning data: ")
-	fmt.Println(data)
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),

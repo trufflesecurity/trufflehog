@@ -222,10 +222,8 @@ func (c *Client) NewRequest(urlStr string, headers map[string]string) (*http.Req
 	}
 
 	var h = c.Headers
-	if headers != nil {
-		for k, v := range headers {
-			h[k] = v
-		}
+	for k, v := range headers {
+		h[k] = v
 	}
 
 	for k, v := range h {
@@ -286,13 +284,7 @@ func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
 		return workspaces, err
 	}
 
-	// Append all workspaces to the workspaces slice so we don't
-	// have to deal with nested objects
-	for _, ws := range workspacesObj.Workspaces {
-		workspaces = append(workspaces, ws)
-	}
-
-	return workspaces, nil
+	return workspacesObj.Workspaces, nil
 }
 
 // GetWorkspace returns the workspace for a given workspace
