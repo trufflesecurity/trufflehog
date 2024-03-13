@@ -1,63 +1,218 @@
 package postman
 
 import (
-	"archive/zip"
-	"encoding/json"
-	"fmt"
-	"io"
+	"reflect"
 	"strings"
+	"testing"
 
-	"github.com/google/uuid"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type ArchiveJSON struct {
-	Collection  map[string]bool `json:"collection"`
-	Environment map[string]bool `json:"environment"`
-}
-
-func IsValidUUID(u string) bool {
-	_, err := uuid.Parse(u)
-	return err == nil
-}
-
-func verifyPostmanExportZip(filepath string) ArchiveJSON {
-	var archiveData ArchiveJSON
-
-	// Open the ZIP archive.
-	r, err := zip.OpenReader(filepath)
+func createTestSource(src *sourcespb.Postman) (*Source, *anypb.Any) {
+	s := &Source{}
+	conn, err := anypb.New(src)
 	if err != nil {
-		fmt.Println("Error opening ZIP file:", err)
-		return archiveData
+		panic(err)
 	}
-	defer r.Close()
+	return s, conn
+}
 
-	// Iterate through the files in the ZIP archive.
-	for _, file := range r.File {
-		if strings.HasSuffix(file.Name, "archive.json") {
-			// Open the file within the ZIP archive.
-			rc, err := file.Open()
-			if err != nil {
-				fmt.Println("Error opening archive.json:", err)
-				return archiveData
-			}
-			defer rc.Close()
+func TestSource_Init(t *testing.T) {
+	s, conn := createTestSource(&sourcespb.Postman{
+		DetectorKeywords: []string{"keyword1", "keyword2"},
+		Credential: &sourcespb.Postman_Token{
+			Token: "super secret token",
+		},
+	})
 
-			// Read the contents of archive.json.
-			contents, err := io.ReadAll(rc)
-			if err != nil {
-				fmt.Println("Error reading archive.json:", err)
-				return archiveData
-			}
-
-			// Unmarshal the JSON contents into the ArchiveJSON struct.
-			if err := json.Unmarshal(contents, &archiveData); err != nil {
-				fmt.Println("Error decoding JSON:", err)
-				return archiveData
-			}
-
-			// Check if the structure matches your requirements.
-			return archiveData
-		}
+	err := s.Init(context.Background(), "test - postman", 0, 1, false, conn, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	return archiveData
+
+	expectedKeywords := map[string]struct{}{
+		"keyword1": {},
+		"keyword2": {},
+	}
+	if !reflect.DeepEqual(s.detectorKeywords, expectedKeywords) {
+		t.Errorf("expected detector keywords: %v, got: %v", expectedKeywords, s.detectorKeywords)
+	}
+}
+
+func TestSource_ScanCollection(t *testing.T) {
+	ctx := context.Background()
+	s := &Source{
+		detectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: []string{
+			"keyword1",
+		},
+	}
+
+	testCases := []struct {
+		name           string
+		collection     Collection
+		expectedChunks []string
+	}{
+		{
+			name: "GET request with URL",
+			collection: Collection{
+				Info: Info{
+					PostmanID: "col1",
+					Name:      "Test Collection",
+				},
+				Items: []Item{
+					{
+						Name: "Request 1",
+						Request: Request{
+							URL: URL{
+								Raw: "https://example.com/api/endpoint",
+							},
+							Method: "GET",
+						},
+					},
+				},
+			},
+			expectedChunks: []string{
+				"keyword1:https://example.com/api/endpoint\n",
+			},
+		},
+		{
+			name: "POST request with URL and auth",
+			collection: Collection{
+				Info: Info{
+					PostmanID: "col2",
+					Name:      "Test Collection",
+				},
+				Items: []Item{
+					{
+						Name: "Request 2",
+						Request: Request{
+							URL: URL{
+								Raw: "https://example.com/api/endpoint",
+							},
+							Method: "POST",
+							Auth: Auth{
+								Type: "bearer",
+								Bearer: []KeyValue{
+									{
+										Key:   "token",
+										Value: "abcdef123456",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedChunks: []string{
+				"keyword1:https://example.com/api/endpoint\n",
+				"keyword1:token:abcdef123456 \n",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			chunksChan := make(chan *sources.Chunk, len(tc.expectedChunks))
+			metadata := Metadata{
+				CollectionInfo: tc.collection.Info,
+			}
+
+			go s.scanCollection(ctx, chunksChan, metadata, tc.collection)
+
+			for _, expectedData := range tc.expectedChunks {
+				chunk := <-chunksChan
+				if strings.TrimSpace(string(chunk.Data)) != strings.TrimSpace(expectedData) {
+					t.Errorf("expected chunk data from collection: \n%sgot: \n%s", expectedData, chunk.Data)
+				}
+			}
+		})
+	}
+}
+
+func TestSource_ScanVariableData(t *testing.T) {
+	ctx := context.Background()
+	s := &Source{
+		detectorKeywords: map[string]struct{}{
+			"keyword1": {},
+		},
+		keywords: []string{
+			"keyword1",
+		},
+		sub: NewSubstitution(),
+	}
+
+	testCases := []struct {
+		name           string
+		metadata       Metadata
+		variableData   VariableData
+		expectedChunks []string
+	}{
+		{
+			name: "Single variable",
+			metadata: Metadata{
+				CollectionInfo: Info{
+					PostmanID: "col1",
+					Name:      "Test Collection",
+				},
+			},
+			variableData: VariableData{
+				KeyValues: []KeyValue{
+					{
+						Key:   "var1",
+						Value: "value1",
+					},
+				},
+			},
+			expectedChunks: []string{
+				"keyword1:value1\n",
+			},
+		},
+		{
+			name: "Multiple variables",
+			metadata: Metadata{
+				CollectionInfo: Info{
+					PostmanID: "col2",
+					Name:      "Test Collection",
+				},
+			},
+			variableData: VariableData{
+				KeyValues: []KeyValue{
+					{
+						Key:   "var1",
+						Value: "value1",
+					},
+					{
+						Key:   "var2",
+						Value: "value2",
+					},
+				},
+			},
+			expectedChunks: []string{
+				"keyword1:value1\nkeyword1:value2\n",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			chunksChan := make(chan *sources.Chunk, len(tc.expectedChunks))
+
+			s.scanVariableData(ctx, chunksChan, tc.metadata, tc.variableData)
+
+			for _, expectedData := range tc.expectedChunks {
+				chunk := <-chunksChan
+				if string(chunk.Data) != expectedData {
+					t.Errorf("expected chunk data from variable:\n%s\ngot:\n%s", expectedData, chunk.Data)
+				}
+			}
+
+		})
+	}
 }

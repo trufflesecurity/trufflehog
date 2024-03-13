@@ -39,6 +39,14 @@ func (s *Source) keywordCombinations(str string) string {
 	return data
 }
 
+func (s *Source) formatAndInjectKeywords(data []string) string {
+	var ret []string
+	for _, d := range data {
+		ret = append(ret, s.keywordCombinations(d))
+	}
+	return strings.Join(ret, "")
+}
+
 func (s *Source) buildSubstitueSet(metadata Metadata, data string) []string {
 	var ret []string
 	combos := make(map[string]struct{})
@@ -46,11 +54,11 @@ func (s *Source) buildSubstitueSet(metadata Metadata, data string) []string {
 	s.buildSubstitution(data, metadata, &combos)
 
 	for combo := range combos {
-		ret = append(ret, s.keywordCombinations(combo))
+		ret = append(ret, combo)
 	}
 
 	if len(ret) == 0 {
-		ret = append(ret, data)
+		return []string{data}
 	}
 	return ret
 }

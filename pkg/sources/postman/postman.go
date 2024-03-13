@@ -301,7 +301,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		metadata.Link += "?tab=tests"
 	}
 
-	s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(metadata, data), ""), metadata)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, data)), metadata)
 }
 
 func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, u URL) string {
@@ -381,7 +381,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	m.Link = m.Link + "?tab=authorization"
 	m.Type = m.Type + " > authorization"
 	m.FieldType = AUTH_TYPE
-	s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(m, authData), ""), m)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, authData)), m)
 
 	return ""
 }
@@ -400,7 +400,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 
 	if r.URL.Raw != "" {
 		metadata.Type = metadata.Type + " > request URL"
-		s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(metadata, r.URL.Raw), ""), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, r.URL.Raw)), metadata)
 	}
 
 	if len(r.URL.Query) > 0 {
@@ -446,7 +446,7 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		if b.Mode == "raw" {
 			m.Type = m.Type + " > raw"
 		}
-		s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(m, data), ""), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
 	default:
 		break
 	}
@@ -469,7 +469,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	// Body in a response is just a string
 	if response.Body != "" {
 		m.Type = m.Type + " > response body"
-		s.scanData(ctx, chunksChan, strings.Join(s.buildSubstitueSet(m, response.Body), ""), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, response.Body)), m)
 	}
 
 	if response.OriginalRequest.Method != "" {
@@ -507,7 +507,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 	}
 
 	m.FieldType = m.Type + " variables"
-	s.scanData(ctx, chunksChan, strings.Join(values, ""), m)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
 }
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
