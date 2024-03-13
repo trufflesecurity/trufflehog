@@ -173,7 +173,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		}
 		// s.scanEnvironment(ctx, chunksChan, env, workspace)
 		metadata.Type = ENVIRONMENT_TYPE
-		metadata.Link = LINK_BASE_URL + ENVIRONMENT_TYPE + "/" + envVars.ID
+		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
 		metadata.FullID = envVars.ID
 		metadata.EnvironmentID = envID.UUID
 
@@ -400,8 +400,10 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 	}
 
 	if r.URL.Raw != "" {
-		metadata.Type = originalType + " > request URL"
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, r.URL.Raw)), metadata)
+		metadata.Type = originalType + " > request URL (no query parameters)"
+		// Note: query parameters are handled separately
+		u := fmt.Sprintf("%s://%s/%s", r.URL.Protocol, strings.Join(r.URL.Host, "."), strings.Join(r.URL.Path, "/"))
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, u)), metadata)
 	}
 
 	if len(r.URL.Query) > 0 {
@@ -517,6 +519,7 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 	if data == "" {
 		return
 	}
+	metadata.FieldType = metadata.Type
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
