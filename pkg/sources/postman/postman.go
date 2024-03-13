@@ -388,18 +388,19 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
 	s.keywords = append(s.keywords, r.URL.Host...)
+	originalType := metadata.Type
 
 	// Add in var procesisng for headers
 	if r.Header != nil {
 		vars := VariableData{
 			KeyValues: r.Header,
 		}
-		metadata.Type = metadata.Type + " > header"
+		metadata.Type = originalType + " > header"
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
 	}
 
 	if r.URL.Raw != "" {
-		metadata.Type = metadata.Type + " > request URL"
+		metadata.Type = originalType + " > request URL"
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, r.URL.Raw)), metadata)
 	}
 
@@ -407,32 +408,33 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		vars := VariableData{
 			KeyValues: r.URL.Query,
 		}
-		metadata.Type = metadata.Type + " > GET parameters (query)"
+		metadata.Type = originalType + " > GET parameters (query)"
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
 	}
 
 	if r.Auth.Type != "" {
-		metadata.Type = metadata.Type + " > request auth"
+		metadata.Type = originalType + " > request auth"
 		s.scanAuth(ctx, chunksChan, metadata, r.Auth, r.URL)
 	}
 
 	if r.Body.Mode != "" {
-		metadata.Type = metadata.Type + " > body"
+		metadata.Type = originalType + " > body"
 		s.scanBody(ctx, chunksChan, metadata, r.Body)
 	}
 }
 
 func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
 	m.Link = m.Link + "?tab=body"
+	originalType := m.Type
 	switch b.Mode {
 	case "formdata":
-		m.Type = m.Type + " > form data"
+		m.Type = originalType + " > form data"
 		vars := VariableData{
 			KeyValues: b.FormData,
 		}
 		s.scanVariableData(ctx, chunksChan, m, vars)
 	case "urlencoded":
-		m.Type = m.Type + " > url encoded"
+		m.Type = originalType + " > url encoded"
 		vars := VariableData{
 			KeyValues: b.URLEncoded,
 		}
@@ -440,11 +442,11 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 	case "raw", "graphql":
 		data := b.Raw
 		if b.Mode == "graphql" {
-			m.Type = m.Type + " > graphql"
+			m.Type = originalType + " > graphql"
 			data = b.GraphQL.Query + " " + b.GraphQL.Variables
 		}
 		if b.Mode == "raw" {
-			m.Type = m.Type + " > raw"
+			m.Type = originalType + " > raw"
 		}
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
 	default:
@@ -457,23 +459,24 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 		m.Link = LINK_BASE_URL + "example/" + response.UID
 		m.FullID = response.UID
 	}
+	originalType := m.Type
 
 	if response.Header != nil {
 		vars := VariableData{
 			KeyValues: response.Header,
 		}
-		m.Type = m.Type + " > response header"
+		m.Type = originalType + " > response header"
 		s.scanVariableData(ctx, chunksChan, m, vars)
 	}
 
 	// Body in a response is just a string
 	if response.Body != "" {
-		m.Type = m.Type + " > response body"
+		m.Type = originalType + " > response body"
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, response.Body)), m)
 	}
 
 	if response.OriginalRequest.Method != "" {
-		m.Type = m.Type + " > original request"
+		m.Type = originalType + " > original request"
 		s.scanHTTPRequest(ctx, chunksChan, m, response.OriginalRequest)
 	}
 }
