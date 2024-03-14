@@ -3,6 +3,7 @@ package postman
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -74,7 +75,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.jobPool.SetLimit(concurrency)
 	s.detectorKeywords = make(map[string]struct{})
 	s.sub = NewSubstitution()
-
 	s.log = ctx.Logger()
 
 	var conn sourcespb.Postman
@@ -117,6 +117,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan collections
 	for _, collectionID := range s.conn.Collections {
+		if shouldSkip(collectionID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
+			continue
+		}
+
 		collection, err := s.client.GetCollection(collectionID)
 		if err != nil {
 			s.log.Error(err, "could not get collection object", "collection_uuid", collectionID)
@@ -171,6 +175,9 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		if err != nil {
 			s.log.Error(err, "could not get environment object", "environment_uuid", envID.UUID)
 		}
+		if shouldSkip(envID.UUID, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
+			continue
+		}
 		// s.scanEnvironment(ctx, chunksChan, env, workspace)
 		metadata.Type = ENVIRONMENT_TYPE
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
@@ -191,6 +198,9 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	// at this point we have all the possible
 	// substitutions from Global and Environment variables
 	for _, collectionID := range workspace.Collections {
+		if shouldSkip(collectionID.UUID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
+			continue
+		}
 		collection, err := s.client.GetCollection(collectionID.UUID)
 		if err != nil {
 			s.log.Error(err, "could not get collection object", "collection_uuid", collectionID.UUID)
@@ -533,7 +543,7 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					Link:            metadata.Link,
 					WorkspaceUuid:   metadata.WorkspaceUUID,
 					WorkspaceName:   metadata.WorkspaceName,
-					CollectionId:    metadata.CollectionInfo.PostmanID,
+					CollectionId:    metadata.CollectionInfo.UID,
 					CollectionName:  metadata.CollectionInfo.Name,
 					EnvironmentId:   metadata.EnvironmentID,
 					EnvironmentName: metadata.EnvironmentName,
@@ -574,42 +584,12 @@ func filterKeywords(keys []string, detectorKeywords map[string]struct{}) []strin
 
 }
 
-// Used to filter out collections and environments that are not wanted for scanning.
-func filterItemsByUUID(slice []IDNameUUID, uuidsToRemove []string, uuidsToInclude []string) []IDNameUUID {
-	var result []IDNameUUID
-
-	// Include takes precedence over exclude
-	if uuidsToInclude != nil {
-		// Create map of UUIDs to include for efficiency
-		uuidSet := make(map[string]struct{})
-		for _, uuid := range uuidsToInclude {
-			uuidSet[uuid] = struct{}{}
-		}
-
-		// Iterate through the slice and add items that match the UUIDs to include
-		for _, item := range slice {
-			if _, exists := uuidSet[item.UUID]; exists {
-				result = append(result, item)
-			}
-		}
-		return result
+func shouldSkip(uuid string, include []string, exclude []string) bool {
+	if len(include) > 0 && !slices.Contains(include, uuid) {
+		return true
 	}
-
-	if uuidsToRemove != nil {
-		// Create map of UUIDs to remove for efficiency
-		uuidSet := make(map[string]struct{})
-		for _, uuid := range uuidsToRemove {
-			uuidSet[uuid] = struct{}{}
-		}
-
-		// Iterate through the slice and add items that don't match the UUIDs to remove
-		for _, item := range slice {
-			if _, exists := uuidSet[item.UUID]; !exists {
-				result = append(result, item)
-			}
-		}
-		return result
+	if slices.Contains(exclude, uuid) {
+		return true
 	}
-
-	return slice
+	return false
 }
