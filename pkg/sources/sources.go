@@ -307,6 +307,10 @@ type PostmanConfig struct {
 	ExcludeEnvironments []string
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency int
+	// CollectionPaths is the list of paths to Postman collections.
+	CollectionPaths []string
+	// WorkspacePaths is the list of paths to Postman workspaces.
+	WorkspacePaths []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 }

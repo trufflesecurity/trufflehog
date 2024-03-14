@@ -153,7 +153,7 @@ var (
 
 	// Postman is hidden for now until we get more feedback from the community.
 	postmanScan                = cli.Command("postman", "Scan Postman").Hidden()
-	postmanToken               = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").Required().String()
+	postmanToken               = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
 	postmanWorkspaces          = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag.").Strings()
 	postmanCollections         = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag.").Strings()
 	postmanEnvironments        = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
@@ -161,6 +161,8 @@ var (
 	postmanIncludeEnvironments = postmanScan.Flag("include-environments", "Environments to include in scan. Comma separated list of environments. You can repeat this flag.").Strings()
 	postmanExcludeCollections  = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. Comma separated list of collections. You can repeat this flag.").Strings()
 	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. Comma separated list of environments. You can repeat this flag.").Strings()
+	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
+	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
 )
 
 func init() {
@@ -583,6 +585,8 @@ func run(state overseer.State) {
 			IncludeEnvironments: *postmanIncludeEnvironments,
 			ExcludeCollections:  *postmanExcludeCollections,
 			ExcludeEnvironments: *postmanExcludeEnvironments,
+			CollectionPaths:     *postmanCollectionPaths,
+			WorkspacePaths:      *postmanWorkspacePaths,
 		}
 		if err := e.ScanPostman(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Postman.")

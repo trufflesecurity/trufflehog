@@ -1,8 +1,13 @@
 package postman
 
 import (
+	"archive/zip"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
+	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -49,6 +54,11 @@ type Source struct {
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+}
+
+type ArchiveJSON struct {
+	Collection  Collection
+	Environment Environment
 }
 
 // Type returns the type of source.
@@ -106,6 +116,48 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 }
 
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	// Scan local workspaces
+	for _, workspacePath := range s.conn.WorkspacePaths {
+		// check if zip file
+		workspace := Workspace{}
+		if strings.HasSuffix(workspacePath, ".zip") {
+			r, err := zip.OpenReader(workspacePath)
+			if err != nil {
+				return err
+			}
+			defer r.Close()
+			for _, file := range r.File {
+				rc, err := file.Open()
+				if err != nil {
+					return err
+				}
+				defer rc.Close()
+				contents, err := io.ReadAll(rc)
+				if err != nil {
+					return err
+				}
+				if strings.Contains(file.Name, "collection") {
+					// read in the collection then scan it
+					c := Collection{}
+					if err = json.Unmarshal(contents, &c); err != nil {
+						return err
+					}
+					workspace.CollectionsRaw = append(workspace.CollectionsRaw, c)
+				}
+				if strings.Contains(file.Name, "environment") {
+					e := VariableData{}
+					if err = json.Unmarshal(contents, &e); err != nil {
+						return err
+					}
+					workspace.EnvironmentsRaw = append(workspace.EnvironmentsRaw, e)
+				}
+			}
+		}
+		basename := path.Base(workspacePath)
+		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
+		s.scanLocalWorkspace(ctx, chunksChan, workspace)
+	}
+
 	// Scan workspaces
 	for _, workspaceID := range s.conn.Workspaces {
 		w, err := s.client.GetWorkspace(workspaceID)
@@ -129,7 +181,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	// Scan personal workspaces (from API token)
-	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil {
+	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil && s.conn.GetToken() != "" {
 		workspaces, err := s.client.EnumerateWorkspaces()
 		if err != nil {
 			ctx.Logger().Error(errors.New("Could not enumerate any workspaces for the API token provided"), "failed to scan postman")
@@ -141,6 +193,24 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 
 	return nil
+}
+
+func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) {
+	// reset keywords for each workspace
+	s.keywords = []string{}
+
+	metadata := Metadata{
+		WorkspaceUUID: workspace.ID,
+	}
+
+	for _, environment := range workspace.EnvironmentsRaw {
+		metadata.Link = LINK_BASE_URL + "workspace/" + workspace.ID
+		s.scanVariableData(ctx, chunksChan, metadata, environment)
+	}
+	for _, collection := range workspace.CollectionsRaw {
+		metadata.Link = LINK_BASE_URL + "collection/" + collection.Info.UID
+		s.scanCollection(ctx, chunksChan, metadata, collection)
+	}
 }
 
 func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) {

@@ -394,5 +394,7 @@ message Postman {
   repeated string include_collections = 8; // comma separated list of collection uuids
   repeated string include_environments = 9; // comma separated list of environment uuids
   repeated string detector_keywords = 10; // [internal use] list of detector keywords for filtering
+  repeated string workspace_paths = 11; // comma separated list of workspace paths
+  repeated string collection_paths = 12; // comma separated list of collection paths
 }
  
