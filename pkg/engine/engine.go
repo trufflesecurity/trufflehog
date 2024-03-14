@@ -169,21 +169,18 @@ func WithFilterEntropy(entropy float64) Option {
 // WithResults defines which results will be printed by the engine.
 func WithResults(results map[string]struct{}) Option {
 	return func(e *Engine) {
-		if len(results) > 0 {
-			if _, ok := results["verified"]; ok {
-				e.notifyVerifiedResults = true
-			}
-			if _, ok := results["unknown"]; ok {
-				e.notifyUnknownResults = true
-			}
-			if _, ok := results["unverified"]; ok {
-				e.notifyUnverifiedResults = true
-			}
-		} else {
-			e.notifyVerifiedResults = true
-			e.notifyUnknownResults = true
-			e.notifyUnverifiedResults = true
+		if len(results) == 0 {
+			return
 		}
+
+		_, ok := results["verified"]
+		e.notifyVerifiedResults = ok
+
+		_, ok = results["unknown"]
+		e.notifyUnknownResults = ok
+
+		_, ok = results["unverified"]
+		e.notifyUnverifiedResults = ok
 	}
 }
 
@@ -379,6 +376,9 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// The buffer sizes for these channels are set to multiples of defaultChannelBuffer,
 	// considering the expected concurrency and workload in the system.
 	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer*detectableChunksChanMultiplier)
+	e.notifyVerifiedResults = true
+	e.notifyUnknownResults = true
+	e.notifyUnverifiedResults = true
 	e.verificationOverlapChunksChan = make(chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
 	e.dedupeCache = cache
