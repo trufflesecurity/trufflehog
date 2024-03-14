@@ -93,6 +93,7 @@ type Metadata struct {
 	VarType         string
 	FieldName       string
 	FieldType       string
+	fromLocal       bool
 }
 
 type Collection struct {
@@ -101,7 +102,6 @@ type Collection struct {
 	Auth      Auth       `json:"auth,omitempty"`
 	Events    []Event    `json:"event,omitempty"`
 	Variables []KeyValue `json:"variable,omitempty"`
-	metadata  Metadata
 }
 
 type Info struct {

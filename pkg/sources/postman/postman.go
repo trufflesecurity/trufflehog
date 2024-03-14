@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -155,7 +156,21 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 		basename := path.Base(workspacePath)
 		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
-		s.scanLocalWorkspace(ctx, chunksChan, workspace)
+		s.scanLocalWorkspace(ctx, chunksChan, workspace, workspacePath)
+	}
+
+	// Scan local workspaces
+	for _, collectionPath := range s.conn.CollectionPaths {
+		collection := Collection{}
+		// open the file and read contents into collection
+		contents, err := os.ReadFile(collectionPath)
+		if err != nil {
+			return err
+		}
+		if err = json.Unmarshal(contents, &collection); err != nil {
+			return err
+		}
+		s.scanCollection(ctx, chunksChan, Metadata{CollectionInfo: collection.Info, fromLocal: true, Link: collectionPath}, collection)
 	}
 
 	// Scan workspaces
@@ -195,20 +210,21 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) {
+func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace, filePath string) {
 	// reset keywords for each workspace
 	s.keywords = []string{}
 
 	metadata := Metadata{
 		WorkspaceUUID: workspace.ID,
+		fromLocal:     true,
 	}
 
 	for _, environment := range workspace.EnvironmentsRaw {
-		metadata.Link = LINK_BASE_URL + "workspace/" + workspace.ID
+		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/environments/" + environment.ID + ".json"
 		s.scanVariableData(ctx, chunksChan, metadata, environment)
 	}
 	for _, collection := range workspace.CollectionsRaw {
-		metadata.Link = LINK_BASE_URL + "collection/" + collection.Info.UID
+		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/collections/" + collection.Info.PostmanID + ".json"
 		s.scanCollection(ctx, chunksChan, metadata, collection)
 	}
 }
@@ -286,14 +302,9 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 
-	if metadata.CollectionInfo.UID != "" {
-		// means we're reading in from an API call vs. local JSON file read
+	if !metadata.fromLocal {
 		metadata.FullID = metadata.CollectionInfo.UID
 		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
-	} else {
-		// means we're reading in from a local JSON file
-		metadata.FullID = metadata.CollectionInfo.PostmanID
-		metadata.Link = "../" + metadata.FullID + ".json"
 	}
 
 	// variables must be scanned first before drilling down into the folders and events
@@ -312,7 +323,6 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 
 }
 
-// ZRNOTE: rename back to folder and change struct name from Item to Folder
 func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item) {
 	s.keywords = append(s.keywords, item.Name)
 
@@ -329,11 +339,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	if item.UID != "" {
 		metadata.FullID = item.UID
 		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.FullID
-	} else {
-		metadata.FullID = item.ID
-		metadata.Link = "../" + collection.metadata.FullID + ".json"
 	}
-
 	// recurse through the folders
 	for _, subItem := range item.Items {
 		s.scanItem(ctx, chunksChan, collection, metadata, subItem)
@@ -351,7 +357,6 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		} else {
 			// Route to collection.json
 			metadata.FullID = item.ID
-			metadata.Link = "../" + metadata.CollectionInfo.PostmanID + ".json"
 		}
 		s.scanHTTPRequest(ctx, chunksChan, metadata, item.Request)
 	}
@@ -373,12 +378,14 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 	metadata.Type = metadata.Type + " > event"
 	data := strings.Join(event.Script.Exec, " ")
 
-	// Prep direct links
-	metadata.Link = LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
-	if event.Listen == "prerequest" {
-		metadata.Link += "?tab=pre-request-scripts"
-	} else {
-		metadata.Link += "?tab=tests"
+	// Prep direct links. Ignore updating link if it's a local JSON file
+	if !metadata.fromLocal {
+		metadata.Link = LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
+		if event.Listen == "prerequest" {
+			metadata.Link += "?tab=pre-request-scripts"
+		} else {
+			metadata.Link += "?tab=tests"
+		}
 	}
 
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, data)), metadata)
@@ -458,8 +465,11 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		return ""
 	}
 
-	m.Link = m.Link + "?tab=authorization"
-	m.Type = m.Type + " > authorization"
+	if !m.fromLocal {
+		m.Link += "?tab=authorization"
+		m.Type += " > authorization"
+	}
+
 	m.FieldType = AUTH_TYPE
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, authData)), m)
 
@@ -506,7 +516,9 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 }
 
 func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
-	m.Link = m.Link + "?tab=body"
+	if !m.fromLocal {
+		m.Link = m.Link + "?tab=body"
+	}
 	originalType := m.Type
 	switch b.Mode {
 	case "formdata":
@@ -569,11 +581,8 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		return
 	}
 
-	// If collection and not a JSON file, then append the tab=variables to the link
-	if m.Type == COLLECTION_TYPE {
-		if !strings.HasSuffix(m.Link, ".json") {
-			m.Link += "?tab=variables"
-		}
+	if !m.fromLocal && m.Type == COLLECTION_TYPE {
+		m.Link += "?tab=variables"
 	}
 
 	values := []string{}
