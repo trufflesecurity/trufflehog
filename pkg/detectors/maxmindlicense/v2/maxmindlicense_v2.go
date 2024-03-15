@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -38,7 +37,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, keyMatch := range keyMatches {
-		keyRes := strings.TrimSpace(keyMatch[1])
+		keyRes := keyMatch[1]
 
 		r := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MaxMindLicense,
@@ -64,10 +63,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					r.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
