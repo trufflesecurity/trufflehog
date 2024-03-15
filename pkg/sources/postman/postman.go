@@ -57,11 +57,6 @@ type Source struct {
 	sources.CommonSourceUnitUnmarshaller
 }
 
-type ArchiveJSON struct {
-	Collection  Collection
-	Environment Environment
-}
-
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
@@ -116,6 +111,13 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	return nil
 }
 
+// Chunks scans the Postman source and sends the data to the chunks chan.
+// It scans the local environment, collection, and workspace files, and then scans the Postman API if a token is provided.
+// The Postman detector is different to our other detectors in that we are not relying on the data we read from the source to contain
+// all the information we need to scan, i.e, a git chunk contains all the information needed to check if a secret is present in that chunk.
+// Postman on the other hand requires us to build context (the keywords and variables) as we scan the data.
+// Check out the postman UI to see what I mean.
+// Metadata is used to track information that informs the source of the chunk (e.g. the workspace -> collection -> request -> variable hierarchy).
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	// Scan local environments
 	for _, envPath := range s.conn.EnvironmentPaths {
@@ -402,7 +404,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, data)), metadata)
 }
 
-func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, u URL) string {
+func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, u URL) {
 	var authData string
 	switch auth.Type {
 	case "apikey":
@@ -452,14 +454,12 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 			parsedURL, err := url.Parse(u.Raw)
 			if err != nil {
 				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
-				return ""
 			}
 
 			parsedURL.User = url.User(username + ":" + password)
 			decodedURL, err := url.PathUnescape(parsedURL.String())
 			if err != nil {
 				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
-				return ""
 			}
 			authData += decodedURL
 		}
@@ -471,9 +471,9 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 			}
 		}
 	case "noauth":
-		return ""
+		return
 	default:
-		return ""
+		return
 	}
 
 	if !m.fromLocal {
@@ -483,8 +483,6 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 
 	m.FieldType = AUTH_TYPE
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, authData)), m)
-
-	return ""
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
