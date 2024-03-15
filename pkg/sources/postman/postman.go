@@ -636,7 +636,6 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 		return
 	}
 	metadata.FieldType = metadata.Type
-	fmt.Println(data)
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
