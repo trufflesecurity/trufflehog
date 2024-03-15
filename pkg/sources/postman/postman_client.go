@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -314,14 +313,6 @@ func (c *Client) GetWorkspace(workspaceUUID string) (Workspace, error) {
 		return workspace, err
 	}
 
-	// Create a file to save the JSON response
-	file, err := os.Create("workspace.json")
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-	file.Write(body)
-
 	return obj.Workspace, nil
 }
 
@@ -375,14 +366,6 @@ func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData,
 		return VariableData{}, err
 	}
 
-	// save to env file
-	file, err := os.Create(fmt.Sprintf("env_%s.json", environment_uuid))
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-	file.Write(body)
-
 	return obj.VariableData, nil
 }
 
@@ -409,14 +392,6 @@ func (c *Client) GetCollection(collection_uuid string) (Collection, error) {
 		err = fmt.Errorf("could not unmarshal JSON for collection: %s", collection_uuid)
 		return Collection{}, err
 	}
-
-	// Create a file to save the JSON response
-	file, err := os.Create(fmt.Sprintf("response_%s.json", collection_uuid))
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-	file.Write(body)
 
 	return obj.Collection, nil
 }
