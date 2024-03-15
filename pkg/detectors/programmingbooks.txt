@@ -1241,7 +1241,6 @@ getusermedia
 getval
 gg@allin.com
 ghastly
-github
 gitignore
 giving
 glance

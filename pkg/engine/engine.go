@@ -68,10 +68,12 @@ type Engine struct {
 	// only the first one will be kept.
 	filterUnverified bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
-	filterEntropy        *float64
-	onlyVerified         bool
-	verificationOverlap  bool
-	printAvgDetectorTime bool
+	filterEntropy           *float64
+	notifyVerifiedResults   bool
+	notifyUnverifiedResults bool
+	notifyUnknownResults    bool
+	verificationOverlap     bool
+	printAvgDetectorTime    bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
@@ -164,11 +166,21 @@ func WithFilterEntropy(entropy float64) Option {
 	}
 }
 
-// WithOnlyVerified sets the onlyVerified flag on the engine. If set to true,
-// the engine will only print verified results.
-func WithOnlyVerified(onlyVerified bool) Option {
+// WithResults defines which results will be printed by the engine.
+func WithResults(results map[string]struct{}) Option {
 	return func(e *Engine) {
-		e.onlyVerified = onlyVerified
+		if len(results) == 0 {
+			return
+		}
+
+		_, ok := results["verified"]
+		e.notifyVerifiedResults = ok
+
+		_, ok = results["unknown"]
+		e.notifyUnknownResults = ok
+
+		_, ok = results["unverified"]
+		e.notifyUnverifiedResults = ok
 	}
 }
 
@@ -364,6 +376,9 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// The buffer sizes for these channels are set to multiples of defaultChannelBuffer,
 	// considering the expected concurrency and workload in the system.
 	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer*detectableChunksChanMultiplier)
+	e.notifyVerifiedResults = true
+	e.notifyUnknownResults = true
+	e.notifyUnverifiedResults = true
 	e.verificationOverlapChunksChan = make(chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
 	e.dedupeCache = cache
@@ -849,7 +864,20 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 func (e *Engine) notifyResults(ctx context.Context) {
 	for r := range e.ResultsChan() {
-		if e.onlyVerified && !r.Verified {
+		// Filter unwanted results, based on `--results`.
+		if !r.Verified {
+			if r.VerificationError() != nil {
+				if !e.notifyUnknownResults {
+					// Skip results with verification errors.
+					continue
+				}
+			} else if !e.notifyUnverifiedResults {
+				// Skip unverified results.
+				continue
+			}
+		} else if !e.notifyVerifiedResults {
+			// Skip verified results.
+			// TODO: Is this a legitimate use case?
 			continue
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)

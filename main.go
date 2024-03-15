@@ -38,18 +38,20 @@ import (
 )
 
 var (
-	cli                      = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd                      string
-	debug                    = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace                    = cli.Flag("trace", "Run in trace mode.").Bool()
-	profile                  = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
-	localDev                 = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
-	jsonOut                  = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
-	jsonLegacy               = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
-	gitHubActionsFormat      = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
-	concurrency              = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
-	noVerification           = cli.Flag("no-verification", "Don't verify the results.").Bool()
-	onlyVerified             = cli.Flag("only-verified", "Only output verified results.").Bool()
+	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd                 string
+	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
+	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
+	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
+	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
+	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
+	jsonLegacy          = cli.Flag("json-legacy", "Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.").Bool()
+	gitHubActionsFormat = cli.Flag("github-actions", "Output in GitHub Actions format.").Bool()
+	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
+	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
+	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. Defaults to all types.").Hidden().String()
+
 	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
 	filterEntropy            = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
@@ -120,7 +122,8 @@ var (
 	s3ScanSecret        = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
 	s3ScanSessionToken  = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
 	s3ScanCloudEnv      = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
-	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
+	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag. Incompatible with --ignore-bucket.").Strings()
+	s3ScanIgnoreBuckets = s3Scan.Flag("ignore-bucket", "Name of S3 bucket to ignore. You can repeat this flag. Incompatible with --bucket.").Strings()
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
@@ -418,6 +421,17 @@ func run(state overseer.State) {
 	if *jobReportFile != nil {
 		jobReportWriter = *jobReportFile
 	}
+
+	// Parse --results flag.
+	if *onlyVerified {
+		r := "verified"
+		results = &r
+	}
+	parsedResults, err := parseResults(results)
+	if err != nil {
+		logFatal(err, "failed to configure results flag")
+	}
+
 	e, err := engine.Start(ctx,
 		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
@@ -428,7 +442,7 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
-		engine.WithOnlyVerified(*onlyVerified),
+		engine.WithResults(parsedResults),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),
@@ -518,6 +532,7 @@ func run(state overseer.State) {
 			Secret:        *s3ScanSecret,
 			SessionToken:  *s3ScanSessionToken,
 			Buckets:       *s3ScanBuckets,
+			IgnoreBuckets: *s3ScanIgnoreBuckets,
 			Roles:         *s3ScanRoleArns,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
@@ -621,6 +636,33 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
+}
+
+// parseResults ensures that users provide valid CSV input to `--results`.
+//
+// This is a work-around to kingpin not supporting CSVs.
+// See: https://github.com/trufflesecurity/trufflehog/pull/2372#issuecomment-1983868917
+func parseResults(input *string) (map[string]struct{}, error) {
+	if *input == "" {
+		return nil, nil
+	}
+
+
+	var (
+		values  = strings.Split(strings.ToLower(*input), ",")
+		results = make(map[string]struct{}, 3)
+	)
+	for _, value := range values {
+		switch value {
+		case "verified":
+		case "unknown":
+		case "unverified":
+			results[value] = struct{}{}
+		default:
+			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified'", value)
+		}
+	}
+	return results, nil
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned

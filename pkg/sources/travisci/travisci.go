@@ -75,7 +75,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			return errors.New("token is empty")
 		}
 		s.client = travis.NewClient(baseURL, conn.GetToken())
-		s.client.HTTPClient = common.RetryableHttpClientTimeout(3)
+		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
 
 		user, _, err := s.client.User.Current(ctx, nil)
 		if err != nil {
