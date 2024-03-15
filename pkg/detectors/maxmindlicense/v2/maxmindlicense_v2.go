@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_MaxMindLicense,
 			Redacted:     keyRes,
 			Raw:          []byte(keyRes),
-			RawV2:        []byte(keyRes),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 				"version":        fmt.Sprintf("%d", s.Version()),
