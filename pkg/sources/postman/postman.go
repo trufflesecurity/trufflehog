@@ -113,7 +113,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 // Chunks scans the Postman source and sends the data to the chunks chan.
 // It scans the local environment, collection, and workspace files, and then scans the Postman API if a token is provided.
-// The Postman detector is different to our other detectors in that we are not relying on the data we read from the source to contain
+// The Postman source is different to our other sources in that we are not relying on the data we read from the source to contain
 // all the information we need to scan, i.e, a git chunk contains all the information needed to check if a secret is present in that chunk.
 // Postman on the other hand requires us to build context (the keywords and variables) as we scan the data.
 // Check out the postman UI to see what I mean.
