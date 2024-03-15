@@ -32,7 +32,7 @@ func (sub *Substitution) add(metadata Metadata, key string, value string) {
 
 func (s *Source) keywordCombinations(str string) string {
 	data := ""
-	for _, keyword := range filterKeywords(s.keywords, s.detectorKeywords) {
+	for keyword := range s.keywords {
 		data += fmt.Sprintf("%s:%s\n", keyword, str)
 	}
 

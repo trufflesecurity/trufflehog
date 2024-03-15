@@ -49,8 +49,8 @@ func TestSource_ScanCollection(t *testing.T) {
 		detectorKeywords: map[string]struct{}{
 			"keyword1": {},
 		},
-		keywords: []string{
-			"keyword1",
+		keywords: map[string]struct{}{
+			"keyword1": {},
 		},
 	}
 
@@ -71,7 +71,10 @@ func TestSource_ScanCollection(t *testing.T) {
 						Name: "Request 1",
 						Request: Request{
 							URL: URL{
-								Raw: "https://example.com/api/endpoint",
+								Protocol: "https",
+								Host:     []string{"example.com"},
+								Path:     []string{"api", "endpoint"},
+								Raw:      "https://example.com/api/endpoint",
 							},
 							Method: "GET",
 						},
@@ -94,7 +97,10 @@ func TestSource_ScanCollection(t *testing.T) {
 						Name: "Request 2",
 						Request: Request{
 							URL: URL{
-								Raw: "https://example.com/api/endpoint",
+								Protocol: "https",
+								Host:     []string{"example.com"},
+								Path:     []string{"api", "endpoint"},
+								Raw:      "https://example.com/api/endpoint",
 							},
 							Method: "POST",
 							Auth: Auth{
@@ -142,8 +148,8 @@ func TestSource_ScanVariableData(t *testing.T) {
 		detectorKeywords: map[string]struct{}{
 			"keyword1": {},
 		},
-		keywords: []string{
-			"keyword1",
+		keywords: map[string]struct{}{
+			"keyword1": {},
 		},
 		sub: NewSubstitution(),
 	}

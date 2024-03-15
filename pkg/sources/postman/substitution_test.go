@@ -42,8 +42,11 @@ func TestSource_KeywordCombinations(t *testing.T) {
 			"keyword1": {},
 			"keyword2": {},
 		},
-		keywords: []string{"keyword1", "keyword2", "keyword3"},
+		keywords: make(map[string]struct{}),
 	}
+	s.addKeyword("keyword1")
+	s.addKeyword("keyword2")
+	s.addKeyword("keyword3")
 
 	result := s.keywordCombinations("test")
 	expected := "keyword1:test\nkeyword2:test\n"
@@ -106,8 +109,11 @@ func TestSource_FormatAndInjectKeywords(t *testing.T) {
 			"keyword1": {},
 			"keyword2": {},
 		},
-		keywords: []string{"keyword1", "keyword2", "keyword3"},
+		keywords: make(map[string]struct{}),
 	}
+	s.addKeyword("keyword1")
+	s.addKeyword("keyword2")
+	s.addKeyword("keyword3")
 
 	testCases := []struct {
 		input    []string

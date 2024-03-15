@@ -50,11 +50,27 @@ type Source struct {
 
 	// Keywords are words that are discovered when we walk through postman data.
 	// These keywords are then injected into data that is sent to the detectors.
-	keywords []string
+	keywords map[string]struct{}
 	sub      *Substitution
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+}
+
+func (s *Source) addKeywords(keywords []string) {
+	for _, keyword := range keywords {
+		s.addKeyword(keyword)
+	}
+}
+
+func (s *Source) addKeyword(keyword string) {
+	if _, ok := s.detectorKeywords[keyword]; ok {
+		s.keywords[keyword] = struct{}{}
+	}
+}
+
+func (s *Source) resetKeywords() {
+	s.keywords = make(map[string]struct{})
 }
 
 // Type returns the type of source.
@@ -80,6 +96,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 	s.detectorKeywords = make(map[string]struct{})
+	s.keywords = make(map[string]struct{})
 	s.sub = NewSubstitution()
 	s.log = ctx.Logger()
 
@@ -226,7 +243,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace, filePath string) {
 	// reset keywords for each workspace
-	s.keywords = []string{}
+	s.resetKeywords()
 
 	metadata := Metadata{
 		WorkspaceUUID: workspace.ID,
@@ -245,7 +262,8 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 
 func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) {
 	// reset keywords for each workspace
-	s.keywords = []string{workspace.Name}
+	s.resetKeywords()
+	s.addKeyword(workspace.Name)
 
 	// initiate metadata to track the tree structure of postman data
 	metadata := Metadata{
@@ -285,7 +303,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
 		for _, word := range strings.Split(envVars.Name, " ") {
-			s.keywords = append(s.keywords, string(word))
+			s.addKeyword(word)
 		}
 
 		s.scanVariableData(ctx, chunksChan, metadata, envVars)
@@ -337,7 +355,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 }
 
 func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item) {
-	s.keywords = append(s.keywords, item.Name)
+	s.addKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
 	metadata.FolderID = item.ID
@@ -486,7 +504,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
-	s.keywords = append(s.keywords, r.URL.Host...)
+	s.addKeywords(r.URL.Host)
 	originalType := metadata.Type
 
 	// Add in var procesisng for headers
@@ -596,7 +614,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 
 	values := []string{}
 	for _, kv := range variableData.KeyValues {
-		s.keywords = append(s.keywords, kv.Key)
+		s.addKeyword(kv.Key)
 		valStr := fmt.Sprintf("%v", kv.Value)
 		if valStr != "" {
 			s.sub.add(m, kv.Key, valStr)
@@ -618,6 +636,7 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 		return
 	}
 	metadata.FieldType = metadata.Type
+	fmt.Println(data)
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -647,29 +666,6 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 		},
 		Verify: s.verify,
 	}
-}
-
-func filterKeywords(keys []string, detectorKeywords map[string]struct{}) []string {
-	// Filter out keywords that don't exist in pkg/detectors/*
-	filteredKeywords := make(map[string]struct{})
-
-	// Iterate through the input keys
-	for _, key := range keys {
-		// Check if the key contains any detectorKeyword
-		for detectorKey := range detectorKeywords {
-			if strings.Contains(strings.ToLower(key), detectorKey) {
-				filteredKeywords[detectorKey] = struct{}{}
-				break
-			}
-		}
-	}
-
-	filteredKeywordsSlice := make([]string, 0, len(filteredKeywords))
-	for key := range filteredKeywords {
-		filteredKeywordsSlice = append(filteredKeywordsSlice, key)
-	}
-	return filteredKeywordsSlice
-
 }
 
 func shouldSkip(uuid string, include []string, exclude []string) bool {
