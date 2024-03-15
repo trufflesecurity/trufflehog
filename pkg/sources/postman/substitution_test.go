@@ -2,6 +2,8 @@ package postman
 
 import (
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -48,11 +50,15 @@ func TestSource_KeywordCombinations(t *testing.T) {
 	s.addKeyword("keyword2")
 	s.addKeyword("keyword3")
 
-	result := s.keywordCombinations("test")
-	expected := "keyword1:test\nkeyword2:test\n"
+	// remove that \n from the end of the string
+	got := strings.Split(strings.TrimSuffix(s.keywordCombinations("test"), "\n"), "\n")
+	expected := []string{"keyword1:test", "keyword2:test"}
 
-	if result != expected {
-		t.Errorf("Expected keyword combinations: %q, got: %q", expected, result)
+	sort.Strings(got)
+	sort.Strings(expected)
+
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Expected keyword combinations: %q, got: %q", expected, got)
 	}
 }
 
@@ -135,7 +141,13 @@ func TestSource_FormatAndInjectKeywords(t *testing.T) {
 
 	for _, tc := range testCases {
 		result := s.formatAndInjectKeywords(tc.input)
-		if result != tc.expected {
+		got := strings.Split(result, "\n")
+		expected := strings.Split(tc.expected, "\n")
+		sort.Strings(got)
+		sort.Strings(expected)
+		// CHATGPT CHECK HERE
+
+		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Expected result: %q, got: %q", tc.expected, result)
 		}
 	}

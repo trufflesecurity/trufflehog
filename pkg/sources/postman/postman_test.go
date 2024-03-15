@@ -2,6 +2,7 @@ package postman
 
 import (
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -134,7 +135,15 @@ func TestSource_ScanCollection(t *testing.T) {
 
 			for _, expectedData := range tc.expectedChunks {
 				chunk := <-chunksChan
-				if strings.TrimSpace(string(chunk.Data)) != strings.TrimSpace(expectedData) {
+
+				// can't guarantee order of keywords in chunk data
+				// so we need to compare the data after sorting
+				got := strings.Split(strings.TrimSpace(string(chunk.Data)), "\n")
+				expected := strings.Split(strings.TrimSpace(expectedData), "\n")
+				sort.Strings(got)
+				sort.Strings(expected)
+
+				if !reflect.DeepEqual(got, expected) {
 					t.Errorf("expected chunk data from collection: \n%sgot: \n%s", expectedData, chunk.Data)
 				}
 			}
@@ -214,11 +223,15 @@ func TestSource_ScanVariableData(t *testing.T) {
 
 			for _, expectedData := range tc.expectedChunks {
 				chunk := <-chunksChan
-				if string(chunk.Data) != expectedData {
-					t.Errorf("expected chunk data from variable:\n%s\ngot:\n%s", expectedData, chunk.Data)
+				got := strings.Split(strings.TrimSpace(string(chunk.Data)), "\n")
+				expected := strings.Split(strings.TrimSpace(expectedData), "\n")
+				sort.Strings(got)
+				sort.Strings(expected)
+
+				if !reflect.DeepEqual(got, expected) {
+					t.Errorf("expected chunk data from collection: \n%sgot: \n%s", expectedData, chunk.Data)
 				}
 			}
-
 		})
 	}
 }
