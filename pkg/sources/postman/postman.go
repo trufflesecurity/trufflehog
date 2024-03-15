@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -21,8 +23,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
@@ -105,7 +105,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			return errors.New("Postman token is empty")
 		}
 		s.client = NewClient(conn.GetToken())
-		s.client.HTTPClient = common.RetryableHttpClientTimeout(3)
+		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
 	case *sourcespb.Postman_Unauthenticated:
 		s.client = nil
 		// No client needed if reading from local
