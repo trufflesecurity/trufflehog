@@ -89,8 +89,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
-			SetUserResponse(userResponse, &s1)
-			SetHeaderInfo(headers, &s1)
+
+			if userResponse != nil {
+				SetUserResponse(userResponse, &s1)
+			}
+
+			if headers != nil {
+				SetHeaderInfo(headers, &s1)
+			}
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
@@ -103,7 +109,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token string) (bool, UserRes, HeaderInfo, error) {
+func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token string) (bool, *UserRes, *HeaderInfo, error) {
 	// https://developer.github.com/v3/users/#get-the-authenticated-user
 	var requestErr error
 	for _, url := range s.Endpoints(s.DefaultEndpoint()) {
@@ -129,42 +135,38 @@ func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token st
 				// GitHub does not seem to consistently return this header.
 				scopes := res.Header.Get("X-OAuth-Scopes")
 				expiry := res.Header.Get("github-authentication-token-expiration")
-				return true, userResponse, HeaderInfo{Scopes: scopes, Expiry: expiry}, nil
+				return true, &userResponse, &HeaderInfo{Scopes: scopes, Expiry: expiry}, nil
 			}
 		}
 	}
-	return false, UserRes{}, HeaderInfo{}, requestErr
+	return false, &UserRes{}, &HeaderInfo{}, requestErr
 }
 
-func SetUserResponse(userResponse UserRes, s1 *detectors.Result) {
-	if userResponse != (UserRes{}) {
-		s1.ExtraData["username"] = userResponse.Login
-		s1.ExtraData["url"] = userResponse.UserURL
-		s1.ExtraData["account_type"] = userResponse.Type
+func SetUserResponse(userResponse *UserRes, s1 *detectors.Result) {
+	s1.ExtraData["username"] = userResponse.Login
+	s1.ExtraData["url"] = userResponse.UserURL
+	s1.ExtraData["account_type"] = userResponse.Type
 
-		if userResponse.SiteAdmin {
-			s1.ExtraData["site_admin"] = "true"
-		}
-		if userResponse.Name != "" {
-			s1.ExtraData["name"] = userResponse.Name
-		}
-		if userResponse.Company != "" {
-			s1.ExtraData["company"] = userResponse.Company
-		}
-		if userResponse.LdapDN != "" {
-			s1.ExtraData["ldap_dn"] = userResponse.LdapDN
-		}
+	if userResponse.SiteAdmin {
+		s1.ExtraData["site_admin"] = "true"
+	}
+	if userResponse.Name != "" {
+		s1.ExtraData["name"] = userResponse.Name
+	}
+	if userResponse.Company != "" {
+		s1.ExtraData["company"] = userResponse.Company
+	}
+	if userResponse.LdapDN != "" {
+		s1.ExtraData["ldap_dn"] = userResponse.LdapDN
 	}
 }
 
-func SetHeaderInfo(headers HeaderInfo, s1 *detectors.Result) {
-	if headers != (HeaderInfo{}) {
-		if headers.Scopes != "" {
-			s1.ExtraData["scopes"] = headers.Scopes
-		}
-		if headers.Expiry != "" {
-			s1.ExtraData["expiry"] = headers.Expiry
-		}
+func SetHeaderInfo(headers *HeaderInfo, s1 *detectors.Result) {
+	if headers.Scopes != "" {
+		s1.ExtraData["scopes"] = headers.Scopes
+	}
+	if headers.Expiry != "" {
+		s1.ExtraData["expiry"] = headers.Expiry
 	}
 }
 
