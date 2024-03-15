@@ -66,14 +66,13 @@ func (s *Source) buildSubstitueSet(metadata Metadata, data string) []string {
 func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[string]struct{}) {
 	matches := removeDuplicateStr(subRe.FindAllString(data, -1))
 	for _, match := range matches {
-		if slices, ok := s.sub.variables[strings.Trim(match, "{}")]; ok {
-			for _, slice := range slices {
-				if slice.Metadata.CollectionInfo.PostmanID != "" && slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
-					continue
-				}
-				d := strings.ReplaceAll(data, match, slice.value)
-				s.buildSubstitution(d, metadata, combos)
+		for _, slice := range s.sub.variables[strings.Trim(match, "{}")] {
+			if slice.Metadata.CollectionInfo.PostmanID != "" && slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
+				continue
 			}
+			// to ensure we don't infinitely recurse, we will trim all `{{}}` from the values before replacement
+			d := strings.ReplaceAll(data, match, strings.Trim(slice.value, "{}"))
+			s.buildSubstitution(d, metadata, combos)
 		}
 	}
 
