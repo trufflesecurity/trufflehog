@@ -74,8 +74,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, token)
-			v1.SetUserResponse(userResponse, &s1)
-			v1.SetHeaderInfo(headers, &s1)
+
+			if userResponse != nil {
+				v1.SetUserResponse(userResponse, &s1)
+			}
+			if headers != nil {
+				v1.SetHeaderInfo(headers, &s1)
+			}
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {

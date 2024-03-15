@@ -93,7 +93,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if userResponse != nil {
 				SetUserResponse(userResponse, &s1)
 			}
-
 			if headers != nil {
 				SetHeaderInfo(headers, &s1)
 			}
@@ -139,7 +138,7 @@ func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token st
 			}
 		}
 	}
-	return false, &UserRes{}, &HeaderInfo{}, requestErr
+	return false, nil, nil, requestErr
 }
 
 func SetUserResponse(userResponse *UserRes, s1 *detectors.Result) {
