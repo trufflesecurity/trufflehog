@@ -267,9 +267,11 @@ Flags:
   -j, --json                Output in JSON format.
       --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
       --github-actions      Output in GitHub Actions format.
-      --concurrency=8       Number of concurrent workers.
+      --concurrency=20           Number of concurrent workers.
       --no-verification     Don't verify the results.
       --only-verified       Only output verified results.
+      --allow-verification-overlap
+                                 Allow verification of similar credentials across detectors
       --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
       --filter-entropy=FILTER-ENTROPY
                                  Filter unverified results with Shannon entropy. Start with 3.0.
@@ -279,6 +281,7 @@ Flags:
       --no-update           Don't check for updates.
       --fail                Exit with code 183 if results are found.
       --verifier=VERIFIER ...    Set custom verification endpoints.
+      --custom-verifiers-only   Only use custom verification endpoints.
       --archive-max-size=ARCHIVE-MAX-SIZE
                                  Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
       --archive-max-depth=ARCHIVE-MAX-DEPTH
