@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -50,13 +52,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://secret-scanning.maxmind.com/secrets/validate-license-key", nil)
+			data := url.Values{}
+			data.Add("license_key", keyRes)
+			req, err := http.NewRequestWithContext(
+				ctx, "POST", "https://secret-scanning.maxmind.com/secrets/validate-license-key",
+				strings.NewReader(data.Encode()))
 			if err != nil {
 				continue
 			}
-
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			req.Form.Add("license_key", keyRes)
 
 			res, err := client.Do(req)
 			if err == nil {

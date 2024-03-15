@@ -16,7 +16,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestMaxMindLicense_FromChunk(t *testing.T) {
+func TestMaxMindLicense(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
@@ -24,7 +24,6 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("MAXMIND_LICENSE")
-	user := testSecrets.MustGetField("MAXMIND_USER")
 	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE")
 
 	type args struct {
@@ -44,13 +43,13 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a geoip secret %s within with maxmind user %s", secret, user)),
+				data:   []byte(fmt.Sprintf("You can find a geoip secret %s", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_MaxMindLicense,
-					Redacted:     "662034",
+					Redacted:     "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",
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
@@ -65,13 +64,13 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a maxmind secret %s within with maxmind user %s", inactiveSecret, user)),
+				data:   []byte(fmt.Sprintf("You can find a maxmind secret %s", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_MaxMindLicense,
-					Redacted:     "662034",
+					Redacted:     "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",
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
