@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"errors"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -22,6 +24,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 		ExcludeEnvironments: c.ExcludeEnvironments,
 		WorkspacePaths:      c.WorkspacePaths,
 		CollectionPaths:     c.CollectionPaths,
+		EnvironmentPaths:    c.EnvironmentPaths,
 	}
 	if len(c.Token) > 0 {
 		connection.Credential = &sourcespb.Postman_Token{
@@ -31,10 +34,10 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 		connection.Credential = &sourcespb.Postman_Unauthenticated{}
 	}
 
-	// if len(c.Workspaces) == 0 && len(c.Collections) == 0 && len(c.Environments) == 0 && len(c.Token) == 0 {
-	// 	ctx.Logger().Error(errors.New("no postman workspaces, collections, environments or API token provided"), "failed to scan postman")
-	// 	return nil
-	// }
+	if len(c.Workspaces) == 0 && len(c.Collections) == 0 && len(c.Environments) == 0 && len(c.Token) == 0 && len(c.WorkspacePaths) == 0 && len(c.CollectionPaths) == 0 && len(c.EnvironmentPaths) == 0 {
+		ctx.Logger().Error(errors.New("no postman workspaces, collections, environments or API token provided"), "failed to scan postman")
+		return nil
+	}
 
 	// Turn AhoCorasick keywordsToDetectors into a map of keywords
 	keywords := []string{}

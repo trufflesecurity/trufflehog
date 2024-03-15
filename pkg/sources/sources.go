@@ -311,6 +311,8 @@ type PostmanConfig struct {
 	CollectionPaths []string
 	// WorkspacePaths is the list of paths to Postman workspaces.
 	WorkspacePaths []string
+	// EnvironmentPaths is the list of paths to Postman environments.
+	EnvironmentPaths []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 }

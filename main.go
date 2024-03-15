@@ -163,6 +163,7 @@ var (
 	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. Comma separated list of environments. You can repeat this flag.").Strings()
 	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
 	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
+	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
 )
 
 func init() {
@@ -587,6 +588,7 @@ func run(state overseer.State) {
 			ExcludeEnvironments: *postmanExcludeEnvironments,
 			CollectionPaths:     *postmanCollectionPaths,
 			WorkspacePaths:      *postmanWorkspacePaths,
+			EnvironmentPaths:    *postmanEnvironmentPaths,
 		}
 		if err := e.ScanPostman(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Postman.")

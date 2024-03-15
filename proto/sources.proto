@@ -389,12 +389,13 @@ message Postman {
   repeated string workspaces = 3; 
   repeated string collections = 4;
   repeated string environments = 5;
-  repeated string exclude_collections = 6; // comma separated list of collection uuids
-  repeated string exclude_environments = 7; // comma separated list of environment uuids
-  repeated string include_collections = 8; // comma separated list of collection uuids
-  repeated string include_environments = 9; // comma separated list of environment uuids
-  repeated string detector_keywords = 10; // [internal use] list of detector keywords for filtering
-  repeated string workspace_paths = 11; // comma separated list of workspace paths
-  repeated string collection_paths = 12; // comma separated list of collection paths
+  repeated string exclude_collections = 6;
+  repeated string exclude_environments = 7; 
+  repeated string include_collections = 8;
+  repeated string include_environments = 9; 
+  repeated string detector_keywords = 10;
+  repeated string workspace_paths = 11;
+  repeated string collection_paths = 12;
+  repeated string environment_paths = 13;
 }
  

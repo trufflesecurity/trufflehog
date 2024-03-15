@@ -117,6 +117,32 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 }
 
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+	// Scan local environments
+	for _, envPath := range s.conn.EnvironmentPaths {
+		env := VariableData{}
+		contents, err := os.ReadFile(envPath)
+		if err != nil {
+			return err
+		}
+		if err = json.Unmarshal(contents, &env); err != nil {
+			return err
+		}
+		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentName: env.ID, fromLocal: true, Link: envPath}, env)
+	}
+
+	// Scan local workspaces
+	for _, collectionPath := range s.conn.CollectionPaths {
+		collection := Collection{}
+		contents, err := os.ReadFile(collectionPath)
+		if err != nil {
+			return err
+		}
+		if err = json.Unmarshal(contents, &collection); err != nil {
+			return err
+		}
+		s.scanCollection(ctx, chunksChan, Metadata{CollectionInfo: collection.Info, fromLocal: true, Link: collectionPath}, collection)
+	}
+
 	// Scan local workspaces
 	for _, workspacePath := range s.conn.WorkspacePaths {
 		// check if zip file
@@ -157,20 +183,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		basename := path.Base(workspacePath)
 		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
 		s.scanLocalWorkspace(ctx, chunksChan, workspace, workspacePath)
-	}
-
-	// Scan local workspaces
-	for _, collectionPath := range s.conn.CollectionPaths {
-		collection := Collection{}
-		// open the file and read contents into collection
-		contents, err := os.ReadFile(collectionPath)
-		if err != nil {
-			return err
-		}
-		if err = json.Unmarshal(contents, &collection); err != nil {
-			return err
-		}
-		s.scanCollection(ctx, chunksChan, Metadata{CollectionInfo: collection.Info, fromLocal: true, Link: collectionPath}, collection)
 	}
 
 	// Scan workspaces
@@ -466,7 +478,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	}
 
 	if !m.fromLocal {
-		m.Link += "?tab=authorization"
+		m.Link += "?tab=auth"
 		m.Type += " > authorization"
 	}
 
