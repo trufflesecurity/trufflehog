@@ -589,15 +589,36 @@ func TestLineChecksNoStaged(t *testing.T) {
 }
 
 func TestBinaryPathParse(t *testing.T) {
+	ctx := context.Background()
 	cases := map[string]string{
-		"Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ\n":                                   "",
-		"Binary files /dev/null and b/plugin.sig differ\n":                                                             "plugin.sig",
-		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n":                                          " Lunch and Learn - HCDiag.pdf",
-		"Binary files /dev/null and \"b/assets/retailers/ON-ikony-Platforma-ecom \\342\\200\\224 kopia.png\" differ\n": "assets/retailers/ON-ikony-Platforma-ecom \\342\\200\\224 kopia.png",
+		"Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ\n":                                                                                         "",
+		"Binary files /dev/null and b/plugin.sig differ\n":                                                                                                                   "plugin.sig",
+		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n":                                                                                                " Lunch and Learn - HCDiag.pdf",
+		"Binary files /dev/null and \"b/assets/retailers/ON-ikony-Platforma-ecom \\342\\200\\224 kopia.png\" differ\n":                                                       "assets/retailers/ON-ikony-Platforma-ecom — kopia.png",
+		"Binary files /dev/null and \"b/\\346\\267\\261\\345\\272\\246\\345\\255\\246\\344\\271\\240500\\351\\227\\256-Tan-00\\347\\233\\256\\345\\275\\225.docx\" differ\n": "深度学习500问-Tan-00目录.docx",
 	}
 
 	for name, expected := range cases {
-		filename, ok := pathFromBinaryLine([]byte(name))
+		filename, ok := pathFromBinaryLine(ctx, []byte(name))
+		if !ok {
+			t.Errorf("Failed to get path: %s", name)
+		}
+		if filename != expected {
+			t.Errorf("Expected: %s, Got: %s", expected, filename)
+		}
+	}
+}
+
+func TestToFileLinePathParse(t *testing.T) {
+	ctx := context.Background()
+	cases := map[string]string{
+		"+++ /dev/null\n":      "",
+		"+++ b/embeds.xml\t\n": "embeds.xml",
+		"+++ \"b/C++/1 \\320\\243\\321\\200\\320\\276\\320\\272/B.c\"\t\n": "C++/1 Урок/B.c",
+	}
+
+	for name, expected := range cases {
+		filename, ok := pathFromToFileLine(ctx, []byte(name))
 		if !ok {
 			t.Errorf("Failed to get path: %s", name)
 		}
@@ -1336,7 +1357,29 @@ func TestMaxCommitSize(t *testing.T) {
 
 }
 
-const commitLog = `commit fd6e99e7a80199b76a694603be57c5ade1de18e7
+const commitLog = `commit e50b135fd29e91b2fbb25923797f5ecffe59f359
+Author: lionzxy <nikita@kulikof.ru>
+Date:   Wed Mar 1 18:20:04 2017 +0300
+
+    Все работает, но он не принимает :(
+
+diff --git "a/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml" "b/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml"
+index 85bfb17..89b08b5 100644
+--- "a/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml"
++++ "b/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml"
+@@ -29,8 +29,8 @@
+       <file leaf-file-name="CMakeLists.txt" pinned="false" current-in-tab="false">
+         <entry file="file://$PROJECT_DIR$/CMakeLists.txt">
+           <provider selected="true" editor-type-id="text-editor">
+-            <state relative-caret-position="0">
+-              <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
++            <state relative-caret-position="72">
++              <caret line="4" column="0" lean-forward="false" selection-start-line="4" selection-start-column="0" selection-end-line="4" selection-end-column="0" />
+               <folding />
+             </state>
+           </provider>
+
+commit fd6e99e7a80199b76a694603be57c5ade1de18e7
 Author: Jaliborc <jaliborc@gmail.com>
 Date:   Mon Apr 25 16:28:06 2011 +0100
 
@@ -1776,6 +1819,18 @@ func newStringBuilderValue(value string) strings.Builder {
 // This throws a nasty panic if it's a top-level var.
 func expectedDiffs() []*Diff {
 	return []*Diff{
+		{
+			PathB:     "C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml",
+			LineStart: 29,
+			Commit: &Commit{
+				Hash:    "e50b135fd29e91b2fbb25923797f5ecffe59f359",
+				Author:  "lionzxy <nikita@kulikof.ru>",
+				Date:    newTime("Wed Mar 1 18:20:04 2017 +0300"),
+				Message: newStringBuilderValue("Все работает, но он не принимает :(\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n            <state relative-caret-position=\"72\">\n              <caret line=\"4\" column=\"0\" lean-forward=\"false\" selection-start-line=\"4\" selection-start-column=\"0\" selection-end-line=\"4\" selection-end-column=\"0\" />\n\n\n\n")),
+			IsBinary:      false,
+		},
 		{
 			PathB:     "components/item.lua",
 			LineStart: 9,
