@@ -124,6 +124,7 @@ func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token st
 		res, err := client.Do(req)
 		if err != nil {
 			requestErr = err
+			continue
 		}
 
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
