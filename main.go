@@ -616,16 +616,13 @@ func parseResults(input *string) (map[string]struct{}, error) {
 		return nil, nil
 	}
 
-
 	var (
 		values  = strings.Split(strings.ToLower(*input), ",")
 		results = make(map[string]struct{}, 3)
 	)
 	for _, value := range values {
 		switch value {
-		case "verified":
-		case "unknown":
-		case "unverified":
+		case "verified", "unknown", "unverified":
 			results[value] = struct{}{}
 		default:
 			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified'", value)
