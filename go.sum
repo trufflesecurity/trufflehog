@@ -26,6 +26,8 @@ cloud.google.com/go/pubsub v1.0.1/go.mod h1:R0Gpsv3s54REJCy4fxDixWD93lHJMoZTyQ2k
 cloud.google.com/go/pubsub v1.1.0/go.mod h1:EwwdRX2sKPjnvnqCa270oGRyludottCI76h+R3AArQw=
 cloud.google.com/go/secretmanager v1.11.5 h1:82fpF5vBBvu9XW4qj0FU2C6qVMtj1RM/XHwKXUEAfYY=
 cloud.google.com/go/secretmanager v1.11.5/go.mod h1:eAGv+DaCHkeVyQi0BeXgAHOU0RdrMeZIASKc+S7VqH4=
+cloud.google.com/go/secretmanager v1.11.6 h1:xDFCr7AKz4VGPVtaWGOdeRoG7Al8q74qhPQZXW+7Mbw=
+cloud.google.com/go/secretmanager v1.11.6/go.mod h1:Y1Gne3Ag+fZ2TDTiJc8ZJCMFbi7k1rYT4Rw30GXfvlk=
 cloud.google.com/go/storage v1.0.0/go.mod h1:IhtSnM/ZTZV8YYJWCY8RULGVqBDmpoyjwiyrjsg+URw=
 cloud.google.com/go/storage v1.5.0/go.mod h1:tpKbwo567HUNpVclU5sGELwQWBDZ8gh0ZeosJ0Rtdos=
 cloud.google.com/go/storage v1.39.0 h1:brbjUa4hbDHhpQf48tjqMaXEV+f1OGoaTmQau9tmCsA=
@@ -1055,6 +1057,8 @@ google.golang.org/genproto/googleapis/api v0.0.0-20240221002015-b0ce06bbee7c h1:
 google.golang.org/genproto/googleapis/api v0.0.0-20240221002015-b0ce06bbee7c/go.mod h1:5iCWqnniDlqZHrd3neWVTOwvh/v6s3232omMecelax8=
 google.golang.org/genproto/googleapis/api v0.0.0-20240304161311-37d4d3c04a78 h1:SzXBGiWM1LNVYLCRP3e0/Gsze804l4jGoJ5lYysEO5I=
 google.golang.org/genproto/googleapis/api v0.0.0-20240304161311-37d4d3c04a78/go.mod h1:O1cOfN1Cy6QEYr7VxtjOyP5AdAuR0aJ/MYZaaof623Y=
+google.golang.org/genproto/googleapis/api v0.0.0-20240311132316-a219d84964c2 h1:rIo7ocm2roD9DcFIX67Ym8icoGCKSARAiPljFhh5suQ=
+google.golang.org/genproto/googleapis/api v0.0.0-20240311132316-a219d84964c2/go.mod h1:O1cOfN1Cy6QEYr7VxtjOyP5AdAuR0aJ/MYZaaof623Y=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20240304161311-37d4d3c04a78 h1:Xs9lu+tLXxLIfuci70nG4cpwaRC+mRQPUL7LoIeDJC4=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20240304161311-37d4d3c04a78/go.mod h1:UCOku4NytXMJuLQE5VuqA5lX3PcHCBo8pxNyvkf4xBs=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20240304212257-790db918fca8 h1:IR+hp6ypxjH24bkMfEJ0yHR21+gwPWdV+/IBrPQyn3k=
