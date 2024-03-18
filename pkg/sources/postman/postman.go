@@ -462,12 +462,14 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 			parsedURL, err := url.Parse(u.Raw)
 			if err != nil {
 				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
+				return
 			}
 
 			parsedURL.User = url.User(username + ":" + password)
 			decodedURL, err := url.PathUnescape(parsedURL.String())
 			if err != nil {
 				ctx.Logger().V(2).Info("error parsing URL in basic auth check", "url", u.Raw)
+				return
 			}
 			authData += decodedURL
 		}
