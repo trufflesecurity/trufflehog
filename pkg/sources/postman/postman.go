@@ -195,7 +195,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	for _, workspaceID := range s.conn.Workspaces {
 		w, err := s.client.GetWorkspace(workspaceID)
 		if err != nil {
-			return err
+			ctx.Logger().Error(err, "could not scan workspace:", workspaceID)
+			continue
 		}
 		s.scanWorkspace(ctx, chunksChan, w)
 	}
@@ -208,7 +209,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		collection, err := s.client.GetCollection(collectionID)
 		if err != nil {
-			return err
+			ctx.Logger().Error(err, "could not scan collection:", collectionID)
+			continue
 		}
 		s.scanCollection(ctx, chunksChan, Metadata{}, collection)
 	}
@@ -217,7 +219,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil && s.conn.GetToken() != "" {
 		workspaces, err := s.client.EnumerateWorkspaces()
 		if err != nil {
-			return err
+			return fmt.Errorf("error enumerating postman workspaces: %w", err)
 		}
 		for _, workspace := range workspaces {
 			s.scanWorkspace(ctx, chunksChan, workspace)
