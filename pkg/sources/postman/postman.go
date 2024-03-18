@@ -265,7 +265,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	ctx.Logger().V(2).Info("starting scanning global variables")
 	globalVars, err := s.client.GetGlobalVariables(workspace.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting global variables for workspace %s, %w", workspace.ID, err)
 	}
 
 	metadata.Type = GLOBAL_TYPE
@@ -279,7 +279,8 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	for _, envID := range workspace.Environments {
 		envVars, err := s.client.GetEnvironmentVariables(envID.UUID)
 		if err != nil {
-			return err
+			ctx.Logger().Error(err, "could not get env variables:", envID.UUID)
+			continue
 		}
 		if shouldSkip(envID.UUID, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
 			continue
