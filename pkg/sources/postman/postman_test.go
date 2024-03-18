@@ -22,8 +22,6 @@ func createTestSource(src *sourcespb.Postman) (*Source, *anypb.Any) {
 	return s, conn
 }
 
-//DetectorKeywords: []string{"keyword1", "keyword2"},
-
 func TestSource_Init(t *testing.T) {
 	s, conn := createTestSource(&sourcespb.Postman{
 		Credential: &sourcespb.Postman_Token{
