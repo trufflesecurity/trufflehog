@@ -17,12 +17,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/go-errors/errors"
-	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -42,11 +40,9 @@ type Source struct {
 	sourceId         sources.SourceID
 	jobId            sources.JobID
 	verify           bool
-	log              logr.Logger
-	jobPool          *errgroup.Group
 	client           *Client
 	conn             *sourcespb.Postman
-	detectorKeywords map[string]struct{}
+	DetectorKeywords map[string]struct{}
 
 	// Keywords are words that are discovered when we walk through postman data.
 	// These keywords are then injected into data that is sent to the detectors.
@@ -64,7 +60,7 @@ func (s *Source) addKeywords(keywords []string) {
 }
 
 func (s *Source) addKeyword(keyword string) {
-	if _, ok := s.detectorKeywords[keyword]; ok {
+	if _, ok := s.DetectorKeywords[keyword]; ok {
 		s.keywords[keyword] = struct{}{}
 	}
 }
@@ -93,12 +89,8 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.sourceId = sourceId
 	s.jobId = jobId
 	s.verify = verify
-	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
-	s.detectorKeywords = make(map[string]struct{})
 	s.keywords = make(map[string]struct{})
 	s.sub = NewSubstitution()
-	s.log = ctx.Logger()
 
 	var conn sourcespb.Postman
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
@@ -106,10 +98,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	}
 
 	s.conn = &conn
-
-	for _, key := range s.conn.DetectorKeywords {
-		s.detectorKeywords[key] = struct{}{}
-	}
 
 	switch conn.Credential.(type) {
 	case *sourcespb.Postman_Token:
@@ -171,13 +159,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			if err != nil {
 				return err
 			}
-			defer r.Close()
 			for _, file := range r.File {
 				rc, err := file.Open()
 				if err != nil {
 					return err
 				}
-				defer rc.Close()
 				contents, err := io.ReadAll(rc)
 				if err != nil {
 					return err
@@ -198,6 +184,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 					workspace.EnvironmentsRaw = append(workspace.EnvironmentsRaw, e)
 				}
 			}
+			r.Close()
 		}
 		basename := path.Base(workspacePath)
 		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
@@ -208,7 +195,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	for _, workspaceID := range s.conn.Workspaces {
 		w, err := s.client.GetWorkspace(workspaceID)
 		if err != nil {
-			s.log.Error(err, "could not get workspace object", "workspace_uuid", workspaceID)
+			return err
 		}
 		s.scanWorkspace(ctx, chunksChan, w)
 	}
@@ -221,7 +208,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		collection, err := s.client.GetCollection(collectionID)
 		if err != nil {
-			s.log.Error(err, "could not get collection object", "collection_uuid", collectionID)
+			return err
 		}
 		s.scanCollection(ctx, chunksChan, Metadata{}, collection)
 	}
@@ -230,8 +217,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil && s.conn.GetToken() != "" {
 		workspaces, err := s.client.EnumerateWorkspaces()
 		if err != nil {
-			ctx.Logger().Error(errors.New("Could not enumerate any workspaces for the API token provided"), "failed to scan postman")
-			return nil
+			return err
 		}
 		for _, workspace := range workspaces {
 			s.scanWorkspace(ctx, chunksChan, workspace)
@@ -260,7 +246,7 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 	}
 }
 
-func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) {
+func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) error {
 	// reset keywords for each workspace
 	s.resetKeywords()
 	s.addKeyword(workspace.Name)
@@ -277,7 +263,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	ctx.Logger().V(2).Info("starting scanning global variables")
 	globalVars, err := s.client.GetGlobalVariables(workspace.ID)
 	if err != nil {
-		s.log.Error(err, "could not get global variables object")
+		return err
 	}
 
 	metadata.Type = GLOBAL_TYPE
@@ -291,7 +277,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	for _, envID := range workspace.Environments {
 		envVars, err := s.client.GetEnvironmentVariables(envID.UUID)
 		if err != nil {
-			s.log.Error(err, "could not get environment object", "environment_uuid", envID.UUID)
+			return err
 		}
 		if shouldSkip(envID.UUID, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
 			continue
@@ -320,10 +306,11 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		}
 		collection, err := s.client.GetCollection(collectionID.UUID)
 		if err != nil {
-			s.log.Error(err, "could not get collection object", "collection_uuid", collectionID.UUID)
+			return err
 		}
 		s.scanCollection(ctx, chunksChan, metadata, collection)
 	}
+	return nil
 }
 
 // scanCollection scans a collection and all its items, folders, and requests.

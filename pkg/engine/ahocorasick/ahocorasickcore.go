@@ -38,7 +38,7 @@ type AhoCorasickCore struct {
 	// type and then again from detector type to detector. We could
 	// go straight from keywords to detectors but doing it this way makes
 	// some consuming code a little cleaner.)
-	KeywordsToDetectors map[string][]DetectorKey
+	keywordsToDetectors map[string][]DetectorKey
 	detectorsByKey      map[DetectorKey]detectors.Detector
 }
 
@@ -60,7 +60,7 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	}
 
 	return &AhoCorasickCore{
-		KeywordsToDetectors: keywordsToDetectors,
+		keywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
 		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
 	}
@@ -92,7 +92,7 @@ func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[D
 	uniqueDetectors := make([]DetectorInfo, 0, len(matches))
 
 	for _, m := range matches {
-		for _, k := range ac.KeywordsToDetectors[m.MatchString()] {
+		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
 			if _, exists := addedDetectors[k]; exists {
 				continue
 			}
@@ -122,4 +122,8 @@ func CreateDetectorKey(d detectors.Detector) DetectorKey {
 		customDetectorName = r.GetName()
 	}
 	return DetectorKey{detectorType: detectorType, version: version, customDetectorName: customDetectorName}
+}
+
+func (ac *AhoCorasickCore) KeywordsToDetectors() map[string][]DetectorKey {
+	return ac.keywordsToDetectors
 }

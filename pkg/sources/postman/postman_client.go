@@ -273,13 +273,13 @@ func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
 		err = fmt.Errorf("could not get workspaces")
 		return workspaces, err
 	}
-	r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("could not read response body for workspaces")
 		return workspaces, err
 	}
+	r.Body.Close()
 
 	if err := json.Unmarshal([]byte(body), &workspacesObj); err != nil {
 		err = fmt.Errorf("could not unmarshal workspaces JSON")
@@ -354,7 +354,6 @@ func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData,
 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
-		fmt.Println(err)
 		err = fmt.Errorf("could not get env variables for environment: %s", environment_uuid)
 		return VariableData{}, err
 	}
@@ -382,7 +381,6 @@ func (c *Client) GetCollection(collection_uuid string) (Collection, error) {
 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
-		fmt.Println(err)
 		err = fmt.Errorf("could not get collection: %s", collection_uuid)
 		return Collection{}, err
 	}

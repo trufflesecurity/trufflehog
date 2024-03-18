@@ -40,11 +40,10 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 	}
 
 	// Turn AhoCorasick keywordsToDetectors into a map of keywords
-	keywords := []string{}
-	for key := range e.ahoCorasickCore.KeywordsToDetectors {
-		keywords = append(keywords, key)
+	keywords := make(map[string]struct{})
+	for key := range e.ahoCorasickCore.KeywordsToDetectors() {
+		keywords[key] = struct{}{}
 	}
-	connection.DetectorKeywords = keywords
 
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
@@ -56,7 +55,9 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 	sourceName := "trufflehog - postman"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, postman.SourceType)
 
-	postmanSource := &postman.Source{}
+	postmanSource := &postman.Source{
+		DetectorKeywords: keywords,
+	}
 	if err := postmanSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return err
 	}

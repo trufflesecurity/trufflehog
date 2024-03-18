@@ -160,10 +160,10 @@ var (
 	postmanWorkspaces          = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag.").Strings()
 	postmanCollections         = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag.").Strings()
 	postmanEnvironments        = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
-	postmanIncludeCollections  = postmanScan.Flag("include-collections", "Collections to include in scan. Comma separated list of collections. You can repeat this flag.").Strings()
-	postmanIncludeEnvironments = postmanScan.Flag("include-environments", "Environments to include in scan. Comma separated list of environments. You can repeat this flag.").Strings()
-	postmanExcludeCollections  = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. Comma separated list of collections. You can repeat this flag.").Strings()
-	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. Comma separated list of environments. You can repeat this flag.").Strings()
+	postmanIncludeCollections  = postmanScan.Flag("include-collections", "Collections to include in scan. You can repeat this flag.").Strings()
+	postmanIncludeEnvironments = postmanScan.Flag("include-environments", "Environments to include in scan. You can repeat this flag.").Strings()
+	postmanExcludeCollections  = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. You can repeat this flag.").Strings()
+	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. You can repeat this flag.").Strings()
 	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
 	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
 	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
@@ -646,7 +646,6 @@ func parseResults(input *string) (map[string]struct{}, error) {
 	if *input == "" {
 		return nil, nil
 	}
-
 
 	var (
 		values  = strings.Split(strings.ToLower(*input), ",")
