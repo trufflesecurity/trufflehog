@@ -40,7 +40,7 @@ func TestSubstitution_Add(t *testing.T) {
 
 func TestSource_KeywordCombinations(t *testing.T) {
 	s := &Source{
-		detectorKeywords: map[string]struct{}{
+		DetectorKeywords: map[string]struct{}{
 			"keyword1": {},
 			"keyword2": {},
 		},
@@ -111,7 +111,7 @@ func TestRemoveDuplicateStr(t *testing.T) {
 
 func TestSource_FormatAndInjectKeywords(t *testing.T) {
 	s := &Source{
-		detectorKeywords: map[string]struct{}{
+		DetectorKeywords: map[string]struct{}{
 			"keyword1": {},
 			"keyword2": {},
 		},

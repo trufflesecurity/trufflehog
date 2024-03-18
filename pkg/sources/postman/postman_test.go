@@ -22,13 +22,18 @@ func createTestSource(src *sourcespb.Postman) (*Source, *anypb.Any) {
 	return s, conn
 }
 
+//DetectorKeywords: []string{"keyword1", "keyword2"},
+
 func TestSource_Init(t *testing.T) {
 	s, conn := createTestSource(&sourcespb.Postman{
-		DetectorKeywords: []string{"keyword1", "keyword2"},
 		Credential: &sourcespb.Postman_Token{
 			Token: "super secret token",
 		},
 	})
+	s.DetectorKeywords = map[string]struct{}{
+		"keyword1": {},
+		"keyword2": {},
+	}
 
 	err := s.Init(context.Background(), "test - postman", 0, 1, false, conn, 10)
 	if err != nil {
@@ -39,15 +44,15 @@ func TestSource_Init(t *testing.T) {
 		"keyword1": {},
 		"keyword2": {},
 	}
-	if !reflect.DeepEqual(s.detectorKeywords, expectedKeywords) {
-		t.Errorf("expected detector keywords: %v, got: %v", expectedKeywords, s.detectorKeywords)
+	if !reflect.DeepEqual(s.DetectorKeywords, expectedKeywords) {
+		t.Errorf("expected detector keywords: %v, got: %v", expectedKeywords, s.DetectorKeywords)
 	}
 }
 
 func TestSource_ScanCollection(t *testing.T) {
 	ctx := context.Background()
 	s := &Source{
-		detectorKeywords: map[string]struct{}{
+		DetectorKeywords: map[string]struct{}{
 			"keyword1": {},
 		},
 		keywords: map[string]struct{}{
@@ -154,7 +159,7 @@ func TestSource_ScanCollection(t *testing.T) {
 func TestSource_ScanVariableData(t *testing.T) {
 	ctx := context.Background()
 	s := &Source{
-		detectorKeywords: map[string]struct{}{
+		DetectorKeywords: map[string]struct{}{
 			"keyword1": {},
 		},
 		keywords: map[string]struct{}{
