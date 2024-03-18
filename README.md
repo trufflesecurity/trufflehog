@@ -435,11 +435,11 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
 
 ## Pre-commit Hook
 
-Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
+TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
 
 **Key Usage Note:**
 
-- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures Trufflehog analyzes all intended changes.
+- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures TruffleHog analyzes all intended changes.
 - **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
 
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
@@ -460,13 +460,13 @@ repos:
 
 ## Regex Detector (alpha)
 
-Trufflehog supports detection and verification of custom regular expressions.
+TruffleHog supports detection and verification of custom regular expressions.
 For detection, at least one **regular expression** and **keyword** is required.
 A **keyword** is a fixed literal string identifier that appears in or around
 the regex to be detected. To allow maximum flexibility for verification, a
 webhook is used containing the regular expression matches.
 
-Trufflehog will send a JSON POST request containing the regex matches to a
+TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
 status code, the secret is considered verified.
 
