@@ -660,10 +660,10 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 }
 
 func shouldSkip(uuid string, include []string, exclude []string) bool {
-	if len(include) > 0 && !slices.Contains(include, uuid) {
+	if slices.Contains(exclude, uuid) {
 		return true
 	}
-	if slices.Contains(exclude, uuid) {
+	if len(include) > 0 && !slices.Contains(include, uuid) {
 		return true
 	}
 	return false
