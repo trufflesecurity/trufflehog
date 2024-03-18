@@ -57,15 +57,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req, err := http.NewRequestWithContext(
 				ctx, "POST", "https://secret-scanning.maxmind.com/secrets/validate-license-key",
 				strings.NewReader(data.Encode()))
-			r.SetVerificationError(err, keyRes)
+			if err != nil {
+				r.SetVerificationError(err)
+				results = append(results, r)
+				continue
+			}
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					r.Verified = true
-				}
+			if err != nil {
+				r.SetVerificationError(err)
+			}
+			defer res.Body.Close()
+			if err == nil && res.StatusCode >= 200 && res.StatusCode < 300 {
+				r.Verified = true
 			}
 		}
 
