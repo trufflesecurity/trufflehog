@@ -281,7 +281,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	for _, envID := range workspace.Environments {
 		envVars, err := s.client.GetEnvironmentVariables(envID.UUID)
 		if err != nil {
-			ctx.Logger().Error(err, "could not get env variables:", envID.UUID)
+			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.UUID)
 			continue
 		}
 		if shouldSkip(envID.UUID, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
