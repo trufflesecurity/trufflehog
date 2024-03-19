@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			// We don't want to actually send anything to webhooks we find. To verify them without spamming them, we
 			// send an intentionally malformed message and look for a particular expected error message.
-			payload := strings.NewReader(`intentionally malformed JSON from Trufflehog scan`)
+			payload := strings.NewReader(`intentionally malformed JSON from TruffleHog scan`)
 			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 			if err != nil {
 				continue

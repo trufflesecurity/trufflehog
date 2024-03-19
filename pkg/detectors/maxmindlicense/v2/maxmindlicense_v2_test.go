@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package maxmindlicense_v2
+package maxmindlicense
 
 import (
 	"context"
@@ -54,6 +54,7 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+						"version":        "2",
 					},
 				},
 			},
@@ -74,6 +75,7 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+						"version":        "2",
 					},
 				},
 			},

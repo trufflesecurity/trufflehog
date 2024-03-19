@@ -280,6 +280,7 @@ message S3 {
   repeated string buckets = 3;
   int64 max_object_size = 6;
   repeated string roles = 7;
+  repeated string ignore_buckets = 8;
 }
 
 message Slack {

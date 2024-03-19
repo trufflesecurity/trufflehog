@@ -55,14 +55,15 @@ func TestGitHub_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Github,
 					Verified:     true,
 					ExtraData: map[string]string{
-						"account_type":   "User",
-						"company":        "",
-						"name":           "",
+						"account_type": "User",
+						// "company":        "", // not present in test verifiedGhp
+						// "name":           "", // not present in test verifiedGhp
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 						"scopes":         "notifications",
-						"site_admin":     "false",
-						"url":            "https://github.com/truffle-sandbox",
-						"username":       "truffle-sandbox",
+						// "site_admin":     "false", // not present in test verifiedGhp
+						"url":      "https://github.com/truffle-sandbox",
+						"username": "truffle-sandbox",
+						"version":  "2",
 					},
 				},
 			},
@@ -82,6 +83,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"version":        "2",
 					},
 				},
 			},
@@ -101,6 +103,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"version":        "2",
 					},
 				},
 			},
@@ -120,6 +123,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"version":        "2",
 					},
 				},
 			},
@@ -139,6 +143,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"version":        "2",
 					},
 				},
 			},
@@ -158,6 +163,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"version":        "2",
 					},
 				},
 			},
@@ -177,6 +183,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+						"version":        "2",
 					},
 				},
 			},
