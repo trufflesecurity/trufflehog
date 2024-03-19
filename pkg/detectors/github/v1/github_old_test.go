@@ -16,6 +16,8 @@ import (
 )
 
 func TestGitHub_FromChunk(t *testing.T) {
+	t.Skip("old tokens no longer valid, and no way to generate new ones")
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")

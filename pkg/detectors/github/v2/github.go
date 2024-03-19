@@ -2,9 +2,7 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -12,16 +10,21 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
 )
 
-type Scanner struct{ detectors.EndpointSetter }
+type Scanner struct {
+	v1.Scanner
+}
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
-var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.Detector = (*v1.Scanner)(nil)
+var _ detectors.Versioner = (*v1.Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*v1.Scanner)(nil)
 
-func (Scanner) Version() int            { return 2 }
+func (s Scanner) Version() int {
+	return 2
+}
 func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
 
 var (
@@ -35,18 +38,6 @@ var (
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
 )
-
-// TODO: Add secret context?? Information about access, ownership etc
-type userRes struct {
-	Login     string `json:"login"`
-	Type      string `json:"type"`
-	SiteAdmin bool   `json:"site_admin"`
-	Name      string `json:"name"`
-	Company   string `json:"company"`
-	UserURL   string `json:"html_url"`
-	// Included in GitHub Enterprise Server.
-	LdapDN string `json:"ldap_dn"`
-}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -79,60 +70,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			client := common.SaneHttpClient()
-			// https://developer.github.com/v3/users/#get-the-authenticated-user
-			for _, url := range s.Endpoints(s.DefaultEndpoint()) {
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/user", url), nil)
-				if err != nil {
-					continue
-				}
 
-				req.Header.Set("Content-Type", "application/json; charset=utf-8")
-				req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
-				res, err := client.Do(req)
-				if err == nil {
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						var userResponse userRes
-						err = json.NewDecoder(res.Body).Decode(&userResponse)
-						res.Body.Close()
-						if err == nil {
-							s1.Verified = true
-							s1.ExtraData["username"] = userResponse.Login
-							s1.ExtraData["url"] = userResponse.UserURL
-							s1.ExtraData["account_type"] = userResponse.Type
-							if userResponse.SiteAdmin {
-								s1.ExtraData["site_admin"] = "true"
-							}
-							if userResponse.Name != "" {
-								s1.ExtraData["name"] = userResponse.Name
-							}
-							if userResponse.Company != "" {
-								s1.ExtraData["company"] = userResponse.Company
-							}
-							if userResponse.LdapDN != "" {
-								s1.ExtraData["ldap_dn"] = userResponse.LdapDN
-							}
+			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, token)
 
-							// GitHub does not seem to consistently return this header.
-							scopes := res.Header.Get("X-OAuth-Scopes")
-							if scopes != "" {
-								s1.ExtraData["scopes"] = scopes
-							}
-							expiry := res.Header.Get("github-authentication-token-expiration")
-							if expiry != "" {
-								s1.ExtraData["expires_at"] = expiry
-							}
-						}
-					}
-				} else {
-					s1.SetVerificationError(err, token)
-				}
+			if userResponse != nil {
+				v1.SetUserResponse(userResponse, &s1)
+			}
+			if headers != nil {
+				v1.SetHeaderInfo(headers, &s1)
 			}
 		}
 
 		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
 			continue
 		}
-
 		results = append(results, s1)
 	}
 

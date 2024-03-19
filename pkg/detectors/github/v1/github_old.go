@@ -33,7 +33,7 @@ var (
 )
 
 // TODO: Add secret context?? Information about access, ownership etc
-type userRes struct {
+type UserRes struct {
 	Login     string `json:"login"`
 	Type      string `json:"type"`
 	SiteAdmin bool   `json:"site_admin"`
@@ -42,6 +42,11 @@ type userRes struct {
 	UserURL   string `json:"html_url"`
 	// Included in GitHub Enterprise Server.
 	LdapDN string `json:"ldap_dn"`
+}
+
+type HeaderInfo struct {
+	Scopes string `json:"X-OAuth-Scopes"`
+	Expiry string `json:"github-authentication-token-expiration"`
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -72,62 +77,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
-		}
-		s1.ExtraData = map[string]string{
-			"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
-			"version":        fmt.Sprintf("%d", s.Version()),
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
+				"version":        fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
 			client := common.SaneHttpClient()
-			// https://developer.github.com/v3/users/#get-the-authenticated-user
-			for _, url := range s.Endpoints(s.DefaultEndpoint()) {
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/user", url), nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Set("Content-Type", "application/json; charset=utf-8")
-				req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
-				res, err := client.Do(req)
-				if err == nil {
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						var userResponse userRes
-						err = json.NewDecoder(res.Body).Decode(&userResponse)
-						res.Body.Close()
-						if err == nil {
-							s1.Verified = true
 
-							if err == nil {
-								s1.Verified = true
-								s1.ExtraData["username"] = userResponse.Login
-								s1.ExtraData["url"] = userResponse.UserURL
-								s1.ExtraData["account_type"] = userResponse.Type
-								if userResponse.SiteAdmin {
-									s1.ExtraData["site_admin"] = "true"
-								}
-								if userResponse.Name != "" {
-									s1.ExtraData["name"] = userResponse.Name
-								}
-								if userResponse.Company != "" {
-									s1.ExtraData["company"] = userResponse.Company
-								}
-								if userResponse.LdapDN != "" {
-									s1.ExtraData["ldap_dn"] = userResponse.LdapDN
-								}
+			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, token)
 
-								// GitHub does not seem to consistently return this header.
-								scopes := res.Header.Get("X-OAuth-Scopes")
-								if scopes != "" {
-									s1.ExtraData["scopes"] = scopes
-								}
-								expiry := res.Header.Get("github-authentication-token-expiration")
-								if expiry != "" {
-									s1.ExtraData["expires_at"] = expiry
-								}
-							}
-						}
-					}
-				}
+			if userResponse != nil {
+				SetUserResponse(userResponse, &s1)
+			}
+			if headers != nil {
+				SetHeaderInfo(headers, &s1)
 			}
 		}
 
@@ -139,6 +106,68 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token string) (bool, *UserRes, *HeaderInfo, error) {
+	// https://developer.github.com/v3/users/#get-the-authenticated-user
+	var requestErr error
+	for _, url := range s.Endpoints(s.DefaultEndpoint()) {
+		requestErr = nil
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/user", url), nil)
+		if err != nil {
+			continue
+		}
+
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
+		res, err := client.Do(req)
+		if err != nil {
+			requestErr = err
+			continue
+		}
+
+		if res.StatusCode >= 200 && res.StatusCode < 300 {
+			var userResponse UserRes
+			err = json.NewDecoder(res.Body).Decode(&userResponse)
+			res.Body.Close()
+			if err == nil {
+				// GitHub does not seem to consistently return this header.
+				scopes := res.Header.Get("X-OAuth-Scopes")
+				expiry := res.Header.Get("github-authentication-token-expiration")
+				return true, &userResponse, &HeaderInfo{Scopes: scopes, Expiry: expiry}, nil
+			}
+		}
+	}
+	return false, nil, nil, requestErr
+}
+
+func SetUserResponse(userResponse *UserRes, s1 *detectors.Result) {
+	s1.ExtraData["username"] = userResponse.Login
+	s1.ExtraData["url"] = userResponse.UserURL
+	s1.ExtraData["account_type"] = userResponse.Type
+
+	if userResponse.SiteAdmin {
+		s1.ExtraData["site_admin"] = "true"
+	}
+	if userResponse.Name != "" {
+		s1.ExtraData["name"] = userResponse.Name
+	}
+	if userResponse.Company != "" {
+		s1.ExtraData["company"] = userResponse.Company
+	}
+	if userResponse.LdapDN != "" {
+		s1.ExtraData["ldap_dn"] = userResponse.LdapDN
+	}
+}
+
+func SetHeaderInfo(headers *HeaderInfo, s1 *detectors.Result) {
+	if headers.Scopes != "" {
+		s1.ExtraData["scopes"] = headers.Scopes
+	}
+	if headers.Expiry != "" {
+		s1.ExtraData["expiry"] = headers.Expiry
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
