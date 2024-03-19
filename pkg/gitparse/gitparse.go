@@ -424,10 +424,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isBinaryLine(latestState, line):
 			latestState = BinaryFileLine
 
-			path, ok := pathFromBinaryLine(line)
+			path, ok := pathFromBinaryLine(ctx, line)
 			if !ok {
 				err = fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
-				ctx.Logger().Error(err, "Failed to parse binary file line")
+				ctx.Logger().Error(err, "Failed to parse BinaryFileLine")
 				latestState = ParseFailure
 				continue
 			}
@@ -443,8 +443,15 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isToFileLine(latestState, line):
 			latestState = ToFileLine
 
-			// TODO: Is this fix still required?
-			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
+			path, ok := pathFromToFileLine(ctx, line)
+			if !ok {
+				err = fmt.Errorf(`expected line to match format '+++ b/path/to/file.go', got "%s"`, line)
+				ctx.Logger().Error(err, "Failed to parse ToFileLine")
+				latestState = ParseFailure
+				continue
+			}
+
+			currentDiff.PathB = path
 		case isHunkLineNumberLine(latestState, line):
 			latestState = HunkLineNumberLine
 
@@ -681,27 +688,35 @@ func isBinaryLine(latestState ParseState, line []byte) bool {
 }
 
 // Get the b/ file path. Ignoring the edge case of files having `and /b` in the name for simplicity.
-func pathFromBinaryLine(line []byte) (string, bool) {
+func pathFromBinaryLine(ctx context.Context, line []byte) (string, bool) {
 	if bytes.Contains(line, []byte("and /dev/null")) {
 		return "", true
 	}
 
-	_, after, ok := bytes.Cut(line, []byte(" and b/"))
-	if ok {
+	var path string
+	if _, after, ok := bytes.Cut(line, []byte(" and b/")); ok {
 		// drop the " differ\n"
-		return string(after[:len(after)-8]), true
-	}
+		path = string(after[:len(after)-8])
+	} else if _, after, ok = bytes.Cut(line, []byte(` and "b/`)); ok {
+		// Edge case where the path is quoted.
+		// https://github.com/trufflesecurity/trufflehog/issues/2384
 
-	// Edge case where the path is quoted.
-	// https://github.com/trufflesecurity/trufflehog/issues/2384
-	_, after, ok = bytes.Cut(line, []byte(` and "b/`))
-	if ok {
 		// drop the `" differ\n`
-		return string(after[:len(after)-9]), true
+		path = string(after[:len(after)-9])
+	} else {
+		// Unknown format.
+		return "", false
 	}
 
-	// Unknown format.
-	return "", false
+	// Handle escaped characters in the path, such as "\342\200\224" instead of "—".
+	// See https://github.com/trufflesecurity/trufflehog/issues/2418
+	unicodePath, err := strconv.Unquote(`"` + path + `"`)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to decode path", "path", path)
+		return path, true
+	}
+
+	return unicodePath, true
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
@@ -725,6 +740,42 @@ func isToFileLine(latestState ParseState, line []byte) bool {
 		return true
 	}
 	return false
+}
+
+// Get the b/ file path.
+func pathFromToFileLine(ctx context.Context, line []byte) (string, bool) {
+	// Normalize paths, as they can end in `\n`, `\t\n`, etc.
+	// See https://github.com/trufflesecurity/trufflehog/issues/1060
+	line = bytes.TrimSpace(line)
+
+	// File was deleted.
+	if bytes.Equal(line, []byte("+++ /dev/null")) {
+		return "", true
+	}
+
+	var path string
+	if _, after, ok := bytes.Cut(line, []byte("+++ b/")); ok {
+		path = string(after)
+	} else if _, after, ok = bytes.Cut(line, []byte(`+++ "b/`)); ok {
+		// Edge case where the path is quoted.
+		// e.g., `+++ "b/C++/1 \320\243\321\200\320\276\320\272/B.c"`
+
+		// drop the trailing `"`
+		path = string(after[:len(after)-1])
+	} else {
+		// Unknown format.
+		return "", false
+	}
+
+	// Handle escaped characters in the path, such as "\342\200\224" instead of "—".
+	// See https://github.com/trufflesecurity/trufflehog/issues/2418
+	unicodePath, err := strconv.Unquote(`"` + path + `"`)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to decode path", "path", path)
+		return path, true
+	}
+
+	return unicodePath, true
 }
 
 // @@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)
