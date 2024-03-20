@@ -165,6 +165,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 					return err
 				}
 				contents, err := io.ReadAll(rc)
+				rc.Close()
 				if err != nil {
 					return err
 				}
