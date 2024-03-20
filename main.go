@@ -153,6 +153,20 @@ var (
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
+
+	// Postman is hidden for now until we get more feedback from the community.
+	postmanScan                = cli.Command("postman", "Scan Postman").Hidden()
+	postmanToken               = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
+	postmanWorkspaces          = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag.").Strings()
+	postmanCollections         = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag.").Strings()
+	postmanEnvironments        = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
+	postmanIncludeCollections  = postmanScan.Flag("include-collections", "Collections to include in scan. You can repeat this flag.").Strings()
+	postmanIncludeEnvironments = postmanScan.Flag("include-environments", "Environments to include in scan. You can repeat this flag.").Strings()
+	postmanExcludeCollections  = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. You can repeat this flag.").Strings()
+	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. You can repeat this flag.").Strings()
+	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
+	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
+	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
 )
 
 func init() {
@@ -576,6 +590,23 @@ func run(state overseer.State) {
 		}
 		if err := e.ScanDocker(ctx, anyConn); err != nil {
 			logFatal(err, "Failed to scan Docker.")
+		}
+	case postmanScan.FullCommand():
+		cfg := sources.PostmanConfig{
+			Token:               *postmanToken,
+			Workspaces:          *postmanWorkspaces,
+			Collections:         *postmanCollections,
+			Environments:        *postmanEnvironments,
+			IncludeCollections:  *postmanIncludeCollections,
+			IncludeEnvironments: *postmanIncludeEnvironments,
+			ExcludeCollections:  *postmanExcludeCollections,
+			ExcludeEnvironments: *postmanExcludeEnvironments,
+			CollectionPaths:     *postmanCollectionPaths,
+			WorkspacePaths:      *postmanWorkspacePaths,
+			EnvironmentPaths:    *postmanEnvironmentPaths,
+		}
+		if err := e.ScanPostman(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Postman.")
 		}
 	}
 

@@ -45,6 +45,7 @@ enum SourceType {
   SOURCE_TYPE_GCS_UNAUTHED = 30;
   SOURCE_TYPE_AZURE_REPOS = 31;
   SOURCE_TYPE_TRAVISCI = 32;
+  SOURCE_TYPE_POSTMAN = 33;
 }
 
 message LocalSource {
@@ -380,3 +381,22 @@ message AzureRepos {
   bool skip_binaries = 12;
   bool skip_archives = 13;
 }
+
+message Postman {
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 1;
+    string token = 2;
+  }
+  repeated string workspaces = 3; 
+  repeated string collections = 4;
+  repeated string environments = 5;
+  repeated string exclude_collections = 6;
+  repeated string exclude_environments = 7; 
+  repeated string include_collections = 8;
+  repeated string include_environments = 9; 
+  repeated string detector_keywords = 10;
+  repeated string workspace_paths = 11;
+  repeated string collection_paths = 12;
+  repeated string environment_paths = 13;
+}
+ 
