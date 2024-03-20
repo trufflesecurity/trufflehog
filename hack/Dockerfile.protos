@@ -24,7 +24,7 @@ RUN set -e; \
 	wget -q https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VER}/protoc-${PROTOC_VER}-${TARGETOS}-${arch}.zip && unzip protoc-${PROTOC_VER}-${TARGETOS}-${arch}.zip -d /usr/local
 RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -; echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list; apt-get update; apt-get install -y google-cloud-cli
 RUN echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | tee /etc/apt/sources.list.d/goreleaser.list; \
-    apt-get update; apt-get install -y goreleaser-pro=${GORELEASER_VERSION} && rm -rf /var/lib/apt/lists/*
+    apt-get update; apt-get install -y goreleaser=${GORELEASER_VERSION} && rm -rf /var/lib/apt/lists/*
 RUN go install "github.com/golang/protobuf/protoc-gen-go@${PROTOC_GEN_GO_VER}"
 RUN go install gotest.tools/gotestsum@latest
 RUN git clone https://github.com/envoyproxy/protoc-gen-validate $GOPATH/src/github.com/envoyproxy/protoc-gen-validate && \
