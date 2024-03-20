@@ -17,6 +17,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+const canaryAccessKeyID = "AKIASP2TPHJSQH3FJRUX"
+
 var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
 
 func TestAWS_FromChunk(t *testing.T) {
@@ -49,7 +51,7 @@ func TestAWS_FromChunk(t *testing.T) {
 	}{
 		{
 			name: "found, verified",
-			s:    scanner{verifyCanaries: true},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
@@ -61,11 +63,11 @@ func TestAWS_FromChunk(t *testing.T) {
 					Verified:     true,
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
-						"resource_type":  "Access key",
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -73,7 +75,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified",
-			s:    scanner{verificationClient: unverifiedSecretClient, verifyCanaries: true},
+			s:    scanner{verificationClient: unverifiedSecretClient},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
@@ -87,6 +89,8 @@ func TestAWS_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
 						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -105,7 +109,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found two, one included for every ID found",
-			s:    scanner{verifyCanaries: true},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("The verified ID is %s with a secret of %s, but the unverified ID is %s and this is the secret %s", id, secret, inactiveID, inactiveSecret)),
@@ -119,6 +123,8 @@ func TestAWS_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
 						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 				{
@@ -126,11 +132,11 @@ func TestAWS_FromChunk(t *testing.T) {
 					Verified:     true,
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
-						"resource_type":  "Access key",
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -149,9 +155,7 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found two, returned both because the active secret for one paired with the inactive ID, despite the hash",
-			s: scanner{
-				verifyCanaries: true,
-			},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("The verified ID is %s with a secret of %s, but the unverified ID is %s and the secret is this hash %s", id, secret, inactiveID, hash)),
@@ -163,18 +167,23 @@ func TestAWS_FromChunk(t *testing.T) {
 					Verified:     true,
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
-						"resource_type":  "Access key",
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     inactiveID,
-					ExtraData:    map[string]string{"account": "171436882533", "resource_type": "Access key"},
+					ExtraData: map[string]string{
+						"account":       "171436882533",
+						"resource_type": "Access key",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+					},
 				},
 			},
 			wantErr: false,
@@ -183,7 +192,6 @@ func TestAWS_FromChunk(t *testing.T) {
 			name: "found, unverified, with leading +",
 			s: scanner{
 				verificationClient: unverifiedSecretClient,
-				verifyCanaries:     true,
 			},
 			args: args{
 				ctx:    context.Background(),
@@ -198,6 +206,8 @@ func TestAWS_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
 						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -221,7 +231,6 @@ func TestAWS_FromChunk(t *testing.T) {
 			name: "found, would be verified if not for http timeout",
 			s: scanner{
 				verificationClient: common.SaneHttpClientTimeOut(1 * time.Microsecond),
-				verifyCanaries:     true,
 			},
 			args: args{
 				ctx:    context.Background(),
@@ -236,6 +245,8 @@ func TestAWS_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
 						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -246,7 +257,6 @@ func TestAWS_FromChunk(t *testing.T) {
 			name: "found, unverified due to unexpected http response status",
 			s: scanner{
 				verificationClient: common.ConstantResponseHttpClient(500, "internal server error"),
-				verifyCanaries:     true,
 			},
 			args: args{
 				ctx:    context.Background(),
@@ -261,6 +271,8 @@ func TestAWS_FromChunk(t *testing.T) {
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
 						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -268,33 +280,56 @@ func TestAWS_FromChunk(t *testing.T) {
 			wantVerificationError: true,
 		},
 		{
-			name: "found, unverified due to unexpected 403 response reason",
-			s: scanner{
-				verificationClient: common.ConstantResponseHttpClient(403, `{"Error": {"Code": "SignatureDoesNotMatch"} }`),
-				verifyCanaries:     true,
-			},
+			name: "found, unverified due to invalid aws_secret with valid canary access_key_id",
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", inactiveSecret, canaryAccessKeyID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     canaryAccessKeyID,
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
 						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
 			wantErr:               false,
-			wantVerificationError: true,
+			wantVerificationError: false,
+		},
+		{
+			name: "found, valid canary token with no verification",
+			s:    scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, canaryAccessKeyID)),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     canaryAccessKeyID,
+					ExtraData: map[string]string{
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+					},
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: false,
 		},
 		{
 			name: "verified secret checked directly after unverified secret with same key id",
-			s:    scanner{verifyCanaries: true},
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("%s\n%s\n%s", inactiveSecret, id, secret)),
@@ -306,11 +341,11 @@ func TestAWS_FromChunk(t *testing.T) {
 					Verified:     true,
 					Redacted:     "AKIASP2TPHJSQH3FJRUX",
 					ExtraData: map[string]string{
-						"resource_type":  "Access key",
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -333,8 +368,13 @@ func TestAWS_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError %v, verification error = %v", tt.wantVerificationError, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := []cmp.Option{
+				cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError"),
+				cmpopts.SortSlices(func(x, y detectors.Result) bool {
+					return x.Redacted < y.Redacted
+				}),
+			}
+			if diff := cmp.Diff(got, tt.want, ignoreOpts...); diff != "" {
 				t.Errorf("AWS.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

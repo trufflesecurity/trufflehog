@@ -23,8 +23,8 @@ func TestFullstory_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FULLSTORY")
-	inactiveSecret := testSecrets.MustGetField("FULLSTORY_INACTIVE")
+	secret := testSecrets.MustGetField("FULLSTORY_V2")
+	inactiveSecret := testSecrets.MustGetField("FULLSTORY_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -50,6 +50,9 @@ func TestFullstory_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Fullstory,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"version": "2",
+					},
 				},
 			},
 			wantErr: false,
@@ -66,6 +69,9 @@ func TestFullstory_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Fullstory,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "2",
+					},
 				},
 			},
 			wantErr: false,

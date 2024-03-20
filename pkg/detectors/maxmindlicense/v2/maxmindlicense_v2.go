@@ -2,8 +2,9 @@ package maxmindlicense
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9]{2,7})\b`)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9A-Za-z]{16})\b`)
+	keyPat = regexp.MustCompile(`\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -29,7 +30,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"maxmind", "geoip"}
 }
 
-func (Scanner) Version() int { return 1 }
+func (Scanner) Version() int { return 2 }
 
 // FromData will find and optionally verify MaxMindLicense secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -47,13 +48,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			idRes := strings.TrimSpace(idMatch[1])
 
-			s1 := detectors.Result{
+			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MaxMindLicense,
 				Redacted:     idRes,
 				Raw:          []byte(keyRes),
-			}
-			s1.ExtraData = map[string]string{
-				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+				RawV2:        []byte(keyRes + idRes),
+				ExtraData: map[string]string{
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+					"version":        fmt.Sprintf("%d", s.Version()),
+				},
 			}
 
 			if verify {
@@ -66,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
+						s.Verified = true
 					} else {
 						if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
 							continue
@@ -75,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			results = append(results, s1)
+			results = append(results, s)
 		}
 	}
 

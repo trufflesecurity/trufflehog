@@ -267,9 +267,11 @@ Flags:
   -j, --json                Output in JSON format.
       --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
       --github-actions      Output in GitHub Actions format.
-      --concurrency=8       Number of concurrent workers.
+      --concurrency=20           Number of concurrent workers.
       --no-verification     Don't verify the results.
       --only-verified       Only output verified results.
+      --allow-verification-overlap
+                                 Allow verification of similar credentials across detectors
       --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
       --filter-entropy=FILTER-ENTROPY
                                  Filter unverified results with Shannon entropy. Start with 3.0.
@@ -279,6 +281,7 @@ Flags:
       --no-update           Don't check for updates.
       --fail                Exit with code 183 if results are found.
       --verifier=VERIFIER ...    Set custom verification endpoints.
+      --custom-verifiers-only   Only use custom verification endpoints.
       --archive-max-size=ARCHIVE-MAX-SIZE
                                  Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)
       --archive-max-depth=ARCHIVE-MAX-DEPTH
@@ -432,11 +435,11 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
 
 ## Pre-commit Hook
 
-Trufflehog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
+TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
 
 **Key Usage Note:**
 
-- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures Trufflehog analyzes all intended changes.
+- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures TruffleHog analyzes all intended changes.
 - **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
 
 An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
@@ -457,13 +460,13 @@ repos:
 
 ## Regex Detector (alpha)
 
-Trufflehog supports detection and verification of custom regular expressions.
+TruffleHog supports detection and verification of custom regular expressions.
 For detection, at least one **regular expression** and **keyword** is required.
 A **keyword** is a fixed literal string identifier that appears in or around
 the regex to be detected. To allow maximum flexibility for verification, a
 webhook is used containing the regular expression matches.
 
-Trufflehog will send a JSON POST request containing the regex matches to a
+TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
 status code, the secret is considered verified.
 

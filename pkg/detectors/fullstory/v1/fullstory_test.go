@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package maxmindlicense
+package fullstory
 
 import (
 	"context"
@@ -16,16 +16,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestMaxMindLicense_FromChunk(t *testing.T) {
+func TestFullstory_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAXMIND_LICENSE")
-	user := testSecrets.MustGetField("MAXMIND_USER")
-	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE")
+	secret := testSecrets.MustGetField("FULLSTORY")
+	inactiveSecret := testSecrets.MustGetField("FULLSTORY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -44,14 +43,16 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a geoip secret %s within with maxmind user %s", secret, user)),
+				data:   []byte(fmt.Sprintf("You can find a fullstory secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MaxMindLicense,
-					Redacted:     "510124",
+					DetectorType: detectorspb.DetectorType_Fullstory,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr: false,
@@ -61,14 +62,16 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a maxmind secret %s within with maxmind user %s", inactiveSecret, user)),
+				data:   []byte(fmt.Sprintf("You can find a fullstory secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_MaxMindLicense,
-					Redacted:     "510124",
+					DetectorType: detectorspb.DetectorType_Fullstory,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "1",
+					},
 				},
 			},
 			wantErr: false,
@@ -90,7 +93,7 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("MaxMindLicense.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Fullstory.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -100,7 +103,7 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("MaxMindLicense.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Fullstory.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

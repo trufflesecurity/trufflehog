@@ -14,13 +14,11 @@ type mysqlJDBC struct {
 	conn     string
 	userPass string
 	host     string
-	database string
 	params   string
 }
 
 func (s *mysqlJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "mysql", isMySQLErrorDeterminate,
-		buildMySQLConnectionString(s.host, s.database, s.userPass, s.params),
 		buildMySQLConnectionString(s.host, "", s.userPass, s.params))
 }
 
@@ -64,8 +62,7 @@ func parseMySQL(subname string) (jdbc, error) {
 			conn:     subname[2:],
 			userPass: cfg.User + ":" + cfg.Passwd,
 			host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
-			database: cfg.DBName,
-			params:   "timeout=5",
+			params:   "timeout=5s",
 		}, nil
 	}
 
@@ -74,8 +71,6 @@ func parseMySQL(subname string) (jdbc, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	dbName := strings.TrimPrefix(u.Path, "/")
 
 	user := "root"
 	pass := ""
@@ -100,7 +95,6 @@ func parseMySQL(subname string) (jdbc, error) {
 		conn:     subname[2:],
 		userPass: userAndPass,
 		host:     fmt.Sprintf("tcp(%s)", u.Host),
-		database: dbName,
 		params:   "timeout=5s",
 	}, nil
 
