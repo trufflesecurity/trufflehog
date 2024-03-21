@@ -60,8 +60,18 @@ func (s *Source) addKeywords(keywords []string) {
 }
 
 func (s *Source) addKeyword(keyword string) {
+	// fast check
 	if _, ok := s.DetectorKeywords[keyword]; ok {
 		s.keywords[keyword] = struct{}{}
+		return
+	}
+
+	// slow check. This is to handle the case where the keyword is a substring of a detector keyword
+	// e.g. "datadog-token" is a variable key in postman, but "datadog" is a detector keyword
+	for k := range s.DetectorKeywords {
+		if strings.Contains(keyword, k) {
+			s.keywords[k] = struct{}{}
+		}
 	}
 }
 
@@ -325,6 +335,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	ctx.Logger().V(2).Info("starting scanning collection", collection.Info.Name, "uuid", collection.Info.UID)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
+	s.addKeyword(collection.Info.Name)
 
 	if !metadata.fromLocal {
 		metadata.FullID = metadata.CollectionInfo.UID

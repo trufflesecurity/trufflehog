@@ -145,7 +145,6 @@ func TestSource_FormatAndInjectKeywords(t *testing.T) {
 		expected := strings.Split(tc.expected, "\n")
 		sort.Strings(got)
 		sort.Strings(expected)
-		// CHATGPT CHECK HERE
 
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Expected result: %q, got: %q", tc.expected, result)
