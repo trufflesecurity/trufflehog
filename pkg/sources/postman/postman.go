@@ -165,37 +165,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		// check if zip file
 		workspace := Workspace{}
 		if strings.HasSuffix(workspacePath, ".zip") {
-			r, err := zip.OpenReader(workspacePath)
+			var err error
+			workspace, err = unpackWorkspace(workspacePath)
 			if err != nil {
 				return err
 			}
-			for _, file := range r.File {
-				rc, err := file.Open()
-				if err != nil {
-					return err
-				}
-				contents, err := io.ReadAll(rc)
-				rc.Close()
-				if err != nil {
-					return err
-				}
-				if strings.Contains(file.Name, "collection") {
-					// read in the collection then scan it
-					c := Collection{}
-					if err = json.Unmarshal(contents, &c); err != nil {
-						return err
-					}
-					workspace.CollectionsRaw = append(workspace.CollectionsRaw, c)
-				}
-				if strings.Contains(file.Name, "environment") {
-					e := VariableData{}
-					if err = json.Unmarshal(contents, &e); err != nil {
-						return err
-					}
-					workspace.EnvironmentsRaw = append(workspace.EnvironmentsRaw, e)
-				}
-			}
-			r.Close()
 		}
 		basename := path.Base(workspacePath)
 		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
@@ -671,6 +645,45 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 		},
 		Verify: s.verify,
 	}
+}
+
+// unpackWorkspace unzips the provided zip file and scans the inflated files
+// for collections and environments. It populates the CollectionsRaw and
+// EnvironmentsRaw fields of the Workspace object.
+func unpackWorkspace(workspacePath string) (Workspace, error) {
+	var workspace Workspace
+	r, err := zip.OpenReader(workspacePath)
+	if err != nil {
+		return workspace, err
+	}
+	defer r.Close()
+	for _, file := range r.File {
+		rc, err := file.Open()
+		if err != nil {
+			return workspace, err
+		}
+		contents, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return workspace, err
+		}
+		if strings.Contains(file.Name, "collection") {
+			// read in the collection then scan it
+			var c Collection
+			if err = json.Unmarshal(contents, &c); err != nil {
+				return workspace, err
+			}
+			workspace.CollectionsRaw = append(workspace.CollectionsRaw, c)
+		}
+		if strings.Contains(file.Name, "environment") {
+			var e VariableData
+			if err = json.Unmarshal(contents, &e); err != nil {
+				return workspace, err
+			}
+			workspace.EnvironmentsRaw = append(workspace.EnvironmentsRaw, e)
+		}
+	}
+	return workspace, nil
 }
 
 func shouldSkip(uuid string, include []string, exclude []string) bool {
