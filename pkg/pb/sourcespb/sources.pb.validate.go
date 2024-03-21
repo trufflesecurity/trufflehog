@@ -4807,3 +4807,139 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = AzureReposValidationError{}
+
+// Validate checks the field values on Postman with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Postman) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Postman with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in PostmanMultiError, or nil if none found.
+func (m *Postman) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Postman) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch m.Credential.(type) {
+
+	case *Postman_Unauthenticated:
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PostmanValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PostmanValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PostmanValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Postman_Token:
+		// no validation rules for Token
+
+	}
+
+	if len(errors) > 0 {
+		return PostmanMultiError(errors)
+	}
+
+	return nil
+}
+
+// PostmanMultiError is an error wrapping multiple validation errors returned
+// by Postman.ValidateAll() if the designated constraints aren't met.
+type PostmanMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PostmanMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PostmanMultiError) AllErrors() []error { return m }
+
+// PostmanValidationError is the validation error returned by Postman.Validate
+// if the designated constraints aren't met.
+type PostmanValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PostmanValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PostmanValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PostmanValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PostmanValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PostmanValidationError) ErrorName() string { return "PostmanValidationError" }
+
+// Error satisfies the builtin error interface
+func (e PostmanValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPostman.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PostmanValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PostmanValidationError{}

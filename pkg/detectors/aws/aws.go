@@ -16,12 +16,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sns"
 )
 
 type scanner struct {
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
-	verifyCanaries     bool
 }
 
 // resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -93,12 +97,6 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 		}
 
 		s.skipIDs = ids
-	}
-}
-
-func WithVerifyCanaries() func(*scanner) {
-	return func(s *scanner) {
-		s.verifyCanaries = true
 	}
 }
 
@@ -180,20 +178,40 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				s1.ExtraData["account"] = account
 			}
-			if !s.verifyCanaries && !strings.Contains(dataStr, "Redacted: "+resIDMatch) {
-				if _, ok := thinkstCanaryList[account]; ok {
-					s1.ExtraData["is_canary"] = "true"
-					s1.ExtraData["message"] = thinkstMessage
-					s1.Verified = true
+			if _, ok := thinkstCanaryList[account]; ok {
+				s1.ExtraData["is_canary"] = "true"
+				s1.ExtraData["message"] = thinkstMessage
+				if verify {
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
+					if verified {
+						s1.Verified = true
+					}
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					if err != nil {
+						s1.SetVerificationError(err, resSecretMatch)
+					}
 				}
-				if _, ok := thinkstKnockoffsCanaryList[account]; ok {
-					s1.ExtraData["is_canary"] = "true"
-					s1.ExtraData["message"] = thinkstKnockoffsMessage
-					s1.Verified = true
+			}
+			if _, ok := thinkstKnockoffsCanaryList[account]; ok {
+				s1.ExtraData["is_canary"] = "true"
+				s1.ExtraData["message"] = thinkstKnockoffsMessage
+				if verify {
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
+					if verified {
+						s1.Verified = true
+					}
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					if err != nil {
+						s1.SetVerificationError(err, resSecretMatch)
+					}
 				}
 			}
 
-			if verify && !s1.Verified {
+			if verify && (s1.ExtraData["is_canary"] != "true") {
 				isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = isVerified
 				// It'd be good to log when calculated account value does not match
@@ -347,6 +365,38 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 		}
 	} else {
 		return false, nil, err
+	}
+}
+
+func (s scanner) verifyCanary(resIDMatch, resSecretMatch string) (bool, string, error) {
+	// Prep AWS Creds for SNS
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1"), // any region seems to work
+		Credentials: credentials.NewStaticCredentials(
+			resIDMatch,
+			resSecretMatch,
+			"",
+		),
+		HTTPClient: s.verificationClient,
+	}))
+	svc := sns.New(sess)
+
+	// Prep vars and Publish to SNS
+	_, err := svc.Publish(&sns.PublishInput{
+		Message:     aws.String("foo"),
+		PhoneNumber: aws.String("1"),
+	})
+
+	if strings.Contains(err.Error(), "not authorized to perform") {
+		arn := strings.Split(err.Error(), "User: ")[1]
+		arn = strings.Split(arn, " is not authorized to perform: ")[0]
+		return true, arn, nil
+	} else if strings.Contains(err.Error(), "does not match the signature you provided") {
+		return false, "", nil
+	} else if strings.Contains(err.Error(), "status code: 403") {
+		return false, "", nil
+	} else {
+		return false, "", err
 	}
 }
 

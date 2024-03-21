@@ -24,10 +24,11 @@ func (poolMetrics) recordBufferRetrival() {
 	bufferCount.Inc()
 }
 
-func (poolMetrics) recordBufferReturn(bufCap, bufLen int64) {
+func (poolMetrics) recordBufferReturn(buf *Buffer) {
 	activeBufferCount.Dec()
-	totalBufferSize.Add(float64(bufCap))
-	totalBufferLength.Add(float64(bufLen))
+	totalBufferSize.Add(float64(buf.Len()))
+	totalBufferLength.Add(float64(buf.Len()))
+	buf.recordMetric()
 }
 
 // PoolOpts is a function that configures a BufferPool.
@@ -73,7 +74,7 @@ func (p *Pool) Get(ctx context.Context) *Buffer {
 
 // Put returns a Buffer to the pool.
 func (p *Pool) Put(buf *Buffer) {
-	p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
+	p.metrics.recordBufferReturn(buf)
 
 	// If the Buffer is more than twice the default size, replace it with a new Buffer.
 	// This prevents us from returning very large buffers to the pool.
@@ -85,7 +86,6 @@ func (p *Pool) Put(buf *Buffer) {
 		// Reset the Buffer to clear any existing data.
 		buf.Reset()
 	}
-	buf.recordMetric()
 
 	p.Pool.Put(buf)
 }
@@ -151,7 +151,7 @@ func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
 		// which may require multiple allocations and copies if the size required is much larger
 		// than double the capacity. Our approach aligns with default behavior when growth sizes
 		// happen to match current capacity, retaining asymptotic efficiency benefits.
-		b.Buffer.Grow(growSize)
+		b.Grow(growSize)
 	}
 
 	return b.Buffer.Write(data)
