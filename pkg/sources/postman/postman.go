@@ -60,8 +60,18 @@ func (s *Source) addKeywords(keywords []string) {
 }
 
 func (s *Source) addKeyword(keyword string) {
+	// fast check
 	if _, ok := s.DetectorKeywords[keyword]; ok {
 		s.keywords[keyword] = struct{}{}
+		return
+	}
+
+	// slow check. This is to handle the case where the keyword is a substring of a detector keyword
+	// e.g. "datadog-token" is a variable key in postman, but "datadog" is a detector keyword
+	for k := range s.DetectorKeywords {
+		if strings.Contains(keyword, k) {
+			s.keywords[k] = struct{}{}
+		}
 	}
 }
 
@@ -155,37 +165,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		// check if zip file
 		workspace := Workspace{}
 		if strings.HasSuffix(workspacePath, ".zip") {
-			r, err := zip.OpenReader(workspacePath)
+			var err error
+			workspace, err = unpackWorkspace(workspacePath)
 			if err != nil {
 				return err
 			}
-			for _, file := range r.File {
-				rc, err := file.Open()
-				if err != nil {
-					return err
-				}
-				contents, err := io.ReadAll(rc)
-				rc.Close()
-				if err != nil {
-					return err
-				}
-				if strings.Contains(file.Name, "collection") {
-					// read in the collection then scan it
-					c := Collection{}
-					if err = json.Unmarshal(contents, &c); err != nil {
-						return err
-					}
-					workspace.CollectionsRaw = append(workspace.CollectionsRaw, c)
-				}
-				if strings.Contains(file.Name, "environment") {
-					e := VariableData{}
-					if err = json.Unmarshal(contents, &e); err != nil {
-						return err
-					}
-					workspace.EnvironmentsRaw = append(workspace.EnvironmentsRaw, e)
-				}
-			}
-			r.Close()
 		}
 		basename := path.Base(workspacePath)
 		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
@@ -325,6 +309,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	ctx.Logger().V(2).Info("starting scanning collection", collection.Info.Name, "uuid", collection.Info.UID)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
+	s.addKeyword(collection.Info.Name)
 
 	if !metadata.fromLocal {
 		metadata.FullID = metadata.CollectionInfo.UID
@@ -660,6 +645,45 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 		},
 		Verify: s.verify,
 	}
+}
+
+// unpackWorkspace unzips the provided zip file and scans the inflated files
+// for collections and environments. It populates the CollectionsRaw and
+// EnvironmentsRaw fields of the Workspace object.
+func unpackWorkspace(workspacePath string) (Workspace, error) {
+	var workspace Workspace
+	r, err := zip.OpenReader(workspacePath)
+	if err != nil {
+		return workspace, err
+	}
+	defer r.Close()
+	for _, file := range r.File {
+		rc, err := file.Open()
+		if err != nil {
+			return workspace, err
+		}
+		contents, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return workspace, err
+		}
+		if strings.Contains(file.Name, "collection") {
+			// read in the collection then scan it
+			var c Collection
+			if err = json.Unmarshal(contents, &c); err != nil {
+				return workspace, err
+			}
+			workspace.CollectionsRaw = append(workspace.CollectionsRaw, c)
+		}
+		if strings.Contains(file.Name, "environment") {
+			var e VariableData
+			if err = json.Unmarshal(contents, &e); err != nil {
+				return workspace, err
+			}
+			workspace.EnvironmentsRaw = append(workspace.EnvironmentsRaw, e)
+		}
+	}
+	return workspace, nil
 }
 
 func shouldSkip(uuid string, include []string, exclude []string) bool {
