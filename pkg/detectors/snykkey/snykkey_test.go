@@ -124,6 +124,11 @@ func TestSnykKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SnykKey,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"Email":         "rendyplayground@gmail.com",
+						"Organizations": "rendyplayground",
+						"Username":      "rendyplayground",
+					},
 				},
 			},
 			wantErr: false,
