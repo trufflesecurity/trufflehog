@@ -1,4 +1,4 @@
-package dockerhubv2
+package dockerhub
 
 import (
 	"context"
@@ -33,13 +33,13 @@ var (
 	emailPat    = regexp.MustCompile(`(` + common.EmailPattern + `)`)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
+	accessTokenPat = regexp.MustCompile(`\b(dckr_pat_[a-zA-Z0-9_-]{27})(?:[^a-zA-Z0-9_-]|\z)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"docker"}
+	return []string{"dckr_pat_"}
 }
 
 // FromData will find and optionally verify Dockerhub secrets in a given set of bytes.
