@@ -20,6 +20,10 @@ func NewScanErrors() *ScanErrors {
 
 // Add an error to the collection in a thread-safe manner.
 func (s *ScanErrors) Add(err error) {
+	if err == nil {
+		return
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.errors = append(s.errors, err)

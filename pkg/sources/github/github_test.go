@@ -433,18 +433,23 @@ func TestEnumerate(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
+
+	gock.New("https://api.github.com").
+		Get("/repos/super-secret-user/super-secret-repo").
+		Reply(200).
+		JSON(`{"owner": {"login": "super-secret-user"}, "name": "super-secret-repo", "full_name": "super-secret-user/super-secret-repo", "has_wiki": false, "size": 1}`)
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		MatchParam("per_page", "100").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git", "id": "super-secret-gist"}})
+		JSON(`[{"git_pull_url": "https://gist.github.com/2801a2b0523099d0614a951579d99ba9.git", "id": "2801a2b0523099d0614a951579d99ba9"}]`)
 
 	s := initTestSource(&sourcespb.GitHub{
 		Credential: &sourcespb.GitHub_Token{
@@ -455,9 +460,9 @@ func TestEnumerate(t *testing.T) {
 	_, err := s.enumerate(context.Background(), "https://api.github.com")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
 	assert.True(t, ok)
-	ok = s.filteredRepoCache.Exists("super-secret-gist")
+	ok = s.filteredRepoCache.Exists("2801a2b0523099d0614a951579d99ba9")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
