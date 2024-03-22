@@ -208,7 +208,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub"
+	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
+	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -1538,7 +1539,7 @@ func DefaultDetectors() []detectors.Detector {
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
 		opsgenie.Scanner{},
-		dockerhub.Scanner{},
+		dockerhubv1.Scanner{},
 		couchbase.Scanner{},
 		envoyapikey.Scanner{},
 		github_oauth2.Scanner{},
@@ -1591,8 +1592,9 @@ func DefaultDetectors() []detectors.Detector {
 		// azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		azuredevopspersonalaccesstoken.Scanner{},
 		azuresearchadminkey.Scanner{},
-		&azuresearchquerykey.Scanner{},
-		&googleoauth2.Scanner{},
+		azuresearchquerykey.Scanner{},
+		googleoauth2.Scanner{},
+		dockerhubv2.Scanner{},
 	}
 
 }
