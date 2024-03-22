@@ -23,8 +23,8 @@ func TestMaxMindLicense(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAXMIND_LICENSE")
-	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE")
+	secret := testSecrets.MustGetField("MAXMIND_LICENSE_V2")
+	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE_V2")
 
 	type args struct {
 		ctx    context.Context
@@ -49,7 +49,6 @@ func TestMaxMindLicense(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_MaxMindLicense,
-					Redacted:     "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",
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
@@ -70,7 +69,6 @@ func TestMaxMindLicense(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_MaxMindLicense,
-					Redacted:     "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",
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
