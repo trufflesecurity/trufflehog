@@ -29,6 +29,9 @@ import (
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
 
+// This is the URL for gitlab hosted at gitlab.com
+const gitlabBaseURL = "https://gitlab.com/"
+
 type Source struct {
 	name     string
 	sourceID sources.SourceID
@@ -87,6 +90,10 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
+	if err := git.CmdCheck(); err != nil {
+		return err
+	}
+
 	var conn sourcespb.GitLab
 	err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
@@ -95,11 +102,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	s.repos = conn.Repositories
 	s.ignoreRepos = conn.IgnoreRepos
-	s.url = conn.Endpoint
 
-	if conn.Endpoint != "" && !strings.HasSuffix(s.url, "/") {
-		s.url = s.url + "/"
-	}
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.GitLab_Token:
 		s.authMethod = "TOKEN"
@@ -118,12 +121,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		return fmt.Errorf("invalid configuration given for source %q (%s)", name, s.Type().String())
 	}
 
-	if len(s.url) == 0 {
-		// Assuming not custom gitlab url.
-		s.url = "https://gitlab.com/"
-	}
-
-	err = git.CmdCheck()
+	s.url, err = normalizeGitlabEndpoint(conn.Endpoint)
 	if err != nil {
 		return err
 	}
@@ -160,11 +158,18 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	// Start client.
 	apiClient, err := s.newClient()
 	if err != nil {
 		return err
+	}
+
+	// If targets are provided, we're only scanning the data in those targets.
+	// Otherwise, we're scanning all data.
+	// This allows us to only scan the commit where a vulnerability was found.
+	if len(targets) > 0 {
+		return s.scanTargets(ctx, apiClient, targets, chunksChan)
 	}
 
 	gitlabReposScanned.WithLabelValues(s.name).Set(0)
@@ -186,7 +191,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		})
 		reporter := sources.VisitorReporter{
 			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
-				repos = append(repos, unit.SourceUnitID())
+				id, _ := unit.SourceUnitID()
+				repos = append(repos, id)
 				return ctx.Err()
 			},
 		}
@@ -201,6 +207,62 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	slices.Sort(s.repos)
 
 	return s.scanRepos(ctx, chunksChan)
+}
+
+func (s *Source) scanTargets(ctx context.Context, client *gitlab.Client, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	ctx = context.WithValues(ctx, "scan_type", "targeted")
+	for _, tgt := range targets {
+		if err := s.scanTarget(ctx, client, tgt, chunksChan); err != nil {
+			ctx.Logger().Error(err, "error scanning target")
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) scanTarget(ctx context.Context, client *gitlab.Client, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Gitlab)
+	if !ok {
+		return fmt.Errorf("unable to cast metadata type for targeted scan")
+	}
+	meta := metaType.Gitlab
+	projID, sha := int(meta.GetProjectId()), meta.GetCommit()
+	if projID == 0 || sha == "" {
+		return fmt.Errorf("project ID and commit SHA must be provided for targeted scan")
+	}
+
+	aCtx := context.WithValues(ctx, "project_id", projID, "commit", sha)
+
+	diffs, _, err := client.Commits.GetCommitDiff(projID, sha, new(gitlab.GetCommitDiffOptions), gitlab.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("error fetching diffs for commit %s: %w", sha, err)
+	}
+
+	for _, diff := range diffs {
+		if diff.Diff == "" {
+			aCtx.Logger().V(4).Info("skipping empty diff", "file", diff.NewPath)
+			continue
+		}
+
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			SecretID:   target.SecretID,
+			Data:       []byte(diff.Diff),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Gitlab{Gitlab: meta},
+			},
+			Verify: s.verify,
+		}
+
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Source) Validate(ctx context.Context) []error {
@@ -255,7 +317,8 @@ func (s *Source) Validate(ctx context.Context) []error {
 	var repos []string
 	visitor := sources.VisitorReporter{
 		VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
-			repos = append(repos, unit.SourceUnitID())
+			id, _ := unit.SourceUnitID()
+			repos = append(repos, id)
 			return nil
 		},
 	}
@@ -362,7 +425,7 @@ func (s *Source) getAllProjectRepos(
 				continue
 			}
 			// Report the unit.
-			unit := sources.CommonSourceUnit{ID: proj.HTTPURLToRepo}
+			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
@@ -401,8 +464,8 @@ func (s *Source) getAllProjectRepos(
 		TopLevelOnly: gitlab.Ptr(false),
 		Owned:        gitlab.Ptr(false),
 	}
-	const cloudBaseURL = "https://gitlab.com/"
-	if s.url != cloudBaseURL {
+
+	if s.url != gitlabBaseURL {
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
@@ -588,6 +651,46 @@ func normalizeRepos(repos []string) ([]string, []error) {
 	return validRepos, errs
 }
 
+// normalizeGitlabEndpoint ensures that if an endpoint is going to gitlab.com, we use https://gitlab.com/ as the endpoint.
+// If we see the protocol is http, we error, because this shouldn't be used.
+// Otherwise, it ensures we are using https as our protocol, if none was provided.
+func normalizeGitlabEndpoint(gitlabEndpoint string) (string, error) {
+	if gitlabEndpoint == "" {
+		return gitlabBaseURL, nil
+	}
+
+	gitlabURL, err := url.Parse(gitlabEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	// We probably didn't receive a URL with a scheme, which messed up the parsing.
+	if gitlabURL.Host == "" {
+		gitlabURL, err = url.Parse("https://" + gitlabEndpoint)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// If the host is gitlab.com, this is the cloud version, which has only one valid endpoint.
+	if gitlabURL.Host == "gitlab.com" {
+		return gitlabBaseURL, nil
+	}
+
+	// Beyond here, on-prem gitlab is being used, so we have to mostly leave things as-is.
+
+	if gitlabURL.Scheme != "https" {
+		return "", fmt.Errorf("https was not used as URL scheme, but is required. Please use https")
+	}
+
+	// The gitlab library wants trailing slashes.
+	if !strings.HasSuffix(gitlabURL.Path, "/") {
+		gitlabURL.Path = gitlabURL.Path + "/"
+	}
+
+	return gitlabURL.String(), nil
+}
+
 // Enumerate reports all GitLab repositories to be scanned to the reporter. If
 // none are configured, it will find all repositories within all projects that
 // the configured user has access to, while respecting the configured ignore
@@ -616,7 +719,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// Report all repos if specified.
 	if len(repos) > 0 {
 		for _, repo := range repos {
-			unit := sources.CommonSourceUnit{ID: repo}
+			unit := git.SourceUnit{Kind: git.UnitRepo, ID: repo}
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
@@ -635,7 +738,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	repoURL := unit.SourceUnitID()
+	repoURL, _ := unit.SourceUnitID()
 
 	var path string
 	var repo *gogit.Repository

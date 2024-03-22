@@ -54,6 +54,9 @@ func TestMongoDB_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_MongoDB,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+					},
 				},
 			},
 			wantErr: false,
@@ -70,6 +73,9 @@ func TestMongoDB_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_MongoDB,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+					},
 				},
 			},
 			wantErr: false,
@@ -86,6 +92,9 @@ func TestMongoDB_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_MongoDB,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+					},
 				},
 			},
 			wantErr:             false,
@@ -103,6 +112,9 @@ func TestMongoDB_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_MongoDB,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+					},
 				},
 			},
 			wantErr:             false,

@@ -32,7 +32,7 @@ func TestBufferedFileWriterNewThreshold(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(tc.options...)
+			writer := New(context.Background(), tc.options...)
 			assert.Equal(t, tc.expectedThreshold, writer.threshold)
 			// The state should always be writeOnly when created.
 			assert.Equal(t, writeOnly, writer.state)
@@ -77,7 +77,7 @@ func TestBufferedFileWriterString(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			writer := New(WithThreshold(tc.threshold))
+			writer := New(ctx, WithThreshold(tc.threshold))
 			// First write, should go to file if it exceeds the threshold.
 			_, err := writer.Write(ctx, tc.input)
 			assert.NoError(t, err)
@@ -109,7 +109,7 @@ func BenchmarkBufferedFileWriterString_BufferOnly_Small(b *testing.B) {
 	data := bytes.Repeat([]byte("a"), smallBuffer)
 
 	ctx := context.Background()
-	writer := New()
+	writer := New(ctx)
 
 	_, err := writer.Write(ctx, data)
 	assert.NoError(b, err)
@@ -127,7 +127,7 @@ func BenchmarkBufferedFileWriterString_BufferOnly_Small(b *testing.B) {
 func BenchmarkBufferedFileWriterString_BufferOnly_Medium(b *testing.B) {
 	data := bytes.Repeat([]byte("a"), mediumBuffer)
 	ctx := context.Background()
-	writer := New()
+	writer := New(ctx)
 
 	_, err := writer.Write(ctx, data)
 	assert.NoError(b, err)
@@ -146,7 +146,7 @@ func BenchmarkBufferedFileWriterString_OnlyFile_Small(b *testing.B) {
 	data := bytes.Repeat([]byte("a"), smallFile)
 
 	ctx := context.Background()
-	writer := New()
+	writer := New(ctx)
 
 	_, err := writer.Write(ctx, data)
 	assert.NoError(b, err)
@@ -165,7 +165,7 @@ func BenchmarkBufferedFileWriterString_OnlyFile_Medium(b *testing.B) {
 	data := bytes.Repeat([]byte("a"), mediumFile)
 
 	ctx := context.Background()
-	writer := New()
+	writer := New(ctx)
 
 	_, err := writer.Write(ctx, data)
 	assert.NoError(b, err)
@@ -184,7 +184,7 @@ func BenchmarkBufferedFileWriterString_BufferWithFile_Small(b *testing.B) {
 	data := bytes.Repeat([]byte("a"), smallFile)
 
 	ctx := context.Background()
-	writer := New()
+	writer := New(ctx)
 
 	_, err := writer.Write(ctx, data)
 	assert.NoError(b, err)
@@ -207,7 +207,7 @@ func BenchmarkBufferedFileWriterString_BufferWithFile_Medium(b *testing.B) {
 	data := bytes.Repeat([]byte("a"), mediumFile)
 
 	ctx := context.Background()
-	writer := New()
+	writer := New(ctx)
 
 	_, err := writer.Write(ctx, data)
 	assert.NoError(b, err)
@@ -252,7 +252,7 @@ func TestBufferedFileWriterLen(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New()
+			writer := New(context.Background())
 			_, err := writer.Write(context.Background(), tc.input)
 			assert.NoError(t, err)
 
@@ -270,7 +270,7 @@ func TestBufferedFileWriterWriteWithinThreshold(t *testing.T) {
 	ctx := context.Background()
 	data := []byte("hello world")
 
-	writer := New(WithThreshold(64))
+	writer := New(ctx, WithThreshold(64))
 	_, err := writer.Write(ctx, data)
 	assert.NoError(t, err)
 
@@ -285,7 +285,7 @@ func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 	ctx := context.Background()
 	data := []byte("hello world")
 
-	writer := New(WithThreshold(5))
+	writer := New(ctx, WithThreshold(5))
 	_, err := writer.Write(ctx, data)
 	assert.NoError(t, err)
 
@@ -311,7 +311,7 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	subsequentData := []byte("subsequent data")
 
 	// Initialize writer with a threshold that initialData will exceed.
-	writer := New(WithThreshold(uint64(len(initialData) - 1)))
+	writer := New(ctx, WithThreshold(uint64(len(initialData)-1)))
 	_, err := writer.Write(ctx, initialData)
 	assert.NoError(t, err)
 
@@ -398,7 +398,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(WithThreshold(threshold))
+			writer := New(ctx, WithThreshold(threshold))
 
 			tc.prepareWriter(writer)
 
@@ -420,7 +420,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 
 func TestBufferedFileWriterStateTransitionOnClose(t *testing.T) {
 	t.Parallel()
-	writer := New()
+	writer := New(context.Background())
 
 	// Initially, the writer should be in write-only mode.
 	assert.Equal(t, writeOnly, writer.state)
@@ -439,7 +439,7 @@ func TestBufferedFileWriterStateTransitionOnClose(t *testing.T) {
 
 func TestBufferedFileWriterWriteInReadOnlyState(t *testing.T) {
 	t.Parallel()
-	writer := New()
+	writer := New(context.Background())
 	_ = writer.CloseForWriting() // Transition to read-only mode
 
 	// Attempt to write in read-only mode.
@@ -458,7 +458,7 @@ func BenchmarkBufferedFileWriterWriteLarge(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		// Threshold is smaller than the data size, data should get flushed to the file.
-		writer := New(WithThreshold(1024))
+		writer := New(ctx, WithThreshold(1024))
 
 		b.StartTimer()
 		{
@@ -488,7 +488,7 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		// Threshold is the same as the buffer size, data should always be written to the buffer.
-		writer := New(WithThreshold(1024 * 1024))
+		writer := New(ctx, WithThreshold(1024*1024))
 
 		b.StartTimer()
 		{

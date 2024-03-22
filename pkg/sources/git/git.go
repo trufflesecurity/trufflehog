@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -420,7 +421,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
-	safeURL, err := stripPassword(params.gitURL)
+	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
 		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
 	}
@@ -432,17 +433,24 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	)
 
 	// Execute command and wait for the stdout / stderr.
-	output, err := cloneCmd.CombinedOutput()
+	outputBytes, err := cloneCmd.CombinedOutput()
+	var output string
+	if secretForRedaction != "" {
+		output = strings.ReplaceAll(string(outputBytes), secretForRedaction, "<secret>")
+	} else {
+		output = string(outputBytes)
+	}
+
 	if err != nil {
 		err = fmt.Errorf("error executing git clone: %w", err)
 	}
-	logger.V(3).Info("git subcommand finished", "output", string(output))
+	logger.V(3).Info("git subcommand finished", "output", output)
 
 	if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
+		logger.V(1).Info("git clone failed", "output", output, "error", err)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
@@ -522,6 +530,18 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		repoCtx = context.WithValue(ctx, "repo", path)
 	}
 
+	logger := repoCtx.Logger()
+	var logValues []any
+	if scanOptions.BaseHash != "" {
+		logValues = append(logValues, "base", scanOptions.BaseHash)
+	}
+	if scanOptions.HeadHash != "" {
+		logValues = append(logValues, "head", scanOptions.HeadHash)
+	}
+	if scanOptions.MaxDepth > 0 {
+		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
+	}
+
 	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
@@ -532,14 +552,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	gitDir := filepath.Join(path, gitDirName)
 
-	logger := repoCtx.Logger()
-	var logValues []any
-	if scanOptions.BaseHash != "" {
-		logValues = append(logValues, "base", scanOptions.BaseHash)
-	}
-	if scanOptions.HeadHash != "" {
-		logValues = append(logValues, "head", scanOptions.HeadHash)
-	}
 	logger.V(1).Info("scanning repo", logValues...)
 
 	var depth int64
@@ -551,17 +563,16 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		}
 
 		fullHash := diff.Commit.Hash
-		if !strings.EqualFold(fullHash, lastCommitHash) {
+		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
+			logger.V(1).Info("reached base commit", "commit", fullHash)
+			break
+		}
+
+		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 			logger.V(5).Info("scanning commit", "commit", fullHash)
-		}
-		if len(scanOptions.BaseHash) > 0 {
-			if fullHash == scanOptions.BaseHash {
-				logger.V(1).Info("reached base commit", "commit", fullHash)
-				break
-			}
 		}
 
 		if !scanOptions.Filter.Pass(diff.PathB) {
@@ -621,7 +632,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			defer reader.Close()
 
 			data := make([]byte, d.Len())
-			if _, err := reader.Read(data); err != nil {
+			if _, err := io.ReadFull(reader, data); err != nil {
 				ctx.Logger().Error(
 					err, "error reading diff content for commit",
 					"filename", fileName,
@@ -733,7 +744,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	// Get the URL metadata for reporting (may be empty).
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
-	diffChan, err := gitparse.NewParser().Staged(ctx, path)
+	diffChan, err := s.parser.Staged(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -743,6 +754,19 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	reachedBase := false
 	gitDir := filepath.Join(path, gitDirName)
+
+	logger := ctx.Logger()
+	var logValues []any
+	if scanOptions.BaseHash != "" {
+		logValues = append(logValues, "base", scanOptions.BaseHash)
+	}
+	if scanOptions.HeadHash != "" {
+		logValues = append(logValues, "head", scanOptions.HeadHash)
+	}
+	if scanOptions.MaxDepth > 0 {
+		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
+	}
+	logger.V(1).Info("scanning repo", logValues...)
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 
@@ -758,21 +782,19 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			break
 		}
 
-		if !strings.EqualFold(fullHash, lastCommitHash) {
+		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 		}
 
-		if reachedBase && !strings.EqualFold(fullHash, scanOptions.BaseHash) {
+		if reachedBase && fullHash != scanOptions.BaseHash {
 			break
 		}
 
-		if len(scanOptions.BaseHash) > 0 {
-			if strings.EqualFold(fullHash, scanOptions.BaseHash) {
-				logger.V(1).Info("reached base hash, finishing scanning files")
-				reachedBase = true
-			}
+		if scanOptions.BaseHash != "" && fullHash == scanOptions.BaseHash {
+			logger.V(1).Info("reached base hash, finishing scanning files")
+			reachedBase = true
 		}
 
 		if !scanOptions.Filter.Pass(diff.PathB) {
@@ -964,19 +986,24 @@ func resolveHash(repo *git.Repository, ref string) (string, error) {
 	return resolved.String(), nil
 }
 
-func stripPassword(u string) (string, error) {
+// stripPassword removes username:password contents from URLs. The first return value is the cleaned URL and the second
+// is the password that was returned, if any. Callers can therefore use this function to identify secret material to
+// redact elsewhere. If the argument begins with git@, it is returned unchanged, and the returned password is the empty
+// string. If the argument is otherwise not parseable by url.Parse, an error is returned.
+func stripPassword(u string) (string, string, error) {
 	if strings.HasPrefix(u, "git@") {
-		return u, nil
+		return u, "", nil
 	}
 
 	repoURL, err := url.Parse(u)
 	if err != nil {
-		return "", fmt.Errorf("repo remote is not a URI: %w", err)
+		return "", "", fmt.Errorf("repo remote is not a URI: %w", err)
 	}
 
+	password, _ := repoURL.User.Password()
 	repoURL.User = nil
 
-	return repoURL.String(), nil
+	return repoURL.String(), password, nil
 }
 
 // TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
@@ -1138,7 +1165,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 		remote = remotes[0]
 	}
 	// URLs is guaranteed to be non-empty
-	safeURL, err := stripPassword(remote.Config().URLs[0])
+	safeURL, _, err := stripPassword(remote.Config().URLs[0])
 	if err != nil {
 		return ""
 	}
@@ -1249,18 +1276,15 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	gitUnit, ok := unit.(SourceUnit)
-	if !ok {
-		return fmt.Errorf("unsupported unit type: %T", unit)
-	}
+	unitID, kind := unit.SourceUnitID()
 
-	switch gitUnit.Kind {
+	switch kind {
 	case UnitRepo:
-		return s.scanRepo(ctx, gitUnit.ID, reporter)
+		return s.scanRepo(ctx, unitID, reporter)
 	case UnitDir:
-		return s.scanDir(ctx, gitUnit.ID, reporter)
+		return s.scanDir(ctx, unitID, reporter)
 	default:
-		return fmt.Errorf("unexpected git unit kind: %q", gitUnit.Kind)
+		return fmt.Errorf("unexpected git unit kind: %q", kind)
 	}
 }
 

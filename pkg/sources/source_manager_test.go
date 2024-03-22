@@ -60,7 +60,14 @@ func (c *counterChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...Chunki
 // countChunk implements SourceUnit.
 type countChunk byte
 
-func (c countChunk) SourceUnitID() string { return fmt.Sprintf("countChunk(%d)", c) }
+func (c countChunk) SourceUnitID() (string, SourceUnitKind) {
+	return fmt.Sprintf("countChunk(%d)", c), "test"
+}
+
+func (c countChunk) Display() string {
+	id, _ := c.SourceUnitID()
+	return id
+}
 
 func (c *counterChunker) Enumerate(ctx context.Context, reporter UnitReporter) error {
 	for i := 0; i < c.count; i++ {
@@ -187,7 +194,7 @@ func (c *unitChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...ChunkingT
 }
 func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 	for _, step := range c.steps {
-		if err := rep.UnitOk(ctx, CommonSourceUnit{step.unit}); err != nil {
+		if err := rep.UnitOk(ctx, CommonSourceUnit{ID: step.unit}); err != nil {
 			return err
 		}
 	}
@@ -195,7 +202,8 @@ func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 }
 func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkReporter) error {
 	for _, step := range c.steps {
-		if unit.SourceUnitID() != step.unit {
+		id, _ := unit.SourceUnitID()
+		if id != step.unit {
 			continue
 		}
 		if step.err != "" {
@@ -340,12 +348,16 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	for metric := range ch {
 		metrics = append(metrics, metric)
 	}
+	justID := func(unit SourceUnit) string {
+		id, _ := unit.SourceUnitID()
+		return id
+	}
 	sort.Slice(metrics, func(i, j int) bool {
-		return metrics[i].Unit.SourceUnitID() < metrics[j].Unit.SourceUnitID()
+		return justID(metrics[i].Unit) < justID(metrics[j].Unit)
 	})
 	m0, m1, m2 := metrics[0], metrics[1], metrics[2]
 
-	assert.Equal(t, "1 one", m0.Unit.SourceUnitID())
+	assert.Equal(t, "1 one", justID(m0.Unit))
 	assert.Equal(t, uint64(1), m0.TotalChunks)
 	assert.Equal(t, uint64(3), m0.TotalBytes)
 	assert.NotZero(t, m0.StartTime)
@@ -353,7 +365,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m0.ElapsedTime())
 	assert.Equal(t, 0, len(m0.Errors))
 
-	assert.Equal(t, "2 two", m1.Unit.SourceUnitID())
+	assert.Equal(t, "2 two", justID(m1.Unit))
 	assert.Equal(t, uint64(0), m1.TotalChunks)
 	assert.Equal(t, uint64(0), m1.TotalBytes)
 	assert.NotZero(t, m1.StartTime)
@@ -361,7 +373,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m1.ElapsedTime())
 	assert.Equal(t, 1, len(m1.Errors))
 
-	assert.Equal(t, "3 three", m2.Unit.SourceUnitID())
+	assert.Equal(t, "3 three", justID(m2.Unit))
 	assert.Equal(t, uint64(0), m2.TotalChunks)
 	assert.Equal(t, uint64(0), m2.TotalBytes)
 	assert.NotZero(t, m2.StartTime)

@@ -16,6 +16,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
@@ -47,55 +48,6 @@ type contentWriter interface { // Write appends data to the content storage.
 	String() (string, error)
 }
 
-// state represents the current mode of buffer.
-type state uint8
-
-const (
-	// writeOnly indicates the buffer is in write-only mode.
-	writeOnly state = iota
-	// readOnly indicates the buffer has been closed and is in read-only mode.
-	readOnly
-)
-
-// buffer is a wrapper around bytes.Buffer, implementing the contentWriter interface.
-// This allows bytes.Buffer to be used wherever a contentWriter is required, ensuring compatibility
-// with the contentWriter interface while leveraging the existing implementation of bytes.Buffer.
-type buffer struct {
-	state state // current state of the buffer (writeOnly or readOnly)
-	bytes.Buffer
-}
-
-func newBuffer() *buffer { return &buffer{state: writeOnly} }
-
-// Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
-// The context is included to satisfy the contentWriter interface, allowing for future extensions
-// where context handling might be necessary (e.g., for timeouts or cancellation).
-func (b *buffer) Write(_ context.Context, data []byte) (int, error) {
-	if b.state == readOnly {
-		return 0, fmt.Errorf("buffer is in read-only mode")
-	}
-	return b.Buffer.Write(data)
-}
-
-// ReadCloser provides a read-closer for the buffer's content.
-// It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
-// as closing a bytes.Buffer is a no-op.
-func (b *buffer) ReadCloser() (io.ReadCloser, error) {
-	if b.state == writeOnly {
-		return nil, fmt.Errorf("buffer is in write-only mode")
-	}
-	return io.NopCloser(bytes.NewReader(b.Bytes())), nil
-}
-
-// CloseForWriting is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
-func (b *buffer) CloseForWriting() error {
-	b.state = readOnly
-	return nil
-}
-
-// String returns the buffer's content as a string.
-func (b *buffer) String() (string, error) { return b.Buffer.String(), nil }
-
 // Diff contains the information about a file diff in a commit.
 // It abstracts the underlying content representation, allowing for flexible handling of diff content.
 // The use of contentWriter enables the management of diff data either in memory or on disk,
@@ -124,8 +76,8 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 // All Diffs must have an associated commit.
 // The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
 // By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
-func newDiff(commit *Commit, opts ...diffOption) *Diff {
-	diff := &Diff{Commit: commit, contentWriter: newBuffer()}
+func newDiff(ctx context.Context, commit *Commit, opts ...diffOption) *Diff {
+	diff := &Diff{Commit: commit, contentWriter: bufferwriter.New(ctx)}
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -148,7 +100,9 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // finalize ensures proper closure of resources associated with the Diff.
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
-func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
+func (d *Diff) finalize() error {
+	return d.contentWriter.CloseForWriting()
+}
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -157,6 +111,8 @@ type Commit struct {
 	Date    time.Time
 	Message strings.Builder
 	Size    int // in bytes
+
+	hasDiffs bool
 }
 
 // Parser sets values used in GitParse.
@@ -352,13 +308,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	var latestState = Initial
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
-		opts = append(opts, withCustomContentWriter(newBuffer()))
-		return newDiff(c, opts...)
+		opts = append(opts, withCustomContentWriter(bufferwriter.New(ctx)))
+		return newDiff(ctx, c, opts...)
 	}
 	if c.useCustomContentWriter {
 		diff = func(c *Commit, opts ...diffOption) *Diff {
-			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
-			return newDiff(c, opts...)
+			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New(ctx)))
+			return newDiff(ctx, c, opts...)
 		}
 	}
 	currentDiff := diff(currentCommit)
@@ -393,11 +349,19 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				}
 				diffChan <- currentDiff
 				currentCommit.Size += currentDiff.Len()
+				currentCommit.hasDiffs = true
 			}
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				totalLogSize += currentCommit.Size
+				if !currentCommit.hasDiffs {
+					// Initialize an empty Diff instance associated with the given commit.
+					// Since this diff represents "no changes", we only need to set the commit.
+					// This is required to ensure commits that have no diffs are still processed.
+					diffChan <- &Diff{Commit: currentCommit}
+				}
 			}
+
 			// Create a new currentDiff and currentCommit
 			currentCommit = &Commit{Message: strings.Builder{}}
 			currentDiff = diff(currentCommit)
@@ -432,10 +396,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isDiffLine(isStaged, latestState, line):
 			latestState = DiffLine
 
-			// This should never be nil, but check in case the stdin stream is messed up.
-			if currentCommit == nil {
-				currentCommit = &Commit{}
-			}
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				if err := currentDiff.finalize(); err != nil {
 					ctx.Logger().Error(err,
@@ -447,6 +407,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 					)
 				}
 				diffChan <- currentDiff
+				currentCommit.hasDiffs = true
+			}
+
+			// This should never be nil, but check in case the stdin stream is messed up.
+			if currentCommit == nil {
+				currentCommit = &Commit{}
 			}
 			currentDiff = diff(currentCommit)
 		case isModeLine(latestState, line):
@@ -458,10 +424,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isBinaryLine(latestState, line):
 			latestState = BinaryFileLine
 
-			path, ok := pathFromBinaryLine(line)
+			path, ok := pathFromBinaryLine(ctx, line)
 			if !ok {
 				err = fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
-				ctx.Logger().Error(err, "Failed to parse binary file line")
+				ctx.Logger().Error(err, "Failed to parse BinaryFileLine")
 				latestState = ParseFailure
 				continue
 			}
@@ -477,8 +443,15 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isToFileLine(latestState, line):
 			latestState = ToFileLine
 
-			// TODO: Is this fix still required?
-			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
+			path, ok := pathFromToFileLine(ctx, line)
+			if !ok {
+				err = fmt.Errorf(`expected line to match format '+++ b/path/to/file.go', got "%s"`, line)
+				ctx.Logger().Error(err, "Failed to parse ToFileLine")
+				latestState = ParseFailure
+				continue
+			}
+
+			currentDiff.PathB = path
 		case isHunkLineNumberLine(latestState, line):
 			latestState = HunkLineNumberLine
 
@@ -715,27 +688,35 @@ func isBinaryLine(latestState ParseState, line []byte) bool {
 }
 
 // Get the b/ file path. Ignoring the edge case of files having `and /b` in the name for simplicity.
-func pathFromBinaryLine(line []byte) (string, bool) {
+func pathFromBinaryLine(ctx context.Context, line []byte) (string, bool) {
 	if bytes.Contains(line, []byte("and /dev/null")) {
 		return "", true
 	}
 
-	_, after, ok := bytes.Cut(line, []byte(" and b/"))
-	if ok {
+	var path string
+	if _, after, ok := bytes.Cut(line, []byte(" and b/")); ok {
 		// drop the " differ\n"
-		return string(after[:len(after)-8]), true
-	}
+		path = string(after[:len(after)-8])
+	} else if _, after, ok = bytes.Cut(line, []byte(` and "b/`)); ok {
+		// Edge case where the path is quoted.
+		// https://github.com/trufflesecurity/trufflehog/issues/2384
 
-	// Edge case where the path is quoted.
-	// https://github.com/trufflesecurity/trufflehog/issues/2384
-	_, after, ok = bytes.Cut(line, []byte(` and "b/`))
-	if ok {
 		// drop the `" differ\n`
-		return string(after[:len(after)-9]), true
+		path = string(after[:len(after)-9])
+	} else {
+		// Unknown format.
+		return "", false
 	}
 
-	// Unknown format.
-	return "", false
+	// Handle escaped characters in the path, such as "\342\200\224" instead of "—".
+	// See https://github.com/trufflesecurity/trufflehog/issues/2418
+	unicodePath, err := strconv.Unquote(`"` + path + `"`)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to decode path", "path", path)
+		return path, true
+	}
+
+	return unicodePath, true
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
@@ -759,6 +740,42 @@ func isToFileLine(latestState ParseState, line []byte) bool {
 		return true
 	}
 	return false
+}
+
+// Get the b/ file path.
+func pathFromToFileLine(ctx context.Context, line []byte) (string, bool) {
+	// Normalize paths, as they can end in `\n`, `\t\n`, etc.
+	// See https://github.com/trufflesecurity/trufflehog/issues/1060
+	line = bytes.TrimSpace(line)
+
+	// File was deleted.
+	if bytes.Equal(line, []byte("+++ /dev/null")) {
+		return "", true
+	}
+
+	var path string
+	if _, after, ok := bytes.Cut(line, []byte("+++ b/")); ok {
+		path = string(after)
+	} else if _, after, ok = bytes.Cut(line, []byte(`+++ "b/`)); ok {
+		// Edge case where the path is quoted.
+		// e.g., `+++ "b/C++/1 \320\243\321\200\320\276\320\272/B.c"`
+
+		// drop the trailing `"`
+		path = string(after[:len(after)-1])
+	} else {
+		// Unknown format.
+		return "", false
+	}
+
+	// Handle escaped characters in the path, such as "\342\200\224" instead of "—".
+	// See https://github.com/trufflesecurity/trufflehog/issues/2418
+	unicodePath, err := strconv.Unquote(`"` + path + `"`)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to decode path", "path", path)
+		return path, true
+	}
+
+	return unicodePath, true
 }
 
 // @@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)
