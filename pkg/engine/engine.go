@@ -627,6 +627,13 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 
 				for k, detector := range chunkSpecificDetectors {
+					d, ok := detector.(detectors.ConditionalDetector)
+					if ok && !d.ShouldScanChunk(*chunk) {
+						ctx.Logger().V(4).Info("skipping detector for chunk", "detector", detector.Type().String(), "chunk", chunk)
+						delete(chunkSpecificDetectors, k)
+						continue
+					}
+
 					decoded.Chunk.Verify = e.verify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
