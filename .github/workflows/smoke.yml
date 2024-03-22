@@ -1,4 +1,3 @@
-
 name: Smoke
 
 on:
@@ -8,14 +7,14 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.21'
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Smoke
-      run: |
-        set -e
-        go run . git https://github.com/dustin-decker/secretsandstuff.git
-        go run . github --repo https://github.com/dustin-decker/secretsandstuff.git
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Smoke
+        run: |
+          set -e
+          go run . git https://github.com/dustin-decker/secretsandstuff.git
+          go run . github --repo https://github.com/dustin-decker/secretsandstuff.git
