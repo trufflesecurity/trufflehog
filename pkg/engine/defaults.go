@@ -140,6 +140,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudelements"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflarecakey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudimage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudmersive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudplan"
@@ -822,7 +823,7 @@ func DefaultDetectors() []detectors.Detector {
 		&clarifai.Scanner{},
 		&cloudflareapitoken.Scanner{},
 		&cloudflarecakey.Scanner{},
-		// &cloudflareglobalapikey.Scanner{},
+		&cloudflareglobalapikey.Scanner{},
 		&terraformcloudpersonaltoken.Scanner{},
 		&asanapersonalaccesstoken.Scanner{},
 		&trelloapikey.Scanner{},
