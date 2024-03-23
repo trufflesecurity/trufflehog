@@ -22,7 +22,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmate"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesmate"}) + `\b([a-z0-9A-Z]{3,22})\b`)
+	domainPat = regexp.MustCompile(`([a-zA-Z0-9-]+\.salesmate\.io)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -44,24 +44,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, idmatch := range idmatches {
-			if len(idmatch) != 2 {
-				continue
-			}
 			resIdMatch := strings.TrimSpace(idmatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Salesmate,
 				Raw:          []byte(resMatch),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", resIdMatch, resMatch)),
 			}
 
 			if verify {
-				url := fmt.Sprintf("https://%s.salesmate.io/apis/v3/companies/1?trackingRecentSearch=true", resIdMatch)
+				url := fmt.Sprintf("https://%s/apis/company/v4/1?trackingRecentSearch=true", resIdMatch)
 				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}
 
 				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("sessionToken", resMatch)
+				req.Header.Add("accessToken", resMatch)
+				req.Header.Add("x-linkname", resIdMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
