@@ -4,6 +4,7 @@ import (
 	"context"
 	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+	"encoding/json"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -46,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 
+
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://nitro.alconost.com/api/v1/account", nil)
 			if err != nil {
@@ -54,15 +56,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", "application/json")
 			req.SetBasicAuth(resMatch, "")
 			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+			if err != nil {
+				continue
+			}
+			defer res.Body.Close()
+
+			// Check if the response status code indicates success
+			if res.StatusCode == 200 {
+				var jsonResponse map[string]interface{}
+				if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
+					s1.Verified = false
+				} else if _, ok := jsonResponse["id"]; ok {
 					s1.Verified = true
 				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
+					s1.Verified = false
+				}
+			} else {
+				// Check for false positives
+				if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					continue
 				}
 			}
 		}
