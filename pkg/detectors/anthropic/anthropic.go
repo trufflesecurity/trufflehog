@@ -90,6 +90,7 @@ func verifyToken(ctx context.Context, client *http.Client, apiKey string) (bool,
 		return false, nil
 	}
 
+	// https://docs.anthropic.com/claude/reference/messages_post
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return false, nil
