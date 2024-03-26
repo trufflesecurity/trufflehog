@@ -99,7 +99,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			continue
 		}
 
-		if !fileInfo.Mode().IsRegular() {
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			logger.Info("skipping, not a regular file", "path", cleanPath)
 			continue
 		}
@@ -156,8 +156,8 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
 	}
-	if !fileStat.Mode().IsRegular() {
-		return fmt.Errorf("not a regular file")
+	if fileStat.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("skipping symlink")
 	}
 
 	inputFile, err := os.Open(path)
