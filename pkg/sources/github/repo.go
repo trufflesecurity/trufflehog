@@ -329,12 +329,19 @@ type commitQuery struct {
 // getDiffForFileInCommit retrieves the diff for a specified file in a commit.
 // If the file or its diff is not found, it returns an error.
 func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	commit, _, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-	if s.handleRateLimit(err) {
-		return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
-	}
-	if err != nil {
-		return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+	var (
+		commit *github.RepositoryCommit
+		err    error
+	)
+	for {
+		commit, _, err = s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+		if s.handleRateLimit(err) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+		}
+		break
 	}
 
 	if len(commit.Files) == 0 {
