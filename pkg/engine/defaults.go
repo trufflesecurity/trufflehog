@@ -17,7 +17,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alconost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aletheiaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/algoliaadminkey"
@@ -452,7 +451,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nitro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/noticeable"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
@@ -1016,7 +1014,8 @@ func DefaultDetectors() []detectors.Detector {
 		&doppler.Scanner{},
 		&codacy.Scanner{},
 		&gocardless.Scanner{},
-		&alconost.Scanner{},
+		// The service currently has blocked requests with a "TruffleHog" UserAgent.
+		// &alconost.Scanner{},
 		&rawg.Scanner{},
 		&accuweather.Scanner{},
 		&tomtom.Scanner{},
@@ -1115,7 +1114,6 @@ func DefaultDetectors() []detectors.Detector {
 		billomat.Scanner{},
 		blogger.Scanner{},
 		front.Scanner{},
-		nitro.Scanner{},
 		apify.Scanner{},
 		dynalist.Scanner{},
 		mavenlink.Scanner{},
