@@ -216,7 +216,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-func (s *Source) scanLocalWorkspace(workspace Workspace, filePath string) {
+func (s *Source) scanLocalWorkspace(workspace Workspace, fewwwwwwwwwwwwwww filePath string) {
 	// reset keywords for each workspace
 	s.resetKeywords()
 
