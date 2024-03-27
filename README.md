@@ -42,6 +42,10 @@ Join the [Secret Scanning Discord](https://discord.gg/8Hzbrnkr7E)
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --org=trufflesecurity
 ```
 
+
+
+
+
 # :floppy_disk: Installation
 
 Several options available for you:
@@ -209,6 +213,14 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 
 ```bash
 trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
+```
+
+## 12: Scan a Postman workspace
+
+Use the `--workspace`, `--collection`, `--environment` flags multiple times to scan multiple targets.
+
+```bash
+trufflehog postman --token=<postman api token> --workspace=<workspace id>
 ```
 
 # :question: FAQ
@@ -544,7 +556,7 @@ class Verifier(BaseHTTPRequestHandler):
             self.log_message("%s", request)
 
             # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']): 
+            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
                 self.send_response(200)
                 self.end_headers()
             else:
