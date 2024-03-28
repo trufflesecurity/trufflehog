@@ -297,6 +297,18 @@ func (s *Source) cacheRepoInfo(r *github.Repository) {
 	s.repoInfoCache.put(r.GetCloneURL(), info)
 }
 
+func (s *Source) cacheGistInfo(g *github.Gist) {
+	info := repoInfo{
+		owner: g.GetOwner().GetLogin(),
+	}
+	if g.GetPublic() {
+		info.visibility = source_metadatapb.Visibility_public
+	} else {
+		info.visibility = source_metadatapb.Visibility_private
+	}
+	s.repoInfoCache.put(g.GetGitPullURL(), info)
+}
+
 // wikiIsReachable returns true if https://github.com/$org/$repo/wiki is not redirected.
 // Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
 // but still don't have a cloneable wiki.
