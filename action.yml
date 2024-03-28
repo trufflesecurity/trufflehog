@@ -25,11 +25,16 @@ inputs:
 branding:
   icon: "shield"
   color: "green"
+outputs:
+  exit_code:
+    description: "Exit status of the Trufflehog scan"
+    value: ${{ steps.scan.outputs.exit_code }}
 
 runs:
   using: "composite"
   steps:
   - shell: bash
+    id: scan
     env:
       REPO_PATH: ${{ inputs.path }}
       BASE: ${{ inputs.base }}
@@ -38,6 +43,10 @@ runs:
       COMMITS: ${{ toJson(github.event.commits) }}
       VERSION: ${{ inputs.version }}
     run: |
+      ##########################################
+      ## OUTPUT THE EXIT CODE                 ##
+      ##########################################
+      trap 'echo "exit_code=$?" >> "$GITHUB_OUTPUT"' EXIT
       ##########################################
       ## ADVANCED USAGE                       ##
       ## Scan by BASE & HEAD user inputs      ##
