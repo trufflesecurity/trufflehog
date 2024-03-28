@@ -71,7 +71,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/sergi/go-diff v1.3.1
 	github.com/shuheiktgw/go-travis v0.3.1
-	github.com/snowflakedb/gosnowflake v1.8.0
+	github.com/snowflakedb/gosnowflake v1.9.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/testcontainers/testcontainers-go v0.29.1
