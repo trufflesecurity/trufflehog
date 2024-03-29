@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
@@ -128,15 +129,25 @@ func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
 func FilterKnownFalsePositives(results []Result, falsePositives []FalsePositive, wordCheck bool) []Result {
 	var filteredResults []Result
 	for _, result := range results {
-		if result.RawV2 != nil {
-			if !IsKnownFalsePositive(string(result.RawV2), falsePositives, wordCheck) {
-				filteredResults = append(filteredResults, result)
-			}
-		} else {
-			if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
-				filteredResults = append(filteredResults, result)
+		switch result.DetectorType {
+		case detectorspb.DetectorType_CustomRegex:
+			filteredResults = append(filteredResults, result)
+			break
+		case detectorspb.DetectorType_GCP:
+			filteredResults = append(filteredResults, result)
+			break
+		default:
+			if result.RawV2 != nil {
+				if !IsKnownFalsePositive(string(result.RawV2), falsePositives, wordCheck) {
+					filteredResults = append(filteredResults, result)
+				}
+			} else {
+				if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
+					filteredResults = append(filteredResults, result)
+				}
 			}
 		}
+
 	}
 	return filteredResults
 }
