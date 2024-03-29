@@ -62,12 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				body := string(bodyBytes)
 				if strings.Contains(body, "CreatedOn") {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
-
 			}
 		}
 

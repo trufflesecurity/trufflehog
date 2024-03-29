@@ -49,10 +49,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			emailRes := strings.TrimSpace(emailMatch[1])
 
-			if detectors.IsKnownFalsePositive(apiKeyRes, detectors.DefaultFalsePositives, true) { // wait- (apiKeyRes, email) might be false positive does not mean (apiKeyRes, another_email) is ?
-				continue
-			}
-
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MagicBell,
 				Raw:          []byte(apiKeyRes),
@@ -70,11 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(apiKeyRes, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}

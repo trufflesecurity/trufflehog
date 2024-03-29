@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -94,43 +95,35 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						res.Body.Close()
 						if err == nil {
 							s1.Verified = true
+							s1.ExtraData["username"] = userResponse.Login
+							s1.ExtraData["url"] = userResponse.UserURL
+							s1.ExtraData["account_type"] = userResponse.Type
+							if userResponse.SiteAdmin {
+								s1.ExtraData["site_admin"] = "true"
+							}
+							if userResponse.Name != "" {
+								s1.ExtraData["name"] = userResponse.Name
+							}
+							if userResponse.Company != "" {
+								s1.ExtraData["company"] = userResponse.Company
+							}
+							if userResponse.LdapDN != "" {
+								s1.ExtraData["ldap_dn"] = userResponse.LdapDN
+							}
 
-							if err == nil {
-								s1.Verified = true
-								s1.ExtraData["username"] = userResponse.Login
-								s1.ExtraData["url"] = userResponse.UserURL
-								s1.ExtraData["account_type"] = userResponse.Type
-								if userResponse.SiteAdmin {
-									s1.ExtraData["site_admin"] = "true"
-								}
-								if userResponse.Name != "" {
-									s1.ExtraData["name"] = userResponse.Name
-								}
-								if userResponse.Company != "" {
-									s1.ExtraData["company"] = userResponse.Company
-								}
-								if userResponse.LdapDN != "" {
-									s1.ExtraData["ldap_dn"] = userResponse.LdapDN
-								}
-
-								// GitHub does not seem to consistently return this header.
-								scopes := res.Header.Get("X-OAuth-Scopes")
-								if scopes != "" {
-									s1.ExtraData["scopes"] = scopes
-								}
-								expiry := res.Header.Get("github-authentication-token-expiration")
-								if expiry != "" {
-									s1.ExtraData["expires_at"] = expiry
-								}
+							// GitHub does not seem to consistently return this header.
+							scopes := res.Header.Get("X-OAuth-Scopes")
+							if scopes != "" {
+								s1.ExtraData["scopes"] = scopes
+							}
+							expiry := res.Header.Get("github-authentication-token-expiration")
+							if expiry != "" {
+								s1.ExtraData["expires_at"] = expiry
 							}
 						}
 					}
 				}
 			}
-		}
-
-		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
-			continue
 		}
 
 		results = append(results, s1)
