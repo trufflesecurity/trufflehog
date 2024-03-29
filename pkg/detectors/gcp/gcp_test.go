@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -18,7 +19,7 @@ import (
 func TestGCP_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -48,7 +49,7 @@ func TestGCP_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_GCP,
 					Verified:     true,
-					Redacted:     "secret-scanner-test-account@thog-sandbox.iam.gserviceaccount.com",
+					Redacted:     "detector-tester@thog-sandbox.iam.gserviceaccount.com",
 				},
 			},
 			wantErr: false,
@@ -65,7 +66,7 @@ func TestGCP_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_GCP,
 					Verified:     false,
-					Redacted:     "secretcom",
+					Redacted:     "detector-tester@thog-sandbox.iam.gserviceaccount.com",
 				},
 			},
 			wantErr: false,
@@ -82,6 +83,7 @@ func TestGCP_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
@@ -95,6 +97,8 @@ func TestGCP_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("GCP.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

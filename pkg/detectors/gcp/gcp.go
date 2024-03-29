@@ -3,13 +3,16 @@ package gcp
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"golang.org/x/oauth2/google"
-
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -20,6 +23,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	client = common.SaneHttpClient()
 	keyPat = regexp.MustCompile(`\{[^{]+auth_provider_x509_cert_url[^}]+\}`)
 )
 
@@ -95,29 +99,114 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
 		}
-		// Set the RotationGuideURL in the ExtraData
+		// Set the RotationGuideURL in the ExtraData.
 		s.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
 			"project":        creds.ProjectID,
 		}
 
 		if verify {
-			credentials, err := google.CredentialsFromJSON(ctx, credBytes, "https://www.googleapis.com/auth/cloud-platform")
-			if err != nil {
-				continue
-			}
-			if credentials != nil {
-				_, err = credentials.TokenSource.Token()
-				if err == nil {
-					s.Verified = true
-				}
-			}
+			s.Verified = isValidGCPServiceAccountKey(ctx, client, creds)
 		}
 
 		results = append(results, s)
 	}
 
 	return
+}
+
+// isValidGCPServiceAccountKey checks if the provided GCP service account key is valid. It verifies this by
+// comparing the public key extracted from the certificate retrieved from the `ClientX509CertURL`
+// with the public key derived from the `PrivateKey` field of the `gcpKey` struct. If the public keys
+// match, the function returns true, indicating a valid service account key. Otherwise, it returns false.
+func isValidGCPServiceAccountKey(ctx context.Context, client *http.Client, key gcpKey) bool {
+	certPEM, ok := fetchCert(ctx, client, key.ClientX509CertURL)
+	if !ok {
+		return false
+	}
+
+	publicKey, ok := extractPublicKeyFromCert(certPEM)
+	if !ok {
+		return false
+	}
+
+	privateKey, ok := extractPrivateKey(key.PrivateKey)
+	if !ok {
+		return false
+	}
+
+	k, ok := privateKey.Public().(*rsa.PublicKey)
+	if !ok {
+		return false
+	}
+
+	return publicKey.Equal(k)
+}
+
+// fetchCert downloads the certificate from the specified URL and returns its PEM-encoded string.
+func fetchCert(ctx context.Context, client *http.Client, url string) (string, bool) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", false
+	}
+
+	res, err := client.Do(req)
+	if err != nil || res.StatusCode != http.StatusOK {
+		return "", false
+	}
+	defer res.Body.Close()
+
+	var resp map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return "", false
+	}
+
+	// Assuming the certificate is the first value in the response.
+	for _, certPEM := range resp {
+		return strings.TrimSpace(certPEM), true
+	}
+
+	return "", false
+}
+
+// extractPublicKeyFromCert decodes the PEM-encoded certificate to extract the RSA public key.
+func extractPublicKeyFromCert(certPEM string) (*rsa.PublicKey, bool) {
+	block, _ := pem.Decode([]byte(certPEM))
+	if block == nil {
+		return nil, false
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, false
+	}
+
+	publicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return nil, false
+	}
+
+	return publicKey, true
+}
+
+// extractPrivateKey decodes the PEM-encoded private key to extract the RSA private key.
+func extractPrivateKey(privateKeyPEM string) (*rsa.PrivateKey, bool) {
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil {
+		return nil, false
+	}
+
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, false
+	}
+
+	rsaPrivateKey, ok := privateKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, false
+	}
+
+	return rsaPrivateKey, true
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
