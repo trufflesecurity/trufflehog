@@ -111,15 +111,15 @@ func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
 	var filteredResults []Result
 	for _, result := range results {
 		if !result.Verified {
-			if result.RawV2 != nil {
-				if StringShannonEntropy(string(result.RawV2)) >= entropy {
-					filteredResults = append(filteredResults, result)
-				}
-			} else {
+			if result.Raw != nil {
 				if StringShannonEntropy(string(result.Raw)) >= entropy {
 					filteredResults = append(filteredResults, result)
 				}
+			} else {
+				filteredResults = append(filteredResults, result)
 			}
+		} else {
+			filteredResults = append(filteredResults, result)
 		}
 	}
 	return filteredResults
@@ -129,25 +129,26 @@ func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
 func FilterKnownFalsePositives(results []Result, falsePositives []FalsePositive, wordCheck bool) []Result {
 	var filteredResults []Result
 	for _, result := range results {
-		switch result.DetectorType {
-		case detectorspb.DetectorType_CustomRegex:
-			filteredResults = append(filteredResults, result)
-			break
-		case detectorspb.DetectorType_GCP:
-			filteredResults = append(filteredResults, result)
-			break
-		default:
-			if result.RawV2 != nil {
-				if !IsKnownFalsePositive(string(result.RawV2), falsePositives, wordCheck) {
-					filteredResults = append(filteredResults, result)
-				}
-			} else {
-				if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
+		if !result.Verified {
+			switch result.DetectorType {
+			case detectorspb.DetectorType_CustomRegex:
+				filteredResults = append(filteredResults, result)
+				break
+			case detectorspb.DetectorType_GCP:
+				filteredResults = append(filteredResults, result)
+				break
+			default:
+				if result.Raw != nil {
+					if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
+						filteredResults = append(filteredResults, result)
+					}
+				} else {
 					filteredResults = append(filteredResults, result)
 				}
 			}
+		} else {
+			filteredResults = append(filteredResults, result)
 		}
-
 	}
 	return filteredResults
 }
