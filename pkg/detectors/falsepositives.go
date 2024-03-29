@@ -123,3 +123,20 @@ func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
 	}
 	return filteredResults
 }
+
+// FilterKnownFalsePositives filters out known false positives from the results.
+func FilterKnownFalsePositives(results []Result, falsePositives []FalsePositive, wordCheck bool) []Result {
+	var filteredResults []Result
+	for _, result := range results {
+		if result.RawV2 != nil {
+			if !IsKnownFalsePositive(string(result.RawV2), falsePositives, wordCheck) {
+				filteredResults = append(filteredResults, result)
+			}
+		} else {
+			if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
+				filteredResults = append(filteredResults, result)
+			}
+		}
+	}
+	return filteredResults
+}
