@@ -1,24 +1,35 @@
-# trufflesecurity/protos:1.18-0
+# trufflesecurity/protos:1.22
 
 FROM golang:1.22-bullseye
 
 ARG TARGETARCH
 ARG TARGETOS
-ENV PROTOC_VER=3.20.0
-ENV GORELEASER_VER=v1.7.0
-ENV SQLBOILER_VER=v4.9.0
-ENV PROTOC_GEN_GO_VER=v1.5.2
+
+ENV PROTOC_VER=25.3
+ENV PROTOC_GEN_GO_VER=v1.5.4
+ENV PROTOC_GEN_VALIDATE_VER=v1.0.4
+ENV GORELEASER_VERSION=1.19.2
 
 RUN echo "building $TARGETARCH"
-RUN apt-get update; apt-get install -y --no-install-recommends git unzip && rm -rf /var/lib/apt/lists/*
+RUN go install github.com/dustin-decker/quill/cmd/quill@v0.5.1
+RUN apt-get update; apt-get install apt-transport-https ca-certificates curl gnupg lsb-release -y; \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \
+    $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null; \
+    apt-get update; apt-get install -y --no-install-recommends python3-pip docker-ce-cli docker-buildx-plugin docker-compose-plugin \
+    git netbase wget upx unzip && rm -rf /var/lib/apt/lists/*
+RUN pip3 install --upgrade setuptools pip
 RUN set -e; \
 	arch=$(echo $TARGETARCH | sed -e s/amd64/x86_64/ -e s/arm64/aarch_64/); \
 	wget -q https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VER}/protoc-${PROTOC_VER}-${TARGETOS}-${arch}.zip && unzip protoc-${PROTOC_VER}-${TARGETOS}-${arch}.zip -d /usr/local
+RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -; echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list; apt-get update; apt-get install -y google-cloud-cli
+RUN echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | tee /etc/apt/sources.list.d/goreleaser.list; \
+    apt-get update; apt-get install -y goreleaser=${GORELEASER_VERSION} && rm -rf /var/lib/apt/lists/*
 RUN go install "github.com/golang/protobuf/protoc-gen-go@${PROTOC_GEN_GO_VER}"
-RUN GO111MODULE=off go get -d "github.com/envoyproxy/protoc-gen-validate" && \
+RUN go install gotest.tools/gotestsum@latest
+RUN git clone https://github.com/envoyproxy/protoc-gen-validate $GOPATH/src/github.com/envoyproxy/protoc-gen-validate && \
     cd $GOPATH/src/github.com/envoyproxy/protoc-gen-validate && \
-    git checkout v0.6.7 && \
+    git checkout ${PROTOC_GEN_VALIDATE_VER} && \
     ln -s /usr/local/protoc/include/google google && \
     make build
-RUN go install github.com/chrusty/protoc-gen-jsonschema/cmd/protoc-gen-jsonschema@latest
 CMD ["bash"]

@@ -32,7 +32,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"thog"}
 }
 
-// FromData will find and optionally verify Trufflehog Enterprise secrets in a given set of bytes.
+// FromData will find and optionally verify TruffleHog Enterprise secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 

@@ -17,7 +17,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alconost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aletheiaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/algoliaadminkey"
@@ -208,7 +207,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub"
+	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
+	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -247,8 +247,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/feedier"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fetchrss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fibery"
-	figmapersonalaccesstokenV1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
-	figmapersonalaccesstokenV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
+	figmapersonalaccesstokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v1"
+	figmapersonalaccesstokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/figmapersonalaccesstoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fileio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/finage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/financialmodelingprep"
@@ -276,8 +276,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/front"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ftp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fulcrum"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory_v2"
+	fullstoryv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory/v1"
+	fullstoryv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
@@ -292,12 +292,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getgist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getresponse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/getsandbox"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github"
+	githubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
+	githubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_oauth2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github_old"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/githubapp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlabv2"
+	gitlabv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v1"
+	gitlabv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
@@ -354,8 +354,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipquality"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ipstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jdbc"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken_v2"
+	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
+	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/juro"
@@ -411,8 +411,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/marketstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mattermostpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mavenlink"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense_v2"
+	maxmindlicensev1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense/v1"
+	maxmindlicensev2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/maxmindlicense/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meaningcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
@@ -451,7 +451,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nitro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/noticeable"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
@@ -793,7 +792,7 @@ func DefaultDetectors() []detectors.Detector {
 		aws.New(),
 		awssessionkey.New(),
 		&slack.Scanner{}, // has 4 secret types
-		&gitlab.Scanner{},
+		&gitlabv1.Scanner{},
 		&gitlabv2.Scanner{},
 		&sendgrid.Scanner{},
 		&mailchimp.Scanner{},
@@ -804,7 +803,8 @@ func DefaultDetectors() []detectors.Detector {
 		&square.Scanner{},
 		&squareapp.Scanner{},
 		&pivotaltracker.Scanner{},
-		&github.Scanner{},
+		&githubv1.Scanner{},
+		&githubv2.Scanner{},
 		&twilio.Scanner{},
 		&gcp.Scanner{},
 		&circleci.Scanner{},
@@ -812,8 +812,8 @@ func DefaultDetectors() []detectors.Detector {
 		&razorpay.Scanner{},
 		&jdbc.Scanner{},
 		&privatekey.Scanner{},
-		&maxmindlicense.Scanner{},
-		&maxmindlicense_v2.Scanner{},
+		&maxmindlicensev1.Scanner{},
+		&maxmindlicensev2.Scanner{},
 		&airtableapikey.Scanner{},
 		&bitfinex.Scanner{},
 		&telegrambottoken.Scanner{},
@@ -848,9 +848,8 @@ func DefaultDetectors() []detectors.Detector {
 		&fastlypersonaltoken.Scanner{},
 		&snykkey.Scanner{},
 		&postmark.Scanner{},
-		&figmapersonalaccesstokenV1.Scanner{},
-		&figmapersonalaccesstokenV2.Scanner{},
-		&github_old.Scanner{},
+		&figmapersonalaccesstokenv1.Scanner{},
+		&figmapersonalaccesstokenv2.Scanner{},
 		&webex.Scanner{},
 		&segmentapikey.Scanner{},
 		&vultrapikey.Scanner{},
@@ -865,7 +864,8 @@ func DefaultDetectors() []detectors.Detector {
 		&airbrakeuserkey.Scanner{},
 		&sumologickey.Scanner{},
 		&pagerdutyapikey.Scanner{},
-		&jiratoken.Scanner{},
+		&jiratokenv1.Scanner{},
+		jiratokenv2.Scanner{},
 		&airbrakeprojectkey.Scanner{},
 		&calendlyapikey.Scanner{},
 		&bitlyaccesstoken.Scanner{},
@@ -1014,7 +1014,8 @@ func DefaultDetectors() []detectors.Detector {
 		&doppler.Scanner{},
 		&codacy.Scanner{},
 		&gocardless.Scanner{},
-		&alconost.Scanner{},
+		// The service currently has blocked requests with a "TruffleHog" UserAgent.
+		// &alconost.Scanner{},
 		&rawg.Scanner{},
 		&accuweather.Scanner{},
 		&tomtom.Scanner{},
@@ -1085,8 +1086,8 @@ func DefaultDetectors() []detectors.Detector {
 		// mixpanel.Scanner{},
 		ipgeolocation.Scanner{},
 		tmetric.Scanner{},
-		fullstory.Scanner{},
-		fullstory_v2.Scanner{},
+		fullstoryv1.Scanner{},
+		fullstoryv2.Scanner{},
 		noticeable.Scanner{},
 		currencyscoop.Scanner{},
 		scrapingbee.Scanner{},
@@ -1113,7 +1114,6 @@ func DefaultDetectors() []detectors.Detector {
 		billomat.Scanner{},
 		blogger.Scanner{},
 		front.Scanner{},
-		nitro.Scanner{},
 		apify.Scanner{},
 		dynalist.Scanner{},
 		mavenlink.Scanner{},
@@ -1537,7 +1537,7 @@ func DefaultDetectors() []detectors.Detector {
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
 		opsgenie.Scanner{},
-		dockerhub.Scanner{},
+		dockerhubv1.Scanner{},
 		couchbase.Scanner{},
 		envoyapikey.Scanner{},
 		github_oauth2.Scanner{},
@@ -1590,9 +1590,9 @@ func DefaultDetectors() []detectors.Detector {
 		// azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		azuredevopspersonalaccesstoken.Scanner{},
 		azuresearchadminkey.Scanner{},
-		&azuresearchquerykey.Scanner{},
-		jiratoken_v2.Scanner{},
-		&googleoauth2.Scanner{},
+		azuresearchquerykey.Scanner{},
+		googleoauth2.Scanner{},
+		dockerhubv2.Scanner{},
 	}
 
 }
