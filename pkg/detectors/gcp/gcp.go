@@ -119,6 +119,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // comparing the public key extracted from the certificate retrieved from the `ClientX509CertURL`
 // with the public key derived from the `PrivateKey` field of the `gcpKey` struct. If the public keys
 // match, the function returns true, indicating a valid service account key. Otherwise, it returns false.
+//
+// Note: If the service account is expired or disabled, the request to fetch the certificate from the
+// `ClientX509CertURL` will fail with a 404 status code. In this case, the function will return false,
+// indicating that the service account key is invalid, regardless of the public key comparison.
 func isValidGCPServiceAccountKey(ctx context.Context, client *http.Client, key gcpKey) bool {
 	certPEM, ok := fetchCert(ctx, client, key.ClientX509CertURL)
 	if !ok {
