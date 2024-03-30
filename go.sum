@@ -93,6 +93,8 @@ github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 h1:kkhsdkhsCv
 github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371/go.mod h1:EjAoLdwvbIOoOQr3ihjnSoLZRtE8azugULFRteWMNc0=
 github.com/TheZeroSlave/zapsentry v1.20.2 h1:llgC91ZJdoU/OzGxYpUlEhKinf65mw9hJ2KkZ7+cGIk=
 github.com/TheZeroSlave/zapsentry v1.20.2/go.mod h1:D1YMfSuu6xnkhwFXxrronesmsiyDhIqo+86I3Ok+r64=
+github.com/TheZeroSlave/zapsentry v1.22.0 h1:9Q3r5XbN9A7AyIgvS/sNA3ZwiH5PpeJz7pvyrrqGZCU=
+github.com/TheZeroSlave/zapsentry v1.22.0/go.mod h1:D1YMfSuu6xnkhwFXxrronesmsiyDhIqo+86I3Ok+r64=
 github.com/adrg/strutil v0.3.1 h1:OLvSS7CSJO8lBii4YmBt8jiK9QOtB9CzCzwl4Ic/Fz4=
 github.com/adrg/strutil v0.3.1/go.mod h1:8h90y18QLrs11IBffcGX3NW/GFBXCMcNg4M7H6MspPA=
 github.com/alecthomas/chroma v0.10.0 h1:7XDcGkCQopCNKjZHfYrNLraA+M7e0fMiJ/Mfikbfjek=
