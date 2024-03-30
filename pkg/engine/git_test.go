@@ -112,7 +112,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	defer cancel()
 
 	e, err := Start(ctx,
-		WithConcurrency(uint8(runtime.NumCPU())),
+		WithConcurrency(runtime.NumCPU()),
 		WithDecoders(decoders.DefaultDecoders()...),
 		WithDetectors(DefaultDetectors()...),
 		WithVerify(false),
