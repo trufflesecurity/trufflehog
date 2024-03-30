@@ -234,9 +234,18 @@ func (m *Artifactory) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Artifactory_BasicAuth:
+		if v == nil {
+			err := ArtifactoryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -268,9 +277,28 @@ func (m *Artifactory) validate(all bool) error {
 		}
 
 	case *Artifactory_AccessToken:
+		if v == nil {
+			err := ArtifactoryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for AccessToken
-
 	case *Artifactory_Unauthenticated:
+		if v == nil {
+			err := ArtifactoryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -301,6 +329,8 @@ func (m *Artifactory) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -402,12 +432,30 @@ func (m *AzureStorage) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *AzureStorage_ConnectionString:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ConnectionString
-
 	case *AzureStorage_BasicAuth:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -439,9 +487,28 @@ func (m *AzureStorage) validate(all bool) error {
 		}
 
 	case *AzureStorage_ClientCertificate:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ClientCertificate
-
 	case *AzureStorage_Unauthenticated:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -472,6 +539,8 @@ func (m *AzureStorage) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -589,12 +658,30 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Bitbucket_Token:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *Bitbucket_Oauth:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -626,6 +713,16 @@ func (m *Bitbucket) validate(all bool) error {
 		}
 
 	case *Bitbucket_BasicAuth:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -656,6 +753,8 @@ func (m *Bitbucket) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -769,11 +868,21 @@ func (m *CircleCI) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *CircleCI_Token:
+		if v == nil {
+			err := CircleCIValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -887,11 +996,21 @@ func (m *TravisCI) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *TravisCI_Token:
+		if v == nil {
+			err := TravisCIValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1013,9 +1132,18 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for SkipHistory
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Confluence_Unauthenticated:
+		if v == nil {
+			err := ConfluenceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1047,6 +1175,16 @@ func (m *Confluence) validate(all bool) error {
 		}
 
 	case *Confluence_BasicAuth:
+		if v == nil {
+			err := ConfluenceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -1078,8 +1216,19 @@ func (m *Confluence) validate(all bool) error {
 		}
 
 	case *Confluence_Token:
+		if v == nil {
+			err := ConfluenceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1180,9 +1329,18 @@ func (m *Docker) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Docker_Unauthenticated:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1214,6 +1372,16 @@ func (m *Docker) validate(all bool) error {
 		}
 
 	case *Docker_BasicAuth:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -1245,11 +1413,31 @@ func (m *Docker) validate(all bool) error {
 		}
 
 	case *Docker_BearerToken:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for BearerToken
-
 	case *Docker_DockerKeychain:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for DockerKeychain
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1350,9 +1538,18 @@ func (m *ECR) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *ECR_AccessKey:
+		if v == nil {
+			err := ECRValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAccessKey()).(type) {
@@ -1383,6 +1580,8 @@ func (m *ECR) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1590,15 +1789,42 @@ func (m *GCS) validate(all bool) error {
 
 	// no validation rules for MaxObjectSize
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *GCS_JsonServiceAccount:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for JsonServiceAccount
-
 	case *GCS_ApiKey:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ApiKey
-
 	case *GCS_Unauthenticated:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1630,6 +1856,16 @@ func (m *GCS) validate(all bool) error {
 		}
 
 	case *GCS_Adc:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAdc()).(type) {
@@ -1661,9 +1897,28 @@ func (m *GCS) validate(all bool) error {
 		}
 
 	case *GCS_ServiceAccountFile:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ServiceAccountFile
-
 	case *GCS_Oauth:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -1694,6 +1949,8 @@ func (m *GCS) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1814,9 +2071,18 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Git_BasicAuth:
+		if v == nil {
+			err := GitValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -1848,6 +2114,16 @@ func (m *Git) validate(all bool) error {
 		}
 
 	case *Git_Unauthenticated:
+		if v == nil {
+			err := GitValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1879,6 +2155,16 @@ func (m *Git) validate(all bool) error {
 		}
 
 	case *Git_SshAuth:
+		if v == nil {
+			err := GitValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSshAuth()).(type) {
@@ -1909,6 +2195,8 @@ func (m *Git) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2025,12 +2313,30 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *GitLab_Token:
+		if v == nil {
+			err := GitLabValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *GitLab_Oauth:
+		if v == nil {
+			err := GitLabValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -2062,6 +2368,16 @@ func (m *GitLab) validate(all bool) error {
 		}
 
 	case *GitLab_BasicAuth:
+		if v == nil {
+			err := GitLabValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -2092,6 +2408,8 @@ func (m *GitLab) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2224,9 +2542,18 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for IncludeWikis
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGithubApp()).(type) {
@@ -2258,9 +2585,28 @@ func (m *GitHub) validate(all bool) error {
 		}
 
 	case *GitHub_Token:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *GitHub_Unauthenticated:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2292,6 +2638,16 @@ func (m *GitHub) validate(all bool) error {
 		}
 
 	case *GitHub_BasicAuth:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -2322,6 +2678,8 @@ func (m *GitHub) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2423,11 +2781,21 @@ func (m *GoogleDrive) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *GoogleDrive_RefreshToken:
+		if v == nil {
+			err := GoogleDriveValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for RefreshToken
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2542,9 +2910,18 @@ func (m *JIRA) validate(all bool) error {
 
 	// no validation rules for InsecureSkipVerifyTls
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *JIRA_BasicAuth:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -2576,6 +2953,16 @@ func (m *JIRA) validate(all bool) error {
 		}
 
 	case *JIRA_Unauthenticated:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2607,6 +2994,16 @@ func (m *JIRA) validate(all bool) error {
 		}
 
 	case *JIRA_Oauth:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -2638,8 +3035,19 @@ func (m *JIRA) validate(all bool) error {
 		}
 
 	case *JIRA_Token:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2741,9 +3149,18 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *NPMUnauthenticatedPackage_Unauthenticated:
+		if v == nil {
+			err := NPMUnauthenticatedPackageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2774,6 +3191,8 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2878,9 +3297,18 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *PyPIUnauthenticatedPackage_Unauthenticated:
+		if v == nil {
+			err := PyPIUnauthenticatedPackageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2911,6 +3339,8 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3016,9 +3446,18 @@ func (m *S3) validate(all bool) error {
 
 	// no validation rules for MaxObjectSize
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAccessKey()).(type) {
@@ -3050,6 +3489,16 @@ func (m *S3) validate(all bool) error {
 		}
 
 	case *S3_Unauthenticated:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -3081,6 +3530,16 @@ func (m *S3) validate(all bool) error {
 		}
 
 	case *S3_CloudEnvironment:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetCloudEnvironment()).(type) {
@@ -3112,6 +3571,16 @@ func (m *S3) validate(all bool) error {
 		}
 
 	case *S3_SessionToken:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSessionToken()).(type) {
@@ -3142,6 +3611,8 @@ func (m *S3) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3254,12 +3725,30 @@ func (m *Slack) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Slack_Token:
+		if v == nil {
+			err := SlackValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *Slack_Tokens:
+		if v == nil {
+			err := SlackValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTokens()).(type) {
@@ -3290,6 +3779,8 @@ func (m *Slack) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3489,11 +3980,21 @@ func (m *Buildkite) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Buildkite_Token:
+		if v == nil {
+			err := BuildkiteValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3610,9 +4111,18 @@ func (m *Gerrit) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Gerrit_BasicAuth:
+		if v == nil {
+			err := GerritValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -3644,6 +4154,16 @@ func (m *Gerrit) validate(all bool) error {
 		}
 
 	case *Gerrit_Unauthenticated:
+		if v == nil {
+			err := GerritValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -3674,6 +4194,8 @@ func (m *Gerrit) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3788,9 +4310,18 @@ func (m *Jenkins) validate(all bool) error {
 
 	// no validation rules for InsecureSkipVerifyTls
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Jenkins_BasicAuth:
+		if v == nil {
+			err := JenkinsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -3822,6 +4353,16 @@ func (m *Jenkins) validate(all bool) error {
 		}
 
 	case *Jenkins_Header:
+		if v == nil {
+			err := JenkinsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetHeader()).(type) {
@@ -3852,6 +4393,8 @@ func (m *Jenkins) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3964,12 +4507,30 @@ func (m *Teams) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Teams_Token:
+		if v == nil {
+			err := TeamsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *Teams_Authenticated:
+		if v == nil {
+			err := TeamsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAuthenticated()).(type) {
@@ -4001,6 +4562,16 @@ func (m *Teams) validate(all bool) error {
 		}
 
 	case *Teams_Oauth:
+		if v == nil {
+			err := TeamsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -4031,6 +4602,8 @@ func (m *Teams) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4270,9 +4843,18 @@ func (m *Forager) validate(all bool) error {
 		}
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Forager_Unauthenticated:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -4303,6 +4885,8 @@ func (m *Forager) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4404,9 +4988,18 @@ func (m *SlackRealtime) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *SlackRealtime_Tokens:
+		if v == nil {
+			err := SlackRealtimeValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTokens()).(type) {
@@ -4437,6 +5030,8 @@ func (m *SlackRealtime) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4541,9 +5136,18 @@ func (m *Sharepoint) validate(all bool) error {
 
 	// no validation rules for SiteUrl
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Sharepoint_Oauth:
+		if v == nil {
+			err := SharepointValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -4574,6 +5178,8 @@ func (m *Sharepoint) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4693,12 +5299,30 @@ func (m *AzureRepos) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *AzureRepos_Token:
+		if v == nil {
+			err := AzureReposValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *AzureRepos_Oauth:
+		if v == nil {
+			err := AzureReposValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -4729,6 +5353,8 @@ func (m *AzureRepos) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4829,9 +5455,18 @@ func (m *Postman) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Postman_Unauthenticated:
+		if v == nil {
+			err := PostmanValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -4863,8 +5498,19 @@ func (m *Postman) validate(all bool) error {
 		}
 
 	case *Postman_Token:
+		if v == nil {
+			err := PostmanValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {

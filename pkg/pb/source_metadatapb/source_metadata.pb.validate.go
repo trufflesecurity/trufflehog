@@ -2719,9 +2719,18 @@ func (m *Forager) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Metadata.(type) {
-
+	switch v := m.Metadata.(type) {
 	case *Forager_Github:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Metadata",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGithub()).(type) {
@@ -2753,6 +2762,16 @@ func (m *Forager) validate(all bool) error {
 		}
 
 	case *Forager_Npm:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Metadata",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetNpm()).(type) {
@@ -2784,6 +2803,16 @@ func (m *Forager) validate(all bool) error {
 		}
 
 	case *Forager_Pypi:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Metadata",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetPypi()).(type) {
@@ -2814,6 +2843,8 @@ func (m *Forager) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3390,9 +3421,18 @@ func (m *MetaData) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Data.(type) {
-
+	switch v := m.Data.(type) {
 	case *MetaData_Azure:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAzure()).(type) {
@@ -3424,6 +3464,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Bitbucket:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBitbucket()).(type) {
@@ -3455,6 +3505,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Circleci:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetCircleci()).(type) {
@@ -3486,6 +3546,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Confluence:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetConfluence()).(type) {
@@ -3517,6 +3587,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Docker:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetDocker()).(type) {
@@ -3548,6 +3628,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Ecr:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetEcr()).(type) {
@@ -3579,6 +3669,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Gcs:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGcs()).(type) {
@@ -3610,6 +3710,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Github:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGithub()).(type) {
@@ -3641,6 +3751,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Gitlab:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGitlab()).(type) {
@@ -3672,6 +3792,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Jira:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetJira()).(type) {
@@ -3703,6 +3833,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Npm:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetNpm()).(type) {
@@ -3734,6 +3874,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Pypi:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetPypi()).(type) {
@@ -3765,6 +3915,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_S3:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetS3()).(type) {
@@ -3796,6 +3956,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Slack:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSlack()).(type) {
@@ -3827,6 +3997,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Filesystem:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetFilesystem()).(type) {
@@ -3858,6 +4038,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Git:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGit()).(type) {
@@ -3889,6 +4079,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Test:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTest()).(type) {
@@ -3920,6 +4120,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Buildkite:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBuildkite()).(type) {
@@ -3951,6 +4161,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Gerrit:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGerrit()).(type) {
@@ -3982,6 +4202,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Jenkins:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetJenkins()).(type) {
@@ -4013,6 +4243,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Teams:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTeams()).(type) {
@@ -4044,6 +4284,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Artifactory:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetArtifactory()).(type) {
@@ -4075,6 +4325,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Syslog:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSyslog()).(type) {
@@ -4106,6 +4366,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Forager:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetForager()).(type) {
@@ -4137,6 +4407,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Sharepoint:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSharepoint()).(type) {
@@ -4168,6 +4448,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_GoogleDrive:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGoogleDrive()).(type) {
@@ -4199,6 +4489,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_AzureRepos:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAzureRepos()).(type) {
@@ -4230,6 +4530,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_TravisCI:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTravisCI()).(type) {
@@ -4261,6 +4571,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Postman:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetPostman()).(type) {
@@ -4291,6 +4611,8 @@ func (m *MetaData) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
