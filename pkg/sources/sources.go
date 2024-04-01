@@ -289,6 +289,36 @@ type SyslogConfig struct {
 	Concurrency int
 }
 
+// PostmanConfig defines the optional configuration for a Postman source.
+type PostmanConfig struct {
+	// Workspace UUID(s) or file path(s) to Postman workspace (.zip)
+	Workspaces []string
+	// Collection ID(s) or file path(s) to Postman collection (.json)
+	Collections []string
+	// Environment ID(s) or file path(s) to Postman environment (.json)
+	Environments []string
+	// Token is the token to use to authenticate with the API.
+	Token string
+	// IncludeCollections is a list of Collections to include in the scan.
+	IncludeCollections []string
+	// IncludeEnvironment is a list of Environments to include in the scan.
+	IncludeEnvironments []string
+	// ExcludeCollections is a list of Collections to exclude in the scan.
+	ExcludeCollections []string
+	// ExcludeEnvironment is a list of Environments to exclude in the scan.
+	ExcludeEnvironments []string
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency int
+	// CollectionPaths is the list of paths to Postman collections.
+	CollectionPaths []string
+	// WorkspacePaths is the list of paths to Postman workspaces.
+	WorkspacePaths []string
+	// EnvironmentPaths is the list of paths to Postman environments.
+	EnvironmentPaths []string
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
+}
+
 // Progress is used to update job completion progress across sources.
 type Progress struct {
 	mut               sync.Mutex

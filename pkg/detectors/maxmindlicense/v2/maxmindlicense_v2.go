@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -20,7 +21,6 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"maxmind", "geoip"}) + `\b([0-9]{2,7})\b`)
 	keyPat = regexp.MustCompile(`\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
 )
 
@@ -37,49 +37,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, keyMatch := range keyMatches {
-		keyRes := strings.TrimSpace(keyMatch[1])
+		keyRes := keyMatch[1]
 
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
+		r := detectors.Result{
+			DetectorType: detectorspb.DetectorType_MaxMindLicense,
+			Raw:          []byte(keyRes),
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
+				"version":        fmt.Sprintf("%d", s.Version()),
+			},
+		}
+
+		if verify {
+			data := url.Values{}
+			data.Add("license_key", keyRes)
+			req, err := http.NewRequestWithContext(
+				ctx, "POST", "https://secret-scanning.maxmind.com/secrets/validate-license-key",
+				strings.NewReader(data.Encode()))
+			if err != nil {
+				r.SetVerificationError(err)
+				results = append(results, r)
 				continue
 			}
-			idRes := strings.TrimSpace(idMatch[1])
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-			s := detectors.Result{
-				DetectorType: detectorspb.DetectorType_MaxMindLicense,
-				Redacted:     idRes,
-				Raw:          []byte(keyRes),
-				RawV2:        []byte(keyRes + idRes),
-				ExtraData: map[string]string{
-					"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
-					"version":        fmt.Sprintf("%d", s.Version()),
-				},
+			res, err := client.Do(req)
+			if err != nil {
+				r.SetVerificationError(err)
 			}
-
-			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://geoip.maxmind.com/geoip/v2.1/country/8.8.8.8", nil)
-				if err != nil {
-					continue
-				}
-				req.SetBasicAuth(idRes, keyRes)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s.Verified = true
-					} else {
-						if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
-							continue
-						}
-					}
-				}
+			defer res.Body.Close()
+			if err == nil && res.StatusCode >= 200 && res.StatusCode < 300 {
+				r.Verified = true
 			}
-
-			results = append(results, s)
 		}
+
+		results = append(results, r)
 	}
 
 	return results, nil

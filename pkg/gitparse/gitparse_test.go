@@ -589,7 +589,6 @@ func TestLineChecksNoStaged(t *testing.T) {
 }
 
 func TestBinaryPathParse(t *testing.T) {
-	ctx := context.Background()
 	cases := map[string]string{
 		"Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ\n":                                                                                         "",
 		"Binary files /dev/null and b/plugin.sig differ\n":                                                                                                                   "plugin.sig",
@@ -599,7 +598,7 @@ func TestBinaryPathParse(t *testing.T) {
 	}
 
 	for name, expected := range cases {
-		filename, ok := pathFromBinaryLine(ctx, []byte(name))
+		filename, ok := pathFromBinaryLine([]byte(name))
 		if !ok {
 			t.Errorf("Failed to get path: %s", name)
 		}
@@ -610,7 +609,6 @@ func TestBinaryPathParse(t *testing.T) {
 }
 
 func TestToFileLinePathParse(t *testing.T) {
-	ctx := context.Background()
 	cases := map[string]string{
 		"+++ /dev/null\n":      "",
 		"+++ b/embeds.xml\t\n": "embeds.xml",
@@ -618,7 +616,7 @@ func TestToFileLinePathParse(t *testing.T) {
 	}
 
 	for name, expected := range cases {
-		filename, ok := pathFromToFileLine(ctx, []byte(name))
+		filename, ok := pathFromToFileLine([]byte(name))
 		if !ok {
 			t.Errorf("Failed to get path: %s", name)
 		}

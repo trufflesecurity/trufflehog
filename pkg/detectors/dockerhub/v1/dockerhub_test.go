@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package nitro
+package dockerhubv2
 
 import (
 	"context"
@@ -10,21 +10,24 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestNitro_FromChunk(t *testing.T) {
+func TestDockerhub_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NITRO")
-	inactiveSecret := testSecrets.MustGetField("NITRO_INACTIVE")
+	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
+	email := testSecrets.MustGetField("DOCKERHUB_EMAIL")
+	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
+	inactivePat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +46,28 @@ func TestNitro_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a nitro secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, pat)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Nitro,
+					DetectorType: detectorspb.DetectorType_Dockerhub,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified (email)",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", email, pat)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dockerhub,
 					Verified:     true,
 				},
 			},
@@ -59,12 +78,12 @@ func TestNitro_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a nitro secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("docker login -u %s -p %s", username, inactivePat)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Nitro,
+					DetectorType: detectorspb.DetectorType_Dockerhub,
 					Verified:     false,
 				},
 			},
@@ -87,7 +106,7 @@ func TestNitro_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Nitro.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Dockerhub.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -95,9 +114,11 @@ func TestNitro_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Nitro.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Dockerhub.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
