@@ -854,8 +854,6 @@ func (s *Source) handleRateLimit(errIn error) bool {
 	defer rateLimitMu.Unlock()
 
 	if rateLimitResumeTime.IsZero() || time.Now().After(rateLimitResumeTime) {
-		rateLimitMu.Lock()
-
 		var (
 			now = time.Now()
 
