@@ -433,6 +433,9 @@ RepoLoop:
 				for {
 					gistID := extractGistID(urlParts)
 					gist, _, err := s.apiClient.Gists.Get(repoCtx, gistID)
+					// Normalize the URL to the Gist's pull URL.
+					// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
+					r = gist.GetGitPullURL()
 					if s.handleRateLimit(err) {
 						continue
 					}
