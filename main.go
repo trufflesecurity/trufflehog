@@ -155,7 +155,7 @@ var (
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
 
 	// Postman is hidden for now until we get more feedback from the community.
-	postmanScan                = cli.Command("postman", "Scan Postman").Hidden()
+	postmanScan                = cli.Command("postman", "Scan Postman")
 	postmanToken               = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
 	postmanWorkspaces          = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag.").Strings()
 	postmanCollections         = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag.").Strings()

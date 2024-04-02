@@ -211,6 +211,14 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
 ```
 
+## 12: Scan a Postman workspace
+
+Use the `--workspace`, `--collection`, `--environment` flags multiple times to scan multiple targets.
+
+```bash
+trufflehog postman --token=<postman api token> --workspace=<workspace id>
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
