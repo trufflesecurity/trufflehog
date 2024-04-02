@@ -427,7 +427,8 @@ RepoLoop:
 				continue
 			}
 
-			if strings.EqualFold(urlParts[0], "gist.github.com") {
+			if strings.EqualFold(urlParts[0], "gist.github.com") ||
+				(len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist")) {
 				// Cache gist info.
 				for {
 					gistID := extractGistID(urlParts)
@@ -1120,6 +1121,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 // - "https://github.com/trufflesecurity/trufflehog" => ["github.com", "trufflesecurity", "trufflehog"]
 // - "https://gist.github.com/nat/5fdbb7f945d121f197fb074578e53948" => ["gist.github.com", "nat", "5fdbb7f945d121f197fb074578e53948"]
 // - "https://gist.github.com/ff0e5e8dc8ec22f7a25ddfc3492d3451.git" => ["gist.github.com", "ff0e5e8dc8ec22f7a25ddfc3492d3451"]
+// - "https://github.company.org/gist/nat/5fdbb7f945d121f197fb074578e53948.git" => ["github.company.org", "gist", "nat", "5fdbb7f945d121f197fb074578e53948"]
 func getRepoURLParts(repoURL string) (string, []string, error) {
 	// Support ssh and https URLs.
 	url, err := git.GitURLParse(repoURL)
@@ -1136,13 +1138,29 @@ func getRepoURLParts(repoURL string) (string, []string, error) {
 	urlString := url.String()
 	trimmedURL := strings.TrimPrefix(urlString, url.Scheme+"://")
 	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
-	splitURL := strings.Split(trimmedURL, "/")
+	urlParts := strings.Split(trimmedURL, "/")
 
-	if len(splitURL) < 2 || len(splitURL) > 3 {
-		return "", []string{}, fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be 2 or 3", urlString)
+	// Validate
+	switch len(urlParts) {
+	case 2:
+		if !strings.EqualFold(urlParts[0], "gist.github.com") {
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 2 segments are only expected if the host is 'gist.github.com'", urlString)
+		}
+	case 3:
+		// Do nothing
+	case 4:
+		if !(!strings.EqualFold(urlParts[0], "github.com") && strings.EqualFold(urlParts[1], "gist")) {
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 4 segments are only expected if the path starts with 'gist'", urlString)
+		}
+	default:
+		err = fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be 2 or 4, not %d", urlString, len(urlParts))
 	}
 
-	return urlString, splitURL, nil
+	if err != nil {
+		return "", []string{}, err
+	} else {
+		return urlString, urlParts, nil
+	}
 }
 
 const initialPage = 1 // page to start listing from
