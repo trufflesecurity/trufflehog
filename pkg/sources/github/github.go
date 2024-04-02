@@ -427,8 +427,7 @@ RepoLoop:
 				continue
 			}
 
-			if strings.EqualFold(urlParts[0], "gist.github.com") ||
-				(len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist")) {
+			if isGistUrl(urlParts) {
 				// Cache gist info.
 				for {
 					gistID := extractGistID(urlParts)
@@ -1109,7 +1108,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 		return err
 	}
 
-	if s.includeGistComments && urlParts[0] == "gist.github.com" {
+	if s.includeGistComments && isGistUrl(urlParts) {
 		return s.processGistComments(ctx, urlString, urlParts, repoInfo, chunksChan)
 	} else if s.includeIssueComments || s.includePRComments {
 		return s.processRepoComments(ctx, repoInfo, chunksChan)
@@ -1125,45 +1124,49 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 // - "https://gist.github.com/nat/5fdbb7f945d121f197fb074578e53948" => ["gist.github.com", "nat", "5fdbb7f945d121f197fb074578e53948"]
 // - "https://gist.github.com/ff0e5e8dc8ec22f7a25ddfc3492d3451.git" => ["gist.github.com", "ff0e5e8dc8ec22f7a25ddfc3492d3451"]
 // - "https://github.company.org/gist/nat/5fdbb7f945d121f197fb074578e53948.git" => ["github.company.org", "gist", "nat", "5fdbb7f945d121f197fb074578e53948"]
-func getRepoURLParts(repoURL string) (string, []string, error) {
+func getRepoURLParts(repoURLString string) (string, []string, error) {
 	// Support ssh and https URLs.
-	url, err := git.GitURLParse(repoURL)
+	repoURL, err := git.GitURLParse(repoURLString)
 	if err != nil {
-		return "", []string{}, err
+		return "", nil, err
 	}
 
 	// Remove the user information.
 	// e.g., `git@github.com` -> `github.com`
-	if url.User != nil {
-		url.User = nil
+	if repoURL.User != nil {
+		repoURL.User = nil
 	}
 
-	urlString := url.String()
-	trimmedURL := strings.TrimPrefix(urlString, url.Scheme+"://")
+	urlString := repoURL.String()
+	trimmedURL := strings.TrimPrefix(urlString, repoURL.Scheme+"://")
 	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
 	urlParts := strings.Split(trimmedURL, "/")
 
 	// Validate
 	switch len(urlParts) {
 	case 2:
+		// gist.github.com/<gist_id>
 		if !strings.EqualFold(urlParts[0], "gist.github.com") {
-			err = fmt.Errorf("failed to parse repository or gist URL (%s): 2 segments are only expected if the host is 'gist.github.com'", urlString)
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 2 path segments are only expected if the host is 'gist.github.com' ('gist.github.com', '<gist_id>')", urlString)
 		}
 	case 3:
-		// Do nothing
+		// github.com/<user>/repo>
+		// gist.github.com/<user>/<gist_id>
+		// github.company.org/<user>/repo>
+		// github.company.org/gist/<gist_id>
 	case 4:
-		if !(!strings.EqualFold(urlParts[0], "github.com") && strings.EqualFold(urlParts[1], "gist")) {
-			err = fmt.Errorf("failed to parse repository or gist URL (%s): 4 segments are only expected if the path starts with 'gist'", urlString)
+		// github.company.org/gist/<user/<id>
+		if !strings.EqualFold(urlParts[1], "gist") || (strings.EqualFold(urlParts[0], "github.com") && strings.EqualFold(urlParts[1], "gist")) {
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 4 path segments are only expected if the host isn't 'github.com' and the path starts with 'gist' ('github.example.com', 'gist', '<owner>', '<gist_id>')", urlString)
 		}
 	default:
-		err = fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be 2 or 4, not %d", urlString, len(urlParts))
+		err = fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be between 2 and 4, not %d (%v)", urlString, len(urlParts), urlParts)
 	}
 
 	if err != nil {
-		return "", []string{}, err
-	} else {
-		return urlString, urlParts, nil
+		return "", nil, err
 	}
+	return urlString, urlParts, nil
 }
 
 const initialPage = 1 // page to start listing from
@@ -1201,6 +1204,10 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 
 func extractGistID(urlParts []string) string {
 	return urlParts[len(urlParts)-1]
+}
+
+func isGistUrl(urlParts []string) bool {
+	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
