@@ -441,6 +441,31 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
           extra_args: --only-verified
 ```
 
+## TruffleHog GitLab CI
+
+### Example Usage
+
+```yaml
+stages:
+  - security
+  
+security-secrets:
+  stage: security
+  allow_failure: false
+  image: alpine:latest
+  variables:
+    SCAN_PATH: "." # Set the relative path in the repo to scan
+  before_script:
+    - apk add --no-cache git curl jq
+    - curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+  script:
+    - trufflehog filesystem "$SCAN_PATH" --only-verified --fail --json | jq
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+```
+
+In the example pipeline above, we're scanning for live secrets in all repository directories and files. This job runs only when the pipeline source is a merge request event, meaning it's triggered when a new merge request is created.
+
 ## Pre-commit Hook
 
 TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
