@@ -849,12 +849,11 @@ func (s *Source) handleRateLimit(errIn error) bool {
 		return false
 	}
 
-	rateLimitMu.RLock()
-	resumeTime := rateLimitResumeTime
-	rateLimitMu.RUnlock()
-
 	var retryAfter time.Duration
-	if resumeTime.IsZero() || time.Now().After(resumeTime) {
+	rateLimitMu.Lock()
+	defer rateLimitMu.Unlock()
+
+	if rateLimitResumeTime.IsZero() || time.Now().After(rateLimitResumeTime) {
 		rateLimitMu.Lock()
 
 		var (
@@ -865,23 +864,23 @@ func (s *Source) handleRateLimit(errIn error) bool {
 			rateLimit  *github.RateLimitError
 			abuseLimit *github.AbuseRateLimitError
 		)
-		if errors.As(errIn, &rateLimit) {
+		switch {
+		case errors.As(errIn, &rateLimit):
 			limitType = "primary"
 			rate := rateLimit.Rate
 			if rate.Remaining == 0 { // TODO: Will we ever receive a |RateLimitError| when remaining > 0?
 				retryAfter = rate.Reset.Sub(now)
 			}
-		} else if errors.As(errIn, &abuseLimit) {
+		case errors.As(errIn, &abuseLimit):
 			limitType = "secondary"
 			retryAfter = abuseLimit.GetRetryAfter()
-		} else {
-			rateLimitMu.Unlock()
+		default:
 			return false
 		}
 
 		jitter := time.Duration(rand.Intn(10)+1) * time.Second
 		if retryAfter > 0 {
-			retryAfter = retryAfter + jitter
+			retryAfter += jitter
 			rateLimitResumeTime = now.Add(retryAfter)
 			s.log.V(0).Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		} else {
@@ -890,10 +889,8 @@ func (s *Source) handleRateLimit(errIn error) bool {
 			// TODO: Use exponential backoff instead of static retry time.
 			s.log.V(0).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		}
-
-		rateLimitMu.Unlock()
 	} else {
-		retryAfter = time.Until(resumeTime)
+		retryAfter = time.Until(rateLimitResumeTime)
 	}
 
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
