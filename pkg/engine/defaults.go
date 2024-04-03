@@ -1593,7 +1593,6 @@ func DefaultDetectors() []detectors.Detector {
 		azuredevopspersonalaccesstoken.Scanner{},
 		azuresearchadminkey.Scanner{},
 		azuresearchquerykey.Scanner{},
-		jiratokenv2.Scanner{},
 		googleoauth2.Scanner{},
 		dockerhubv2.Scanner{},
 		&jupiterone.Scanner{},
