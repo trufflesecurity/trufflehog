@@ -1,6 +1,6 @@
 module github.com/trufflesecurity/trufflehog/v3
 
-go 1.22.0
+go 1.22.2
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2.7
 
