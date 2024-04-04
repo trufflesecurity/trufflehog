@@ -132,7 +132,6 @@ func TestBase64_FromChunk(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Parallel()
 		t.Run(tt.name, func(t *testing.T) {
 			d := &Base64{}
 			got := d.FromChunk(tt.chunk)
