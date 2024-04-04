@@ -2,7 +2,7 @@ package sources
 
 import (
 	"errors"
-	"strings"
+	"fmt"
 	"sync"
 )
 
@@ -35,17 +35,7 @@ func (s *ScanErrors) Count() uint64 {
 func (s *ScanErrors) String() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	var sb strings.Builder
-	sb.WriteString("[")
-	for i, err := range s.errors {
-		sb.WriteString(`"` + err.Error() + `"`)
-		if i < len(s.errors)-1 {
-			sb.WriteString(", ")
-		}
-	}
-	sb.WriteString("]")
-	return sb.String()
+	return fmt.Sprintf("%v", s.errors)
 }
 
 func (s *ScanErrors) Errors() error {

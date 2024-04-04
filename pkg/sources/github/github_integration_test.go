@@ -53,11 +53,11 @@ func TestSource_Token(t *testing.T) {
 	}
 
 	s := Source{
-		conn:          conn,
-		httpClient:    common.SaneHttpClient(),
-		log:           logr.Discard(),
-		memberCache:   map[string]struct{}{},
-		repoInfoCache: newRepoInfoCache(),
+		conn:        conn,
+		httpClient:  common.SaneHttpClient(),
+		log:         logr.Discard(),
+		memberCache: map[string]struct{}{},
+		repoSizes:   newRepoSize(),
 	}
 	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), nil, nil)
 
