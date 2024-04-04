@@ -714,6 +714,7 @@ func TestGetRepoURLParts(t *testing.T) {
 	tests := []string{
 		"https://github.com/trufflesecurity/trufflehog.git",
 		"git+https://github.com/trufflesecurity/trufflehog.git",
+		//"git@github.com:trufflesecurity/trufflehog.git"
 		"ssh://github.com/trufflesecurity/trufflehog.git",
 		"ssh://git@github.com/trufflesecurity/trufflehog.git",
 		"git+ssh://git@github.com/trufflesecurity/trufflehog.git",
