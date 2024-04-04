@@ -404,59 +404,31 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	}
 
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
-
-RepoLoop:
 	for _, repo := range s.filteredRepoCache.Values() {
-		repoCtx := context.WithValue(ctx, "repo", repo)
-
 		r, ok := repo.(string)
 		if !ok {
-			repoCtx.Logger().Error(fmt.Errorf("type assertion failed"), "Unexpected value in cache")
+			ctx.Logger().Error(fmt.Errorf("type assertion failed"), "unexpected value in cache", "repo", repo)
 			continue
 		}
 
-		// Ensure that |s.repoInfoCache| contains an entry for |repo|.
-		// This compensates for differences in enumeration logic between `--org` and `--repo`.
-		// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
-		if _, ok := s.repoInfoCache.get(r); !ok {
-			repoCtx.Logger().V(2).Info("Caching repository info")
+		_, urlParts, err := getRepoURLParts(r)
+		if err != nil {
+			ctx.Logger().Error(err, "failed to parse repository URL")
+			continue
+		}
 
-			_, urlParts, err := getRepoURLParts(r)
+		// Ignore any gists in |s.filteredRepoCache|.
+		// Repos have three parts (github.com, owner, name), gists have two.
+		if len(urlParts) == 3 {
+			// Ensure that individual repos specified in --repo are cached.
+			// Gists should be cached elsewhere.
+			// https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
+			ghRepo, _, err := s.apiClient.Repositories.Get(ctx, urlParts[1], urlParts[2])
 			if err != nil {
-				repoCtx.Logger().Error(err, "Failed to parse repository URL")
+				ctx.Logger().Error(err, "failed to fetch repository")
 				continue
 			}
-
-			if strings.EqualFold(urlParts[0], "gist.github.com") {
-				// Cache gist info.
-				for {
-					gistID := extractGistID(urlParts)
-					gist, _, err := s.apiClient.Gists.Get(repoCtx, gistID)
-					if s.handleRateLimit(err) {
-						continue
-					}
-					if err != nil {
-						repoCtx.Logger().Error(err, "Failed to fetch gist")
-						continue RepoLoop
-					}
-					s.cacheGistInfo(gist)
-					break
-				}
-			} else {
-				// Cache repository info.
-				for {
-					ghRepo, _, err := s.apiClient.Repositories.Get(repoCtx, urlParts[1], urlParts[2])
-					if s.handleRateLimit(err) {
-						continue
-					}
-					if err != nil {
-						repoCtx.Logger().Error(err, "Failed to fetch repository")
-						continue RepoLoop
-					}
-					s.cacheRepoInfo(ghRepo)
-					break
-				}
-			}
+			s.cacheRepoInfo(ghRepo)
 		}
 		s.repos = append(s.repos, r)
 	}
@@ -930,7 +902,16 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 
 		for _, gist := range gists {
 			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
-			s.cacheGistInfo(gist)
+
+			info := repoInfo{
+				owner: gist.GetOwner().GetLogin(),
+			}
+			if gist.GetPublic() {
+				info.visibility = source_metadatapb.Visibility_public
+			} else {
+				info.visibility = source_metadatapb.Visibility_private
+			}
+			s.repoInfoCache.put(gist.GetGitPullURL(), info)
 		}
 
 		if res == nil || res.NextPage == 0 {
@@ -1017,7 +998,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	logger := s.log.WithValues("user", user)
 	for {
 		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
-		if s.handleRateLimit(err) {
+		if handled := s.handleRateLimit(err); handled {
 			continue
 		}
 		if err != nil {
