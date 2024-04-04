@@ -46,6 +46,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.19.1
 	github.com/google/go-github/v57 v57.0.0
+	github.com/google/go-github/v61 v61.0.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.12.3
 	github.com/h2non/filetype v1.1.3
