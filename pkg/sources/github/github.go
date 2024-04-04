@@ -417,19 +417,12 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 			continue
 		}
 
-		// Ignore any gists in |s.filteredRepoCache|.
-		// Repos have three parts (github.com, owner, name), gists have two.
-		if len(urlParts) == 3 {
-			// Ensure that individual repos specified in --repo are cached.
-			// Gists should be cached elsewhere.
-			// https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
-			ghRepo, _, err := s.apiClient.Repositories.Get(ctx, urlParts[1], urlParts[2])
-			if err != nil {
-				ctx.Logger().Error(err, "failed to fetch repository")
-				continue
-			}
-			s.cacheRepoInfo(ghRepo)
+		ghRepo, _, err := s.apiClient.Repositories.Get(ctx, urlParts[1], urlParts[2])
+		if err != nil {
+			ctx.Logger().Error(err, "failed to fetch repository")
+			continue
 		}
+		s.cacheRepoInfo(ghRepo)
 		s.repos = append(s.repos, r)
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
