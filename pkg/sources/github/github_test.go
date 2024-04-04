@@ -16,7 +16,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v61/github"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -780,7 +780,7 @@ func TestGetRepoURLParts(t *testing.T) {
 	tests := []string{
 		"https://github.com/trufflesecurity/trufflehog.git",
 		"git+https://github.com/trufflesecurity/trufflehog.git",
-		//"git@github.com:trufflesecurity/trufflehog.git",
+		// "git@github.com:trufflesecurity/trufflehog.git",
 		"ssh://github.com/trufflesecurity/trufflehog.git",
 		"ssh://git@github.com/trufflesecurity/trufflehog.git",
 		"git+ssh://git@github.com/trufflesecurity/trufflehog.git",
