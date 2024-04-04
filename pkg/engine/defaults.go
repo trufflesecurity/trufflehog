@@ -481,6 +481,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/overloop"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/owlbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/packagecloud"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pagarme"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pagerdutyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pandadoc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pandascore"
@@ -1584,6 +1585,7 @@ func DefaultDetectors() []detectors.Detector {
 		rabbitmq.Scanner{},
 		planetscale.Scanner{},
 		portainertoken.Scanner{},
+		pagarme.Scanner{},
 		planetscaledb.Scanner{},
 		azure.Scanner{},
 		azurestorage.Scanner{},
