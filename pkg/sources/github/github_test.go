@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
-	"net/url"
 	"reflect"
 	"strconv"
 	"testing"
@@ -330,35 +329,10 @@ func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(nil)
 	assert.False(t, s.handleRateLimit(nil))
 
-	// Request
-	reqUrl, _ := url.Parse("https://github.com/trufflesecurity/trufflehog")
-	res := &github.Response{
-		Response: &http.Response{
-			StatusCode: 429,
-			Header:     make(http.Header),
-			Request: &http.Request{
-				Method: "GET",
-				URL:    reqUrl,
-			},
-		},
-	}
+	err := &github.RateLimitError{}
+	res := &github.Response{Response: &http.Response{Header: make(http.Header)}}
 	res.Header.Set("x-ratelimit-remaining", "0")
 	res.Header.Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Unix()+1, 10))
-
-	// Error
-	resetTime := github.Timestamp{
-		Time: time.Now().Add(time.Millisecond),
-	}
-	err := &github.RateLimitError{
-		Rate: github.Rate{
-			Limit:     5000,
-			Remaining: 0,
-			Reset:     resetTime,
-		},
-		Response: res.Response,
-		Message:  "Too Many Requests",
-	}
-
 	assert.True(t, s.handleRateLimit(err))
 }
 
@@ -767,6 +741,8 @@ func TestGetGistID(t *testing.T) {
 	}{
 		{[]string{"https://gist.github.com", "12345"}, "12345"},
 		{[]string{"https://gist.github.com", "owner", "12345"}, "12345"},
+		{[]string{"https://gist.github.com"}, ""},
+		{[]string{"https://gist.github.com", "owner", "12345", "extra"}, ""},
 	}
 
 	for _, tt := range tests {

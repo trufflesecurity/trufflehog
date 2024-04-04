@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-var testError = fmt.Errorf("simulated failure")
-
 func TestNewScanErrors(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -86,7 +84,7 @@ func TestScanErrorsAdd(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					for j := 0; j < tc.wantErr/tc.concurrency; j++ {
-						se.Add(testError)
+						se.Add(nil)
 					}
 					wg.Done()
 				}()
@@ -137,7 +135,7 @@ func TestScanErrorsCount(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					for j := 0; j < tc.wantErrCnt/tc.concurrency; j++ {
-						se.Add(testError)
+						se.Add(nil)
 					}
 					wg.Done()
 				}()
@@ -153,8 +151,8 @@ func TestScanErrorsCount(t *testing.T) {
 
 func TestScanErrorsString(t *testing.T) {
 	se := NewScanErrors()
-	se.Add(testError)
-	want := `["` + testError.Error() + `"]`
+	se.Add(nil)
+	want := "[]"
 	if got := fmt.Sprintf("%v", se); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

@@ -1151,8 +1151,8 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 	return nil
 }
 
-func extractGistID(urlParts []string) string {
-	return urlParts[len(urlParts)-1]
+func extractGistID(url []string) string {
+	return url[len(url)-1]
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
