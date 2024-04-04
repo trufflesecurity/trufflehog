@@ -74,6 +74,24 @@ func TestSlack_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "account_inactive",
+			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"ok": false, "error": "account_inactive"}`)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
+				verify: true,
+			},
+			wantResults: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Slack,
+					Verified:     false,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
