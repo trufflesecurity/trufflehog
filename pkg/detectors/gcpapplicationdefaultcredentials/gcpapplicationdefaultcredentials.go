@@ -100,7 +100,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		return false, nil, err
 	}
 
-	// Credential not loaded. Not sure this can happend but it should be labeled unverified.
+	// Credential not loaded. Not sure this can happened but it should be labeled unverified.
 	if credentials == nil {
 		return false, nil, nil
 	}
