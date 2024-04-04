@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -91,6 +92,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// Slack API returns 200 even if the token is invalid. We need to check the error field.
 					} else if authResponse.Error == "invalid_auth" {
 						// The secret is determinately not verified (nothing to do)
+					} else if authResponse.Error == "account_inactive" {
+						// This happens for bot tokens that were authorized by now-deactivated users. They are
+						// considered unverified because reactivating the associated integration regenerates all of its
+						// tokens
+						// (https://slack.com/help/articles/360000446446-Manage-deactivated-members-apps-and-integrations)
 					} else {
 						err = fmt.Errorf("unexpected error auth response %+v", authResponse.Error)
 						s1.SetVerificationError(err, token)
