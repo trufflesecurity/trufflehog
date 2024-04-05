@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	gitlabGroupsEnumerated = promauto.NewCounterVec(prometheus.CounterOpts{
+	gitlabGroupsEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "gitlab_groups_enumerated",

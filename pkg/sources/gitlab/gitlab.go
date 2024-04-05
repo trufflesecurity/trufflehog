@@ -470,7 +470,7 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	ctx.Logger().Info("beginning group enumeration", "options", listGroupsOptions)
-	gitlabGroupsEnumerated.Reset()
+	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
 
 	var groups []*gitlab.Group
 	for {
