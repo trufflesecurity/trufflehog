@@ -71,7 +71,7 @@ docker run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github 
 #### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
 
 ```bash
-docker run --rm -it -v "$(Resolve-Path . | % { $_.Path -replace '\\', '/' }):/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+docker run --rm -v "${PWD}:/pwd" trufflesecurity/trufflehog github --repo https://github.com/trufflesecurity/test_keys
 ```
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
