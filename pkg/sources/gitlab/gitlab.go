@@ -469,6 +469,8 @@ func (s *Source) getAllProjectRepos(
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
+	ctx.Logger().Info("beginning group enumeration", "options", listGroupsOptions)
+
 	var groups []*gitlab.Group
 	for {
 		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
@@ -485,6 +487,8 @@ func (s *Source) getAllProjectRepos(
 			break
 		}
 	}
+
+	ctx.Logger().Info("got groups", "group_count", len(groups))
 
 	for _, group := range groups {
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
