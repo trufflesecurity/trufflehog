@@ -471,7 +471,9 @@ func (s *Source) getAllProjectRepos(
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
-	ctx.Logger().Info("beginning group enumeration", "options", listGroupsOptions)
+	ctx.Logger().Info("beginning group enumeration",
+		"list_options", listOpts,
+		"all_available", *listGroupsOptions.AllAvailable)
 	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
 
 	var groups []*gitlab.Group
