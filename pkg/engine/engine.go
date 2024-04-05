@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +26,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/report"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -405,35 +405,10 @@ func (e *Engine) initSourceManager(ctx context.Context) {
 		sources.WithBufferedOutput(defaultChannelBuffer),
 	}
 	if e.jobReportWriter != nil {
-		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
-		opts = append(opts, sources.WithReportHook(unitHook))
-		e.wgDetectorWorkers.Add(1)
-		go func() {
-			defer e.wgDetectorWorkers.Done()
-			defer func() {
-				e.jobReportWriter.Close()
-				// Add a bit of extra information if it's a *os.File.
-				if namer, ok := e.jobReportWriter.(interface{ Name() string }); ok {
-					ctx.Logger().Info("report written", "path", namer.Name())
-				} else {
-					ctx.Logger().Info("report written")
-				}
-			}()
-			for metrics := range finishedMetrics {
-				metrics.Errors = common.ExportErrors(metrics.Errors...)
-				details, err := json.Marshal(map[string]any{
-					"version": 1,
-					"data":    metrics,
-				})
-				if err != nil {
-					ctx.Logger().Error(err, "error marshalling job details")
-					continue
-				}
-				if _, err := e.jobReportWriter.Write(append(details, '\n')); err != nil {
-					ctx.Logger().Error(err, "error writing to file")
-				}
-			}
-		}()
+		reporter := report.New(
+			report.WithWriter(ctx, e.jobReportWriter),
+		)
+		opts = append(opts, sources.WithReportHook(reporter))
 	}
 	e.sourceManager = sources.NewManager(opts...)
 }

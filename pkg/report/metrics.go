@@ -1,4 +1,4 @@
-package sources
+package report
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
@@ -7,11 +7,10 @@ import (
 )
 
 var (
-	hooksExecTime = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	hooksChannelSize = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
-		Name:      "hooks_exec_time_ms",
-		Help:      "Time spent executing hooks (ms)",
-		Buckets:   []float64{5, 50, 500, 1000},
+		Name:      "hooks_channel_size",
+		Help:      "Total number of metrics waiting in the finished channel.",
 	}, nil)
 )
