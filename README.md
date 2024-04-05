@@ -46,35 +46,35 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --or
 
 Several options available for you:
 
-## MacOS users
+### MacOS users
 
 ```bash
 brew install trufflehog
 ```
 
-## Docker:
+### Docker:
 
 <sub><i>*Ensure Docker engine is running before executing the following commands:*</i></sub>
 
-### &nbsp;&nbsp;&nbsp;&nbsp;Unix
+#### &nbsp;&nbsp;&nbsp;&nbsp;Unix
 
 ```bash
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-### &nbsp;&nbsp;&nbsp;&nbsp;Windows Command Prompt
+#### &nbsp;&nbsp;&nbsp;&nbsp;Windows Command Prompt
 
 ```bash
 docker run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
+#### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
 
 ```bash
 docker run --rm -it -v "$(Resolve-Path . | % { $_.Path -replace '\\', '/' }):/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
+#### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
 
 ```bash
 docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
