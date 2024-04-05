@@ -202,7 +202,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	}
 
 	s.repos = repos
-	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	// We must sort the repos so we can resume later if necessary.
 	slices.Sort(s.repos)
 
@@ -392,6 +391,8 @@ func (s *Source) getAllProjectRepos(
 	ignoreRepo func(string) bool,
 	reporter sources.UnitReporter,
 ) error {
+	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
+
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 	if err != nil {
@@ -426,6 +427,7 @@ func (s *Source) getAllProjectRepos(
 			}
 			// Report the unit.
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
+			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
