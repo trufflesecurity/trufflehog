@@ -80,32 +80,32 @@ docker run --rm -it -v "$(Resolve-Path . | % { $_.Path -replace '\\', '/' }):/pw
 docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
 ```
 
-## Binary releases
+### Binary releases
 
 ```bash
 Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
 ```
 
-## Compile from source
+### Compile from source
 
 ```bash
 git clone https://github.com/trufflesecurity/trufflehog.git
 cd trufflehog; go install
 ```
 
-## Using installation script
+### Using installation script
 
 ```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 ```
 
-## Using installation script, verify checksum signature (requires cosign to be installed)
+### Using installation script, verify checksum signature (requires cosign to be installed)
 
 ```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
 ```
 
-## Using installation script to install a specific version
+### Using installation script to install a specific version
 
 ```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
