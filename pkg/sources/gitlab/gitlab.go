@@ -470,6 +470,7 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	ctx.Logger().Info("beginning group enumeration", "options", listGroupsOptions)
+	gitlabGroupsEnumerated.Reset()
 
 	var groups []*gitlab.Group
 	for {
@@ -482,6 +483,7 @@ func (s *Source) getAllProjectRepos(
 			break
 		}
 		groups = append(groups, groupList...)
+		gitlabGroupsEnumerated.WithLabelValues(s.name).Add(float64(len(groupList)))
 		listGroupsOptions.Page = res.NextPage
 		if res.NextPage == 0 {
 			break
