@@ -491,6 +491,7 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	ctx.Logger().Info("got groups", "group_count", len(groups))
+	ctx.Logger().V(2).Info("got groups", "groups", groups)
 
 	for _, group := range groups {
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
