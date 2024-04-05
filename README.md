@@ -46,30 +46,68 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --or
 
 Several options available for you:
 
+## MacOS users
+
 ```bash
-# MacOS users
 brew install trufflehog
+```
 
-# Docker
+## Docker:
+
+<sub><i>*Ensure Docker engine is running before executing the following commands:*</i></sub>
+
+### &nbsp;&nbsp;&nbsp;&nbsp;Unix
+
+```bash
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+```
 
-# Docker for M1 and M2 Mac
+### &nbsp;&nbsp;&nbsp;&nbsp;Windows Command Prompt
+
+```bash
+docker run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+```
+
+### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
+
+```bash
+docker run --rm -it -v "$(Resolve-Path . | % { $_.Path -replace '\\', '/' }):/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+```
+
+### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
+
+```bash
 docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+```
 
-# Binary releases
+## Binary releases
+
+```bash
 Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
+```
 
-# Compile from source
+## Compile from source
+
+```bash
 git clone https://github.com/trufflesecurity/trufflehog.git
 cd trufflehog; go install
+```
 
-# Using installation script
+## Using installation script
+
+```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+```
 
-# Using installation script, verify checksum signature (requires cosign to be installed)
+## Using installation script, verify checksum signature (requires cosign to be installed)
+
+```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
+```
 
-# Using installation script to install a specific version
+## Using installation script to install a specific version
+
+```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
 
@@ -159,7 +197,7 @@ Expected output:
 ...
 ```
 
-## 4: Scan a GitHub Repo + its Issues and Pull Requests.
+## 4: Scan a GitHub Repo + its Issues and Pull Requests
 
 ```bash
 trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
@@ -189,13 +227,13 @@ docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest 
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 9: Scan GCS buckets for verified secrets.
+## 9: Scan GCS buckets for verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
-## 10: Scan a Docker image for verified secrets.
+## 10: Scan a Docker image for verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -319,7 +357,7 @@ Args:
 For example, to scan a `git` repository, start with
 
 ```
-$ trufflehog git https://github.com/trufflesecurity/trufflehog.git
+trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
 
 ## S3
@@ -379,7 +417,6 @@ jobs:
 
 In the example config above, we're scanning for live secrets in all PRs and Pushes to `main`. Only code changes in the referenced commits are scanned. If you'd like to scan an entire branch, please see the "Advanced Usage" section below.
 
-
 ### Shallow Cloning
 
 If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example for how to do it:
@@ -409,6 +446,7 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
 Depending on the event type (push or PR), we calculate the number of commits present. Then we add 2, so that we can reference a base commit before our code changes. We pass that integer value to the `fetch-depth` flag in the checkout action in addition to the relevant branch. Now our checkout process should be much shorter.
 
 ### Canary detection
+
 TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/) and lets you know when they're present without setting them off. You can learn more here: [https://trufflesecurity.com/canaries](https://trufflesecurity.com/canaries)
 
 ![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
@@ -432,6 +470,7 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
 
 #### Advanced Usage: Scan entire branch
+
 ```
 - name: scan-push
         uses: trufflesecurity/trufflehog@main
@@ -524,7 +563,6 @@ detectors:
           - "Authorization: super secret authorization header"
 ```
 
-
 ```
 $ trufflehog filesystem /tmp --config config.yaml --only-verified
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
@@ -535,6 +573,7 @@ Decoder Type: PLAIN
 Raw result: HOGAAIUNNWHAHJJWUQYR
 File: /tmp/hog-facts.txt
 ```
+
 Data structure sent to the custom verification server:
 
 ```
@@ -625,6 +664,6 @@ Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE
 
 # :money_with_wings: Enterprise product
 
-Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
+Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more <https://trufflesecurity.com/contact/>
 
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
