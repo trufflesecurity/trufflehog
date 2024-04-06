@@ -211,6 +211,14 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
 ```
 
+## 12: Scan a Postman workspace
+
+Use the `--workspace`, `--collection`, `--environment` flags multiple times to scan multiple targets.
+
+```bash
+trufflehog postman --token=<postman api token> --workspace=<workspace id>
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -432,6 +440,31 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
           head: ${{ github.ref_name }}
           extra_args: --only-verified
 ```
+
+## TruffleHog GitLab CI
+
+### Example Usage
+
+```yaml
+stages:
+  - security
+  
+security-secrets:
+  stage: security
+  allow_failure: false
+  image: alpine:latest
+  variables:
+    SCAN_PATH: "." # Set the relative path in the repo to scan
+  before_script:
+    - apk add --no-cache git curl jq
+    - curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+  script:
+    - trufflehog filesystem "$SCAN_PATH" --only-verified --fail --json | jq
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+```
+
+In the example pipeline above, we're scanning for live secrets in all repository directories and files. This job runs only when the pipeline source is a merge request event, meaning it's triggered when a new merge request is created.
 
 ## Pre-commit Hook
 

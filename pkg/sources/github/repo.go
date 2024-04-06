@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v61/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -297,6 +297,18 @@ func (s *Source) cacheRepoInfo(r *github.Repository) {
 	s.repoInfoCache.put(r.GetCloneURL(), info)
 }
 
+func (s *Source) cacheGistInfo(g *github.Gist) {
+	info := repoInfo{
+		owner: g.GetOwner().GetLogin(),
+	}
+	if g.GetPublic() {
+		info.visibility = source_metadatapb.Visibility_public
+	} else {
+		info.visibility = source_metadatapb.Visibility_private
+	}
+	s.repoInfoCache.put(g.GetGitPullURL(), info)
+}
+
 // wikiIsReachable returns true if https://github.com/$org/$repo/wiki is not redirected.
 // Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
 // but still don't have a cloneable wiki.
@@ -329,12 +341,19 @@ type commitQuery struct {
 // getDiffForFileInCommit retrieves the diff for a specified file in a commit.
 // If the file or its diff is not found, it returns an error.
 func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	commit, _, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-	if s.handleRateLimit(err) {
-		return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
-	}
-	if err != nil {
-		return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+	var (
+		commit *github.RepositoryCommit
+		err    error
+	)
+	for {
+		commit, _, err = s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+		if s.handleRateLimit(err) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+		}
+		break
 	}
 
 	if len(commit.Files) == 0 {

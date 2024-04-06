@@ -17,7 +17,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alconost"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alegra"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aletheiaapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/algoliaadminkey"
@@ -208,7 +207,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub"
+	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
+	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/documo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docusign"
@@ -280,6 +280,7 @@ import (
 	fullstoryv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcpapplicationdefaultcredentials"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gengo"
@@ -358,6 +359,7 @@ import (
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jotform"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jumpcloud"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jupiterone"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/juro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanban"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kanbantool"
@@ -451,7 +453,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nicereply"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nightfall"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nimble"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nitro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/noticeable"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/notion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nozbeteams"
@@ -1015,7 +1016,8 @@ func DefaultDetectors() []detectors.Detector {
 		&doppler.Scanner{},
 		&codacy.Scanner{},
 		&gocardless.Scanner{},
-		&alconost.Scanner{},
+		// The service currently has blocked requests with a "TruffleHog" UserAgent.
+		// &alconost.Scanner{},
 		&rawg.Scanner{},
 		&accuweather.Scanner{},
 		&tomtom.Scanner{},
@@ -1114,7 +1116,6 @@ func DefaultDetectors() []detectors.Detector {
 		billomat.Scanner{},
 		blogger.Scanner{},
 		front.Scanner{},
-		nitro.Scanner{},
 		apify.Scanner{},
 		dynalist.Scanner{},
 		mavenlink.Scanner{},
@@ -1538,7 +1539,7 @@ func DefaultDetectors() []detectors.Detector {
 		prefect.Scanner{},
 		buildkitev2.Scanner{},
 		opsgenie.Scanner{},
-		dockerhub.Scanner{},
+		dockerhubv1.Scanner{},
 		couchbase.Scanner{},
 		envoyapikey.Scanner{},
 		github_oauth2.Scanner{},
@@ -1591,10 +1592,12 @@ func DefaultDetectors() []detectors.Detector {
 		// azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		azuredevopspersonalaccesstoken.Scanner{},
 		azuresearchadminkey.Scanner{},
-		&azuresearchquerykey.Scanner{},
-		&googleoauth2.Scanner{},
+		azuresearchquerykey.Scanner{},
+		googleoauth2.Scanner{},
+		dockerhubv2.Scanner{},
+		&jupiterone.Scanner{},
+		gcpapplicationdefaultcredentials.Scanner{},
 	}
-
 }
 
 func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {

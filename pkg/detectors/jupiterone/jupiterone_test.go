@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package slack
+package jupiterone
 
 import (
 	"context"
@@ -12,82 +12,78 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestSlack_FromChunk(t *testing.T) {
+func TestJupiterone_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SLACK")
-	secretInactive := testSecrets.MustGetField("SLACK_INACTIVE")
+	secret := testSecrets.MustGetField("JUPITERONE")
+	inactiveSecret := testSecrets.MustGetField("JUPITERONE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
 		data   []byte
 		verify bool
 	}
-
 	tests := []struct {
 		name                string
 		s                   Scanner
 		args                args
-		wantResults         []detectors.Result
+		want                []detectors.Result
 		wantErr             bool
 		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a jupiterone secret %s within", secret)),
 				verify: true,
 			},
-			wantResults: []detectors.Result{
+			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     true,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
-			name: "found but unverified",
+			name: "found, unverified",
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secretInactive)),
+				data:   []byte(fmt.Sprintf("You can find a jupiterone secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
-			wantResults: []detectors.Result{
+			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
-			name: "account_inactive",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"ok": false, "error": "account_inactive"}`)},
+			name: "not found",
+			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
+				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			wantResults: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Slack,
-					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
-				},
-			},
+			want:                nil,
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
@@ -96,32 +92,30 @@ func TestSlack_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a jupiterone secret %s within", secret)),
 				verify: true,
 			},
-			wantResults: []detectors.Result{
+			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
 		{
-			name: "unexpected auth response",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"ok": false, "error": "unexpected_error"}`)},
+			name: "found, verified but unexpected api surface",
+			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a jupiterone secret %s within", secret)),
 				verify: true,
 			},
-			wantResults: []detectors.Result{
+			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Slack,
+					DetectorType: detectorspb.DetectorType_JupiterOne,
 					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
 			wantErr:             false,
@@ -132,23 +126,20 @@ func TestSlack_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Slack.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Jupiterone.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
-
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.wantResults, ignoreOpts); diff != "" {
-				t.Errorf("Slack.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("Jupiterone.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

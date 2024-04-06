@@ -1,4 +1,4 @@
-package dockerhub
+package dockerhubv2
 
 import (
 	"context"
@@ -21,22 +21,25 @@ type Scanner struct {
 	client *http.Client
 }
 
+func (s Scanner) Version() int { return 1 }
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	// Can use email or username for login.
-	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
+	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
 	emailPat    = regexp.MustCompile(`(` + common.EmailPattern + `)`)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(`\b(dckr_pat_[a-zA-Z0-9_-]{27})(?:[^a-zA-Z0-9_-]|\z)`)
+	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"dckr_pat_"}
+	return []string{"docker"}
 }
 
 // FromData will find and optionally verify Dockerhub secrets in a given set of bytes.
