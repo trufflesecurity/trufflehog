@@ -199,10 +199,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 		if err := s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter); err != nil {
 			return err
 		}
+	} else {
+		gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	}
 
 	s.repos = repos
-	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	// We must sort the repos so we can resume later if necessary.
 	slices.Sort(s.repos)
 
