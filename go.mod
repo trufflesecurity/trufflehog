@@ -74,10 +74,10 @@ require (
 	github.com/snowflakedb/gosnowflake v1.8.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/testcontainers/testcontainers-go v0.29.1
-	github.com/testcontainers/testcontainers-go/modules/mssql v0.29.1
-	github.com/testcontainers/testcontainers-go/modules/mysql v0.29.1
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.29.1
+	github.com/testcontainers/testcontainers-go v0.30.0
+	github.com/testcontainers/testcontainers-go/modules/mssql v0.30.0
+	github.com/testcontainers/testcontainers-go/modules/mysql v0.30.0
+	github.com/testcontainers/testcontainers-go/modules/postgres v0.30.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.5.2
 	github.com/xanzy/go-gitlab v0.101.0
