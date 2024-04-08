@@ -202,6 +202,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	}
 
 	s.repos = repos
+	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	// We must sort the repos so we can resume later if necessary.
 	slices.Sort(s.repos)
 
@@ -729,11 +730,13 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 	// Report all repos if specified.
 	if len(repos) > 0 {
+		gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 		for _, repo := range repos {
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: repo}
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
+			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 		}
 		return nil
 	}
