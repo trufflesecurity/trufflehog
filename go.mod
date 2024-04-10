@@ -60,6 +60,7 @@ require (
 	github.com/lrstanley/bubblezone v0.0.0-20240125042004-b7bafc493195
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/microsoft/go-mssqldb v1.7.0
 	github.com/mitchellh/go-ps v1.0.0
@@ -120,7 +121,6 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/Microsoft/hcsshim v0.11.4 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
-	github.com/alecthomas/chroma v0.10.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.6 // indirect
