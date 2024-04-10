@@ -70,8 +70,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(idMatch, detectors.DefaultFalsePositives, true) && detectors.IsKnownFalsePositive(secretMatch, detectors.DefaultFalsePositives, true) {
-				continue
+			if !s1.Verified {
+				if detectors.IsKnownFalsePositive(idMatch, detectors.DefaultFalsePositives, true) ||
+					detectors.IsKnownFalsePositive(secretMatch, detectors.DefaultFalsePositives, true) {
+					continue
+				}
 			}
 
 			results = append(results, s1)
