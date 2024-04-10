@@ -85,15 +85,15 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	switch res.StatusCode {
+	case http.StatusOK:
 		// If the endpoint returns useful information, we can return it as a map.
 		return true, nil, nil
-	} else if res.StatusCode == 401 {
+	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
-	} else {
-		err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-		return false, nil, err
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
