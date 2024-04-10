@@ -27,9 +27,15 @@ func TestWiz_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "wiz_token = '3aBcDFE5678901234567890_1a2b3c4d'",
-			want:  []string{"3aBcDFE5678901234567890_1a2b3c4d"},
+			name: "typical pattern",
+			input: `
+wiz_client_id = 'lmSlx1fe6yCfwAbDa8pMp9sJDM9rZzDblmSlx1fe6yCfwAbDa8pMp'
+wiz_client_secret = 'lmSlx1fe6yCfwAbDa8pMp9sJDM9rZzDblmSlx1fe6yCfwAbDa8pMp9sJDM9rZzDb'
+`,
+			want: []string{
+				"lmSlx1fe6yCfwAbDa8pMp9sJDM9rZzDblmSlx1fe6yCfwAbDa8pMp" +
+					"lmSlx1fe6yCfwAbDa8pMp9sJDM9rZzDblmSlx1fe6yCfwAbDa8pMp9sJDM9rZzDb",
+			},
 		},
 	}
 
@@ -196,7 +202,7 @@ func TestWiz_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Wiz.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

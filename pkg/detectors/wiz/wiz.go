@@ -25,8 +25,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"wiz"}) + `\b([a-zA-Z0-9]{53})\b`) // TODO(shreyas.sriram) - Update regex
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"wiz"}) + `\b([a-zA-Z0-9]{64})\b`) // TODO(shreyas.sriram) - Update regex
+	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"wiz"}) + `\b([a-zA-Z0-9]{53})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"wiz"}) + `\b([a-zA-Z0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
