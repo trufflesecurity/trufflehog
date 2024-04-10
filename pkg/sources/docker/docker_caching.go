@@ -8,7 +8,7 @@ import (
 )
 
 // connectToLayersDB opens the SQLite database and returns a connection.
-func connectToLayersDB(dbName string) (*sql.DB, error) {
+func ConnectToLayersDB(dbName string) (*sql.DB, error) {
 	conn, err := sql.Open("sqlite3", dbName)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
@@ -18,15 +18,9 @@ func connectToLayersDB(dbName string) (*sql.DB, error) {
 
 // initializeDB initializes the SQLite database with the Digest table.
 // It returns an error if encountered
-func InitializeLayersDB(dbName string) error {
-	conn, err := connectToLayersDB(dbName)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
+func InitializeLayersDB(db *sql.DB) error {
 	// Execute SQL to create the Digest table if it does not exist
-	_, err = conn.Exec("CREATE TABLE IF NOT EXISTS digest (digest TEXT UNIQUE, verified BOOLEAN, unverified_with_error BOOLEAN, completed BOOLEAN)")
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS digest (digest TEXT UNIQUE, verified BOOLEAN, unverified_with_error BOOLEAN, completed BOOLEAN)")
 	if err != nil {
 		return err
 	}
@@ -36,14 +30,8 @@ func InitializeLayersDB(dbName string) error {
 // AddToLayersDB inserts a digest into the database. It ignores if the digest already exists.
 // Sets the secret and completed fields to false.
 // It returns an error if encountered
-func AddDigestToLayersDB(dbName string, digest string) error {
-	conn, err := connectToLayersDB(dbName)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	_, err = conn.Exec("INSERT OR REPLACE INTO digest (digest, verified, unverified_with_error, completed) VALUES (?, ?, ?, ?)", digest, false, false, false)
+func AddDigestToLayersDB(db *sql.DB, digest string) error {
+	_, err := db.Exec("INSERT OR REPLACE INTO digest (digest, verified, unverified_with_error, completed) VALUES (?, ?, ?, ?)", digest, false, false, false)
 	if err != nil {
 		return err
 	}
@@ -52,16 +40,9 @@ func AddDigestToLayersDB(dbName string, digest string) error {
 
 // UpdateStatusInLayersDB updates the completed field of a digest in the database.
 // It returns an error if encountered
-func UpdateStatusInLayersDB(dbName string, digest string, completed bool) error {
-	conn, err := connectToLayersDB(dbName)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
+func UpdateStatusInLayersDB(db *sql.DB, digest string, completed bool) error {
 	// Prepare the SQL statement for update
-	query := "UPDATE digest SET completed = ? WHERE digest = ?"
-	_, err = conn.Exec(query, completed, digest)
+	_, err := db.Exec("UPDATE digest SET completed = ? WHERE digest = ?", completed, digest)
 	if err != nil {
 		return err
 	}
@@ -71,15 +52,8 @@ func UpdateStatusInLayersDB(dbName string, digest string, completed bool) error 
 // SkipDockerLayer will return True iff the layer has been scanned before and no secrets were found.
 // This function factors in previously unverified secrets that had errors, since they could still be valid.
 // It returns an error if encountered
-func SkipDockerLayer(dbName string, digest string) (bool, error) {
-	conn, err := connectToLayersDB(dbName)
-	if err != nil {
-		return false, err
-	}
-	defer conn.Close()
-
-	// Query the database for the digest
-	rows, err := conn.Query("SELECT verified, unverified_with_error FROM digest WHERE digest = ? and completed = true", digest)
+func SkipDockerLayer(db *sql.DB, digest string) (bool, error) {
+	rows, err := db.Query("SELECT verified, unverified_with_error FROM digest WHERE digest = ? and completed = true", digest)
 	if err != nil {
 		return false, err
 	}
@@ -100,16 +74,8 @@ func SkipDockerLayer(dbName string, digest string) (bool, error) {
 
 // SetVerified sets the verified field of a digest in the database to true.
 // It returns an error if encountered
-func SetVerified(dbName string, digest string) error {
-	conn, err := connectToLayersDB(dbName)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Prepare the SQL statement for update
-	query := "UPDATE digest SET verified = true WHERE digest = ?"
-	_, err = conn.Exec(query, digest)
+func SetVerified(db *sql.DB, digest string) error {
+	_, err := db.Exec("UPDATE digest SET verified = true WHERE digest = ?", digest)
 	if err != nil {
 		return err
 	}
@@ -118,16 +84,8 @@ func SetVerified(dbName string, digest string) error {
 
 // SetUnverifiedWithError sets the unverified_with_error field of a digest in the database to true.
 // It returns an error if encountered
-func SetUnverifiedWithError(dbName string, digest string) error {
-	conn, err := connectToLayersDB(dbName)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Prepare the SQL statement for update
-	query := "UPDATE digest SET unverified_with_error = true WHERE digest = ?"
-	_, err = conn.Exec(query, digest)
+func SetUnverifiedWithError(db *sql.DB, digest string) error {
+	_, err := db.Exec("UPDATE digest SET unverified_with_error = true WHERE digest = ?", digest)
 	if err != nil {
 		return err
 	}

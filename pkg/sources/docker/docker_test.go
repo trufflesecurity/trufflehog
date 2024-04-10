@@ -1,8 +1,11 @@
 package docker
 
 import (
+	"database/sql"
 	"sync"
 	"testing"
+
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -108,5 +111,223 @@ func TestBaseAndTagFromImage(t *testing.T) {
 			t.Errorf("baseAndTagFromImage(%q) = (%q, %q, %v), want (%q, %q, %v)",
 				tt.image, gotBase, gotTag, gotDigest, tt.wantBase, tt.wantTag, tt.wantDigest)
 		}
+	}
+}
+
+func TestConnectToLayersDB(t *testing.T) {
+	dbName := ":memory:"
+	db, err := ConnectToLayersDB(dbName)
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+	db.Close()
+}
+
+func TestInitializeLayersDB(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	_, err = db.Query("SELECT digest, verified, unverified_with_error, completed FROM digest")
+	assert.NoError(t, err)
+}
+
+func TestAddDigestToLayersDB(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	err = AddDigestToLayersDB(db, "test-digest")
+	assert.NoError(t, err)
+
+	rows, err := db.Query("SELECT verified, unverified_with_error, completed FROM digest WHERE digest = ?", "test-digest")
+	assert.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var verified, unverifiedWithError, completed bool
+		err = rows.Scan(&verified, &unverifiedWithError, &completed)
+		assert.NoError(t, err)
+		assert.False(t, verified)
+		assert.False(t, unverifiedWithError)
+		assert.False(t, completed)
+	}
+}
+
+func TestReplaceDigestInLayersDB(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+
+	_, err = db.Exec("UPDATE digest SET verified = true, unverified_with_error = true, completed = true WHERE digest = ?", "test-digest")
+	assert.NoError(t, err)
+
+	err = AddDigestToLayersDB(db, "test-digest")
+	assert.NoError(t, err)
+
+	rows, err := db.Query("SELECT verified, unverified_with_error, completed FROM digest WHERE digest = ?", "test-digest")
+	assert.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var verified, unverifiedWithError, completed bool
+		err = rows.Scan(&verified, &unverifiedWithError, &completed)
+		assert.NoError(t, err)
+		assert.False(t, verified)
+		assert.False(t, unverifiedWithError)
+		assert.False(t, completed)
+	}
+}
+
+func TestUpdateStatusInLayersDB(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+	err = UpdateStatusInLayersDB(db, "test-digest", true)
+	assert.NoError(t, err)
+
+	rows, err := db.Query("SELECT completed FROM digest WHERE digest = ?", "test-digest")
+	assert.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var completed bool
+		err = rows.Scan(&completed)
+		assert.NoError(t, err)
+		assert.True(t, completed)
+	}
+}
+
+func TestSkipDockerLayerVerified(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+	SetVerified(db, "test-digest")
+	skipLayer, err := SkipDockerLayer(db, "test-digest")
+	assert.NoError(t, err)
+	assert.False(t, skipLayer)
+}
+
+func TestSkipDockerLayerUnverified(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+	SetUnverifiedWithError(db, "test-digest")
+	UpdateStatusInLayersDB(db, "test-digest", true)
+	skipLayer, err := SkipDockerLayer(db, "test-digest")
+	assert.NoError(t, err)
+	assert.False(t, skipLayer)
+}
+
+func TestSkipDockerLayerVerifiedAndUnverifiedTrue(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+	SetVerified(db, "test-digest")
+	SetUnverifiedWithError(db, "test-digest")
+	UpdateStatusInLayersDB(db, "test-digest", true)
+	skipLayer, err := SkipDockerLayer(db, "test-digest")
+	assert.NoError(t, err)
+	assert.False(t, skipLayer)
+}
+
+func TestSkipDockerLayerVerifiedAndUnverifiedFalse(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+	UpdateStatusInLayersDB(db, "test-digest", true)
+	skipLayer, err := SkipDockerLayer(db, "test-digest")
+	assert.NoError(t, err)
+	assert.True(t, skipLayer)
+}
+
+func TestSkipDockerLayerNoRows(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	skipLayer, err := SkipDockerLayer(db, "test-digest")
+	assert.NoError(t, err)
+	assert.False(t, skipLayer)
+}
+
+func TestSetVerified(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+	err = SetVerified(db, "test-digest")
+	assert.NoError(t, err)
+
+	rows, err := db.Query("SELECT verified FROM digest WHERE digest = ?", "test-digest")
+	assert.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var verified bool
+		err = rows.Scan(&verified)
+		assert.NoError(t, err)
+		assert.True(t, verified)
+	}
+}
+
+func TestSetUnverifiedWithError(t *testing.T) {
+	dbName := ":memory:"
+	db, _ := sql.Open("sqlite3", dbName)
+	defer db.Close()
+
+	err := InitializeLayersDB(db)
+	assert.NoError(t, err)
+
+	AddDigestToLayersDB(db, "test-digest")
+	err = SetUnverifiedWithError(db, "test-digest")
+	assert.NoError(t, err)
+
+	rows, err := db.Query("SELECT unverified_with_error FROM digest WHERE digest = ?", "test-digest")
+	assert.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var unverifiedWithError bool
+		err = rows.Scan(&unverifiedWithError)
+		assert.NoError(t, err)
+		assert.True(t, unverifiedWithError)
 	}
 }

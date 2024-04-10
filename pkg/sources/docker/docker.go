@@ -73,7 +73,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 
 	// If using layer caching, initialize the database.
 	if s.conn.Cache {
-		err := InitializeLayersDB(s.conn.CacheDb)
+		db, err := ConnectToLayersDB(s.conn.CacheDb)
+		if err != nil {
+			return fmt.Errorf("error connecting to layer cache database: %w", err)
+		}
+		err = InitializeLayersDB(db)
 		if err != nil {
 			return fmt.Errorf("error initializing layers database: %w", err)
 		}
@@ -205,7 +209,11 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 
 	// If using layer caching, check if layer already scanned. If no secrets found before, skip.
 	if s.conn.Cache {
-		skipLayer, err := SkipDockerLayer(s.conn.CacheDb, layerInfo.digest.String())
+		db, err := ConnectToLayersDB(s.conn.CacheDb)
+		if err != nil {
+			return fmt.Errorf("error connecting to layer cache database: %w", err)
+		}
+		skipLayer, err := SkipDockerLayer(db, layerInfo.digest.String())
 		if err != nil {
 			return err
 		}
@@ -213,7 +221,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 			ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("skipping previously scanned layer with no secrets")
 			return nil
 		}
-		AddDigestToLayersDB(s.conn.CacheDb, layerInfo.digest.String())
+		AddDigestToLayersDB(db, layerInfo.digest.String())
 	}
 
 	ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("scanning layer")
@@ -248,7 +256,11 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 
 	// If using layer caching, update layer cache db that layer has been scanned.
 	if s.conn.Cache {
-		UpdateStatusInLayersDB(s.conn.CacheDb, layerInfo.digest.String(), true)
+		db, err := ConnectToLayersDB(s.conn.CacheDb)
+		if err != nil {
+			return fmt.Errorf("error connecting to layer cache database: %w", err)
+		}
+		UpdateStatusInLayersDB(db, layerInfo.digest.String(), true)
 	}
 
 	return nil
