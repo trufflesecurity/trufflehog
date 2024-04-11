@@ -441,6 +441,7 @@ func TestDockerScanWithCacheVerifiedSecret(t *testing.T) {
 
 	s := &Source{}
 	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
@@ -501,6 +502,7 @@ func TestDockerScanWithCacheUnverifiedSecret(t *testing.T) {
 
 	s := &Source{}
 	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
@@ -564,6 +566,7 @@ func TestDockerScanWithCacheVerifiedAndUnverifiedSecret(t *testing.T) {
 
 	s := &Source{}
 	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
@@ -623,6 +626,7 @@ func TestDockerScanWithCacheVerifiedSecretNotCompleted(t *testing.T) {
 
 	s := &Source{}
 	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
@@ -681,6 +685,7 @@ func TestDockerScanWithCacheNoSecrets(t *testing.T) {
 
 	s := &Source{}
 	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)

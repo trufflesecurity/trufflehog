@@ -215,13 +215,16 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 		}
 		skipLayer, err := SkipDockerLayer(db, layerInfo.digest.String())
 		if err != nil {
-			return err
+			return fmt.Errorf("error checking if layer should be skipped: %w", err)
 		}
 		if skipLayer {
 			ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("skipping previously scanned layer with no secrets")
 			return nil
 		}
-		InsertReplaceDigest(db, layerInfo.digest.String())
+		err = InsertReplaceDigest(db, layerInfo.digest.String())
+		if err != nil {
+			return fmt.Errorf("error inserting layer into database: %w", err)
+		}
 	}
 
 	ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("scanning layer")
@@ -260,7 +263,10 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 		if err != nil {
 			return fmt.Errorf("error connecting to layer cache database: %w", err)
 		}
-		UpdateCompleted(db, layerInfo.digest.String(), true)
+		err = UpdateCompleted(db, layerInfo.digest.String(), true)
+		if err != nil {
+			return fmt.Errorf("error updating layer completion status: %w", err)
+		}
 	}
 
 	return nil

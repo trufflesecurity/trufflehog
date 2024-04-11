@@ -884,7 +884,10 @@ func (e *Engine) notifyResults(ctx context.Context) {
 			db, err := docker.ConnectToLayersDB(e.dockerCacheDb)
 			if err != nil {
 				ctx.Logger().Error(err, "error connecting to docker cache")
-				docker.UpdateCompleted(db, layer, false)
+				err = docker.UpdateCompleted(db, layer, false)
+				if err != nil {
+					ctx.Logger().Error(err, "error updating docker cache")
+				}
 			}
 			if r.Verified {
 				err = docker.UpdateVerified(db, layer, true)
@@ -893,7 +896,10 @@ func (e *Engine) notifyResults(ctx context.Context) {
 			}
 			if err != nil {
 				ctx.Logger().Error(err, "error adding to docker cache")
-				docker.UpdateCompleted(db, layer, false)
+				err = docker.UpdateCompleted(db, layer, false)
+				if err != nil {
+					ctx.Logger().Error(err, "error updating docker cache")
+				}
 			}
 		}
 
