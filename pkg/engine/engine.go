@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -882,21 +881,19 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		// Handle docker layer caching if applicable
 		if e.dockerCache && r.SourceType == sourcespb.SourceType_SOURCE_TYPE_DOCKER {
 			layer := r.SourceMetadata.GetDocker().Layer
-			var err error
-			var db *sql.DB
-			db, err = docker.ConnectToLayersDB(e.dockerCacheDb)
+			db, err := docker.ConnectToLayersDB(e.dockerCacheDb)
 			if err != nil {
 				ctx.Logger().Error(err, "error connecting to docker cache")
-				docker.UpdateStatusInLayersDB(db, layer, false)
+				docker.UpdateCompleted(db, layer, false)
 			}
 			if r.Verified {
-				err = docker.SetVerified(db, layer)
+				err = docker.UpdateVerified(db, layer, true)
 			} else if r.VerificationError() != nil {
-				err = docker.SetUnverifiedWithError(db, layer)
+				err = docker.UpdateUnverified(db, layer, true)
 			}
 			if err != nil {
 				ctx.Logger().Error(err, "error adding to docker cache")
-				docker.UpdateStatusInLayersDB(db, layer, false)
+				docker.UpdateCompleted(db, layer, false)
 			}
 		}
 

@@ -7,7 +7,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// connectToLayersDB opens the SQLite database and returns a connection.
+// ConnectToLayersDB opens the SQLite database and returns a connection.
 func ConnectToLayersDB(dbName string) (*sql.DB, error) {
 	conn, err := sql.Open("sqlite3", dbName)
 	if err != nil {
@@ -16,10 +16,10 @@ func ConnectToLayersDB(dbName string) (*sql.DB, error) {
 	return conn, nil
 }
 
-// initializeDB initializes the SQLite database with the Digest table.
+// InitializeLayersDB initializes the SQLite database with the digest table
+// Schema: digest (digest TEXT UNIQUE, verified BOOLEAN, unverified_with_error BOOLEAN, completed BOOLEAN)
 // It returns an error if encountered
 func InitializeLayersDB(db *sql.DB) error {
-	// Execute SQL to create the Digest table if it does not exist
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS digest (digest TEXT UNIQUE, verified BOOLEAN, unverified_with_error BOOLEAN, completed BOOLEAN)")
 	if err != nil {
 		return err
@@ -27,10 +27,10 @@ func InitializeLayersDB(db *sql.DB) error {
 	return nil
 }
 
-// AddToLayersDB inserts a digest into the database. It ignores if the digest already exists.
-// Sets the secret and completed fields to false.
+// InsertReplaceDigest inserts a digest into the database with the fields verified, unverified_with_error, and completed set to false.
+// It replaces an existing entry b/c this code will only execute if the existing has "completed=false", in which case we want to restart processing.
 // It returns an error if encountered
-func AddDigestToLayersDB(db *sql.DB, digest string) error {
+func InsertReplaceDigest(db *sql.DB, digest string) error {
 	_, err := db.Exec("INSERT OR REPLACE INTO digest (digest, verified, unverified_with_error, completed) VALUES (?, ?, ?, ?)", digest, false, false, false)
 	if err != nil {
 		return err
@@ -38,11 +38,31 @@ func AddDigestToLayersDB(db *sql.DB, digest string) error {
 	return nil
 }
 
-// UpdateStatusInLayersDB updates the completed field of a digest in the database.
+// UpdateCompleted updates the completed field of a digest in the database.
 // It returns an error if encountered
-func UpdateStatusInLayersDB(db *sql.DB, digest string, completed bool) error {
+func UpdateCompleted(db *sql.DB, digest string, completed bool) error {
 	// Prepare the SQL statement for update
 	_, err := db.Exec("UPDATE digest SET completed = ? WHERE digest = ?", completed, digest)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// UpdateVerified updates the verified field of a digest in the database.
+// It returns an error if encountered
+func UpdateVerified(db *sql.DB, digest string, verified bool) error {
+	_, err := db.Exec("UPDATE digest SET verified = ? WHERE digest = ?", verified, digest)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// UpdateUnverified updates the unverified_with_error field of a digest in the database.
+// It returns an error if encountered
+func UpdateUnverified(db *sql.DB, digest string, unverified bool) error {
+	_, err := db.Exec("UPDATE digest SET unverified_with_error = ? WHERE digest = ?", unverified, digest)
 	if err != nil {
 		return err
 	}
@@ -70,24 +90,4 @@ func SkipDockerLayer(db *sql.DB, digest string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-// SetVerified sets the verified field of a digest in the database to true.
-// It returns an error if encountered
-func SetVerified(db *sql.DB, digest string) error {
-	_, err := db.Exec("UPDATE digest SET verified = true WHERE digest = ?", digest)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// SetUnverifiedWithError sets the unverified_with_error field of a digest in the database to true.
-// It returns an error if encountered
-func SetUnverifiedWithError(db *sql.DB, digest string) error {
-	_, err := db.Exec("UPDATE digest SET unverified_with_error = true WHERE digest = ?", digest)
-	if err != nil {
-		return err
-	}
-	return nil
 }

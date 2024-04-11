@@ -221,7 +221,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 			ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("skipping previously scanned layer with no secrets")
 			return nil
 		}
-		AddDigestToLayersDB(db, layerInfo.digest.String())
+		InsertReplaceDigest(db, layerInfo.digest.String())
 	}
 
 	ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("scanning layer")
@@ -260,7 +260,7 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 		if err != nil {
 			return fmt.Errorf("error connecting to layer cache database: %w", err)
 		}
-		UpdateStatusInLayersDB(db, layerInfo.digest.String(), true)
+		UpdateCompleted(db, layerInfo.digest.String(), true)
 	}
 
 	return nil
