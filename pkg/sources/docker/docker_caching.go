@@ -80,12 +80,12 @@ func SkipDockerLayer(db *sql.DB, digest string) (bool, error) {
 	defer rows.Close()
 
 	if rows.Next() {
-		var verified, unverified_with_error bool
-		err = rows.Scan(&verified, &unverified_with_error)
+		var verified, unverifiedWithError bool
+		err = rows.Scan(&verified, &unverifiedWithError)
 		if err != nil {
 			return false, err
 		}
-		if !verified && !unverified_with_error {
+		if !verified && !unverifiedWithError {
 			return true, nil
 		}
 	}
