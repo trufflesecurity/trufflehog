@@ -12,10 +12,10 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2
 	github.com/BobuSumisu/aho-corasick v1.0.3
-	github.com/TheZeroSlave/zapsentry v1.22.1
+	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/aws/aws-sdk-go v1.51.14
+	github.com/aws/aws-sdk-go v1.51.18
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
@@ -35,7 +35,7 @@ require (
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
-	github.com/go-ldap/ldap/v3 v3.4.6
+	github.com/go-ldap/ldap/v3 v3.4.7
 	github.com/go-logr/logr v1.4.1
 	github.com/go-logr/zapr v1.3.0
 	github.com/go-redis/redis v6.15.9+incompatible
@@ -74,21 +74,21 @@ require (
 	github.com/snowflakedb/gosnowflake v1.8.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/testcontainers/testcontainers-go v0.29.1
-	github.com/testcontainers/testcontainers-go/modules/mssql v0.29.1
-	github.com/testcontainers/testcontainers-go/modules/mysql v0.29.1
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.29.1
+	github.com/testcontainers/testcontainers-go v0.30.0
+	github.com/testcontainers/testcontainers-go/modules/mssql v0.30.0
+	github.com/testcontainers/testcontainers-go/modules/mysql v0.30.0
+	github.com/testcontainers/testcontainers-go/modules/postgres v0.30.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
-	github.com/wasilibs/go-re2 v1.5.1
-	github.com/xanzy/go-gitlab v0.101.0
+	github.com/wasilibs/go-re2 v1.5.2
+	github.com/xanzy/go-gitlab v0.102.0
 	go.mongodb.org/mongo-driver v1.14.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.21.0
-	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8
-	golang.org/x/net v0.22.0
-	golang.org/x/oauth2 v0.18.0
-	golang.org/x/sync v0.6.0
+	golang.org/x/crypto v0.22.0
+	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8
+	golang.org/x/net v0.24.0
+	golang.org/x/oauth2 v0.19.0
+	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.14.0
 	google.golang.org/api v0.172.0
 	google.golang.org/protobuf v1.33.0
@@ -269,11 +269,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
-	golang.org/x/mod v0.16.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.19.0 // indirect
+	golang.org/x/tools v0.20.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect

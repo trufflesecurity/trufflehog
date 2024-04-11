@@ -46,7 +46,7 @@ If you think that something should be included outside of these guidelines, plea
 
 ### Adding New Token Formats to an Existing Scanner
 
-In some instances, services will update their token format, requiring a new regex to properly detect secrets in addition to supporting the previous token format. Accomodating this can be done without adding a net-new detector. [We provide a `Versioner` interface](https://github.com/trufflesecurity/trufflehog/blob/e18cfd5e0af1469a9f05b8d5732bcc94c39da49c/pkg/detectors/detectors.go#L30) that can be implemented.
+In some instances, services will update their token format, requiring a new regex to properly detect secrets in addition to supporting the previous token format. Accommodating this can be done without adding a net-new detector. [We provide a `Versioner` interface](https://github.com/trufflesecurity/trufflehog/blob/e18cfd5e0af1469a9f05b8d5732bcc94c39da49c/pkg/detectors/detectors.go#L30) that can be implemented.
 
 1. Create two new directories `v1` and `v2`. Move the existing detector and tests into `v1`, and add new files to `v2`.
 Ex: `<packagename>/<old_files>` -> `<packagename>/v1/<old_files>`, `<packagename>/v2/<new_files>`

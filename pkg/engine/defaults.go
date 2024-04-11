@@ -760,6 +760,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/websitepulse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wiz"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worksnaps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/workstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldcoinindex"
@@ -1599,6 +1600,7 @@ func DefaultDetectors() []detectors.Detector {
 		dockerhubv2.Scanner{},
 		&jupiterone.Scanner{},
 		gcpapplicationdefaultcredentials.Scanner{},
+		wiz.Scanner{},
 	}
 }
 

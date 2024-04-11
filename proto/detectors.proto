@@ -993,7 +993,8 @@ enum DetectorType {
   BuiltWith = 981;
   JupiterOne = 982;
   GCPApplicationDefaultCredentials = 983;
-  Pagarme = 984;
+  Wiz = 984;
+  Pagarme = 985;
 }
 
 message Result {
