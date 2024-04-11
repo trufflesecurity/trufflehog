@@ -280,6 +280,7 @@ import (
 	fullstoryv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fullstory/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fxmarket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcpapplicationdefaultcredentials"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/geckoboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gemini"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gengo"
@@ -480,6 +481,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/overloop"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/owlbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/packagecloud"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pagarme"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pagerdutyapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pandadoc"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pandascore"
@@ -758,6 +760,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/websitepulse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wiz"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worksnaps"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/workstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldcoinindex"
@@ -1583,6 +1586,7 @@ func DefaultDetectors() []detectors.Detector {
 		rabbitmq.Scanner{},
 		planetscale.Scanner{},
 		portainertoken.Scanner{},
+		pagarme.Scanner{},
 		planetscaledb.Scanner{},
 		azure.Scanner{},
 		azurestorage.Scanner{},
@@ -1592,10 +1596,11 @@ func DefaultDetectors() []detectors.Detector {
 		azuredevopspersonalaccesstoken.Scanner{},
 		azuresearchadminkey.Scanner{},
 		azuresearchquerykey.Scanner{},
-		jiratokenv2.Scanner{},
 		googleoauth2.Scanner{},
 		dockerhubv2.Scanner{},
 		&jupiterone.Scanner{},
+		gcpapplicationdefaultcredentials.Scanner{},
+		wiz.Scanner{},
 	}
 }
 

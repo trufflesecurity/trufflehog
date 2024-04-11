@@ -1,10 +1,11 @@
-package alchemy
+package pagarme
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -23,16 +24,16 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alchemy"}) + `\b([a-zA-Z0-9]{23}_[a-zA-Z0-9]{8})\b`)
+	keyPat = regexp.MustCompile(`\b(ak_live_[a-zA-Z0-9]{30})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"alchemy"}
+	return []string{"ak_live_"}
 }
 
-// FromData will find and optionally verify Alchemy secrets in a given set of bytes.
+// FromData will find and optionally verify Pagarme secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -43,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for match := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Alchemy,
+			DetectorType: detectorspb.DetectorType_Pagarme,
 			Raw:          []byte(match),
 		}
 
@@ -71,7 +72,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://eth-mainnet.g.alchemy.com/v2/"+token+"/getNFTs/?owner=vitalik.eth", nil)
+	//req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.pagar.me/1/balance", nil) send a post to this endpoint with the parameters api_key=token
+	data := `{"api_key":"` + token + `"}`
+	payload := strings.NewReader(data)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.pagar.me/1/balance", payload)
+
+	req.Header.Set("Content-Type", "application/json")
+
 	if err != nil {
 		return false, nil, nil
 	}
@@ -85,18 +93,18 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		_ = res.Body.Close()
 	}()
 
-	switch res.StatusCode {
-	case http.StatusOK:
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		// If the endpoint returns useful information, we can return it as a map.
 		return true, nil, nil
-	case http.StatusUnauthorized:
+	} else if res.StatusCode == 401 {
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
-	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	} else {
+		err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, nil, err
 	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Alchemy
+	return detectorspb.DetectorType_Pagarme
 }

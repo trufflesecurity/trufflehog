@@ -199,10 +199,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 		if err := s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter); err != nil {
 			return err
 		}
+	} else {
+		gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	}
 
 	s.repos = repos
-	gitlabReposEnumerated.WithLabelValues(s.name).Set(float64(len(repos)))
 	// We must sort the repos so we can resume later if necessary.
 	slices.Sort(s.repos)
 
@@ -392,6 +393,8 @@ func (s *Source) getAllProjectRepos(
 	ignoreRepo func(string) bool,
 	reporter sources.UnitReporter,
 ) error {
+	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
+
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 	if err != nil {
@@ -426,6 +429,7 @@ func (s *Source) getAllProjectRepos(
 			}
 			// Report the unit.
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
+			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
@@ -469,6 +473,11 @@ func (s *Source) getAllProjectRepos(
 		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
 	}
 
+	ctx.Logger().Info("beginning group enumeration",
+		"list_options", listOpts,
+		"all_available", *listGroupsOptions.AllAvailable)
+	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
+
 	var groups []*gitlab.Group
 	for {
 		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
@@ -480,11 +489,15 @@ func (s *Source) getAllProjectRepos(
 			break
 		}
 		groups = append(groups, groupList...)
+		gitlabGroupsEnumerated.WithLabelValues(s.name).Add(float64(len(groupList)))
 		listGroupsOptions.Page = res.NextPage
 		if res.NextPage == 0 {
 			break
 		}
 	}
+
+	ctx.Logger().Info("got groups", "group_count", len(groups))
+	ctx.Logger().V(2).Info("got groups", "groups", groups)
 
 	for _, group := range groups {
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
@@ -718,11 +731,13 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 	// Report all repos if specified.
 	if len(repos) > 0 {
+		gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 		for _, repo := range repos {
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: repo}
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
+			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 		}
 		return nil
 	}
