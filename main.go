@@ -167,6 +167,10 @@ var (
 	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
 	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
 	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
+
+	logstashScan    = cli.Command("logstash", "Scan Logstash")
+	logstashCloudId = logstashScan.Flag("cloud-id", "Logstash cloud ID. Can also be provided with environment variable").Envar("LOGSTASH_CLOUD_ID").String()
+	logstashAPIKey  = logstashScan.Flag("api-key", "Logstash API key. Can also be provided with environment variable").Envar("LOGSTASH_API_KEY").String()
 )
 
 func init() {
@@ -607,6 +611,14 @@ func run(state overseer.State) {
 		}
 		if err := e.ScanPostman(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Postman.")
+		}
+	case logstashScan.FullCommand():
+		cfg := sources.LogstashConfig{
+			CloudID: *logstashCloudId,
+			APIKey:  *logstashAPIKey,
+		}
+		if err := e.ScanLogstash(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Logstash.")
 		}
 	default:
 		logFatal(fmt.Errorf("invalid command"), "Command not recognized.")

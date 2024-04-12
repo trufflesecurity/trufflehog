@@ -47,6 +47,7 @@ enum SourceType {
   SOURCE_TYPE_TRAVISCI = 32;
   SOURCE_TYPE_POSTMAN = 33;
   SOURCE_TYPE_WEBHOOK = 34;
+  SOURCE_TYPE_LOGSTASH = 35;
 }
 
 message LocalSource {
@@ -406,4 +407,9 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+}
+
+message Logstash {
+  string cloud_id = 1;
+  string api_key = 2;
 }

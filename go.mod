@@ -28,6 +28,7 @@ require (
 	github.com/coinbase/waas-client-library-go v1.0.8
 	github.com/couchbase/gocb/v2 v2.8.1
 	github.com/crewjam/rfc5424 v0.1.0
+	github.com/elastic/go-elasticsearch/v8 v8.13.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
 	github.com/fatih/color v1.16.0
 	github.com/felixge/fgprof v0.9.4
@@ -160,6 +161,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.5.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
