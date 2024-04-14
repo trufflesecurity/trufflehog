@@ -16,7 +16,7 @@ import (
 // It has a single method, HandleFile, which takes a context and an io.Reader as input,
 // and returns a channel of byte slices and an error.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, input io.Reader) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader *diskbufferreader.DiskBufferReader) (chan []byte, error)
 }
 
 type mimeType string
