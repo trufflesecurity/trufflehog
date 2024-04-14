@@ -54,6 +54,7 @@ func (h *RPMHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 			fileInfo, err := reader.Next()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
+					ctx.Logger().V(3).Info("RPM payload archive fully processed")
 					return nil
 				}
 				return fmt.Errorf("error reading RPM payload: %w", err)

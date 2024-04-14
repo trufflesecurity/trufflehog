@@ -31,15 +31,8 @@ func (h *ARHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.D
 			return
 		}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if err := h.processARFiles(ctx, arReader, archiveChan); err != nil {
-					ctx.Logger().Error(err, "error processing AR files")
-				}
-			}
+		if err := h.processARFiles(ctx, arReader, archiveChan); err != nil {
+			ctx.Logger().Error(err, "error processing AR files")
 		}
 	}()
 
@@ -55,6 +48,7 @@ func (h *ARHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 			arEntry, err := reader.Next()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
+					ctx.Logger().V(3).Info("AR archive fully processed")
 					return nil
 				}
 				return fmt.Errorf("error reading AR payload: %w", err)
