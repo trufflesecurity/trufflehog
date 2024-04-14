@@ -94,6 +94,7 @@ require (
 	google.golang.org/api v0.175.0
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/h2non/gock.v1 v1.1.2
+	pault.ag/go/debian v0.16.0
 	pgregory.net/rapid v1.1.0
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -199,6 +200,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/s3 v1.1.4 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
+	github.com/kjk/lzma v0.0.0-20161016003348-3fd93898850d // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
@@ -287,4 +289,5 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	pault.ag/go/topsort v0.1.1 // indirect
 )
