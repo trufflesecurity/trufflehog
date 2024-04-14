@@ -132,38 +132,35 @@ func HandleFile(
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
-) bool {
+) error {
 	config := newFileHandlingConfig(options...)
 
 	mimeT, err := mimetype.DetectReader(reReader)
 	if err != nil {
-		ctx.Logger().Error(err, "error detecting MIME type")
-		return false
+		return fmt.Errorf("error detecting MIME type: %w", err)
 	}
 
 	mime := mimeType(mimeT.String())
 	if config.skipArchives && knownArchiveMimeTypes[mime] {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
-		return true
+		return nil
 	}
 
 	handler, err := getHandlerForType(mime)
 	if err != nil {
-		ctx.Logger().Error(err, "error getting handler for type")
-		return false
+		return fmt.Errorf("error getting handler for type: %w", err)
 	}
 
 	// Reset the reader to the start of the file since the MIME type detection may have read some bytes.
 	if _, err := reReader.Seek(0, io.SeekStart); err != nil {
-		ctx.Logger().Error(err, "error seeking to start of file")
-		return false
+		return fmt.Errorf("error seeking to start of file: %w", err)
 	}
 
 	archiveChan, err := handler.HandleFile(ctx, reReader) // Delegate to the specific handler to process the file.
 	if err != nil {
-		ctx.Logger().Error(err, "error handling file")
-		return false
+		return fmt.Errorf("error handling file: %w", err)
 	}
+
 	return handleChunks(ctx, archiveChan, chunkSkel, reporter)
 }
 
@@ -176,10 +173,9 @@ func handleChunks(
 	handlerChan chan []byte,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
-) bool {
+) error {
 	if handlerChan == nil {
-		ctx.Logger().Error(fmt.Errorf("handler channel is nil"), "error handling chunks")
-		return false
+		return fmt.Errorf("handler channel is nil")
 	}
 
 	for {
@@ -187,17 +183,15 @@ func handleChunks(
 		case data, open := <-handlerChan:
 			if !open {
 				ctx.Logger().V(5).Info("handler channel closed, all chunks processed")
-				return true
+				return nil
 			}
 			chunk := *chunkSkel
 			chunk.Data = data
 			if err := reporter.ChunkOk(ctx, chunk); err != nil {
-				ctx.Logger().Error(err, "error reporting chunk while handling chunks")
-				return false
+				return fmt.Errorf("error reporting chunk: %w", err)
 			}
 		case <-ctx.Done():
-			ctx.Logger().Error(ctx.Err(), "context done while handling chunks")
-			return false
+			return ctx.Err()
 		}
 	}
 }

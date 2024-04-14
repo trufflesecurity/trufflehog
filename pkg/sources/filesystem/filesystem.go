@@ -190,44 +190,8 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		},
 		Verify: s.verify,
 	}
-	if handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
-		return nil
-	}
 
-	if err := reReader.Reset(); err != nil {
-		return err
-	}
-	reReader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reReader)
-	for data := range chunkResChan {
-		if err := data.Error(); err != nil {
-			s.log.Error(err, "error reading chunk.")
-			continue
-		}
-
-		chunk := &sources.Chunk{
-			SourceType: s.Type(),
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			JobID:      s.JobID(),
-			Data:       data.Bytes(),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Filesystem{
-					Filesystem: &source_metadatapb.Filesystem{
-						File: sanitizer.UTF8(path),
-					},
-				},
-			},
-			Verify: s.verify,
-		}
-		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
