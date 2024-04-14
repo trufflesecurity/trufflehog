@@ -284,7 +284,7 @@ func TestDetermineMimeType(t *testing.T) {
 			originalData, _ := io.ReadAll(io.TeeReader(tt.input, &bytes.Buffer{}))
 			tt.input = bytes.NewReader(originalData) // Reset the reader
 
-			mime, reader, err := determineMimeType(tt.input)
+			mime, err := determineMimeType(tt.input)
 			if err != nil && !tt.shouldFail {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -292,10 +292,22 @@ func TestDetermineMimeType(t *testing.T) {
 			if !tt.shouldFail {
 				assert.Equal(t, tt.expected, mime)
 			}
-
-			// Ensure the reader still contains all the original data.
-			data, _ := io.ReadAll(reader)
-			assert.Equal(t, originalData, data)
 		})
 	}
+}
+
+func TestHandleFileRPM(t *testing.T) {
+	wantChunkCount := 179
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/test.rpm")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, len(reporter.Ch))
+	assert.True(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
