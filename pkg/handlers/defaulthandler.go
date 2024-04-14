@@ -44,63 +44,46 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 	maxTimeout = timeout
 }
 
-// Option is a function type that applies a configuration to a DefaultHandler.
-// It is used to modify the behavior of a DefaultHandler.
-type Option func(handler *DefaultHandler)
-
-// WithSkipBinaries returns an Option that configures whether to skip binary files.
-// This function is used to create an Option that sets the skipBinaries field of a DefaultHandler.
-// If skip is true, the DefaultHandler will skip binary files.
-func WithSkipBinaries(skip bool) Option {
-	return func(h *DefaultHandler) { h.skipBinaries = skip }
-}
-
-// WithSkipArchives returns an Option that configures whether to skip archive files.
-// This function is used to create an Option that sets the skipArchives field of a DefaultHandler.
-// If skip is true, the DefaultHandler will skip archive files.
-func WithSkipArchives(skip bool) Option {
-	return func(h *DefaultHandler) { h.skipArchives = skip }
-
-}
-
 // DefaultHandler provides a base implementation for file handlers, encapsulating common behaviors
-// needed across different handlers, such as skipping binary files. This handler is embedded in other
-// specialized handlers to ensure consistent application of these common behaviors and to simplify
-// the extension of handler functionalities.
-type DefaultHandler struct {
-	skipBinaries bool // Controls whether binary files should be processed.
-	skipArchives bool // Controls whether archive files should be processed.
-}
+// needed across different handlers. This handler is embedded in other specialized handlers to ensure
+// consistent application of these common behaviors and to simplify the extension of handler functionalities.
+type DefaultHandler struct{}
 
-// configure applies a series of Options to the handler, allowing for flexible configuration of
-// handler-specific settings such as whether to skip binary files. This method supports dynamic
-// customization of handler behavior at runtime.
-func (h *DefaultHandler) configure(opts ...Option) {
-	for _, opt := range opts {
-		opt(h)
-	}
-}
-
-// HandleFile initiates the asynchronous extraction of archive contents. It creates a channel to send extracted data
-// and starts a goroutine that handles the archive opening process. It utilizes a context with a timeout to ensure
-// that the extraction process does not exceed a predefined maximum duration.
+// HandleFile processes the input as either an archive or non-archive based on its content,
+// utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
+// it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
 func (h *DefaultHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
-	if h.skipArchives {
-		return nil, nil
+	// Shared channel for both archive and non-archive content.
+	dataChan := make(chan []byte, defaultBufferSize)
+
+	_, arReader, err := archiver.Identify("", input)
+	if err != nil {
+		if errors.Is(err, archiver.ErrNoMatch) {
+			// Not an archive, handle as non-archive content in a separate goroutine.
+			ctx.Logger().Info("File not recognized as an archive, handling as non-archive content.")
+			go func() {
+				defer close(dataChan)
+				if err := h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
+					ctx.Logger().Error(err, "error handling non-archive content.")
+				}
+			}()
+			return dataChan, nil
+		}
+
+		return nil, err
 	}
 
-	archiveChan := make(chan []byte, defaultBufferSize)
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
 		defer cancel()
-		defer close(archiveChan)
+		defer close(dataChan)
 
-		if err := h.openArchive(ctx, 0, input, archiveChan); err != nil {
+		if err := h.openArchive(ctx, 0, arReader, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
 		}
 	}()
-	return archiveChan, nil
+	return dataChan, nil
 }
 
 var ErrMaxDepthReached = errors.New("max archive depth reached")
@@ -174,11 +157,6 @@ func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
-		if h.skipBinaries && common.IsBinary(f.Name()) {
-			lCtx.Logger().V(5).Info("skipping binary file", "filename", f.Name())
-			return nil
-		}
-
 		return h.openArchive(lCtx, depth, fReader, archiveChan)
 	}
 }
@@ -203,13 +181,6 @@ func (h *DefaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	if common.SkipFile(mime.Extension()) {
 		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
 		return nil
-	}
-
-	if h.skipBinaries {
-		if common.IsBinary(mime.Extension()) || mimeT == machOType || mimeT == octetStream {
-			ctx.Logger().V(5).Info("skipping binary file", "ext", mimeT)
-			return nil
-		}
 	}
 
 	chunkReader := sources.NewChunkReader()

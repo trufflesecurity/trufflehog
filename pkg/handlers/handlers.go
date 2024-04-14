@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
-	"github.com/h2non/filetype"
+	"github.com/gabriel-vasile/mimetype"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -19,31 +18,82 @@ type FileHandler interface {
 	HandleFile(ctx logContext.Context, reader *diskbufferreader.DiskBufferReader) (chan []byte, error)
 }
 
+// FileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
+type FileHandlingConfig struct{ skipArchives bool }
+
+// NewFileHandlingConfig creates a default FileHandlingConfig with default settings.
+// Optional functional parameters can customize the configuration.
+func NewFileHandlingConfig(options ...func(*FileHandlingConfig)) *FileHandlingConfig {
+	config := new(FileHandlingConfig)
+	for _, option := range options {
+		option(config)
+	}
+
+	return config
+}
+
+// WithSkipArchives sets the skipArchives field of the FileHandlingConfig.
+// If skip is true, the FileHandler will skip archive files.
+func WithSkipArchives(skip bool) func(*FileHandlingConfig) {
+	return func(c *FileHandlingConfig) { c.skipArchives = skip }
+}
+
 type mimeType string
 
 const (
-	arMimeType  mimeType = "application/x-unix-archive"
-	rpmMimeType mimeType = "application/x-rpm"
-	machOType   mimeType = "application/x-mach-binary"
-	octetStream mimeType = "application/octet-stream"
+	sevenZMime          mimeType = "application/x-7z-compressed"
+	bzip2Mime           mimeType = "application/x-bzip2"
+	gzipMime            mimeType = "application/x-gzip"
+	rarCompressedMime   mimeType = "application/x-rar-compressed"
+	rarMime             mimeType = "application/x-rar"
+	tarMime             mimeType = "application/x-tar"
+	zipMime             mimeType = "application/zip"
+	gunzipMime          mimeType = "application/x-gunzip"
+	gzippedMime         mimeType = "application/gzipped"
+	gzipCompressedMime  mimeType = "application/x-gzip-compressed"
+	gzipDocumentMime    mimeType = "gzip/document"
+	xzMime              mimeType = "application/x-xz"
+	msCabCompressedMime mimeType = "application/vnd.ms-cab-compressed"
+	rpmMime             mimeType = "application/x-rpm"
+	fitsMime            mimeType = "application/fits"
+	xarMime             mimeType = "application/x-xar"
+	warcMime            mimeType = "application/warc"
+	cpioMime            mimeType = "application/cpio"
+	unixArMime          mimeType = "application/x-unix-archive"
+	arMime              mimeType = "application/x-archive"
+	debMime             mimeType = "application/vnd.debian.binary-package"
+	lzipMime            mimeType = "application/lzip"
+	lzipXMime           mimeType = "application/x-lzip"
+	machoMime           mimeType = "application/x-mach-binary"
+	octetStreamMime     mimeType = "application/octet-stream"
 )
 
-// determineMimeType reads from the provided reader to detect the MIME type.
-func determineMimeType(reader io.Reader) (mimeType, error) {
-	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
-	// If fewer bytes are read, MIME type detection may still succeed.
-	buffer := make([]byte, defaultBufferSize)
-	_, err := reader.Read(buffer)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return "", fmt.Errorf("unable to read file for MIME type detection: %w", err)
-	}
-
-	kind, err := filetype.Match(buffer)
-	if err != nil {
-		return "", fmt.Errorf("unable to determine file type: %w", err)
-	}
-
-	return mimeType(kind.MIME.Value), nil
+var knownArchiveMimeTypes = map[mimeType]bool{
+	sevenZMime:          true,
+	bzip2Mime:           true,
+	gzipMime:            true,
+	rarCompressedMime:   true,
+	rarMime:             true,
+	tarMime:             true,
+	zipMime:             true,
+	gunzipMime:          true,
+	gzippedMime:         true,
+	gzipCompressedMime:  true,
+	gzipDocumentMime:    true,
+	xzMime:              true,
+	msCabCompressedMime: true,
+	rpmMime:             true,
+	fitsMime:            true,
+	xarMime:             true,
+	warcMime:            true,
+	cpioMime:            true,
+	unixArMime:          true,
+	arMime:              true,
+	debMime:             true,
+	lzipMime:            true,
+	lzipXMime:           true,
+	machoMime:           false,
+	octetStreamMime:     false,
 }
 
 // GetHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type. This method
@@ -52,17 +102,16 @@ func determineMimeType(reader io.Reader) (mimeType, error) {
 // managed by the archiver library.
 // The handler is then configured with provided Options, adapting it to specific operational needs.
 // Returns the configured handler or an error if the handler type does not match the expected type.
-func GetHandlerForType(mimeT mimeType, opts ...Option) (FileHandler, error) {
+func GetHandlerForType(mimeT mimeType) (FileHandler, error) {
 	defaultHandler := new(DefaultHandler)
-	defaultHandler.configure(opts...)
 
 	var handler FileHandler
 	switch mimeT {
-	case arMimeType:
+	case arMime, unixArMime, debMime:
 		handler = &ARHandler{DefaultHandler: defaultHandler}
-	case rpmMimeType:
+	case rpmMime, cpioMime:
 		handler = &RPMHandler{DefaultHandler: defaultHandler}
-	case machOType, octetStream:
+	case machoMime, octetStreamMime:
 		fallthrough
 	default:
 		handler = defaultHandler
@@ -77,14 +126,22 @@ func GetHandlerForType(mimeT mimeType, opts ...Option) (FileHandler, error) {
 // extraction or processing. Errors at any stage (MIME type determination, handler retrieval,
 // seeking, or file handling) result in a log entry and a false return value indicating failure.
 // Successful handling passes the file content through a channel to be chunked and reported, returning true on success.
-func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter, opts ...Option) bool {
-	mimeT, err := determineMimeType(reReader)
+func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter, options ...func(*FileHandlingConfig)) bool {
+	config := NewFileHandlingConfig(options...)
+
+	mimeT, err := mimetype.DetectReader(reReader)
 	if err != nil {
-		ctx.Logger().Error(err, "error determining MIME type")
+		ctx.Logger().Error(err, "error detecting MIME type")
 		return false
 	}
 
-	handler, err := GetHandlerForType(mimeT, opts...)
+	mime := mimeType(mimeT.String())
+	if config.skipArchives && knownArchiveMimeTypes[mime] {
+		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
+		return true
+	}
+
+	handler, err := GetHandlerForType(mime)
 	if err != nil {
 		ctx.Logger().Error(err, "error getting handler for type")
 		return false
