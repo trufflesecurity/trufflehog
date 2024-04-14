@@ -11,13 +11,13 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// RPMHandler specializes DefaultHandler to manage RPM package files. It leverages shared behaviors
-// from DefaultHandler and introduces additional logic specific to RPM packages.
-type RPMHandler struct{ *DefaultHandler }
+// rpmHandler specializes defaultHandler to manage RPM package files. It leverages shared behaviors
+// from defaultHandler and introduces additional logic specific to RPM packages.
+type rpmHandler struct{ *defaultHandler }
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
-func (h *RPMHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
+func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {
@@ -45,7 +45,7 @@ func (h *RPMHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.
 	return archiveChan, nil
 }
 
-func (h *RPMHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.PayloadReader, archiveChan chan []byte) error {
+func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.PayloadReader, archiveChan chan []byte) error {
 	for {
 		select {
 		case <-ctx.Done():

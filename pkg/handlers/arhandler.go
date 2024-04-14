@@ -11,13 +11,13 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// ARHandler specializes DefaultHandler to handle AR archive formats. By embedding DefaultHandler,
-// ARHandler inherits and can further customize the common handling behavior such as skipping binaries.
-type ARHandler struct{ *DefaultHandler }
+// arHandler specializes defaultHandler to handle AR archive formats. By embedding defaultHandler,
+// arHandler inherits and can further customize the common handling behavior such as skipping binaries.
+type arHandler struct{ *defaultHandler }
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *ARHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
+func (h *arHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {
@@ -39,7 +39,7 @@ func (h *ARHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.D
 	return archiveChan, nil
 }
 
-func (h *ARHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archiveChan chan []byte) error {
+func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archiveChan chan []byte) error {
 	for {
 		select {
 		case <-ctx.Done():

@@ -73,7 +73,7 @@ func TestArchiveHandler(t *testing.T) {
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 			defer resp.Body.Close()
 
-			handler := DefaultHandler{}
+			handler := defaultHandler{}
 
 			newReader, err := diskbufferreader.New(resp.Body)
 			if err != nil {
@@ -102,7 +102,7 @@ func TestOpenInvalidArchive(t *testing.T) {
 	reader := strings.NewReader("invalid archive")
 
 	ctx := logContext.AddLogger(context.Background())
-	handler := DefaultHandler{}
+	handler := defaultHandler{}
 
 	archiveChan := make(chan []byte)
 

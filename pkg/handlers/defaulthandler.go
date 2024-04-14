@@ -44,16 +44,16 @@ func SetArchiveMaxTimeout(timeout time.Duration) {
 	maxTimeout = timeout
 }
 
-// DefaultHandler provides a base implementation for file handlers, encapsulating common behaviors
+// defaultHandler provides a base implementation for file handlers, encapsulating common behaviors
 // needed across different handlers. This handler is embedded in other specialized handlers to ensure
 // consistent application of these common behaviors and to simplify the extension of handler functionalities.
-type DefaultHandler struct{}
+type defaultHandler struct{}
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *DefaultHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
@@ -92,7 +92,7 @@ var ErrMaxDepthReached = errors.New("max archive depth reached")
 // It takes a reader from which it attempts to identify and process the archive format. Depending on the archive type,
 // it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
-func (h *DefaultHandler) openArchive(ctx logContext.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
+func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
 	if common.IsDone(ctx) {
 		return ctx.Err()
 	}
@@ -132,7 +132,7 @@ func (h *DefaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 // It logs the extraction, checks for cancellation, and decides whether to skip the file based on its name or type,
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
-func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
+func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, f archiver.File) error {
 		lCtx := logContext.AddLogger(ctx)
 		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
@@ -166,7 +166,7 @@ func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 // on the type, particularly for binary files. It manages reading file chunks and writing them to the archive channel,
 // effectively collecting the final bytes for further processing. This function is a key component in ensuring that all
 // file content, regardless of being an archive or not, is handled appropriately.
-func (h *DefaultHandler) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
+func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
 	bufReader := bufio.NewReaderSize(reader, defaultBufferSize)
 	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
 	// If fewer bytes are read, MIME type detection may still succeed.
