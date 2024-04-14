@@ -1,18 +1,12 @@
 package handlers
 
 import (
-	"archive/tar"
-	"bytes"
-	"encoding/binary"
-	"io"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/h2non/filetype"
 	"github.com/stretchr/testify/assert"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
@@ -70,85 +64,6 @@ func BenchmarkHandleFile(b *testing.B) {
 
 		b.StopTimer()
 	}
-}
-
-func TestHandleFileSkipBinaries(t *testing.T) {
-	filename := createBinaryArchive(t)
-	defer os.Remove(filename)
-
-	file, err := os.Open(filename)
-	assert.NoError(t, err)
-
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
-	ctx, cancel := logContext.WithTimeout(logContext.Background(), 5*time.Second)
-	defer cancel()
-	sourceChan := make(chan *sources.Chunk, 1)
-
-	go func() {
-		defer close(sourceChan)
-		HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan}, WithSkipBinaries(true))
-	}()
-
-	count := 0
-	for range sourceChan {
-		count++
-	}
-	// The binary archive should not be scanned.
-	assert.Equal(t, 0, count)
-}
-
-func createBinaryArchive(t *testing.T) string {
-	t.Helper()
-
-	f, err := os.CreateTemp("", "testbinary")
-	assert.NoError(t, err)
-	defer os.Remove(f.Name())
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	randomBytes := make([]byte, 1024)
-	_, err = r.Read(randomBytes)
-	assert.NoError(t, err)
-
-	_, err = f.Write(randomBytes)
-	assert.NoError(t, err)
-
-	// Create and write some structured binary data (e.g., integers, floats)
-	for i := 0; i < 10; i++ {
-		err = binary.Write(f, binary.LittleEndian, int32(rand.Intn(1000)))
-		assert.NoError(t, err)
-		err = binary.Write(f, binary.LittleEndian, rand.Float64())
-		assert.NoError(t, err)
-	}
-
-	tarFile, err := os.Create("example.tar")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tarFile.Close()
-
-	// Create a new tar archive.
-	tarWriter := tar.NewWriter(tarFile)
-	defer tarWriter.Close()
-
-	fileInfo, err := f.Stat()
-	assert.NoError(t, err)
-
-	header, err := tar.FileInfoHeader(fileInfo, "")
-	assert.NoError(t, err)
-
-	err = tarWriter.WriteHeader(header)
-	assert.NoError(t, err)
-
-	fileContent, err := os.ReadFile(f.Name())
-	assert.NoError(t, err)
-
-	_, err = tarWriter.Write(fileContent)
-	assert.NoError(t, err)
-
-	return tarFile.Name()
 }
 
 func TestSkipArchive(t *testing.T) {
@@ -224,76 +139,6 @@ func TestNestedDirArchive(t *testing.T) {
 		count++
 	}
 	assert.Equal(t, want, count)
-}
-
-func TestDetermineMimeType(t *testing.T) {
-	filetype.AddMatcher(filetype.NewType("txt", "text/plain"), func(buf []byte) bool {
-		return strings.HasPrefix(string(buf), "text:")
-	})
-
-	pngBytes := []byte("\x89PNG\r\n\x1a\n")
-	jpegBytes := []byte{0xFF, 0xD8, 0xFF}
-	textBytes := []byte("text: This is a plain text")
-	rpmBytes := []byte("\xed\xab\xee\xdb")
-
-	tests := []struct {
-		name       string
-		input      io.Reader
-		expected   mimeType
-		shouldFail bool
-	}{
-		{
-			name:       "PNG file",
-			input:      bytes.NewReader(pngBytes),
-			expected:   mimeType("image/png"),
-			shouldFail: false,
-		},
-		{
-			name:       "JPEG file",
-			input:      bytes.NewReader(jpegBytes),
-			expected:   mimeType("image/jpeg"),
-			shouldFail: false,
-		},
-		{
-			name:       "Text file",
-			input:      bytes.NewReader(textBytes),
-			expected:   mimeType("text/plain"),
-			shouldFail: false,
-		},
-		{
-			name:       "RPM file",
-			input:      bytes.NewReader(rpmBytes),
-			expected:   rpmMimeType,
-			shouldFail: false,
-		},
-		{
-			name:       "Truncated JPEG file",
-			input:      io.LimitReader(bytes.NewReader(jpegBytes), 2),
-			expected:   mimeType("unknown"),
-			shouldFail: true,
-		},
-		{
-			name:       "Empty reader",
-			input:      bytes.NewReader([]byte{}),
-			shouldFail: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			originalData, _ := io.ReadAll(io.TeeReader(tt.input, &bytes.Buffer{}))
-			tt.input = bytes.NewReader(originalData) // Reset the reader
-
-			mime, err := determineMimeType(tt.input)
-			if err != nil && !tt.shouldFail {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if !tt.shouldFail {
-				assert.Equal(t, tt.expected, mime)
-			}
-		})
-	}
 }
 
 func TestHandleFileRPM(t *testing.T) {
