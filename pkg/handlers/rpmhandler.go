@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/sassoftware/go-rpmutils"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -16,7 +17,7 @@ type RPMHandler struct{ *DefaultHandler }
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
-func (h *RPMHandler) HandleFile(ctx logContext.Context, input io.Reader) (chan []byte, error) {
+func (h *RPMHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {
@@ -36,15 +37,8 @@ func (h *RPMHandler) HandleFile(ctx logContext.Context, input io.Reader) (chan [
 			return
 		}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
-					ctx.Logger().Error(err, "error processing RPM files")
-				}
-			}
+		if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
+			ctx.Logger().Error(err, "error processing RPM files")
 		}
 	}()
 

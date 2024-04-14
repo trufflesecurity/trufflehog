@@ -10,6 +10,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
+	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -84,7 +85,7 @@ func (h *DefaultHandler) configure(opts ...Option) {
 // and starts a goroutine that handles the archive opening process. It utilizes a context with a timeout to ensure
 // that the extraction process does not exceed a predefined maximum duration.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *DefaultHandler) HandleFile(ctx logContext.Context, input io.Reader) (chan []byte, error) {
+func (h *DefaultHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
 	if h.skipArchives {
 		return nil, nil
 	}

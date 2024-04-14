@@ -311,3 +311,19 @@ func TestHandleFileRPM(t *testing.T) {
 	assert.True(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
+
+func TestHandleFileAR(t *testing.T) {
+	wantChunkCount := 102
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/test.deb")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, len(reporter.Ch))
+	assert.True(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
