@@ -21,7 +21,7 @@ func TestHandleFileCancelledContext(t *testing.T) {
 	cancel()
 	reader, err := diskbufferreader.New(strings.NewReader("file"))
 	assert.NoError(t, err)
-	assert.False(t, HandleFile(canceledCtx, reader, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(canceledCtx, reader, &sources.Chunk{}, reporter))
 }
 
 func TestHandleFile(t *testing.T) {
@@ -37,7 +37,7 @@ func TestHandleFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.True(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
 	assert.Equal(t, 1, len(reporter.Ch))
 }
 
@@ -79,8 +79,8 @@ func TestSkipArchive(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		ok := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
-		assert.False(t, ok)
+		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
+		assert.NoError(t, err)
 	}()
 
 	wantCount := 0
@@ -104,8 +104,8 @@ func TestExtractTarContent(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		ok := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
-		assert.True(t, ok)
+		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
 	}()
 
 	wantCount := 4
@@ -153,7 +153,7 @@ func TestHandleFileRPM(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.True(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
 
@@ -169,6 +169,6 @@ func TestHandleFileAR(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.True(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }

@@ -391,29 +391,9 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(ctx, reader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
-				atomic.AddUint64(objectCount, 1)
-				s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
+			if err := handlers.HandleFile(ctx, reader, chunkSkel, sources.ChanReporter{Ch: chunksChan}); err != nil {
+				ctx.Logger().Error(err, "error handling file")
 				return nil
-			}
-
-			if err := reader.Reset(); err != nil {
-				s.log.Error(err, "Error resetting reader to start.")
-			}
-			reader.Stop()
-
-			chunkReader := sources.NewChunkReader()
-			chunkResChan := chunkReader(ctx, reader)
-			for data := range chunkResChan {
-				if err := data.Error(); err != nil {
-					s.log.Error(err, "error reading chunk.")
-					continue
-				}
-				chunk := *chunkSkel
-				chunk.Data = data.Bytes()
-				if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
-					return err
-				}
 			}
 
 			atomic.AddUint64(objectCount, 1)

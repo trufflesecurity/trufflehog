@@ -1186,12 +1186,6 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	var handlerOpts []handlers.Option
-
-	if s.skipArchives {
-		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
-	}
-
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 
 	var stderr bytes.Buffer
@@ -1227,30 +1221,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 	defer reader.Close()
 
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
-		return nil
-	}
-
-	fileCtx.Logger().V(1).Info("binary file not handled, chunking raw")
-	if err := reader.Reset(); err != nil {
-		return err
-	}
-	reader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(fileCtx, reader)
-	for data := range chunkResChan {
-		chunk := *chunkSkel
-		chunk.Data = data.Bytes()
-		if err := data.Error(); err != nil {
-			return err
-		}
-		if err := reporter.ChunkOk(fileCtx, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
