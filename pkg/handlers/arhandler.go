@@ -8,7 +8,7 @@ import (
 
 // ARHandler specializes DefaultHandler to handle AR archive formats. By embedding DefaultHandler,
 // ARHandler inherits and can further customize the common handling behavior such as skipping binaries.
-type ARHandler struct{ DefaultHandler }
+type ARHandler struct{ *DefaultHandler }
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.

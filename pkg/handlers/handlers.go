@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -30,26 +29,21 @@ const (
 )
 
 // determineMimeType reads from the provided reader to detect the MIME type.
-// It returns the detected MIME type and a new reader that includes the read portion.
-func determineMimeType(reader io.Reader) (mimeType, io.Reader, error) {
+func determineMimeType(reader io.Reader) (mimeType, error) {
 	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
 	// If fewer bytes are read, MIME type detection may still succeed.
-	buffer := make([]byte, 512)
-	n, err := reader.Read(buffer)
+	buffer := make([]byte, defaultBufferSize)
+	_, err := reader.Read(buffer)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return "", nil, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+		return "", fmt.Errorf("unable to read file for MIME type detection: %w", err)
 	}
-
-	// Create a new reader that starts with the buffer we just read
-	// and continues with the rest of the original reader.
-	reader = io.MultiReader(bytes.NewReader(buffer[:n]), reader)
 
 	kind, err := filetype.Match(buffer)
 	if err != nil {
-		return "", nil, fmt.Errorf("unable to determine file type: %w", err)
+		return "", fmt.Errorf("unable to determine file type: %w", err)
 	}
 
-	return mimeType(kind.MIME.Value), reader, nil
+	return mimeType(kind.MIME.Value), nil
 }
 
 // GetHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type. This method
@@ -59,24 +53,21 @@ func determineMimeType(reader io.Reader) (mimeType, io.Reader, error) {
 // The handler is then configured with provided Options, adapting it to specific operational needs.
 // Returns the configured handler or an error if the handler type does not match the expected type.
 func GetHandlerForType(mimeT mimeType, opts ...Option) (FileHandler, error) {
+	defaultHandler := new(DefaultHandler)
+	defaultHandler.configure(opts...)
+
 	var handler FileHandler
 	switch mimeT {
 	case arMimeType:
-		handler = new(ARHandler)
+		handler = &ARHandler{DefaultHandler: defaultHandler}
 	case rpmMimeType:
-		handler = new(RPMHandler)
+		handler = &RPMHandler{DefaultHandler: defaultHandler}
 	case machOType, octetStream:
 		fallthrough
 	default:
-		handler = new(DefaultHandler)
+		handler = defaultHandler
 	}
 
-	defaultHandler, ok := handler.(*DefaultHandler)
-	if !ok {
-		return handler, fmt.Errorf("handler is not a DefaultHandler: %T", handler)
-	}
-
-	defaultHandler.configure(opts...)
 	return handler, nil
 }
 
@@ -87,7 +78,7 @@ func GetHandlerForType(mimeT mimeType, opts ...Option) (FileHandler, error) {
 // seeking, or file handling) result in a log entry and a false return value indicating failure.
 // Successful handling passes the file content through a channel to be chunked and reported, returning true on success.
 func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter, opts ...Option) bool {
-	mimeT, _, err := determineMimeType(reReader)
+	mimeT, err := determineMimeType(reReader)
 	if err != nil {
 		ctx.Logger().Error(err, "error determining MIME type")
 		return false
