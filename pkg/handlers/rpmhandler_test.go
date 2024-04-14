@@ -24,7 +24,7 @@ func TestHandleRPMFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer newReader.Close()
 
-	handler := new(RPMHandler)
+	handler := &RPMHandler{new(DefaultHandler)}
 	archiveChan, err := handler.HandleFile(logContext.AddLogger(ctx), newReader)
 	assert.NoError(t, err)
 
