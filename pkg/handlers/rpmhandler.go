@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/sassoftware/go-rpmutils"
@@ -36,21 +37,38 @@ func (h *RPMHandler) HandleFile(ctx logContext.Context, input io.Reader) (chan [
 		}
 
 		for {
-			fileInfo, err := reader.Next()
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				ctx.Logger().Error(err, "error reading RPM payload")
+			select {
+			case <-ctx.Done():
 				return
-			}
-			ctx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileInfo.Size)
-
-			if err := h.handleNonArchiveContent(ctx, reader, archiveChan); err != nil {
-				ctx.Logger().Error(err, "error handling archive content in RPM")
+			default:
+				if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
+					ctx.Logger().Error(err, "error processing RPM files")
+				}
 			}
 		}
 	}()
 
 	return archiveChan, nil
+}
+
+func (h *RPMHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.PayloadReader, archiveChan chan []byte) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			fileInfo, err := reader.Next()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
+				return fmt.Errorf("error reading RPM payload: %w", err)
+			}
+			fileCtx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileInfo.Size)
+
+			if err := h.handleNonArchiveContent(fileCtx, reader, archiveChan); err != nil {
+				fileCtx.Logger().Error(err, "error handling archive content in RPM")
+			}
+		}
+	}
 }
