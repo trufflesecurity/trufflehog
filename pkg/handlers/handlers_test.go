@@ -21,7 +21,7 @@ func TestHandleFileCancelledContext(t *testing.T) {
 	cancel()
 	reader, err := diskbufferreader.New(strings.NewReader("file"))
 	assert.NoError(t, err)
-	assert.NoError(t, HandleFile(canceledCtx, reader, &sources.Chunk{}, reporter))
+	assert.Error(t, HandleFile(canceledCtx, reader, &sources.Chunk{}, reporter))
 }
 
 func TestHandleFile(t *testing.T) {

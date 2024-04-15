@@ -43,11 +43,12 @@ type mimeType string
 const (
 	sevenZMime          mimeType = "application/x-7z-compressed"
 	bzip2Mime           mimeType = "application/x-bzip2"
-	gzipMime            mimeType = "application/x-gzip"
 	rarCompressedMime   mimeType = "application/x-rar-compressed"
 	rarMime             mimeType = "application/x-rar"
 	tarMime             mimeType = "application/x-tar"
 	zipMime             mimeType = "application/zip"
+	gxzipMime           mimeType = "application/x-gzip"
+	gzipMime            mimeType = "application/gzip"
 	gunzipMime          mimeType = "application/x-gunzip"
 	gzippedMime         mimeType = "application/gzipped"
 	gzipCompressedMime  mimeType = "application/x-gzip-compressed"
@@ -72,6 +73,7 @@ var knownArchiveMimeTypes = map[mimeType]bool{
 	sevenZMime:          true,
 	bzip2Mime:           true,
 	gzipMime:            true,
+	gxzipMime:           true,
 	rarCompressedMime:   true,
 	rarMime:             true,
 	tarMime:             true,
