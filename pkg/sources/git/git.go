@@ -25,8 +25,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -1213,15 +1211,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		}
 	}()
 
-	bufferName := cleantemp.MkFilename()
-
-	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	return handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	return handlers.HandleFile(fileCtx, fileReader, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

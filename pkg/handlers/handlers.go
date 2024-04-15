@@ -127,8 +127,15 @@ func getHandlerForType(mimeT mimeType) (FileHandler, error) {
 // It determines the MIME type of the file, selects the appropriate handler based on this type, and processes the file.
 // This function initializes the handling process and delegates to the specific handler to manage file
 // extraction or processing. Errors at any stage (MIME type determination, handler retrieval,
-// seeking, or file handling) result in a log entry and a false return value indicating failure.
-// Successful handling passes the file content through a channel to be chunked and reported, returning true on success.
+// seeking, or file handling) result in an error return value.
+// Successful handling passes the file content through a channel to be chunked and reported.
+//
+// The function takes an io.Reader as input and wraps it with a diskbufferreader.DiskBufferReader to support
+// seeking and to provide an io.ReaderAt interface. This is necessary for certain file handlers that require
+// random access to the file content.
+//
+// If the skipArchives option is set to true and the detected MIME type is a known archive type,
+// the function will skip processing the file and return nil.
 func HandleFile(
 	ctx logContext.Context,
 	reader io.Reader,
