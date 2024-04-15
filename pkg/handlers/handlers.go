@@ -164,14 +164,14 @@ func HandleFile(
 		return nil
 	}
 
-	handler, err := getHandlerForType(mime)
-	if err != nil {
-		return fmt.Errorf("error getting handler for type: %w", err)
-	}
-
 	// Reset the reader to the start of the file since the MIME type detection may have read some bytes.
 	if _, err := reReader.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("error seeking to start of file: %w", err)
+	}
+
+	handler, err := getHandlerForType(mime)
+	if err != nil {
+		return fmt.Errorf("error getting handler for type: %w", err)
 	}
 
 	archiveChan, err := handler.HandleFile(ctx, reReader) // Delegate to the specific handler to process the file.
