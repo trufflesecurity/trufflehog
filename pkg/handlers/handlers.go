@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/h2non/filetype"
+	"github.com/mholt/archiver/v4"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -96,7 +97,12 @@ func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferRea
 		return false
 	}
 
-	archiveChan, err := handler.HandleFile(ctx, reReader) // Delegate to the specific handler to process the file.
+	_, arReader, err := archiver.Identify("", reReader)
+	if errors.Is(err, archiver.ErrNoMatch) {
+		return false
+	}
+
+	archiveChan, err := handler.HandleFile(ctx, arReader) // Delegate to the specific handler to process the file.
 	if err != nil {
 		ctx.Logger().Error(err, "error handling file")
 		return false
