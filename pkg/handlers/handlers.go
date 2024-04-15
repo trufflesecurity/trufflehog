@@ -24,6 +24,7 @@ type mimeType string
 
 const (
 	arMimeType  mimeType = "application/x-unix-archive"
+	debMimeType mimeType = "application/vnd.debian.binary-package"
 	rpmMimeType mimeType = "application/x-rpm"
 	machOType   mimeType = "application/x-mach-binary"
 	octetStream mimeType = "application/octet-stream"
@@ -59,7 +60,7 @@ func GetHandlerForType(mimeT mimeType, opts ...Option) (FileHandler, error) {
 
 	var handler FileHandler
 	switch mimeT {
-	case arMimeType:
+	case arMimeType, debMimeType:
 		handler = &ARHandler{DefaultHandler: defaultHandler}
 	case rpmMimeType:
 		handler = &RPMHandler{DefaultHandler: defaultHandler}
@@ -97,7 +98,7 @@ func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferRea
 		return false
 	}
 
-	if !(mimeT == arMimeType || mimeT == rpmMimeType) {
+	if !(mimeT == arMimeType || mimeT == rpmMimeType || mimeT == debMimeType) {
 		_, _, err := archiver.Identify("", reReader)
 		if errors.Is(err, archiver.ErrNoMatch) {
 			return false
