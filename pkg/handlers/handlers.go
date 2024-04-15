@@ -7,6 +7,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -130,12 +131,18 @@ func getHandlerForType(mimeT mimeType) (FileHandler, error) {
 // Successful handling passes the file content through a channel to be chunked and reported, returning true on success.
 func HandleFile(
 	ctx logContext.Context,
-	reReader *diskbufferreader.DiskBufferReader,
+	reader io.Reader,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
 ) error {
 	config := newFileHandlingConfig(options...)
+
+	reReader, err := diskbufferreader.New(reader, diskbufferreader.WithBufferName(cleantemp.MkFilename()))
+	if err != nil {
+		return err
+	}
+	defer reReader.Close()
 
 	mimeT, err := mimetype.DetectReader(reReader)
 	if err != nil {

@@ -56,7 +56,8 @@ func BenchmarkHandleFile(b *testing.B) {
 
 		go func() {
 			defer close(sourceChan)
-			HandleFile(logContext.Background(), reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			err := HandleFile(logContext.Background(), reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			assert.NoError(b, err)
 		}()
 
 		for range sourceChan {
@@ -130,7 +131,8 @@ func TestNestedDirArchive(t *testing.T) {
 
 	go func() {
 		defer close(sourceChan)
-		HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+		assert.NoError(t, err)
 	}()
 
 	count := 0
