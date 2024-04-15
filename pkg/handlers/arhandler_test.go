@@ -24,7 +24,7 @@ func TestHandleARFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer newReader.Close()
 
-	handler := &ARHandler{new(DefaultHandler)}
+	handler := &arHandler{new(defaultHandler)}
 	archiveChan, err := handler.HandleFile(logContext.AddLogger(ctx), newReader)
 	assert.NoError(t, err)
 
