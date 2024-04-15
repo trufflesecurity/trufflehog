@@ -162,6 +162,14 @@ func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
 		}
+		if int(f.Size()) > maxSize {
+			lCtx.Logger().V(3).Info(
+				"skipping file due to size",
+				"filename", f.Name(),
+				"size", f.Size(),
+			)
+			return nil
+		}
 
 		fReader, err := f.Open()
 		if err != nil {
