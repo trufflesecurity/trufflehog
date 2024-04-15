@@ -18,13 +18,13 @@ type FileHandler interface {
 	HandleFile(ctx logContext.Context, reader *diskbufferreader.DiskBufferReader) (chan []byte, error)
 }
 
-// FileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
-type FileHandlingConfig struct{ skipArchives bool }
+// fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
+type fileHandlingConfig struct{ skipArchives bool }
 
-// NewFileHandlingConfig creates a default FileHandlingConfig with default settings.
+// newFileHandlingConfig creates a default fileHandlingConfig with default settings.
 // Optional functional parameters can customize the configuration.
-func NewFileHandlingConfig(options ...func(*FileHandlingConfig)) *FileHandlingConfig {
-	config := new(FileHandlingConfig)
+func newFileHandlingConfig(options ...func(*fileHandlingConfig)) *fileHandlingConfig {
+	config := new(fileHandlingConfig)
 	for _, option := range options {
 		option(config)
 	}
@@ -32,10 +32,10 @@ func NewFileHandlingConfig(options ...func(*FileHandlingConfig)) *FileHandlingCo
 	return config
 }
 
-// WithSkipArchives sets the skipArchives field of the FileHandlingConfig.
+// WithSkipArchives sets the skipArchives field of the fileHandlingConfig.
 // If skip is true, the FileHandler will skip archive files.
-func WithSkipArchives(skip bool) func(*FileHandlingConfig) {
-	return func(c *FileHandlingConfig) { c.skipArchives = skip }
+func WithSkipArchives(skip bool) func(*fileHandlingConfig) {
+	return func(c *fileHandlingConfig) { c.skipArchives = skip }
 }
 
 type mimeType string
@@ -96,23 +96,23 @@ var knownArchiveMimeTypes = map[mimeType]bool{
 	octetStreamMime:     false,
 }
 
-// GetHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type. This method
-// determines the appropriate handler to use: ARHandler for 'arMimeType', RPMHandler for 'rpmMimeType', and
-// DefaultHandler for other types, which includes common archive formats like .zip, .tar, .gz, etc
-// managed by the archiver library.
-// The handler is then configured with provided Options, adapting it to specific operational needs.
+// getHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type.
+// This method uses specialized handlers for specific archive types and RPM packages:
+// - arHandler is used for 'arMime', 'unixArMime', and 'debMime' which include Unix archives and Debian packages.
+// - rpmHandler is used for 'rpmMime' and 'cpioMime', handling RPM and CPIO archives.
+// For all other MIME types, which typically include common archive formats like .zip, .tar, .gz, etc.,
+// a defaultHandler is used, leveraging the archiver library to manage these formats.
+// The chosen handler is then configured with provided options, adapting it to specific operational needs.
 // Returns the configured handler or an error if the handler type does not match the expected type.
-func GetHandlerForType(mimeT mimeType) (FileHandler, error) {
-	defaultHandler := new(DefaultHandler)
+func getHandlerForType(mimeT mimeType) (FileHandler, error) {
+	defaultHandler := new(defaultHandler)
 
 	var handler FileHandler
 	switch mimeT {
 	case arMime, unixArMime, debMime:
-		handler = &ARHandler{DefaultHandler: defaultHandler}
+		handler = &arHandler{defaultHandler: defaultHandler}
 	case rpmMime, cpioMime:
-		handler = &RPMHandler{DefaultHandler: defaultHandler}
-	case machoMime, octetStreamMime:
-		fallthrough
+		handler = &rpmHandler{defaultHandler: defaultHandler}
 	default:
 		handler = defaultHandler
 	}
@@ -126,8 +126,14 @@ func GetHandlerForType(mimeT mimeType) (FileHandler, error) {
 // extraction or processing. Errors at any stage (MIME type determination, handler retrieval,
 // seeking, or file handling) result in a log entry and a false return value indicating failure.
 // Successful handling passes the file content through a channel to be chunked and reported, returning true on success.
-func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferReader, chunkSkel *sources.Chunk, reporter sources.ChunkReporter, options ...func(*FileHandlingConfig)) bool {
-	config := NewFileHandlingConfig(options...)
+func HandleFile(
+	ctx logContext.Context,
+	reReader *diskbufferreader.DiskBufferReader,
+	chunkSkel *sources.Chunk,
+	reporter sources.ChunkReporter,
+	options ...func(*fileHandlingConfig),
+) bool {
+	config := newFileHandlingConfig(options...)
 
 	mimeT, err := mimetype.DetectReader(reReader)
 	if err != nil {
@@ -141,7 +147,7 @@ func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferRea
 		return true
 	}
 
-	handler, err := GetHandlerForType(mime)
+	handler, err := getHandlerForType(mime)
 	if err != nil {
 		ctx.Logger().Error(err, "error getting handler for type")
 		return false
@@ -165,7 +171,12 @@ func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferRea
 // Each filled chunk is reported using the provided reporter. This function manages the lifecycle of the channel,
 // handling the termination condition when the channel closes and ensuring the cancellation of the operation if the context
 // is done. It returns true if all chunks are processed successfully, otherwise returns false on errors or cancellation.
-func handleChunks(ctx logContext.Context, handlerChan chan []byte, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) bool {
+func handleChunks(
+	ctx logContext.Context,
+	handlerChan chan []byte,
+	chunkSkel *sources.Chunk,
+	reporter sources.ChunkReporter,
+) bool {
 	if handlerChan == nil {
 		ctx.Logger().Error(fmt.Errorf("handler channel is nil"), "error handling chunks")
 		return false
