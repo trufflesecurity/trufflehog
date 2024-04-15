@@ -150,9 +150,13 @@ func (h *DefaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
 func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
-	return func(ctx context.Context, f archiver.File) error {
-		lCtx := logContext.AddLogger(ctx)
-		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
+	return func(ctx context.Context, file archiver.File) error {
+		lCtx := logContext.WithValues(
+			logContext.AddLogger(ctx),
+			"filename", file.Name(),
+			"size", file.Size(),
+		)
+		lCtx.Logger().V(5).Info("Handling extracted file.")
 
 		if common.IsDone(ctx) {
 			return ctx.Err()
@@ -162,22 +166,26 @@ func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
 		}
+		if int(file.Size()) > maxSize {
+			lCtx.Logger().V(3).Info("skipping file due to size")
+			return nil
+		}
 
-		fReader, err := f.Open()
+		if common.SkipFile(file.Name()) {
+			lCtx.Logger().V(5).Info("skipping file")
+			return nil
+		}
+
+		if h.skipBinaries && common.IsBinary(file.Name()) {
+			lCtx.Logger().V(5).Info("skipping binary file")
+			return nil
+		}
+
+		fReader, err := file.Open()
 		if err != nil {
 			return err
 		}
 		defer fReader.Close()
-
-		if common.SkipFile(f.Name()) {
-			lCtx.Logger().V(5).Info("skipping file", "filename", f.Name())
-			return nil
-		}
-
-		if h.skipBinaries && common.IsBinary(f.Name()) {
-			lCtx.Logger().V(5).Info("skipping binary file", "filename", f.Name())
-			return nil
-		}
 
 		return h.openArchive(lCtx, depth, fReader, archiveChan)
 	}
