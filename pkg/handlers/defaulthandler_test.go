@@ -18,51 +18,61 @@ func TestArchiveHandler(t *testing.T) {
 		archiveURL     string
 		expectedChunks int
 		matchString    string
+		expectErr      bool
 	}{
 		"gzip-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one-zip.gz",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
+			false,
 		},
 		"gzip-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/double-zip.gz",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
+			false,
 		},
 		"gzip-too-deep": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six-zip.gz",
 			0,
 			"",
+			true,
 		},
 		"tar-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one.tar",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
+			false,
 		},
 		"tar-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/two.tar",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
+			false,
 		},
 		"tar-too-deep": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six.tar",
 			0,
 			"",
+			true,
 		},
 		"targz-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/tar-archive.tar.gz",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
+			false,
 		},
 		"gzip-large": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
 			1543,
 			"AKIAYVP4CIPPH5TNP3SW",
+			false,
 		},
 		"zip-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
+			false,
 		},
 	}
 
@@ -80,7 +90,10 @@ func TestArchiveHandler(t *testing.T) {
 				t.Errorf("error creating reusable reader: %s", err)
 			}
 			archiveChan, err := handler.HandleFile(logContext.Background(), newReader)
-			assert.NoError(t, err)
+			if testCase.expectErr {
+				assert.NoError(t, err)
+				return
+			}
 
 			count := 0
 			re := regexp.MustCompile(testCase.matchString)
