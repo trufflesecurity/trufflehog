@@ -171,12 +171,6 @@ func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
-		fReader, err := file.Open()
-		if err != nil {
-			return err
-		}
-		defer fReader.Close()
-
 		if common.SkipFile(file.Name()) {
 			lCtx.Logger().V(5).Info("skipping file")
 			return nil
@@ -186,6 +180,12 @@ func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			lCtx.Logger().V(5).Info("skipping binary file")
 			return nil
 		}
+
+		fReader, err := file.Open()
+		if err != nil {
+			return err
+		}
+		defer fReader.Close()
 
 		return h.openArchive(lCtx, depth, fReader, archiveChan)
 	}
