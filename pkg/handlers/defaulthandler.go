@@ -132,8 +132,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 // It logs the extraction, checks for cancellation, and decides whether to skip the file based on its name or type,
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
-<<<<<<< HEAD
-func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
+func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, file archiver.File) error {
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
@@ -141,12 +140,6 @@ func (h *DefaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			"size", file.Size(),
 		)
 		lCtx.Logger().V(5).Info("Handling extracted file.")
-=======
-func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
-	return func(ctx context.Context, f archiver.File) error {
-		lCtx := logContext.AddLogger(ctx)
-		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
->>>>>>> d2a11ce7f (make structs and methods private)
 
 		if common.IsDone(ctx) {
 			return ctx.Err()
@@ -163,11 +156,6 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		if common.SkipFile(file.Name()) {
 			lCtx.Logger().V(5).Info("skipping file")
-			return nil
-		}
-
-		if h.skipBinaries && common.IsBinary(file.Name()) {
-			lCtx.Logger().V(5).Info("skipping binary file")
 			return nil
 		}
 
