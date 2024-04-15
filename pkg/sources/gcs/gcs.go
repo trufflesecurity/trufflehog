@@ -12,7 +12,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
@@ -20,7 +19,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -355,16 +353,5 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		},
 	}
 
-	return s.readObjectData(ctx, o, chunkSkel)
-}
-
-func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) error {
-	bufferName := cleantemp.MkFilename()
-	reader, err := diskbufferreader.New(o, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return fmt.Errorf("error creating disk buffer reader: %w", err)
-	}
-	defer reader.Close()
-
-	return handlers.HandleFile(ctx, reader, chunk, sources.ChanReporter{Ch: s.chunksCh})
+	return handlers.HandleFile(ctx, o, chunkSkel, sources.ChanReporter{Ch: s.chunksCh})
 }
