@@ -13,9 +13,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// FileHandler is an represents a handler for files.
-// It has a single method, HandleFile, which takes a context and an io.Reader as input,
+// FileHandler represents a handler for files.
+// It has a single method, HandleFile, which takes a context and a *diskbufferreader.DiskBufferReader as input,
 // and returns a channel of byte slices and an error.
+// The DiskBufferReader provides an io.ReaderAt interface and supports seeking, allowing handlers to perform
+// random access on the file content if needed.
 type FileHandler interface {
 	HandleFile(ctx logContext.Context, reader *diskbufferreader.DiskBufferReader) (chan []byte, error)
 }
