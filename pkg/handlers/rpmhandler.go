@@ -36,15 +36,8 @@ func (h *RPMHandler) HandleFile(ctx logContext.Context, input io.Reader) (chan [
 			return
 		}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
-					ctx.Logger().Error(err, "error processing RPM files")
-				}
-			}
+		if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
+			ctx.Logger().Error(err, "error processing RPM files")
 		}
 	}()
 

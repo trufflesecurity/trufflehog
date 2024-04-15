@@ -97,12 +97,14 @@ func HandleFile(ctx logContext.Context, reReader *diskbufferreader.DiskBufferRea
 		return false
 	}
 
-	_, arReader, err := archiver.Identify("", reReader)
-	if errors.Is(err, archiver.ErrNoMatch) {
-		return false
+	if !(mimeT == arMimeType || mimeT == rpmMimeType) {
+		_, _, err := archiver.Identify("", reReader)
+		if errors.Is(err, archiver.ErrNoMatch) {
+			return false
+		}
 	}
 
-	archiveChan, err := handler.HandleFile(ctx, arReader) // Delegate to the specific handler to process the file.
+	archiveChan, err := handler.HandleFile(ctx, reReader) // Delegate to the specific handler to process the file.
 	if err != nil {
 		ctx.Logger().Error(err, "error handling file")
 		return false
