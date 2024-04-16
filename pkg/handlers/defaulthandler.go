@@ -75,6 +75,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 
 				if err := h.handleNonArchiveContent(ctx, arReader, dataChan); err != nil {
 					ctx.Logger().Error(err, "error handling non-archive content.")
+					h.metrics.incErrors()
 				}
 				h.metrics.incFilesProcessed()
 			}()
@@ -97,6 +98,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 
 		if err := h.openArchive(ctx, 0, arReader, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
+			h.metrics.incErrors()
 		}
 	}()
 	return dataChan, nil
@@ -214,6 +216,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	for data := range chunkResChan {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")
+			h.metrics.incErrors()
 			continue
 		}
 
