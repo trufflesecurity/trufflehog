@@ -44,11 +44,13 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.D
 		arReader, err := deb.LoadAr(input)
 		if err != nil {
 			ctx.Logger().Error(err, "error reading AR")
+			h.metrics.incErrors()
 			return
 		}
 
 		if err := h.processARFiles(ctx, arReader, archiveChan); err != nil {
 			ctx.Logger().Error(err, "error processing AR files")
+			h.metrics.incErrors()
 		}
 	}()
 
@@ -73,6 +75,7 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 
 			if err := h.handleNonArchiveContent(fileCtx, arEntry.Data, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in AR")
+				h.metrics.incErrors()
 			}
 
 			h.metrics.incFilesProcessed()

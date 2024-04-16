@@ -50,11 +50,13 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.
 		reader, err := rpm.PayloadReaderExtended()
 		if err != nil {
 			ctx.Logger().Error(err, "error getting RPM payload reader")
+			h.metrics.incErrors()
 			return
 		}
 
 		if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
 			ctx.Logger().Error(err, "error processing RPM files")
+			h.metrics.incErrors()
 		}
 	}()
 
@@ -79,6 +81,7 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 
 			if err := h.handleNonArchiveContent(fileCtx, reader, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in RPM")
+				h.metrics.incErrors()
 			}
 
 			h.metrics.incFilesProcessed()
