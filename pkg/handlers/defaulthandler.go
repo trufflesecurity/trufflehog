@@ -73,11 +73,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 					h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
 				}(time.Now())
 
-<<<<<<< HEAD
 				if err := h.handleNonArchiveContent(ctx, arReader, dataChan); err != nil {
-=======
-				if err := h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
->>>>>>> 2c8fba4cf (add metrics for file handling)
 					ctx.Logger().Error(err, "error handling non-archive content.")
 					h.metrics.incErrors()
 				}
