@@ -61,7 +61,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 	if err != nil {
 		if errors.Is(err, archiver.ErrNoMatch) {
 			// Not an archive, handle as non-archive content in a separate goroutine.
-			ctx.Logger().Info("File not recognized as an archive, handling as non-archive content.")
+			ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
 			go func() {
 				defer close(dataChan)
 				if err := h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
