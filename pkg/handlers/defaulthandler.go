@@ -69,15 +69,24 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 			go func() {
 				defer close(dataChan)
 
+				// Update the metrics for the file processing.
+				var err error
 				defer func(start time.Time) {
+					if err != nil {
+						h.metrics.incErrors()
+						if errors.Is(err, context.DeadlineExceeded) {
+							h.metrics.incFileProcessingTimeouts()
+						}
+						return
+					}
+
 					h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+					h.metrics.incFilesProcessed()
 				}(time.Now())
 
 				if err := h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
 					ctx.Logger().Error(err, "error handling non-archive content.")
-					h.metrics.incErrors()
 				}
-				h.metrics.incFilesProcessed()
 			}()
 			return dataChan, nil
 		}
@@ -90,13 +99,22 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 		defer cancel()
 		defer close(dataChan)
 
+		// Update the metrics for the file processing.
+		var err error
 		defer func(start time.Time) {
+			if err != nil {
+				h.metrics.incErrors()
+				if errors.Is(err, context.DeadlineExceeded) {
+					h.metrics.incFileProcessingTimeouts()
+				}
+				return
+			}
+
 			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
 		}(time.Now())
 
-		if err := h.openArchive(ctx, 0, arReader, dataChan); err != nil {
+		if err = h.openArchive(ctx, 0, arReader, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
-			h.metrics.incErrors()
 		}
 	}()
 	return dataChan, nil
@@ -114,6 +132,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 	}
 
 	if depth >= maxDepth {
+		h.metrics.incMaxArchiveDepthCount()
 		return ErrMaxDepthReached
 	}
 
@@ -131,10 +150,10 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
 		compReader, err := archive.OpenReader(arReader)
 		if err != nil {
-			return err
+			return fmt.Errorf("error opening decompressor with format: %s %w", format.Name(), err)
 		}
-
 		defer compReader.Close()
+
 		h.metrics.incFilesProcessed()
 
 		return h.openArchive(ctx, depth+1, compReader, archiveChan)
@@ -162,13 +181,16 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
 		}
-		if int(file.Size()) > maxSize {
+
+		fileSize := file.Size()
+		if int(fileSize) > maxSize {
 			lCtx.Logger().V(3).Info("skipping file due to size")
 			return nil
 		}
 
 		if common.SkipFile(file.Name()) {
 			lCtx.Logger().V(5).Info("skipping file")
+			h.metrics.incFilesSkipped()
 			return nil
 		}
 
@@ -182,7 +204,9 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return err
 		}
 		defer fReader.Close()
+
 		h.metrics.incFilesProcessed()
+		h.metrics.observeFileSize(fileSize)
 
 		return h.openArchive(lCtx, depth, fReader, archiveChan)
 	}
@@ -207,6 +231,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 
 	if common.SkipFile(mime.Extension()) {
 		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
+		h.metrics.incFilesSkipped()
 		return nil
 	}
 
