@@ -19,30 +19,25 @@ import (
 
 type ctxKey int
 
-const depthKey ctxKey = iota
+const (
+	depthKey          ctxKey = iota
+	defaultBufferSize        = 512
+)
 
 var (
 	maxDepth   = 5
-	maxSize    = 250 * 1024 * 1024 // 20MB
+	maxSize    = 250 * 1024 * 1024 // 250 MB
 	maxTimeout = time.Duration(30) * time.Second
-
-	defaultBufferSize = 512
 )
 
 // SetArchiveMaxSize sets the maximum size of the archive.
-func SetArchiveMaxSize(size int) {
-	maxSize = size
-}
+func SetArchiveMaxSize(size int) { maxSize = size }
 
 // SetArchiveMaxDepth sets the maximum depth of the archive.
-func SetArchiveMaxDepth(depth int) {
-	maxDepth = depth
-}
+func SetArchiveMaxDepth(depth int) { maxDepth = depth }
 
 // SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
-func SetArchiveMaxTimeout(timeout time.Duration) {
-	maxTimeout = timeout
-}
+func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
 // defaultHandler provides a base implementation for file handlers, encapsulating common behaviors
 // needed across different handlers. This handler is embedded in other specialized handlers to ensure
