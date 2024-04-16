@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -37,26 +38,36 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.
 		defer cancel()
 		defer close(archiveChan)
 
+		// Update the metrics for the file processing.
+		var err error
 		defer func(start time.Time) {
+			if err != nil {
+				h.metrics.incErrors()
+				if errors.Is(err, context.DeadlineExceeded) {
+					h.metrics.incFileProcessingTimeouts()
+				}
+				return
+			}
+
 			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
 		}(time.Now())
 
-		rpm, err := rpmutils.ReadRpm(input)
+		var rpm *rpmutils.Rpm
+		rpm, err = rpmutils.ReadRpm(input)
 		if err != nil {
 			ctx.Logger().Error(err, "error reading RPM")
 			return
 		}
 
-		reader, err := rpm.PayloadReaderExtended()
+		var reader rpmutils.PayloadReader
+		reader, err = rpm.PayloadReaderExtended()
 		if err != nil {
 			ctx.Logger().Error(err, "error getting RPM payload reader")
-			h.metrics.incErrors()
 			return
 		}
 
-		if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
+		if err = h.processRPMFiles(ctx, reader, archiveChan); err != nil {
 			ctx.Logger().Error(err, "error processing RPM files")
-			h.metrics.incErrors()
 		}
 	}()
 
@@ -77,7 +88,9 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 				}
 				return fmt.Errorf("error reading RPM payload: %w", err)
 			}
-			fileCtx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileInfo.Size)
+
+			fileSize := fileInfo.Size()
+			fileCtx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileSize)
 
 			if err := h.handleNonArchiveContent(fileCtx, reader, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in RPM")
@@ -85,6 +98,7 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 			}
 
 			h.metrics.incFilesProcessed()
+			h.metrics.observeFileSize(fileSize)
 		}
 	}
 }

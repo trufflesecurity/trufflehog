@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -37,20 +38,29 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.D
 		defer cancel()
 		defer close(archiveChan)
 
+		// Update the metrics for the file processing.
+		var err error
 		defer func(start time.Time) {
+			if err != nil {
+				h.metrics.incErrors()
+				if errors.Is(err, context.DeadlineExceeded) {
+					h.metrics.incFileProcessingTimeouts()
+				}
+				return
+			}
+
 			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
 		}(time.Now())
 
-		arReader, err := deb.LoadAr(input)
+		var arReader *deb.Ar
+		arReader, err = deb.LoadAr(input)
 		if err != nil {
 			ctx.Logger().Error(err, "error reading AR")
-			h.metrics.incErrors()
 			return
 		}
 
-		if err := h.processARFiles(ctx, arReader, archiveChan); err != nil {
+		if err = h.processARFiles(ctx, arReader, archiveChan); err != nil {
 			ctx.Logger().Error(err, "error processing AR files")
-			h.metrics.incErrors()
 		}
 	}()
 
@@ -71,7 +81,9 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 				}
 				return fmt.Errorf("error reading AR payload: %w", err)
 			}
-			fileCtx := logContext.WithValues(ctx, "filename", arEntry.Name, "size", arEntry.Size)
+
+			fileSize := arEntry.Size
+			fileCtx := logContext.WithValues(ctx, "filename", arEntry.Name, "size", fileSize)
 
 			if err := h.handleNonArchiveContent(fileCtx, arEntry.Data, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in AR")
@@ -79,6 +91,7 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 			}
 
 			h.metrics.incFilesProcessed()
+			h.metrics.observeFileSize(fileSize)
 		}
 	}
 }
