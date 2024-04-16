@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"pault.ag/go/debian/deb"
@@ -13,7 +14,18 @@ import (
 
 // arHandler specializes defaultHandler to handle AR archive formats. By embedding defaultHandler,
 // arHandler inherits and can further customize the common handling behavior such as skipping binaries.
-type arHandler struct{ *defaultHandler }
+type arHandler struct {
+	*defaultHandler
+	metrics *metrics
+}
+
+// newARHandler creates an arHandler with the provided metrics.
+func newARHandler() *arHandler {
+	return &arHandler{
+		defaultHandler: newDefaultHandler(arHandlerType),
+		metrics:        newHandlerMetrics(arHandlerType),
+	}
+}
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
@@ -24,6 +36,10 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.D
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
 		defer cancel()
 		defer close(archiveChan)
+
+		defer func(start time.Time) {
+			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+		}(time.Now())
 
 		arReader, err := deb.LoadAr(input)
 		if err != nil {
@@ -58,6 +74,8 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 			if err := h.handleNonArchiveContent(fileCtx, arEntry.Data, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in AR")
 			}
+
+			h.metrics.incFilesProcessed()
 		}
 	}
 }
