@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/sassoftware/go-rpmutils"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
@@ -13,7 +14,18 @@ import (
 
 // rpmHandler specializes defaultHandler to manage RPM package files. It leverages shared behaviors
 // from defaultHandler and introduces additional logic specific to RPM packages.
-type rpmHandler struct{ *defaultHandler }
+type rpmHandler struct {
+	*defaultHandler
+	metrics *metrics
+}
+
+// newRPMHandler creates an rpmHandler with the provided metrics.
+func newRPMHandler() *rpmHandler {
+	return &rpmHandler{
+		defaultHandler: newDefaultHandler(rpmHandlerType),
+		metrics:        newHandlerMetrics(rpmHandlerType),
+	}
+}
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
@@ -24,6 +36,10 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
 		defer cancel()
 		defer close(archiveChan)
+
+		defer func(start time.Time) {
+			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+		}(time.Now())
 
 		rpm, err := rpmutils.ReadRpm(input)
 		if err != nil {
@@ -64,6 +80,8 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 			if err := h.handleNonArchiveContent(fileCtx, reader, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in RPM")
 			}
+
+			h.metrics.incFilesProcessed()
 		}
 	}
 }

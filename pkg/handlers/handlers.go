@@ -41,6 +41,14 @@ func WithSkipArchives(skip bool) func(*fileHandlingConfig) {
 	return func(c *fileHandlingConfig) { c.skipArchives = skip }
 }
 
+type handlerType string
+
+const (
+	defaultHandlerType handlerType = "default"
+	arHandlerType      handlerType = "ar"
+	rpmHandlerType     handlerType = "rpm"
+)
+
 type mimeType string
 
 const (
@@ -110,16 +118,14 @@ var knownArchiveMimeTypes = map[mimeType]bool{
 // The chosen handler is then configured with provided options, adapting it to specific operational needs.
 // Returns the configured handler or an error if the handler type does not match the expected type.
 func getHandlerForType(mimeT mimeType) (FileHandler, error) {
-	defaultHandler := new(defaultHandler)
-
 	var handler FileHandler
 	switch mimeT {
 	case arMime, unixArMime, debMime:
-		handler = &arHandler{defaultHandler: defaultHandler}
+		handler = newARHandler()
 	case rpmMime, cpioMime:
-		handler = &rpmHandler{defaultHandler: defaultHandler}
+		handler = newRPMHandler()
 	default:
-		handler = defaultHandler
+		handler = newDefaultHandler(defaultHandlerType)
 	}
 
 	return handler, nil

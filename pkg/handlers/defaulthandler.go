@@ -42,7 +42,16 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 // defaultHandler provides a base implementation for file handlers, encapsulating common behaviors
 // needed across different handlers. This handler is embedded in other specialized handlers to ensure
 // consistent application of these common behaviors and to simplify the extension of handler functionalities.
-type defaultHandler struct{}
+type defaultHandler struct{ metrics *metrics }
+
+// newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
+// The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
+// ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
+// specific handler that invoked them. This allows for accurate metrics attribution when the defaultHandler
+// is embedded in specialized handlers like arHandler or rpmHandler.
+func newDefaultHandler(handlerType handlerType) *defaultHandler {
+	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
+}
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
@@ -59,9 +68,15 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 			ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
 			go func() {
 				defer close(dataChan)
+
+				defer func(start time.Time) {
+					h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+				}(time.Now())
+
 				if err := h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
 					ctx.Logger().Error(err, "error handling non-archive content.")
 				}
+				h.metrics.incFilesProcessed()
 			}()
 			return dataChan, nil
 		}
@@ -73,6 +88,10 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
 		defer cancel()
 		defer close(dataChan)
+
+		defer func(start time.Time) {
+			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+		}(time.Now())
 
 		if err := h.openArchive(ctx, 0, arReader, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
@@ -114,6 +133,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		}
 
 		defer compReader.Close()
+		h.metrics.incFilesProcessed()
 
 		return h.openArchive(ctx, depth+1, compReader, archiveChan)
 	case archiver.Extractor:
@@ -160,6 +180,7 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return err
 		}
 		defer fReader.Close()
+		h.metrics.incFilesProcessed()
 
 		return h.openArchive(lCtx, depth, fReader, archiveChan)
 	}
@@ -194,9 +215,11 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 			ctx.Logger().Error(err, "error reading chunk")
 			continue
 		}
+
 		if err := common.CancellableWrite(ctx, archiveChan, data.Bytes()); err != nil {
 			return err
 		}
+		h.metrics.incBytesProcessed(len(data.Bytes()))
 	}
 	return nil
 }
