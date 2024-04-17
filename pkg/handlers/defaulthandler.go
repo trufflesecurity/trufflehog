@@ -179,6 +179,11 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		)
 		lCtx.Logger().V(5).Info("Handling extracted file.")
 
+		if file.IsDir() || file.LinkTarget != "" {
+			lCtx.Logger().V(5).Info("skipping directory or symlink")
+			return nil
+		}
+
 		if common.IsDone(ctx) {
 			return ctx.Err()
 		}
@@ -202,9 +207,14 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		fReader, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s, isDir %v: %w", file.Name(), file.IsDir(), err)
+			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
 		}
 		defer fReader.Close()
+
+		// We should be skipping directories and symlinks at the start of the function, so fReader should not be nil.
+		if fReader == nil {
+			return nil
+		}
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
