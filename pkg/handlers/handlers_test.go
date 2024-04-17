@@ -92,6 +92,56 @@ func TestSkipArchive(t *testing.T) {
 	assert.Equal(t, wantCount, count)
 }
 
+func TestHandleNestedArchives(t *testing.T) {
+	file, err := os.Open("testdata/nested-dirs.zip")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
+	ctx := logContext.Background()
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 8
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleNestedCompressedArchive(t *testing.T) {
+	file, err := os.Open("testdata/nested-compressed-archive.tar.gz")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	reader, err := diskbufferreader.New(file)
+	assert.NoError(t, err)
+
+	ctx := logContext.Background()
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 4
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
 func TestExtractTarContent(t *testing.T) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)
