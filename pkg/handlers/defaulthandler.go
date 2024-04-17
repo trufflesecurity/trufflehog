@@ -219,10 +219,16 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
+		reader, err := diskbufferreader.New(fReader)
+		if err != nil {
+			return fmt.Errorf("error creating reusable reader: %w", err)
+		}
+		defer reader.Close()
+
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
-		return h.openArchive(lCtx, depth, fReader, archiveChan)
+		return h.openArchive(lCtx, depth, reader, archiveChan)
 	}
 }
 
