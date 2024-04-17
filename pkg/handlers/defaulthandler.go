@@ -202,7 +202,7 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		fReader, err := file.Open()
 		if err != nil {
-			return err
+			return fmt.Errorf("error opening file %s, isDir %v: %w", file.Name(), file.IsDir(), err)
 		}
 		defer fReader.Close()
 
