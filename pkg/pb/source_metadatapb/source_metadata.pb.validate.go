@@ -3674,6 +3674,111 @@ var _ interface {
 	ErrorName() string
 } = WebhookValidationError{}
 
+// Validate checks the field values on Logstash with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Logstash) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Logstash with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in LogstashMultiError, or nil
+// if none found.
+func (m *Logstash) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Logstash) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Index
+
+	// no validation rules for DocumentId
+
+	// no validation rules for Timestamp
+
+	if len(errors) > 0 {
+		return LogstashMultiError(errors)
+	}
+
+	return nil
+}
+
+// LogstashMultiError is an error wrapping multiple validation errors returned
+// by Logstash.ValidateAll() if the designated constraints aren't met.
+type LogstashMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m LogstashMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m LogstashMultiError) AllErrors() []error { return m }
+
+// LogstashValidationError is the validation error returned by
+// Logstash.Validate if the designated constraints aren't met.
+type LogstashValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e LogstashValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e LogstashValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e LogstashValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e LogstashValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e LogstashValidationError) ErrorName() string { return "LogstashValidationError" }
+
+// Error satisfies the builtin error interface
+func (e LogstashValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sLogstash.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = LogstashValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = LogstashValidationError{}
+
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -4921,6 +5026,47 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "Webhook",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Logstash:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetLogstash()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Logstash",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Logstash",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetLogstash()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Logstash",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
