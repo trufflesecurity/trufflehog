@@ -158,7 +158,11 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 
 		return h.openArchive(ctx, depth+1, compReader, archiveChan)
 	case archiver.Extractor:
-		return archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
+		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
+		if err != nil {
+			return fmt.Errorf("error extracting archive with format: %s: %w", format.Name(), err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown archive type: %s", format.Name())
 	}
