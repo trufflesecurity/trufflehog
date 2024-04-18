@@ -45,8 +45,8 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
 					Raw:          []byte("P@ssw0rd!"),
-					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@localhost?database=master&disableRetry=false"),
-					Redacted:     "sqlserver://sa:********@localhost?database=master&disableRetry=false",
+					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@localhost?database=master&dial+timeout=15&disableretry=false"),
+					Redacted:     "sqlserver://sa:********@localhost?database=master&dial+timeout=15&disableretry=false",
 					Verified:     true,
 				},
 			},
