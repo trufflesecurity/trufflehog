@@ -82,16 +82,18 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("Server=localhost;User ID=sa;Password=123"),
+				data:   []byte(fmt.Sprintf("Server=localhost;Port=%s;User ID=sa;Password=123", port.Port())),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
 					Raw:          []byte("123"),
-					RawV2:        []byte("sqlserver://sa:123@localhost?dial+timeout=15&disableretry=false"),
-					Redacted:     "sqlserver://sa:********@localhost?dial+timeout=15&disableretry=false",
-					Verified:     false,
+					RawV2: []byte(fmt.Sprintf("sqlserver://sa:123@localhost:%s?dial+timeout=15&disableretry=false",
+						port.Port())),
+					Redacted: fmt.Sprintf("sqlserver://sa:********@localhost:%s?dial+timeout=15&disableretry=false",
+						port.Port()),
+					Verified: false,
 				},
 			},
 			wantErr: false,
