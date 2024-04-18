@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -46,22 +47,19 @@ func BenchmarkHandleFile(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sourceChan := make(chan *sources.Chunk, 1)
-		reader, err := diskbufferreader.New(file)
-		assert.NoError(b, err)
 
 		b.StartTimer()
-
 		go func() {
 			defer close(sourceChan)
-			err := HandleFile(logContext.Background(), reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
 			assert.NoError(b, err)
 		}()
 
 		for range sourceChan {
 		}
-
 		b.StopTimer()
-		reader.Close()
+
+		file.Seek(0, io.SeekStart)
 	}
 }
 

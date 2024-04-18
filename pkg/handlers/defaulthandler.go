@@ -10,12 +10,12 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 )
 
 type ctxKey int
@@ -159,13 +159,23 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 
 		h.metrics.incFilesProcessed()
 
-		reReader, err := diskbufferreader.New(compReader)
+		bufferWriter := bufferwriter.New(ctx)
+		_, err = io.Copy(bufferWriter, compReader)
 		if err != nil {
-			return fmt.Errorf("error creating reusable reader: %w", err)
+			return fmt.Errorf("error writing to buffered file writer: %w", err)
 		}
-		defer reReader.Close()
 
-		return h.openArchive(ctx, depth+1, reReader, archiveChan)
+		if err = bufferWriter.CloseForWriting(); err != nil {
+			return fmt.Errorf("error closing buffered file writer for writing: %w", err)
+		}
+
+		rdr, err := bufferWriter.ReadCloser()
+		if err != nil {
+			return fmt.Errorf("error creating reader for buffered file writer: %w", err)
+		}
+		defer rdr.Close()
+
+		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
 		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
@@ -223,16 +233,26 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer fReader.Close()
 
-		reReader, err := diskbufferreader.New(fReader)
+		bufferWriter := bufferwriter.New(lCtx)
+		_, err = io.Copy(bufferWriter, fReader)
 		if err != nil {
-			return fmt.Errorf("error creating reusable reader: %w", err)
+			return fmt.Errorf("error writing to buffered file writer: %w", err)
 		}
-		defer reReader.Close()
+
+		if err = bufferWriter.CloseForWriting(); err != nil {
+			return fmt.Errorf("error closing buffered file writer for writing: %w", err)
+		}
+
+		rdr, err := bufferWriter.ReadCloser()
+		if err != nil {
+			return fmt.Errorf("error creating reader for buffered file writer: %w", err)
+		}
+		defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
-		return h.openArchive(lCtx, depth, reReader, archiveChan)
+		return h.openArchive(lCtx, depth, rdr, archiveChan)
 	}
 }
 
