@@ -3,7 +3,6 @@ package bufferwriter
 
 import (
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -55,7 +54,7 @@ func New(ctx context.Context) *BufferWriter {
 // Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
 // The context is included to satisfy the contentWriter interface, allowing for future extensions
 // where context handling might be necessary (e.g., for timeouts or cancellation).
-func (b *BufferWriter) Write(ctx context.Context, data []byte) (int, error) {
+func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
 	}
@@ -67,20 +66,20 @@ func (b *BufferWriter) Write(ctx context.Context, data []byte) (int, error) {
 		bufferLength := uint64(b.buf.Len())
 		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
 
-		ctx.Logger().V(4).Info(
-			"write complete",
-			"data_size", size,
-			"buffer_len", bufferLength,
-			"buffer_size", b.buf.Cap(),
-		)
+		// ctx.Logger().V(4).Info(
+		// 	"write complete",
+		// 	"data_size", size,
+		// 	"buffer_len", bufferLength,
+		// 	"buffer_size", b.buf.Cap(),
+		// )
 	}(start)
-	return b.buf.Write(ctx, data)
+	return b.buf.Write(data)
 }
 
 // ReadCloser provides a read-closer for the buffer's content.
 // It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
 // as closing a bytes.Buffer is a no-op.
-func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
+func (b *BufferWriter) ReadCloser() (buffer.ReadSeekCloser, error) {
 	if b.state != readOnly {
 		return nil, fmt.Errorf("buffer is in read-only mode")
 	}

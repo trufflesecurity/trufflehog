@@ -27,11 +27,11 @@ func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Durat
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func (bufferedFileWriterMetrics) recordDiskWrite(ctx context.Context, f *os.File) {
+func (bufferedFileWriterMetrics) recordDiskWrite(f *os.File) {
 	diskWriteCount.Inc()
 	size, err := f.Stat()
 	if err != nil {
-		ctx.Logger().Error(err, "failed to get file size for metric")
+		// ctx.Logger().Error(err, "failed to get file size for metric")
 		return
 	}
 	fileSizeHistogram.Observe(float64(size.Size()))
@@ -122,7 +122,7 @@ func (w *BufferedFileWriter) String() (string, error) {
 }
 
 // Write writes data to the buffer or a file, depending on the size.
-func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error) {
+func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	if w.state != writeOnly {
 		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
 	}
@@ -134,17 +134,17 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 		w.metrics.recordDataProcessed(size, time.Since(start))
 
 		w.size += size
-		ctx.Logger().V(4).Info(
-			"write complete",
-			"data_size", size,
-			"content_size", bufferLength,
-			"total_size", w.size,
-		)
+		// ctx.Logger().V(4).Info(
+		// 	"write complete",
+		// 	"data_size", size,
+		// 	"content_size", bufferLength,
+		// 	"total_size", w.size,
+		// )
 	}(start)
 
 	totalSizeNeeded := uint64(bufferLength) + size
 	if totalSizeNeeded <= w.threshold {
-		return w.buf.Write(ctx, data)
+		return w.buf.Write(data)
 	}
 
 	// Switch to file writing if threshold is exceeded.
@@ -157,19 +157,19 @@ func (w *BufferedFileWriter) Write(ctx context.Context, data []byte) (int, error
 
 		w.filename = file.Name()
 		w.file = file
-		w.metrics.recordDiskWrite(ctx, file)
+		w.metrics.recordDiskWrite(file)
 
 		// Transfer existing data in buffer to the file, then clear the buffer.
 		// This ensures all the data is in one place - either entirely in the buffer or the file.
 		if bufferLength > 0 {
-			ctx.Logger().V(4).Info("writing buffer to file", "content_size", bufferLength)
+			// ctx.Logger().V(4).Info("writing buffer to file", "content_size", bufferLength)
 			if _, err := w.buf.WriteTo(w.file); err != nil {
 				return 0, err
 			}
 			w.bufPool.Put(w.buf)
 		}
 	}
-	ctx.Logger().V(4).Info("writing to file", "data_size", size)
+	// ctx.Logger().V(4).Info("writing to file", "data_size", size)
 
 	return w.file.Write(data)
 }
@@ -198,7 +198,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 // the buffer to the pool.
 // The caller should call Close() on the returned io.Reader when done to ensure files are cleaned up.
 // It can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
+func (w *BufferedFileWriter) ReadCloser() (buffer.ReadSeekCloser, error) {
 	if w.state != readOnly {
 		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
 	}

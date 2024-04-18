@@ -5,11 +5,11 @@ import (
 	"io"
 
 	"github.com/gabriel-vasile/mimetype"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 )
 
 // FileHandler represents a handler for files.
@@ -18,7 +18,7 @@ import (
 // The DiskBufferReader provides an io.ReaderAt interface and supports seeking, allowing handlers to perform
 // random access on the file content if needed.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader *diskbufferreader.DiskBufferReader) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader buffer.ReadSeekCloser) (chan []byte, error)
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -153,34 +153,82 @@ func HandleFile(
 ) error {
 	config := newFileHandlingConfig(options...)
 
-	reReader, err := diskbufferreader.New(reader, diskbufferreader.WithBufferName(cleantemp.MkFilename()))
-	if err != nil {
-		return err
-	}
-	defer reReader.Close()
+	// reReader, err := diskbufferreader.New(reader, diskbufferreader.WithBufferName(cleantemp.MkFilename()))
+	// if err != nil {
+	// 	return err
+	// }
+	// defer reReader.Close()
 
-	mimeT, err := mimetype.DetectReader(reReader)
+	bufferWriter := bufferwriter.New(ctx)
+	n, err := io.Copy(bufferWriter, reader)
+	if err != nil {
+		return fmt.Errorf("error writing to buffered file writer: %w", err)
+	}
+
+	// n, err := bufferWriter.Write(ctx, reader)
+	// if err != nil {
+	// 	return fmt.Errorf("error writing to buffered file writer: %w", err)
+	// }
+	ctx = logContext.WithValues(ctx, "num_bytes", n)
+	ctx.Logger().V(3).Info("wrote binary file to buffered file writer")
+
+	if err = bufferWriter.CloseForWriting(); err != nil {
+		return fmt.Errorf("error closing buffered file writer for writing: %w", err)
+	}
+
+	rdr, err := bufferWriter.ReadCloser()
+	if err != nil {
+		return fmt.Errorf("error creating reader for buffered file writer: %w", err)
+	}
+	defer rdr.Close()
+
+	// bufReader := bufio.NewReaderSize(reader, defaultBufferSize)
+	// // A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// // If fewer bytes are read, MIME type detection may still succeed.
+	// buffer, err := bufReader.Peek(defaultBufferSize)
+	// if err != nil && !errors.Is(err, io.EOF) {
+	// 	return fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	// }
+
+	// mimeT := mimetype.Detect(buffer)
+	mimeT, err := mimetype.DetectReader(rdr)
 	if err != nil {
 		return fmt.Errorf("error detecting MIME type: %w", err)
 	}
-
 	mime := mimeType(mimeT.String())
+
+	if _, err = rdr.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("error seeking to start of file: %w", err)
+	}
+
+	// mimeT, err := mimetype.DetectReader(reReader)
+	// if err != nil {
+	// 	return fmt.Errorf("error detecting MIME type: %w", err)
+	// }
+	//
+	// mime := mimeType(mimeT.String())
 	if config.skipArchives && knownArchiveMimeTypes[mime] {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
 		return nil
 	}
 
+	// reReader, err := diskbufferreader.New(bufReader, diskbufferreader.WithBufferName(cleantemp.MkFilename()))
+	// if err != nil {
+	// 	return err
+	// }
+	// defer reReader.Close()
+
 	// Reset the reader to the start of the file since the MIME type detection may have read some bytes.
-	if _, err := reReader.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("error seeking to start of file: %w", err)
-	}
+	// if _, err := reReader.Seek(0, io.SeekStart); err != nil {
+	// 	return fmt.Errorf("error seeking to start of file: %w", err)
+	// }
 
 	handler, err := getHandlerForType(mime)
 	if err != nil {
 		return fmt.Errorf("error getting handler for type: %w", err)
 	}
 
-	archiveChan, err := handler.HandleFile(ctx, reReader) // Delegate to the specific handler to process the file.
+	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)
 	}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
@@ -37,9 +38,9 @@ const (
 // based on performance needs or resource constraints, providing a unified way to interact with different content types.
 type contentWriter interface { // Write appends data to the content storage.
 	// Write appends data to the content storage.
-	Write(ctx context.Context, data []byte) (int, error)
+	Write(data []byte) (int, error)
 	// ReadCloser provides a reader for accessing stored content.
-	ReadCloser() (io.ReadCloser, error)
+	ReadCloser() (buffer.ReadSeekCloser, error)
 	// CloseForWriting closes the content storage for writing.
 	CloseForWriting() error
 	// Len returns the current size of the content.
@@ -93,7 +94,7 @@ func (d *Diff) ReadCloser() (io.ReadCloser, error) { return d.contentWriter.Read
 
 // write delegates to the contentWriter.
 func (d *Diff) write(ctx context.Context, p []byte) error {
-	_, err := d.contentWriter.Write(ctx, p)
+	_, err := d.contentWriter.Write(p)
 	return err
 }
 
