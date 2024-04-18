@@ -188,7 +188,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 // the buffer to the pool.
 // The caller should call Close() on the returned io.Reader when done to ensure files are cleaned up.
 // It can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadCloser() (buffer.ReadSeekCloser, error) {
+func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 	if w.state != readOnly {
 		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/sassoftware/go-rpmutils"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
 // rpmHandler specializes defaultHandler to manage RPM package files. It leverages shared behaviors
@@ -30,7 +29,7 @@ func newRPMHandler() *rpmHandler {
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
-func (h *rpmHandler) HandleFile(ctx logContext.Context, input buffer.ReadSeekCloser) (chan []byte, error) {
+func (h *rpmHandler) HandleFile(ctx logContext.Context, input randomAccessReadSeekCloser) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {

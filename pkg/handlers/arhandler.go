@@ -10,7 +10,6 @@ import (
 	"pault.ag/go/debian/deb"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
 // arHandler specializes defaultHandler to handle AR archive formats. By embedding defaultHandler,
@@ -30,7 +29,7 @@ func newARHandler() *arHandler {
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *arHandler) HandleFile(ctx logContext.Context, input buffer.ReadSeekCloser) (chan []byte, error) {
+func (h *arHandler) HandleFile(ctx logContext.Context, input randomAccessReadSeekCloser) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {

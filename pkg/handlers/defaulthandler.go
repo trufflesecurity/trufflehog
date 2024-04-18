@@ -14,7 +14,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 )
 
@@ -58,7 +57,7 @@ func newDefaultHandler(handlerType handlerType) *defaultHandler {
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *defaultHandler) HandleFile(ctx logContext.Context, input buffer.ReadSeekCloser) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input randomAccessReadSeekCloser) (chan []byte, error) {
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
@@ -222,30 +221,15 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
-		if h.skipBinaries && common.IsBinary(file.Name()) {
-			lCtx.Logger().V(5).Info("skipping binary file")
-			return nil
-		}
-
-		fReader, err := file.Open()
+		f, err := file.Open()
 		if err != nil {
 			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
 		}
-		defer fReader.Close()
+		defer f.Close()
 
-		bufferWriter := bufferwriter.New(lCtx)
-		_, err = io.Copy(bufferWriter, fReader)
+		rdr, err := bufferwriter.NewBufferReadSeekCloser(lCtx, f)
 		if err != nil {
-			return fmt.Errorf("error writing to buffered file writer: %w", err)
-		}
-
-		if err = bufferWriter.CloseForWriting(); err != nil {
-			return fmt.Errorf("error closing buffered file writer for writing: %w", err)
-		}
-
-		rdr, err := bufferWriter.ReadCloser()
-		if err != nil {
-			return fmt.Errorf("error creating reader for buffered file writer: %w", err)
+			return fmt.Errorf("error creating random access reader: %w", err)
 		}
 		defer rdr.Close()
 
