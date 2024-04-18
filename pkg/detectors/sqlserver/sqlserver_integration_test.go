@@ -76,7 +76,7 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(`<add name="Sample2" value="SERVER=server_name;DATABASE=database_name;user=user_name;pwd=plaintextpassword;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
+				data:   []byte(`<add name="Sample2" value="SERVER=server_name;DATABASE=database_name;user=user_name;pwd=plaintextpassword;Timeout=120;MultipleActiveResultSets=True;" />`),
 				verify: true,
 			},
 			want:    nil,
@@ -87,15 +87,15 @@ func TestSQLServerIntegration_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(`<add name="test db" value="SERVER=localhost;DATABASE=master;user=sa;password=P@ssw0rd!;encrypt=true;Timeout=120;MultipleActiveResultSets=True;" />`),
+				data:   []byte(`<add name="test db" value="SERVER=localhost;DATABASE=master;user=sa;password=P@ssw0rd!;Timeout=120;MultipleActiveResultSets=True;" />`),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Redacted:     "sqlserver://sa:********@localhost?database=master&disableRetry=false",
+					Redacted:     "sqlserver://sa:********@localhost?database=master&dial+timeout=15&disableretry=false",
 					Raw:          []byte("P@ssw0rd!"),
-					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@localhost?database=master&disableRetry=false"),
+					RawV2:        []byte("sqlserver://sa:P%40ssw0rd%21@localhost?database=master&dial+timeout=15&disableretry=false"),
 					Verified:     true,
 				},
 			},
