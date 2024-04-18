@@ -1189,6 +1189,8 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
+	cmd.StdoutPipe()
+
 	stdout, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())

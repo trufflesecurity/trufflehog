@@ -84,15 +84,13 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 					h.metrics.incFilesProcessed()
 				}(time.Now())
 
-				if err = h.handleNonArchiveContent(ctx, arReader, dataChan); err != nil {
+				if err = h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
 					ctx.Logger().Error(err, "error handling non-archive content.")
 				}
 			}()
-
 			return dataChan, nil
 		}
 
-		h.metrics.incErrors()
 		return nil, err
 	}
 
@@ -168,7 +166,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 	case archiver.Extractor:
 		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
-			return fmt.Errorf("error extracting archive with format: %s archive:%+v %w", format.Name(), archive, err)
+			return fmt.Errorf("error extracting archive with format: %s: %w", format.Name(), err)
 		}
 		return nil
 	default:
