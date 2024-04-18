@@ -156,7 +156,13 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 
 		h.metrics.incFilesProcessed()
 
-		return h.openArchive(ctx, depth+1, compReader, archiveChan)
+		reReader, err := diskbufferreader.New(compReader)
+		if err != nil {
+			return fmt.Errorf("error creating reusable reader: %w", err)
+		}
+		defer reReader.Close()
+
+		return h.openArchive(ctx, depth+1, reReader, archiveChan)
 	case archiver.Extractor:
 		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
