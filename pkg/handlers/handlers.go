@@ -8,17 +8,26 @@ import (
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 )
 
+// randomAccessReadSeekCloser is an interface that combines the functionality of io.ReadSeekCloser and io.ReaderAt.
+// It supports reading data, seeking within an open resource, and closing the resource once operations are complete.
+// Additionally, it allows reading from a specific offset within the resource without altering its current position,
+// enabling efficient and flexible data access patterns. This interface is particularly useful for handling files
+// or other data streams where random access and sequential processing are required.
+type randomAccessReadSeekCloser interface {
+	io.ReadSeekCloser
+	io.ReaderAt
+}
+
 // FileHandler represents a handler for files.
-// It has a single method, HandleFile, which takes a context and a *diskbufferreader.DiskBufferReader as input,
+// It has a single method, HandleFile, which takes a context and a randomAccessReadSeekCloser as input,
 // and returns a channel of byte slices and an error.
-// The DiskBufferReader provides an io.ReaderAt interface and supports seeking, allowing handlers to perform
-// random access on the file content if needed.
+// The randomAccessReadSeekCloser extends io.ReadSeekCloser with io.ReaderAt capabilities,
+// allowing handlers to perform random and direct access on the file content efficiently.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader buffer.ReadSeekCloser) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader randomAccessReadSeekCloser) (chan []byte, error)
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -138,9 +147,9 @@ func getHandlerForType(mimeT mimeType) (FileHandler, error) {
 // seeking, or file handling) result in an error return value.
 // Successful handling passes the file content through a channel to be chunked and reported.
 //
-// The function takes an io.Reader as input and wraps it with a diskbufferreader.DiskBufferReader to support
-// seeking and to provide an io.ReaderAt interface. This is necessary for certain file handlers that require
-// random access to the file content.
+// The function takes an io.Reader as input and creates a randomAccessReadSeekCloser using bufferwriter.NewBufferReadSeekCloser.
+// The randomAccessReadSeekCloser supports seeking and provides an io.ReaderAt interface, which is essential for
+// file handlers requiring random access to file content.
 //
 // If the skipArchives option is set to true and the detected MIME type is a known archive type,
 // the function will skip processing the file and return nil.
@@ -153,44 +162,12 @@ func HandleFile(
 ) error {
 	config := newFileHandlingConfig(options...)
 
-	// reReader, err := diskbufferreader.New(reader, diskbufferreader.WithBufferName(cleantemp.MkFilename()))
-	// if err != nil {
-	// 	return err
-	// }
-	// defer reReader.Close()
-
-	bufferWriter := bufferwriter.New(ctx)
-	n, err := io.Copy(bufferWriter, reader)
+	rdr, err := bufferwriter.NewBufferReadSeekCloser(ctx, reader)
 	if err != nil {
-		return fmt.Errorf("error writing to buffered file writer: %w", err)
-	}
-
-	// n, err := bufferWriter.Write(ctx, reader)
-	// if err != nil {
-	// 	return fmt.Errorf("error writing to buffered file writer: %w", err)
-	// }
-	ctx = logContext.WithValues(ctx, "num_bytes", n)
-	ctx.Logger().V(3).Info("wrote binary file to buffered file writer")
-
-	if err = bufferWriter.CloseForWriting(); err != nil {
-		return fmt.Errorf("error closing buffered file writer for writing: %w", err)
-	}
-
-	rdr, err := bufferWriter.ReadCloser()
-	if err != nil {
-		return fmt.Errorf("error creating reader for buffered file writer: %w", err)
+		return fmt.Errorf("error creating random access reader: %w", err)
 	}
 	defer rdr.Close()
 
-	// bufReader := bufio.NewReaderSize(reader, defaultBufferSize)
-	// // A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
-	// // If fewer bytes are read, MIME type detection may still succeed.
-	// buffer, err := bufReader.Peek(defaultBufferSize)
-	// if err != nil && !errors.Is(err, io.EOF) {
-	// 	return fmt.Errorf("unable to read file for MIME type detection: %w", err)
-	// }
-
-	// mimeT := mimetype.Detect(buffer)
 	mimeT, err := mimetype.DetectReader(rdr)
 	if err != nil {
 		return fmt.Errorf("error detecting MIME type: %w", err)
@@ -201,27 +178,10 @@ func HandleFile(
 		return fmt.Errorf("error seeking to start of file: %w", err)
 	}
 
-	// mimeT, err := mimetype.DetectReader(reReader)
-	// if err != nil {
-	// 	return fmt.Errorf("error detecting MIME type: %w", err)
-	// }
-	//
-	// mime := mimeType(mimeT.String())
 	if config.skipArchives && knownArchiveMimeTypes[mime] {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
 		return nil
 	}
-
-	// reReader, err := diskbufferreader.New(bufReader, diskbufferreader.WithBufferName(cleantemp.MkFilename()))
-	// if err != nil {
-	// 	return err
-	// }
-	// defer reReader.Close()
-
-	// Reset the reader to the start of the file since the MIME type detection may have read some bytes.
-	// if _, err := reReader.Seek(0, io.SeekStart); err != nil {
-	// 	return fmt.Errorf("error seeking to start of file: %w", err)
-	// }
 
 	handler, err := getHandlerForType(mime)
 	if err != nil {

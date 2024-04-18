@@ -16,7 +16,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
@@ -40,7 +39,7 @@ type contentWriter interface { // Write appends data to the content storage.
 	// Write appends data to the content storage.
 	Write(data []byte) (int, error)
 	// ReadCloser provides a reader for accessing stored content.
-	ReadCloser() (buffer.ReadSeekCloser, error)
+	ReadCloser() (io.ReadCloser, error)
 	// CloseForWriting closes the content storage for writing.
 	CloseForWriting() error
 	// Len returns the current size of the content.
