@@ -1194,28 +1194,6 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	// fileReader, err := cmd.StdoutPipe()
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// if err := cmd.Start(); err != nil {
-	// 	return err
-	// }
-	// defer func() {
-	// 	if err := fileReader.Close(); err != nil {
-	// 		ctx.Logger().Error(err, "error closing fileReader")
-	// 	}
-	// 	if err := cmd.Wait(); err != nil {
-	// 		ctx.Logger().Error(
-	// 			err, "error waiting for command",
-	// 			"command", cmd.String(),
-	// 			"stderr", stderr.String(),
-	// 			"commit", commitHash,
-	// 		)
-	// 	}
-	// }()
-
 	return handlers.HandleFile(fileCtx, bytes.NewReader(stdout), chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 

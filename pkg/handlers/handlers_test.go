@@ -33,11 +33,8 @@ func TestHandleFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	reader, err := diskbufferreader.New(resp.Body)
-	assert.NoError(t, err)
-
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, reporter))
 	assert.Equal(t, 1, len(reporter.Ch))
 }
 
@@ -64,6 +61,7 @@ func BenchmarkHandleFile(b *testing.B) {
 		}
 
 		b.StopTimer()
+		reader.Close()
 	}
 }
 
@@ -72,15 +70,12 @@ func TestSkipArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
 	ctx := logContext.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
+		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
 		assert.NoError(t, err)
 	}()
 
@@ -97,44 +92,16 @@ func TestHandleNestedArchives(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
 	ctx := logContext.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
 	wantCount := 8
-	count := 0
-	for range chunkCh {
-		count++
-	}
-	assert.Equal(t, wantCount, count)
-}
-
-func TestHandleCompressedZip(t *testing.T) {
-	file, err := os.Open("testdata/example.zip.gz")
-	assert.Nil(t, err)
-	defer file.Close()
-
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
-	ctx := logContext.Background()
-
-	chunkCh := make(chan *sources.Chunk)
-	go func() {
-		defer close(chunkCh)
-		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
-		assert.NoError(t, err)
-	}()
-
-	wantCount := 2
 	count := 0
 	for range chunkCh {
 		count++
@@ -147,15 +114,12 @@ func TestHandleNestedCompressedArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
 	ctx := logContext.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -172,15 +136,12 @@ func TestExtractTarContent(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
 	ctx := logContext.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -197,16 +158,13 @@ func TestNestedDirArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
 	ctx, cancel := logContext.WithTimeout(logContext.Background(), 5*time.Second)
 	defer cancel()
 	sourceChan := make(chan *sources.Chunk, 1)
 
 	go func() {
 		defer close(sourceChan)
-		err := HandleFile(ctx, reader, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
 		assert.NoError(t, err)
 	}()
 
@@ -226,11 +184,8 @@ func TestHandleFileRPM(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(logContext.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
 
@@ -242,10 +197,7 @@ func TestHandleFileAR(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	reader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(logContext.Background(), reader, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(logContext.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
