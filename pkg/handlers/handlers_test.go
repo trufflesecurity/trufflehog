@@ -70,12 +70,10 @@ func TestSkipArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
-
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
 		assert.NoError(t, err)
 	}()
 
@@ -92,12 +90,10 @@ func TestHandleNestedArchives(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
-
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -134,12 +130,10 @@ func TestHandleNestedCompressedArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
-
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -156,12 +150,10 @@ func TestExtractTarContent(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
-
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(ctx, file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
