@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func TestHandleFileCancelledContext(t *testing.T) {
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 2)}
 
-	canceledCtx, cancel := logContext.WithCancel(logContext.Background())
+	canceledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 	reader, err := diskbufferreader.New(strings.NewReader("file"))
 	assert.NoError(t, err)
@@ -35,7 +35,7 @@ func TestHandleFile(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(context.Background(), resp.Body, &sources.Chunk{}, reporter))
 	assert.Equal(t, 1, len(reporter.Ch))
 }
 
@@ -51,7 +51,7 @@ func BenchmarkHandleFile(b *testing.B) {
 		b.StartTimer()
 		go func() {
 			defer close(sourceChan)
-			err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
 			assert.NoError(b, err)
 		}()
 
@@ -68,7 +68,7 @@ func TestSkipArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
+	ctx := context.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
@@ -90,7 +90,7 @@ func TestHandleNestedArchives(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
+	ctx := context.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
@@ -112,7 +112,7 @@ func TestHandleNestedCompressedArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
+	ctx := context.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
@@ -134,7 +134,7 @@ func TestExtractTarContent(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx := logContext.Background()
+	ctx := context.Background()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
@@ -156,7 +156,7 @@ func TestNestedDirArchive(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx, cancel := logContext.WithTimeout(logContext.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	sourceChan := make(chan *sources.Chunk, 1)
 
@@ -183,7 +183,7 @@ func TestHandleFileRPM(t *testing.T) {
 	defer file.Close()
 
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(logContext.Background(), file, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
 
@@ -196,6 +196,6 @@ func TestHandleFileAR(t *testing.T) {
 	defer file.Close()
 
 	assert.Equal(t, 0, len(reporter.Ch))
-	assert.NoError(t, HandleFile(logContext.Background(), file, &sources.Chunk{}, reporter))
+	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
