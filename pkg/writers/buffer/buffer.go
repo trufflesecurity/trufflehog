@@ -5,6 +5,7 @@ package buffer
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -142,6 +143,11 @@ func (b *Buffer) Write(data []byte) (int, error) {
 	}
 
 	return b.Buffer.Write(data)
+}
+
+type ReadSeekCloser interface {
+	io.ReadSeekCloser
+	io.ReaderAt
 }
 
 // readCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader
