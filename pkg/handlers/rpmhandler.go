@@ -48,7 +48,7 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (c
 				return
 			}
 
-			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		}(time.Now())
 
 		var rpm *rpmutils.Rpm

@@ -48,7 +48,7 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (ch
 				return
 			}
 
-			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		}(time.Now())
 
 		var arReader *deb.Ar

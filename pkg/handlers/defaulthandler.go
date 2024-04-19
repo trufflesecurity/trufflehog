@@ -88,9 +88,11 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input readSeekCloser
 					ctx.Logger().Error(err, "error handling non-archive content.")
 				}
 			}()
+
 			return dataChan, nil
 		}
 
+		h.metrics.incErrors()
 		return nil, err
 	}
 
@@ -110,7 +112,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input readSeekCloser
 				return
 			}
 
-			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		}(time.Now())
 
 		if err = h.openArchive(ctx, 0, arReader, dataChan); err != nil {
