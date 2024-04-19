@@ -104,7 +104,7 @@ var (
 // The function initializes and returns a pointer to a metrics struct that contains the following Prometheus metrics:
 //
 //   - handleFileLatency: a HistogramVec metric that measures the latency of the HandleFile method.
-//     It uses exponential buckets with a base of 1 and a factor of 2, up to 5 buckets.
+//     It uses exponential buckets with a base of 1 and a factor of 5, up to 6 buckets.
 //     The metric is labeled with the handlerType.
 //
 //   - bytesProcessed: a CounterVec metric that tracks the total number of bytes processed by the handler.
