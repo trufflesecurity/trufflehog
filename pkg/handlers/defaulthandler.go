@@ -215,11 +215,6 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer fReader.Close()
 
-		// We should be skipping directories and symlinks at the start of the function, so fReader should not be nil.
-		if fReader == nil {
-			return nil
-		}
-
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
