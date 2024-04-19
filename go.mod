@@ -282,7 +282,11 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.20.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
+<<<<<<< HEAD
 	google.golang.org/genproto v0.0.0-20240227224415-6ceb2ff114de // indirect
+=======
+	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
+>>>>>>> 6bbae32eb5eb17c7be7045cbbf8b648097382020
 	google.golang.org/genproto/googleapis/api v0.0.0-20240314234333-6e1732d8331c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect
 	google.golang.org/grpc v1.63.2 // indirect

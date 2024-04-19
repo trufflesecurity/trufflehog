@@ -190,8 +190,12 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
 func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, file archiver.File) error {
-		lCtx := logContext.AddLogger(ctx)
-		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", file.Name())
+		lCtx := logContext.WithValues(
+			logContext.AddLogger(ctx),
+			"filename", file.Name(),
+			"size", file.Size(),
+		)
+		lCtx.Logger().V(5).Info("Handling extracted file.")
 
 		if file.IsDir() || file.LinkTarget != "" {
 			lCtx.Logger().V(5).Info("skipping directory or symlink")
