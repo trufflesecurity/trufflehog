@@ -15,7 +15,7 @@ require (
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/aws/aws-sdk-go v1.51.24
+	github.com/aws/aws-sdk-go v1.51.25
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
