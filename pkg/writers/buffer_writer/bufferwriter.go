@@ -2,6 +2,7 @@
 package bufferwriter
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"time"
@@ -52,6 +53,19 @@ func New(ctx context.Context) *BufferWriter {
 	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
 }
 
+// NewFromReader creates a new instance of BufferWriter and writes the content from the provided reader to the buffer.
+func NewFromReader(ctx context.Context, r io.Reader) (*BufferWriter, error) {
+	buf := New(ctx)
+	n, err := io.Copy(buf, r)
+	if err != nil {
+		return nil, fmt.Errorf("error writing to buffer writer: %w", err)
+	}
+
+	ctx.Logger().V(3).Info("file written to buffer writer", "bytes", n)
+
+	return buf, nil
+}
+
 // Write delegates the writing operation to the underlying bytes.Buffer.
 func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {
@@ -96,3 +110,67 @@ func (b *BufferWriter) String() (string, error) {
 
 // Len returns the length of the buffer's content.
 func (b *BufferWriter) Len() int { return b.size }
+
+// readSeekCloser provides random access read, seek, and close capabilities on top of the BufferWriter.
+// It combines the functionality of BufferWriter for buffered writing, bytes.Reader for random access reading and seeking,
+// and adds a close method to return the buffer to the pool.
+type readSeekCloser struct {
+	bufWriter *BufferWriter
+	reader    *bytes.Reader
+}
+
+// NewBufferReadSeekCloser initializes a readSeekCloser from an io.Reader by using
+// the BufferWriter's functionality to read and store data, then setting up a bytes.Reader for random access.
+// It returns the initialized readSeekCloser and any error encountered during the process.
+func NewBufferReadSeekCloser(ctx context.Context, r io.Reader) (*readSeekCloser, error) {
+	rdr, err := NewFromReader(ctx, r)
+	if err != nil {
+		return nil, fmt.Errorf("error creating readSeekCloser: %w", err)
+	}
+
+	// Ensure that the BufferWriter is not in write mode anymore.
+	if err := rdr.CloseForWriting(); err != nil {
+		return nil, err
+	}
+
+	return &readSeekCloser{rdr, bytes.NewReader(rdr.buf.Bytes())}, nil
+}
+
+// Close releases the buffer back to the buffer pool.
+// It should be called when the readSeekCloser is no longer needed.
+// Note that closing the readSeekCloser does not affect the underlying bytes.Reader,
+// which can still be used for reading, seeking, and reading at specific positions.
+// Close is a no-op for the bytes.Reader.
+func (b *readSeekCloser) Close() error {
+	b.bufWriter.bufPool.Put(b.bufWriter.buf)
+	return nil
+}
+
+// Read reads up to len(p) bytes into p from the underlying bytes.Reader.
+// It returns the number of bytes read and any error encountered.
+// If the bytes.Reader reaches the end of the available data, Read returns 0, io.EOF.
+// It implements the io.Reader interface.
+func (b *readSeekCloser) Read(p []byte) (int, error) {
+	return b.reader.Read(p)
+}
+
+// Seek sets the offset for the next Read or Write operation on the underlying bytes.Reader.
+// The offset is interpreted according to the whence parameter:
+//   - io.SeekStart means relative to the start of the file
+//   - io.SeekCurrent means relative to the current offset
+//   - io.SeekEnd means relative to the end of the file
+//
+// Seek returns the new offset and any error encountered.
+// It implements the io.Seeker interface.
+func (b *readSeekCloser) Seek(offset int64, whence int) (int64, error) {
+	return b.reader.Seek(offset, whence)
+}
+
+// ReadAt reads len(p) bytes from the underlying bytes.Reader starting at byte offset off.
+// It returns the number of bytes read and any error encountered.
+// If the bytes.Reader reaches the end of the available data before len(p) bytes are read,
+// ReadAt returns the number of bytes read and io.EOF.
+// It implements the io.ReaderAt interface.
+func (b *readSeekCloser) ReadAt(p []byte, off int64) (n int, err error) {
+	return b.reader.ReadAt(p, off)
+}
