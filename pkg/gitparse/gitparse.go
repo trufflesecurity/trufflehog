@@ -37,7 +37,7 @@ const (
 // based on performance needs or resource constraints, providing a unified way to interact with different content types.
 type contentWriter interface { // Write appends data to the content storage.
 	// Write appends data to the content storage.
-	Write(ctx context.Context, data []byte) (int, error)
+	Write(data []byte) (int, error)
 	// ReadCloser provides a reader for accessing stored content.
 	ReadCloser() (io.ReadCloser, error)
 	// CloseForWriting closes the content storage for writing.
@@ -92,8 +92,8 @@ func (d *Diff) Len() int { return d.contentWriter.Len() }
 func (d *Diff) ReadCloser() (io.ReadCloser, error) { return d.contentWriter.ReadCloser() }
 
 // write delegates to the contentWriter.
-func (d *Diff) write(ctx context.Context, p []byte) error {
-	_, err := d.contentWriter.Write(ctx, p)
+func (d *Diff) write(p []byte) error {
+	_, err := d.contentWriter.Write(p)
 	return err
 }
 
@@ -483,7 +483,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				latestState = HunkContentLine
 			}
 			// TODO: Why do we care about this? It creates empty lines in the diff. If there are no plusLines, it's just newlines.
-			if err := currentDiff.write(ctx, []byte("\n")); err != nil {
+			if err := currentDiff.write([]byte("\n")); err != nil {
 				ctx.Logger().Error(err, "failed to write to diff")
 			}
 		case isHunkPlusLine(latestState, line):
@@ -491,7 +491,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				latestState = HunkContentLine
 			}
 
-			if err := currentDiff.write(ctx, line[1:]); err != nil {
+			if err := currentDiff.write(line[1:]); err != nil {
 				ctx.Logger().Error(err, "failed to write to diff")
 			}
 			// NoOp. We only care about additions.
