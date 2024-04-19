@@ -112,7 +112,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 				return
 			}
 
-			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		}(time.Now())
 
 		if err = h.openArchive(ctx, 0, arReader, dataChan); err != nil {

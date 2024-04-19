@@ -49,7 +49,7 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.
 				return
 			}
 
-			h.metrics.observeHandleFileLatency(time.Since(start).Microseconds())
+			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		}(time.Now())
 
 		var rpm *rpmutils.Rpm
