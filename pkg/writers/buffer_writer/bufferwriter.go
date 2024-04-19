@@ -112,8 +112,8 @@ func (b *BufferWriter) String() (string, error) {
 func (b *BufferWriter) Len() int { return b.size }
 
 // bufferReadSeekCloser provides random access read, seek, and close capabilities on top of the BufferWriter.
-// It combines the functionality of BufferWriter for buffered writing, bytes.Reader for random access reading and seeking,
-// and adds a close method to return the buffer to the pool.
+// It combines the functionality of BufferWriter for buffered writing, bytes.Reader for
+// random access reading and seeking, and adds a close method to return the buffer to the pool.
 type bufferReadSeekCloser struct {
 	bufWriter *BufferWriter
 	reader    *bytes.Reader
