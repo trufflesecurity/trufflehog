@@ -17,9 +17,7 @@ func (metrics) recordDataProcessed(size uint64, dur time.Duration) {
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func init() {
-	bufferPool = buffer.NewBufferPool()
-}
+func init() { bufferPool = buffer.NewBufferPool() }
 
 // bufferPool is the shared Buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.

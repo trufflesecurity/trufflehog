@@ -533,7 +533,8 @@ func TestEnumerate(t *testing.T) {
 	assert.Equal(t, len(units), len(reporter.Units))
 	assert.Equal(t, 0, len(reporter.UnitErrs))
 	for _, unit := range reporter.Units {
-		assert.Contains(t, units, unit.SourceUnitID())
+		id, _ := unit.SourceUnitID()
+		assert.Contains(t, units, id)
 	}
 	for _, unit := range units[:3] {
 		assert.Contains(t, reporter.Units, SourceUnit{ID: unit, Kind: UnitRepo})

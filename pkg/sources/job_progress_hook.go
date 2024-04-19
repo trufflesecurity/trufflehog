@@ -64,7 +64,8 @@ func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) (*UnitHook, <-chan Un
 func (u *UnitHook) id(ref JobProgressRef, unit SourceUnit) string {
 	unitID := ""
 	if unit != nil {
-		unitID = unit.SourceUnitID()
+		id, kind := unit.SourceUnitID()
+		unitID = fmt.Sprintf("%s:%s", kind, id)
 	}
 	return fmt.Sprintf("%d/%d/%s", ref.SourceID, ref.JobID, unitID)
 }

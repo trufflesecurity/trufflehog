@@ -19,9 +19,7 @@ import (
 // This allows for efficient reuse of buffers across multiple writers.
 var sharedBufferPool *buffer.Pool
 
-func init() {
-	sharedBufferPool = buffer.NewBufferPool()
-}
+func init() { sharedBufferPool = buffer.NewBufferPool() }
 
 type bufferedFileWriterMetrics struct{}
 

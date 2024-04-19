@@ -100,7 +100,9 @@ func (d *Diff) write(ctx context.Context, p []byte) error {
 // finalize ensures proper closure of resources associated with the Diff.
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
-func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
+func (d *Diff) finalize() error {
+	return d.contentWriter.CloseForWriting()
+}
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -109,6 +111,8 @@ type Commit struct {
 	Date    time.Time
 	Message strings.Builder
 	Size    int // in bytes
+
+	hasDiffs bool
 }
 
 // Parser sets values used in GitParse.
@@ -345,11 +349,19 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				}
 				diffChan <- currentDiff
 				currentCommit.Size += currentDiff.Len()
+				currentCommit.hasDiffs = true
 			}
 			// If there is a currentCommit, send it to the channel.
 			if currentCommit != nil {
 				totalLogSize += currentCommit.Size
+				if !currentCommit.hasDiffs {
+					// Initialize an empty Diff instance associated with the given commit.
+					// Since this diff represents "no changes", we only need to set the commit.
+					// This is required to ensure commits that have no diffs are still processed.
+					diffChan <- &Diff{Commit: currentCommit}
+				}
 			}
+
 			// Create a new currentDiff and currentCommit
 			currentCommit = &Commit{Message: strings.Builder{}}
 			currentDiff = diff(currentCommit)
@@ -384,10 +396,6 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isDiffLine(isStaged, latestState, line):
 			latestState = DiffLine
 
-			// This should never be nil, but check in case the stdin stream is messed up.
-			if currentCommit == nil {
-				currentCommit = &Commit{}
-			}
 			if currentDiff.Len() > 0 || currentDiff.IsBinary {
 				if err := currentDiff.finalize(); err != nil {
 					ctx.Logger().Error(err,
@@ -399,6 +407,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 					)
 				}
 				diffChan <- currentDiff
+				currentCommit.hasDiffs = true
+			}
+
+			// This should never be nil, but check in case the stdin stream is messed up.
+			if currentCommit == nil {
+				currentCommit = &Commit{}
 			}
 			currentDiff = diff(currentCommit)
 		case isModeLine(latestState, line):
@@ -413,7 +427,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			path, ok := pathFromBinaryLine(line)
 			if !ok {
 				err = fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
-				ctx.Logger().Error(err, "Failed to parse binary file line")
+				ctx.Logger().Error(err, "Failed to parse BinaryFileLine")
 				latestState = ParseFailure
 				continue
 			}
@@ -429,8 +443,15 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isToFileLine(latestState, line):
 			latestState = ToFileLine
 
-			// TODO: Is this fix still required?
-			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
+			path, ok := pathFromToFileLine(line)
+			if !ok {
+				err = fmt.Errorf(`expected line to match format '+++ b/path/to/file.go', got '%s'`, line)
+				ctx.Logger().Error(err, "Failed to parse ToFileLine")
+				latestState = ParseFailure
+				continue
+			}
+
+			currentDiff.PathB = path
 		case isHunkLineNumberLine(latestState, line):
 			latestState = HunkLineNumberLine
 
@@ -672,22 +693,30 @@ func pathFromBinaryLine(line []byte) (string, bool) {
 		return "", true
 	}
 
-	_, after, ok := bytes.Cut(line, []byte(" and b/"))
-	if ok {
+	var (
+		path string
+		err  error
+	)
+	if _, after, ok := bytes.Cut(line, []byte(" and b/")); ok {
 		// drop the " differ\n"
-		return string(after[:len(after)-8]), true
+		path = string(after[:len(after)-8])
+	} else if _, after, ok = bytes.Cut(line, []byte(` and "b/`)); ok {
+		// Edge case where the path is quoted.
+		// https://github.com/trufflesecurity/trufflehog/issues/2384
+
+		// Drop the `" differ\n` and handle escaped characters in the path.
+		// e.g., "\342\200\224" instead of "—".
+		// See https://github.com/trufflesecurity/trufflehog/issues/2418
+		path, err = strconv.Unquote(`"` + string(after[:len(after)-9]) + `"`)
+		if err != nil {
+			return "", false
+		}
+	} else {
+		// Unknown format.
+		return "", false
 	}
 
-	// Edge case where the path is quoted.
-	// https://github.com/trufflesecurity/trufflehog/issues/2384
-	_, after, ok = bytes.Cut(line, []byte(` and "b/`))
-	if ok {
-		// drop the `" differ\n`
-		return string(after[:len(after)-9]), true
-	}
-
-	// Unknown format.
-	return "", false
+	return path, true
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
@@ -711,6 +740,42 @@ func isToFileLine(latestState ParseState, line []byte) bool {
 		return true
 	}
 	return false
+}
+
+// Get the b/ file path.
+func pathFromToFileLine(line []byte) (string, bool) {
+	// Normalize paths, as they can end in `\n`, `\t\n`, etc.
+	// See https://github.com/trufflesecurity/trufflehog/issues/1060
+	line = bytes.TrimSpace(line)
+
+	// File was deleted.
+	if bytes.Equal(line, []byte("+++ /dev/null")) {
+		return "", true
+	}
+
+	var (
+		path string
+		err  error
+	)
+	if _, after, ok := bytes.Cut(line, []byte("+++ b/")); ok {
+		path = string(after)
+	} else if _, after, ok = bytes.Cut(line, []byte(`+++ "b/`)); ok {
+		// Edge case where the path is quoted.
+		// e.g., `+++ "b/C++/1 \320\243\321\200\320\276\320\272/B.c"`
+
+		// Drop the trailing `"` and handle escaped characters in the path
+		// e.g., "\342\200\224" instead of "—".
+		// See https://github.com/trufflesecurity/trufflehog/issues/2418
+		path, err = strconv.Unquote(`"` + string(after[:len(after)-1]) + `"`)
+		if err != nil {
+			return "", false
+		}
+	} else {
+		// Unknown format.
+		return "", false
+	}
+
+	return path, true
 }
 
 // @@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)

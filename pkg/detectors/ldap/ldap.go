@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -151,16 +152,17 @@ func verifyLDAP(username, password string, ldapURL *url.URL) error {
 		return l.Bind(username, password)
 	case "ldaps":
 		// TLS dial
-		l, err := ldap.DialTLS("tcp", uri, &tls.Config{InsecureSkipVerify: true})
+		l, err := ldap.DialURL(uri, ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 		if err != nil {
 			return err
 		}
 		defer l.Close()
 		// TLS verify
 		return l.Bind(username, password)
+	default:
+		return fmt.Errorf("unknown ldap scheme %q", ldapURL.Scheme)
 	}
 
-	return fmt.Errorf("unknown ldap scheme %q", ldapURL.Scheme)
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

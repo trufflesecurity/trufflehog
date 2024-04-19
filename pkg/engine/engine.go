@@ -13,10 +13,9 @@ import (
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -60,7 +59,7 @@ type Printer interface {
 
 type Engine struct {
 	// CLI flags.
-	concurrency     uint8
+	concurrency     int
 	decoders        []decoders.Decoder
 	detectors       []detectors.Detector
 	jobReportWriter io.WriteCloser
@@ -69,10 +68,12 @@ type Engine struct {
 	// only the first one will be kept.
 	filterUnverified bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
-	filterEntropy        *float64
-	onlyVerified         bool
-	verificationOverlap  bool
-	printAvgDetectorTime bool
+	filterEntropy           *float64
+	notifyVerifiedResults   bool
+	notifyUnverifiedResults bool
+	notifyUnknownResults    bool
+	verificationOverlap     bool
+	printAvgDetectorTime    bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
@@ -99,7 +100,7 @@ type Engine struct {
 
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
-	dedupeCache *lru.Cache
+	dedupeCache *lru.Cache[string, detectorspb.DecoderType]
 
 	// verify determines whether the scanner will attempt to verify candidate secrets
 	verify bool
@@ -128,7 +129,7 @@ func WithJobReportWriter(w io.WriteCloser) Option {
 	}
 }
 
-func WithConcurrency(concurrency uint8) Option {
+func WithConcurrency(concurrency int) Option {
 	return func(e *Engine) {
 		e.concurrency = concurrency
 	}
@@ -165,11 +166,21 @@ func WithFilterEntropy(entropy float64) Option {
 	}
 }
 
-// WithOnlyVerified sets the onlyVerified flag on the engine. If set to true,
-// the engine will only print verified results.
-func WithOnlyVerified(onlyVerified bool) Option {
+// WithResults defines which results will be printed by the engine.
+func WithResults(results map[string]struct{}) Option {
 	return func(e *Engine) {
-		e.onlyVerified = onlyVerified
+		if len(results) == 0 {
+			return
+		}
+
+		_, ok := results["verified"]
+		e.notifyVerifiedResults = ok
+
+		_, ok = results["unknown"]
+		e.notifyUnknownResults = ok
+
+		_, ok = results["unverified"]
+		e.notifyUnverifiedResults = ok
 	}
 }
 
@@ -343,7 +354,7 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// TODO (ahrav): Determine the optimal cache size.
 	const cacheSize = 512 // number of entries in the LRU cache
 
-	cache, err := lru.New(cacheSize)
+	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
 	if err != nil {
 		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
@@ -365,6 +376,9 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	// The buffer sizes for these channels are set to multiples of defaultChannelBuffer,
 	// considering the expected concurrency and workload in the system.
 	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer*detectableChunksChanMultiplier)
+	e.notifyVerifiedResults = true
+	e.notifyUnknownResults = true
+	e.notifyUnverifiedResults = true
 	e.verificationOverlapChunksChan = make(chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
 	e.dedupeCache = cache
@@ -431,7 +445,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
-		e.concurrency = uint8(numCPU)
+		e.concurrency = numCPU
 	}
 	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
 
@@ -540,10 +554,6 @@ func (e *Engine) Finish(ctx context.Context) error {
 
 	close(e.results)    // Detector workers are done, close the results channel and call it a day.
 	e.WgNotifier.Wait() // Wait for the notifier workers to finish notifying results.
-
-	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
-		ctx.Logger().Error(err, "error cleaning temp artifacts")
-	}
 
 	e.metrics.ScanDuration = time.Since(e.metrics.scanStartTime)
 
@@ -854,7 +864,20 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 func (e *Engine) notifyResults(ctx context.Context) {
 	for r := range e.ResultsChan() {
-		if e.onlyVerified && !r.Verified {
+		// Filter unwanted results, based on `--results`.
+		if !r.Verified {
+			if r.VerificationError() != nil {
+				if !e.notifyUnknownResults {
+					// Skip results with verification errors.
+					continue
+				}
+			} else if !e.notifyUnverifiedResults {
+				// Skip unverified results.
+				continue
+			}
+		} else if !e.notifyVerifiedResults {
+			// Skip verified results.
+			// TODO: Is this a legitimate use case?
 			continue
 		}
 		atomic.AddUint32(&e.numFoundResults, 1)
@@ -864,11 +887,11 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		// want to include duplicate results with the same decoder type.
 		// Duplicate results with the same decoder type SHOULD have their own entry in the
 		// results list, this would happen if the same secret is found multiple times.
+		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
 		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
-		if val, ok := e.dedupeCache.Get(key); ok {
-			if res, ok := val.(detectorspb.DecoderType); ok && res != r.DecoderType {
-				continue
-			}
+		if val, ok := e.dedupeCache.Get(key); ok && (val != r.DecoderType ||
+			r.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
+			continue
 		}
 		e.dedupeCache.Add(key, r.DecoderType)
 
