@@ -88,9 +88,11 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 					ctx.Logger().Error(err, "error handling non-archive content.")
 				}
 			}()
+
 			return dataChan, nil
 		}
 
+		h.metrics.incErrors()
 		return nil, err
 	}
 
