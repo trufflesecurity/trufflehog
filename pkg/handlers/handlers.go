@@ -11,23 +11,23 @@ import (
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 )
 
-// randomAccessReadSeekCloser is an interface that combines the functionality of io.ReadSeekCloser and io.ReaderAt.
+// readSeekCloser is an interface that combines the functionality of io.ReadSeekCloser and io.ReaderAt.
 // It supports reading data, seeking within an open resource, and closing the resource once operations are complete.
 // Additionally, it allows reading from a specific offset within the resource without altering its current position,
 // enabling efficient and flexible data access patterns. This interface is particularly useful for handling files
 // or other data streams where random access and sequential processing are required.
-type randomAccessReadSeekCloser interface {
+type readSeekCloser interface {
 	io.ReadSeekCloser
 	io.ReaderAt
 }
 
 // FileHandler represents a handler for files.
-// It has a single method, HandleFile, which takes a context and a randomAccessReadSeekCloser as input,
+// It has a single method, HandleFile, which takes a context and a readSeekCloser as input,
 // and returns a channel of byte slices and an error.
-// The randomAccessReadSeekCloser extends io.ReadSeekCloser with io.ReaderAt capabilities,
+// The readSeekCloser extends io.ReadSeekCloser with io.ReaderAt capabilities,
 // allowing handlers to perform random and direct access on the file content efficiently.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader randomAccessReadSeekCloser) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader readSeekCloser) (chan []byte, error)
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -125,8 +125,8 @@ var knownArchiveMimeTypes = map[mimeType]bool{
 // For all other MIME types, which typically include common archive formats like .zip, .tar, .gz, etc.,
 // a defaultHandler is used, leveraging the archiver library to manage these formats.
 // The chosen handler is then configured with provided options, adapting it to specific operational needs.
-// Returns the configured handler or an error if the handler type does not match the expected type.
-func getHandlerForType(mimeT mimeType) (FileHandler, error) {
+// Returns the configured handler.
+func getHandlerForType(mimeT mimeType) FileHandler {
 	var handler FileHandler
 	switch mimeT {
 	case arMime, unixArMime, debMime:
@@ -137,7 +137,7 @@ func getHandlerForType(mimeT mimeType) (FileHandler, error) {
 		handler = newDefaultHandler(defaultHandlerType)
 	}
 
-	return handler, nil
+	return handler
 }
 
 // HandleFile orchestrates the complete file handling process for a given file.
@@ -147,8 +147,8 @@ func getHandlerForType(mimeT mimeType) (FileHandler, error) {
 // seeking, or file handling) result in an error return value.
 // Successful handling passes the file content through a channel to be chunked and reported.
 //
-// The function takes an io.Reader as input and creates a randomAccessReadSeekCloser using bufferwriter.NewBufferReadSeekCloser.
-// The randomAccessReadSeekCloser supports seeking and provides an io.ReaderAt interface, which is essential for
+// The function takes an io.Reader as input and creates a readSeekCloser using bufferwriter.NewBufferReadSeekCloser.
+// The readSeekCloser supports seeking and provides an io.ReaderAt interface, which is essential for
 // file handlers requiring random access to file content.
 //
 // If the skipArchives option is set to true and the detected MIME type is a known archive type,
@@ -183,11 +183,7 @@ func HandleFile(
 		return nil
 	}
 
-	handler, err := getHandlerForType(mime)
-	if err != nil {
-		return fmt.Errorf("error getting handler for type: %w", err)
-	}
-
+	handler := getHandlerForType(mime)
 	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)

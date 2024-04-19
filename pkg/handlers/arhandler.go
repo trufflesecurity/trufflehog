@@ -29,7 +29,7 @@ func newARHandler() *arHandler {
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *arHandler) HandleFile(ctx logContext.Context, input randomAccessReadSeekCloser) (chan []byte, error) {
+func (h *arHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {

@@ -57,7 +57,7 @@ func newDefaultHandler(handlerType handlerType) *defaultHandler {
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *defaultHandler) HandleFile(ctx logContext.Context, input randomAccessReadSeekCloser) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
@@ -189,9 +189,9 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
 func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
-	return func(ctx context.Context, f archiver.File) error {
+	return func(ctx context.Context, file archiver.File) error {
 		lCtx := logContext.AddLogger(ctx)
-		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", f.Name())
+		lCtx.Logger().V(5).Info("Handling extracted file.", "filename", file.Name())
 
 		if file.IsDir() || file.LinkTarget != "" {
 			lCtx.Logger().V(5).Info("skipping directory or symlink")
@@ -275,5 +275,6 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 		}
 		h.metrics.incBytesProcessed(len(data.Bytes()))
 	}
+
 	return nil
 }
