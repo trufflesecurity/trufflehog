@@ -35,10 +35,10 @@ type fileHandlingConfig struct{ skipArchives bool }
 
 // newFileHandlingConfig creates a default fileHandlingConfig with default settings.
 // Optional functional parameters can customize the configuration.
-func newFileHandlingConfig(options ...func(*fileHandlingConfig)) *fileHandlingConfig {
-	config := new(fileHandlingConfig)
+func newFileHandlingConfig(options ...func(*fileHandlingConfig)) fileHandlingConfig {
+	config := fileHandlingConfig{}
 	for _, option := range options {
-		option(config)
+		option(&config)
 	}
 
 	return config
@@ -160,8 +160,6 @@ func HandleFile(
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
 ) error {
-	config := newFileHandlingConfig(options...)
-
 	rdr, err := bufferwriter.NewBufferReadSeekCloser(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("error creating random access reader: %w", err)
@@ -178,6 +176,7 @@ func HandleFile(
 		return fmt.Errorf("error seeking to start of file: %w", err)
 	}
 
+	config := newFileHandlingConfig(options...)
 	if config.skipArchives && knownArchiveMimeTypes[mime] {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
 		return nil
