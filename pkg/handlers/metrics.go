@@ -24,9 +24,9 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
 			Subsystem: common.MetricsSubsystem,
-			Name:      "handlers_file_latency_microseconds",
+			Name:      "handlers_file_latency_milliseconds",
 			Help:      "Latency of the HandleFile method",
-			Buckets:   prometheus.ExponentialBuckets(1, 2, 5),
+			Buckets:   prometheus.ExponentialBuckets(1, 5, 6),
 		},
 		[]string{"handler_type"},
 	)
