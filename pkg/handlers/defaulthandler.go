@@ -156,21 +156,9 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		}
 		defer compReader.Close()
 
-		h.metrics.incFilesProcessed()
-
-		bufferWriter := bufferwriter.New(ctx)
-		_, err = io.Copy(bufferWriter, compReader)
+		rdr, err := bufferwriter.NewBufferReadSeekCloser(ctx, reader)
 		if err != nil {
-			return fmt.Errorf("error writing to buffered file writer: %w", err)
-		}
-
-		if err = bufferWriter.CloseForWriting(); err != nil {
-			return fmt.Errorf("error closing buffered file writer for writing: %w", err)
-		}
-
-		rdr, err := bufferWriter.ReadCloser()
-		if err != nil {
-			return fmt.Errorf("error creating reader for buffered file writer: %w", err)
+			return fmt.Errorf("error creating random access reader: %w", err)
 		}
 		defer rdr.Close()
 
