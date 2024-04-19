@@ -162,15 +162,7 @@ func (m *metrics) incFilesProcessed() {
 	m.filesProcessed.WithLabelValues(string(m.handlerType)).Inc()
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (m *metrics) incErrors() {
-=======
-func (m *metrics) incErrorsEncountered() {
->>>>>>> 2c8fba4cf (add metrics for file handling)
-=======
-func (m *metrics) incErrors() {
->>>>>>> 86a633f3d (add metrics for errors)
 	m.errorsEncountered.WithLabelValues(string(m.handlerType)).Inc()
 }
 
