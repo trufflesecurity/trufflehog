@@ -47,7 +47,6 @@ type BufferWriter struct {
 func New(ctx context.Context) *BufferWriter {
 	buf := bufferPool.Get(ctx)
 	if buf == nil {
-		// buf = buffer.NewBuffer()
 		buf = ring.NewRingBuffer(1 << 12)
 	}
 	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
