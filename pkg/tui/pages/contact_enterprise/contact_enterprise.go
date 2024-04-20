@@ -42,7 +42,7 @@ func (m *ContactEnterprise) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *ContactEnterprise) View() string {
 
 	s := strings.Builder{}
-	s.WriteString("Interested in Trufflehog enterprise?\n")
+	s.WriteString("Interested in TruffleHog enterprise?\n")
 	s.WriteString(linkStyle.Render("🔗 https://trufflesecurity.com/contact"))
 
 	m.viewed = true

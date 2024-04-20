@@ -13,6 +13,7 @@ import (
 	"github.com/lib/pq"
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -63,6 +64,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	candidateParamSets := findUriMatches(data)
 
 	for _, params := range candidateParamSets {
+		if common.IsDone(ctx) {
+			break
+		}
 		user, ok := params[pg_user]
 		if !ok {
 			continue
@@ -113,8 +117,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		if verify {
 			// pq appears to ignore the context deadline, so we copy any timeout that's been set into the connection
 			// parameters themselves.
-			if timeout := getDeadlineInSeconds(ctx); timeout != 0 {
+			if timeout, ok := getDeadlineInSeconds(ctx); ok && timeout > 0 {
 				params[pg_connect_timeout] = strconv.Itoa(timeout)
+			} else if timeout <= 0 {
+				// Deadline in the context has already exceeded.
+				break
 			}
 
 			isVerified, verificationErr := verifyPostgres(params)
@@ -159,15 +166,18 @@ func findUriMatches(data []byte) []map[string]string {
 	return matches
 }
 
-func getDeadlineInSeconds(ctx context.Context) int {
+// getDeadlineInSeconds gets the deadline from the context in seconds. If there
+// is no deadline, false is returned. If the deadline is already exceeded, a
+// negative or 0 value will be returned.
+func getDeadlineInSeconds(ctx context.Context) (int, bool) {
 	deadline, ok := ctx.Deadline()
 	if !ok {
-		// Context does not have a deadline
-		return 0
+		// Context does not have a deadline.
+		return 0, false
 	}
 
 	duration := time.Until(deadline)
-	return int(duration.Seconds())
+	return int(duration.Seconds()), true
 }
 
 func isErrorDatabaseNotFound(err error, dbName string) bool {

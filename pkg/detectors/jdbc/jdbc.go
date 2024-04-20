@@ -200,7 +200,6 @@ func tryRedactRegex(conn string) (string, bool) {
 }
 
 var supportedSubprotocols = map[string]func(string) (jdbc, error){
-	"sqlite":     parseSqlite,
 	"mysql":      parseMySQL,
 	"postgresql": parsePostgres,
 	"sqlserver":  parseSqlServer,

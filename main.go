@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -49,9 +50,12 @@ var (
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
-	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	filterEntropy       = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
-	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. Defaults to all types.").Hidden().String()
+
+	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
+	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy            = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	configFilename           = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
@@ -63,6 +67,7 @@ var (
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
 	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.").String()
+	jobReportFile        = cli.Flag("output-report", "Write a scan report to the provided path.").Hidden().OpenFile(os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -85,7 +90,7 @@ var (
 	githubIncludeForks   = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
 	githubIncludeMembers = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
 	githubIncludeRepos   = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
-	githubIncludeWikis   = githubScan.Flag("include-wikis", "Include repository wikisin scan.").Default("true").Bool()
+	githubIncludeWikis   = githubScan.Flag("include-wikis", "Include repository wikisin scan.").Bool()
 
 	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
@@ -117,7 +122,8 @@ var (
 	s3ScanSecret        = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
 	s3ScanSessionToken  = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
 	s3ScanCloudEnv      = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
-	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
+	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag. Incompatible with --ignore-bucket.").Strings()
+	s3ScanIgnoreBuckets = s3Scan.Flag("ignore-bucket", "Name of S3 bucket to ignore. You can repeat this flag. Incompatible with --bucket.").Strings()
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
@@ -147,6 +153,20 @@ var (
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
+
+	// Postman is hidden for now until we get more feedback from the community.
+	postmanScan                = cli.Command("postman", "Scan Postman")
+	postmanToken               = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
+	postmanWorkspaces          = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag.").Strings()
+	postmanCollections         = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag.").Strings()
+	postmanEnvironments        = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
+	postmanIncludeCollections  = postmanScan.Flag("include-collections", "Collections to include in scan. You can repeat this flag.").Strings()
+	postmanIncludeEnvironments = postmanScan.Flag("include-environments", "Environments to include in scan. You can repeat this flag.").Strings()
+	postmanExcludeCollections  = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. You can repeat this flag.").Strings()
+	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. You can repeat this flag.").Strings()
+	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
+	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
+	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
 )
 
 func init() {
@@ -397,8 +417,23 @@ func run(state overseer.State) {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
+	var jobReportWriter io.WriteCloser
+	if *jobReportFile != nil {
+		jobReportWriter = *jobReportFile
+	}
+
+	// Parse --results flag.
+	if *onlyVerified {
+		r := "verified"
+		results = &r
+	}
+	parsedResults, err := parseResults(results)
+	if err != nil {
+		logFatal(err, "failed to configure results flag")
+	}
+
 	e, err := engine.Start(ctx,
-		engine.WithConcurrency(uint8(*concurrency)),
+		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(engine.DefaultDetectors()...),
 		engine.WithDetectors(conf.Detectors...),
@@ -407,10 +442,12 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
-		engine.WithOnlyVerified(*onlyVerified),
+		engine.WithResults(parsedResults),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),
+		engine.WithVerificationOverlap(*allowVerificationOverlap),
+		engine.WithJobReportWriter(jobReportWriter),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")
@@ -495,6 +532,7 @@ func run(state overseer.State) {
 			Secret:        *s3ScanSecret,
 			SessionToken:  *s3ScanSessionToken,
 			Buckets:       *s3ScanBuckets,
+			IgnoreBuckets: *s3ScanIgnoreBuckets,
 			Roles:         *s3ScanRoleArns,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
@@ -553,11 +591,31 @@ func run(state overseer.State) {
 		if err := e.ScanDocker(ctx, anyConn); err != nil {
 			logFatal(err, "Failed to scan Docker.")
 		}
+	case postmanScan.FullCommand():
+		cfg := sources.PostmanConfig{
+			Token:               *postmanToken,
+			Workspaces:          *postmanWorkspaces,
+			Collections:         *postmanCollections,
+			Environments:        *postmanEnvironments,
+			IncludeCollections:  *postmanIncludeCollections,
+			IncludeEnvironments: *postmanIncludeEnvironments,
+			ExcludeCollections:  *postmanExcludeCollections,
+			ExcludeEnvironments: *postmanExcludeEnvironments,
+			CollectionPaths:     *postmanCollectionPaths,
+			WorkspacePaths:      *postmanWorkspacePaths,
+			EnvironmentPaths:    *postmanEnvironmentPaths,
+		}
+		if err := e.ScanPostman(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Postman.")
+		}
 	}
 
 	// Wait for all workers to finish.
 	if err = e.Finish(ctx); err != nil {
 		logFatal(err, "engine failed to finish execution")
+	}
+	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+		ctx.Logger().Error(err, "error cleaning temp artifacts")
 	}
 
 	metrics := e.GetMetrics()
@@ -578,6 +636,30 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
+}
+
+// parseResults ensures that users provide valid CSV input to `--results`.
+//
+// This is a work-around to kingpin not supporting CSVs.
+// See: https://github.com/trufflesecurity/trufflehog/pull/2372#issuecomment-1983868917
+func parseResults(input *string) (map[string]struct{}, error) {
+	if *input == "" {
+		return nil, nil
+	}
+
+	var (
+		values  = strings.Split(strings.ToLower(*input), ",")
+		results = make(map[string]struct{}, 3)
+	)
+	for _, value := range values {
+		switch value {
+		case "verified", "unknown", "unverified":
+			results[value] = struct{}{}
+		default:
+			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified'", value)
+		}
+	}
+	return results, nil
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
