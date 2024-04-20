@@ -27,7 +27,7 @@ const (
 var (
 	maxDepth   = 5
 	maxSize    = 250 * 1024 * 1024 // 250 MB
-	maxTimeout = time.Duration(30) * time.Second
+	maxTimeout = time.Duration(3000) * time.Second
 )
 
 // SetArchiveMaxSize sets the maximum size of the archive.
@@ -156,7 +156,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		}
 		defer compReader.Close()
 
-		rdr, err := bufferwriter.NewBufferReadSeekCloser(ctx, reader)
+		rdr, err := bufferwriter.NewBufferReadSeekCloser(ctx, compReader)
 		if err != nil {
 			return fmt.Errorf("error creating random access reader: %w", err)
 		}

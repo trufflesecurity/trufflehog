@@ -82,6 +82,20 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	return b.buf.Write(data)
 }
 
+// WriteTo writes the buffer's content to the provided writer.
+func (b *BufferWriter) WriteTo(w io.Writer) (int64, error) {
+	if b.state != readOnly {
+		return 0, fmt.Errorf("buffer is in write-only mode")
+	}
+
+	start := time.Now()
+	defer func(start time.Time) {
+		bufferLength := uint64(b.buf.Len())
+		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
+	}(start)
+	return b.buf.WriteTo(w)
+}
+
 // ReadCloser provides a read-closer for the buffer's content.
 // It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
 // as closing a bytes.Buffer is a no-op.

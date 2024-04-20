@@ -36,7 +36,13 @@ func (r *Ring) Write(p []byte) (int, error) {
 
 	if len(p) > r.availableCap {
 		oldLen := r.Len()
-		r.resize(len(p)+oldLen, oldLen) // Ensure there's enough space for new data
+		newSize := r.size * 2
+		if newSize < oldLen+len(p) {
+			newSize = oldLen + len(p)
+			// Add extra capacity to ensure the buffer is not resized to fit only the new data.
+			newSize += newSize / 2
+		}
+		r.resize(newSize, oldLen) // Ensure there's enough space for new data
 	}
 	n := r.write(p)
 

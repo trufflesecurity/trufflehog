@@ -34,7 +34,7 @@ func TestRingWrite(t *testing.T) {
 			initData:    nil,
 			writeData:   []byte("hello"),
 			wantWritten: 5,
-			wantBufSize: 10,
+			wantBufSize: 5,
 			wantBufData: []byte("hello"),
 		},
 		{
@@ -61,8 +61,8 @@ func TestRingWrite(t *testing.T) {
 			initData:    []byte("hi"),
 			writeData:   []byte("12345"),
 			wantWritten: 5,
-			wantBufSize: 7, // Expecting resize to accommodate new data
-			wantBufData: []byte("hi12345"),
+			wantBufSize: 10,                            // Expected double the size of the initial buffer
+			wantBufData: []byte("hi12345\x00\x00\x00"), // Including the extra null bytes
 		},
 		{
 			name:        "WriteWithZeroLengthData",
