@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer/ring"
 )
 
@@ -169,6 +170,40 @@ func generateData(size int) []byte {
 	return data
 }
 
+func BenchmarkRingBufferWrite(b *testing.B) {
+	type benchCase struct {
+		name     string
+		dataSize int // Size of the data to write in bytes
+	}
+
+	benchmarks := []benchCase{
+		{"1KB", 1 << 10},     // 1KB
+		{"4KB", 4 << 10},     // 4KB
+		{"16KB", 16 << 10},   // 16KB
+		{"64KB", 64 << 10},   // 64KB
+		{"256KB", 256 << 10}, // 256KB
+		{"1MB", 1 << 20},     // 1MB
+		{"4MB", 4 << 20},     // 4MB
+		{"16MB", 16 << 20},   // 16MB
+		{"64MB", 64 << 20},   // 64MB
+	}
+
+	for _, bc := range benchmarks {
+		bc := bc
+		b.Run(bc.name, func(b *testing.B) {
+			data := generateData(bc.dataSize) // Generate pseudo-random data for this benchmark case
+			r := ring.NewRingBuffer(bc.dataSize)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := r.Write(data)
+				assert.NoError(b, err)
+				r.Reset()
+			}
+		})
+	}
+}
+
 func BenchmarkBufferWrite(b *testing.B) {
 	type benchCase struct {
 		name     string
@@ -190,16 +225,14 @@ func BenchmarkBufferWrite(b *testing.B) {
 	for _, bc := range benchmarks {
 		bc := bc
 		b.Run(bc.name, func(b *testing.B) {
-			ctx := context.Background()
-
 			data := generateData(bc.dataSize) // Generate pseudo-random data for this benchmark case
-			r := ring.NewRingBuffer(bc.dataSize)
+			buf := buffer.NewBuffer()
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := r.Write(ctx, data)
+				_, err := buf.Write(data)
 				assert.NoError(b, err)
-				r.Reset()
+				buf.Reset()
 			}
 		})
 	}

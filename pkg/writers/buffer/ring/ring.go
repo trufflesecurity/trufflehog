@@ -2,8 +2,6 @@ package ring
 
 import (
 	"io"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 // Ring is a ring buffer implementation that implements the io.Writer and io.Reader interfaces.
@@ -31,7 +29,7 @@ func NewRingBuffer(size int) *Ring {
 }
 
 // Write writes len(p) bytes from p to the underlying data buffer.
-func (r *Ring) Write(_ context.Context, p []byte) (int, error) {
+func (r *Ring) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}

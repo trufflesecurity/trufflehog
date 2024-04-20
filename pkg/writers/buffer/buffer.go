@@ -14,20 +14,20 @@ type Buffer struct {
 // NewBuffer creates a new instance of Buffer.
 func NewBuffer() *Buffer { return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, defaultBufferSize))} }
 
-func (r *Buffer) Grow(size int) {
-	r.Buffer.Grow(size)
-	r.recordGrowth(size)
+func (b *Buffer) Grow(size int) {
+	b.Buffer.Grow(size)
+	b.recordGrowth(size)
 }
 
-func (r *Buffer) resetMetric() { r.checkedOutAt = time.Now() }
+func (b *Buffer) resetMetric() { b.checkedOutAt = time.Now() }
 
-func (r *Buffer) recordMetric() {
-	dur := time.Since(r.checkedOutAt)
+func (b *Buffer) recordMetric() {
+	dur := time.Since(b.checkedOutAt)
 	checkoutDuration.Observe(float64(dur.Microseconds()))
 	checkoutDurationTotal.Add(float64(dur.Microseconds()))
 }
 
-func (r *Buffer) recordGrowth(size int) {
+func (b *Buffer) recordGrowth(size int) {
 	growCount.Inc()
 	growAmount.Add(float64(size))
 }
@@ -41,7 +41,7 @@ func (b *Buffer) Write(data []byte) (int, error) {
 	}
 
 	size := len(data)
-	bufferLength := r.Buffer.Len()
+	bufferLength := b.Buffer.Len()
 	totalSizeNeeded := bufferLength + size
 
 	// If the total size is within the threshold, write to the buffer.
@@ -53,10 +53,10 @@ func (b *Buffer) Write(data []byte) (int, error) {
 		// which may require multiple allocations and copies if the size required is much larger
 		// than double the capacity. Our approach aligns with default behavior when growth sizes
 		// happen to match current capacity, retaining asymptotic efficiency benefits.
-		r.Buffer.Grow(growSize)
+		b.Buffer.Grow(growSize)
 	}
 
-	return r.Buffer.Write(data)
+	return b.Buffer.Write(data)
 }
 
 // readCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader

@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestRingWrite(t *testing.T) {
@@ -83,12 +81,11 @@ func TestRingWrite(t *testing.T) {
 			t.Parallel()
 
 			r := NewRingBuffer(tc.initBufSize)
-			ctx := context.Background()
 			if len(tc.initData) > 0 {
-				_, _ = r.Write(ctx, tc.initData)
+				_, _ = r.Write(tc.initData)
 			}
 
-			gotWritten, err := r.Write(ctx, tc.writeData)
+			gotWritten, err := r.Write(tc.writeData)
 			assert.NoError(t, err)
 
 			assert.Equal(t, tc.wantWritten, gotWritten)
@@ -123,14 +120,12 @@ func BenchmarkBufferWrite(b *testing.B) {
 	for _, bc := range benchmarks {
 		bc := bc
 		b.Run(bc.name, func(b *testing.B) {
-			ctx := context.Background()
-
 			data := generateData(bc.dataSize) // Generate pseudo-random data for this benchmark case
 			r := NewRingBuffer(defaultBufferSize)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := r.Write(ctx, data)
+				_, err := r.Write(data)
 				assert.NoError(b, err)
 				r.Reset()
 			}
@@ -178,7 +173,7 @@ func TestRingBufferBytes(t *testing.T) {
 			t.Parallel()
 			r := NewRingBuffer(tc.initBufSize)
 			if tc.initData != nil {
-				_, _ = r.Write(context.Background(), tc.initData)
+				_, _ = r.Write(tc.initData)
 			}
 
 			assert.Equal(t, tc.wantBytes, r.Bytes())
@@ -217,7 +212,7 @@ func TestRingBufferLen(t *testing.T) {
 			t.Parallel()
 			r := NewRingBuffer(tc.initBufSize)
 			if tc.initData != nil {
-				_, _ = r.Write(context.Background(), tc.initData)
+				_, _ = r.Write(tc.initData)
 			}
 
 			assert.Equal(t, tc.wantLen, r.Len())
@@ -275,7 +270,7 @@ func TestRingBufferReset(t *testing.T) {
 			t.Parallel()
 			r := NewRingBuffer(tc.initBufSize)
 			if tc.initData != nil {
-				_, _ = r.Write(context.Background(), tc.initData)
+				_, _ = r.Write(tc.initData)
 			}
 
 			r.Reset()
@@ -323,7 +318,7 @@ func TestRingBufferRead(t *testing.T) {
 			t.Parallel()
 			r := NewRingBuffer(tc.initBufSize)
 			if tc.writeData != nil {
-				_, _ = r.Write(context.Background(), tc.writeData)
+				_, _ = r.Write(tc.writeData)
 			}
 
 			readData := make([]byte, tc.readLen)
