@@ -25,8 +25,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -1186,71 +1184,17 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	var handlerOpts []handlers.Option
-
-	if s.skipArchives {
-		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
-	}
-
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	fileReader, err := cmd.StdoutPipe()
+	stdout, err := cmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		if err := fileReader.Close(); err != nil {
-			ctx.Logger().Error(err, "error closing fileReader")
-		}
-		if err := cmd.Wait(); err != nil {
-			ctx.Logger().Error(
-				err, "error waiting for command",
-				"command", cmd.String(),
-				"stderr", stderr.String(),
-				"commit", commitHash,
-			)
-		}
-	}()
-
-	bufferName := cleantemp.MkFilename()
-
-	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
-		return nil
-	}
-
-	fileCtx.Logger().V(1).Info("binary file not handled, chunking raw")
-	if err := reader.Reset(); err != nil {
-		return err
-	}
-	reader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(fileCtx, reader)
-	for data := range chunkResChan {
-		chunk := *chunkSkel
-		chunk.Data = data.Bytes()
-		if err := data.Error(); err != nil {
-			return err
-		}
-		if err := reporter.ChunkOk(fileCtx, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handlers.HandleFile(fileCtx, bytes.NewReader(stdout), chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
