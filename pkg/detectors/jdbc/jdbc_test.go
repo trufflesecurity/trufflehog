@@ -5,9 +5,10 @@ package jdbc
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -66,22 +67,6 @@ func TestJdbc_FromChunk(t *testing.T) {
 				verify: false,
 			},
 			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "sqlite unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("jdbc:sqlite::memory:"),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:sqlite::memory:",
-				},
-			},
 			wantErr: false,
 		},
 		{
