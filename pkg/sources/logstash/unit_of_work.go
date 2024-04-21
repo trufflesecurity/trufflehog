@@ -1,72 +1,48 @@
 package logstash
 
-import (
-	"fmt"
-	"strings"
-)
-
-type IndexDocumentCount struct {
-	IndexName     string
-	DocumentCount int
-}
-
 type IndexDocumentRange struct {
+	Index
 	Offset int
-	Limit  int
 }
 
 type UnitOfWork struct {
 	MaxDocumentCount    int
 	DocumentCount       int
-	IndexDocumentRanges map[string]IndexDocumentRange
+	IndexDocumentRanges []IndexDocumentRange
 }
 
 func NewUnitOfWork(maxDocumentCount int) UnitOfWork {
 	uow := UnitOfWork{MaxDocumentCount: maxDocumentCount}
-	uow.IndexDocumentRanges = make(map[string]IndexDocumentRange)
+	uow.IndexDocumentRanges = []IndexDocumentRange{}
 
 	return uow
 }
 
-func (uow *UnitOfWork) String() string {
-	b := strings.Builder{}
-	b.WriteString("UnitOfWork{")
-	rangesWritten := 0
-	for indexName, indexDocumentRange := range uow.IndexDocumentRanges {
-		if rangesWritten > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(fmt.Sprintf(
-			"%s: %d-%d",
-			indexName,
-			indexDocumentRange.Offset,
-			indexDocumentRange.Offset+indexDocumentRange.Limit,
-		))
-		rangesWritten++
+func (uow *UnitOfWork) AddRange(index Index, offset int) int {
+	indexDocCount := index.DocumentCount - offset
+	addedDocumentCount := min(uow.MaxDocumentCount-uow.DocumentCount, indexDocCount)
+
+	if addedDocumentCount > 0 {
+		uow.IndexDocumentRanges = append(uow.IndexDocumentRanges, IndexDocumentRange{
+			Index: Index{
+				Name:          index.Name,
+				PrimaryShards: index.PrimaryShards,
+				DocumentCount: addedDocumentCount,
+			},
+			Offset: offset,
+		})
+
+		uow.DocumentCount += addedDocumentCount
 	}
-	b.WriteString("}")
-	return b.String()
+
+	return addedDocumentCount
 }
 
-func (uow *UnitOfWork) AddRange(indexName string, offset, limit int) (int, int) {
-	addedDocumentCount := min(uow.MaxDocumentCount-uow.DocumentCount, limit)
-	uow.IndexDocumentRanges[indexName] = IndexDocumentRange{
-		Offset: offset,
-		Limit:  addedDocumentCount,
-	}
-	uow.DocumentCount += addedDocumentCount
-
-	return offset + addedDocumentCount, limit - addedDocumentCount
-}
-
-func DistributeDocumentScans(
-	maxUnits int,
-	indexDocumentCounts []IndexDocumentCount,
-) []UnitOfWork {
+func DistributeDocumentScans(maxUnits int, indices []Index) []UnitOfWork {
 	totalDocumentCount := 0
 
-	for _, idc := range indexDocumentCounts {
-		totalDocumentCount += idc.DocumentCount
+	for _, i := range indices {
+		totalDocumentCount += i.DocumentCount
 	}
 
 	unitsOfWork := make([]UnitOfWork, maxUnits)
@@ -87,31 +63,16 @@ func DistributeDocumentScans(
 	}
 
 	unitOfWorkIndex := 0
-	for _, indexDocumentCount := range indexDocumentCounts {
-		// Skip empty indices
-		if indexDocumentCount.DocumentCount == 0 {
-			continue
-		}
-
+	for _, i := range indices {
 		uow := &unitsOfWork[unitOfWorkIndex]
+		offset := uow.AddRange(i, 0)
 
-		// Add the indexes documents to the unit of work, returning any spillover
-		offset, documentCount := uow.AddRange(
-			indexDocumentCount.IndexName,
-			0,
-			indexDocumentCount.DocumentCount,
-		)
-
-		// If there was spillover, it needs to go into the next unit of work, and
-		// the next, and the next....
-		for documentCount > 0 {
+		// If we've yet to distribute all the documents in the index, go into the
+		// next unit of work, and the next, and the next....
+		for offset < i.DocumentCount {
 			unitOfWorkIndex++
 			uow := &unitsOfWork[unitOfWorkIndex]
-			offset, documentCount = uow.AddRange(
-				indexDocumentCount.IndexName,
-				offset,
-				documentCount,
-			)
+			offset += uow.AddRange(i, offset)
 		}
 	}
 

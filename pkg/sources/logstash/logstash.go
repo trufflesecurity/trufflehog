@@ -2,6 +2,7 @@ package logstash
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-errors/errors"
@@ -27,11 +28,13 @@ type Source struct {
 	verify      bool
 	cloudId     string
 	apiKey      string
+	ctx         context.Context
 	client      *elasticsearch.TypedClient
 	log         logr.Logger
 	sources.Progress
 }
 
+// Init returns an initialized Logstash source
 func (s *Source) Init(
 	aCtx context.Context,
 	name string,
@@ -53,6 +56,7 @@ func (s *Source) Init(
 	s.verify = verify
 	s.cloudId = conn.CloudId
 	s.apiKey = conn.ApiKey
+	s.ctx = aCtx
 	s.log = aCtx.Logger()
 
 	client, err := s.buildElasticClient()
@@ -66,10 +70,7 @@ func (s *Source) Init(
 }
 
 func (s *Source) buildElasticClient() (*elasticsearch.TypedClient, error) {
-	return elasticsearch.NewTypedClient(elasticsearch.Config{
-		CloudID: s.cloudId,
-		APIKey:  s.apiKey,
-	})
+	return BuildElasticClient(s.cloudId, s.apiKey)
 }
 
 func (s *Source) Type() sourcespb.SourceType {
@@ -84,45 +85,42 @@ func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
+// Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(
 	ctx context.Context,
 	chunksChan chan *sources.Chunk,
 	targets ...sources.ChunkingTarget,
 ) error {
-	indexDocumentCounts, err := fetchIndexDocumentCounts(s.client)
+	indices, err := FetchIndices(s.ctx, s.client)
 	if err != nil {
 		return err
 	}
 
-	unitsOfWork := DistributeDocumentScans(s.concurrency, indexDocumentCounts)
+	unitsOfWork := DistributeDocumentScans(s.concurrency, indices)
 
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
 	defer func() { _ = workerPool.Wait() }()
 
 	for _, outerUOW := range unitsOfWork {
-		workerPool.Go(func() error {
-			uow := outerUOW
+		uow := outerUOW
 
+		workerPool.Go(func() error {
 			// Give each worker its own client
 			client, err := s.buildElasticClient()
 			if err != nil {
 				return err
 			}
 
-			for indexName, indexDocumentRange := range uow.IndexDocumentRanges {
+			for _, indexDocumentRange := range uow.IndexDocumentRanges {
 				// We should never set out to process a range of documents if the unit
 				// of work's document count is 0; if that's the case we goofed
 				// accounting somewhere. Log a warning in that case.
 				if uow.DocumentCount == 0 {
-					s.log.V(2).Info("Accounting error; doc count is 0 but pages remain")
+					log.Println("Accounting error: doc count is 0 but pages remain")
 				}
 
-				documents, err := fetchIndexDocuments(
-					client,
-					indexName,
-					indexDocumentRange.Offset,
-				)
+				documents, err := FetchIndexDocuments(s.ctx, client, &indexDocumentRange)
 				if err != nil {
 					return err
 				}
@@ -136,7 +134,7 @@ func (s *Source) Chunks(
 						SourceMetadata: &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Logstash{
 								Logstash: &source_metadatapb.Logstash{
-									Index:      sanitizer.UTF8(indexName),
+									Index:      sanitizer.UTF8(indexDocumentRange.Name),
 									DocumentId: sanitizer.UTF8(document.ID),
 									Timestamp:  sanitizer.UTF8(document.Timestamp),
 								},
@@ -150,7 +148,6 @@ func (s *Source) Chunks(
 					if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
 						return err
 					}
-
 					uow.DocumentCount--
 					indexDocumentRange.Offset++
 
@@ -164,25 +161,21 @@ func (s *Source) Chunks(
 					// of documents back, but that use is limited to 10000 documents
 					// which we could well exceed)
 					if uow.DocumentCount == 0 {
+						s.SetProgressComplete(
+							uow.MaxDocumentCount,
+							uow.MaxDocumentCount,
+							fmt.Sprintf("Scanned %d total documents", uow.MaxDocumentCount),
+							"",
+						)
 						break
 					}
-				}
-
-				if uow.DocumentCount == 0 {
-					s.SetProgressComplete(
-						uow.MaxDocumentCount,
-						uow.MaxDocumentCount,
-						fmt.Sprintf("Scanned %d total documents", uow.MaxDocumentCount),
-						"",
-					)
-				} else {
 					s.SetProgressComplete(
 						uow.MaxDocumentCount-uow.DocumentCount,
 						uow.MaxDocumentCount,
 						fmt.Sprintf(
 							"Scanned %d documents from index %s",
 							len(documents),
-							indexName,
+							indexDocumentRange.Name,
 						),
 						"",
 					)
