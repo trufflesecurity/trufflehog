@@ -2,10 +2,10 @@ package onfleet
 
 import (
 	"context"
+	b64 "encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
-	b64 "encoding/base64"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -72,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://onfleet.com/api/v2/tasks/all?from=1455072025000", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://onfleet.com/api/v2/organization", nil)
 	if err != nil {
 		return false, nil, nil
 	}
