@@ -995,6 +995,7 @@ enum DetectorType {
   GCPApplicationDefaultCredentials = 983;
   Wiz = 984;
   Pagarme = 985;
+  Onfleet = 986;
 }
 
 message Result {
