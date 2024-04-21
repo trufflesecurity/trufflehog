@@ -23,6 +23,9 @@ type DetectorKey struct {
 	customDetectorName string
 }
 
+// Type returns the detector type of the key.
+func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
+
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
@@ -119,4 +122,8 @@ func CreateDetectorKey(d detectors.Detector) DetectorKey {
 		customDetectorName = r.GetName()
 	}
 	return DetectorKey{detectorType: detectorType, version: version, customDetectorName: customDetectorName}
+}
+
+func (ac *AhoCorasickCore) KeywordsToDetectors() map[string][]DetectorKey {
+	return ac.keywordsToDetectors
 }

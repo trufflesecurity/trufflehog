@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"time"
 	"unicode"
 
 	_ "github.com/snowflakedb/gosnowflake"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -117,7 +118,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						ctx = context.Background()
 					}
 
-					// Disable pool + retries to prevent flooding the server with failed login attemps.
+					// Disable pool + retries to prevent flooding the server with failed login attempts.
 					db.SetConnMaxLifetime(time.Second)
 					db.SetMaxOpenConns(1)
 

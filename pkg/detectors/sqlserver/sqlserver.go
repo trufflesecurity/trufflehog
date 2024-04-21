@@ -3,10 +3,12 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
+	"time"
+
 	regexp "github.com/wasilibs/go-re2"
 
-	mssql "github.com/denisenkom/go-mssqldb"
-	"github.com/denisenkom/go-mssqldb/msdsn"
+	mssql "github.com/microsoft/go-mssqldb"
+	"github.com/microsoft/go-mssqldb/msdsn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -32,7 +34,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	matches := pattern.FindAllStringSubmatch(string(data), -1)
 	for _, match := range matches {
-		paramsUnsafe, _, err := msdsn.Parse(match[1])
+		paramsUnsafe, err := msdsn.Parse(match[1])
 		if err != nil {
 			continue
 		}
@@ -69,10 +71,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 var ping = func(config msdsn.Config) (bool, error) {
-	url := config.URL()
+	cleanConfig := msdsn.Config{}
+	cleanConfig.Host = config.Host
+	cleanConfig.User = config.User
+	cleanConfig.Password = config.Password
+	cleanConfig.Database = config.Database
+	cleanConfig.DisableRetry = true
+	cleanConfig.Encryption = config.Encryption
+	cleanConfig.TLSConfig = config.TLSConfig
+	cleanConfig.Instance = config.Instance
+	cleanConfig.DialTimeout = time.Second * 3
+	cleanConfig.ConnTimeout = time.Second * 3
+
+	url := cleanConfig.URL()
 	query := url.Query()
-	query.Set("dial timeout", "3")
-	query.Set("connection timeout", "3")
 	url.RawQuery = query.Encode()
 
 	conn, err := sql.Open("mssql", url.String())

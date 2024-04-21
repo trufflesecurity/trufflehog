@@ -122,7 +122,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 			return false, nil, fmt.Errorf("unexpected error description '%s' for %s", errInfo.Error, req.URL)
 		}
 	} else {
-		return false, nil, fmt.Errorf("unexpected respones %d for %s", res.StatusCode, req.URL)
+		return false, nil, fmt.Errorf("unexpected response %d for %s", res.StatusCode, req.URL)
 	}
 }
 

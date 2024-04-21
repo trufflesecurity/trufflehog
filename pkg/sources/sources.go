@@ -130,11 +130,18 @@ type ChunkReporter interface {
 	ChunkErr(ctx context.Context, err error) error
 }
 
+type SourceUnitKind string
+
 // SourceUnit is an object that represents a Source's unit of work. This is
 // used as the output of enumeration, progress reporting, and job distribution.
 type SourceUnit interface {
-	// SourceUnitID uniquely identifies a source unit.
-	SourceUnitID() string
+	// SourceUnitID uniquely identifies a source unit. It does not need to
+	// be human readable or two-way, however, it should be canonical and
+	// stable across runs.
+	SourceUnitID() (string, SourceUnitKind)
+
+	// Display is the human readable representation of the SourceUnit.
+	Display() string
 }
 
 // GCSConfig defines the optional configuration for a GCS source.
@@ -258,6 +265,8 @@ type S3Config struct {
 	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
+	// IgnoreBuckets is the list buckets to ignore.
+	IgnoreBuckets []string
 	// Roles is the list of Roles to use.
 	Roles []string
 	// MaxObjectSize is the maximum object size to scan.
@@ -278,6 +287,36 @@ type SyslogConfig struct {
 	KeyPath string
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency int
+}
+
+// PostmanConfig defines the optional configuration for a Postman source.
+type PostmanConfig struct {
+	// Workspace UUID(s) or file path(s) to Postman workspace (.zip)
+	Workspaces []string
+	// Collection ID(s) or file path(s) to Postman collection (.json)
+	Collections []string
+	// Environment ID(s) or file path(s) to Postman environment (.json)
+	Environments []string
+	// Token is the token to use to authenticate with the API.
+	Token string
+	// IncludeCollections is a list of Collections to include in the scan.
+	IncludeCollections []string
+	// IncludeEnvironment is a list of Environments to include in the scan.
+	IncludeEnvironments []string
+	// ExcludeCollections is a list of Collections to exclude in the scan.
+	ExcludeCollections []string
+	// ExcludeEnvironment is a list of Environments to exclude in the scan.
+	ExcludeEnvironments []string
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency int
+	// CollectionPaths is the list of paths to Postman collections.
+	CollectionPaths []string
+	// WorkspacePaths is the list of paths to Postman workspaces.
+	WorkspacePaths []string
+	// EnvironmentPaths is the list of paths to Postman environments.
+	EnvironmentPaths []string
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
 }
 
 // Progress is used to update job completion progress across sources.
