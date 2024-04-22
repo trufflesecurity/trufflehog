@@ -9,15 +9,16 @@ import (
 )
 
 // bufferedFileReader provides random access read, seek, and close capabilities on top of the BufferedFileWriter.
-// It combines the functionality of BufferedFileWriter for buffered writing, bytes.Reader for
-// random access reading and seeking, and adds a close method to return the buffer to the pool.
+// It combines the functionality of BufferedFileWriter for buffered writing, io.ReadSeekCloser for
+// random access reading and seeking.
 type bufferedFileReader struct {
 	bufWriter *bufferedfilewriter.BufferedFileWriter
 	reader    io.ReadSeekCloser
 }
 
 // NewBufferedFileReader initializes a bufferedFileReader from an io.Reader by using
-// the BufferedFileWriter's functionality to read and store data, then setting up a bytes.Reader for random access.
+// the BufferedFileWriter's functionality to read and store data, then setting up a io.ReadSeekCloser
+// for random access reading and seeking.
 // It returns the initialized bufferedFileReader and any error encountered during the process.
 func NewBufferedFileReader(ctx context.Context, r io.Reader) (*bufferedFileReader, error) {
 	writer, err := bufferedfilewriter.NewFromReader(ctx, r)
@@ -43,7 +44,7 @@ func NewBufferedFileReader(ctx context.Context, r io.Reader) (*bufferedFileReade
 	return &bufferedFileReader{writer, rdr}, nil
 }
 
-// Close releases the buffer back to the buffer pool.
+// Close the bufferedFileReader.
 // It should be called when the bufferedFileReader is no longer needed.
 // Note that closing the bufferedFileReader does not affect the underlying bytes.Reader,
 // which can still be used for reading, seeking, and reading at specific positions.
@@ -52,15 +53,15 @@ func (b *bufferedFileReader) Close() error {
 	return b.reader.Close()
 }
 
-// Read reads up to len(p) bytes into p from the underlying bytes.Reader.
+// Read reads up to len(p) bytes into p from the underlying reader.
 // It returns the number of bytes read and any error encountered.
-// If the bytes.Reader reaches the end of the available data, Read returns 0, io.EOF.
+// If the reader reaches the end of the available data, Read returns 0, io.EOF.
 // It implements the io.Reader interface.
 func (b *bufferedFileReader) Read(p []byte) (int, error) {
 	return b.reader.Read(p)
 }
 
-// Seek sets the offset for the next Read or Write operation on the underlying bytes.Reader.
+// Seek sets the offset for the next Read operation on the underlying reader.
 // The offset is interpreted according to the whence parameter:
 //   - io.SeekStart means relative to the start of the file
 //   - io.SeekCurrent means relative to the current offset
