@@ -98,9 +98,7 @@ matchLoop:
 			// TODO: specialized redaction
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
+		
 
 		results = append(results, s)
 	}

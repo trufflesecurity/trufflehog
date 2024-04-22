@@ -653,10 +653,10 @@ func parseResults(input *string) (map[string]struct{}, error) {
 	)
 	for _, value := range values {
 		switch value {
-		case "verified", "unknown", "unverified":
+		case "verified", "unknown", "unverified", "filtered_unverified":
 			results[value] = struct{}{}
 		default:
-			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified'", value)
+			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified,filtered_unverified'", value)
 		}
 	}
 	return results, nil

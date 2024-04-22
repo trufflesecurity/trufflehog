@@ -88,11 +88,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if r.Workplace.Name != "" {
 						s1.ExtraData["workplace"] = r.Workplace.Name
 					}
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}

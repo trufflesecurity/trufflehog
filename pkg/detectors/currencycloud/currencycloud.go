@@ -77,10 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.Verified = true
 							s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.currencycloud.com", env)}
 							break
-						} else {
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
