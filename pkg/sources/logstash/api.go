@@ -68,7 +68,7 @@ func getShardListPreference(i *Index) string {
 		if i > 0 {
 			shardList.WriteString(",")
 		}
-		shardList.WriteString(fmt.Sprintf("%s", strconv.Itoa(n)))
+		shardList.WriteString(strconv.Itoa(n))
 	}
 
 	return shardList.String()
@@ -93,7 +93,7 @@ func fetchIndexNames(
 	names := make([]string, len(data))
 	count := 0
 
-	for indexName, _ := range data {
+	for indexName := range data {
 		names[count] = indexName
 		count++
 	}
