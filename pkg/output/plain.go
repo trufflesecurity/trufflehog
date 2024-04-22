@@ -17,12 +17,10 @@ import (
 )
 
 var (
-	boldYellowPrinter = color.New(color.Bold, color.FgYellow)
-	yellowPrinter     = color.New(color.FgHiYellow)
-	greenPrinter      = color.New(color.FgHiGreen)
-	boldGreenPrinter  = color.New(color.Bold, color.FgHiGreen)
-	whitePrinter      = color.New(color.FgWhite)
-	boldWhitePrinter  = color.New(color.Bold, color.FgWhite)
+	greenPrinter     = color.New(color.FgHiGreen)
+	boldGreenPrinter = color.New(color.Bold, color.FgHiGreen)
+	whitePrinter     = color.New(color.FgWhite)
+	boldWhitePrinter = color.New(color.Bold, color.FgWhite)
 )
 
 // PlainPrinter is a printer that prints results in plain text format.
