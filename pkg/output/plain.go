@@ -49,13 +49,12 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 
 	if out.Verified {
 		boldGreenPrinter.Print("✅ Found verified result 🐷🔑\n")
-	} else if out.VerificationError != nil {
-		printer = yellowPrinter
-		boldYellowPrinter.Print("⚠️  Found result - unable to verify due to error 🐷🔑❗️\n")
-		printer.Printf("Verification Error: %s\n", out.VerificationError)
 	} else {
 		printer = whitePrinter
 		boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
+		if out.VerificationError != nil {
+			printer.Printf("Verification issue: %s\n", out.VerificationError)
+		}
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
 	printer.Printf("Decoder Type: %s\n", out.DecoderType)
