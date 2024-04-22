@@ -427,7 +427,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			path, ok := pathFromBinaryLine(line)
 			if !ok {
 				err = fmt.Errorf(`expected line to match 'Binary files a/fileA and b/fileB differ', got "%s"`, line)
-				ctx.Logger().Error(err, "Failed to parse binary file line")
+				ctx.Logger().Error(err, "Failed to parse BinaryFileLine")
 				latestState = ParseFailure
 				continue
 			}
@@ -443,8 +443,15 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 		case isToFileLine(latestState, line):
 			latestState = ToFileLine
 
-			// TODO: Is this fix still required?
-			currentDiff.PathB = strings.TrimRight(strings.TrimRight(string(line[6:]), "\n"), "\t") // Trim the newline and tab characters. https://github.com/trufflesecurity/trufflehog/issues/1060
+			path, ok := pathFromToFileLine(line)
+			if !ok {
+				err = fmt.Errorf(`expected line to match format '+++ b/path/to/file.go', got '%s'`, line)
+				ctx.Logger().Error(err, "Failed to parse ToFileLine")
+				latestState = ParseFailure
+				continue
+			}
+
+			currentDiff.PathB = path
 		case isHunkLineNumberLine(latestState, line):
 			latestState = HunkLineNumberLine
 
@@ -686,22 +693,30 @@ func pathFromBinaryLine(line []byte) (string, bool) {
 		return "", true
 	}
 
-	_, after, ok := bytes.Cut(line, []byte(" and b/"))
-	if ok {
+	var (
+		path string
+		err  error
+	)
+	if _, after, ok := bytes.Cut(line, []byte(" and b/")); ok {
 		// drop the " differ\n"
-		return string(after[:len(after)-8]), true
+		path = string(after[:len(after)-8])
+	} else if _, after, ok = bytes.Cut(line, []byte(` and "b/`)); ok {
+		// Edge case where the path is quoted.
+		// https://github.com/trufflesecurity/trufflehog/issues/2384
+
+		// Drop the `" differ\n` and handle escaped characters in the path.
+		// e.g., "\342\200\224" instead of "—".
+		// See https://github.com/trufflesecurity/trufflehog/issues/2418
+		path, err = strconv.Unquote(`"` + string(after[:len(after)-9]) + `"`)
+		if err != nil {
+			return "", false
+		}
+	} else {
+		// Unknown format.
+		return "", false
 	}
 
-	// Edge case where the path is quoted.
-	// https://github.com/trufflesecurity/trufflehog/issues/2384
-	_, after, ok = bytes.Cut(line, []byte(` and "b/`))
-	if ok {
-		// drop the `" differ\n`
-		return string(after[:len(after)-9]), true
-	}
-
-	// Unknown format.
-	return "", false
+	return path, true
 }
 
 // --- a/internal/addrs/move_endpoint_module.go
@@ -725,6 +740,42 @@ func isToFileLine(latestState ParseState, line []byte) bool {
 		return true
 	}
 	return false
+}
+
+// Get the b/ file path.
+func pathFromToFileLine(line []byte) (string, bool) {
+	// Normalize paths, as they can end in `\n`, `\t\n`, etc.
+	// See https://github.com/trufflesecurity/trufflehog/issues/1060
+	line = bytes.TrimSpace(line)
+
+	// File was deleted.
+	if bytes.Equal(line, []byte("+++ /dev/null")) {
+		return "", true
+	}
+
+	var (
+		path string
+		err  error
+	)
+	if _, after, ok := bytes.Cut(line, []byte("+++ b/")); ok {
+		path = string(after)
+	} else if _, after, ok = bytes.Cut(line, []byte(`+++ "b/`)); ok {
+		// Edge case where the path is quoted.
+		// e.g., `+++ "b/C++/1 \320\243\321\200\320\276\320\272/B.c"`
+
+		// Drop the trailing `"` and handle escaped characters in the path
+		// e.g., "\342\200\224" instead of "—".
+		// See https://github.com/trufflesecurity/trufflehog/issues/2418
+		path, err = strconv.Unquote(`"` + string(after[:len(after)-1]) + `"`)
+		if err != nil {
+			return "", false
+		}
+	} else {
+		// Unknown format.
+		return "", false
+	}
+
+	return path, true
 }
 
 // @@ -298 +298 @@ func maxRetryErrorHandler(resp *http.Response, err error, numTries int)

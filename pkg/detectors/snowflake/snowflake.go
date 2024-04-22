@@ -118,7 +118,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						ctx = context.Background()
 					}
 
-					// Disable pool + retries to prevent flooding the server with failed login attemps.
+					// Disable pool + retries to prevent flooding the server with failed login attempts.
 					db.SetConnMaxLifetime(time.Second)
 					db.SetMaxOpenConns(1)
 
