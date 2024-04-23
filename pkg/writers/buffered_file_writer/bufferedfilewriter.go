@@ -167,7 +167,6 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		return n, err
 	}
 
-	// Record the disk write metric after successfully writing to the file
 	w.metrics.recordDiskWrite(w.file)
 
 	return n, nil
