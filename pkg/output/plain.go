@@ -17,6 +17,7 @@ import (
 )
 
 var (
+	yellowPrinter    = color.New(color.FgYellow)
 	greenPrinter     = color.New(color.FgHiGreen)
 	boldGreenPrinter = color.New(color.Bold, color.FgHiGreen)
 	whitePrinter     = color.New(color.FgWhite)
@@ -51,7 +52,7 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 		printer = whitePrinter
 		boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
 		if out.VerificationError != nil {
-			printer.Printf("Verification issue: %s\n", out.VerificationError)
+			yellowPrinter.Printf("Connection issue: %s\n", out.VerificationError)
 		}
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
