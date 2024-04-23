@@ -139,7 +139,6 @@ func FilterKnownFalsePositives(ctx context.Context, results []Result, falsePosit
 			switch result.DetectorType {
 			case detectorspb.DetectorType_CustomRegex:
 				filteredResults = append(filteredResults, result)
-				break
 			case detectorspb.DetectorType_GCP,
 				detectorspb.DetectorType_URI,
 				detectorspb.DetectorType_AzureBatch,
@@ -149,7 +148,6 @@ func FilterKnownFalsePositives(ctx context.Context, results []Result, falsePosit
 				detectorspb.DetectorType_MongoDB,
 				detectorspb.DetectorType_JDBC:
 				filteredResults = append(filteredResults, result)
-				break
 			default:
 				if result.Raw != nil {
 					if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
