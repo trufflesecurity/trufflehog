@@ -3,9 +3,10 @@ package notion
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -63,14 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// /v1/search, /v1/databases/*, etc. may work.
 					s1.Verified = true
 
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
-					// Nothing returns 401 on all requests not containing a api key.
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			} else {
 				s1.SetVerificationError(err, resMatch)
