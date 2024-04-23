@@ -31,10 +31,8 @@ func (bufferedFileWriterMetrics) recordDiskWrite(f *os.File) {
 	diskWriteCount.Inc()
 	size, err := f.Stat()
 	if err != nil {
-		fmt.Println("Error getting file size:", err)
 		return
 	}
-	fmt.Println("File size:", size.Size())
 	fileSizeHistogram.Observe(float64(size.Size()))
 }
 
