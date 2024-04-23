@@ -7,8 +7,8 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 )
 
 // readSeekCloser is an interface that combines the functionality of io.ReadSeekCloser and io.ReaderAt.
@@ -160,7 +160,7 @@ func HandleFile(
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
 ) error {
-	rdr, err := bufferwriter.NewBufferReadSeekCloser(ctx, reader)
+	rdr, err := readers.NewBufferedFileReader(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("error creating random access reader: %w", err)
 	}

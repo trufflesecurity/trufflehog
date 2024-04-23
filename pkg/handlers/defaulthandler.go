@@ -13,8 +13,8 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 )
 
 type ctxKey int
@@ -156,7 +156,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		}
 		defer compReader.Close()
 
-		rdr, err := bufferwriter.NewBufferReadSeekCloser(ctx, compReader)
+		rdr, err := readers.NewBufferedFileReader(ctx, reader)
 		if err != nil {
 			return fmt.Errorf("error creating random access reader: %w", err)
 		}
@@ -219,7 +219,7 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer f.Close()
 
-		rdr, err := bufferwriter.NewBufferReadSeekCloser(lCtx, f)
+		rdr, err := readers.NewBufferedFileReader(lCtx, f)
 		if err != nil {
 			return fmt.Errorf("error creating random access reader: %w", err)
 		}
