@@ -70,10 +70,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if strings.Contains(body, "Active") {
 						s1.Verified = true
-					} else {
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}

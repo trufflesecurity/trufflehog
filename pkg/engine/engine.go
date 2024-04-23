@@ -72,6 +72,7 @@ type Engine struct {
 	notifyVerifiedResults   bool
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
+	logFilteredUnverified   bool
 	verificationOverlap     bool
 	printAvgDetectorTime    bool
 
@@ -181,6 +182,9 @@ func WithResults(results map[string]struct{}) Option {
 
 		_, ok = results["unverified"]
 		e.notifyUnverifiedResults = ok
+
+		_, ok = results["filtered_unverified"]
+		e.logFilteredUnverified = ok
 	}
 }
 
@@ -827,8 +831,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results = detectors.CleanResults(results)
 	}
 
+	results = detectors.FilterKnownFalsePositives(ctx, results, detectors.DefaultFalsePositives, true, e.logFilteredUnverified)
+
 	if e.filterEntropy != nil {
-		results = detectors.FilterResultsWithEntropy(results, *e.filterEntropy)
+		results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)
 	}
 
 	for _, res := range results {

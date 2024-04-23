@@ -4,9 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
-	// "log"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -64,10 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if strings.Contains(body, "success") {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}

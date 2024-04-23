@@ -44,7 +44,7 @@ func TestBufferWriterWrite(t *testing.T) {
 			writer := New(context.Background())
 			writer.state = tc.initialState
 
-			_, err := writer.Write(context.Background(), tc.input)
+			_, err := writer.Write(tc.input)
 			if tc.expectedError {
 				assert.Error(t, err)
 			} else {
@@ -121,7 +121,7 @@ func TestBufferWriterString(t *testing.T) {
 		{
 			name: "String with data",
 			prepareBuffer: func(bw *BufferWriter) {
-				_, _ = bw.Write(context.Background(), []byte("test data"))
+				_, _ = bw.Write([]byte("test data"))
 			},
 			expectedStr:   "test data",
 			expectedError: false,

@@ -72,10 +72,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							"username": apiRes.Result.Username,
 						}
 					}
-				} else {
-					if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
