@@ -90,6 +90,19 @@ func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
 	return w
 }
 
+// NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
+func NewFromReader(ctx context.Context, r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
+	writer := New(ctx, opts...)
+	n, err := io.Copy(writer, r)
+	if err != nil {
+		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
+	}
+
+	ctx.Logger().V(3).Info("data written to buffered file writer", "bytes", n)
+
+	return writer, nil
+}
+
 // Len returns the number of bytes written to the buffer or file.
 func (w *BufferedFileWriter) Len() int { return int(w.size) }
 
