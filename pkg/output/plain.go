@@ -52,7 +52,7 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 		printer = whitePrinter
 		boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
 		if out.VerificationError != nil {
-			yellowPrinter.Printf("Connection issue: %s\n", out.VerificationError)
+			yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
 		}
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
