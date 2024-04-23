@@ -90,7 +90,7 @@ require (
 	golang.org/x/oauth2 v0.19.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.14.0
-	google.golang.org/api v0.176.0
+	google.golang.org/api v0.176.1
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/h2non/gock.v1 v1.1.2
 	pgregory.net/rapid v1.1.0
@@ -99,8 +99,8 @@ require (
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
-	cloud.google.com/go/auth v0.2.2 // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.2.1 // indirect
+	cloud.google.com/go/auth v0.3.0 // indirect
+	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.7 // indirect
