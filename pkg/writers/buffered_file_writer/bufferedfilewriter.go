@@ -31,8 +31,10 @@ func (bufferedFileWriterMetrics) recordDiskWrite(f *os.File) {
 	diskWriteCount.Inc()
 	size, err := f.Stat()
 	if err != nil {
+		fmt.Println("Error getting file size:", err)
 		return
 	}
+	fmt.Println("File size:", size.Size())
 	fileSizeHistogram.Observe(float64(size.Size()))
 }
 
@@ -55,7 +57,7 @@ type BufferedFileWriter struct {
 	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
 	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
-	file     io.WriteCloser // File for storing data over the threshold.
+	file     *os.File       // File for storing data over the threshold.
 
 	state state // Current state of the writer. (writeOnly or readOnly)
 
@@ -149,7 +151,6 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 
 		w.filename = file.Name()
 		w.file = file
-		w.metrics.recordDiskWrite(file)
 
 		// Transfer existing data in buffer to the file, then clear the buffer.
 		// This ensures all the data is in one place - either entirely in the buffer or the file.
@@ -161,7 +162,15 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		}
 	}
 
-	return w.file.Write(data)
+	n, err := w.file.Write(data)
+	if err != nil {
+		return n, err
+	}
+
+	// Record the disk write metric after successfully writing to the file
+	w.metrics.recordDiskWrite(w.file)
+
+	return n, nil
 }
 
 // CloseForWriting flushes any remaining data in the buffer to the file, closes the file if created,
