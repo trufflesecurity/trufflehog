@@ -58,9 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
-		}
 		results = append(results, s1)
 	}
 

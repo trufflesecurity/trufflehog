@@ -8,6 +8,9 @@ import (
 	"unicode/utf8"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
@@ -106,19 +109,60 @@ func StringShannonEntropy(input string) float64 {
 }
 
 // FilterResultsWithEntropy filters out determinately unverified results that have a shannon entropy below the given value.
-func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
+func FilterResultsWithEntropy(ctx context.Context, results []Result, entropy float64, shouldLog bool) []Result {
 	var filteredResults []Result
 	for _, result := range results {
 		if !result.Verified {
-			if result.RawV2 != nil {
-				if StringShannonEntropy(string(result.RawV2)) >= entropy {
+			if result.Raw != nil {
+				if StringShannonEntropy(string(result.Raw)) >= entropy {
 					filteredResults = append(filteredResults, result)
+				} else {
+					if shouldLog {
+						ctx.Logger().Info("Filtered out result with low entropy", "result", result)
+					}
 				}
 			} else {
-				if StringShannonEntropy(string(result.Raw)) >= entropy {
+				filteredResults = append(filteredResults, result)
+			}
+		} else {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+	return filteredResults
+}
+
+// FilterKnownFalsePositives filters out known false positives from the results.
+func FilterKnownFalsePositives(ctx context.Context, results []Result, falsePositives []FalsePositive, wordCheck bool, shouldLog bool) []Result {
+	var filteredResults []Result
+	for _, result := range results {
+		if !result.Verified {
+			switch result.DetectorType {
+			case detectorspb.DetectorType_CustomRegex:
+				filteredResults = append(filteredResults, result)
+			case detectorspb.DetectorType_GCP,
+				detectorspb.DetectorType_URI,
+				detectorspb.DetectorType_AzureBatch,
+				detectorspb.DetectorType_AzureContainerRegistry,
+				detectorspb.DetectorType_Shopify,
+				detectorspb.DetectorType_Postgres,
+				detectorspb.DetectorType_MongoDB,
+				detectorspb.DetectorType_JDBC:
+				filteredResults = append(filteredResults, result)
+			default:
+				if result.Raw != nil {
+					if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
+						filteredResults = append(filteredResults, result)
+					} else {
+						if shouldLog {
+							ctx.Logger().Info("Filtered out known false positive", "result", result)
+						}
+					}
+				} else {
 					filteredResults = append(filteredResults, result)
 				}
 			}
+		} else {
+			filteredResults = append(filteredResults, result)
 		}
 	}
 	return filteredResults

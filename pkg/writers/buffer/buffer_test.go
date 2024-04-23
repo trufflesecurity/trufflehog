@@ -144,7 +144,7 @@ func TestBufferWrite(t *testing.T) {
 			buf := &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, tc.initialCapacity))}
 			totalWritten := 0
 			for _, data := range tc.writeDataSequence {
-				n, err := buf.Write(context.Background(), data)
+				n, err := buf.Write(data)
 				assert.NoError(t, err)
 
 				totalWritten += n
