@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
 func TestBufferedFileWriterNewThreshold(t *testing.T) {
@@ -79,12 +80,12 @@ func TestBufferedFileWriterString(t *testing.T) {
 			ctx := context.Background()
 			writer := New(ctx, WithThreshold(tc.threshold))
 			// First write, should go to file if it exceeds the threshold.
-			_, err := writer.Write(ctx, tc.input)
+			_, err := writer.Write(tc.input)
 			assert.NoError(t, err)
 
 			// Second write, should go to buffer
 			if tc.additionalInput != nil {
-				_, err = writer.Write(ctx, tc.additionalInput)
+				_, err = writer.Write(tc.additionalInput)
 				assert.NoError(t, err)
 			}
 
@@ -111,7 +112,7 @@ func BenchmarkBufferedFileWriterString_BufferOnly_Small(b *testing.B) {
 	ctx := context.Background()
 	writer := New(ctx)
 
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(b, err)
 
 	benchmarkBufferedFileWriterString(b, writer)
@@ -129,7 +130,7 @@ func BenchmarkBufferedFileWriterString_BufferOnly_Medium(b *testing.B) {
 	ctx := context.Background()
 	writer := New(ctx)
 
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(b, err)
 
 	benchmarkBufferedFileWriterString(b, writer)
@@ -148,7 +149,7 @@ func BenchmarkBufferedFileWriterString_OnlyFile_Small(b *testing.B) {
 	ctx := context.Background()
 	writer := New(ctx)
 
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(b, err)
 
 	benchmarkBufferedFileWriterString(b, writer)
@@ -167,7 +168,7 @@ func BenchmarkBufferedFileWriterString_OnlyFile_Medium(b *testing.B) {
 	ctx := context.Background()
 	writer := New(ctx)
 
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(b, err)
 
 	benchmarkBufferedFileWriterString(b, writer)
@@ -186,11 +187,11 @@ func BenchmarkBufferedFileWriterString_BufferWithFile_Small(b *testing.B) {
 	ctx := context.Background()
 	writer := New(ctx)
 
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(b, err)
 
 	// Write again so we also fill up the buffer.
-	_, err = writer.Write(ctx, data)
+	_, err = writer.Write(data)
 	assert.NoError(b, err)
 
 	benchmarkBufferedFileWriterString(b, writer)
@@ -209,11 +210,11 @@ func BenchmarkBufferedFileWriterString_BufferWithFile_Medium(b *testing.B) {
 	ctx := context.Background()
 	writer := New(ctx)
 
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(b, err)
 
 	// Write again so we also fill up the buffer.
-	_, err = writer.Write(ctx, data)
+	_, err = writer.Write(data)
 	assert.NoError(b, err)
 
 	benchmarkBufferedFileWriterString(b, writer)
@@ -253,7 +254,7 @@ func TestBufferedFileWriterLen(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			writer := New(context.Background())
-			_, err := writer.Write(context.Background(), tc.input)
+			_, err := writer.Write(tc.input)
 			assert.NoError(t, err)
 
 			length := writer.Len()
@@ -271,7 +272,7 @@ func TestBufferedFileWriterWriteWithinThreshold(t *testing.T) {
 	data := []byte("hello world")
 
 	writer := New(ctx, WithThreshold(64))
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(t, err)
 
 	assert.Equal(t, data, writer.buf.Bytes())
@@ -286,7 +287,7 @@ func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 	data := []byte("hello world")
 
 	writer := New(ctx, WithThreshold(5))
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(t, err)
 
 	defer func() {
@@ -312,7 +313,7 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 
 	// Initialize writer with a threshold that initialData will exceed.
 	writer := New(ctx, WithThreshold(uint64(len(initialData)-1)))
-	_, err := writer.Write(ctx, initialData)
+	_, err := writer.Write(initialData)
 	assert.NoError(t, err)
 
 	defer func() {
@@ -328,7 +329,7 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	assert.Equal(t, initialData, fileContents)
 
 	// Perform a subsequent write with data under the threshold.
-	_, err = writer.Write(ctx, subsequentData)
+	_, err = writer.Write(subsequentData)
 	assert.NoError(t, err)
 
 	assert.Equal(t, subsequentData, writer.buf.Bytes()) // Check buffer contents
@@ -362,7 +363,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "No File Created, Only Buffer Data",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data under the threshold
-				_, _ = w.Write(ctx, []byte("small data"))
+				_, _ = w.Write([]byte("small data"))
 			},
 			expectFileContent: "",
 		},
@@ -370,7 +371,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, No Data in Buffer",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file
-				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
+				_, _ = w.Write([]byte("large data is more than the threshold"))
 			},
 			expectFileContent: "large data is more than the threshold",
 		},
@@ -378,8 +379,8 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, Data in Buffer",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file, then write more data
-				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
-				_, _ = w.Write(ctx, []byte(" more data"))
+				_, _ = w.Write([]byte("large data is more than the threshold"))
+				_, _ = w.Write([]byte(" more data"))
 			},
 			expectFileContent: "large data is more than the threshold more data",
 		},
@@ -387,7 +388,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, Buffer Cleared",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file, then clear the buffer.
-				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
+				_, _ = w.Write([]byte("large data is more than the threshold"))
 				w.buf.Reset()
 			},
 			expectFileContent: "large data is more than the threshold",
@@ -426,7 +427,7 @@ func TestBufferedFileWriterStateTransitionOnClose(t *testing.T) {
 	assert.Equal(t, writeOnly, writer.state)
 
 	// Perform some write operation.
-	_, err := writer.Write(context.Background(), []byte("test data"))
+	_, err := writer.Write([]byte("test data"))
 	assert.NoError(t, err)
 
 	// Close the writer.
@@ -443,7 +444,7 @@ func TestBufferedFileWriterWriteInReadOnlyState(t *testing.T) {
 	_ = writer.CloseForWriting() // Transition to read-only mode
 
 	// Attempt to write in read-only mode.
-	_, err := writer.Write(context.Background(), []byte("should fail"))
+	_, err := writer.Write([]byte("should fail"))
 	assert.Error(t, err)
 }
 
@@ -462,7 +463,7 @@ func BenchmarkBufferedFileWriterWriteLarge(b *testing.B) {
 
 		b.StartTimer()
 		{
-			_, err := writer.Write(ctx, data)
+			_, err := writer.Write(data)
 			assert.NoError(b, err)
 		}
 		b.StopTimer()
@@ -492,7 +493,7 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 
 		b.StartTimer()
 		{
-			_, err := writer.Write(ctx, data)
+			_, err := writer.Write(data)
 			assert.NoError(b, err)
 		}
 		b.StopTimer()
@@ -505,4 +506,34 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 		assert.NoError(b, err)
 		rc.Close()
 	}
+}
+
+func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
+	bufPool := buffer.NewBufferPool()
+
+	ctx := context.Background()
+	buf := bufPool.Get(ctx)
+	writer := &BufferedFileWriter{
+		threshold: 10,
+		bufPool:   bufPool,
+		buf:       buf,
+	}
+
+	// Write data exceeding the threshold to ensure a file is created.
+	data := []byte("this is a longer string exceeding the threshold")
+	_, err := writer.Write(data)
+	assert.NoError(t, err)
+
+	err = writer.CloseForWriting()
+	assert.NoError(t, err)
+	assert.Equal(t, readOnly, writer.state)
+
+	rdr, err := writer.ReadCloser()
+	assert.NoError(t, err)
+	defer rdr.Close()
+
+	// Get a buffer from the pool and check if it is the same buffer used in the writer.
+	bufFromPool := bufPool.Get(ctx)
+	assert.Same(t, buf, bufFromPool, "Buffer should be returned to the pool")
+	bufPool.Put(bufFromPool)
 }
