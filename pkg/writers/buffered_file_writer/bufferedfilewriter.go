@@ -185,7 +185,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 		return nil
 	}
 
-	w.bufPool.Put(w.buf)
+	defer w.bufPool.Put(w.buf)
 	if w.buf.Len() > 0 {
 		_, err := w.buf.WriteTo(w.file)
 		if err != nil {
