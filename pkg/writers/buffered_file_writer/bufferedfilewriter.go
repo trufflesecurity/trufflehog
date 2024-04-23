@@ -14,12 +14,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
-// sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
-// This allows for efficient reuse of buffers across multiple writers.
-var sharedBufferPool *buffer.Pool
-
-func init() { sharedBufferPool = buffer.NewBufferPool() }
-
 type bufferedFileWriterMetrics struct{}
 
 func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Duration) {
@@ -73,7 +67,8 @@ func WithThreshold(threshold uint64) Option {
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
-	buf := sharedBufferPool.Get(ctx)
+	pool := buffer.GetSharedBufferPool()
+	buf := pool.Get(ctx)
 	if buf == nil {
 		buf = buffer.NewBuffer()
 	}
@@ -81,7 +76,7 @@ func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
 		threshold: defaultThreshold,
 		state:     writeOnly,
 		buf:       buf,
-		bufPool:   sharedBufferPool,
+		bufPool:   pool,
 	}
 	for _, opt := range opts {
 		opt(w)
