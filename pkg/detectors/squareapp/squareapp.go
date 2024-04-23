@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -40,10 +40,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secMatches := secPat.FindAllString(dataStr, -1)
 	for _, match := range matches {
 		for _, secMatch := range secMatches {
-
-			if detectors.IsKnownFalsePositive(strings.ToLower(secMatch), detectors.DefaultFalsePositives, true) {
-				continue
-			}
 
 			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SquareApp,
@@ -81,10 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s.Verified = true
 					}
 				}
-			}
-
-			if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s)

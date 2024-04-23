@@ -192,8 +192,8 @@ func BenchmarkSupportsLineNumbersLoop(b *testing.B) {
 	}
 }
 
-// TestEngine_DuplicatSecrets is a test that detects ALL duplicate secrets with the same decoder.
-func TestEngine_DuplicatSecrets(t *testing.T) {
+// TestEngine_DuplicateSecrets is a test that detects ALL duplicate secrets with the same decoder.
+func TestEngine_DuplicateSecrets(t *testing.T) {
 	ctx := context.Background()
 
 	absPath, err := filepath.Abs("./testdata/secrets.txt")

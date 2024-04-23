@@ -118,10 +118,9 @@ func (b *Buffer) recordGrowth(size int) {
 }
 
 // Write date to the buffer.
-func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
+func (b *Buffer) Write(data []byte) (int, error) {
 	if b.Buffer == nil {
 		// This case should ideally never occur if buffers are properly managed.
-		ctx.Logger().Error(fmt.Errorf("buffer is nil, initializing a new buffer"), "action", "initializing_new_buffer")
 		b.Buffer = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 		b.resetMetric()
 	}
@@ -129,23 +128,11 @@ func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
 	size := len(data)
 	bufferLength := b.Buffer.Len()
 	totalSizeNeeded := bufferLength + size
-	// If the total size is within the threshold, write to the buffer.
-	ctx.Logger().V(4).Info(
-		"writing to buffer",
-		"data_size", size,
-		"content_size", bufferLength,
-	)
 
+	// If the total size is within the threshold, write to the buffer.
 	availableSpace := b.Buffer.Cap() - bufferLength
 	growSize := totalSizeNeeded - bufferLength
 	if growSize > availableSpace {
-		ctx.Logger().V(4).Info(
-			"buffer size exceeded, growing buffer",
-			"current_size", bufferLength,
-			"new_size", totalSizeNeeded,
-			"available_space", availableSpace,
-			"grow_size", growSize,
-		)
 		// We are manually growing the buffer so we can track the growth via metrics.
 		// Knowing the exact data size, we directly resize to fit it, rather than exponential growth
 		// which may require multiple allocations and copies if the size required is much larger

@@ -694,7 +694,7 @@ func TestCommitParsing(t *testing.T) {
 func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
 	ctx := context.Background()
 	b := bufferedfilewriter.New(ctx)
-	_, err := b.Write(ctx, content) // Using Write method to add content
+	_, err := b.Write(content) // Using Write method to add content
 	if err != nil {
 		panic(err)
 	}
@@ -704,7 +704,7 @@ func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.Buffer
 func newBufferWithContent(content []byte) *bufferwriter.BufferWriter {
 	ctx := context.Background()
 	b := bufferwriter.New(ctx)
-	_, _ = b.Write(ctx, content) // Using Write method to add content
+	_, _ = b.Write(content) // Using Write method to add content
 	return b
 }
 
