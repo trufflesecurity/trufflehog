@@ -74,6 +74,10 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 // as closing a bytes.Buffer is a no-op.
 func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
 	if b.state != readOnly {
+		// Return buffer to pool and error out if buffer writer state is not set to readOnly.
+		// This prevents a resource leak since the buffer will not be reused
+		// and the underlying buffer would otherwise remain unconsumed.
+		b.bufPool.Put(b.buf)
 		return nil, fmt.Errorf("buffer is in read-only mode")
 	}
 
