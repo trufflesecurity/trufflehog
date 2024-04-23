@@ -156,7 +156,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		}
 		defer compReader.Close()
 
-		rdr, err := readers.NewBufferedFileReader(ctx, reader)
+		rdr, err := readers.NewBufferedFileReader(ctx, compReader)
 		if err != nil {
 			return fmt.Errorf("error creating random access reader: %w", err)
 		}
