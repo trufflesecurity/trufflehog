@@ -178,6 +178,10 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 		return nil
 	}
 
+	// Return the buffer to the pool since the contents have been written to the file and
+	// the writer is transitioning to read-only mode.
+	defer w.bufPool.Put(w.buf)
+
 	if w.buf.Len() > 0 {
 		_, err := w.buf.WriteTo(w.file)
 		if err != nil {
