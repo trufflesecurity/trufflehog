@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
 func TestBufferedFileWriterNewThreshold(t *testing.T) {
@@ -505,4 +506,34 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 		assert.NoError(b, err)
 		rc.Close()
 	}
+}
+
+func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
+	bufPool := buffer.NewBufferPool()
+
+	ctx := context.Background()
+	buf := bufPool.Get(ctx)
+	writer := &BufferedFileWriter{
+		threshold: 10,
+		bufPool:   bufPool,
+		buf:       buf,
+	}
+
+	// Write data exceeding the threshold to ensure a file is created.
+	data := []byte("this is a longer string exceeding the threshold")
+	_, err := writer.Write(data)
+	assert.NoError(t, err)
+
+	err = writer.CloseForWriting()
+	assert.NoError(t, err)
+	assert.Equal(t, readOnly, writer.state)
+
+	rdr, err := writer.ReadCloser()
+	assert.NoError(t, err)
+	defer rdr.Close()
+
+	// Get a buffer from the pool and check if it is the same buffer used in the writer.
+	bufFromPool := bufPool.Get(ctx)
+	assert.Same(t, buf, bufFromPool, "Buffer should be returned to the pool")
+	bufPool.Put(bufFromPool)
 }
