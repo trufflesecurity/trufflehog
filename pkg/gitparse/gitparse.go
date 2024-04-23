@@ -101,7 +101,21 @@ func (d *Diff) write(p []byte) error {
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
 func (d *Diff) finalize() error {
-	return d.contentWriter.CloseForWriting()
+	if err := d.contentWriter.CloseForWriting(); err != nil {
+		return fmt.Errorf("failed to finalize diff: %w", err)
+	}
+
+	if !d.IsBinary {
+		return nil
+	}
+
+	// If the diff is binary, the contentWriter will NOT contain any diff content.
+	// We should close it to release resources.
+	rdr, err := d.ReadCloser()
+	if err != nil {
+		return fmt.Errorf("failed to finalize diff: %w", err)
+	}
+	return rdr.Close()
 }
 
 // Commit contains commit header info and diffs.
