@@ -31,13 +31,18 @@ func (poolMetrics) recordBufferReturn(buf *Buffer) {
 	buf.recordMetric()
 }
 
-// sharedBufferPool is the shared Buffer pool used by any package that needs to manage buffers.
-var sharedBufferPool *Pool
+var (
+	sharedBufferPool *Pool
+	once             sync.Once
+)
 
-func init() { sharedBufferPool = NewBufferPool() }
+func initSharedBufferPool() { sharedBufferPool = NewBufferPool() }
 
 // GetSharedBufferPool returns the shared buffer pool.
-func GetSharedBufferPool() *Pool { return sharedBufferPool }
+func GetSharedBufferPool() *Pool {
+	once.Do(initSharedBufferPool)
+	return sharedBufferPool
+}
 
 // PoolOpts is a function that configures a BufferPool.
 type PoolOpts func(pool *Pool)
