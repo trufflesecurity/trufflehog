@@ -19,6 +19,7 @@ type bufferedFileReader struct {
 // NewBufferedFileReader initializes a bufferedFileReader from an io.Reader by using
 // the BufferedFileWriter's functionality to read and store data, then setting up a io.ReadSeekCloser
 // for random access reading and seeking.
+// Close should be called when the bufferedFileReader is no longer needed.
 // It returns the initialized bufferedFileReader and any error encountered during the process.
 func NewBufferedFileReader(ctx context.Context, r io.Reader) (*bufferedFileReader, error) {
 	writer, err := bufferedfilewriter.NewFromReader(ctx, r)
