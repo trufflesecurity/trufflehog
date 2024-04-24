@@ -45,6 +45,17 @@ func init() {
 	filter = builder.Build()
 }
 
+func GetFalsePositiveCheck(detector Detector) func(Result) bool {
+	checker, ok := detector.(CustomFalsePositiveChecker)
+	if ok {
+		return checker.IsFalsePositive
+	}
+
+	return func(res Result) bool {
+		return IsKnownFalsePositive(string(res.Raw), DefaultFalsePositives, true)
+	}
+}
+
 // IsKnownFalsePositives will not return a valid secret finding if any of the disqualifying conditions are met
 // Currently that includes: No number, english word in key, or matches common example pattens.
 // Only the secret key material should be passed into this function
@@ -137,13 +148,7 @@ func FilterResultsWithEntropy(ctx context.Context, results []Result, entropy flo
 func FilterKnownFalsePositives(ctx context.Context, detector Detector, results []Result, shouldLog bool) []Result {
 	var filteredResults []Result
 
-	isFalsePositive := func(result Result) bool {
-		return IsKnownFalsePositive(string(result.Raw), DefaultFalsePositives, true)
-	}
-	checker, ok := detector.(CustomFalsePositiveChecker)
-	if ok {
-		isFalsePositive = checker.IsFalsePositive
-	}
+	isFalsePositive := GetFalsePositiveCheck(detector)
 
 	for _, result := range results {
 		if !result.Verified && result.Raw != nil {
