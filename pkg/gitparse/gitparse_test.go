@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
@@ -2346,3 +2348,45 @@ index 2ee133b..12b4843 100644
 +output = json
 +region = us-east-2
 `
+
+type mockContentWriter struct{ createCount int }
+
+func (m *mockContentWriter) Write(p []byte) (n int, err error) {
+	m.createCount++
+	return len(p), nil
+}
+
+func TestNewDiffContentWriterCreation(t *testing.T) {
+	testCases := []struct {
+		name          string
+		opts          []diffOption
+		expectedCount int
+	}{
+		{
+			name:          "Without custom contentWriter",
+			expectedCount: 0,
+		},
+		{
+			name:          "With custom contentWriter",
+			opts:          []diffOption{withCustomContentWriter(bufferwriter.New(context.Background()))},
+			expectedCount: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			commit := new(Commit)
+
+			mockWriter := new(mockContentWriter)
+			diff := newDiff(ctx, commit, tc.opts...)
+			assert.NotNil(t, diff, "Failed to create diff")
+			assert.NotNil(t, diff.contentWriter, "Failed to create contentWriter")
+
+			assert.Equal(t, tc.expectedCount, mockWriter.createCount, "Unexpected number of contentWriter creations")
+		})
+	}
+}
