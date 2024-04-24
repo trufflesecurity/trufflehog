@@ -9,9 +9,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
 type bufferedFileWriterMetrics struct{}
@@ -46,7 +47,7 @@ type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
 
-	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
+	bufPool  *pool.Pool     // Pool for storing buffers for reuse.
 	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     *os.File       // File for storing data over the threshold.
@@ -67,7 +68,7 @@ func WithThreshold(threshold uint64) Option {
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
-	pool := buffer.GetSharedBufferPool()
+	pool := pool.GetSharedBufferPool()
 	buf := pool.Get(ctx)
 	if buf == nil {
 		buf = buffer.NewBuffer()

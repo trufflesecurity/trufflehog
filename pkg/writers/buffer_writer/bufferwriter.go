@@ -7,14 +7,15 @@ import (
 	"io"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
 type metrics struct{}
 
-func (metrics) recordDataProcessed(size uint64, dur time.Duration) {
-	totalWriteSize.Add(float64(size))
+func (metrics) recordDataProcessed(size int64, dur time.Duration) {
+	writeSize.Observe(float64(size))
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
@@ -31,7 +32,7 @@ const (
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
 	buf     *buffer.Buffer // The current buffer in use.
-	bufPool *buffer.Pool   // The buffer pool used to manage the buffer.
+	bufPool *pool.Pool     // The buffer pool used to manage the buffer.
 	size    int            // The total size of the content written to the buffer.
 	state   state          // The current state of the buffer.
 
@@ -40,7 +41,7 @@ type BufferWriter struct {
 
 // New creates a new instance of BufferWriter.
 func New(ctx context.Context) *BufferWriter {
-	pool := buffer.GetSharedBufferPool()
+	pool := pool.GetSharedBufferPool()
 	buf := pool.Get(ctx)
 	if buf == nil {
 		buf = buffer.NewBuffer()
@@ -71,8 +72,8 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	b.size += size
 	start := time.Now()
 	defer func(start time.Time) {
-		bufferLength := uint64(b.buf.Len())
-		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
+		bufferLength := b.buf.Len()
+		b.metrics.recordDataProcessed(int64(bufferLength), time.Since(start))
 	}(start)
 	return b.buf.Write(data)
 }
