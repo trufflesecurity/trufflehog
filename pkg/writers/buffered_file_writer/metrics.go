@@ -34,6 +34,6 @@ var (
 		Subsystem: common.MetricsSubsystem,
 		Name:      "file_size_bytes",
 		Help:      "Sizes of files created by the BufferedFileWriter.",
-		Buckets:   prometheus.ExponentialBuckets(defaultThreshold, 2, 4),
+		Buckets:   prometheus.ExponentialBuckets(defaultThreshold*2, 4, 5),
 	})
 )
