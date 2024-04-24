@@ -8,6 +8,9 @@ import (
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
+// Compile time check to ensure that bufferedFileReader implements io.ReaderAt.
+var _ io.ReaderAt = (*bufferedFileReader)(nil)
+
 // bufferedFileReader provides random access read, seek, and close capabilities on top of the BufferedFileWriter.
 // It combines the functionality of BufferedFileWriter for buffered writing, io.ReadSeekCloser for
 // random access reading and seeking.

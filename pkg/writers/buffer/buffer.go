@@ -5,6 +5,7 @@ package buffer
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -143,6 +144,9 @@ func (b *Buffer) Write(data []byte) (int, error) {
 
 	return b.Buffer.Write(data)
 }
+
+// Compile time check to make sure readCloser implements io.ReadSeekCloser.
+var _ io.ReadSeekCloser = (*readCloser)(nil)
 
 // readCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader
 // for reading data from an in-memory buffer and includes an onClose callback.
