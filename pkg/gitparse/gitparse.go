@@ -77,9 +77,13 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 // The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
 // By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
 func newDiff(ctx context.Context, commit *Commit, opts ...diffOption) *Diff {
-	diff := &Diff{Commit: commit, contentWriter: bufferwriter.New(ctx)}
+	diff := &Diff{Commit: commit}
 	for _, opt := range opts {
 		opt(diff)
+	}
+
+	if diff.contentWriter == nil {
+		diff.contentWriter = bufferwriter.New(ctx)
 	}
 
 	return diff
