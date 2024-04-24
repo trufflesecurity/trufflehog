@@ -17,6 +17,10 @@ var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcd
 
 type FalsePositive string
 
+type CustomFalsePositiveChecker interface {
+	IsFalsePositive(result Result) bool
+}
+
 //go:embed "badlist.txt"
 var badList []byte
 
