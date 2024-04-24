@@ -67,17 +67,11 @@ func WithThreshold(threshold uint64) Option {
 
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
-func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
-	pool := pool.GetSharedBufferPool()
-	buf := pool.Get(ctx)
-	if buf == nil {
-		buf = buffer.NewBuffer()
-	}
+func New(_ context.Context, opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		buf:       buf,
-		bufPool:   pool,
+		bufPool:   pool.GetSharedBufferPool(),
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -135,6 +129,13 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
 	}
 
+	if w.buf == nil {
+		w.buf = w.bufPool.Get()
+		if w.buf == nil {
+			w.buf = buffer.NewBuffer()
+		}
+	}
+
 	size := uint64(len(data))
 	bufferLength := w.buf.Len()
 	start := time.Now()
@@ -177,6 +178,61 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	w.metrics.recordDiskWrite(w.file)
 
 	return n, nil
+}
+
+// ReadFrom reads data from the reader and writes it to the buffer or a file, depending on the size.
+func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
+	if w.state != writeOnly {
+		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
+	}
+
+	var totalBytesRead int64
+
+	// If no file is being used, read the data into the buffer.
+	if w.file == nil {
+		if w.buf == nil {
+			w.buf = w.bufPool.Get()
+			if w.buf == nil {
+				w.buf = buffer.NewBuffer()
+			}
+		}
+
+		n, err := w.buf.ReadFrom(reader)
+		if err != nil {
+			return totalBytesRead, err
+		}
+		totalBytesRead += n
+
+		// If the buffer size exceeds the threshold, switch to file writing.
+		if w.buf.Len() > int(w.threshold) {
+			file, err := os.CreateTemp(os.TempDir(), cleantemp.MkFilename())
+			if err != nil {
+				return totalBytesRead, err
+			}
+
+			w.filename = file.Name()
+			w.file = file
+
+			// Transfer existing data in the buffer to the file, then clear the buffer.
+			if _, err := w.buf.WriteTo(w.file); err != nil {
+				return totalBytesRead, err
+			}
+			w.bufPool.Put(w.buf)
+		}
+	}
+
+	// If a file is being used, read the data directly into the file.
+	if w.file != nil {
+		n, err := io.Copy(w.file, reader)
+		if err != nil {
+			return totalBytesRead, err
+		}
+		totalBytesRead += n
+
+		w.metrics.recordDiskWrite(w.file)
+	}
+
+	return totalBytesRead, nil
 }
 
 // CloseForWriting flushes any remaining data in the buffer to the file, closes the file if created,

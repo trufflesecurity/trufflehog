@@ -39,13 +39,8 @@ type BufferWriter struct {
 }
 
 // New creates a new instance of BufferWriter.
-func New(ctx context.Context) *BufferWriter {
-	pool := pool.GetSharedBufferPool()
-	buf := pool.Get(ctx)
-	if buf == nil {
-		buf = buffer.NewBuffer()
-	}
-	return &BufferWriter{buf: buf, state: writeOnly, bufPool: pool}
+func New(_ context.Context) *BufferWriter {
+	return &BufferWriter{state: writeOnly, bufPool: pool.GetSharedBufferPool()}
 }
 
 // NewFromReader creates a new instance of BufferWriter and writes the content from the provided reader to the buffer.
@@ -65,6 +60,12 @@ func NewFromReader(ctx context.Context, r io.Reader) (*BufferWriter, error) {
 func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
+	}
+	if b.buf == nil {
+		b.buf = b.bufPool.Get()
+		if b.buf == nil {
+			b.buf = buffer.NewBuffer()
+		}
 	}
 
 	size := len(data)

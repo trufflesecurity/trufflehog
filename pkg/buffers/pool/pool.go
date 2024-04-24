@@ -2,11 +2,9 @@ package pool
 
 import (
 	"bytes"
-	"fmt"
 	"sync"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type poolMetrics struct{}
@@ -69,10 +67,9 @@ func NewBufferPool(opts ...Opts) *Pool {
 }
 
 // Get returns a Buffer from the pool.
-func (p *Pool) Get(ctx context.Context) *buffer.Buffer {
+func (p *Pool) Get() *buffer.Buffer {
 	buf, ok := p.Pool.Get().(*buffer.Buffer)
 	if !ok {
-		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
 		buf = &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
 	}
 	p.metrics.recordBufferRetrival()
