@@ -8,8 +8,6 @@ import (
 	"unicode/utf8"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -136,37 +134,26 @@ func FilterResultsWithEntropy(ctx context.Context, results []Result, entropy flo
 }
 
 // FilterKnownFalsePositives filters out known false positives from the results.
-func FilterKnownFalsePositives(ctx context.Context, results []Result, falsePositives []FalsePositive, wordCheck bool, shouldLog bool) []Result {
+func FilterKnownFalsePositives(ctx context.Context, detector Detector, results []Result, shouldLog bool) []Result {
 	var filteredResults []Result
+
+	isFalsePositive := func(result Result) bool {
+		return IsKnownFalsePositive(string(result.Raw), DefaultFalsePositives, true)
+	}
+	checker, ok := detector.(CustomFalsePositiveChecker)
+	if ok {
+		isFalsePositive = checker.IsFalsePositive
+	}
+
 	for _, result := range results {
-		if !result.Verified {
-			switch result.DetectorType {
-			case detectorspb.DetectorType_CustomRegex:
+		if !result.Verified && result.Raw != nil {
+			if !isFalsePositive(result) {
 				filteredResults = append(filteredResults, result)
-			case detectorspb.DetectorType_GCP,
-				detectorspb.DetectorType_URI,
-				detectorspb.DetectorType_AzureBatch,
-				detectorspb.DetectorType_AzureContainerRegistry,
-				detectorspb.DetectorType_Shopify,
-				detectorspb.DetectorType_Postgres,
-				detectorspb.DetectorType_MongoDB,
-				detectorspb.DetectorType_JDBC:
-				filteredResults = append(filteredResults, result)
-			default:
-				if result.Raw != nil {
-					if !IsKnownFalsePositive(string(result.Raw), falsePositives, wordCheck) {
-						filteredResults = append(filteredResults, result)
-					} else {
-						if shouldLog {
-							ctx.Logger().Info("Filtered out known false positive", "result", result)
-						}
-					}
-				} else {
-					filteredResults = append(filteredResults, result)
-				}
+			} else if shouldLog {
+				ctx.Logger().Info("Filtered out known false positive", "result", result)
 			}
 		} else {
-			filteredResults = append(filteredResults, result)
+			results = append(filteredResults, result)
 		}
 	}
 	return filteredResults
