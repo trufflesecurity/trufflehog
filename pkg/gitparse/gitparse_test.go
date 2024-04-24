@@ -2349,12 +2349,13 @@ index 2ee133b..12b4843 100644
 +region = us-east-2
 `
 
-type mockContentWriter struct{ createCount int }
+type mockContentWriter struct{ counter int }
 
-func (m *mockContentWriter) Write(p []byte) (n int, err error) {
-	m.createCount++
-	return len(p), nil
+func newMockContentWriter() *mockContentWriter {
+	return &mockContentWriter{counter: 1}
 }
+
+func (m *mockContentWriter) Write(p []byte) (n int, err error) { return len(p), nil }
 
 func TestNewDiffContentWriterCreation(t *testing.T) {
 	testCases := []struct {
@@ -2364,12 +2365,12 @@ func TestNewDiffContentWriterCreation(t *testing.T) {
 	}{
 		{
 			name:          "Without custom contentWriter",
-			expectedCount: 0,
+			expectedCount: 1,
 		},
 		{
 			name:          "With custom contentWriter",
 			opts:          []diffOption{withCustomContentWriter(bufferwriter.New(context.Background()))},
-			expectedCount: 0,
+			expectedCount: 1,
 		},
 	}
 
@@ -2381,12 +2382,14 @@ func TestNewDiffContentWriterCreation(t *testing.T) {
 			ctx := context.Background()
 			commit := new(Commit)
 
-			mockWriter := new(mockContentWriter)
+			mockWriter := newMockContentWriter()
+			assert.NotNil(t, mockWriter, "Failed to create mockWriter")
+
 			diff := newDiff(ctx, commit, tc.opts...)
 			assert.NotNil(t, diff, "Failed to create diff")
 			assert.NotNil(t, diff.contentWriter, "Failed to create contentWriter")
 
-			assert.Equal(t, tc.expectedCount, mockWriter.createCount, "Unexpected number of contentWriter creations")
+			assert.Equal(t, tc.expectedCount, mockWriter.counter, "Unexpected number of contentWriter creations")
 		})
 	}
 }
