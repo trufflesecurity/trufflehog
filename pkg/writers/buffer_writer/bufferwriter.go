@@ -12,8 +12,8 @@ import (
 
 type metrics struct{}
 
-func (metrics) recordDataProcessed(size uint64, dur time.Duration) {
-	totalWriteSize.Add(float64(size))
+func (metrics) recordDataProcessed(size int64, dur time.Duration) {
+	writeSize.Observe(float64(size))
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
@@ -62,7 +62,7 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	b.size += size
 	start := time.Now()
 	defer func(start time.Time) {
-		bufferLength := uint64(b.buf.Len())
+		bufferLength := int64(b.buf.Len())
 		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
 
 	}(start)
