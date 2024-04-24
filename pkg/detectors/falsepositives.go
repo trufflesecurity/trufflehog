@@ -158,7 +158,7 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 				ctx.Logger().Info("Filtered out known false positive", "result", result)
 			}
 		} else {
-			results = append(filteredResults, result)
+			filteredResults = append(filteredResults, result)
 		}
 	}
 	return filteredResults
