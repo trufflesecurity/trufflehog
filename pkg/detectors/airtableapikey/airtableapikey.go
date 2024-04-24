@@ -92,10 +92,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								s1.Verified = true
 							}
 						}
-					} else {
-						if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}

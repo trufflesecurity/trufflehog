@@ -83,10 +83,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						"locked":                  fmt.Sprintf("%t", userRes.Locked),
 						"two_factor_auth_enabled": fmt.Sprintf("%t", userRes.TwoFactorAuthEnabled),
 					}
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}

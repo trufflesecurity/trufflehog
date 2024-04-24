@@ -138,9 +138,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			pg_sslmode: sslmode,
 		}
 
-		if !result.Verified && detectors.IsKnownFalsePositive(password, detectors.DefaultFalsePositives, true) {
-			continue
-		}
 		results = append(results, result)
 	}
 
