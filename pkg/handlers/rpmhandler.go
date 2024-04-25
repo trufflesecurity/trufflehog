@@ -22,7 +22,7 @@ type rpmHandler struct {
 // newRPMHandler creates an rpmHandler with the provided metrics.
 func newRPMHandler() *rpmHandler {
 	return &rpmHandler{
-		defaultHandler: newDefaultHandler(rpmHandlerType),
+		defaultHandler: newDefaultHandler(rpmHandlerType, false),
 		metrics:        newHandlerMetrics(rpmHandlerType),
 	}
 }

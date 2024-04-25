@@ -83,7 +83,7 @@ func TestArchiveHandler(t *testing.T) {
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 			defer resp.Body.Close()
 
-			handler := newDefaultHandler(defaultHandlerType)
+			handler := newDefaultHandler(defaultHandlerType, true)
 
 			newReader, err := diskbufferreader.New(resp.Body)
 			if err != nil {

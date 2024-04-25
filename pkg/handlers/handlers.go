@@ -126,7 +126,7 @@ var knownArchiveMimeTypes = map[mimeType]bool{
 // a defaultHandler is used, leveraging the archiver library to manage these formats.
 // The chosen handler is then configured with provided options, adapting it to specific operational needs.
 // Returns the configured handler.
-func getHandlerForType(mimeT mimeType) FileHandler {
+func getHandlerForType(mimeT mimeType, isArchive bool) FileHandler {
 	var handler FileHandler
 	switch mimeT {
 	case arMime, unixArMime, debMime:
@@ -134,7 +134,7 @@ func getHandlerForType(mimeT mimeType) FileHandler {
 	case rpmMime, cpioMime:
 		handler = newRPMHandler()
 	default:
-		handler = newDefaultHandler(defaultHandlerType)
+		handler = newDefaultHandler(defaultHandlerType, isArchive)
 	}
 
 	return handler
@@ -177,12 +177,14 @@ func HandleFile(
 	}
 
 	config := newFileHandlingConfig(options...)
-	if config.skipArchives && knownArchiveMimeTypes[mime] {
+
+	isArchive := knownArchiveMimeTypes[mime]
+	if config.skipArchives && isArchive {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
 		return nil
 	}
 
-	handler := getHandlerForType(mime)
+	handler := getHandlerForType(mime, isArchive)
 	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)

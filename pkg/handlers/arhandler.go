@@ -22,7 +22,7 @@ type arHandler struct {
 // newARHandler creates an arHandler with the provided metrics.
 func newARHandler() *arHandler {
 	return &arHandler{
-		defaultHandler: newDefaultHandler(arHandlerType),
+		defaultHandler: newDefaultHandler(arHandlerType, false),
 		metrics:        newHandlerMetrics(arHandlerType),
 	}
 }

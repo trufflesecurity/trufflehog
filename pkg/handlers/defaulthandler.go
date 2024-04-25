@@ -42,15 +42,18 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 // defaultHandler provides a base implementation for file handlers, encapsulating common behaviors
 // needed across different handlers. This handler is embedded in other specialized handlers to ensure
 // consistent application of these common behaviors and to simplify the extension of handler functionalities.
-type defaultHandler struct{ metrics *metrics }
+type defaultHandler struct {
+	isArchive bool
+	metrics   *metrics
+}
 
 // newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
 // The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
 // ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
 // specific handler that invoked them. This allows for accurate metrics attribution when the defaultHandler
 // is embedded in specialized handlers like arHandler or rpmHandler.
-func newDefaultHandler(handlerType handlerType) *defaultHandler {
-	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
+func newDefaultHandler(handlerType handlerType, isArchive bool) *defaultHandler {
+	return &defaultHandler{metrics: newHandlerMetrics(handlerType), isArchive: isArchive}
 }
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
@@ -61,39 +64,33 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input readSeekCloser
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
-	_, arReader, err := archiver.Identify("", input)
-	if err != nil {
-		if errors.Is(err, archiver.ErrNoMatch) {
-			// Not an archive, handle as non-archive content in a separate goroutine.
-			ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
-			go func() {
-				defer close(dataChan)
+	if !h.isArchive {
+		// Not an archive, handle as non-archive content in a separate goroutine.
+		ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
+		go func() {
+			defer close(dataChan)
 
-				// Update the metrics for the file processing.
-				var err error
-				defer func(start time.Time) {
-					if err != nil {
-						h.metrics.incErrors()
-						if errors.Is(err, context.DeadlineExceeded) {
-							h.metrics.incFileProcessingTimeouts()
-						}
-						return
+			// Update the metrics for the file processing.
+			var err error
+			defer func(start time.Time) {
+				if err != nil {
+					h.metrics.incErrors()
+					if errors.Is(err, context.DeadlineExceeded) {
+						h.metrics.incFileProcessingTimeouts()
 					}
-
-					h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-					h.metrics.incFilesProcessed()
-				}(time.Now())
-
-				if err = h.handleNonArchiveContent(ctx, arReader, dataChan); err != nil {
-					ctx.Logger().Error(err, "error handling non-archive content.")
+					return
 				}
-			}()
 
-			return dataChan, nil
-		}
+				h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
+				h.metrics.incFilesProcessed()
+			}(time.Now())
 
-		h.metrics.incErrors()
-		return nil, err
+			if err = h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
+				ctx.Logger().Error(err, "error handling non-archive content.")
+			}
+		}()
+
+		return dataChan, nil
 	}
 
 	go func() {
@@ -115,7 +112,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input readSeekCloser
 			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		}(time.Now())
 
-		if err = h.openArchive(ctx, 0, arReader, dataChan); err != nil {
+		if err = h.openArchive(ctx, 0, input, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
 		}
 	}()
