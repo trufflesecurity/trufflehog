@@ -23,7 +23,7 @@ func (poolMetrics) recordBufferRetrival() {
 
 func (poolMetrics) recordBufferReturn(buf *Buffer) {
 	activeBufferCount.Dec()
-	totalBufferSize.Add(float64(buf.Len()))
+	totalBufferSize.Add(float64(buf.Cap()))
 	totalBufferLength.Add(float64(buf.Len()))
 	buf.recordMetric()
 }
