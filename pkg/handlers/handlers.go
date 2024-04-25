@@ -68,37 +68,33 @@ const (
 	debMime             mimeType = "application/vnd.debian.binary-package"
 	lzipMime            mimeType = "application/lzip"
 	lzipXMime           mimeType = "application/x-lzip"
-	machoMime           mimeType = "application/x-mach-binary"
-	octetStreamMime     mimeType = "application/octet-stream"
 )
 
-var knownArchiveMimeTypes = map[mimeType]bool{
-	sevenZMime:          true,
-	bzip2Mime:           true,
-	gzipMime:            true,
-	gxzipMime:           true,
-	rarCompressedMime:   true,
-	rarMime:             true,
-	tarMime:             true,
-	zipMime:             true,
-	gunzipMime:          true,
-	gzippedMime:         true,
-	gzipCompressedMime:  true,
-	gzipDocumentMime:    true,
-	xzMime:              true,
-	msCabCompressedMime: true,
-	rpmMime:             true,
-	fitsMime:            true,
-	xarMime:             true,
-	warcMime:            true,
-	cpioMime:            true,
-	unixArMime:          true,
-	arMime:              true,
-	debMime:             true,
-	lzipMime:            true,
-	lzipXMime:           true,
-	machoMime:           false,
-	octetStreamMime:     false,
+var knownArchiveMimeTypes = map[mimeType]struct{}{
+	sevenZMime:          {},
+	bzip2Mime:           {},
+	gzipMime:            {},
+	gxzipMime:           {},
+	rarCompressedMime:   {},
+	rarMime:             {},
+	tarMime:             {},
+	zipMime:             {},
+	gunzipMime:          {},
+	gzippedMime:         {},
+	gzipCompressedMime:  {},
+	gzipDocumentMime:    {},
+	xzMime:              {},
+	msCabCompressedMime: {},
+	rpmMime:             {},
+	fitsMime:            {},
+	xarMime:             {},
+	warcMime:            {},
+	cpioMime:            {},
+	unixArMime:          {},
+	arMime:              {},
+	debMime:             {},
+	lzipMime:            {},
+	lzipXMime:           {},
 }
 
 // getHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type.
@@ -159,7 +155,7 @@ func HandleFile(
 	}
 
 	mime := mimeType(mimeT.String())
-	if config.skipArchives && knownArchiveMimeTypes[mime] {
+	if _, ok := knownArchiveMimeTypes[mime]; ok && config.skipArchives {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
 		return nil
 	}
