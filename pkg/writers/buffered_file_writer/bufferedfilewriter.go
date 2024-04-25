@@ -73,14 +73,9 @@ func WithThreshold(threshold uint64) Option {
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
-	buf := sharedBufferPool.Get(ctx)
-	if buf == nil {
-		buf = buffer.NewBuffer()
-	}
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		buf:       buf,
 		bufPool:   sharedBufferPool,
 	}
 	for _, opt := range opts {
@@ -124,6 +119,13 @@ func (w *BufferedFileWriter) String() (string, error) {
 func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	if w.state != writeOnly {
 		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
+	}
+
+	if w.buf == nil {
+		w.buf = w.bufPool.Get()
+		if w.buf == nil {
+			w.buf = buffer.NewBuffer()
+		}
 	}
 
 	size := uint64(len(data))
@@ -210,6 +212,10 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 			return nil, err
 		}
 		return newAutoDeletingFileReader(file), nil
+	}
+
+	if w.buf == nil {
+		return nil, fmt.Errorf("BufferedFileWriter has not buffer data to read")
 	}
 
 	// Data is in memory.

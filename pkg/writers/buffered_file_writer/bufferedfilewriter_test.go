@@ -511,8 +511,7 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
 	bufPool := buffer.NewBufferPool()
 
-	ctx := context.Background()
-	buf := bufPool.Get(ctx)
+	buf := bufPool.Get()
 	writer := &BufferedFileWriter{
 		threshold: 10,
 		bufPool:   bufPool,
@@ -533,7 +532,7 @@ func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
 	defer rdr.Close()
 
 	// Get a buffer from the pool and check if it is the same buffer used in the writer.
-	bufFromPool := bufPool.Get(ctx)
+	bufFromPool := bufPool.Get()
 	assert.Same(t, buf, bufFromPool, "Buffer should be returned to the pool")
 	bufPool.Put(bufFromPool)
 }

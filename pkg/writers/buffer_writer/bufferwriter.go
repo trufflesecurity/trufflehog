@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
@@ -44,18 +43,19 @@ type BufferWriter struct {
 }
 
 // New creates a new instance of BufferWriter.
-func New(ctx context.Context) *BufferWriter {
-	buf := bufferPool.Get(ctx)
-	if buf == nil {
-		buf = buffer.NewBuffer()
-	}
-	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
-}
+func New() *BufferWriter { return &BufferWriter{state: writeOnly, bufPool: bufferPool} }
 
 // Write delegates the writing operation to the underlying bytes.Buffer.
 func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
+	}
+
+	if b.buf == nil {
+		b.buf = b.bufPool.Get()
+		if b.buf == nil {
+			b.buf = buffer.NewBuffer()
+		}
 	}
 
 	size := len(data)

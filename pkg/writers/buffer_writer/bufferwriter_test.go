@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestBufferWriterWrite(t *testing.T) {
@@ -41,7 +39,7 @@ func TestBufferWriterWrite(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(context.Background())
+			writer := New()
 			writer.state = tc.initialState
 
 			_, err := writer.Write(tc.input)
@@ -77,7 +75,7 @@ func TestBufferWriterReadCloser(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(context.Background())
+			writer := New()
 			writer.state = tc.initialState
 
 			rc, err := writer.ReadCloser()
@@ -96,7 +94,7 @@ func TestBufferWriterReadCloser(t *testing.T) {
 }
 
 func TestBufferWriterCloseForWriting(t *testing.T) {
-	writer := New(context.Background())
+	writer := New()
 	err := writer.CloseForWriting()
 	assert.NoError(t, err)
 	assert.Equal(t, readOnly, writer.state)
@@ -140,7 +138,7 @@ func TestBufferWriterString(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(context.Background())
+			writer := New()
 			tc.prepareBuffer(writer)
 
 			result, err := writer.String()

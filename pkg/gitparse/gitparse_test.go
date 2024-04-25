@@ -704,8 +704,7 @@ func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.Buffer
 }
 
 func newBufferWithContent(content []byte) *bufferwriter.BufferWriter {
-	ctx := context.Background()
-	b := bufferwriter.New(ctx)
+	b := bufferwriter.New()
 	_, _ = b.Write(content) // Using Write method to add content
 	return b
 }
@@ -2369,7 +2368,7 @@ func TestNewDiffContentWriterCreation(t *testing.T) {
 		},
 		{
 			name:          "With custom contentWriter",
-			opts:          []diffOption{withCustomContentWriter(bufferwriter.New(context.Background()))},
+			opts:          []diffOption{withCustomContentWriter(bufferwriter.New())},
 			expectedCount: 1,
 		},
 	}
@@ -2379,13 +2378,12 @@ func TestNewDiffContentWriterCreation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
 			commit := new(Commit)
 
 			mockWriter := newMockContentWriter()
 			assert.NotNil(t, mockWriter, "Failed to create mockWriter")
 
-			diff := newDiff(ctx, commit, tc.opts...)
+			diff := newDiff(commit, tc.opts...)
 			assert.NotNil(t, diff, "Failed to create diff")
 			assert.NotNil(t, diff.contentWriter, "Failed to create contentWriter")
 
