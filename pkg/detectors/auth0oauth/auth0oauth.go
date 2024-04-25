@@ -43,21 +43,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, clientIdMatch := range clientIdMatches {
-		if len(clientIdMatch) != 2 {
-			continue
-		}
 		clientIdRes := strings.TrimSpace(clientIdMatch[1])
 
 		for _, clientSecretMatch := range clientSecretMatches {
-			if len(clientSecretMatch) != 2 {
-				continue
-			}
 			clientSecretRes := strings.TrimSpace(clientSecretMatch[1])
 
 			for _, domainMatch := range domainMatches {
-				if len(domainMatch) != 2 {
-					continue
-				}
 				domainRes := strings.TrimSpace(domainMatch[1])
 
 				s1 := detectors.Result{

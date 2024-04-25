@@ -44,15 +44,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	projIdMatches := projIdPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, projIdMatch := range projIdMatches {
-		if len(projIdMatch) != 2 {
-			continue
-		}
 		resProjIdMatch := strings.TrimSpace(projIdMatch[1])
 
 		for _, match := range matches {
-			if len(match) != 2 {
-				continue
-			}
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{

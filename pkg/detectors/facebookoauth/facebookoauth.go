@@ -42,15 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	apiSecretMatches := apiSecretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, apiIdMatch := range apiIdMatches {
-		if len(apiIdMatch) != 2 {
-			continue
-		}
 		apiIdRes := strings.TrimSpace(apiIdMatch[1])
 
 		for _, apiSecretMatch := range apiSecretMatches {
-			if len(apiSecretMatch) != 2 {
-				continue
-			}
 			apiSecretRes := strings.TrimSpace(apiSecretMatch[1])
 
 			s1 := detectors.Result{

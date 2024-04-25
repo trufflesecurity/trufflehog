@@ -60,14 +60,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resEmail := strings.TrimSpace(email[1])
 
 		for _, token := range tokens {
-			if len(token) != 2 {
-				continue
-			}
 			resToken := strings.TrimSpace(token[1])
 			for _, domain := range domains {
-				if len(domain) != 2 {
-					continue
-				}
 				resDomain := strings.TrimSpace(domain[1])
 
 				s1 := detectors.Result{
