@@ -3,9 +3,10 @@ package pubnubpublishkey
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -42,15 +43,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	subMatches := subPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, subMatch := range subMatches {
-			if len(subMatch) != 2 {
-				continue
-			}
 			ressubMatch := strings.TrimSpace(subMatch[1])
 
 			s1 := detectors.Result{

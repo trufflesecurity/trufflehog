@@ -45,15 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	clientIdmatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range secretMatches {
-		if len(match) != 2 {
-			continue
-		}
 		resSecret := strings.TrimSpace(match[1])
 
 		for _, clientIdMatch := range clientIdmatches {
-			if len(clientIdMatch) != 2 {
-				continue
-			}
 			resClientId := strings.TrimSpace(clientIdMatch[1])
 
 			s1 := detectors.Result{
