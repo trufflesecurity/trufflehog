@@ -43,22 +43,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	emails := email.FindAllStringSubmatch(dataStr, -1)
 
 	for _, token := range tokens {
-		if len(token) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(token[1])
 
 		var resDomain string
 		for _, domain := range domains {
-			if len(domain) != 2 {
-				continue
-			}
 			resDomain = strings.TrimSpace(domain[1])
 
 			for _, email := range emails {
-				if len(email) != 2 {
-					continue
-				}
 				resEmail := strings.TrimSpace(email[1])
 
 				s1 := detectors.Result{

@@ -36,9 +36,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range keyMatches {
-		if len(match) != 2 {
-			continue
-		}
 		keyRes := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
