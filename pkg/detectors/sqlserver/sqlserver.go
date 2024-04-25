@@ -73,6 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 var ping = func(config msdsn.Config) (bool, error) {
 	cleanConfig := msdsn.Config{}
 	cleanConfig.Host = config.Host
+	cleanConfig.Port = config.Port
 	cleanConfig.User = config.User
 	cleanConfig.Password = config.Password
 	cleanConfig.Database = config.Database

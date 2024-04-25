@@ -76,7 +76,7 @@ var (
 		Subsystem: common.MetricsSubsystem,
 		Name:      "checkout_duration_us",
 		Help:      "Duration in microseconds of Buffer checkouts.",
-		Buckets:   []float64{50, 500, 5000},
+		Buckets:   prometheus.ExponentialBuckets(10, 10, 7),
 	})
 
 	checkoutCount = promauto.NewCounter(prometheus.CounterOpts{
