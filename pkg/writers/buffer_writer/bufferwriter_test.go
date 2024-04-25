@@ -77,6 +77,7 @@ func TestBufferWriterReadCloser(t *testing.T) {
 			t.Parallel()
 			writer := New()
 			writer.state = tc.initialState
+			writer.buf = writer.bufPool.Get()
 
 			rc, err := writer.ReadCloser()
 			if tc.expectedError {
@@ -110,8 +111,8 @@ func TestBufferWriterString(t *testing.T) {
 	}{
 		{
 			name: "String with no data",
-			prepareBuffer: func(_ *BufferWriter) {
-				// No preparation needed, buffer is empty by default
+			prepareBuffer: func(bw *BufferWriter) {
+				_, _ = bw.Write([]byte(""))
 			},
 			expectedStr:   "",
 			expectedError: false,

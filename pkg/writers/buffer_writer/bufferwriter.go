@@ -76,6 +76,9 @@ func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
 	if b.state != readOnly {
 		return nil, fmt.Errorf("buffer is in read-only mode")
 	}
+	if b.buf == nil {
+		return nil, fmt.Errorf("writer buffer is nil")
+	}
 
 	return buffer.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil
 }
