@@ -277,6 +277,10 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 		return newAutoDeletingFileReader(file), nil
 	}
 
+	if w.buf == nil {
+		return nil, fmt.Errorf("buffer is empty")
+	}
+
 	// Data is in memory.
 	return buffer.ReadCloser(w.buf.Bytes(), func() { w.bufPool.Put(w.buf) }), nil
 }
