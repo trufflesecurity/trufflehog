@@ -4,9 +4,39 @@
 package detectors
 
 import (
+	"context"
 	_ "embed"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
+
+type fakeDetectorWithDefaultLogic struct{}
+
+func (d fakeDetectorWithDefaultLogic) FromData(ctx context.Context, verify bool, data []byte) ([]Result, error) {
+	return nil, nil
+}
+
+func (d fakeDetectorWithDefaultLogic) Keywords() []string {
+	return nil
+}
+
+func (d fakeDetectorWithDefaultLogic) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType(0)
+}
+
+func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
+	results := []Result{
+		{Raw: []byte("00000")},           // "default" false positive list
+		{Raw: []byte("number")},          // from wordlist
+		{Raw: []byte("hga8adshla3434g")}, // real secret
+	}
+	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetectorWithDefaultLogic{}, results, false)
+	assert.Equal(t, 1, len(filtered))
+	assert.Equal(t, []byte("hga8adshla3434g"), filtered[0].Raw)
+}
 
 func TestIsFalsePositive(t *testing.T) {
 	type args struct {
