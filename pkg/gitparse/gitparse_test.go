@@ -3,7 +3,6 @@ package gitparse
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
@@ -2356,7 +2355,7 @@ type mockContentWriter struct{ counter int }
 func newMockContentWriter() *mockContentWriter { return &mockContentWriter{counter: 1} }
 
 func (m *mockContentWriter) ReadCloser() (io.ReadCloser, error) {
-	return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
+	return io.NopCloser(bytes.NewReader([]byte{})), nil
 }
 
 func (m *mockContentWriter) CloseForWriting() error { return nil }
