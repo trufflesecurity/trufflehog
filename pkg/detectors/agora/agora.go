@@ -48,23 +48,14 @@ func (s Scanner) getClient() *http.Client {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, keyMatch := range keyMatches {
-		if len(keyMatch) != 2 {
-			continue
-		}
+	for _, match := range matches {
+		resMatch := strings.TrimSpace(match[1])
 
-		resMatch := strings.TrimSpace(keyMatch[1])
-
-		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
-
-			resSecret := strings.TrimSpace(secretMatch[1])
-
+		for _, secret := range secretMatches {
+			resSecret := strings.TrimSpace(secret[1])
 			/*
 				as both agora key and secretMatch has same regex, the set of strings keyMatch for both probably me same.
 				we need to avoid the scenario where key is same as secretMatch. This will reduce the number of matches we process.

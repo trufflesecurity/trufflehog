@@ -45,9 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for _, keyMatch := range apiKeyMatches {
-		if len(keyMatch) != 2 {
-			continue
-		}
 		apiKeyRes := strings.TrimSpace(keyMatch[1])
 
 		for emailMatch := range uniqueEmailMatches {

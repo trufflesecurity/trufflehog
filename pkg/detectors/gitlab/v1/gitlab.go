@@ -50,9 +50,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		// ignore v2 detectors which have a prefix of `glpat-`
 		if strings.Contains(match[0], "glpat-") {
 			continue

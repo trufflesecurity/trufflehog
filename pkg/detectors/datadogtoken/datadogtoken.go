@@ -106,15 +106,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	apiMatches := apiPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, apiMatch := range apiMatches {
-		if len(apiMatch) != 2 {
-			continue
-		}
 		resApiMatch := strings.TrimSpace(apiMatch[1])
 		appIncluded := false
 		for _, appMatch := range appMatches {
-			if len(appMatch) != 2 {
-				continue
-			}
 			resAppMatch := strings.TrimSpace(appMatch[1])
 
 			s1 := detectors.Result{
