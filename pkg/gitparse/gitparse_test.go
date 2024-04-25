@@ -2,6 +2,8 @@ package gitparse
 
 import (
 	"bytes"
+	"io"
+	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
@@ -2351,9 +2353,17 @@ index 2ee133b..12b4843 100644
 
 type mockContentWriter struct{ counter int }
 
-func newMockContentWriter() *mockContentWriter {
-	return &mockContentWriter{counter: 1}
+func newMockContentWriter() *mockContentWriter { return &mockContentWriter{counter: 1} }
+
+func (m *mockContentWriter) ReadCloser() (io.ReadCloser, error) {
+	return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
 }
+
+func (m *mockContentWriter) CloseForWriting() error { return nil }
+
+func (m *mockContentWriter) Len() int { return 0 }
+
+func (m *mockContentWriter) String() (string, error) { return "", nil }
 
 func (m *mockContentWriter) Write(p []byte) (n int, err error) { return len(p), nil }
 
@@ -2369,7 +2379,7 @@ func TestNewDiffContentWriterCreation(t *testing.T) {
 		},
 		{
 			name:          "With custom contentWriter",
-			opts:          []diffOption{withCustomContentWriter(bufferwriter.New(context.Background()))},
+			opts:          []diffOption{withCustomContentWriter(newMockContentWriter())},
 			expectedCount: 1,
 		},
 	}
