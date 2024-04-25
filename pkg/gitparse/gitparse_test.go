@@ -637,6 +637,7 @@ func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
 		if s1.Len() == 0 && s2.Len() == 0 {
 			return true, nil
 		}
+
 		str1, err := s1.String()
 		if err != nil {
 			return false, err
@@ -699,8 +700,7 @@ func TestCommitParsing(t *testing.T) {
 }
 
 func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
-	ctx := context.Background()
-	b := bufferedfilewriter.New(ctx)
+	b := bufferedfilewriter.New()
 	_, err := b.Write(content) // Using Write method to add content
 	if err != nil {
 		panic(err)
@@ -1249,12 +1249,12 @@ index 239b415..2ee133b 100644
 +++ b/aws2
 !!!ERROR!!!
  blah blaj
-
+ 
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
-
+ 
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
@@ -1668,7 +1668,7 @@ Author: rjtmahinay <rjt.mahinay@gmail.com>
 Date:   Mon Jul 10 01:22:32 2023 +0800
 
     Add QuarkusApplication javadoc
-
+    
     * Fix #34463
 
 diff --git a/core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java b/core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java
@@ -2186,12 +2186,12 @@ index 239b415..2ee133b 100644
 +++ b/aws2
 @@ -1,5 +1,7 @@
  blah blaj
-
+ 
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
-
+ 
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
@@ -2317,12 +2317,12 @@ index 239b415..2ee133b 100644
 +++ b/aws
 @@ -1,5 +1,7 @@
  blah blaj
-
+ 
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
-
+ 
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye

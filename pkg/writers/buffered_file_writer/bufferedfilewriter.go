@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
@@ -72,7 +71,7 @@ func WithThreshold(threshold uint64) Option {
 
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
-func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
+func New(opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,

@@ -315,7 +315,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	}
 	if c.useCustomContentWriter {
 		diff = func(c *Commit, opts ...diffOption) *Diff {
-			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New(ctx)))
+			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
 			return newDiff(c, opts...)
 		}
 	}
