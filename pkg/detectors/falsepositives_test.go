@@ -13,18 +13,23 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type fakeDetectorWithDefaultLogic struct{}
+type fakeDetector struct{}
+type customFalsePositiveChecker struct{ fakeDetector }
 
-func (d fakeDetectorWithDefaultLogic) FromData(ctx context.Context, verify bool, data []byte) ([]Result, error) {
+func (d fakeDetector) FromData(ctx context.Context, verify bool, data []byte) ([]Result, error) {
 	return nil, nil
 }
 
-func (d fakeDetectorWithDefaultLogic) Keywords() []string {
+func (d fakeDetector) Keywords() []string {
 	return nil
 }
 
-func (d fakeDetectorWithDefaultLogic) Type() detectorspb.DetectorType {
+func (d fakeDetector) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType(0)
+}
+
+func (d customFalsePositiveChecker) IsFalsePositive(result Result) bool {
+	return IsKnownFalsePositive(string(result.Raw), []FalsePositive{"a specific magic string"}, false)
 }
 
 func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
@@ -33,9 +38,27 @@ func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
 		{Raw: []byte("number")},          // from wordlist
 		{Raw: []byte("hga8adshla3434g")}, // real secret
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetectorWithDefaultLogic{}, results, false)
-	assert.Equal(t, 1, len(filtered))
-	assert.Equal(t, []byte("hga8adshla3434g"), filtered[0].Raw)
+	expected := []Result{
+		{Raw: []byte("hga8adshla3434g")},
+	}
+	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results, false)
+	assert.ElementsMatch(t, expected, filtered)
+}
+
+func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
+	results := []Result{
+		{Raw: []byte("a specific magic string")}, // specific target
+		{Raw: []byte("00000")},                   // "default" false positive list
+		{Raw: []byte("number")},                  // from wordlist
+		{Raw: []byte("hga8adshla3434g")},         // real secret
+	}
+	expected := []Result{
+		{Raw: []byte("00000")},
+		{Raw: []byte("number")},
+		{Raw: []byte("hga8adshla3434g")},
+	}
+	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results, false)
+	assert.ElementsMatch(t, expected, filtered)
 }
 
 func TestIsFalsePositive(t *testing.T) {
