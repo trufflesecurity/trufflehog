@@ -1,4 +1,3 @@
-// Package bufferwritter provides a contentWriter implementation using a shared buffer pool for memory management.
 package bufferwriter
 
 import (
@@ -9,6 +8,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer/ring"
 )
 
 type metrics struct{}
@@ -36,10 +36,10 @@ const (
 
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
-	buf     *buffer.Buffer // The current buffer in use.
-	bufPool *buffer.Pool   // The buffer pool used to manage the buffer.
-	size    int            // The total size of the content written to the buffer.
-	state   state          // The current state of the buffer.
+	buf     *ring.Ring   // The current buffer in use.
+	bufPool *buffer.Pool // The buffer pool used to manage the buffer.
+	size    int          // The total size of the content written to the buffer.
+	state   state        // The current state of the buffer.
 
 	metrics metrics
 }
@@ -48,7 +48,7 @@ type BufferWriter struct {
 func New(ctx context.Context) *BufferWriter {
 	buf := bufferPool.Get(ctx)
 	if buf == nil {
-		buf = buffer.NewBuffer()
+		buf = ring.NewRingBuffer(1 << 12)
 	}
 	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
 }
@@ -82,6 +82,20 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	return b.buf.Write(data)
 }
 
+// WriteTo writes the buffer's content to the provided writer.
+func (b *BufferWriter) WriteTo(w io.Writer) (int64, error) {
+	if b.state != readOnly {
+		return 0, fmt.Errorf("buffer is in write-only mode")
+	}
+
+	start := time.Now()
+	defer func(start time.Time) {
+		bufferLength := uint64(b.buf.Len())
+		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
+	}(start)
+	return b.buf.WriteTo(w)
+}
+
 // ReadCloser provides a read-closer for the buffer's content.
 // It wraps the buffer's content in a NopCloser to provide a ReadCloser without additional closing behavior,
 // as closing a bytes.Buffer is a no-op.
@@ -104,7 +118,7 @@ func (b *BufferWriter) String() (string, error) {
 	if b.buf == nil {
 		return "", fmt.Errorf("buffer is nil")
 	}
-	return b.buf.String(), nil
+	return string(b.buf.Bytes()), nil
 }
 
 // Len returns the length of the buffer's content.

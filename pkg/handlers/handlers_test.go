@@ -65,6 +65,31 @@ func BenchmarkHandleFile(b *testing.B) {
 	}
 }
 
+func BenchmarkHandleZipFile(b *testing.B) {
+	file, err := os.Open("testdata/example.zip.gz")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sourceChan := make(chan *sources.Chunk, 1)
+
+		b.StartTimer()
+		go func() {
+			defer close(sourceChan)
+			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			assert.NoError(b, err)
+		}()
+
+		for range sourceChan {
+		}
+		b.StopTimer()
+
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
+	}
+}
+
 func TestSkipArchive(t *testing.T) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)

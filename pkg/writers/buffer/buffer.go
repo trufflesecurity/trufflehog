@@ -1,94 +1,9 @@
-// Package buffer provides a custom buffer type that includes metrics for tracking buffer usage.
-// It also provides a pool for managing buffer reusability.
 package buffer
 
 import (
 	"bytes"
-	"fmt"
-	"sync"
 	"time"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
-
-type poolMetrics struct{}
-
-func (poolMetrics) recordShrink(amount int) {
-	shrinkCount.Inc()
-	shrinkAmount.Add(float64(amount))
-}
-
-func (poolMetrics) recordBufferRetrival() {
-	activeBufferCount.Inc()
-	checkoutCount.Inc()
-	bufferCount.Inc()
-}
-
-func (poolMetrics) recordBufferReturn(buf *Buffer) {
-	activeBufferCount.Dec()
-	totalBufferSize.Add(float64(buf.Len()))
-	totalBufferLength.Add(float64(buf.Len()))
-	buf.recordMetric()
-}
-
-// PoolOpts is a function that configures a BufferPool.
-type PoolOpts func(pool *Pool)
-
-// Pool of buffers.
-type Pool struct {
-	*sync.Pool
-	bufferSize uint32
-
-	metrics poolMetrics
-}
-
-const defaultBufferSize = 1 << 12 // 4KB
-// NewBufferPool creates a new instance of BufferPool.
-func NewBufferPool(opts ...PoolOpts) *Pool {
-	pool := &Pool{bufferSize: defaultBufferSize}
-
-	for _, opt := range opts {
-		opt(pool)
-	}
-	pool.Pool = &sync.Pool{
-		New: func() any {
-			return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
-		},
-	}
-
-	return pool
-}
-
-// Get returns a Buffer from the pool.
-func (p *Pool) Get(ctx context.Context) *Buffer {
-	buf, ok := p.Pool.Get().(*Buffer)
-	if !ok {
-		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
-	}
-	p.metrics.recordBufferRetrival()
-	buf.resetMetric()
-
-	return buf
-}
-
-// Put returns a Buffer to the pool.
-func (p *Pool) Put(buf *Buffer) {
-	p.metrics.recordBufferReturn(buf)
-
-	// If the Buffer is more than twice the default size, replace it with a new Buffer.
-	// This prevents us from returning very large buffers to the pool.
-	const maxAllowedCapacity = 2 * defaultBufferSize
-	if buf.Cap() > maxAllowedCapacity {
-		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
-	} else {
-		// Reset the Buffer to clear any existing data.
-		buf.Reset()
-	}
-
-	p.Pool.Put(buf)
-}
 
 // Buffer is a wrapper around bytes.Buffer that includes a timestamp for tracking Buffer checkout duration.
 type Buffer struct {
@@ -138,7 +53,7 @@ func (b *Buffer) Write(data []byte) (int, error) {
 		// which may require multiple allocations and copies if the size required is much larger
 		// than double the capacity. Our approach aligns with default behavior when growth sizes
 		// happen to match current capacity, retaining asymptotic efficiency benefits.
-		b.Grow(growSize)
+		b.Buffer.Grow(growSize)
 	}
 
 	return b.Buffer.Write(data)
