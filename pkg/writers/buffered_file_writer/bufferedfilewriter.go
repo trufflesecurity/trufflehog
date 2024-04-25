@@ -27,6 +27,7 @@ func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Durat
 }
 
 func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
+	diskWriteCount.Inc()
 	fileSizeHistogram.Observe(float64(size))
 }
 
