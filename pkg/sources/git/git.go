@@ -562,55 +562,29 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 
-		commit := diff.Commit
-		fullHash := commit.Hash
+		fullHash := diff.Commit.Hash
 		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
 			logger.V(1).Info("reached base commit", "commit", fullHash)
 			break
 		}
-
-		email := commit.Author
-		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 			logger.V(5).Info("scanning commit", "commit", fullHash)
+		}
 
-			// Scan the commit metadata.
-			// See https://github.com/trufflesecurity/trufflehog/issues/2683
-			var (
-				metadata = s.sourceMetadataFunc("", email, fullHash, when, remoteURL, 0)
-				sb       strings.Builder
-			)
-			sb.WriteString(email)
-			sb.WriteString("\n")
-			sb.WriteString(commit.Committer)
-			sb.WriteString("\n")
-			sb.WriteString(commit.Message.String())
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           []byte(sb.String()),
-				Verify:         s.verify,
-			}
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
-				return err
-			}
+		if !scanOptions.Filter.Pass(diff.PathB) {
+			continue
 		}
 
 		fileName := diff.PathB
 		if fileName == "" {
 			continue
 		}
-
-		if !scanOptions.Filter.Pass(fileName) {
-			continue
-		}
+		email := diff.Commit.Author
+		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
