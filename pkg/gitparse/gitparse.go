@@ -76,10 +76,14 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 // All Diffs must have an associated commit.
 // The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
 // By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
-func newDiff(ctx context.Context, commit *Commit, opts ...diffOption) *Diff {
-	diff := &Diff{Commit: commit, contentWriter: bufferwriter.New(ctx)}
+func newDiff(commit *Commit, opts ...diffOption) *Diff {
+	diff := &Diff{Commit: commit}
 	for _, opt := range opts {
 		opt(diff)
+	}
+
+	if diff.contentWriter == nil {
+		diff.contentWriter = bufferwriter.New()
 	}
 
 	return diff
@@ -100,9 +104,7 @@ func (d *Diff) write(p []byte) error {
 // finalize ensures proper closure of resources associated with the Diff.
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
-func (d *Diff) finalize() error {
-	return d.contentWriter.CloseForWriting()
-}
+func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -308,13 +310,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	var latestState = Initial
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
-		opts = append(opts, withCustomContentWriter(bufferwriter.New(ctx)))
-		return newDiff(ctx, c, opts...)
+		opts = append(opts, withCustomContentWriter(bufferwriter.New()))
+		return newDiff(c, opts...)
 	}
 	if c.useCustomContentWriter {
 		diff = func(c *Commit, opts ...diffOption) *Diff {
-			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New(ctx)))
-			return newDiff(ctx, c, opts...)
+			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
+			return newDiff(c, opts...)
 		}
 	}
 	currentDiff := diff(currentCommit)
