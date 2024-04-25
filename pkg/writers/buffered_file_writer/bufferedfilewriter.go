@@ -26,13 +26,8 @@ func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Durat
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func (bufferedFileWriterMetrics) recordDiskWrite(f *os.File) {
-	diskWriteCount.Inc()
-	size, err := f.Stat()
-	if err != nil {
-		return
-	}
-	fileSizeHistogram.Observe(float64(size.Size()))
+func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
+	fileSizeHistogram.Observe(float64(size))
 }
 
 // state represents the current mode of BufferedFileWriter.
@@ -165,8 +160,7 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	if err != nil {
 		return n, err
 	}
-
-	w.metrics.recordDiskWrite(w.file)
+	w.metrics.recordDiskWrite(int64(n))
 
 	return n, nil
 }
