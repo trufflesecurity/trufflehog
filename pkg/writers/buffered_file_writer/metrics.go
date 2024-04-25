@@ -29,11 +29,12 @@ var (
 		Help:      "Total number of times data was written to disk by the BufferedFileWriter.",
 	})
 
+	// The first bucket is greater than the default threshold to avoid a bucket with a zero value.
 	fileSizeHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "file_size_bytes",
 		Help:      "Sizes of files created by the BufferedFileWriter.",
-		Buckets:   prometheus.ExponentialBuckets(defaultThreshold, 2, 4),
+		Buckets:   prometheus.ExponentialBuckets(defaultThreshold*2, 4, 5),
 	})
 )
