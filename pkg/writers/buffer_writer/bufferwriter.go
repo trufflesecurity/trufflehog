@@ -72,8 +72,7 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	b.size += size
 	start := time.Now()
 	defer func(start time.Time) {
-		bufferLength := b.buf.Len()
-		b.metrics.recordDataProcessed(int64(bufferLength), time.Since(start))
+		b.metrics.recordDataProcessed(int64(size), time.Since(start))
 	}(start)
 	return b.buf.Write(data)
 }

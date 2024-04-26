@@ -28,7 +28,7 @@ func (b *Buffer) RecordMetric() {
 	dur := time.Since(b.checkedOutAt)
 	checkoutDuration.Observe(float64(dur.Microseconds()))
 	checkoutDurationTotal.Add(float64(dur.Microseconds()))
-	totalBufferSize.Add(float64(b.Len()))
+	totalBufferSize.Add(float64(b.Cap()))
 	totalBufferLength.Add(float64(b.Len()))
 }
 
