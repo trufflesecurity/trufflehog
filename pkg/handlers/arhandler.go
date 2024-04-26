@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,17 +14,11 @@ import (
 
 // arHandler specializes defaultHandler to handle AR archive formats. By embedding defaultHandler,
 // arHandler inherits and can further customize the common handling behavior such as skipping binaries.
-type arHandler struct {
-	*defaultHandler
-	metrics *metrics
-}
+type arHandler struct{ *defaultHandler }
 
-// newARHandler creates an arHandler with the provided metrics.
+// newARHandler creates an arHandler.
 func newARHandler() *arHandler {
-	return &arHandler{
-		defaultHandler: newDefaultHandler(arHandlerType),
-		metrics:        newHandlerMetrics(arHandlerType),
-	}
+	return &arHandler{defaultHandler: newDefaultHandler(arHandlerType)}
 }
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
@@ -39,18 +32,9 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.D
 		defer close(archiveChan)
 
 		// Update the metrics for the file processing.
+		start := time.Now()
 		var err error
-		defer func(start time.Time) {
-			if err != nil {
-				h.metrics.incErrors()
-				if errors.Is(err, context.DeadlineExceeded) {
-					h.metrics.incFileProcessingTimeouts()
-				}
-				return
-			}
-
-			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-		}(time.Now())
+		defer h.measureLatencyAndHandleErrors(start, err)
 
 		var arReader *deb.Ar
 		arReader, err = deb.LoadAr(input)

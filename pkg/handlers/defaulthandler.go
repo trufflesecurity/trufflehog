@@ -70,21 +70,14 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 				defer close(dataChan)
 
 				// Update the metrics for the file processing.
+				start := time.Now()
 				var err error
-				defer func(start time.Time) {
-					if err != nil {
-						h.metrics.incErrors()
-						if errors.Is(err, context.DeadlineExceeded) {
-							h.metrics.incFileProcessingTimeouts()
-						}
-						return
-					}
-
-					h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
+				defer func() {
+					h.measureLatencyAndHandleErrors(start, err)
 					h.metrics.incFilesProcessed()
-				}(time.Now())
+				}()
 
-				if err = h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
+				if err = h.handleNonArchiveContent(ctx, arReader, dataChan); err != nil {
 					ctx.Logger().Error(err, "error handling non-archive content.")
 				}
 			}()
@@ -102,24 +95,29 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 		defer close(dataChan)
 
 		// Update the metrics for the file processing.
+		start := time.Now()
 		var err error
-		defer func(start time.Time) {
-			if err != nil {
-				h.metrics.incErrors()
-				if errors.Is(err, context.DeadlineExceeded) {
-					h.metrics.incFileProcessingTimeouts()
-				}
-				return
-			}
-
-			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-		}(time.Now())
+		defer h.measureLatencyAndHandleErrors(start, err)
 
 		if err = h.openArchive(ctx, 0, arReader, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
 		}
 	}()
 	return dataChan, nil
+}
+
+// measureLatencyAndHandleErrors measures the latency of the file processing and updates the metrics accordingly.
+// It also records errors and timeouts in the metrics.
+func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err error) {
+	if err == nil {
+		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
+		return
+	}
+
+	h.metrics.incErrors()
+	if errors.Is(err, context.DeadlineExceeded) {
+		h.metrics.incFileProcessingTimeouts()
+	}
 }
 
 var ErrMaxDepthReached = errors.New("max archive depth reached")
@@ -152,7 +150,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
 		compReader, err := archive.OpenReader(arReader)
 		if err != nil {
-			return fmt.Errorf("error opening decompressor with format: %s %w", format.Name(), err)
+			return fmt.Errorf("error opening decompressor with format %q: %w", format.Name(), err)
 		}
 		defer compReader.Close()
 
@@ -217,7 +215,7 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		fReader, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
+			return fmt.Errorf("error opening file %q: %w", file.Name(), err)
 		}
 		defer fReader.Close()
 
