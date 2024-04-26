@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestNewBufferPool(t *testing.T) {
@@ -72,12 +71,12 @@ func TestBufferPoolGetPut(t *testing.T) {
 				pool.Put(initialBuf)
 			}
 
-			buf := pool.Get(context.Background())
+			buf := pool.Get()
 			assert.Equal(t, tc.expectedCapBefore, buf.Cap())
 
 			pool.Put(buf)
 
-			bufAfter := pool.Get(context.Background())
+			bufAfter := pool.Get()
 			assert.Equal(t, tc.expectedCapAfter, bufAfter.Cap())
 		})
 	}

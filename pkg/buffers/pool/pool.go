@@ -25,19 +25,6 @@ func (poolMetrics) recordBufferReturn(buf *buffer.Buffer) {
 	buf.RecordMetric()
 }
 
-var (
-	sharedBufferPool *Pool
-	once             sync.Once
-)
-
-func initSharedBufferPool() { sharedBufferPool = NewBufferPool() }
-
-// GetSharedBufferPool returns the shared buffer pool.
-func GetSharedBufferPool() *Pool {
-	once.Do(initSharedBufferPool)
-	return sharedBufferPool
-}
-
 // Opts is a function that configures a BufferPool.
 type Opts func(pool *Pool)
 

@@ -18,6 +18,12 @@ func (metrics) recordDataProcessed(size int64, dur time.Duration) {
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
+func init() { bufferPool = pool.NewBufferPool() }
+
+// bufferPool is the shared Buffer pool used by all BufferedFileWriters.
+// This allows for efficient reuse of buffers across multiple writers.
+var bufferPool *pool.Pool
+
 // state represents the current mode of buffer.
 type state uint8
 
@@ -40,7 +46,7 @@ type BufferWriter struct {
 
 // New creates a new instance of BufferWriter.
 func New(_ context.Context) *BufferWriter {
-	return &BufferWriter{state: writeOnly, bufPool: pool.GetSharedBufferPool()}
+	return &BufferWriter{state: writeOnly, bufPool: bufferPool}
 }
 
 // NewFromReader creates a new instance of BufferWriter and writes the content from the provided reader to the buffer.
@@ -72,8 +78,7 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	b.size += size
 	start := time.Now()
 	defer func(start time.Time) {
-		bufferLength := b.buf.Len()
-		b.metrics.recordDataProcessed(int64(bufferLength), time.Since(start))
+		b.metrics.recordDataProcessed(int64(size), time.Since(start))
 	}(start)
 	return b.buf.Write(data)
 }

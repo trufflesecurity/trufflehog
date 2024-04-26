@@ -22,14 +22,16 @@ func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Durat
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func (bufferedFileWriterMetrics) recordDiskWrite(f *os.File) {
+func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 	diskWriteCount.Inc()
-	size, err := f.Stat()
-	if err != nil {
-		return
-	}
-	fileSizeHistogram.Observe(float64(size.Size()))
+	fileSizeHistogram.Observe(float64(size))
 }
+
+func init() { bufferPool = pool.NewBufferPool() }
+
+// bufferPool is the shared Buffer pool used by all BufferedFileWriters.
+// This allows for efficient reuse of buffers across multiple writers.
+var bufferPool *pool.Pool
 
 // state represents the current mode of BufferedFileWriter.
 type state uint8
@@ -71,7 +73,7 @@ func New(_ context.Context, opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		bufPool:   pool.GetSharedBufferPool(),
+		bufPool:   bufferPool,
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -174,8 +176,7 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	if err != nil {
 		return n, err
 	}
-
-	w.metrics.recordDiskWrite(w.file)
+	w.metrics.recordDiskWrite(int64(n))
 
 	return n, nil
 }
@@ -229,7 +230,7 @@ func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
 		}
 		totalBytesRead += n
 
-		w.metrics.recordDiskWrite(w.file)
+		w.metrics.recordDiskWrite(n)
 	}
 
 	return totalBytesRead, nil
