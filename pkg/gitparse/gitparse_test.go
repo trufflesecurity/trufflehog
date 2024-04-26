@@ -2,9 +2,12 @@ package gitparse
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
@@ -630,6 +633,11 @@ func TestToFileLinePathParse(t *testing.T) {
 func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
 	// isEqualString handles the error-prone String() method calls and compares the results.
 	isEqualContentString := func(s1, s2 contentWriter) (bool, error) {
+		// If the content is nil, it's likely a binary so there won't be any content to compare.
+		if s1.Len() == 0 && s2.Len() == 0 {
+			return true, nil
+		}
+
 		str1, err := s1.String()
 		if err != nil {
 			return false, err
@@ -692,8 +700,7 @@ func TestCommitParsing(t *testing.T) {
 }
 
 func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
-	ctx := context.Background()
-	b := bufferedfilewriter.New(ctx)
+	b := bufferedfilewriter.New()
 	_, err := b.Write(content) // Using Write method to add content
 	if err != nil {
 		panic(err)
@@ -702,8 +709,7 @@ func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.Buffer
 }
 
 func newBufferWithContent(content []byte) *bufferwriter.BufferWriter {
-	ctx := context.Background()
-	b := bufferwriter.New(ctx)
+	b := bufferwriter.New()
 	_, _ = b.Write(content) // Using Write method to add content
 	return b
 }
@@ -2346,3 +2352,55 @@ index 2ee133b..12b4843 100644
 +output = json
 +region = us-east-2
 `
+
+type mockContentWriter struct{ counter int }
+
+func newMockContentWriter() *mockContentWriter { return &mockContentWriter{counter: 1} }
+
+func (m *mockContentWriter) ReadCloser() (io.ReadCloser, error) {
+	return io.NopCloser(bytes.NewReader([]byte{})), nil
+}
+
+func (m *mockContentWriter) CloseForWriting() error { return nil }
+
+func (m *mockContentWriter) Len() int { return 0 }
+
+func (m *mockContentWriter) String() (string, error) { return "", nil }
+
+func (m *mockContentWriter) Write(p []byte) (n int, err error) { return len(p), nil }
+
+func TestNewDiffContentWriterCreation(t *testing.T) {
+	testCases := []struct {
+		name          string
+		opts          []diffOption
+		expectedCount int
+	}{
+		{
+			name:          "Without custom contentWriter",
+			expectedCount: 1,
+		},
+		{
+			name:          "With custom contentWriter",
+			opts:          []diffOption{withCustomContentWriter(newMockContentWriter())},
+			expectedCount: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			commit := new(Commit)
+
+			mockWriter := newMockContentWriter()
+			assert.NotNil(t, mockWriter, "Failed to create mockWriter")
+
+			diff := newDiff(commit, tc.opts...)
+			assert.NotNil(t, diff, "Failed to create diff")
+			assert.NotNil(t, diff.contentWriter, "Failed to create contentWriter")
+
+			assert.Equal(t, tc.expectedCount, mockWriter.counter, "Unexpected number of contentWriter creations")
+		})
+	}
+}
