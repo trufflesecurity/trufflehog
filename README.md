@@ -16,7 +16,7 @@
 
 ---
 
-# :mag_right: _Now Scanning_
+# :mag*right: \_Now Scanning*
 
 <div align="center">
 
@@ -54,7 +54,7 @@ brew install trufflehog
 
 ### Docker:
 
-<sub><i>*Ensure Docker engine is running before executing the following commands:*</i></sub>
+<sub><i>_Ensure Docker engine is running before executing the following commands:_</i></sub>
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;Unix
 
@@ -251,10 +251,10 @@ trufflehog git file://. --since-commit main --branch feature-1 --only-verified -
 
 ## 12: Scan a Postman workspace
 
-Use the `--workspace`, `--collection`, `--environment` flags multiple times to scan multiple targets.
+Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
 ```bash
-trufflehog postman --token=<postman api token> --workspace=<workspace id>
+trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
 # :question: FAQ
@@ -487,7 +487,7 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
 ```yaml
 stages:
   - security
-  
+
 security-secrets:
   stage: security
   allow_failure: false
@@ -616,7 +616,7 @@ class Verifier(BaseHTTPRequestHandler):
             self.log_message("%s", request)
 
             # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']): 
+            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
                 self.send_response(200)
                 self.end_headers()
             else:
