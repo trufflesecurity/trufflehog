@@ -630,6 +630,11 @@ func TestToFileLinePathParse(t *testing.T) {
 func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
 	// isEqualString handles the error-prone String() method calls and compares the results.
 	isEqualContentString := func(s1, s2 contentWriter) (bool, error) {
+		// If the content is nil, it's likely a binary so there won't be any content to compare.
+		if s1.Len() == 0 && s2.Len() == 0 {
+			return true, nil
+		}
+
 		str1, err := s1.String()
 		if err != nil {
 			return false, err
@@ -692,8 +697,7 @@ func TestCommitParsing(t *testing.T) {
 }
 
 func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
-	ctx := context.Background()
-	b := bufferedfilewriter.New(ctx)
+	b := bufferedfilewriter.New()
 	_, err := b.Write(content) // Using Write method to add content
 	if err != nil {
 		panic(err)
@@ -702,8 +706,7 @@ func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.Buffer
 }
 
 func newBufferWithContent(content []byte) *bufferwriter.BufferWriter {
-	ctx := context.Background()
-	b := bufferwriter.New(ctx)
+	b := bufferwriter.New()
 	_, _ = b.Write(content) // Using Write method to add content
 	return b
 }

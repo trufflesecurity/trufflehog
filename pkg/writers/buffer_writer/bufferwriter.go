@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
@@ -44,13 +43,7 @@ type BufferWriter struct {
 }
 
 // New creates a new instance of BufferWriter.
-func New(ctx context.Context) *BufferWriter {
-	buf := bufferPool.Get(ctx)
-	if buf == nil {
-		buf = buffer.NewBuffer()
-	}
-	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
-}
+func New() *BufferWriter { return &BufferWriter{state: writeOnly, bufPool: bufferPool} }
 
 // Write delegates the writing operation to the underlying bytes.Buffer.
 func (b *BufferWriter) Write(data []byte) (int, error) {
@@ -58,12 +51,18 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
 	}
 
+	if b.buf == nil {
+		b.buf = b.bufPool.Get()
+		if b.buf == nil {
+			b.buf = buffer.NewBuffer()
+		}
+	}
+
 	size := len(data)
 	b.size += size
 	start := time.Now()
 	defer func(start time.Time) {
-		bufferLength := int64(b.buf.Len())
-		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
+		b.metrics.recordDataProcessed(int64(size), time.Since(start))
 
 	}(start)
 	return b.buf.Write(data)
@@ -75,6 +74,9 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
 	if b.state != readOnly {
 		return nil, fmt.Errorf("buffer is in read-only mode")
+	}
+	if b.buf == nil {
+		return nil, fmt.Errorf("writer buffer is nil")
 	}
 
 	return buffer.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil

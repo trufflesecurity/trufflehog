@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
@@ -27,13 +26,9 @@ func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Durat
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func (bufferedFileWriterMetrics) recordDiskWrite(f *os.File) {
+func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 	diskWriteCount.Inc()
-	size, err := f.Stat()
-	if err != nil {
-		return
-	}
-	fileSizeHistogram.Observe(float64(size.Size()))
+	fileSizeHistogram.Observe(float64(size))
 }
 
 // state represents the current mode of BufferedFileWriter.
@@ -72,15 +67,10 @@ func WithThreshold(threshold uint64) Option {
 
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
-func New(ctx context.Context, opts ...Option) *BufferedFileWriter {
-	buf := sharedBufferPool.Get(ctx)
-	if buf == nil {
-		buf = buffer.NewBuffer()
-	}
+func New(opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		buf:       buf,
 		bufPool:   sharedBufferPool,
 	}
 	for _, opt := range opts {
@@ -139,6 +129,13 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
 	}
 
+	if w.buf == nil {
+		w.buf = w.bufPool.Get()
+		if w.buf == nil {
+			w.buf = buffer.NewBuffer()
+		}
+	}
+
 	size := uint64(len(data))
 	bufferLength := w.buf.Len()
 	start := time.Now()
@@ -177,8 +174,7 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	if err != nil {
 		return n, err
 	}
-
-	w.metrics.recordDiskWrite(w.file)
+	w.metrics.recordDiskWrite(int64(n))
 
 	return n, nil
 }
@@ -223,6 +219,10 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 			return nil, err
 		}
 		return newAutoDeletingFileReader(file), nil
+	}
+
+	if w.buf == nil {
+		return nil, fmt.Errorf("BufferedFileWriter has not buffer data to read")
 	}
 
 	// Data is in memory.
