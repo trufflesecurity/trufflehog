@@ -169,7 +169,7 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 			if _, err := w.buf.WriteTo(w.file); err != nil {
 				return 0, err
 			}
-			w.bufPool.Put(w.buf)
+			w.buf.Reset()
 		}
 	}
 
@@ -212,46 +212,6 @@ func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
 	}
 
 	return totalBytesRead, nil
-
-	// var totalBytesRead int64
-	// buf := make([]byte, 32*1024)
-	//
-	// // Read the first chunk of data.
-	// n, err := reader.Read(buf)
-	// if err != nil && err != io.EOF {
-	// 	return totalBytesRead, err
-	// }
-	//
-	// if n > 0 {
-	// 	written, err := w.Write(buf[:n])
-	// 	if err != nil {
-	// 		return totalBytesRead, err
-	// 	}
-	// 	totalBytesRead += int64(written)
-	// }
-	//
-	// // Continue reading the remaining data in chunks.
-	// for {
-	// 	n, err := reader.Read(buf)
-	// 	if err != nil && err != io.EOF {
-	// 		return totalBytesRead, err
-	// 	}
-	//
-	// 	if n > 0 {
-	// 		written, err := w.Write(buf[:n])
-	// 		if err != nil {
-	// 			return totalBytesRead, err
-	// 		}
-	// 		totalBytesRead += int64(written)
-	// 	}
-	//
-	// 	if errors.Is(err, io.EOF) {
-	// 		// Reached the end of the reader, break the loop
-	// 		break
-	// 	}
-	// }
-	//
-	// return totalBytesRead, nil
 }
 
 // CloseForWriting flushes any remaining data in the buffer to the file, closes the file if created,
