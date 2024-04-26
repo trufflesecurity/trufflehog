@@ -109,15 +109,15 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 // measureLatencyAndHandleErrors measures the latency of the file processing and updates the metrics accordingly.
 // It also records errors and timeouts in the metrics.
 func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err error) {
-	if err != nil {
-		h.metrics.incErrors()
-		if errors.Is(err, context.DeadlineExceeded) {
-			h.metrics.incFileProcessingTimeouts()
-		}
+	if err == nil {
+		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		return
 	}
 
-	h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
+	h.metrics.incErrors()
+	if errors.Is(err, context.DeadlineExceeded) {
+		h.metrics.incFileProcessingTimeouts()
+	}
 }
 
 var ErrMaxDepthReached = errors.New("max archive depth reached")
