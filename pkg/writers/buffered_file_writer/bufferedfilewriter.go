@@ -4,6 +4,7 @@ package bufferedfilewriter
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -188,52 +189,69 @@ func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
 	}
 
 	var totalBytesRead int64
+	const bufferSize = 1 << 15 // 32KB
+	buf := make([]byte, bufferSize)
 
-	// If no file is being used, read the data into the buffer.
-	if w.file == nil {
-		if w.buf == nil {
-			w.buf = w.bufPool.Get()
-			if w.buf == nil {
-				w.buf = buffer.NewBuffer()
-			}
-		}
-
-		n, err := w.buf.ReadFrom(reader)
-		if err != nil {
+	for {
+		n, err := reader.Read(buf)
+		if err != nil && !errors.Is(err, io.EOF) {
 			return totalBytesRead, err
 		}
-		totalBytesRead += n
 
-		// If the buffer size exceeds the threshold, switch to file writing.
-		if w.buf.Len() > int(w.threshold) {
-			file, err := os.CreateTemp(os.TempDir(), cleantemp.MkFilename())
+		if n > 0 {
+			written, err := w.Write(buf[:n])
 			if err != nil {
 				return totalBytesRead, err
 			}
-
-			w.filename = file.Name()
-			w.file = file
-
-			// Transfer existing data in the buffer to the file, then clear the buffer.
-			if _, err := w.buf.WriteTo(w.file); err != nil {
-				return totalBytesRead, err
-			}
-			w.bufPool.Put(w.buf)
+			totalBytesRead += int64(written)
 		}
-	}
 
-	// If a file is being used, read the data directly into the file.
-	if w.file != nil {
-		n, err := io.Copy(w.file, reader)
-		if err != nil {
-			return totalBytesRead, err
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		totalBytesRead += n
-
-		w.metrics.recordDiskWrite(n)
 	}
 
 	return totalBytesRead, nil
+
+	// var totalBytesRead int64
+	// buf := make([]byte, 32*1024)
+	//
+	// // Read the first chunk of data.
+	// n, err := reader.Read(buf)
+	// if err != nil && err != io.EOF {
+	// 	return totalBytesRead, err
+	// }
+	//
+	// if n > 0 {
+	// 	written, err := w.Write(buf[:n])
+	// 	if err != nil {
+	// 		return totalBytesRead, err
+	// 	}
+	// 	totalBytesRead += int64(written)
+	// }
+	//
+	// // Continue reading the remaining data in chunks.
+	// for {
+	// 	n, err := reader.Read(buf)
+	// 	if err != nil && err != io.EOF {
+	// 		return totalBytesRead, err
+	// 	}
+	//
+	// 	if n > 0 {
+	// 		written, err := w.Write(buf[:n])
+	// 		if err != nil {
+	// 			return totalBytesRead, err
+	// 		}
+	// 		totalBytesRead += int64(written)
+	// 	}
+	//
+	// 	if errors.Is(err, io.EOF) {
+	// 		// Reached the end of the reader, break the loop
+	// 		break
+	// 	}
+	// }
+	//
+	// return totalBytesRead, nil
 }
 
 // CloseForWriting flushes any remaining data in the buffer to the file, closes the file if created,
