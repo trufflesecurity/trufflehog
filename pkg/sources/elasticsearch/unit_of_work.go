@@ -1,35 +1,37 @@
 package elasticsearch
 
-type IndexDocumentRange struct {
+type DocumentSearch struct {
 	Index
-	Offset int
+	Offset    int
+	QueryJSON string
 }
 
 type UnitOfWork struct {
-	MaxDocumentCount    int
-	DocumentCount       int
-	IndexDocumentRanges []IndexDocumentRange
+	MaxDocumentCount int
+	DocumentCount    int
+	DocumentSearches []DocumentSearch
 }
 
 func NewUnitOfWork(maxDocumentCount int) UnitOfWork {
 	uow := UnitOfWork{MaxDocumentCount: maxDocumentCount}
-	uow.IndexDocumentRanges = []IndexDocumentRange{}
+	uow.DocumentSearches = []DocumentSearch{}
 
 	return uow
 }
 
-func (uow *UnitOfWork) AddRange(index Index, offset int) int {
+func (uow *UnitOfWork) AddSearch(index Index, offset int, queryJSON string) int {
 	indexDocCount := index.DocumentCount - offset
 	addedDocumentCount := min(uow.MaxDocumentCount-uow.DocumentCount, indexDocCount)
 
 	if addedDocumentCount > 0 {
-		uow.IndexDocumentRanges = append(uow.IndexDocumentRanges, IndexDocumentRange{
+		uow.DocumentSearches = append(uow.DocumentSearches, DocumentSearch{
 			Index: Index{
 				Name:          index.Name,
 				PrimaryShards: index.PrimaryShards,
 				DocumentCount: addedDocumentCount,
 			},
-			Offset: offset,
+			Offset:    offset,
+			QueryJSON: queryJSON,
 		})
 
 		uow.DocumentCount += addedDocumentCount
@@ -38,7 +40,11 @@ func (uow *UnitOfWork) AddRange(index Index, offset int) int {
 	return addedDocumentCount
 }
 
-func DistributeDocumentScans(maxUnits int, indices []Index) []UnitOfWork {
+func DistributeDocumentScans(
+	maxUnits int,
+	indices []Index,
+	queryJSON string,
+) []UnitOfWork {
 	totalDocumentCount := 0
 
 	for _, i := range indices {
@@ -65,14 +71,14 @@ func DistributeDocumentScans(maxUnits int, indices []Index) []UnitOfWork {
 	unitOfWorkIndex := 0
 	for _, i := range indices {
 		uow := &unitsOfWork[unitOfWorkIndex]
-		offset := uow.AddRange(i, 0)
+		offset := uow.AddSearch(i, 0, queryJSON)
 
 		// If we've yet to distribute all the documents in the index, go into the
 		// next unit of work, and the next, and the next....
 		for offset < i.DocumentCount {
 			unitOfWorkIndex++
 			uow := &unitsOfWork[unitOfWorkIndex]
-			offset += uow.AddRange(i, offset)
+			offset += uow.AddSearch(i, offset, queryJSON)
 		}
 	}
 

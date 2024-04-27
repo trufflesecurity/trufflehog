@@ -323,6 +323,7 @@ type ElasticsearchConfig struct {
 	CloudID      string
 	APIKey       string
 	IndexPattern string
+	QueryJSON    string
 }
 
 // Progress is used to update job completion progress across sources.

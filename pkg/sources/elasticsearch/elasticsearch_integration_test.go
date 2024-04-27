@@ -145,13 +145,14 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"Stored document matches passed values",
 		func(t *testing.T) {
-			docRange := IndexDocumentRange{
+			docRange := DocumentSearch{
 				Index: Index{
 					Name:          indexName,
 					PrimaryShards: []int{0},
 					DocumentCount: 1,
 				},
-				Offset: 0,
+				Offset:    0,
+				QueryJSON: "",
 			}
 
 			docs, err := FetchIndexDocuments(ctx, es, &docRange)

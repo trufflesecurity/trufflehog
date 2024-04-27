@@ -413,4 +413,5 @@ message Elasticsearch {
   string cloud_id = 1;
   string api_key = 2;
   string index_pattern = 3;
+  string query_json = 4;
 }

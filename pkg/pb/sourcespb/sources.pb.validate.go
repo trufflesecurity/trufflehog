@@ -5804,6 +5804,8 @@ func (m *Elasticsearch) validate(all bool) error {
 
 	// no validation rules for IndexPattern
 
+	// no validation rules for QueryJson
+
 	if len(errors) > 0 {
 		return ElasticsearchMultiError(errors)
 	}

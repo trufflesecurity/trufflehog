@@ -29,6 +29,7 @@ type Source struct {
 	cloudId      string
 	apiKey       string
 	indexPattern string
+	queryJSON    string
 	ctx          context.Context
 	client       *es.TypedClient
 	log          logr.Logger
@@ -65,6 +66,8 @@ func (s *Source) Init(
 	} else {
 		s.indexPattern = conn.IndexPattern
 	}
+
+	s.queryJSON = conn.QueryJson
 
 	client, err := s.buildElasticClient()
 	if err != nil {
@@ -103,7 +106,7 @@ func (s *Source) Chunks(
 		return err
 	}
 
-	unitsOfWork := DistributeDocumentScans(s.concurrency, indices)
+	unitsOfWork := DistributeDocumentScans(s.concurrency, indices, s.queryJSON)
 
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
@@ -119,7 +122,7 @@ func (s *Source) Chunks(
 				return err
 			}
 
-			for _, indexDocumentRange := range uow.IndexDocumentRanges {
+			for _, docSearch := range uow.DocumentSearches {
 				// We should never set out to process a range of documents if the unit
 				// of work's document count is 0; if that's the case we goofed
 				// accounting somewhere. Log a warning in that case.
@@ -127,7 +130,7 @@ func (s *Source) Chunks(
 					log.Println("Accounting error: doc count is 0 but pages remain")
 				}
 
-				documents, err := FetchIndexDocuments(s.ctx, client, &indexDocumentRange)
+				documents, err := FetchIndexDocuments(s.ctx, client, &docSearch)
 				if err != nil {
 					return err
 				}
@@ -141,7 +144,7 @@ func (s *Source) Chunks(
 						SourceMetadata: &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Elasticsearch{
 								Elasticsearch: &source_metadatapb.Elasticsearch{
-									Index:      sanitizer.UTF8(indexDocumentRange.Name),
+									Index:      sanitizer.UTF8(docSearch.Index.Name),
 									DocumentId: sanitizer.UTF8(document.ID),
 									Timestamp:  sanitizer.UTF8(document.Timestamp),
 								},
@@ -156,7 +159,7 @@ func (s *Source) Chunks(
 						return err
 					}
 					uow.DocumentCount--
-					indexDocumentRange.Offset++
+					docSearch.Offset++
 
 					// When we use the Elastic API in this way, we can't tell it to only
 					// return a specific number of documents. We can only say "return a
@@ -182,7 +185,7 @@ func (s *Source) Chunks(
 						fmt.Sprintf(
 							"Scanned %d documents from index %s",
 							len(documents),
-							indexDocumentRange.Name,
+							docSearch.Index.Name,
 						),
 						"",
 					)

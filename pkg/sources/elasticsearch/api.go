@@ -1,6 +1,7 @@
 package elasticsearch
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -166,12 +167,12 @@ func fetchIndexDocumentCount(
 func createPITSearch(
 	ctx context.Context,
 	client *es.TypedClient,
-	docRange *IndexDocumentRange,
+	docSearch *DocumentSearch,
 ) (string, error) {
 	req := esapi.OpenPointInTimeRequest{
-		Index:      []string{docRange.Name},
+		Index:      []string{docSearch.Index.Name},
 		KeepAlive:  "1m",
-		Preference: getShardListPreference(docRange.Index.PrimaryShards),
+		Preference: getShardListPreference(docSearch.Index.PrimaryShards),
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -201,9 +202,9 @@ func BuildElasticClient(
 func FetchIndexDocuments(
 	ctx context.Context,
 	client *es.TypedClient,
-	docRange *IndexDocumentRange,
+	docSearch *DocumentSearch,
 ) ([]Document, error) {
-	pitID, err := createPITSearch(ctx, client, docRange)
+	pitID, err := createPITSearch(ctx, client, docSearch)
 	if err != nil {
 		return nil, err
 	}
@@ -214,34 +215,32 @@ func FetchIndexDocuments(
 	body := ""
 	documentsFetched := 0
 
-	for documentsFetched < docRange.DocumentCount {
-		searchAfter := docRange.Offset + documentsFetched
+	for documentsFetched < docSearch.DocumentCount {
+		bodyWriter := bytes.NewBufferString(
+			fmt.Sprintf(
+				`{"pit": { "id":  "%s", "keep_alive": "1m" }, "sort": ["_doc"]`,
+				pitID,
+			),
+		)
 
+		searchAfter := docSearch.Offset + documentsFetched
 		if searchAfter > 0 {
-			body = fmt.Sprintf(`
-				{
-					"pit": {
-						"id":  "%s",
-						"keep_alive": "1m"
-					},
-					"sort": ["_doc"],
-					"search_after": [%d]
-				}`,
-				pitID,
-				// "search_after" really means "after"; the specified index isn't
-				// included. You can think of it as -1-based indexing.
-				searchAfter-1,
+			bodyWriter.WriteString(
+				fmt.Sprintf(
+					`, "search_after": [%d]`,
+					// "search_after" really means "after"; the specified index isn't
+					// included. You can think of it as -1-based indexing.
+					searchAfter-1,
+				),
 			)
-		} else {
-			body = fmt.Sprintf(`
-				{
-					"pit": {
-						"id":  "%s",
-						"keep_alive": "1m"
-					},
-					"sort": ["_doc"]
-				}`,
-				pitID,
+		}
+
+		if docSearch.QueryJSON != "" {
+			bodyWriter.WriteString(
+				fmt.Sprintf(
+					`, "query": %s`,
+					docSearch.QueryJSON,
+				),
 			)
 		}
 

@@ -172,6 +172,7 @@ var (
 	elasticsearchCloudId      = elasticsearchScan.Flag("cloud-id", "Elasticsearch cloud ID. Can also be provided with environment variable").Envar("ELASTICSEARCH_CLOUD_ID").String()
 	elasticsearchAPIKey       = elasticsearchScan.Flag("api-key", "Elasticsearch API key. Can also be provided with environment variable").Envar("ELASTICSEARCH_API_KEY").String()
 	elasticsearchIndexPattern = elasticsearchScan.Flag("index-pattern", "Filters the indices to search").Envar("ELASTICSEARCH_INDEX_PATTERN").String()
+	elasticsearchQueryJSON    = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
 )
 
 func init() {
@@ -618,6 +619,7 @@ func run(state overseer.State) {
 			CloudID:      *elasticsearchCloudId,
 			APIKey:       *elasticsearchAPIKey,
 			IndexPattern: *elasticsearchIndexPattern,
+			QueryJSON:    *elasticsearchQueryJSON,
 		}
 		if err := e.ScanElasticsearch(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Elasticsearch.")
