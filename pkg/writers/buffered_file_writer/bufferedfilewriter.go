@@ -3,6 +3,7 @@
 package bufferedfilewriter
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -31,6 +32,43 @@ func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 	fileSizeHistogram.Observe(float64(size))
 }
 
+// fileWriter represents a buffered writer for storing data in a temporary file.
+// It encapsulates the underlying file handle, buffered writer, and the filename.
+//
+// By using a buffered writer, it minimizes the number of disk I/O operations and improves performance.
+//
+// The fileWriter provides methods to write data to the file and to properly close the file,
+// ensuring that all buffered data is flushed and the file is closed gracefully.
+//
+// The use of a fileWriter allows for better memory management and enables handling large amounts of data
+// that might not fit in memory. It provides a clean and encapsulated API for writing data to a file
+// while abstracting away the low-level details of file handling.
+type fileWriter struct {
+	filename string
+	file     *os.File      // Underlying file handle for the temporary file.
+	writer   *bufio.Writer // Buffered writer for efficient writing to the file.
+}
+
+func newFileWriter() (*fileWriter, error) {
+	file, err := os.CreateTemp(os.TempDir(), cleantemp.MkFilename())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary file for file writer: %w", err)
+	}
+
+	return &fileWriter{filename: file.Name(), file: file, writer: bufio.NewWriter(file)}, nil
+}
+
+// Write writes data to the fileWriter.
+func (fw *fileWriter) Write(data []byte) (int, error) { return fw.writer.Write(data) }
+
+// Close flushes the buffered writer and closes the underlying file.
+func (fw *fileWriter) Close() error {
+	if err := fw.writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush buffered writer: %w", err)
+	}
+	return fw.file.Close()
+}
+
 // state represents the current mode of BufferedFileWriter.
 type state uint8
 
@@ -47,10 +85,10 @@ type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
 
-	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
-	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
-	filename string         // Name of the temporary file.
-	file     *os.File       // File for storing data over the threshold.
+	bufPool *buffer.Pool   // Pool for storing buffers for reuse.
+	buf     *buffer.Buffer // Buffer for storing data under the threshold in memory.
+
+	file *fileWriter // File for storing data over the threshold.
 
 	state state // Current state of the writer. (writeOnly or readOnly)
 
@@ -90,7 +128,7 @@ func (w *BufferedFileWriter) String() (string, error) {
 	}
 
 	// Data is in a file, read from the file.
-	file, err := os.Open(w.filename)
+	file, err := os.Open(w.file.filename)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
@@ -139,12 +177,10 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	// Switch to file writing if threshold is exceeded.
 	// This helps in managing memory efficiently for large content.
 	if w.file == nil {
-		file, err := os.CreateTemp(os.TempDir(), cleantemp.MkFilename())
+		file, err := newFileWriter()
 		if err != nil {
 			return 0, err
 		}
-
-		w.filename = file.Name()
 		w.file = file
 
 		// Transfer existing data in buffer to the file, then clear the buffer.
@@ -184,6 +220,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 			return err
 		}
 	}
+
 	return w.file.Close()
 }
 
@@ -201,7 +238,7 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 
 	if w.file != nil {
 		// Data is in a file, read from the file.
-		file, err := os.Open(w.filename)
+		file, err := os.Open(w.file.filename)
 		if err != nil {
 			return nil, err
 		}

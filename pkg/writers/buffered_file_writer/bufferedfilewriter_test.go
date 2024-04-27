@@ -51,11 +51,12 @@ func TestBufferedFileWriterString(t *testing.T) {
 	}{
 		{name: "Empty", input: []byte(""), expectedStr: ""},
 		{name: "Nil", input: nil, expectedStr: ""},
-		{name: "Small content, buffer only", input: []byte("hello"), expectedStr: "hello"},
+		{name: "Small content, buffer only", input: []byte("hello"), expectedStr: "hello", threshold: defaultThreshold},
 		{
 			name:        "Large content, buffer only",
 			input:       []byte("longer string with more characters"),
 			expectedStr: "longer string with more characters",
+			threshold:   defaultThreshold,
 		},
 		{
 			name:        "Large content, file only",
@@ -87,12 +88,18 @@ func TestBufferedFileWriterString(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			got, err := writer.String()
-			assert.NoError(t, err)
 			err = writer.CloseForWriting()
 			assert.NoError(t, err)
 
+			rc, err := writer.ReadCloser()
+			assert.NoError(t, err)
+			defer rc.Close()
+
+			got, err := writer.String()
+			assert.NoError(t, err)
+
 			assert.Equal(t, tc.expectedStr, got, "String content mismatch")
+
 		})
 	}
 }
@@ -280,14 +287,17 @@ func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 	_, err := writer.Write(data)
 	assert.NoError(t, err)
 
-	defer func() {
-		err := writer.CloseForWriting()
-		assert.NoError(t, err)
-	}()
+	err = writer.CloseForWriting()
+	assert.NoError(t, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(t, err)
+	defer rc.Close()
 
 	assert.NotNil(t, writer.file)
 	assert.Len(t, writer.buf.Bytes(), 0)
-	fileContents, err := os.ReadFile(writer.filename)
+
+	fileContents, err := os.ReadFile(writer.file.filename)
 	assert.NoError(t, err)
 	assert.Equal(t, data, fileContents)
 }
@@ -305,26 +315,26 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	_, err := writer.Write(initialData)
 	assert.NoError(t, err)
 
-	defer func() {
-		err := writer.CloseForWriting()
-		assert.NoError(t, err)
-	}()
-
 	// Get the file modification time after the initial write.
-	initialModTime, err := getFileModTime(t, writer.filename)
+	initialModTime, err := getFileModTime(t, writer.file.filename)
 	assert.NoError(t, err)
-	fileContents, err := os.ReadFile(writer.filename)
-	assert.NoError(t, err)
-	assert.Equal(t, initialData, fileContents)
+	assert.Empty(t, writer.buf.Bytes()) // Buffer should be empty the write was flushed to the file.
 
 	// Perform a subsequent write with data under the threshold.
 	_, err = writer.Write(subsequentData)
 	assert.NoError(t, err)
 
 	assert.Equal(t, subsequentData, writer.buf.Bytes()) // Check buffer contents
-	finalModTime, err := getFileModTime(t, writer.filename)
+	finalModTime, err := getFileModTime(t, writer.file.filename)
 	assert.NoError(t, err)
 	assert.Equal(t, initialModTime, finalModTime) // File should not be modified again
+
+	err = writer.CloseForWriting()
+	assert.NoError(t, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(t, err)
+	rc.Close()
 }
 
 func getFileModTime(t *testing.T, fileName string) (time.Time, error) {
@@ -395,7 +405,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			assert.NoError(t, err)
 
 			if writer.file != nil {
-				fileContents, err := os.ReadFile(writer.filename)
+				fileContents, err := os.ReadFile(writer.file.filename)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectFileContent, string(fileContents))
 				return
