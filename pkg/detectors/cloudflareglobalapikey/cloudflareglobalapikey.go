@@ -2,9 +2,10 @@ package cloudflareglobalapikey
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -51,10 +52,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			emailRes := strings.TrimSpace(emailMatch[1])
-
-			if detectors.IsKnownFalsePositive(apiKeyRes, detectors.DefaultFalsePositives, true) { // wait- (apiKeyRes, email) might be false positive does not mean (apiKeyRes, another_email) is ?
-				continue
-			}
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_CloudflareGlobalApiKey,

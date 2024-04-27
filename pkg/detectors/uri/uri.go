@@ -95,10 +95,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && !s.allowKnownTestSites && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 

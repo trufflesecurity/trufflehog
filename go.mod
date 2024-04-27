@@ -15,7 +15,7 @@ require (
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/aws/aws-sdk-go v1.51.23
+	github.com/aws/aws-sdk-go v1.51.29
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
@@ -26,7 +26,7 @@ require (
 	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/coinbase/waas-client-library-go v1.0.8
-	github.com/couchbase/gocb/v2 v2.8.0
+	github.com/couchbase/gocb/v2 v2.8.1
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
 	github.com/fatih/color v1.16.0
@@ -61,7 +61,7 @@ require (
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
-	github.com/microsoft/go-mssqldb v1.7.0
+	github.com/microsoft/go-mssqldb v1.7.1
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -80,7 +80,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.30.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.5.2
-	github.com/xanzy/go-gitlab v0.102.0
+	github.com/xanzy/go-gitlab v0.103.0
 	go.mongodb.org/mongo-driver v1.15.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
@@ -90,7 +90,7 @@ require (
 	golang.org/x/oauth2 v0.19.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.14.0
-	google.golang.org/api v0.174.0
+	google.golang.org/api v0.176.1
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/h2non/gock.v1 v1.1.2
 	pgregory.net/rapid v1.1.0
@@ -99,8 +99,8 @@ require (
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
-	cloud.google.com/go/auth v0.2.0 // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.2.0 // indirect
+	cloud.google.com/go/auth v0.3.0 // indirect
+	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.7 // indirect
@@ -141,7 +141,7 @@ require (
 	github.com/containerd/containerd v1.7.12 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
-	github.com/couchbase/gocbcore/v10 v10.4.0 // indirect
+	github.com/couchbase/gocbcore/v10 v10.4.1 // indirect
 	github.com/couchbase/gocbcoreps v0.1.2 // indirect
 	github.com/couchbase/goprotostellar v1.0.2 // indirect
 	github.com/couchbaselabs/gocbconnstr/v2 v2.0.0-20230515165046-68b522a21131 // indirect
@@ -281,7 +281,7 @@ require (
 	google.golang.org/genproto v0.0.0-20240227224415-6ceb2ff114de // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240314234333-6e1732d8331c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect
-	google.golang.org/grpc v1.63.0 // indirect
+	google.golang.org/grpc v1.63.2 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

@@ -37,7 +37,7 @@ const (
 // based on performance needs or resource constraints, providing a unified way to interact with different content types.
 type contentWriter interface { // Write appends data to the content storage.
 	// Write appends data to the content storage.
-	Write(ctx context.Context, data []byte) (int, error)
+	Write(data []byte) (int, error)
 	// ReadCloser provides a reader for accessing stored content.
 	ReadCloser() (io.ReadCloser, error)
 	// CloseForWriting closes the content storage for writing.
@@ -76,10 +76,14 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 // All Diffs must have an associated commit.
 // The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
 // By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
-func newDiff(ctx context.Context, commit *Commit, opts ...diffOption) *Diff {
-	diff := &Diff{Commit: commit, contentWriter: bufferwriter.New(ctx)}
+func newDiff(commit *Commit, opts ...diffOption) *Diff {
+	diff := &Diff{Commit: commit}
 	for _, opt := range opts {
 		opt(diff)
+	}
+
+	if diff.contentWriter == nil {
+		diff.contentWriter = bufferwriter.New()
 	}
 
 	return diff
@@ -92,17 +96,15 @@ func (d *Diff) Len() int { return d.contentWriter.Len() }
 func (d *Diff) ReadCloser() (io.ReadCloser, error) { return d.contentWriter.ReadCloser() }
 
 // write delegates to the contentWriter.
-func (d *Diff) write(ctx context.Context, p []byte) error {
-	_, err := d.contentWriter.Write(ctx, p)
+func (d *Diff) write(p []byte) error {
+	_, err := d.contentWriter.Write(p)
 	return err
 }
 
 // finalize ensures proper closure of resources associated with the Diff.
 // handle the final flush in the finalize method, in case there's data remaining in the buffer.
 // This method should be called to release resources, especially when writing to a file.
-func (d *Diff) finalize() error {
-	return d.contentWriter.CloseForWriting()
-}
+func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 
 // Commit contains commit header info and diffs.
 type Commit struct {
@@ -327,13 +329,13 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 	var latestState = Initial
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
-		opts = append(opts, withCustomContentWriter(bufferwriter.New(ctx)))
-		return newDiff(ctx, c, opts...)
+		opts = append(opts, withCustomContentWriter(bufferwriter.New()))
+		return newDiff(c, opts...)
 	}
 	if c.useCustomContentWriter {
 		diff = func(c *Commit, opts ...diffOption) *Diff {
-			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New(ctx)))
-			return newDiff(ctx, c, opts...)
+			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
+			return newDiff(c, opts...)
 		}
 	}
 	currentDiff := diff(currentCommit)
@@ -520,7 +522,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				latestState = HunkContentLine
 			}
 			// TODO: Why do we care about this? It creates empty lines in the diff. If there are no plusLines, it's just newlines.
-			if err := currentDiff.write(ctx, []byte("\n")); err != nil {
+			if err := currentDiff.write([]byte("\n")); err != nil {
 				ctx.Logger().Error(err, "failed to write to diff")
 			}
 		case isHunkPlusLine(latestState, line):
@@ -528,7 +530,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 				latestState = HunkContentLine
 			}
 
-			if err := currentDiff.write(ctx, line[1:]); err != nil {
+			if err := currentDiff.write(line[1:]); err != nil {
 				ctx.Logger().Error(err, "failed to write to diff")
 			}
 			// NoOp. We only care about additions.
