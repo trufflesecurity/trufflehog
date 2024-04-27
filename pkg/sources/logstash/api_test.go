@@ -11,7 +11,7 @@ func TestSource_GetShardListPreference(t *testing.T) {
 	index2 := Index{Name: "index2", PrimaryShards: []int{1}, DocumentCount: 10}
 	index3 := Index{Name: "index3", PrimaryShards: []int{}, DocumentCount: 0}
 
-	assert.Equal(t, "_shards:1,4,3", getShardListPreference(&index))
-	assert.Equal(t, "_shards:1", getShardListPreference(&index2))
-	assert.Equal(t, "", getShardListPreference(&index3))
+	assert.Equal(t, "_shards:1,4,3", getShardListPreference(index.PrimaryShards))
+	assert.Equal(t, "_shards:1", getShardListPreference(index2.PrimaryShards))
+	assert.Equal(t, "", getShardListPreference(index3.PrimaryShards))
 }

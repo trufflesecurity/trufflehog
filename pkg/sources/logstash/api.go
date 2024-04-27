@@ -56,15 +56,15 @@ func makeElasticSearchRequest(
 	return data, nil
 }
 
-func getShardListPreference(i *Index) string {
-	if len(i.PrimaryShards) == 0 {
+func getShardListPreference(primaryShards []int) string {
+	if len(primaryShards) == 0 {
 		return ""
 	}
 
 	shardList := &strings.Builder{}
 	shardList.WriteString("_shards:")
 
-	for i, n := range i.PrimaryShards {
+	for i, n := range primaryShards {
 		if i > 0 {
 			shardList.WriteString(",")
 		}
@@ -173,7 +173,7 @@ func createPITSearch(
 	req := esapi.OpenPointInTimeRequest{
 		Index:      []string{docRange.Name},
 		KeepAlive:  "1m",
-		Preference: getShardListPreference(&docRange.Index),
+		Preference: getShardListPreference(docRange.Index.PrimaryShards),
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -210,11 +210,10 @@ func FetchIndexDocuments(
 		return nil, err
 	}
 
-	// [TODO] See if it's possible to restrict the returned fields to just what
-	// 				we want
-	allowPartialSearchResults := true
-	body := ""
 	documents := make([]Document, 0)
+
+	allowPartialSearchResults := false
+	body := ""
 	documentsFetched := 0
 
 	for documentsFetched < docRange.DocumentCount {
@@ -251,6 +250,7 @@ func FetchIndexDocuments(
 		req := esapi.SearchRequest{
 			AllowPartialSearchResults: &allowPartialSearchResults,
 			Body:                      strings.NewReader(body),
+			SourceIncludes:            []string{"@timestamp", "message"},
 		}
 
 		searchResults, err := makeElasticSearchRequest(ctx, client, req)
@@ -266,6 +266,10 @@ func FetchIndexDocuments(
 		hits, ok := topLevelHits["hits"].([]any)
 		if !ok {
 			continue
+		}
+
+		if len(hits) == 0 {
+			break
 		}
 
 		documentsFetched += len(hits)
