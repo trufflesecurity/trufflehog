@@ -5776,22 +5776,22 @@ var _ interface {
 	ErrorName() string
 } = WebhookValidationError{}
 
-// Validate checks the field values on Logstash with the rules defined in the
-// proto definition for this message. If any rules are violated, the first
+// Validate checks the field values on Elasticsearch with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
-func (m *Logstash) Validate() error {
+func (m *Elasticsearch) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Logstash with the rules defined in
-// the proto definition for this message. If any rules are violated, the
-// result is a list of violation errors wrapped in LogstashMultiError, or nil
-// if none found.
-func (m *Logstash) ValidateAll() error {
+// ValidateAll checks the field values on Elasticsearch with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ElasticsearchMultiError, or
+// nil if none found.
+func (m *Elasticsearch) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Logstash) validate(all bool) error {
+func (m *Elasticsearch) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -5803,18 +5803,19 @@ func (m *Logstash) validate(all bool) error {
 	// no validation rules for ApiKey
 
 	if len(errors) > 0 {
-		return LogstashMultiError(errors)
+		return ElasticsearchMultiError(errors)
 	}
 
 	return nil
 }
 
-// LogstashMultiError is an error wrapping multiple validation errors returned
-// by Logstash.ValidateAll() if the designated constraints aren't met.
-type LogstashMultiError []error
+// ElasticsearchMultiError is an error wrapping multiple validation errors
+// returned by Elasticsearch.ValidateAll() if the designated constraints
+// aren't met.
+type ElasticsearchMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m LogstashMultiError) Error() string {
+func (m ElasticsearchMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -5823,11 +5824,11 @@ func (m LogstashMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m LogstashMultiError) AllErrors() []error { return m }
+func (m ElasticsearchMultiError) AllErrors() []error { return m }
 
-// LogstashValidationError is the validation error returned by
-// Logstash.Validate if the designated constraints aren't met.
-type LogstashValidationError struct {
+// ElasticsearchValidationError is the validation error returned by
+// Elasticsearch.Validate if the designated constraints aren't met.
+type ElasticsearchValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -5835,22 +5836,22 @@ type LogstashValidationError struct {
 }
 
 // Field function returns field value.
-func (e LogstashValidationError) Field() string { return e.field }
+func (e ElasticsearchValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e LogstashValidationError) Reason() string { return e.reason }
+func (e ElasticsearchValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e LogstashValidationError) Cause() error { return e.cause }
+func (e ElasticsearchValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e LogstashValidationError) Key() bool { return e.key }
+func (e ElasticsearchValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e LogstashValidationError) ErrorName() string { return "LogstashValidationError" }
+func (e ElasticsearchValidationError) ErrorName() string { return "ElasticsearchValidationError" }
 
 // Error satisfies the builtin error interface
-func (e LogstashValidationError) Error() string {
+func (e ElasticsearchValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -5862,14 +5863,14 @@ func (e LogstashValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sLogstash.%s: %s%s",
+		"invalid %sElasticsearch.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = LogstashValidationError{}
+var _ error = ElasticsearchValidationError{}
 
 var _ interface {
 	Field() string
@@ -5877,4 +5878,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = LogstashValidationError{}
+} = ElasticsearchValidationError{}

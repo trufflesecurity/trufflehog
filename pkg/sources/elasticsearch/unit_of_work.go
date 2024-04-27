@@ -1,4 +1,4 @@
-package logstash
+package elasticsearch
 
 type IndexDocumentRange struct {
 	Index

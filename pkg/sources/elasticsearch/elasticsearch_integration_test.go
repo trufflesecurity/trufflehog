@@ -1,7 +1,7 @@
 //go:build integration
 // +build integration
 
-package logstash
+package elasticsearch
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
-	"github.com/elastic/go-elasticsearch/v8"
+	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/testcontainers/testcontainers-go"
 	elasticcontainer "github.com/testcontainers/testcontainers-go/modules/elasticsearch"
@@ -22,8 +22,8 @@ const USER string = "elastic" // This is hardcoded in the container
 
 func buildTestClient(
 	ec *elasticcontainer.ElasticsearchContainer,
-) (*elasticsearch.TypedClient, error) {
-	return elasticsearch.NewTypedClient(elasticsearch.Config{
+) (*es.TypedClient, error) {
+	return es.NewTypedClient(es.Config{
 		Addresses: []string{ec.Settings.Address},
 		Username:  USER,
 		Password:  ec.Settings.Password,

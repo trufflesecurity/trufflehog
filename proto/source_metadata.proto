@@ -312,7 +312,7 @@ message Webhook {
   }
 }
 
-message Logstash {
+message Elasticsearch {
   string index = 1;
   string document_id = 2;
   string timestamp = 3;
@@ -350,6 +350,6 @@ message MetaData {
     TravisCI travisCI = 28;
     Postman postman = 29;
     Webhook webhook = 30;
-    Logstash logstash = 31;
+    Elasticsearch elasticsearch = 31;
   }
 }

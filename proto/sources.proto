@@ -409,7 +409,7 @@ message Webhook {
   }
 }
 
-message Logstash {
+message Elasticsearch {
   string cloud_id = 1;
   string api_key = 2;
 }

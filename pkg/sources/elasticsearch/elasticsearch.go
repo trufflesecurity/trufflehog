@@ -1,10 +1,10 @@
-package logstash
+package elasticsearch
 
 import (
 	"fmt"
 	"log"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -29,12 +29,12 @@ type Source struct {
 	cloudId     string
 	apiKey      string
 	ctx         context.Context
-	client      *elasticsearch.TypedClient
+	client      *es.TypedClient
 	log         logr.Logger
 	sources.Progress
 }
 
-// Init returns an initialized Logstash source
+// Init returns an initialized Elasticsearch source
 func (s *Source) Init(
 	aCtx context.Context,
 	name string,
@@ -44,7 +44,7 @@ func (s *Source) Init(
 	connection *anypb.Any,
 	concurrency int,
 ) error {
-	var conn sourcespb.Logstash
+	var conn sourcespb.Elasticsearch
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
 		return errors.WrapPrefix(err, "error unmarshalling connection", 0)
 	}
@@ -69,7 +69,7 @@ func (s *Source) Init(
 	return nil
 }
 
-func (s *Source) buildElasticClient() (*elasticsearch.TypedClient, error) {
+func (s *Source) buildElasticClient() (*es.TypedClient, error) {
 	return BuildElasticClient(s.cloudId, s.apiKey)
 }
 
@@ -132,8 +132,8 @@ func (s *Source) Chunks(
 						SourceID:   s.SourceID(),
 						JobID:      s.JobID(),
 						SourceMetadata: &source_metadatapb.MetaData{
-							Data: &source_metadatapb.MetaData_Logstash{
-								Logstash: &source_metadatapb.Logstash{
+							Data: &source_metadatapb.MetaData_Elasticsearch{
+								Elasticsearch: &source_metadatapb.Elasticsearch{
 									Index:      sanitizer.UTF8(indexDocumentRange.Name),
 									DocumentId: sanitizer.UTF8(document.ID),
 									Timestamp:  sanitizer.UTF8(document.Timestamp),

@@ -1,4 +1,4 @@
-package logstash
+package elasticsearch
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
@@ -76,7 +76,7 @@ func getShardListPreference(primaryShards []int) string {
 
 func fetchIndexNames(
 	ctx context.Context,
-	client *elasticsearch.TypedClient,
+	client *es.TypedClient,
 ) ([]string, error) {
 	allowNoIndices := true
 
@@ -103,7 +103,7 @@ func fetchIndexNames(
 
 func fetchIndexPrimaryShards(
 	ctx context.Context,
-	client *elasticsearch.TypedClient,
+	client *es.TypedClient,
 	indexNames []string,
 ) (map[string][]int, error) {
 	primaryShards := make(map[string][]int)
@@ -140,7 +140,7 @@ func fetchIndexPrimaryShards(
 
 func fetchIndexDocumentCount(
 	ctx context.Context,
-	client *elasticsearch.TypedClient,
+	client *es.TypedClient,
 	indexName string,
 ) (int, error) {
 	req := esapi.CountRequest{
@@ -167,7 +167,7 @@ func fetchIndexDocumentCount(
 
 func createPITSearch(
 	ctx context.Context,
-	client *elasticsearch.TypedClient,
+	client *es.TypedClient,
 	docRange *IndexDocumentRange,
 ) (string, error) {
 	req := esapi.OpenPointInTimeRequest{
@@ -192,8 +192,8 @@ func createPITSearch(
 // Builds a new Elasticsearch client
 func BuildElasticClient(
 	cloudID, apiKey string,
-) (*elasticsearch.TypedClient, error) {
-	return elasticsearch.NewTypedClient(elasticsearch.Config{
+) (*es.TypedClient, error) {
+	return es.NewTypedClient(es.Config{
 		CloudID: cloudID,
 		APIKey:  apiKey,
 	})
@@ -202,7 +202,7 @@ func BuildElasticClient(
 // Fetches a range of documents from an index
 func FetchIndexDocuments(
 	ctx context.Context,
-	client *elasticsearch.TypedClient,
+	client *es.TypedClient,
 	docRange *IndexDocumentRange,
 ) ([]Document, error) {
 	pitID, err := createPITSearch(ctx, client, docRange)
@@ -317,7 +317,7 @@ func FetchIndexDocuments(
 // Returns an array of all of the indices in an Elasticsearch cluster.
 func FetchIndices(
 	ctx context.Context,
-	client *elasticsearch.TypedClient,
+	client *es.TypedClient,
 ) ([]Index, error) {
 	indices := []Index{}
 
