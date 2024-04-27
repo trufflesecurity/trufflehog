@@ -83,8 +83,7 @@ func New(opts ...Option) *BufferedFileWriter {
 // NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
 func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
 	writer := New(opts...)
-	_, err := io.Copy(writer, r)
-	if err != nil {
+	if _, err := io.Copy(writer, r); err != nil {
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
 	}
 
