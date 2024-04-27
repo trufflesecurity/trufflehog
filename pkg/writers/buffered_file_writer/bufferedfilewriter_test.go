@@ -518,8 +518,9 @@ func TestNewFromReader(t *testing.T) {
 			wantData: "hello world",
 		},
 		{
-			name:   "Empty reader",
-			reader: strings.NewReader(""),
+			name:    "Empty reader",
+			reader:  strings.NewReader(""),
+			wantErr: true,
 		},
 		{
 			name:    "Error reader",
@@ -533,9 +534,7 @@ func TestNewFromReader(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			bufWriter, err := NewFromReader(tc.reader)
-			if tc.wantErr {
-				assert.Error(t, err)
-				assert.Nil(t, bufWriter)
+			if err != nil && tc.wantErr {
 				return
 			}
 
@@ -545,14 +544,17 @@ func TestNewFromReader(t *testing.T) {
 			err = bufWriter.CloseForWriting()
 			assert.NoError(t, err)
 
-			buffer := new(bytes.Buffer)
+			b := new(bytes.Buffer)
 			rdr, err := bufWriter.ReadCloser()
+			if err != nil && tc.wantErr {
+				return
+			}
 			assert.NoError(t, err)
 			defer rdr.Close()
 
-			_, err = buffer.ReadFrom(rdr)
+			_, err = b.ReadFrom(rdr)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantData, buffer.String())
+			assert.Equal(t, tc.wantData, b.String())
 		})
 	}
 }
