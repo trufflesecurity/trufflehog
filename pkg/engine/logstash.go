@@ -9,29 +9,29 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/logstash"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/elasticsearch"
 )
 
-// ScanLogstash scans a Logstash installation.
-func (e *Engine) ScanLogstash(ctx context.Context, c sources.LogstashConfig) error {
-	connection := &sourcespb.Logstash{
+// ScanElasticsearch scans a Elasticsearch installation.
+func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchConfig) error {
+	connection := &sourcespb.Elasticsearch{
 		CloudId: c.CloudID,
 		ApiKey:  c.APIKey,
 	}
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		ctx.Logger().Error(err, "failed to marshal Logstash connection")
+		ctx.Logger().Error(err, "failed to marshal Elasticsearch connection")
 		return err
 	}
 
-	sourceName := "trufflehog - Logstash"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, logstash.SourceType)
+	sourceName := "trufflehog - Elasticsearch"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, elasticsearch.SourceType)
 
-	logstashSource := &logstash.Source{}
-	if err := logstashSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	elasticsearchSource := &elasticsearch.Source{}
+	if err := elasticsearchSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, logstashSource)
+	_, err = e.sourceManager.Run(ctx, sourceName, elasticsearchSource)
 	return err
 }

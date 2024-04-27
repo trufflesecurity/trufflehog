@@ -53,7 +53,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 	}
 
 	t.Run("New server contains no indexes", func(t *testing.T) {
-		indexNames, err := fetchIndexNames(ctx, es)
+		indexNames, err := fetchIndexNames(ctx, es, "*")
 		if err != nil {
 			t.Error(err)
 		}
@@ -90,7 +90,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"Adding a document to a new index creates a single index",
 		func(t *testing.T) {
-			indexNames, err := fetchIndexNames(ctx, es)
+			indexNames, err := fetchIndexNames(ctx, es, "*")
 			if err != nil {
 				t.Error(err)
 			}

@@ -47,7 +47,7 @@ enum SourceType {
   SOURCE_TYPE_TRAVISCI = 32;
   SOURCE_TYPE_POSTMAN = 33;
   SOURCE_TYPE_WEBHOOK = 34;
-  SOURCE_TYPE_LOGSTASH = 35;
+  SOURCE_TYPE_ELASTICSEARCH = 35;
 }
 
 message LocalSource {
@@ -412,4 +412,5 @@ message Webhook {
 message Elasticsearch {
   string cloud_id = 1;
   string api_key = 2;
+  string index_pattern = 3;
 }

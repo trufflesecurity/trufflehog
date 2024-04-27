@@ -5802,6 +5802,8 @@ func (m *Elasticsearch) validate(all bool) error {
 
 	// no validation rules for ApiKey
 
+	// no validation rules for IndexPattern
+
 	if len(errors) > 0 {
 		return ElasticsearchMultiError(errors)
 	}

@@ -319,9 +319,10 @@ type PostmanConfig struct {
 	Filter *common.Filter
 }
 
-type LogstashConfig struct {
-	CloudID string
-	APIKey  string
+type ElasticsearchConfig struct {
+	CloudID      string
+	APIKey       string
+	IndexPattern string
 }
 
 // Progress is used to update job completion progress across sources.

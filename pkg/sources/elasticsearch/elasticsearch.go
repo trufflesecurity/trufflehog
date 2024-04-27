@@ -18,19 +18,20 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-const SourceType = sourcespb.SourceType_SOURCE_TYPE_LOGSTASH
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_ELASTICSEARCH
 
 type Source struct {
-	name        string
-	sourceId    sources.SourceID
-	jobId       sources.JobID
-	concurrency int
-	verify      bool
-	cloudId     string
-	apiKey      string
-	ctx         context.Context
-	client      *es.TypedClient
-	log         logr.Logger
+	name         string
+	sourceId     sources.SourceID
+	jobId        sources.JobID
+	concurrency  int
+	verify       bool
+	cloudId      string
+	apiKey       string
+	indexPattern string
+	ctx          context.Context
+	client       *es.TypedClient
+	log          logr.Logger
 	sources.Progress
 }
 
@@ -58,6 +59,12 @@ func (s *Source) Init(
 	s.apiKey = conn.ApiKey
 	s.ctx = aCtx
 	s.log = aCtx.Logger()
+
+	if conn.IndexPattern == "" {
+		s.indexPattern = "*"
+	} else {
+		s.indexPattern = conn.IndexPattern
+	}
 
 	client, err := s.buildElasticClient()
 	if err != nil {
@@ -91,7 +98,7 @@ func (s *Source) Chunks(
 	chunksChan chan *sources.Chunk,
 	targets ...sources.ChunkingTarget,
 ) error {
-	indices, err := FetchIndices(s.ctx, s.client)
+	indices, err := FetchIndices(s.ctx, s.client, s.indexPattern)
 	if err != nil {
 		return err
 	}

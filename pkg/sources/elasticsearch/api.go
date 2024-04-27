@@ -77,12 +77,10 @@ func getShardListPreference(primaryShards []int) string {
 func fetchIndexNames(
 	ctx context.Context,
 	client *es.TypedClient,
+	indexPattern string,
 ) ([]string, error) {
-	allowNoIndices := true
-
 	req := esapi.IndicesGetRequest{
-		Index:          []string{"*"},
-		AllowNoIndices: &allowNoIndices,
+		Index: []string{indexPattern},
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -318,10 +316,11 @@ func FetchIndexDocuments(
 func FetchIndices(
 	ctx context.Context,
 	client *es.TypedClient,
+	indexPattern string,
 ) ([]Index, error) {
 	indices := []Index{}
 
-	indexNames, err := fetchIndexNames(ctx, client)
+	indexNames, err := fetchIndexNames(ctx, client, indexPattern)
 	if err != nil {
 		return nil, err
 	}
