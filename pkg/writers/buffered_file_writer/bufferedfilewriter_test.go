@@ -532,8 +532,7 @@ func TestNewFromReader(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
-			bufWriter, err := NewFromReader(ctx, tc.reader)
+			bufWriter, err := NewFromReader(tc.reader)
 			if tc.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, bufWriter)
@@ -568,7 +567,7 @@ func TestNewFromReaderThresholdExceeded(t *testing.T) {
 
 	// Create a BufferedFileWriter with a smaller threshold.
 	threshold := uint64(1024) // 1 KB
-	bufWriter, err := NewFromReader(context.Background(), bytes.NewReader(largeData), WithThreshold(threshold))
+	bufWriter, err := NewFromReader(bytes.NewReader(largeData), WithThreshold(threshold))
 	assert.NoError(t, err)
 
 	err = bufWriter.CloseForWriting()

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
@@ -24,8 +23,8 @@ type bufferedFileReader struct {
 // for random access reading and seeking.
 // Close should be called when the bufferedFileReader is no longer needed.
 // It returns the initialized bufferedFileReader and any error encountered during the process.
-func NewBufferedFileReader(ctx context.Context, r io.Reader) (*bufferedFileReader, error) {
-	writer, err := bufferedfilewriter.NewFromReader(ctx, r)
+func NewBufferedFileReader(r io.Reader) (*bufferedFileReader, error) {
+	writer, err := bufferedfilewriter.NewFromReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("error creating bufferedFileReader: %w", err)
 	}

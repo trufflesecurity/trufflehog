@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestBufferedFileReader(t *testing.T) {
@@ -15,7 +13,7 @@ func TestBufferedFileReader(t *testing.T) {
 
 	data := []byte("Hello, World!")
 
-	bufferReadSeekCloser, err := NewBufferedFileReader(context.Background(), bytes.NewReader(data))
+	bufferReadSeekCloser, err := NewBufferedFileReader(bytes.NewReader(data))
 	assert.NoError(t, err)
 	defer bufferReadSeekCloser.Close()
 
@@ -49,7 +47,7 @@ func TestBufferedFileReaderClose(t *testing.T) {
 
 	data := []byte("Hello, World!")
 
-	bufferReadSeekCloser, err := NewBufferedFileReader(context.Background(), bytes.NewReader(data))
+	bufferReadSeekCloser, err := NewBufferedFileReader(bytes.NewReader(data))
 	assert.NoError(t, err)
 
 	err = bufferReadSeekCloser.Close()
@@ -85,7 +83,7 @@ func TestBufferedFileReaderReadFromFile(t *testing.T) {
 		largeData[i] = byte(i % 256)
 	}
 
-	bufferReadSeekCloser, err := NewBufferedFileReader(context.Background(), bytes.NewReader(largeData))
+	bufferReadSeekCloser, err := NewBufferedFileReader(bytes.NewReader(largeData))
 	assert.NoError(t, err)
 	defer bufferReadSeekCloser.Close()
 
