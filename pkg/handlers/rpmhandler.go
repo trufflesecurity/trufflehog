@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,17 +14,11 @@ import (
 
 // rpmHandler specializes defaultHandler to manage RPM package files. It leverages shared behaviors
 // from defaultHandler and introduces additional logic specific to RPM packages.
-type rpmHandler struct {
-	*defaultHandler
-	metrics *metrics
-}
+type rpmHandler struct{ *defaultHandler }
 
-// newRPMHandler creates an rpmHandler with the provided metrics.
+// newRPMHandler creates an rpmHandler.
 func newRPMHandler() *rpmHandler {
-	return &rpmHandler{
-		defaultHandler: newDefaultHandler(rpmHandlerType),
-		metrics:        newHandlerMetrics(rpmHandlerType),
-	}
+	return &rpmHandler{defaultHandler: newDefaultHandler(rpmHandlerType)}
 }
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
@@ -39,18 +32,9 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.
 		defer close(archiveChan)
 
 		// Update the metrics for the file processing.
+		start := time.Now()
 		var err error
-		defer func(start time.Time) {
-			if err != nil {
-				h.metrics.incErrors()
-				if errors.Is(err, context.DeadlineExceeded) {
-					h.metrics.incFileProcessingTimeouts()
-				}
-				return
-			}
-
-			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-		}(time.Now())
+		defer h.measureLatencyAndHandleErrors(start, err)
 
 		var rpm *rpmutils.Rpm
 		rpm, err = rpmutils.ReadRpm(input)

@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestBufferWriterWrite(t *testing.T) {
@@ -41,7 +39,7 @@ func TestBufferWriterWrite(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(context.Background())
+			writer := New()
 			writer.state = tc.initialState
 
 			_, err := writer.Write(tc.input)
@@ -77,8 +75,9 @@ func TestBufferWriterReadCloser(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(context.Background())
+			writer := New()
 			writer.state = tc.initialState
+			writer.buf = writer.bufPool.Get()
 
 			rc, err := writer.ReadCloser()
 			if tc.expectedError {
@@ -96,7 +95,7 @@ func TestBufferWriterReadCloser(t *testing.T) {
 }
 
 func TestBufferWriterCloseForWriting(t *testing.T) {
-	writer := New(context.Background())
+	writer := New()
 	err := writer.CloseForWriting()
 	assert.NoError(t, err)
 	assert.Equal(t, readOnly, writer.state)
@@ -112,8 +111,8 @@ func TestBufferWriterString(t *testing.T) {
 	}{
 		{
 			name: "String with no data",
-			prepareBuffer: func(_ *BufferWriter) {
-				// No preparation needed, buffer is empty by default
+			prepareBuffer: func(bw *BufferWriter) {
+				_, _ = bw.Write([]byte(""))
 			},
 			expectedStr:   "",
 			expectedError: false,
@@ -140,7 +139,7 @@ func TestBufferWriterString(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			writer := New(context.Background())
+			writer := New()
 			tc.prepareBuffer(writer)
 
 			result, err := writer.String()
