@@ -194,7 +194,7 @@ func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
 	}
 
 	var totalBytesRead int64
-	const bufferSize = 1 << 15 // 32KB
+	const bufferSize = 1 << 16 // 64KB
 	buf := make([]byte, bufferSize)
 
 	for {
