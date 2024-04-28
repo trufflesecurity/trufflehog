@@ -28,8 +28,7 @@ type Source struct {
 	verify       bool
 	cloudId      string
 	apiKey       string
-	indexPattern string
-	queryJSON    string
+	filterParams FilterParams
 	ctx          context.Context
 	client       *es.TypedClient
 	log          logr.Logger
@@ -62,12 +61,13 @@ func (s *Source) Init(
 	s.log = aCtx.Logger()
 
 	if conn.IndexPattern == "" {
-		s.indexPattern = "*"
+		s.filterParams.indexPattern = "*"
 	} else {
-		s.indexPattern = conn.IndexPattern
+		s.filterParams.indexPattern = conn.IndexPattern
 	}
 
-	s.queryJSON = conn.QueryJson
+	s.filterParams.queryJSON = conn.QueryJson
+	s.filterParams.sinceTimestamp = conn.SinceTimestamp
 
 	client, err := s.buildElasticClient()
 	if err != nil {
@@ -80,7 +80,7 @@ func (s *Source) Init(
 }
 
 func (s *Source) buildElasticClient() (*es.TypedClient, error) {
-	return BuildElasticClient(s.cloudId, s.apiKey)
+	return buildElasticClient(s.cloudId, s.apiKey)
 }
 
 func (s *Source) Type() sourcespb.SourceType {
@@ -101,12 +101,12 @@ func (s *Source) Chunks(
 	chunksChan chan *sources.Chunk,
 	targets ...sources.ChunkingTarget,
 ) error {
-	indices, err := FetchIndices(s.ctx, s.client, s.indexPattern)
+	indices, err := fetchIndices(s.ctx, s.client, s.filterParams)
 	if err != nil {
 		return err
 	}
 
-	unitsOfWork := DistributeDocumentScans(s.concurrency, indices, s.queryJSON)
+	unitsOfWork := DistributeDocumentScans(s.concurrency, indices, s.filterParams)
 
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
@@ -122,15 +122,15 @@ func (s *Source) Chunks(
 				return err
 			}
 
-			for _, docSearch := range uow.DocumentSearches {
+			for _, docSearch := range uow.documentSearches {
 				// We should never set out to process a range of documents if the unit
 				// of work's document count is 0; if that's the case we goofed
 				// accounting somewhere. Log a warning in that case.
-				if uow.DocumentCount == 0 {
+				if uow.documentCount == 0 {
 					log.Println("Accounting error: doc count is 0 but pages remain")
 				}
 
-				documents, err := FetchIndexDocuments(s.ctx, client, &docSearch)
+				documents, err := fetchIndexDocuments(s.ctx, client, &docSearch)
 				if err != nil {
 					return err
 				}
@@ -144,22 +144,22 @@ func (s *Source) Chunks(
 						SourceMetadata: &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Elasticsearch{
 								Elasticsearch: &source_metadatapb.Elasticsearch{
-									Index:      sanitizer.UTF8(docSearch.Index.Name),
-									DocumentId: sanitizer.UTF8(document.ID),
-									Timestamp:  sanitizer.UTF8(document.Timestamp),
+									Index:      sanitizer.UTF8(docSearch.Index.name),
+									DocumentId: sanitizer.UTF8(document.id),
+									Timestamp:  sanitizer.UTF8(document.timestamp),
 								},
 							},
 						},
 						Verify: s.verify,
 					}
 
-					chunk.Data = []byte(document.Message)
+					chunk.Data = []byte(document.message)
 
 					if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
 						return err
 					}
-					uow.DocumentCount--
-					docSearch.Offset++
+					uow.documentCount--
+					docSearch.offset++
 
 					// When we use the Elastic API in this way, we can't tell it to only
 					// return a specific number of documents. We can only say "return a
@@ -170,22 +170,22 @@ func (s *Source) Chunks(
 					// (We could use the API in a different way to get a precise number
 					// of documents back, but that use is limited to 10000 documents
 					// which we could well exceed)
-					if uow.DocumentCount == 0 {
+					if uow.documentCount == 0 {
 						s.SetProgressComplete(
-							uow.MaxDocumentCount,
-							uow.MaxDocumentCount,
-							fmt.Sprintf("Scanned %d total documents", uow.MaxDocumentCount),
+							uow.maxDocumentCount,
+							uow.maxDocumentCount,
+							fmt.Sprintf("Scanned %d total documents", uow.maxDocumentCount),
 							"",
 						)
 						break
 					}
 					s.SetProgressComplete(
-						uow.MaxDocumentCount-uow.DocumentCount,
-						uow.MaxDocumentCount,
+						uow.maxDocumentCount-uow.documentCount,
+						uow.maxDocumentCount,
 						fmt.Sprintf(
 							"Scanned %d documents from index %s",
 							len(documents),
-							docSearch.Index.Name,
+							docSearch.Index.name,
 						),
 						"",
 					)

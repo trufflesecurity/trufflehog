@@ -131,7 +131,11 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"Adding a document to a new index creates a document count of 1",
 		func(t *testing.T) {
-			indexDocumentCount, err := fetchIndexDocumentCount(ctx, es, indexName)
+			indexDocumentCount, err := fetchIndexDocumentCount(
+				ctx,
+				es,
+				FilterParams{indexPattern: indexName},
+			)
 			if err != nil {
 				t.Error(err)
 			}
@@ -147,15 +151,15 @@ func TestSource_ElasticAPI(t *testing.T) {
 		func(t *testing.T) {
 			docRange := DocumentSearch{
 				Index: Index{
-					Name:          indexName,
-					PrimaryShards: []int{0},
-					DocumentCount: 1,
+					name:          indexName,
+					primaryShards: []int{0},
+					documentCount: 1,
 				},
-				Offset:    0,
-				QueryJSON: "",
+				offset:       0,
+				filterParams: FilterParams{},
 			}
 
-			docs, err := FetchIndexDocuments(ctx, es, &docRange)
+			docs, err := fetchIndexDocuments(ctx, es, &docRange)
 			if err != nil {
 				t.Error(err)
 			}
@@ -165,18 +169,18 @@ func TestSource_ElasticAPI(t *testing.T) {
 			}
 
 			doc := docs[0]
-			if doc.Timestamp != now.Format(time.RFC3339) {
+			if doc.timestamp != now.Format(time.RFC3339) {
 				t.Errorf(
 					"wanted timestamp %s, got %s\n",
 					now.Format(time.RFC3339),
-					doc.Timestamp,
+					doc.timestamp,
 				)
 			}
-			if doc.Message != payload["message"] {
+			if doc.message != payload["message"] {
 				t.Errorf(
 					"wanted message %s, got %s\n",
 					payload["message"],
-					doc.Message,
+					doc.message,
 				)
 			}
 		},

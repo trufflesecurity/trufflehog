@@ -320,10 +320,11 @@ type PostmanConfig struct {
 }
 
 type ElasticsearchConfig struct {
-	CloudID      string
-	APIKey       string
-	IndexPattern string
-	QueryJSON    string
+	CloudID        string
+	APIKey         string
+	IndexPattern   string
+	QueryJSON      string
+	SinceTimestamp string
 }
 
 // Progress is used to update job completion progress across sources.

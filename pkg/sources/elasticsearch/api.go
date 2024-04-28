@@ -13,6 +13,35 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
+type FilterParams struct {
+	indexPattern   string
+	queryJSON      string
+	sinceTimestamp string
+}
+
+func (fp *FilterParams) Query() (map[string]any, error) {
+	query := make(map[string]any)
+
+	if fp.queryJSON != "" {
+		err := json.Unmarshal([]byte(fp.queryJSON), &query)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if fp.sinceTimestamp != "" {
+		gte := make(map[string]string)
+		gte["gte"] = fp.sinceTimestamp
+
+		timestamp := make(map[string]map[string]string)
+		timestamp["timestamp"] = gte
+
+		query["range"] = timestamp
+	}
+
+	return query, nil
+}
+
 type PointInTime struct {
 	ID        string `json:"id"`
 	KeepAlive string `json:"keep_alive"`
@@ -26,19 +55,29 @@ type SearchRequestBody struct {
 }
 
 type Document struct {
-	ID        string
-	Timestamp string
-	Message   string
+	id        string
+	timestamp string
+	message   string
 }
 
 type Index struct {
-	Name          string
-	PrimaryShards []int
-	DocumentCount int
+	name          string
+	primaryShards []int
+	documentCount int
 }
 
 type elasticSearchRequest interface {
 	Do(providedCtx context.Context, transport esapi.Transport) (*esapi.Response, error)
+}
+
+// Builds a new Elasticsearch client
+func buildElasticClient(
+	cloudID, apiKey string,
+) (*es.TypedClient, error) {
+	return es.NewTypedClient(es.Config{
+		CloudID: cloudID,
+		APIKey:  apiKey,
+	})
 }
 
 func makeElasticSearchRequest(
@@ -151,10 +190,21 @@ func fetchIndexPrimaryShards(
 func fetchIndexDocumentCount(
 	ctx context.Context,
 	client *es.TypedClient,
-	indexName string,
+	filterParams FilterParams,
 ) (int, error) {
+	query, err := filterParams.Query()
+	if err != nil {
+		return 0, err
+	}
+
+	body, err := json.Marshal(query)
+	if err != nil {
+		return 0, err
+	}
+
 	req := esapi.CountRequest{
-		Index: []string{indexName},
+		Index: []string{filterParams.indexPattern},
+		Body:  strings.NewReader(string(body)),
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -181,9 +231,9 @@ func createPITSearch(
 	docSearch *DocumentSearch,
 ) (string, error) {
 	req := esapi.OpenPointInTimeRequest{
-		Index:      []string{docSearch.Index.Name},
+		Index:      []string{docSearch.Index.name},
 		KeepAlive:  "1m",
-		Preference: getShardListPreference(docSearch.Index.PrimaryShards),
+		Preference: getShardListPreference(docSearch.Index.primaryShards),
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -199,22 +249,21 @@ func createPITSearch(
 	return pitID, nil
 }
 
-// Builds a new Elasticsearch client
-func BuildElasticClient(
-	cloudID, apiKey string,
-) (*es.TypedClient, error) {
-	return es.NewTypedClient(es.Config{
-		CloudID: cloudID,
-		APIKey:  apiKey,
-	})
-}
-
 // Fetches a range of documents from an index
-func FetchIndexDocuments(
+func fetchIndexDocuments(
 	ctx context.Context,
 	client *es.TypedClient,
 	docSearch *DocumentSearch,
 ) ([]Document, error) {
+	/* [TODO]
+
+	It's possible that between counting and fetching documents that the count's
+	changed; in particular a document could have been deleted. That won't cause
+	issues with our bookkeeping here as we'll see we didn't get more hits for a
+	search and bail (this short circuits the loop invariant), but it could
+	result in us scanning a document multiple times. I think this isn't a
+	problem, but need to validate with Truffle.
+	*/
 	pitID, err := createPITSearch(ctx, client, docSearch)
 	if err != nil {
 		return nil, err
@@ -225,7 +274,7 @@ func FetchIndexDocuments(
 	allowPartialSearchResults := false
 	documentsFetched := 0
 
-	for documentsFetched < docSearch.DocumentCount {
+	for documentsFetched < docSearch.documentCount {
 		searchReqBody := SearchRequestBody{
 			PIT: PointInTime{
 				ID:        pitID,
@@ -238,19 +287,17 @@ func FetchIndexDocuments(
 		// the results. This means 0 is a valid value here, but that interacts
 		// badly with Go's "omitempty" which will omit it. So we use a pointer and
 		// only specify it if the value > -1.
-		searchAfter := ((docSearch.Offset + documentsFetched) - 1)
+		searchAfter := ((docSearch.offset + documentsFetched) - 1)
 		if searchAfter > -1 {
 			searchReqBody.SearchAfter = &searchAfter
 		}
 
-		if docSearch.QueryJSON != "" {
-			query := make(map[string]any)
-			err := json.Unmarshal([]byte(docSearch.QueryJSON), &query)
-			if err != nil {
-				return nil, err
-			}
-			searchReqBody.Query = query
+		query, err := docSearch.filterParams.Query()
+		if err != nil {
+			return nil, err
 		}
+
+		searchReqBody.Query = query
 
 		body, err := json.MarshalIndent(searchReqBody, "", "  ")
 		if err != nil {
@@ -313,9 +360,9 @@ func FetchIndexDocuments(
 			documents = append(
 				documents,
 				Document{
-					ID:        id,
-					Timestamp: timestamp,
-					Message:   message,
+					id:        id,
+					timestamp: timestamp,
+					message:   message,
 				},
 			)
 		}
@@ -325,14 +372,14 @@ func FetchIndexDocuments(
 }
 
 // Returns an array of all of the indices in an Elasticsearch cluster.
-func FetchIndices(
+func fetchIndices(
 	ctx context.Context,
 	client *es.TypedClient,
-	indexPattern string,
+	filterParams FilterParams,
 ) ([]Index, error) {
 	indices := []Index{}
 
-	indexNames, err := fetchIndexNames(ctx, client, indexPattern)
+	indexNames, err := fetchIndexNames(ctx, client, filterParams.indexPattern)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +390,7 @@ func FetchIndices(
 	}
 
 	for indexName, primaryShards := range indexPrimaryShards {
-		c, err := fetchIndexDocumentCount(ctx, client, indexName)
+		c, err := fetchIndexDocumentCount(ctx, client, filterParams)
 		if err != nil {
 			return nil, err
 		}
@@ -351,9 +398,9 @@ func FetchIndices(
 		indices = append(
 			indices,
 			Index{
-				Name:          indexName,
-				PrimaryShards: primaryShards,
-				DocumentCount: c,
+				name:          indexName,
+				primaryShards: primaryShards,
+				documentCount: c,
 			},
 		)
 	}

@@ -2,39 +2,43 @@ package elasticsearch
 
 type DocumentSearch struct {
 	Index
-	Offset    int
-	QueryJSON string
+	offset       int
+	filterParams FilterParams
 }
 
 type UnitOfWork struct {
-	MaxDocumentCount int
-	DocumentCount    int
-	DocumentSearches []DocumentSearch
+	maxDocumentCount int
+	documentCount    int
+	documentSearches []DocumentSearch
 }
 
 func NewUnitOfWork(maxDocumentCount int) UnitOfWork {
-	uow := UnitOfWork{MaxDocumentCount: maxDocumentCount}
-	uow.DocumentSearches = []DocumentSearch{}
+	uow := UnitOfWork{maxDocumentCount: maxDocumentCount}
+	uow.documentSearches = []DocumentSearch{}
 
 	return uow
 }
 
-func (uow *UnitOfWork) AddSearch(index Index, offset int, queryJSON string) int {
-	indexDocCount := index.DocumentCount - offset
-	addedDocumentCount := min(uow.MaxDocumentCount-uow.DocumentCount, indexDocCount)
+func (uow *UnitOfWork) AddSearch(
+	index Index,
+	offset int,
+	filterParams FilterParams,
+) int {
+	indexDocCount := index.documentCount - offset
+	addedDocumentCount := min(uow.maxDocumentCount-uow.documentCount, indexDocCount)
 
 	if addedDocumentCount > 0 {
-		uow.DocumentSearches = append(uow.DocumentSearches, DocumentSearch{
+		uow.documentSearches = append(uow.documentSearches, DocumentSearch{
 			Index: Index{
-				Name:          index.Name,
-				PrimaryShards: index.PrimaryShards,
-				DocumentCount: addedDocumentCount,
+				name:          index.name,
+				primaryShards: index.primaryShards,
+				documentCount: addedDocumentCount,
 			},
-			Offset:    offset,
-			QueryJSON: queryJSON,
+			offset:       offset,
+			filterParams: filterParams,
 		})
 
-		uow.DocumentCount += addedDocumentCount
+		uow.documentCount += addedDocumentCount
 	}
 
 	return addedDocumentCount
@@ -43,12 +47,12 @@ func (uow *UnitOfWork) AddSearch(index Index, offset int, queryJSON string) int 
 func DistributeDocumentScans(
 	maxUnits int,
 	indices []Index,
-	queryJSON string,
+	filterParams FilterParams,
 ) []UnitOfWork {
 	totalDocumentCount := 0
 
 	for _, i := range indices {
-		totalDocumentCount += i.DocumentCount
+		totalDocumentCount += i.documentCount
 	}
 
 	unitsOfWork := make([]UnitOfWork, maxUnits)
@@ -71,14 +75,14 @@ func DistributeDocumentScans(
 	unitOfWorkIndex := 0
 	for _, i := range indices {
 		uow := &unitsOfWork[unitOfWorkIndex]
-		offset := uow.AddSearch(i, 0, queryJSON)
+		offset := uow.AddSearch(i, 0, filterParams)
 
 		// If we've yet to distribute all the documents in the index, go into the
 		// next unit of work, and the next, and the next....
-		for offset < i.DocumentCount {
+		for offset < i.documentCount {
 			unitOfWorkIndex++
 			uow := &unitsOfWork[unitOfWorkIndex]
-			offset += uow.AddSearch(i, offset, queryJSON)
+			offset += uow.AddSearch(i, offset, filterParams)
 		}
 	}
 

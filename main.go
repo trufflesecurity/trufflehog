@@ -168,11 +168,12 @@ var (
 	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
 	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
 
-	elasticsearchScan         = cli.Command("elasticsearch", "Scan Elasticsearch")
-	elasticsearchCloudId      = elasticsearchScan.Flag("cloud-id", "Elasticsearch cloud ID. Can also be provided with environment variable").Envar("ELASTICSEARCH_CLOUD_ID").String()
-	elasticsearchAPIKey       = elasticsearchScan.Flag("api-key", "Elasticsearch API key. Can also be provided with environment variable").Envar("ELASTICSEARCH_API_KEY").String()
-	elasticsearchIndexPattern = elasticsearchScan.Flag("index-pattern", "Filters the indices to search").Envar("ELASTICSEARCH_INDEX_PATTERN").String()
-	elasticsearchQueryJSON    = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
+	elasticsearchScan           = cli.Command("elasticsearch", "Scan Elasticsearch")
+	elasticsearchCloudId        = elasticsearchScan.Flag("cloud-id", "Elasticsearch cloud ID. Can also be provided with environment variable").Envar("ELASTICSEARCH_CLOUD_ID").String()
+	elasticsearchAPIKey         = elasticsearchScan.Flag("api-key", "Elasticsearch API key. Can also be provided with environment variable").Envar("ELASTICSEARCH_API_KEY").String()
+	elasticsearchIndexPattern   = elasticsearchScan.Flag("index-pattern", "Filters the indices to search").Envar("ELASTICSEARCH_INDEX_PATTERN").String()
+	elasticsearchQueryJSON      = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
+	elasticsearchSinceTimestamp = elasticsearchScan.Flag("since-timestamp", "Filters the documents to search to those created since this timestamp; overrides any timestamp from --query-json").Envar("ELASTICSEARCH_SINCE_TIMESTAMP").String()
 )
 
 func init() {
@@ -616,10 +617,11 @@ func run(state overseer.State) {
 		}
 	case elasticsearchScan.FullCommand():
 		cfg := sources.ElasticsearchConfig{
-			CloudID:      *elasticsearchCloudId,
-			APIKey:       *elasticsearchAPIKey,
-			IndexPattern: *elasticsearchIndexPattern,
-			QueryJSON:    *elasticsearchQueryJSON,
+			CloudID:        *elasticsearchCloudId,
+			APIKey:         *elasticsearchAPIKey,
+			IndexPattern:   *elasticsearchIndexPattern,
+			QueryJSON:      *elasticsearchQueryJSON,
+			SinceTimestamp: *elasticsearchSinceTimestamp,
 		}
 		if err := e.ScanElasticsearch(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Elasticsearch.")

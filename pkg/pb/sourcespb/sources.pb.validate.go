@@ -5806,6 +5806,8 @@ func (m *Elasticsearch) validate(all bool) error {
 
 	// no validation rules for QueryJson
 
+	// no validation rules for SinceTimestamp
+
 	if len(errors) > 0 {
 		return ElasticsearchMultiError(errors)
 	}
