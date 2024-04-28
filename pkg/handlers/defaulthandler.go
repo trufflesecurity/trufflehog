@@ -246,7 +246,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	mime := mimetype.Detect(buffer)
 	mimeT := mimeType(mime.String())
 
-	if common.SkipFile(mime.Extension()) {
+	if common.SkipFile(mime.Extension()) || common.IsBinary(mime.Extension()) {
 		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
 		h.metrics.incFilesSkipped()
 		return nil
