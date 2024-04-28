@@ -648,8 +648,8 @@ func TestBufferedFileWriter_ReadFrom(t *testing.T) {
 		},
 		{
 			name:           "Input greater than threshold",
-			input:          string(make([]byte, 1<<24)), // 16MB input
-			expectedOutput: string(make([]byte, 1<<24)),
+			input:          string(make([]byte, defaultThreshold+1)),
+			expectedOutput: string(make([]byte, defaultThreshold+1)),
 			expectedSize:   1 << 24,
 		},
 	}
