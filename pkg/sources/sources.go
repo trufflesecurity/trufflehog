@@ -320,8 +320,12 @@ type PostmanConfig struct {
 }
 
 type ElasticsearchConfig struct {
+	Nodes          []string
+	Username       string
+	Password       string
 	CloudID        string
 	APIKey         string
+	ServiceToken   string
 	IndexPattern   string
 	QueryJSON      string
 	SinceTimestamp string

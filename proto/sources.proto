@@ -410,9 +410,13 @@ message Webhook {
 }
 
 message Elasticsearch {
-  string cloud_id = 1;
-  string api_key = 2;
-  string index_pattern = 3;
-  string query_json = 4;
-  string since_timestamp = 5;
+  repeated string nodes = 1;
+  string username = 2;
+  string password = 3;
+  string cloud_id = 4;
+  string api_key = 5;
+  string service_token = 6;
+  string index_pattern = 7;
+  string query_json = 8;
+  string since_timestamp = 9;
 }

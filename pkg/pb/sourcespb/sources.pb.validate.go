@@ -5798,9 +5798,15 @@ func (m *Elasticsearch) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for Username
+
+	// no validation rules for Password
+
 	// no validation rules for CloudId
 
 	// no validation rules for ApiKey
+
+	// no validation rules for ServiceToken
 
 	// no validation rules for IndexPattern
 

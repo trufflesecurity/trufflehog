@@ -70,16 +70,6 @@ type elasticSearchRequest interface {
 	Do(providedCtx context.Context, transport esapi.Transport) (*esapi.Response, error)
 }
 
-// Builds a new Elasticsearch client
-func buildElasticClient(
-	cloudID, apiKey string,
-) (*es.TypedClient, error) {
-	return es.NewTypedClient(es.Config{
-		CloudID: cloudID,
-		APIKey:  apiKey,
-	})
-}
-
 func makeElasticSearchRequest(
 	ctx context.Context,
 	transport esapi.Transport,

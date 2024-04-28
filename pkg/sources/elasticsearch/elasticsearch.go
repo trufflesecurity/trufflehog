@@ -26,8 +26,7 @@ type Source struct {
 	jobId        sources.JobID
 	concurrency  int
 	verify       bool
-	cloudId      string
-	apiKey       string
+	esConfig     es.Config
 	filterParams FilterParams
 	ctx          context.Context
 	client       *es.TypedClient
@@ -55,10 +54,33 @@ func (s *Source) Init(
 	s.jobId = jobId
 	s.concurrency = concurrency
 	s.verify = verify
-	s.cloudId = conn.CloudId
-	s.apiKey = conn.ApiKey
+
 	s.ctx = aCtx
 	s.log = aCtx.Logger()
+
+	esConfig := es.Config{}
+
+	if conn.Username != "" {
+		esConfig.Username = conn.Username
+	}
+
+	if conn.Password != "" {
+		esConfig.Password = conn.Password
+	}
+
+	if conn.CloudId != "" {
+		esConfig.CloudID = conn.CloudId
+	}
+
+	if conn.ApiKey != "" {
+		esConfig.APIKey = conn.ApiKey
+	}
+
+	if conn.ServiceToken != "" {
+		esConfig.ServiceToken = conn.ServiceToken
+	}
+
+	s.esConfig = esConfig
 
 	if conn.IndexPattern == "" {
 		s.filterParams.indexPattern = "*"
@@ -80,7 +102,7 @@ func (s *Source) Init(
 }
 
 func (s *Source) buildElasticClient() (*es.TypedClient, error) {
-	return buildElasticClient(s.cloudId, s.apiKey)
+	return es.NewTypedClient(s.esConfig)
 }
 
 func (s *Source) Type() sourcespb.SourceType {
