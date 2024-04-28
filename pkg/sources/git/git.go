@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v61/github"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -63,7 +63,7 @@ type Git struct {
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
-	concurrency        *semaphore.Weighted
+	concurrency        int
 	skipBinaries       bool
 	skipArchives       bool
 
@@ -110,7 +110,7 @@ func NewGit(config *Config) *Git {
 		jobID:              config.JobID,
 		sourceMetadataFunc: config.SourceMetadataFunc,
 		verify:             config.Verify,
-		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
+		concurrency:        config.Concurrency,
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
 		parser:             parser,
@@ -554,6 +554,118 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 	var lastCommitHash string
+
+	numWorkers := s.concurrency
+	workerPool := make(chan struct{}, numWorkers)
+	diffQueue := make(chan *gitparse.Diff, numWorkers)
+	defer close(diffQueue)
+
+	// Start the worker goroutines.
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			for diff := range diffQueue {
+				func() {
+					workerPool <- struct{}{}        // Acquire a worker from the pool.
+					defer func() { <-workerPool }() // Release the worker back to the pool.
+
+					// Check if the diff passes the filter.
+					// This helps to avoid processing unnecessary diffs.
+					if !scanOptions.Filter.Pass(diff.PathB) {
+						return
+					}
+
+					fileName := diff.PathB
+					// Avoid processing empty file names.
+					if fileName == "" {
+						return
+					}
+					email := diff.Commit.Author
+					when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+					fullHash := diff.Commit.Hash
+
+					// Handle binary files by reading the entire file rather than using the diff.
+					if diff.IsBinary {
+						metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
+						chunkSkel := &sources.Chunk{
+							SourceName:     s.sourceName,
+							SourceID:       s.sourceID,
+							JobID:          s.jobID,
+							SourceType:     s.sourceType,
+							SourceMetadata: metadata,
+							Verify:         s.verify,
+						}
+
+						commitHash := plumbing.NewHash(fullHash)
+						if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+							logger.V(1).Info(
+								"error handling binary file",
+								"error", err,
+								"filename", fileName,
+								"commit", commitHash,
+								"file", diff.PathB,
+							)
+						}
+						return
+					}
+
+					// Check if the diff size exceeds the chunk size limit.
+					// If it does, chunk it to handle the large diff.
+					// This helps to efficiently process large diffs and avoid memory issues.
+					if diff.Len() > sources.ChunkSize+sources.PeekSize {
+						s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
+						return
+					}
+
+					chunkData := func(d *gitparse.Diff) error {
+						metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, int64(diff.LineStart))
+
+						reader, err := d.ReadCloser()
+						if err != nil {
+							ctx.Logger().Error(
+								err, "error creating reader for commits",
+								"filename", fileName,
+								"commit", fullHash,
+								"file", diff.PathB,
+							)
+							return nil
+						}
+						defer reader.Close()
+
+						data := make([]byte, d.Len())
+						if _, err := io.ReadFull(reader, data); err != nil {
+							ctx.Logger().Error(
+								err, "error reading diff content for commit",
+								"filename", fileName,
+								"commit", fullHash,
+								"file", diff.PathB,
+							)
+							return nil
+						}
+						chunk := sources.Chunk{
+							SourceName:     s.sourceName,
+							SourceID:       s.sourceID,
+							JobID:          s.jobID,
+							SourceType:     s.sourceType,
+							SourceMetadata: metadata,
+							Data:           data,
+							Verify:         s.verify,
+						}
+						return reporter.ChunkOk(ctx, chunk)
+					}
+					if err := chunkData(diff); err != nil {
+						return
+					}
+				}()
+			}
+		}()
+	}
+
+	// Populate the diffQueue with diffs from the diffChan channel.
+	// This allows for concurrent processing of diffs by distributing the workload to the worker goroutines.
+	// The worker goroutines will consume the diffs from the diffQueue and process them concurrently.
 	for diff := range diffChan {
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth", "depth", depth)
@@ -573,87 +685,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			logger.V(5).Info("scanning commit", "commit", fullHash)
 		}
 
-		if !scanOptions.Filter.Pass(diff.PathB) {
-			continue
-		}
-
-		fileName := diff.PathB
-		if fileName == "" {
-			continue
-		}
-		email := diff.Commit.Author
-		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
-		// Handle binary files by reading the entire file rather than using the diff.
-		if diff.IsBinary {
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
-			chunkSkel := &sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Verify:         s.verify,
-			}
-
-			commitHash := plumbing.NewHash(fullHash)
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info(
-					"error handling binary file",
-					"error", err,
-					"filename", fileName,
-					"commit", commitHash,
-					"file", diff.PathB,
-				)
-			}
-			continue
-		}
-
-		if diff.Len() > sources.ChunkSize+sources.PeekSize {
-			s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
-			continue
-		}
-
-		chunkData := func(d *gitparse.Diff) error {
-			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, int64(diff.LineStart))
-
-			reader, err := d.ReadCloser()
-			if err != nil {
-				ctx.Logger().Error(
-					err, "error creating reader for commits",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
-				return nil
-			}
-			defer reader.Close()
-
-			data := make([]byte, d.Len())
-			if _, err := io.ReadFull(reader, data); err != nil {
-				ctx.Logger().Error(
-					err, "error reading diff content for commit",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
-				return nil
-			}
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           data,
-				Verify:         s.verify,
-			}
-			return reporter.ChunkOk(ctx, chunk)
-		}
-		if err := chunkData(diff); err != nil {
-			return err
-		}
+		diffQueue <- diff
 	}
+
+	wg.Wait() // Wait for all worker goroutines to finish
+
 	return nil
 }
 
