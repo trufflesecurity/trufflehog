@@ -102,6 +102,7 @@ var (
 		"pyo":    {}, // Compiled Python file
 		"pyc":    {}, // Compiled Python file
 		"sym":    {}, // Symbolic link, Unix/Linux
+		"rlib":   {}, // Rust library
 	}
 )
 
