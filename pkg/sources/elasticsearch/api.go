@@ -1,7 +1,6 @@
 package elasticsearch
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +12,18 @@ import (
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
+
+type PointInTime struct {
+	ID        string `json:"id"`
+	KeepAlive string `json:"keep_alive"`
+}
+
+type SearchRequestBody struct {
+	PIT         PointInTime    `json:"pit"`
+	Sort        []string       `json:"sort"`
+	SearchAfter *int           `json:"search_after,omitempty"`
+	Query       map[string]any `json:"query,omitempty"`
+}
 
 type Document struct {
 	ID        string
@@ -212,41 +223,43 @@ func FetchIndexDocuments(
 	documents := make([]Document, 0)
 
 	allowPartialSearchResults := false
-	body := ""
 	documentsFetched := 0
 
 	for documentsFetched < docSearch.DocumentCount {
-		bodyWriter := bytes.NewBufferString(
-			fmt.Sprintf(
-				`{"pit": { "id":  "%s", "keep_alive": "1m" }, "sort": ["_doc"]`,
-				pitID,
-			),
-		)
+		searchReqBody := SearchRequestBody{
+			PIT: PointInTime{
+				ID:        pitID,
+				KeepAlive: "1m",
+			},
+			Sort: []string{"_doc"},
+		}
 
-		searchAfter := docSearch.Offset + documentsFetched
-		if searchAfter > 0 {
-			bodyWriter.WriteString(
-				fmt.Sprintf(
-					`, "search_after": [%d]`,
-					// "search_after" really means "after"; the specified index isn't
-					// included. You can think of it as -1-based indexing.
-					searchAfter-1,
-				),
-			)
+		// "search_after" really means "after": the specified ID isn't included in
+		// the results. This means 0 is a valid value here, but that interacts
+		// badly with Go's "omitempty" which will omit it. So we use a pointer and
+		// only specify it if the value > -1.
+		searchAfter := ((docSearch.Offset + documentsFetched) - 1)
+		if searchAfter > -1 {
+			searchReqBody.SearchAfter = &searchAfter
 		}
 
 		if docSearch.QueryJSON != "" {
-			bodyWriter.WriteString(
-				fmt.Sprintf(
-					`, "query": %s`,
-					docSearch.QueryJSON,
-				),
-			)
+			query := make(map[string]any)
+			err := json.Unmarshal([]byte(docSearch.QueryJSON), &query)
+			if err != nil {
+				return nil, err
+			}
+			searchReqBody.Query = query
+		}
+
+		body, err := json.MarshalIndent(searchReqBody, "", "  ")
+		if err != nil {
+			return nil, err
 		}
 
 		req := esapi.SearchRequest{
 			AllowPartialSearchResults: &allowPartialSearchResults,
-			Body:                      strings.NewReader(body),
+			Body:                      strings.NewReader(string(body)),
 			SourceIncludes:            []string{"@timestamp", "message"},
 		}
 
