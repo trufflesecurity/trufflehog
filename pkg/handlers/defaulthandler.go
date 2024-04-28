@@ -204,7 +204,7 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
-		if common.SkipFile(file.Name()) {
+		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
 			lCtx.Logger().V(5).Info("skipping file")
 			h.metrics.incFilesSkipped()
 			return nil
