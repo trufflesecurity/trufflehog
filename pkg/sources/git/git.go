@@ -558,7 +558,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	numWorkers := s.concurrency
 	workerPool := make(chan struct{}, numWorkers)
 	diffQueue := make(chan *gitparse.Diff, numWorkers)
-	defer close(diffQueue)
 
 	// Start the worker goroutines.
 	var wg sync.WaitGroup
@@ -687,6 +686,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		diffQueue <- diff
 	}
+	close(diffQueue) // Close the diffQueue channel to signal the worker goroutines to finish processing.
 
 	wg.Wait() // Wait for all worker goroutines to finish
 
