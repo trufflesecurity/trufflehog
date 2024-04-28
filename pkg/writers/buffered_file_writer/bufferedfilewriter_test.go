@@ -620,3 +620,68 @@ func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
 	assert.Same(t, buf, bufFromPool, "Buffer should be returned to the pool")
 	bufPool.Put(bufFromPool)
 }
+
+func TestBufferedFileWriter_ReadFrom(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedOutput string
+		expectedSize   int64
+	}{
+		{
+			name:           "Empty input",
+			input:          "",
+			expectedOutput: "",
+			expectedSize:   0,
+		},
+		{
+			name:           "Small input",
+			input:          "Hello, World!",
+			expectedOutput: "Hello, World!",
+			expectedSize:   13,
+		},
+		{
+			name:           "Large input",
+			input:          string(make([]byte, 1<<20)), // 1MB input
+			expectedOutput: string(make([]byte, 1<<20)),
+			expectedSize:   1 << 20,
+		},
+		{
+			name:           "Input greater than threshold",
+			input:          string(make([]byte, 1<<24)), // 16MB input
+			expectedOutput: string(make([]byte, 1<<24)),
+			expectedSize:   1 << 24,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			writer := New()
+			reader := bytes.NewReader([]byte(tc.input))
+			size, err := writer.ReadFrom(reader)
+			assert.NoError(t, err)
+
+			err = writer.CloseForWriting()
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.expectedSize, size)
+			if size == 0 {
+				return
+			}
+
+			rc, err := writer.ReadCloser()
+			assert.NoError(t, err)
+			defer rc.Close()
+
+			var result bytes.Buffer
+
+			_, err = io.Copy(&result, rc)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedOutput, result.String())
+		})
+	}
+}

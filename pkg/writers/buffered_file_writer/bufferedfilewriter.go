@@ -4,6 +4,7 @@ package bufferedfilewriter
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -174,6 +175,48 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	w.metrics.recordDiskWrite(int64(n))
 
 	return n, nil
+}
+
+// ReadFrom reads data from the provided reader and writes it to the buffer or file, depending on the size.
+// This method satisfies the io.ReaderFrom interface, allowing it to be used with standard library functions
+// like io.Copy and io.CopyBuffer.
+//
+// By implementing this method, BufferedFileWriter can leverage optimized data transfer mechanisms provided
+// by the standard library. For example, when using io.Copy with a BufferedFileWriter, the copy operation
+// will be delegated to the ReadFrom method, avoiding the potentially non-optimized default approach.
+//
+// This is particularly useful when creating a new BufferedFileWriter from an io.Reader using the NewFromReader
+// function. By leveraging the ReadFrom method, data can be efficiently transferred from the reader to
+// the BufferedFileWriter.
+func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
+	if w.state != writeOnly {
+		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
+	}
+
+	var totalBytesRead int64
+	const bufferSize = 1 << 15 // 32KB
+	buf := make([]byte, bufferSize)
+
+	for {
+		n, err := reader.Read(buf)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return totalBytesRead, err
+		}
+
+		if n > 0 {
+			written, err := w.Write(buf[:n])
+			if err != nil {
+				return totalBytesRead, err
+			}
+			totalBytesRead += int64(written)
+		}
+
+		if errors.Is(err, io.EOF) {
+			break
+		}
+	}
+
+	return totalBytesRead, nil
 }
 
 // CloseForWriting flushes any remaining data in the buffer to the file, closes the file if created,
