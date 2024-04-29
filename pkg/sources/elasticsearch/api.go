@@ -50,7 +50,7 @@ type PointInTime struct {
 type SearchRequestBody struct {
 	PIT         PointInTime    `json:"pit"`
 	Sort        []string       `json:"sort"`
-	SearchAfter *int           `json:"search_after,omitempty"`
+	SearchAfter []int          `json:"search_after,omitempty"`
 	Query       map[string]any `json:"query,omitempty"`
 }
 
@@ -180,21 +180,20 @@ func fetchIndexPrimaryShards(
 func fetchIndexDocumentCount(
 	ctx context.Context,
 	client *es.TypedClient,
-	filterParams FilterParams,
+	indexName string,
+	query map[string]any,
 ) (int, error) {
-	query, err := filterParams.Query()
-	if err != nil {
-		return 0, err
-	}
-
 	body, err := json.Marshal(query)
 	if err != nil {
 		return 0, err
 	}
 
 	req := esapi.CountRequest{
-		Index: []string{filterParams.indexPattern},
-		Body:  strings.NewReader(string(body)),
+		Index: []string{indexName},
+	}
+
+	if len(body) > 0 {
+		req.Body = strings.NewReader(string(body))
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -221,9 +220,9 @@ func createPITSearch(
 	docSearch *DocumentSearch,
 ) (string, error) {
 	req := esapi.OpenPointInTimeRequest{
-		Index:      []string{docSearch.Index.name},
+		Index:      []string{docSearch.name},
 		KeepAlive:  "1m",
-		Preference: getShardListPreference(docSearch.Index.primaryShards),
+		Preference: getShardListPreference(docSearch.primaryShards),
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -273,13 +272,9 @@ func fetchIndexDocuments(
 			Sort: []string{"_doc"},
 		}
 
-		// "search_after" really means "after": the specified ID isn't included in
-		// the results. This means 0 is a valid value here, but that interacts
-		// badly with Go's "omitempty" which will omit it. So we use a pointer and
-		// only specify it if the value > -1.
 		searchAfter := ((docSearch.offset + documentsFetched) - 1)
 		if searchAfter > -1 {
-			searchReqBody.SearchAfter = &searchAfter
+			searchReqBody.SearchAfter = []int{searchAfter}
 		}
 
 		query, err := docSearch.filterParams.Query()
@@ -304,6 +299,8 @@ func fetchIndexDocuments(
 		if err != nil {
 			return nil, err
 		}
+
+		// [TODO] Check for errors
 
 		topLevelHits, ok := searchResults["hits"].(map[string]any)
 		if !ok {
@@ -380,7 +377,12 @@ func fetchIndices(
 	}
 
 	for indexName, primaryShards := range indexPrimaryShards {
-		c, err := fetchIndexDocumentCount(ctx, client, filterParams)
+		query, err := filterParams.Query()
+		if err != nil {
+			return nil, err
+		}
+
+		c, err := fetchIndexDocumentCount(ctx, client, indexName, query)
 		if err != nil {
 			return nil, err
 		}

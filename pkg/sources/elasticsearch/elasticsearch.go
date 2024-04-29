@@ -166,7 +166,7 @@ func (s *Source) Chunks(
 						SourceMetadata: &source_metadatapb.MetaData{
 							Data: &source_metadatapb.MetaData_Elasticsearch{
 								Elasticsearch: &source_metadatapb.Elasticsearch{
-									Index:      sanitizer.UTF8(docSearch.Index.name),
+									Index:      sanitizer.UTF8(docSearch.name),
 									DocumentId: sanitizer.UTF8(document.id),
 									Timestamp:  sanitizer.UTF8(document.timestamp),
 								},
@@ -207,7 +207,7 @@ func (s *Source) Chunks(
 						fmt.Sprintf(
 							"Scanned %d documents from index %s",
 							len(documents),
-							docSearch.Index.name,
+							docSearch.name,
 						),
 						"",
 					)

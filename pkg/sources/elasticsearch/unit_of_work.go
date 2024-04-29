@@ -1,5 +1,7 @@
 package elasticsearch
 
+import "fmt"
+
 type DocumentSearch struct {
 	Index
 	offset       int
@@ -17,6 +19,14 @@ func NewUnitOfWork(maxDocumentCount int) UnitOfWork {
 	uow.documentSearches = []DocumentSearch{}
 
 	return uow
+}
+
+func (ds *DocumentSearch) String() string {
+	if ds.offset > 0 {
+		return fmt.Sprintf("%s [%d:]", ds.name, ds.offset)
+	} else {
+		return ds.name
+	}
 }
 
 func (uow *UnitOfWork) AddSearch(

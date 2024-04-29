@@ -64,6 +64,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 	})
 
 	indexName := gofakeit.Word()
+	indexName2 := gofakeit.Word()
 	now := time.Now()
 
 	payload := make(map[string]string)
@@ -96,11 +97,156 @@ func TestSource_ElasticAPI(t *testing.T) {
 			}
 
 			if len(indexNames) != 1 {
-				t.Errorf("wanted 1 indexNames, got %d\n", len(indexNames))
+				t.Fatalf("wanted 1 indexNames, got %d\n", len(indexNames))
 			}
 
 			if indexNames[0] != indexName {
 				t.Errorf("wanted index name \"%s\", got %s", indexName, indexNames[0])
+			}
+		},
+	)
+
+	nowAgain := time.Now()
+	payload2 := make(map[string]string)
+	payload2["message"] = gofakeit.SentenceSimple()
+	payload2["@timestamp"] = nowAgain.Format(time.RFC3339)
+
+	jsonMessage, err = json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req = esapi.IndexRequest{
+		Index:   indexName2,
+		Body:    bytes.NewReader(jsonMessage),
+		Refresh: "true",
+	}
+
+	res, err = req.Do(ctx, es)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	t.Run(
+		"Unspecified indexPattern fetches no indices",
+		func(t *testing.T) {
+			indices, err := fetchIndices(ctx, es, FilterParams{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(indices) != 0 {
+				t.Errorf("wanted 0 indices, got %d\n", len(indices))
+			}
+		},
+	)
+
+	t.Run(
+		"Indices have the correct document count",
+		func(t *testing.T) {
+			indices, err := fetchIndices(ctx, es, FilterParams{indexPattern: "*"})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(indices) != 2 {
+				t.Errorf("wanted 2 indices, got %d\n", len(indices))
+			}
+
+			if indices[0].documentCount != 1 {
+				t.Errorf(
+					"wanted documentCount of 1 in 1st index, got %d\n",
+					indices[0].documentCount,
+				)
+			}
+
+			if indices[1].documentCount != 1 {
+				t.Errorf(
+					"wanted documentCount of 1 in 2nd index, got %d\n",
+					indices[1].documentCount,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"A single unit of work has the correct max document count",
+		func(t *testing.T) {
+			indices, err := fetchIndices(ctx, es, FilterParams{indexPattern: "*"})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			unitsOfWork := DistributeDocumentScans(1, indices, FilterParams{indexPattern: "*"})
+
+			if len(unitsOfWork) != 1 {
+				t.Fatalf("wanted 1 unit of work, got %d\n", len(unitsOfWork))
+			}
+
+			if len(unitsOfWork[0].documentSearches) != 2 {
+				t.Fatalf(
+					"wanted 1 doc search in 1st unit of work, got %d\n",
+					len(unitsOfWork[0].documentSearches),
+				)
+			}
+
+			if unitsOfWork[0].documentSearches[0].documentCount != 1 {
+				t.Errorf(
+					"wanted max document count of 1 in unit of work's 1st doc search, got %d\n",
+					unitsOfWork[0].documentSearches[0].documentCount,
+				)
+			}
+
+			if unitsOfWork[0].documentSearches[1].documentCount != 1 {
+				t.Errorf(
+					"wanted max document count of 1 in unit of work's 2nd doc search, got %d\n",
+					unitsOfWork[0].documentSearches[1].documentCount,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"Multiple units of work have the correct max document count",
+		func(t *testing.T) {
+			indices, err := fetchIndices(ctx, es, FilterParams{indexPattern: "*"})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			unitsOfWork := DistributeDocumentScans(2, indices, FilterParams{indexPattern: "*"})
+
+			if len(unitsOfWork) != 2 {
+				t.Fatalf("wanted 2 units of work, got %d\n", len(unitsOfWork))
+			}
+
+			if len(unitsOfWork[0].documentSearches) != 1 {
+				t.Fatalf(
+					"wanted 1 doc search in 1st unit of work, got %d\n",
+					len(unitsOfWork[0].documentSearches),
+				)
+			}
+
+			if len(unitsOfWork[1].documentSearches) != 1 {
+				t.Fatalf(
+					"wanted 1 doc search in 2nd unit of work, got %d\n",
+					len(unitsOfWork[0].documentSearches),
+				)
+			}
+
+			if unitsOfWork[0].documentSearches[0].documentCount != 1 {
+				t.Errorf(
+					"wanted max document count of 1 in 1st unit of work's doc search, got %d\n",
+					unitsOfWork[0].documentSearches[0].documentCount,
+				)
+			}
+
+			if unitsOfWork[1].documentSearches[0].documentCount != 1 {
+				t.Errorf(
+					"wanted max document count of 1 in 2nd unit of work's doc search, got %d\n",
+					unitsOfWork[1].documentSearches[0].documentCount,
+				)
 			}
 		},
 	)
@@ -134,7 +280,8 @@ func TestSource_ElasticAPI(t *testing.T) {
 			indexDocumentCount, err := fetchIndexDocumentCount(
 				ctx,
 				es,
-				FilterParams{indexPattern: indexName},
+				indexName,
+				make(map[string]any),
 			)
 			if err != nil {
 				t.Error(err)
@@ -149,7 +296,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"Stored document matches passed values",
 		func(t *testing.T) {
-			docRange := DocumentSearch{
+			docSearch := DocumentSearch{
 				Index: Index{
 					name:          indexName,
 					primaryShards: []int{0},
@@ -159,7 +306,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				filterParams: FilterParams{},
 			}
 
-			docs, err := fetchIndexDocuments(ctx, es, &docRange)
+			docs, err := fetchIndexDocuments(ctx, es, &docSearch)
 			if err != nil {
 				t.Error(err)
 			}
