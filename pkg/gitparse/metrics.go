@@ -24,26 +24,19 @@ var (
 		Buckets:   prometheus.ExponentialBuckets(1, 10, 8),
 	})
 
-	producedDiffsTotal = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "produced_diffs_total",
+	diffWaitingTime = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:      "diff_waiting_time_microseconds",
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
-		Help:      "Total number of produced diffs.",
-	})
-
-	consumedDiffsTotal = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "consumed_diffs_total",
-		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
-		Help:      "Total number of consumed diffs.",
+		Help:      "Waiting time of a diff in the queue.",
+		Buckets:   prometheus.ExponentialBuckets(1, 10, 8),
 	})
 )
 
 type metrics struct {
 	produceDiffDuration prometheus.Histogram
 	consumeDiffDuration prometheus.Histogram
-	producedDiffsTotal  prometheus.Counter
-	consumedDiffsTotal  prometheus.Counter
+	diffWaitingTime     prometheus.Histogram
 }
 
 // newDiffChanMetrics creates a new metrics instance configured with Prometheus metrics specific to a DiffChan.
@@ -57,13 +50,9 @@ type metrics struct {
 //     It tracks the time taken to retrieve a diff from the DiffChan.
 //     This metric helps to monitor the performance and latency of diff consumption.
 //
-//   - producedDiffsTotal: a Counter metric that tracks the total number of diffs produced.
-//     It increments each time a diff is successfully added to the DiffChan.
-//     This metric provides insights into the overall volume of diffs being produced.
-//
-//   - consumedDiffsTotal: a Counter metric that tracks the total number of diffs consumed.
-//     It increments each time a diff is successfully retrieved from the DiffChan.
-//     This metric provides insights into the overall volume of diffs being consumed.
+//   - diffWaitingTime: a Histogram metric that measures the waiting time of a diff in the queue.
+//     It tracks the time a diff spends waiting in the queue before being processed.
+//     This metric helps to monitor the queuing time and identify any bottlenecks or delays in diff processing.
 //
 // These metrics are useful for monitoring the performance and throughput of the DiffChan.
 // By tracking the durations of diff production and consumption, as well as the total counts,
@@ -75,8 +64,7 @@ func newDiffChanMetrics() *metrics {
 	return &metrics{
 		produceDiffDuration: produceDiffDuration,
 		consumeDiffDuration: consumeDiffDuration,
-		producedDiffsTotal:  producedDiffsTotal,
-		consumedDiffsTotal:  consumedDiffsTotal,
+		diffWaitingTime:     diffWaitingTime,
 	}
 }
 
@@ -88,6 +76,6 @@ func (m *metrics) observeConsumeDiffDuration(duration float64) {
 	m.consumeDiffDuration.Observe(duration)
 }
 
-func (m *metrics) incProducedDiffsTotal() { m.producedDiffsTotal.Inc() }
-
-func (m *metrics) incConsumedDiffsTotal() { m.consumedDiffsTotal.Inc() }
+func (m *metrics) observeDiffWaitingTime(duration float64) {
+	m.diffWaitingTime.Observe(duration)
+}

@@ -91,6 +91,10 @@ func NewFromReader(ctx context.Context, r io.Reader, opts ...Option) (*BufferedF
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
 	}
 
+	if writer.buf == nil {
+		return nil, fmt.Errorf("buffer is empty, no reader created")
+	}
+
 	ctx.Logger().V(3).Info("data written to buffered file writer", "bytes", n)
 
 	return writer, nil

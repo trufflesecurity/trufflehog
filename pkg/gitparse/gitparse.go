@@ -224,20 +224,22 @@ func (d *DiffChan) produceDiff(diff *Diff) {
 	startTime := time.Now()
 	d.ch <- diff
 	d.metrics.observeProduceDiffDuration(float64(time.Since(startTime).Microseconds()))
-	d.metrics.incProducedDiffsTotal()
 }
 
 func (d *DiffChan) ConsumeDiff() *Diff {
-	startTime := time.Now()
 	diff := <-d.ch
-	d.metrics.observeConsumeDiffDuration(float64(time.Since(startTime).Microseconds()))
-	d.metrics.incConsumedDiffsTotal()
 	return diff
 }
 
-func (d *DiffChan) Close() {
-	close(d.ch)
+func (d *DiffChan) RecordConsumptionTime(duration time.Duration) {
+	d.metrics.observeConsumeDiffDuration(float64(duration.Microseconds()))
 }
+
+func (d *DiffChan) RecordWaitingTime(duration time.Duration) {
+	d.metrics.observeDiffWaitingTime(float64(duration.Microseconds()))
+}
+
+func (d *DiffChan) Close() { close(d.ch) }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log.
@@ -295,7 +297,7 @@ func (c *Parser) Staged(ctx context.Context, source string) (*DiffChan, error) {
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
 func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (*DiffChan, error) {
-	diffChan := newDiffChan(64)
+	diffChan := newDiffChan(32)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {

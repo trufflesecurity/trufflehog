@@ -518,6 +518,16 @@ func (s *Git) CommitsScanned() uint64 {
 
 const gitDirName = ".git"
 
+// timestampedDiff combines a gitparse.Diff and a timestamp.
+// It is used to track the time when a diff is enqueued for processing.
+//
+// The timestamp field records the time when the diff is enqueued into the diffQueue.
+// This timestamp is used to calculate the waiting time and processing time of the diff.
+type timestampedDiff struct {
+	*gitparse.Diff
+	timestamp time.Time
+}
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := getSafeRemoteURL(repo, "origin")
@@ -557,7 +567,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	numWorkers := s.concurrency * 4
 	workerPool := make(chan struct{}, numWorkers)
-	diffQueue := make(chan *gitparse.Diff, numWorkers)
+	diffQueue := make(chan *timestampedDiff, numWorkers)
 
 	// Start the worker goroutines.
 	var wg sync.WaitGroup
@@ -567,8 +577,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			defer wg.Done()
 			for diff := range diffQueue {
 				func() {
-					workerPool <- struct{}{}        // Acquire a worker from the pool.
-					defer func() { <-workerPool }() // Release the worker back to the pool.
+					workerPool <- struct{}{} // Acquire a worker from the pool.
+					diffChan.RecordWaitingTime(time.Since(diff.timestamp))
+					start := time.Now() // Start the timer for processing the diff.
+					defer func(t time.Time) {
+						<-workerPool
+						diffChan.RecordConsumptionTime(time.Since(t)) // Record the time taken to process the diff.
+					}(start) // Release the worker back to the pool.
 
 					// Check if the diff passes the filter.
 					// This helps to avoid processing unnecessary diffs.
@@ -614,7 +629,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					// If it does, chunk it to handle the large diff.
 					// This helps to efficiently process large diffs and avoid memory issues.
 					if diff.Len() > sources.ChunkSize+sources.PeekSize {
-						s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
+						s.gitChunk(ctx, diff.Diff, fileName, email, fullHash, when, remoteURL, reporter)
 						return
 					}
 
@@ -654,7 +669,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 						}
 						return reporter.ChunkOk(ctx, chunk)
 					}
-					if err := chunkData(diff); err != nil {
+					if err := chunkData(diff.Diff); err != nil {
 						return
 					}
 				}()
@@ -689,7 +704,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			logger.V(5).Info("scanning commit", "commit", fullHash)
 		}
 
-		diffQueue <- diff
+		timestampedDiff := &timestampedDiff{
+			Diff:      diff,
+			timestamp: time.Now(),
+		}
+		diffQueue <- timestampedDiff
 	}
 	close(diffQueue) // Close the diffQueue channel to signal the worker goroutines to finish processing.
 
@@ -814,7 +833,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	numWorkers := s.concurrency * 4
 	workerPool := make(chan struct{}, numWorkers)
-	diffQueue := make(chan *gitparse.Diff, numWorkers)
+	diffQueue := make(chan *timestampedDiff, numWorkers)
 
 	// Start the worker goroutines.
 	var wg sync.WaitGroup
@@ -824,8 +843,13 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			defer wg.Done()
 			for diff := range diffQueue {
 				func() {
-					workerPool <- struct{}{}        // Acquire a worker from the pool.
-					defer func() { <-workerPool }() // Release the worker back to the pool.
+					workerPool <- struct{}{} // Acquire a worker from the pool.
+					diffChan.RecordWaitingTime(time.Since(diff.timestamp))
+					start := time.Now() // Start the timer for processing the diff.
+					defer func(t time.Time) {
+						<-workerPool
+						diffChan.RecordConsumptionTime(time.Since(t)) // Record the time taken to process the diff.
+					}(start) // Release the worker back to the pool.
 
 					if !scanOptions.Filter.Pass(diff.PathB) {
 						return
@@ -894,7 +918,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 						}
 						return reporter.ChunkOk(ctx, chunk)
 					}
-					if err := chunkData(diff); err != nil {
+					if err := chunkData(diff.Diff); err != nil {
 						return
 					}
 				}()
@@ -936,7 +960,11 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			reachedBase = true
 		}
 
-		diffQueue <- diff
+		timestampedDiff := &timestampedDiff{
+			Diff:      diff,
+			timestamp: time.Now(),
+		}
+		diffQueue <- timestampedDiff
 	}
 	close(diffQueue) // Close the diffQueue channel to signal the worker goroutines to finish processing.
 
