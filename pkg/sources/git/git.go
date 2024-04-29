@@ -665,7 +665,12 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	// Populate the diffQueue with diffs from the diffChan channel.
 	// This allows for concurrent processing of diffs by distributing the workload to the worker goroutines.
 	// The worker goroutines will consume the diffs from the diffQueue and process them concurrently.
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
+		if diff == nil {
+			ctx.Logger().V(3).Info("finished scanning commits")
+			break
+		}
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth", "depth", depth)
 			break
@@ -806,7 +811,107 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	var depth int64
 	var lastCommitHash string
-	for diff := range diffChan {
+
+	numWorkers := s.concurrency * 4
+	workerPool := make(chan struct{}, numWorkers)
+	diffQueue := make(chan *gitparse.Diff, numWorkers)
+
+	// Start the worker goroutines.
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			for diff := range diffQueue {
+				func() {
+					workerPool <- struct{}{}        // Acquire a worker from the pool.
+					defer func() { <-workerPool }() // Release the worker back to the pool.
+
+					if !scanOptions.Filter.Pass(diff.PathB) {
+						return
+					}
+
+					fileName := diff.PathB
+					if fileName == "" {
+						return
+					}
+
+					email := diff.Commit.Author
+					when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+					fullHash := diff.Commit.Hash
+
+					// Handle binary files by reading the entire file rather than using the diff.
+					if diff.IsBinary {
+						commitHash := plumbing.NewHash(fullHash)
+						metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, 0)
+						chunkSkel := &sources.Chunk{
+							SourceName:     s.sourceName,
+							SourceID:       s.sourceID,
+							JobID:          s.jobID,
+							SourceType:     s.sourceType,
+							SourceMetadata: metadata,
+							Verify:         s.verify,
+						}
+						if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+							logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
+						}
+						return
+					}
+
+					chunkData := func(d *gitparse.Diff) error {
+						metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
+
+						reader, err := d.ReadCloser()
+						if err != nil {
+							ctx.Logger().Error(
+								err, "error creating reader for staged",
+								"filename", fileName,
+								"commit", fullHash,
+								"file", diff.PathB,
+							)
+							return nil
+						}
+						defer reader.Close()
+
+						data := make([]byte, d.Len())
+						if _, err := reader.Read(data); err != nil {
+							ctx.Logger().Error(
+								err, "error reading diff content for staged",
+								"filename", fileName,
+								"commit", fullHash,
+								"file", diff.PathB,
+							)
+							return nil
+						}
+						chunk := sources.Chunk{
+							SourceName:     s.sourceName,
+							SourceID:       s.sourceID,
+							JobID:          s.jobID,
+							SourceType:     s.sourceType,
+							SourceMetadata: metadata,
+							Data:           data,
+							Verify:         s.verify,
+						}
+						return reporter.ChunkOk(ctx, chunk)
+					}
+					if err := chunkData(diff); err != nil {
+						return
+					}
+				}()
+			}
+		}()
+	}
+
+	// Populate the diffQueue with diffs from the diffChan channel.
+	// This allows for concurrent processing of diffs by distributing the workload to the worker goroutines.
+	// The worker goroutines will consume the diffs from the diffQueue and process them concurrently.
+	for {
+		diff := diffChan.ConsumeDiff()
+		if diff == nil {
+			ctx.Logger().V(3).Info("finished scanning staged changes")
+			break
+		}
+
 		fullHash := diff.Commit.Hash
 		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
 		logger.V(2).Info("scanning staged changes from git")
@@ -831,76 +936,12 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			reachedBase = true
 		}
 
-		if !scanOptions.Filter.Pass(diff.PathB) {
-			continue
-		}
-
-		fileName := diff.PathB
-		if fileName == "" {
-			continue
-		}
-
-		email := diff.Commit.Author
-		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
-		// Handle binary files by reading the entire file rather than using the diff.
-		if diff.IsBinary {
-			commitHash := plumbing.NewHash(fullHash)
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, 0)
-			chunkSkel := &sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Verify:         s.verify,
-			}
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
-			}
-			continue
-		}
-
-		chunkData := func(d *gitparse.Diff) error {
-			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
-
-			reader, err := d.ReadCloser()
-			if err != nil {
-				ctx.Logger().Error(
-					err, "error creating reader for staged",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
-				return nil
-			}
-			defer reader.Close()
-
-			data := make([]byte, d.Len())
-			if _, err := reader.Read(data); err != nil {
-				ctx.Logger().Error(
-					err, "error reading diff content for staged",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
-				return nil
-			}
-			chunk := sources.Chunk{
-				SourceName:     s.sourceName,
-				SourceID:       s.sourceID,
-				JobID:          s.jobID,
-				SourceType:     s.sourceType,
-				SourceMetadata: metadata,
-				Data:           data,
-				Verify:         s.verify,
-			}
-			return reporter.ChunkOk(ctx, chunk)
-		}
-		if err := chunkData(diff); err != nil {
-			return err
-		}
+		diffQueue <- diff
 	}
+	close(diffQueue) // Close the diffQueue channel to signal the worker goroutines to finish processing.
+
+	wg.Wait() // Wait for all worker goroutines to finish
+
 	return nil
 }
 
