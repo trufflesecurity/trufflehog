@@ -206,7 +206,8 @@ func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) { return w.Read
 
 // ReadSeekCloser returns an io.ReadSeekCloser to read the written content.
 // If the content is stored in a file, it opens the file and returns a file reader.
-// If the content is stored in memory, it returns a custom reader that allows seeking and handles returning the buffer to the pool.
+// If the content is stored in memory, it returns a custom reader that allows seeking and handles returning
+// the buffer to the pool.
 // This method can only be used when the BufferedFileWriter is in read-only mode.
 func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	if w.state != readOnly {
