@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -297,7 +298,7 @@ func (c *Parser) Staged(ctx context.Context, source string) (*DiffChan, error) {
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
 func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (*DiffChan, error) {
-	diffChan := newDiffChan(32)
+	diffChan := newDiffChan(runtime.NumCPU())
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
