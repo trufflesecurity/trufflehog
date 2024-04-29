@@ -24,8 +24,8 @@ var (
 		Buckets:   prometheus.ExponentialBuckets(1, 10, 8),
 	})
 
-	diffWaitingTime = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:      "diff_waiting_time_microseconds",
+	diffWaitingDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:      "diff_waiting_duration_microseconds",
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Help:      "Waiting time of a diff in the queue.",
@@ -50,7 +50,7 @@ type metrics struct {
 //     It tracks the time taken to retrieve a diff from the DiffChan.
 //     This metric helps to monitor the performance and latency of diff consumption.
 //
-//   - diffWaitingTime: a Histogram metric that measures the waiting time of a diff in the queue.
+//   - diffWaitingDuration: a Histogram metric that measures the waiting time of a diff in the queue.
 //     It tracks the time a diff spends waiting in the queue before being processed.
 //     This metric helps to monitor the queuing time and identify any bottlenecks or delays in diff processing.
 //
@@ -64,7 +64,7 @@ func newDiffChanMetrics() *metrics {
 	return &metrics{
 		produceDiffDuration: produceDiffDuration,
 		consumeDiffDuration: consumeDiffDuration,
-		diffWaitingTime:     diffWaitingTime,
+		diffWaitingTime:     diffWaitingDuration,
 	}
 }
 
