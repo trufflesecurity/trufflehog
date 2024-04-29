@@ -307,13 +307,13 @@ func (jp *JobProgress) Ref() JobProgressRef {
 	}
 }
 
-// EnumerationErrors joins all errors encountered during initialization or
+// EnumerationError joins all errors encountered during initialization or
 // enumeration.
 func (m JobProgressMetrics) EnumerationError() error {
 	return errors.Join(m.Errors...)
 }
 
-// ChunkErrors joins all errors encountered during chunking.
+// ChunkError joins all errors encountered during chunking.
 func (m JobProgressMetrics) ChunkError() error {
 	var aggregate []error
 	for _, err := range m.Errors {
