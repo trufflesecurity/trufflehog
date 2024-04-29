@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/mholt/archiver/v4"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
@@ -61,62 +63,12 @@ const (
 type mimeType string
 
 const (
-	sevenZMime          mimeType = "application/x-7z-compressed"
-	bzip2Mime           mimeType = "application/x-bzip2"
-	rarCompressedMime   mimeType = "application/x-rar-compressed"
-	rarMime             mimeType = "application/x-rar"
-	tarMime             mimeType = "application/x-tar"
-	zipMime             mimeType = "application/zip"
-	gxzipMime           mimeType = "application/x-gzip"
-	gzipMime            mimeType = "application/gzip"
-	gunzipMime          mimeType = "application/x-gunzip"
-	gzippedMime         mimeType = "application/gzipped"
-	gzipCompressedMime  mimeType = "application/x-gzip-compressed"
-	gzipDocumentMime    mimeType = "gzip/document"
-	xzMime              mimeType = "application/x-xz"
-	msCabCompressedMime mimeType = "application/vnd.ms-cab-compressed"
-	rpmMime             mimeType = "application/x-rpm"
-	fitsMime            mimeType = "application/fits"
-	xarMime             mimeType = "application/x-xar"
-	warcMime            mimeType = "application/warc"
-	cpioMime            mimeType = "application/cpio"
-	unixArMime          mimeType = "application/x-unix-archive"
-	arMime              mimeType = "application/x-archive"
-	debMime             mimeType = "application/vnd.debian.binary-package"
-	lzipMime            mimeType = "application/lzip"
-	lzipXMime           mimeType = "application/x-lzip"
-	machoMime           mimeType = "application/x-mach-binary"
-	octetStreamMime     mimeType = "application/octet-stream"
+	rpmMime    mimeType = "application/x-rpm"
+	cpioMime   mimeType = "application/cpio"
+	unixArMime mimeType = "application/x-unix-archive"
+	arMime     mimeType = "application/x-archive"
+	debMime    mimeType = "application/vnd.debian.binary-package"
 )
-
-var knownArchiveMimeTypes = map[mimeType]bool{
-	sevenZMime:          true,
-	bzip2Mime:           true,
-	gzipMime:            true,
-	gxzipMime:           true,
-	rarCompressedMime:   true,
-	rarMime:             true,
-	tarMime:             true,
-	zipMime:             true,
-	gunzipMime:          true,
-	gzippedMime:         true,
-	gzipCompressedMime:  true,
-	gzipDocumentMime:    true,
-	xzMime:              true,
-	msCabCompressedMime: true,
-	rpmMime:             true,
-	fitsMime:            true,
-	xarMime:             true,
-	warcMime:            true,
-	cpioMime:            true,
-	unixArMime:          true,
-	arMime:              true,
-	debMime:             true,
-	lzipMime:            true,
-	lzipXMime:           true,
-	machoMime:           false,
-	octetStreamMime:     false,
-}
 
 // getHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type.
 // This method uses specialized handlers for specific archive types and RPM packages:
@@ -178,7 +130,21 @@ func HandleFile(
 
 	config := newFileHandlingConfig(options...)
 
-	isArchive := knownArchiveMimeTypes[mime]
+	isArchive := false
+	_, _, err = archiver.Identify("", rdr)
+	switch {
+	case err == nil: // Archive detected
+		isArchive = true
+	case errors.Is(err, archiver.ErrNoMatch):
+		// Not an archive, process as a regular file.
+	default: // Error identifying archive
+		return fmt.Errorf("error identifying archive: %w", err)
+	}
+
+	if _, err = rdr.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("error seeking to start of file: %w", err)
+	}
+
 	if config.skipArchives && isArchive {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
 		return nil
