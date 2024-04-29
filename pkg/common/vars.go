@@ -23,6 +23,7 @@ var (
 		"tga":  {},
 		"tif":  {},
 		"tiff": {},
+		"vsdx": {}, // Microsoft Visio drawing file
 
 		// audio
 		"fev":  {}, // video game audio
@@ -104,6 +105,7 @@ var (
 		"sym":    {}, // Symbolic link, Unix/Linux
 		"rlib":   {}, // Rust library
 		"pth":    {}, // Pytorch serialized model
+		"pbix":   {}, // Power BI report file
 	}
 )
 
