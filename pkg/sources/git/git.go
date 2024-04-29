@@ -555,7 +555,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	var depth int64
 	var lastCommitHash string
 
-	numWorkers := s.concurrency
+	numWorkers := s.concurrency * 4
 	workerPool := make(chan struct{}, numWorkers)
 	diffQueue := make(chan *gitparse.Diff, numWorkers)
 
