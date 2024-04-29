@@ -3,29 +3,39 @@ package gitparse
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 var (
 	produceDiffDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "produce_diff_duration_microseconds",
-		Help:    "Duration of producing a diff.",
-		Buckets: prometheus.ExponentialBuckets(1, 10, 8),
+		Name:      "produce_diff_duration_microseconds",
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Help:      "Duration of producing a diff.",
+		Buckets:   prometheus.ExponentialBuckets(1, 10, 8),
 	})
 
 	consumeDiffDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "consume_diff_duration_microseconds",
-		Help:    "Duration of consuming a diff.",
-		Buckets: prometheus.ExponentialBuckets(1, 10, 8),
+		Name:      "consume_diff_duration_microseconds",
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Help:      "Duration of consuming a diff.",
+		Buckets:   prometheus.ExponentialBuckets(1, 10, 8),
 	})
 
 	producedDiffsTotal = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "produced_diffs_total",
-		Help: "Total number of produced diffs.",
+		Name:      "produced_diffs_total",
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Help:      "Total number of produced diffs.",
 	})
 
 	consumedDiffsTotal = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "consumed_diffs_total",
-		Help: "Total number of consumed diffs.",
+		Name:      "consumed_diffs_total",
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Help:      "Total number of consumed diffs.",
 	})
 )
 
