@@ -1113,47 +1113,6 @@ func (s *Git) extractBinaryDiff(ctx context.Context, diff binaryDiff, reporter s
 	return handlers.HandleFile(ctx, bytes.NewReader(stdout), diff.chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
-// func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
-// 	if scanOptions == nil {
-// 		scanOptions = NewScanOptions()
-// 	}
-// 	if err := normalizeConfig(scanOptions, repo); err != nil {
-// 		return err
-// 	}
-// 	start := time.Now().Unix()
-//
-// 	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, reporter); err != nil {
-// 		return err
-// 	}
-// 	if !scanOptions.Bare {
-// 		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter); err != nil {
-// 			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
-// 		}
-// 	}
-//
-// 	logger := ctx.Logger()
-// 	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp.
-// 	// To make this duration logging useful, we need to log the remote as well.
-// 	// Other sources may have included this info to the context, in which case we don't need to add it again.
-// 	if ctx.Value("repo") == nil {
-// 		remotes, _ := repo.Remotes()
-// 		repoURL := "Could not get remote for repo"
-// 		if len(remotes) != 0 {
-// 			repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
-// 		}
-// 		logger = logger.WithValues("repo", repoURL)
-// 	}
-//
-// 	scanTime := time.Now().Unix() - start
-// 	logger.V(1).Info(
-// 		"scanning git repo complete",
-// 		"path", repoPath,
-// 		"time_seconds", scanTime,
-// 		"commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned),
-// 	)
-// 	return nil
-// }
-
 // normalizeConfig updates scanOptions with the resolved base and head commit hashes.
 // It's designed to handle scenarios where BaseHash and HeadHash in scanOptions might be branch names or
 // other non-hash references. This ensures that both the base and head commits are resolved to actual commit hashes.
