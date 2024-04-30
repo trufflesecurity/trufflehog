@@ -15,7 +15,6 @@ func TestBufferedFileReader(t *testing.T) {
 
 	bufferReadSeekCloser, err := NewBufferedFileReader(bytes.NewReader(data))
 	assert.NoError(t, err)
-	defer bufferReadSeekCloser.Close()
 
 	// Test Read.
 	buffer := make([]byte, len(data))
