@@ -34,14 +34,9 @@ func NewBufferedFileReader(r io.Reader) (*bufferedFileReader, error) {
 		return nil, err
 	}
 
-	reader, err := writer.ReadCloser()
+	rdr, err := writer.ReadSeekCloser()
 	if err != nil {
 		return nil, err
-	}
-
-	rdr, ok := reader.(io.ReadSeekCloser)
-	if !ok {
-		return nil, fmt.Errorf("reader does not implement io.ReadSeekCloser")
 	}
 
 	return &bufferedFileReader{writer, rdr}, nil
